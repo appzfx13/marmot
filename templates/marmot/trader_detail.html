@@ -1,0 +1,51 @@
+{% extends "marmot/index.html" %}
+
+{% block title %}Trader Detail: {{ trader.name }} - Bug Tracker{% endblock %}
+
+{% block nav_traders_active %}active{% endblock %}
+
+{% block dashboard_content %}
+<div class="row mb-4 align-items-center">
+    <div class="col d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center">
+            <span class="material-icons text-primary fs-2 me-2">account_circle</span>
+            <div>
+                <h2 class="text-white fw-bold mb-1">{{ trader.name }}</h2>
+                <p class="text-white-50 small mb-0">@{{ trader.username }} &bull; Registered {{ trader.created_at|date:"M d, Y" }}</p>
+            </div>
+        </div>
+        <div class="d-flex gap-2">
+            <a href="{% url 'admins:marmot_trader_edit' trader.pk %}" class="btn btn-sm btn-primary py-2 px-3 fw-bold">Edit Trader</a>
+            <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-sm btn-outline-light py-2 px-3 fw-bold">Back to List</a>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-6">
+        <div class="form-card p-4">
+            <h6 class="text-primary fw-bold text-uppercase mb-3 smaller">Contact & Account Information</h6>
+            <table class="table table-dark table-borderless mb-0">
+                <tr><td class="text-white-50">Username:</td><td>@{{ trader.username }}</td></tr>
+                <tr><td class="text-white-50">Email:</td><td>{{ trader.email }} {% if trader.is_email_verified %}<span class="badge bg-success ms-1">Verified</span>{% endif %}</td></tr>
+                <tr><td class="text-white-50">Phone:</td><td>{{ trader.phone_number }} {% if trader.is_mobile_verified %}<span class="badge bg-success ms-1">Verified</span>{% endif %}</td></tr>
+                <tr><td class="text-white-50">Role:</td><td>{{ trader.get_role_display }}</td></tr>
+                <tr><td class="text-white-50">Notes:</td><td>{{ trader.description|default:"None" }}</td></tr>
+            </table>
+        </div>
+    </div>
+
+    <div class="col-md-6">
+        <div class="form-card p-4">
+            <h6 class="text-primary fw-bold text-uppercase mb-3 smaller">Broker Credentials & Status</h6>
+            <table class="table table-dark table-borderless mb-0">
+                <tr><td class="text-white-50">Broker Platform:</td><td>{{ trader.broker|default:"Not set" }}</td></tr>
+                <tr><td class="text-white-50">API Key:</td><td><code>{{ trader.api_key|default:"Not set" }}</code></td></tr>
+                <tr><td class="text-white-50">App ID:</td><td><code>{{ trader.app_id|default:"Not set" }}</code></td></tr>
+                <tr><td class="text-white-50">P&L Status:</td><td>{{ trader.get_stats_display }} ({{ trader.pl_integer }})</td></tr>
+                <tr><td class="text-white-50">Trade Eligible:</td><td>{% if trader.trade_eligibility %}<span class="text-success">Yes</span>{% else %}<span class="text-danger">No</span>{% endif %}</td></tr>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

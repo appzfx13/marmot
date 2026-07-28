@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Sign In - Bug Tracker</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <style>
+        :root { 
+            /* Matching Dashboard Colors */
+            --dashboard-bg: radial-gradient(circle at top right, #0a102e 0%, #050505 100%);
+            --glass-card-bg: rgba(255, 255, 255, 0.05);
+            --glass-border: rgba(255, 255, 255, 0.1);
+            --accent-blue: #4e73df;
+        }
+
+        body {
+            font-family: 'Google Sans', sans-serif;
+            background: var(--dashboard-bg);
+            min-height: 100vh;
+            color: white;
+            overflow-x: hidden;
+            overflow-y: auto;
+        }
+
+        .login-wrapper {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 1.5rem 1rem;
+        }
+
+        .glass-card {
+            background: var(--glass-card-bg);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border-radius: 28px;
+            border: 1px solid var(--glass-border);
+            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+        }
+
+        /* Dashboard-style Pill Inputs */
+        .input-group {
+            background: rgba(0, 0, 0, 0.2);
+            border: 1px solid var(--glass-border);
+            border-radius: 50px !important;
+            padding: 2px 5px;
+            transition: all 0.3s ease;
+        }
+
+        .input-group:focus-within {
+            border-color: var(--accent-blue);
+            background: rgba(0, 0, 0, 0.4);
+            box-shadow: 0 0 0 4px rgba(78, 115, 223, 0.1);
+        }
+
+        .input-group-text {
+            background: transparent !important;
+            border: none !important;
+            color: rgba(255, 255, 255, 0.5) !important;
+        }
+
+        .form-control {
+            background: transparent !important;
+            border: none !important;
+            color: white !important;
+            box-shadow: none !important;
+            font-size: 0.95rem;
+        }
+
+        .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Premium Gradient Button */
+        .btn-tracker-premium {
+            padding: 14px 0;
+            font-size: 0.9rem;
+            background: linear-gradient(135deg, #3a61d0 0%, #6f42c1 100%);
+            border-radius: 50px;
+            transition: all 0.4s cubic-bezier(.25,.8,.25,1);
+            box-shadow: 0 8px 20px rgba(58, 97, 208, 0.3);
+            border: none;
+            letter-spacing: 1px;
+        }
+
+        .btn-tracker-premium:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 12px 25px rgba(78, 115, 223, 0.5);
+            filter: brightness(1.1);
+        }
+
+        .text-white-50 {
+            color: rgba(255, 255, 255, 0.5) !important;
+        }
+
+        /* Responsive typography and sizing refinements */
+        @media (max-width: 576px) {
+            .glass-card {
+                border-radius: 20px;
+            }
+            .brand-icon {
+                font-size: 2.5rem !important;
+            }
+            h2 {
+                font-size: 1.5rem;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-wrapper">
+        <div class="container">
+            <div class="row justify-content-center">
+                <!-- Smooth responsive widths for mobile, tablet, desktop, and large desktop screens -->
+                <div class="col-12 col-sm-10 col-md-8 col-lg-5 col-xl-4">
+                    <div class="glass-card p-4 p-sm-5">
+                        <div class="text-center mb-4 mb-sm-5">
+                            <div class="mb-3 d-inline-block">
+                                <span class="material-icons text-primary brand-icon" style="font-size: 3rem;">bug_report</span>
+                            </div>
+                            <h2 class="fw-bold text-white mb-2">Welcome Back</h2>
+                            <p class="text-white-50 small">Enter your credentials to access the Bug Tracker</p>
+                        </div>
+
+                        <form method="post" novalidate>
+                            {% csrf_token %}
+
+                            {% if form.non_field_errors %}
+                            <div class="alert alert-danger py-2 small bg-danger bg-opacity-25 border-danger text-white text-center rounded-4 mb-4">
+                                {% for error in form.non_field_errors %}
+                                    <div>{{ error }}</div>
+                                {% endfor %}
+                            </div>
+                            {% endif %}
+
+                            <div class="mb-4">
+                                <label class="form-label text-white-50 small ps-2 mb-2">Username</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <span class="material-icons" style="font-size: 1.2rem;">person_outline</span>
+                                    </span>
+                                    <input type="text"
+                                           name="username"
+                                           class="form-control"
+                                           placeholder="Username"
+                                           required>
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label class="form-label text-white-50 small ps-2 mb-2">Password</label>
+                                <div class="input-group">
+                                    <span class="input-group-text">
+                                        <span class="material-icons" style="font-size: 1.2rem;">lock_open</span>
+                                    </span>
+                                    <input type="password"
+                                        id="passwordField"
+                                        name="password"
+                                        class="form-control"
+                                        placeholder="••••••••"
+                                        required>
+                                    <span class="input-group-text" id="togglePassword" style="cursor: pointer;">
+                                        <span class="material-icons" style="font-size: 1.1rem;">visibility_off</span>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-tracker-premium text-white w-100 fw-bold d-flex justify-content-center align-items-center mt-3">
+                                <span class="material-icons me-2" style="font-size: 1.1rem;">login</span>
+                                <span>SIGN IN</span>
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="text-center mt-4">
+                        <small class="text-white-50">
+                            © 2026 Bug Tracker Dashboard. All rights reserved.
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function () {
+            const togglePassword = document.querySelector('#togglePassword');
+            const password = document.querySelector('#passwordField');
+            const icon = togglePassword.querySelector('.material-icons');
+
+            togglePassword.addEventListener('click', function () {
+                const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+                password.setAttribute('type', type);
+                icon.textContent = type === 'password' ? 'visibility_off' : 'visibility';
+            });
+        });
+    </script>
+</body>
+</html>

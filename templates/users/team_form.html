@@ -1,0 +1,112 @@
+{% extends "users/index.html" %}
+
+{% block title %}{% if form.instance.pk %}Edit Team{% else %}Create Team{% endif %} - Bug Tracker{% endblock %}
+
+{% block nav_teams_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+    }
+
+    /* Refined Theme-Consistent Form Card Container */
+    .form-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Premium Text Input & Textarea Styling */
+    .form-card input,
+    .form-card textarea {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        padding: 8px 12px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        width: 100%;
+    }
+
+    .form-card input:focus,
+    .form-card textarea:focus {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+        outline: none;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+{# Header Section #}
+<div class="row mb-4 align-items-center">
+    <div class="col d-flex align-items-center">
+        <span class="material-icons text-primary fs-2 me-2">group_add</span>
+        <div>
+            <h2 class="text-white fw-bold mb-1">
+                {% if form.instance.pk %}Edit Team{% else %}Create Team{% endif %}
+            </h2>
+            <p class="text-white-50 small mb-0">Define your team details and operational descriptions.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="form-card p-4 text-white">
+    {# Visual Theme Accent Line #}
+    <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
+
+    <form method="post" novalidate class="ms-2">
+        {% csrf_token %}
+
+        {# Team Name Field Row #}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.name.id_for_label }}" style="min-width: 140px;">
+                Team Name{% if form.name.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.name }}
+                {% for error in form.name.errors %}
+                    <div class="text-danger smaller mt-1">
+                        <span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Description Field Row #}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-start gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase pt-md-2" for="{{ form.description.id_for_label }}" style="min-width: 140px;">
+                Description{% if form.description.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.description }}
+                {% for error in form.description.errors %}
+                    <div class="text-danger smaller mt-1">
+                        <span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Control Action Buttons Footer #}
+        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top border-secondary border-opacity-10">
+            <a href="{% url 'users:team_list' %}" class="btn btn-sm btn-outline-light py-2 px-3 smaller fw-bold tracking-tighter">
+                CANCEL
+            </a>
+            <button type="submit" class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter">
+                SAVE TEAM
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% endblock %}

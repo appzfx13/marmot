@@ -1,0 +1,698 @@
+{% extends "users/index.html" %}
+
+{% block title %}{% if issue %}Edit Issue{% else %}New Issue{% endif %} | Bug Tracker{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+    }
+
+    /* Refined Theme-Consistent Form Card Container */
+    .form-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Section Subheaders */
+    .section-label {
+        color: #3b82f6;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 1.25rem;
+        display: block;
+    }
+
+    /* Premium Input Styling (Text, Select, and Textareas) */
+    .form-card input:not([type="checkbox"]):not([type="radio"]),
+    .form-card select,
+    .form-card textarea {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        padding: 8px 12px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        width: 100%;
+    }
+
+    .form-card input:not([type="checkbox"]):not([type="radio"]):focus,
+    .form-card select:focus,
+    .form-card textarea:focus {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+        outline: none;
+    }
+
+    /* Theme Matching for Dropdown Option Panels */
+    .form-card select option {
+        background-color: #0b0f19 !important; /* Matches your dashboard background canvas */
+        color: #ffffff !important;
+        padding: 8px;
+    }
+
+    /* Readonly Fields styling rules */
+    .form-card input[readonly] {
+        background: rgba(255, 255, 255, 0.02) !important;
+        border-color: rgba(255, 255, 255, 0.05) !important;
+        color: rgba(255, 255, 255, 0.4) !important;
+        cursor: not-allowed;
+    }
+
+    /* Handle specific dropdown rendering semantics */
+    .form-card select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 16px 12px;
+        appearance: none;
+        -webkit-appearance: none;
+    }
+
+    /* Uniform Label Sizing Properties across regular multi-column lines */
+    .form-card .horizontal-label {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0;
+    }
+
+    @media (min-width: 768px) {
+        .form-card .horizontal-label {
+            min-width: 100px;
+            max-width: 100px;
+        }
+        .form-card .horizontal-label-wide {
+            min-width: 140px;
+            max-width: 140px;
+        }
+    }
+
+    /* Custom Glass Dropdown Overrides for Custom Select Blocks */
+    .custom-glass-dropdown-menu {
+        background: #0b0f19 !important;
+        border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        border-radius: 8px !important;
+        box-shadow: 0 10px 25px rgba(0,0,0,0.5);
+        padding: 12px !important;
+        width: 100%;
+        min-width: 260px;
+    }
+
+    /* Custom Scrollable Matrix Box Design for Multi-Select Elements (Assignees, Co-Assignees, Tags) */
+    .custom-glass-multiselect-container {
+        background: rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        border-radius: 8px;
+        padding: 6px;
+    }
+    .multiselect-scroll-area {
+        max-height: 160px;
+        overflow-y: auto;
+        padding-right: 4px;
+    }
+    .multiselect-scroll-area::-webkit-scrollbar {
+        width: 4px;
+    }
+    .multiselect-scroll-area::-webkit-scrollbar-track {
+        background: transparent;
+    }
+    .multiselect-scroll-area::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 10px;
+    }
+
+    /* Tag Selector Matrix Refinements */
+    .react-tag-select-display {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.4rem;
+        padding: 10px;
+        border-radius: 8px;
+        background: rgba(0, 0, 0, 0.15);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+    }
+
+    .react-tag-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 6px 12px;
+        border-radius: 6px;
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.6);
+        font-size: 0.8rem;
+        cursor: pointer;
+        transition: all 0.15s ease;
+        width: 100%;
+        margin-bottom: 4px;
+    }
+    .react-tag-pill:hover {
+        background: rgba(255, 255, 255, 0.08);
+    }
+
+    .react-tag-pill input[type="checkbox"],
+    .react-tag-pill input[type="radio"] {
+        width: 14px;
+        height: 14px;
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.2) !important;
+        border-radius: 4px !important;
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        cursor: pointer;
+        position: relative;
+        margin-top: 0;
+    }
+
+    /* Checkbox & Radio States */
+    .react-tag-pill input[type="checkbox"]:checked,
+    .react-tag-pill input[type="radio"]:checked {
+        background-color: #3b82f6 !important;
+        border-color: #3b82f6 !important;
+        background-size: 100% 100% !important;
+    }
+    
+    .react-tag-pill input[type="checkbox"]:checked {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e") !important;
+    }
+    
+    .react-tag-pill input[type="radio"]:checked {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3ccircle cx='10' cy='10' r='5' fill='%23fff'/%3e%3c/svg%3e") !important;
+    }
+
+    /* Distinct Purple Branding Shift for Co-Assignees Checkboxes */
+    .react-tag-pill-purple input[type="checkbox"]:checked {
+        background-color: #a370f7 !important;
+        border-color: #a370f7 !important;
+    }
+
+    .react-tag-pill:has(input:checked) {
+        background: rgba(59, 130, 246, 0.15);
+        border-color: rgba(59, 130, 246, 0.4);
+        color: #60a5fa;
+    }
+    
+    .react-tag-pill-purple:has(input:checked) {
+        background: rgba(163, 112, 247, 0.15);
+        border-color: rgba(163, 112, 247, 0.4);
+        color: #c084fc;
+    }
+
+    /* File Attachment Area Adjustments */
+    .file-input-wrapper {
+        background: rgba(0, 0, 0, 0.15);
+        border: 1px dashed rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 8px;
+    }
+    .file-input-wrapper input[type="file"] {
+        font-size: 0.8rem;
+        color: rgba(255,255,255,0.6);
+    }
+
+    /* Hide standard select layouts underneath our custom UI blocks */
+    .hide-native-select select {
+        display: none !important;
+    }
+
+    /* Complete Dark Theme Blending Variables Overrides for CKEditor */
+    :root {
+        --ck-color-base-background: #0b0f19 !important;
+        --ck-color-base-border: rgba(255, 255, 255, 0.1) !important;
+        --ck-color-toolbar-background: rgba(255, 255, 255, 0.04) !important;
+        --ck-color-toolbar-border: rgba(255, 255, 255, 0.08) !important;
+        --ck-color-text: #ffffff !important;
+        --ck-color-button-default-hover-background: rgba(255, 255, 255, 0.08) !important;
+        --ck-color-button-default-active-background: rgba(59, 130, 246, 0.25) !important;
+        --ck-color-button-on-background: rgba(59, 130, 246, 0.2) !important;
+        --ck-color-button-on-hover-background: rgba(59, 130, 246, 0.3) !important;
+        --ck-color-dropdown-panel-background: #0b0f19 !important;
+        --ck-color-dropdown-panel-border: rgba(255, 255, 255, 0.15) !important;
+        --ck-color-list-background: #0b0f19 !important;
+        --ck-color-list-button-hover-background: rgba(255, 255, 255, 0.08) !important;
+    }
+
+    .ck-editor__editable_inline {
+        min-height: 200px;
+        background: rgba(255, 255, 255, 0.02) !important;
+        color: #ffffff !important;
+        border-bottom-left-radius: 8px !important;
+        border-bottom-right-radius: 8px !important;
+    }
+
+    .ck.ck-editor__top .ck-toolbar {
+        border-top-left-radius: 8px !important;
+        border-top-right-radius: 8px !important;
+    }
+
+    .ck.ck-focused {
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+    }
+
+    .ck.ck-button, .ck.ck-dropdown__button {
+        color: rgba(255, 255, 255, 0.7) !important;
+        cursor: pointer !important;
+    }
+
+    .ck.ck-button.ck-on, .ck.ck-button.ck-on:not(.ck-disabled):hover {
+        color: #60a5fa !important;
+    }
+
+    .ck.ck-list__item .ck-button {
+        color: #ffffff !important;
+    }
+
+    /* Inline Selected Tags Container Style */
+    .selected-inline-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 8px;
+        padding: 8px;
+        min-height: 42px;
+    }
+    .inline-tag-pill {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 2px 10px;
+        border-radius: 4px;
+        font-size: 0.75rem;
+        font-weight: 500;
+    }
+    .inline-tag-pill-blue {
+        background: rgba(59, 130, 246, 0.2);
+        border: 1px solid rgba(59, 130, 246, 0.4);
+        color: #60a5fa;
+    }
+    .inline-tag-pill-purple {
+        background: rgba(163, 112, 247, 0.2);
+        border: 1px solid rgba(163, 112, 247, 0.4);
+        color: #c084fc;
+    }
+    .inline-tag-remove {
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        font-weight: bold;
+        opacity: 0.7;
+        transition: opacity 0.15s ease;
+    }
+    .inline-tag-remove:hover {
+        opacity: 1;
+    }
+
+    /* Theme Matching Custom Dropdown Trigger Button */
+    .dropdown-select-trigger {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: rgba(255, 255, 255, 0.7) !important;
+        border-radius: 8px !important;
+        padding: 8px 12px;
+        font-size: 0.875rem;
+        width: 100%;
+        text-align: left;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+    }
+    .dropdown-select-trigger::after {
+        content: "";
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-size: 12px 10px;
+        width: 12px;
+        height: 10px;
+        display: inline-block;
+        border: none;
+    }
+</style>
+<script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
+<script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/translations/en.js"></script> 
+{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+{# Header Section #}
+<div class="row mb-4 align-items-center">
+    <div class="col d-flex align-items-center">
+        <span class="material-icons text-primary fs-2 me-2">bug_report</span>
+        <div>
+            <p class="smaller mb-0 text-white-50">
+                <a href="{% url 'issues:project_detail' project.pk %}" class="text-decoration-none text-primary fw-bold">
+                    {{ project.name }}
+                </a>
+                <span class="mx-1 opacity-50">&raquo;</span> {% if issue %}Edit{% else %}New{% endif %} Issue
+            </p>
+            <h2 class="text-white fw-bold mb-1">{% if issue %}Edit Issue{% else %}New Issue{% endif %}</h2>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<form method="post" enctype="multipart/form-data" novalidate id="issue-form">
+    {% csrf_token %}
+
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger py-2 px-3 small border-0 bg-danger bg-opacity-25 text-white mb-4 rounded-3 d-flex align-items-center gap-2">
+            <span class="material-icons fs-6">error_outline</span>
+            {{ form.non_field_errors }}
+        </div>
+    {% endif %}
+
+    <div class="row g-4">
+        {# LEFT REGION: Main Structural Form Fields #}
+        <div class="col-lg-8">
+            
+            {# Segment 1: General Information Matrix #}
+            <div class="form-card p-4 text-white mb-4">
+                <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
+                <div class="ms-2">
+                    <span class="section-label">General Information</span>
+                    
+                    <div class="row g-0 g-md-4">
+                        <div class="col-12 col-md-6 mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-2">
+                            <label class="form-label horizontal-label" for="{{ form.project.id_for_label }}">
+                                Project{% if form.project.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+                            </label>
+                            <div class="flex-grow-1 w-100">
+                                {{ form.project }}
+                                {% for error in form.project.errors %}<div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>{% endfor %}
+                            </div>
+                        </div>
+                        <div class="col-12 col-md-6 mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-2">
+                            <label class="form-label horizontal-label" for="{{ form.title.id_for_label }}">
+                                Title{% if form.title.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+                            </label>
+                            <div class="flex-grow-1 w-100">
+                                {{ form.title }}
+                                {% for error in form.title.errors %}<div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>{% endfor %}
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="row g-0 g-md-3 mt-1">
+                        <div class="col-6 col-md-3 mb-2">
+                            <label class="form-label text-white-50 smaller smaller fw-bold uppercase mb-1" for="{{ form.status.id_for_label }}">{{ form.status.label }}</label>
+                            {{ form.status }}
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <label class="form-label text-white-50 smaller smaller fw-bold uppercase mb-1" for="{{ form.priority.id_for_label }}">{{ form.priority.label }}</label>
+                            {{ form.priority }}
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <label class="form-label text-white-50 smaller smaller fw-bold uppercase mb-1" for="{{ form.environment.id_for_label }}">{{ form.environment.label }}</label>
+                            {{ form.environment }}
+                        </div>
+                        <div class="col-6 col-md-3 mb-2">
+                            <label class="form-label text-white-50 smaller smaller fw-bold uppercase mb-1" for="{{ form.issue_type.id_for_label }}">{{ form.issue_type.label }}</label>
+                            {{ form.issue_type }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# Segment 2: Details & Context Textareas #}
+            <div class="form-card p-4 text-white mb-4">
+                <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
+                <div class="ms-2">
+                    <span class="section-label">Details & Context</span>
+                    
+                    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-start gap-1 gap-md-3">
+                        <label class="form-label horizontal-label horizontal-label-wide pt-md-2" for="{{ form.description.id_for_label }}">{{ form.description.label }}</label>
+                        <div class="flex-grow-1 w-100">
+                            {{ form.description }}
+                            {% if form.description.help_text %}<div class="form-text text-white-50 smaller mt-1 opacity-75">{{ form.description.help_text }}</div>{% endif %}
+                        </div>
+                    </div>
+
+                    <div class="mb-2 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+                        <label class="form-label horizontal-label horizontal-label-wide" for="{{ form.drive_url.id_for_label }}">{{ form.drive_url.label }}</label>
+                        <div class="flex-grow-1 w-100">
+                            {{ form.drive_url }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# Segment 3: Collaboration Comments Blocks #}
+            <div class="form-card p-4 text-white mb-4">
+                <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
+                <div class="ms-2">
+                    <span class="section-label">Collaboration Notes</span>
+                    
+                    <div class="row g-0">
+                        <div class="col-12 mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-start gap-1 gap-md-3">
+                            <label class="form-label horizontal-label horizontal-label-wide pt-md-2" for="{{ form.remarks.id_for_label }}">{{ form.remarks.label }}</label>
+                            <div class="flex-grow-1 w-100">
+                                {{ form.remarks }}
+                            </div>
+                        </div>
+                        <div class="col-12 mb-2 d-flex flex-column flex-md-row align-items-start align-items-md-start gap-1 gap-md-3">
+                            <label class="form-label horizontal-label horizontal-label-wide pt-md-2" for="{{ form.qa_note.id_for_label }}">{{ form.qa_note.label }}</label>
+                            <div class="flex-grow-1 w-100">
+                                {{ form.qa_note }}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# Segment 4: Media Attachments Image File Upload Blocks #}
+            <div class="form-card p-4 text-white mb-4">
+                <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
+                <div class="ms-2">
+                    <span class="section-label">Attachments</span>
+                    <div class="row g-3">
+                        {% for field in form %}
+                            {% if "image" in field.name %}
+                            <div class="col-12 col-md-6">
+                                <label class="form-label text-white-50 smaller fw-bold uppercase mb-1">{{ field.label }}</label>
+                                {% if issue %}
+                                    {% if field.name == 'image_1' and issue.image_1 %}<img src="{{ issue.image_1.url }}" class="img-fluid rounded-3 mb-2 border border-white border-opacity-10">
+                                    {% elif field.name == 'image_2' and issue.image_2 %}<img src="{{ issue.image_2.url }}" class="img-fluid rounded-3 mb-2 border border-white border-opacity-10">
+                                    {% elif field.name == 'image_3' and issue.image_3 %}<img src="{{ issue.image_3.url }}" class="img-fluid rounded-3 mb-2 border border-white border-opacity-10">
+                                    {% elif field.name == 'image_4' and issue.image_4 %}<img src="{{ issue.image_4.url }}" class="img-fluid rounded-3 mb-2 border border-white border-opacity-10">
+                                    {% endif %}
+                                {% endif %}
+                                <div class="file-input-wrapper">
+                                    {{ field }}
+                                </div>
+                            </div>
+                            {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        {# RIGHT REGION: Meta Assignment Controls & Timestamps Sidebar #}
+        <div class="col-lg-4">
+            <div class="form-card p-4 text-white mb-4">
+                <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
+                <div class="ms-2">
+                    <span class="section-label">Assignments & Tags</span>
+                    
+                    {# Reporter Control Field Row #}
+                    <div class="mb-3">
+                        {% with field=form.reporter %}
+                            <label class="form-label text-white-50 smaller fw-bold uppercase mb-1">{{ field.label }}</label>
+                            <input type="text" class="form-control" value="{{ request.user.get_full_name|default:request.user.username }}" readonly>
+                            <input type="hidden" name="{{ field.name }}" value="{{ field.value|default:request.user.id }}">
+                        {% endwith %}
+                    </div>
+
+                    {# Assignee Control Field Row #}
+                    <div class="mb-3">
+                        {% with field=form.assignee %}
+                            <label class="form-label text-white-50 smaller fw-bold uppercase mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                        {% endwith %}
+                    </div>
+
+                    {# Co-Assignees Dropdown Component with Inner Search #}
+                    <div class="mb-3" id="co-assignees-search-container">
+                        {% with field=form.co_assignees %}
+                            <label class="form-label text-white-50 smaller fw-bold uppercase mb-1">Co-Assignees</label>
+                            <div class="hide-native-select">
+                                {{ field }}
+                                
+                                {# Inline Display Box for Selected Items #}
+                                <div class="selected-inline-container mb-2" id="co-assignees-selected-box"></div>
+                                
+                                {# Bootstrap Dropdown Wrapper Container #}
+                                <div class="dropdown">
+                                    <button class="btn dropdown-select-trigger" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                        Select Co-Assignees
+                                    </button>
+                                    <div class="dropdown-menu custom-glass-dropdown-menu">
+                                        {# Inner Search Input Field #}
+                                        <input type="text" class="form-control mb-2 py-1.5 fs-7 border-opacity-20" placeholder="Search co-assignees..." id="co-assignees-search-input">
+                                        
+                                        <div class="custom-glass-multiselect-container">
+                                            <div class="multiselect-scroll-area">
+                                                {% for opt in field.field.choices %}
+                                                    {% if opt.0 %}
+                                                        <label class="react-tag-pill react-tag-pill-purple matrix-option-row">
+                                                            <input type="checkbox" name="{{ field.name }}" value="{{ opt.0 }}"
+                                                                {% if opt.0|stringformat:"s" in field.value|stringformat:"s" or opt.0 in field.value %}checked{% endif %}>
+                                                            <span class="option-label-text">{{ opt.1 }}</span>
+                                                        </label>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            {% if field.help_text %}<div class="form-text text-white-50 smaller mt-1 opacity-75">{{ field.help_text }}</div>{% endif %}
+                        {% endwith %}
+                    </div>
+
+                    {# UPDATED: Related Issue Dropdown Search Selection Component (Single Select via Radio Elements) #}
+                    <div class="mb-3" id="related-issue-search-container">
+                        {% with field=form.related_issue %}
+                            <label class="form-label text-white-50 smaller fw-bold uppercase mb-1">Related Issue</label>
+                            <div class="hide-native-select">
+                                {{ field }}
+                                
+                                {# Inline Display Box for Selected Item #}
+                                <div class="selected-inline-container mb-2" id="related-issue-selected-box"></div>
+                                
+                                {# Bootstrap Dropdown Wrapper Container #}
+                                <div class="dropdown">
+                                    <button class="btn dropdown-select-trigger" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                        Select Related Issue
+                                    </button>
+                                    <div class="dropdown-menu custom-glass-dropdown-menu">
+                                        {# Inner Search Input Field #}
+                                        <input type="text" class="form-control mb-2 py-1.5 fs-7 border-opacity-20" placeholder="Search related issues..." id="related-issue-search-input">
+                                        
+                                        <div class="custom-glass-multiselect-container">
+                                            <div class="multiselect-scroll-area">
+                                                {# Explicit Empty Option Row to allow clearing selection #}
+                                                <label class="react-tag-pill matrix-option-row">
+                                                    <input type="radio" name="{{ field.name }}" value="" {% if not field.value %}checked{% endif %}>
+                                                    <span class="option-label-text text-white-50">None (Clear Selection)</span>
+                                                </label>
+                                                
+                                                {% for opt in field.field.choices %}
+                                                    {% if opt.0 %}
+                                                        <label class="react-tag-pill matrix-option-row">
+                                                            <input type="radio" name="{{ field.name }}" value="{{ opt.0 }}"
+                                                                {% if opt.0|stringformat:"s" == field.value|stringformat:"s" %}checked{% endif %}>
+                                                            <span class="option-label-text">{{ opt.1 }}</span>
+                                                        </label>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endwith %}
+                    </div>
+
+                    {# Multi-Select Tags Matrix Area Dropdown Component with Inner Search #}
+                    <div class="mb-3" id="tags-search-container">
+                        {% with field=form.tags %}
+                            <label class="form-label text-white-50 smaller fw-bold uppercase mb-1">Tags Matrix</label>
+                            <div class="hide-native-select">
+                                {{ field }}
+                                
+                                {# Inline Display Box for Selected Items #}
+                                <div class="selected-inline-container mb-2" id="tags-selected-box"></div>
+                                
+                                {# Bootstrap Dropdown Wrapper Container #}
+                                <div class="dropdown">
+                                    <button class="btn dropdown-select-trigger" type="button" data-bs-toggle="dropdown" data-bs-auto-close="outside" aria-expanded="false">
+                                        Select Tags
+                                    </button>
+                                    <div class="dropdown-menu custom-glass-dropdown-menu">
+                                        {# Inner Search Input Field #}
+                                        <input type="text" class="form-control mb-2 py-1.5 fs-7 border-opacity-20" placeholder="Search tags..." id="tags-search-input">
+                                        
+                                        <div class="custom-glass-multiselect-container">
+                                            <div class="multiselect-scroll-area">
+                                                {% for opt in field.field.choices %}
+                                                    {% if opt.0 %}
+                                                        <label class="react-tag-pill matrix-option-row">
+                                                            <input type="checkbox" name="{{ field.name }}" value="{{ opt.0 }}"
+                                                                {% if opt.0|stringformat:"s" in field.value|stringformat:"s" or opt.0 in field.value %}checked{% endif %}>
+                                                            <span class="option-label-text">{{ opt.1 }}</span>
+                                                        </label>
+                                                    {% endif %}
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endwith %}
+                    </div>
+
+                    {# Estimated Capacity Row #}
+                    <div class="mb-0">
+                        {% with field=form.time_estimate_hours %}
+                            <label class="form-label text-white-50 smaller fw-bold uppercase mb-1" for="{{ field.id_for_label }}">{{ field.label }}</label>
+                            {{ field }}
+                            {% if field.help_text %}<div class="form-text text-white-50 smaller mt-1 opacity-75">{{ field.help_text }}</div>{% endif %}
+                        {% endwith %}
+                    </div>
+
+                    {# History Tracking Blocks #}
+                    {% if issue %}
+                        <div class="mt-4 pt-3 border-top border-secondary border-opacity-10 opacity-75">
+                            <p class="mb-1 text-white-50 smaller d-flex align-items-center gap-1"><span class="material-icons" style="font-size: 13px;">calendar_today</span> Created: {{ issue.created_at|date:"M d, Y" }}</p>
+                            <p class="mb-0 text-white-50 smaller d-flex align-items-center gap-1"><span class="material-icons" style="font-size: 13px;">update</span> Updated: {{ issue.updated_at|date:"M d, Y" }}</p>
+                        </div>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Footer Control Buttons Matrix Container #}
+            <div class="d-flex flex-column gap-2">
+                <button type="submit" class="btn btn-sm btn-primary py-2.5 fw-bold tracking-tighter w-100">
+                    {% if issue %}SAVE CHANGES{% else %}CREATE ISSUE{% endif %}
+                </button>
+                <a href="{% if issue %}{% url 'issues:issue_detail' issue.pk %}{% else %}{% url 'issues:project_detail' project.pk %}{% endif %}"
+                   class="btn btn-sm btn-outline-light py-2.5 smaller fw-bold tracking-tighter w-100">
+                    CANCEL
+                </a>
+            </div>
+        </div>
+    </div>
+</form>
+
+<script>
+    const toolbarConfig = [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo' ];
+
+    if (document.querySelector('#{{ form.description.id_for_label }}')) {
+        ClassicEditor.create(document.querySelector('#{{ form.description.id_for_label }}'), { toolbar: toolbarConfig }).catch(error => console.error(error));
+    }
+    if (document.querySelector('#{{ form.remarks.id_for_label }}')) {
+        ClassicEditor.create(document.querySelector('#{{ form.remarks.id_for_label }}'), { toolbar: toolbarConfig }).catch(error => console.error(error));
+    }
+    if (document.querySelector('#{{ form.qa_note.id_for_label }}')) {
+        ClassicEditor.create(document.querySelector('#{{ form.qa_note.id_for_label }}'), { toolbar: toolbarConfig }).catch(error => console.error(error));
+    }
+</script>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,227 @@
+{% extends "marmot/index.html" %}
+
+{% block title %}{% if form.instance.pk %}Edit Trader: {{ form.instance.name }}{% else %}Create Trader{% endif %} - Bug Tracker{% endblock %}
+
+{% block nav_traders_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    body {
+        font-size: 0.875rem;
+    }
+
+    .form-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    .form-card input[type="text"],
+    .form-card input[type="email"],
+    .form-card select,
+    .form-card textarea {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        padding: 8px 12px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        width: 100%;
+    }
+
+    .form-card select option {
+        background-color: #1e293b;
+        color: #ffffff;
+    }
+
+    .form-card input:focus,
+    .form-card select:focus,
+    .form-card textarea:focus {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+        outline: none;
+    }
+
+    .form-check-input {
+        width: 1.1em;
+        height: 1.1em;
+        cursor: pointer;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+<div class="row mb-4 align-items-center">
+    <div class="col d-flex align-items-center justify-content-between">
+        <div class="d-flex align-items-center">
+            <span class="material-icons text-primary fs-2 me-2">manage_accounts</span>
+            <div>
+                <h2 class="text-white fw-bold mb-1">
+                    {% if form.instance.pk %}Edit Trader: {{ form.instance.name }}{% else %}Create New Trader{% endif %}
+                </h2>
+                <p class="text-white-50 small mb-0">Configure trader profile, authentication credentials, and freeze flags.</p>
+            </div>
+        </div>
+        <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-sm btn-outline-light py-2 px-3 smaller fw-bold">
+            Back to List
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="form-card p-4 text-white">
+    <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
+
+    <form method="post" novalidate class="ms-2">
+        {% csrf_token %}
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger mb-4">
+                {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        {# Section 1: Basic Identity Information #}
+        <h6 class="text-primary fw-bold text-uppercase mb-3 smaller tracking-wider">Identity & Account Details</h6>
+        
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.name.id_for_label }}" style="min-width: 160px;">
+                Full Name{% if form.name.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.name }}
+                {% for error in form.name.errors %}
+                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.username.id_for_label }}" style="min-width: 160px;">
+                Username{% if form.username.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.username }}
+                {% for error in form.username.errors %}
+                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.email.id_for_label }}" style="min-width: 160px;">
+                Email Address{% if form.email.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.email }}
+                {% for error in form.email.errors %}
+                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.phone_number.id_for_label }}" style="min-width: 160px;">
+                Phone Number{% if form.phone_number.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.phone_number }}
+                {% for error in form.phone_number.errors %}
+                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Verification Checkboxes #}
+        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" style="min-width: 160px;">Verifications</label>
+            <div class="flex-grow-1 w-100 d-flex gap-4">
+                <div class="form-check d-flex align-items-center gap-2">
+                    {{ form.is_email_verified }}
+                    <label class="form-check-label text-white-50 smaller fw-bold" for="{{ form.is_email_verified.id_for_label }}">Email Verified</label>
+                </div>
+                <div class="form-check d-flex align-items-center gap-2">
+                    {{ form.is_mobile_verified }}
+                    <label class="form-check-label text-white-50 smaller fw-bold" for="{{ form.is_mobile_verified.id_for_label }}">Mobile Verified</label>
+                </div>
+            </div>
+        </div>
+
+        <hr class="border-secondary opacity-25 my-4">
+
+        {# Section 2: Broker & API Credentials #}
+        <h6 class="text-primary fw-bold text-uppercase mb-3 smaller tracking-wider">Broker Integration</h6>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.broker.id_for_label }}" style="min-width: 160px;">Broker Platform</label>
+            <div class="flex-grow-1 w-100">{{ form.broker }}</div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.api_key.id_for_label }}" style="min-width: 160px;">API Key</label>
+            <div class="flex-grow-1 w-100">{{ form.api_key }}</div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.app_id.id_for_label }}" style="min-width: 160px;">App ID</label>
+            <div class="flex-grow-1 w-100">{{ form.app_id }}</div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-start gap-1 gap-md-3">
+            <label class="form-label text-white-50 smaller fw-bold uppercase pt-md-2" for="{{ form.description.id_for_label }}" style="min-width: 160px;">Description / Notes</label>
+            <div class="flex-grow-1 w-100">{{ form.description }}</div>
+        </div>
+
+        <hr class="border-secondary opacity-25 my-4">
+
+        {# Section 3: Trade Control Flags #}
+        <h6 class="text-primary fw-bold text-uppercase mb-3 smaller tracking-wider">Trade Control & Freeze Flags</h6>
+
+        <div class="row g-3">
+            <div class="col-6 col-md-3">
+                <div class="form-check d-flex align-items-center gap-2">
+                    {{ form.trade_eligibility }}
+                    <label class="form-check-label text-white-50 smaller fw-bold" for="{{ form.trade_eligibility.id_for_label }}">Trade Eligible</label>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="form-check d-flex align-items-center gap-2">
+                    {{ form.is_blocked }}
+                    <label class="form-check-label text-danger smaller fw-bold" for="{{ form.is_blocked.id_for_label }}">Is Blocked</label>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="form-check d-flex align-items-center gap-2">
+                    {{ form.primary_freeze }}
+                    <label class="form-check-label text-warning smaller fw-bold" for="{{ form.primary_freeze.id_for_label }}">Primary Freeze</label>
+                </div>
+            </div>
+            <div class="col-6 col-md-3">
+                <div class="form-check d-flex align-items-center gap-2">
+                    {{ form.final_freeze }}
+                    <label class="form-check-label text-warning smaller fw-bold" for="{{ form.final_freeze.id_for_label }}">Final Freeze</label>
+                </div>
+            </div>
+        </div>
+
+        {# Action Buttons #}
+        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top border-secondary border-opacity-10">
+            <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-sm btn-outline-light py-2 px-3 smaller fw-bold">
+                CANCEL
+            </a>
+            <button type="submit" class="btn btn-sm btn-primary py-2 px-3 fw-bold">
+                SAVE TRADER
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% endblock %}

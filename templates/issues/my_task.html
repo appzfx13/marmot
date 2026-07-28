@@ -1,0 +1,963 @@
+{% extends "users/index.html" %}
+
+{% block title %}Dashboard - {{ view_perspective }}{% endblock %}
+
+{% block nav_my_issues_active %}active{% endblock %}
+
+{% block extra_head %}
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
+
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+        overflow: hidden; /* Prevents body layout double-scrollbars */
+    }
+
+    /* Fixed Viewport Flex Engine Wrapper */
+    .dashboard-viewport-flex {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 40px); /* Locks view to window bounds precisely */
+        overflow: hidden;
+    }
+
+    /* Layout Split Logic: Fixed Upper Section Container */
+    .sticky-top-section {
+        flex-shrink: 0;
+        background: transparent; 
+        padding-bottom: 0.5rem;
+    }
+
+    /* Independent Custom Theme Hidden Scroll Area */
+    .scrollable-issues-region {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding-top: 0.5rem;
+        padding-bottom: 2.5rem;
+        
+        /* Disable visible browser scroll indicators */
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+    .scrollable-issues-region::-webkit-scrollbar {
+        display: none; /* Chrome, Safari and Opera */
+    }
+
+    /* Card Uniformity */
+    .issue-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .issue-card:hover { 
+        background: rgba(255, 255, 255, 0.07); 
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Fixed Width Badges */
+    .status-badge-fixed {
+        width: 160px; 
+        text-align: center;
+        padding: 4px 10px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        display: inline-block;
+    }
+
+    /* Metric Cards Styling */
+    .metric-box {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+        padding: 0.75rem 0.5rem;
+        text-align: center;
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+    }
+    .metric-box:hover {
+        transform: translateY(-3px);
+        background: rgba(255, 255, 255, 0.12) !important;
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+    .metric-box i { font-size: 18px; opacity: 0.8; }
+    .metric-box h3 { font-weight: 700; margin: 3px 0; font-size: 1.2rem; }
+    .metric-label { font-size: 0.6rem; color: rgba(255,255,255,0.5); font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    .issue-tag-pill {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        font-size: 0.7rem;
+        padding: 1px 8px;
+        border-radius: 4px;
+        color: #60a5fa;
+        transition: all 0.2s;
+    }
+    .issue-tag-pill:hover {
+        background: rgba(59, 130, 246, 0.2);
+        transform: translateY(-1px);
+    }
+
+    .Accordion-arrow-icon {
+        transition: transform 0.2s ease-in-out;
+    }
+    [aria-expanded="true"] .Accordion-arrow-icon {
+        transform: rotate(180deg);
+    }
+
+    /* Ultra-Modern Sleek Pagination UI Component */
+    .custom-pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .custom-pagination {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.03);
+        padding: 6px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin: 0;
+    }
+
+    .custom-page-item {
+        list-style: none;
+    }
+
+    .custom-page-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 34px;
+        height: 34px;
+        padding: 0 8px;
+        font-size: 0.825rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+        text-decoration: none;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        border: none;
+        background: transparent;
+    }
+
+    .custom-page-link:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+    }
+
+    .custom-page-item.active .custom-page-link {
+        background: #4e73df;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(78, 115, 223, 0.3);
+    }
+
+    .custom-page-item.disabled .custom-page-link {
+        color: rgba(255, 255, 255, 0.15);
+        background: transparent;
+        pointer-events: none;
+    }
+
+    .custom-page-nav-btn {
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .custom-page-nav-btn:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* --- FIXED: Deep Transparency Glass-Themed Dark Modal Engine --- */
+    .modal-glass-toast .modal-content {
+        background: rgba(18, 24, 36, 0.65) !important; 
+        backdrop-filter: blur(20px) saturate(220%) !important;
+        -webkit-backdrop-filter: blur(20px) saturate(220%) !important;
+        border: 1px solid rgba(255, 255, 255, 0.12) !important;
+        border-left: 5px solid #f6c23e !important; 
+        border-radius: 14px !important;
+        color: #ffffff !important;
+        box-shadow: 0 24px 64px -12px rgba(0, 0, 0, 0.85) !important;
+    }
+    
+    .modal-glass-toast .modal-header,
+    .modal-glass-toast .modal-footer,
+    .modal-glass-toast .modal-body {
+        background: transparent !important;
+        border: none !important;
+    }
+    
+    .modal-glass-toast .modal-header {
+        border-bottom: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding: 18px 22px;
+    }
+    .modal-glass-toast .modal-footer {
+        border-top: 1px solid rgba(255, 255, 255, 0.08) !important;
+        padding: 14px 22px;
+    }
+    .modal-glass-toast .modal-title {
+        font-weight: 700;
+        font-size: 0.95rem;
+        letter-spacing: 0.2px;
+    }
+    .modal-glass-toast-body-text {
+        font-size: 0.825rem;
+        color: rgba(255, 255, 255, 0.75);
+        line-height: 1.5;
+    }
+
+    .btn-theme-primary {
+        background-color: #4e73df !important;
+        border-color: #4e73df !important;
+        color: #ffffff !important;
+    }
+    .btn-theme-primary:hover {
+        background-color: #375ac2 !important;
+        border-color: #375ac2 !important;
+    }
+
+    /* --- Floating Glass Toast Engine CSS System --- */
+    #glass-toast-container {
+        position: fixed;
+        top: 24px;
+        right: 24px;
+        z-index: 1099;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+        width: 360px;
+        pointer-events: none;
+    }
+    .glass-toast-card {
+        pointer-events: auto;
+        background: rgba(18, 24, 36, 0.85);
+        backdrop-filter: blur(14px) saturate(190%);
+        -webkit-backdrop-filter: blur(14px) saturate(190%);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-left: 4px solid #4e73df; 
+        border-radius: 10px;
+        padding: 16px;
+        color: #ffffff;
+        box-shadow: 0 12px 24px -4px rgba(0, 0, 0, 0.6);
+        display: flex;
+        align-items: flex-start;
+        gap: 12px;
+        transform: translateX(420px);
+        transition: transform 0.35s cubic-bezier(0.175, 0.885, 0.32, 1.275), opacity 0.3s ease;
+        opacity: 0;
+    }
+    .glass-toast-card.show {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    .glass-toast-card.status_changed { border-left-color: #f6c23e; } 
+    .glass-toast-card.issue_assigned { border-left-color: #1cc88a; } 
+    .glass-toast-card.management_announcement { border-left-color: #a370f7; } 
+    .glass-toast-card.admin_announcement, .glass-toast-card.system_alert { border-left-color: #e74a3b; } 
+
+    .glass-toast-icon { font-size: 20px; margin-top: 2px; }
+    .glass-toast-body { flex: 1; }
+    .glass-toast-title { font-weight: 700; font-size: 0.875rem; margin-bottom: 2px; letter-spacing: 0.2px; }
+    .glass-toast-msg { font-size: 0.8rem; color: rgba(255, 255, 255, 0.65); line-height: 1.4; }
+    .glass-toast-close { background: none; border: none; color: rgba(255, 255, 255, 0.4); cursor: pointer; padding: 0; font-size: 16px; transition: color 0.2s; }
+    .glass-toast-close:hover { color: #ffffff; }
+
+    @media (min-width: 1400px) {
+        .row-cols-xxl-7 > * {
+            flex: 0 0 auto;
+            width: 14.28571429%;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div id="glass-toast-container"></div>
+
+<div class="modal fade modal-glass-toast" id="statusConfirmModal" {{ 'tabindex="-1"'|safe }} aria-labelledby="statusConfirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title d-flex align-items-center" id="statusConfirmModalLabel">
+                    <span class="material-icons text-warning me-2" style="font-size: 20px;">sync</span>Confirm Status Transformation
+                </h5>
+                <button type="button" class="glass-toast-close ms-auto" data-bs-dismiss="modal" aria-label="Close">
+                    <span class="material-icons">close</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-glass-toast-body-text mb-3">Are you sure you want to perform this system state transformation rule change?</p>
+                
+                <div class="p-3 rounded bg-black bg-opacity-40 border border-white border-opacity-5 small">
+                    <div class="mb-1">
+                        <span style="color: rgba(255,255,255,0.45)">Task:</span> 
+                        <span id="modalIssueIdentifier" class="fw-bold text-white ms-1"></span>
+                    </div>
+                    <div>
+                        <span style="color: rgba(255,255,255,0.45)">Status:</span> 
+                        <span class="badge bg-primary ms-1 text-uppercase" id="modalTargetLabel" style="font-size: 0.65rem; font-weight: 700; letter-spacing: 0.5px; border-radius: 4px;"></span>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-sm text-white-50 text-hover-white border-0 bg-transparent px-3" data-bs-dismiss="modal" style="font-size: 0.8rem;">Cancel</button>
+                <button type="button" class="btn btn-sm btn-primary px-3 fw-bold" id="executeStatusUpdateBtn" style="border-radius: 6px; font-size: 0.8rem; background-color: #4e73df; border: none;">
+                    Confirm & Apply
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="dashboard-viewport-flex">
+    {# --- FIXED PINNED SECTION --- #}
+    <div class="sticky-top-section">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="text-white fw-bold mb-0">{{ view_perspective }} Dashboard</h2>
+                <p class="text-white-50 small mb-0">Live status monitoring and task management.</p>
+            </div>
+            <div class="btn-group btn-group-sm bg-dark p-1 rounded-pill shadow-sm">
+                <a href="?date_filter=all&status={{ current_status }}" class="btn rounded-pill border-0 {% if current_date_filter == 'all' or not current_date_filter %}btn-primary text-white{% else %}text-white-50{% endif %}">All Time</a>
+                <a href="?date_filter=day&status={{ current_status }}" class="btn rounded-pill border-0 {% if current_date_filter == 'day' %}btn-primary text-white{% else %}text-white-50{% endif %}">Day</a>
+                <a href="?date_filter=week&status={{ current_status }}" class="btn rounded-pill border-0 {% if current_date_filter == 'week' %}btn-primary text-white{% else %}text-white-50{% endif %}">Week</a>
+                <a href="?date_filter=month&status={{ current_status }}" class="btn rounded-pill border-0 {% if current_date_filter == 'month' %}btn-primary text-white{% else %}text-white-50{% endif %}">Month</a>
+            </div>
+        </div>
+
+        {# Metric Grid Section #}
+        <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 row-cols-xxl-7 g-2 mb-3">
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-primary">analytics</i>
+                    <h3 class="text-white">{{ paginator.count|default:metrics.total }}</h3>
+                    <div class="metric-label">TOTAL</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-info">fiber_new</i>
+                    <h3 class="text-white">{{ metrics.open|default:0 }}</h3>
+                    <div class="metric-label">OPEN</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-warning">sync</i>
+                    <h3 class="text-white">{{ metrics.dev_in_progress|default:0 }}</h3>
+                    <div class="metric-label">DEV PROGRESS</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-success">fact_check</i>
+                    <h3 class="text-white">{{ metrics.pending_qa|default:0 }}</h3>
+                    <div class="metric-label">READY QA</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-warning" style="color: #fd7e14 !important;">flaky</i>
+                    <h3 class="text-white">{{ metrics.qa_in_progress|default:0 }}</h3>
+                    <div class="metric-label">QA PROGRESS</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-info" style="color: #bb86fc !important;">rate_review</i>
+                    <h3 class="text-white">{{ metrics.in_review|default:0 }}</h3>
+                    <div class="metric-label">IN REVIEW</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-secondary">pause_circle</i>
+                    <h3 class="text-white">{{ metrics.hold|default:0 }}</h3>
+                    <div class="metric-label">HOLD</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-warning" style="color: #ff758f !important;">gavel</i>
+                    <h3 class="text-white">{{ metrics.scope_review|default:0 }}</h3>
+                    <div class="metric-label">SCOPE REVIEW</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-danger" style="opacity: 0.7;">cancel</i>
+                    <h3 class="text-white">{{ metrics.rejected|default:0 }}</h3>
+                    <div class="metric-label">REJECTED</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-success" style="color: #03dac6 !important;">check_circle</i>
+                    <h3 class="text-white">{{ metrics.done|default:0 }}</h3>
+                    <div class="metric-label">DONE</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-muted" style="opacity: 0.6;">archive</i>
+                    <h3 class="text-white">{{ metrics.closed|default:0 }}</h3>
+                    <div class="metric-label">CLOSED</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-info" style="color: #ffb703 !important;">published_with_changes</i>
+                    <h3 class="text-white">{{ metrics.reopen|default:0 }}</h3>
+                    <div class="metric-label">REOPEN</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-purple" style="color: #a370f7;">group</i>
+                    <h3 class="text-white">{{ metrics.co_assigned|default:0 }}</h3>
+                    <div class="metric-label">CO-ASSIGNED</div>
+                </div>
+            </div>
+            <div class="col">
+                <div class="metric-box">
+                    <i class="material-icons text-danger">report_problem</i>
+                    <h3 class="text-white">{{ metrics.critical|default:0 }}</h3>
+                    <div class="metric-label">CRITICAL</div>
+                </div>
+            </div>
+        </div>
+
+        {# Filter Pills Section #}
+        <div class="d-flex gap-2 mb-2 overflow-auto pb-1 flex-wrap">
+            <a href="?status=&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if not current_status %}btn-light{% else %}btn-outline-secondary text-white{% endif %}">All Status</a>
+            <a href="?status=open&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'open' %}btn-info text-dark{% else %}btn-outline-info text-white{% endif %}">Open</a>
+            <a href="?status=dev_in_progress&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'dev_in_progress' %}btn-warning text-dark{% else %}btn-outline-warning text-white{% endif %}">Dev Progress</a>
+            <a href="?status=pending_qa&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'pending_qa' %}btn-success text-dark{% else %}btn-outline-success text-white{% endif %}">Pending QA</a>
+            <a href="?status=qa_in_progress&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'qa_in_progress' %}btn-warning text-dark{% else %}btn-outline-warning text-white{% endif %}">QA Progress</a>
+            <a href="?status=in_review&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'in_review' %}btn-primary text-white{% else %}btn-outline-primary text-white{% endif %}">In Review</a>
+            <a href="?status=hold&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'hold' %}btn-secondary text-white{% else %}btn-outline-secondary text-white{% endif %}">Hold</a>
+            <a href="?status=scope_review&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'scope_review' %}bg-danger text-white{% else %}btn-outline-danger text-white{% endif %}" style="{% if current_status == 'scope_review' %}background-color: #ff758f; border-color: #ff758f;{% endif %}">Scope Review</a>
+            <a href="?status=rejected&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'rejected' %}bg-danger text-white{% else %}btn-outline-danger text-white{% endif %}">Rejected</a>
+            <a href="?status=done&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'done' %}btn-success text-white{% else %}btn-outline-success text-white{% endif %}">Done</a>
+            <a href="?status=closed&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'closed' %}btn-light text-dark{% else %}btn-outline-light text-white{% endif %}">Closed</a>
+            <a href="?status=reopen&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'reopen' %}btn-warning text-dark{% else %}btn-outline-warning text-white{% endif %}">Reopen</a>
+            <a href="?status=co_assigned&date_filter={{ current_date_filter }}" class="btn btn-sm px-3 rounded-pill {% if current_status == 'co_assigned' %}btn-secondary text-white{% else %}btn-outline-light text-white{% endif %}" style="{% if current_status == 'co_assigned' %}background-color: #a370f7; border-color: #a370f7; color: #fff !important;{% endif %}">Co-Assigned</a>
+        </div>
+    </div>
+
+    {# --- SCROLLABLE DATA REGION --- #}
+    <div class="scrollable-issues-region mt-1">
+        {% if issues %}
+        <div class="row g-3">
+            {% for issue in issues %}
+            <div class="col-12" id="issue-card-container-{{ issue.pk }}">
+                <div class="issue-card p-3 text-white position-relative">
+                    <div class="position-absolute start-0 top-0 bottom-0 bg-{% if issue.status == 'done' %}success{% elif issue.priority == 'critical' %}danger{% else %}primary{% endif %}" style="width: 4px; opacity: 0.7;"></div>
+                    
+                    <div class="ms-2">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-2" 
+                            data-bs-toggle="collapse" 
+                            data-bs-target="#collapseIssue{{ issue.pk }}" 
+                            style="cursor: pointer;"
+                            role="button"
+                            aria-expanded="false" 
+                            aria-controls="collapseIssue{{ issue.pk }}">
+                            
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                                    <span class="text-primary smaller fw-bold uppercase tracking-wider">{{ issue.project.name }}</span>
+                                    <span class="text-white-50 small">/</span>
+                                    <span class="text-white-50 smaller" id="issue-tracking-tag-{{ issue.pk }}">
+                                        {% if issue.project.code %}{{ issue.project.code }}-{{ issue.pk }}{% else %}#{{ issue.pk }}{% endif %}
+                                    </span>
+                                    <span class="badge bg-primary-subtle text-primary smaller px-2 py-0 border border-primary border-opacity-25" style="font-size: 0.65rem;">
+                                        {{ issue.get_issue_type_display }}
+                                    </span>
+                                    <span class="badge bg-secondary smaller opacity-75 ms-1">{{ issue.get_priority_display }} Priority</span>
+                                </div>
+                                <h6 class="fw-bold mb-0 text-white" id="issue-title-heading-{{ issue.pk }}">
+                                    {{ issue.title }}
+                                </h6>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-3 align-self-stretch align-self-md-center justify-content-between justify-content-md-end">
+                                <span id="status-badge-{{ issue.pk }}" class="status-badge-fixed text-dark text-center {% if issue.status == 'open' %}bg-info{% elif issue.status == 'ready_for_qa' or issue.status == 'pending_qa' or issue.status == 'done' %}bg-success{% elif issue.status == 'dev_in_progress' or issue.status == 'qa_in_progress' %}bg-warning{% else %}bg-secondary text-white{% endif %}">
+                                    {{ issue.get_status_display }}
+                                </span>
+                                <span class="material-icons text-white-50 Accordion-arrow-icon" style="transition: transform 0.2s ease;">expand_more</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-2 d-flex flex-wrap gap-1">
+                            {% for tag in issue.tags.all %}
+                                <span class="issue-tag-pill">{{ tag.name }}</span>
+                            {% empty %}
+                                <span class="text-white-50 smaller italic opacity-50">No tags</span>
+                            {% endfor %}
+                        </div>
+
+                        <div class="d-flex flex-wrap align-items-center gap-y-1 smaller text-white-50 pt-1" style="column-gap: 1.25rem !important;">
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-primary" style="font-size: 0.95rem;">person</span>
+                                <span>Assignee: <strong class="text-white">{{ issue.assignee.get_short_name|default:issue.assignee.username|default:"Unassigned" }}</strong></span>
+                            </div>
+                            
+                            {% if issue.co_assignees.all %}
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-purple align-middle" style="font-size: 0.95rem; color: #a370f7;">group</span>
+                                <span class="me-1">Co-Assignees:</span>
+                                <div class="d-inline-flex flex-wrap gap-1 align-middle">
+                                    {% for user in issue.co_assignees.all %}
+                                        <span class="badge rounded-pill px-2 py-1" style="font-size: 0.65rem; color: #c084fc; background-color: rgba(163, 112, 247, 0.1); border: 1px solid rgba(163, 112, 247, 0.25);">
+                                            {{ user.get_short_name|default:user.username }}
+                                        </span>
+                                    {% endfor %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-info" style="font-size: 0.95rem;">campaign</span>
+                                <span>Reporter: <strong class="text-white">{{ issue.reporter.get_short_name|default:issue.reporter.username|default:"-" }}</strong></span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-warning" style="font-size: 0.95rem;">layers</span>
+                                <span>Env: <strong class="text-white">{{ issue.get_environment_display }}</strong></span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-success" style="font-size: 0.95rem;">schedule</span>
+                                <span>Updated: <strong class="text-white">{{ issue.updated_at|date:"M d, H:i" }}</strong></span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="collapse" id="collapseIssue{{ issue.pk }}">
+                        <div class="ms-2 mt-3 pt-3 border-top border-secondary border-opacity-25">
+                            <div class="row g-3 mb-4">
+                                <div class="col-12">
+                                    <div class="bg-dark bg-opacity-25 p-3 rounded border border-secondary border-opacity-10">
+                                        <span class="text-white-50 smaller fw-bold uppercase d-block mb-1">Description</span>
+                                        <p class="mb-0 smaller text-white-50 lh-base text-break">{% if issue.description %}{{ issue.description|safe }}{% else %}No description provided.{% endif %}</p>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <div class="d-flex flex-wrap justify-content-between align-items-center gap-3 border-top border-secondary border-opacity-10 pt-3">
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="smaller text-white-50 fw-bold uppercase tracking-wider nonce-label">Status:</span>
+                                    
+                                    <select class="form-select form-select-sm inline-status-selector bg-black text-white border-secondary border-opacity-50 smaller" 
+                                            style="width: 175px; border-radius: 6px;"
+                                            data-issue-id="{{ issue.pk }}"
+                                            data-update-url="{% url 'issues:issue_update_status_ajax' issue.pk %}"
+                                            data-initial-val="{{ issue.status }}">
+                                        
+                                        {% if status_choices %}
+                                            {% for value, label in status_choices %}
+                                                <option value="{{ value }}" {% if issue.status == value %}selected{% endif %}>{{ label }}</option>
+                                            {% endfor %}
+                                        {% else %}
+                                            <option value="open" {% if issue.status == 'open' %}selected{% endif %}>Open</option>
+                                            <option value="dev_in_progress" {% if issue.status == 'dev_in_progress' %}selected{% endif %}>Dev In Progress</option>
+                                            <option value="ready_for_qa" {% if issue.status == 'ready_for_qa' %}selected{% endif %}>Ready for QA</option>
+                                            <option value="qa_in_progress" {% if issue.status == 'qa_in_progress' %}selected{% endif %}>QA In Progress</option>
+                                            <option value="in_review" {% if issue.status == 'in_review' %}selected{% endif %}>In Review</option>
+                                            <option value="hold" {% if issue.status == 'hold' %}selected{% endif %}>Hold</option>
+                                            <option value="scope_review" {% if issue.status == 'scope_review' %}selected{% endif %}>Scope Review</option>
+                                            <option value="rejected" {% if issue.status == 'rejected' %}selected{% endif %}>Rejected</option>
+                                            <option value="done" {% if issue.status == 'done' %}selected{% endif %}>Done</option>
+                                            <option value="closed" {% if issue.status == 'closed' %}selected{% endif %}>Closed</option>
+                                            <option value="reopen" {% if issue.status == 'reopen' %}selected{% endif %}>Reopen</option>
+                                        {% endif %}
+                                    </select>
+                                </div>
+
+                                <div class="d-flex align-items-center">
+                                    <a href="{% url 'issues:issue_detail' issue.pk %}" class="btn btn-sm btn-primary py-1 px-3 smaller fw-bold tracking-tighter">VIEW DETAILS</a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+        {# Pagination system controls block #}
+        {% if is_paginated %}
+        <div class="custom-pagination-container">
+            <div class="text-white-50 small">
+                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} Issues
+            </div>
+            <nav aria-label="Dashboard pagination">
+                <ul class="custom-pagination">
+                    {% if page_obj.has_previous %}
+                        <li class="custom-page-item">
+                            <a class="custom-page-link custom-page-nav-btn" href="?page=1{% if current_filters %}&{{ current_filters }}{% endif %}" aria-label="First">
+                                <span class="material-icons" style="font-size: 16px;">keyboard_double_arrow_left</span>
+                            </a>
+                        </li>
+                        <li class="custom-page-item">
+                            <a class="custom-page-link custom-page-nav-btn" href="?page={{ page_obj.previous_page_number }}{% if current_filters %}&{{ current_filters }}{% endif %}" aria-label="Previous">
+                                <span class="material-icons" style="font-size: 16px;">chevron_left</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="custom-page-item disabled">
+                            <span class="custom-page-link custom-page-nav-btn">
+                                <span class="material-icons" style="font-size: 16px;">chevron_left</span>
+                            </span>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="custom-page-item active" aria-current="page">
+                                <span class="custom-page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="custom-page-item">
+                                <a class="custom-page-link" href="?page={{ num }}{% if current_filters %}&{{ current_filters }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="custom-page-item">
+                            <a class="custom-page-link custom-page-nav-btn" href="?page={{ page_obj.next_page_number }}{% if current_filters %}&{{ current_filters }}{% endif %}" aria-label="Next">
+                                <span class="material-icons" style="font-size: 16px;">chevron_right</span>
+                            </a>
+                        </li>
+                        <li class="custom-page-item">
+                            <a class="custom-page-link custom-page-nav-btn" href="?page={{ page_obj.paginator.num_pages }}{% if current_filters %}&{{ current_filters }}{% endif %}" aria-label="Last">
+                                <span class="material-icons" style="font-size: 16px;">keyboard_double_arrow_right</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="custom-page-item disabled">
+                            <span class="custom-page-link custom-page-nav-btn">
+                                <span class="material-icons" style="font-size: 16px;">chevron_right</span>
+                            </span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        {% else %}
+            <div class="row g-3 mt-1">
+                <div class="col-12">
+                    <div class="metric-box text-center py-5 text-white">
+                        <span class="material-icons fs-1 text-white-50 mb-2">search_off</span>
+                        <p class="text-white-50 mb-0">No active tasks assigned under this perspective view.</p>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+// Track unique notification IDs to ensure individual alerts only display once per session
+const manifestedToastTrackerIds = new Set();
+
+/**
+ * Triggers a realistic canvas confetti shockwave eruption from the bottom corners
+ */
+function triggerCelebrationConfetti() {
+    if (typeof confetti !== 'function') return;
+    
+    const duration = 2.5 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 28, spread: 360, ticks: 50, zIndex: 1150 }; 
+
+    function randomInRange(min, max) {
+        return Math.random() * (max - min) + min;
+    }
+
+    const interval = setInterval(function() {
+        const timeLeft = animationEnd - Date.now();
+
+        if (timeLeft <= 0) {
+            return clearInterval(interval);
+        }
+
+        const particleCount = 45 * (timeLeft / duration);
+        
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.1, 0.3), y: Math.random() - 0.2 } });
+        confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 } });
+    }, 250);
+}
+
+/**
+ * Global Dynamic Glass-Themed Toast Generator Engine 
+ */
+function showGlassToast(title, message, type = 'status_changed') {
+    const toastContainer = document.getElementById('glass-toast-container');
+    if (!toastContainer) return;
+
+    const toastCard = document.createElement('div');
+    const randomId = Math.floor(Math.random() * 100000);
+    toastCard.className = `glass-toast-card ${type}`;
+    toastCard.id = `glass-toast-${randomId}`;
+
+    let iconCode = 'notifications';
+    if (type === 'status_changed') iconCode = 'sync';
+    if (type === 'issue_assigned') iconCode = 'person_add';
+    if (type === 'management_announcement') iconCode = 'campaign';
+    if (type === 'admin_announcement' || type === 'system_alert') iconCode = 'report_problem';
+
+    const normalizedMsg = message.toLowerCase();
+
+    if (normalizedMsg.includes('done') || title.toLowerCase().includes('transformed')) {
+        iconCode = 'check_circle';
+    }
+
+    toastCard.innerHTML = `
+        <span class="material-icons glass-toast-icon">${iconCode}</span>
+        <div class="glass-toast-body">
+            <div class="glass-toast-title">${title}</div>
+            <div class="glass-toast-msg">${message}</div>
+        </div>
+        <button class="glass-toast-close" onclick="dismissGlassToast(${randomId})">
+            <span class="material-icons" style="font-size: 16px;">close</span>
+        </button>
+    `;
+
+    toastContainer.appendChild(toastCard);
+
+    setTimeout(() => toastCard.classList.add('show'), 40);
+
+    if (normalizedMsg.includes('done') || type === 'issue_assigned') {
+        triggerCelebrationConfetti();
+    }
+
+    setTimeout(() => dismissGlassToast(randomId), 6000);
+}
+
+/**
+ * Closes and removes active toast components smoothly
+ */
+function dismissGlassToast(uniqueId) {
+    const structuralTarget = document.getElementById(`glass-toast-${uniqueId}`);
+    if (structuralTarget) {
+        structuralTarget.classList.remove('show');
+        setTimeout(() => structuralTarget.remove(), 350);
+    }
+}
+
+/**
+ * Background Long-Polling AJAX Request System Loop
+ */
+function executeLiveNotificationPolling() {
+    fetch('/notifications/api/live/', {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' }
+    })
+    .then(res => {
+        if (!res.ok) throw new Error("API stream connection offline.");
+        return res.json();
+    })
+    .then(payload => {
+        const structuralNavbarBadge = document.getElementById('global-unread-badge') || document.querySelector('.notification-badge');
+        
+        if (structuralNavbarBadge) {
+            if (payload.unread_count > 0) {
+                structuralNavbarBadge.textContent = payload.unread_count;
+                structuralNavbarBadge.style.display = 'block';
+            } else {
+                structuralNavbarBadge.style.display = 'none';
+            }
+        }
+
+        if (payload.notifications && Array.isArray(payload.notifications)) {
+            payload.notifications.forEach(item => {
+                if (!item.is_read && !manifestedToastTrackerIds.has(item.id)) {
+                    manifestedToastTrackerIds.add(item.id);
+                    
+                    let trackingStyleClass = 'status_changed';
+                    if (item.type === 'ISSUE_ASSIGNED') trackingStyleClass = 'issue_assigned';
+                    
+                    showGlassToast(item.title, item.message, trackingStyleClass);
+                }
+            });
+        }
+    })
+    .catch(err => console.warn("Live context monitoring polling tick suspended:", err));
+}
+
+document.addEventListener('DOMContentLoaded', function () {
+    executeLiveNotificationPolling();
+    setInterval(executeLiveNotificationPolling, 15000);
+
+    let activeTransferContext = null;
+    const statusModalElement = document.getElementById('statusConfirmModal');
+    
+    // Safety check in case elements are missing dynamically
+    if (!statusModalElement || typeof bootstrap === 'undefined') return;
+    
+    const nativeModalInstance = new bootstrap.Modal(statusModalElement);
+    const confirmationSubmitTrigger = document.getElementById('executeStatusUpdateBtn');
+
+    document.body.addEventListener('change', function(event) {
+        if (event.target.classList.contains('inline-status-selector')) {
+            const selector = event.target;
+            const initialVal = selector.getAttribute('data-initial-val');
+            const tentativeVal = selector.value;
+
+            if (tentativeVal === initialVal) return;
+
+            const issueId = selector.getAttribute('data-issue-id');
+            const actionUrl = selector.getAttribute('data-update-url');
+            const selectedLabel = selector.options[selector.selectedIndex].text;
+            
+            const tagEl = document.getElementById(`issue-tracking-tag-${issueId}`);
+            const headingEl = document.getElementById(`issue-title-heading-${issueId}`);
+            const codeLabelText = tagEl ? tagEl.textContent.trim() : `#${issueId}`;
+            const titleText = headingEl ? headingEl.textContent.trim() : '';
+
+            activeTransferContext = {
+                issueId: issueId,
+                targetUrl: actionUrl,
+                statusValue: tentativeVal,
+                statusLabel: selectedLabel,
+                selectorElement: selector
+            };
+
+            document.getElementById('modalIssueIdentifier').textContent = `${codeLabelText} - ${titleText}`;
+            document.getElementById('modalTargetLabel').textContent = selectedLabel;
+
+            const modalContent = statusModalElement.querySelector('.modal-content');
+            if (modalContent) {
+                if (tentativeVal === 'done') {
+                    modalContent.style.setProperty('border-left-color', '#1cc88a', 'important');
+                } else if (['dev_in_progress', 'qa_in_progress', 'reopen'].includes(tentativeVal)) {
+                    modalContent.style.setProperty('border-left-color', '#f6c23e', 'important');
+                } else if (['open', 'in_review'].includes(tentativeVal)) {
+                    modalContent.style.setProperty('border-left-color', '#4e73df', 'important');
+                } else {
+                    modalContent.style.setProperty('border-left-color', '#e74a3b', 'important');
+                }
+            }
+
+            nativeModalInstance.show();
+        }
+    });
+
+    statusModalElement.addEventListener('hidden.bs.modal', function () {
+        if (activeTransferContext) {
+            const previousBaseVal = activeTransferContext.selectorElement.getAttribute('data-initial-val');
+            activeTransferContext.selectorElement.value = previousBaseVal;
+            activeTransferContext = null;
+        }
+    });
+
+    if (confirmationSubmitTrigger) {
+        confirmationSubmitTrigger.addEventListener('click', function() {
+            if (!activeTransferContext) return;
+
+            const ctx = activeTransferContext;
+            const csrftoken = getCookie('csrftoken');
+
+            confirmationSubmitTrigger.disabled = true;
+            confirmationSubmitTrigger.textContent = "Processing...";
+
+            if (ctx.statusValue === 'done') {
+                triggerCelebrationConfetti();
+            }
+
+            fetch(ctx.targetUrl, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest', 
+                    'X-CSRFToken': csrftoken
+                },
+                body: JSON.stringify({ 'status': ctx.statusValue })
+            })
+            .then(response => {
+                if (!response.ok) throw new Error('Bad network transaction processing operation.');
+                return response.json();
+            })
+            .then(data => {
+                const trackingSelector = ctx.selectorElement;
+                const trackingCodeLabel = document.getElementById(`issue-tracking-tag-${ctx.issueId}`)?.textContent.trim() || `#${ctx.issueId}`;
+                activeTransferContext = null; 
+                nativeModalInstance.hide();
+
+                if (data.success) {
+                    const localizedBadge = document.getElementById(`status-badge-${ctx.issueId}`);
+                    if (localizedBadge) {
+                        localizedBadge.textContent = data.new_status_display || ctx.statusLabel;
+                        if (data.new_status_class) {
+                            localizedBadge.className = "status-badge-fixed text-dark text-center " + data.new_status_class;
+                        }
+                    }
+                    
+                    trackingSelector.setAttribute('data-initial-val', ctx.statusValue);
+                    
+                    showGlassToast(
+                        'Status Transformed', 
+                        `Issue ${trackingCodeLabel} successfully updated to "${data.new_status_display || ctx.statusLabel}"!`, 
+                        ctx.statusValue === 'done' ? 'issue_assigned' : 'status_changed'
+                    );
+                    
+                    setTimeout(executeLiveNotificationPolling, 800);
+                } else {
+                    trackingSelector.value = trackingSelector.getAttribute('data-initial-val');
+                    showGlassToast('Update Rejected', data.error || 'Server rejected changes.', 'admin_announcement');
+                }
+            })
+            .catch(error => {
+                console.error('AJAX Layer Context Fault Tracking Logs:', error);
+                if (activeTransferContext) {
+                    activeTransferContext.selectorElement.value = activeTransferContext.selectorElement.getAttribute('data-initial-val');
+                    activeTransferContext = null;
+                }
+                nativeModalInstance.hide();
+                showGlassToast('Connection Error', 'Network failure or lifecycle expiration error.', 'system_alert');
+            })
+            .finally(() => {
+                confirmationSubmitTrigger.disabled = false;
+                confirmationSubmitTrigger.textContent = "Confirm & Apply";
+            });
+        });
+    }
+
+    function getCookie(name) {
+        let cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            const cookies = document.cookie.split(';');
+            for (let i = 0; i < cookies.length; i++) {
+                const cookie = cookies[i].trim();
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+});
+</script>
+{% endblock %}

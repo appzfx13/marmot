@@ -1,0 +1,119 @@
+{% extends "users/index.html" %}
+
+{% block title %}Teams - Bug Tracker{% endblock %}
+
+{% block nav_teams_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+    }
+
+    /* Unified Card Styles matching the Bug Tracker theme */
+    .team-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+    }
+    .team-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* Metric Empty State Container */
+    .metric-empty-box {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+    {% block page_header %}
+    {# Header Section #}
+    <div class="row mb-4 align-items-center">
+        <div class="col d-flex align-items-center">
+            <span class="material-icons text-primary fs-2 me-2">groups</span>
+            <div>
+                <h2 class="text-white fw-bold mb-1">Teams</h2>
+                <p class="text-white-50 small mb-0">Manage your project teams and collaborators.</p>
+            </div>
+        </div>
+        {% if request.user.is_authenticated and request.user.team_member and request.user.team_member.has_management_role or request.user.is_superuser %}
+            <div class="col-auto d-flex align-items-center">
+                <a href="{% url 'users:team_create' %}"
+                   class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-flex align-items-center">
+                    <span class="material-icons me-1 fs-6">add</span>
+                    ADD TEAM
+                </a>
+            </div>
+        {% endif %}
+    </div>
+    {% endblock %}
+
+    {% block content %}
+    <div class="row g-3">
+        {% for team in teams %}
+        <div class="col-12 col-md-6 col-lg-4 d-flex align-items-stretch">
+            <div class="team-card p-3 w-100 text-white">
+                
+                {# Card Body Content #}
+                <div class="mb-3">
+                    <div class="d-flex align-items-start gap-2 mb-2">
+                        <span class="material-icons text-info" style="font-size: 1.25rem;">group</span>
+                        <h5 class="fw-bold text-white mb-0">{{ team.name }}</h5>
+                    </div>
+                    
+                    <p class="text-white-50 smaller lh-base mb-3">{{ team.description|default:"No description provided."|truncatewords:15 }}</p>
+                    
+                    <div class="d-flex align-items-center gap-1 smaller text-white-50">
+                        <span class="material-icons opacity-50" style="font-size: 0.95rem;">calendar_today</span>
+                        <span>Created: <strong class="text-white">{{ team.created_at|date:"M d, Y" }}</strong></span>
+                    </div>
+                </div>
+
+                {# Card Action Control Buttons Footer #}
+                {% if request.user.is_authenticated and request.user.team_member and request.user.team_member.has_management_role or request.user.is_superuser %}
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary border-opacity-10">
+                    <a href="{% url 'users:team_edit' team.pk %}"
+                       class="btn btn-sm btn-outline-light py-1 px-2 smaller fw-bold d-inline-flex align-items-center gap-1">
+                        <span class="material-icons" style="font-size:14px;">edit</span>
+                        Edit
+                    </a>
+                    <a href="{% url 'users:team_delete' team.pk %}"
+                       class="btn btn-sm btn-outline-danger py-1 px-2 smaller fw-bold d-inline-flex align-items-center gap-1">
+                        <span class="material-icons" style="font-size:14px;">delete</span>
+                        Delete
+                    </a>
+                </div>
+                {% endif %}
+
+            </div>
+        </div>
+        {% empty %}
+        <div class="col-12">
+            <div class="metric-empty-box text-center py-5 text-white">
+                <span class="material-icons fs-1 text-white-50 mb-2">groups</span>
+                <h4 class="text-white-50 fw-bold mb-1">No teams found</h4>
+                <p class="text-white-50 smaller mb-3">Create your first team to start organizing your work.</p>
+                <a href="{% url 'users:team_create' %}"
+                   class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-inline-flex align-items-center">
+                    <span class="material-icons me-1 fs-6">add</span>
+                    ADD TEAM
+                </a>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endblock %}
+{% endblock %}

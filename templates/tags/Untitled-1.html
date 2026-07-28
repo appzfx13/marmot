@@ -1,0 +1,43 @@
+{% extends "users/index.html" %}
+
+{% block title %}Delete Tag - Tags{% endblock %}
+
+{% block nav_tags_active %}active{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+<div class="row mb-5">
+    <div class="col d-flex align-items-center">
+        <span class="material-icons text-white fs-1 me-2">label_off</span>
+        <div>
+            <h1 class="text-white fw-bold mb-1">Delete Tag</h1>
+            <p class="text-white-50 mb-0">This action cannot be undone.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="glass-card p-4">
+    <div class="alert alert-warning d-flex align-items-center mb-4">
+        <span class="material-icons me-2">warning</span>
+        <div>
+            Are you sure you want to delete the tag
+            <strong>{{ tag.name }}</strong>?
+        </div>
+    </div>
+
+    <form method="post">
+        {% csrf_token %}
+        <div class="d-flex justify-content-end">
+            <a href="{% url 'issues:tag_list' %}" class="btn btn-secondary me-2">
+                Cancel
+            </a>
+            <button type="submit" class="btn btn-danger">
+                Yes, delete
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% endblock %}

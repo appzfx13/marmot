@@ -1,0 +1,598 @@
+{% extends "users/index.html" %}
+{% load text_filters %}
+
+{% block title %}Issues | Bug Tracker{% endblock %}
+
+{% block nav_issues_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+        overflow: hidden; /* Prevents body layout double-scrollbars */
+    }
+
+    /* Fixed Viewport Flex Engine Wrapper */
+    .dashboard-viewport-flex {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 40px); /* Locks view to window bounds precisely */
+        overflow: hidden;
+    }
+
+    /* Layout Split Logic: Fixed Upper Section Container */
+    .sticky-top-section {
+        flex-shrink: 0;
+        background: transparent; 
+        padding-bottom: 0.5rem;
+    }
+
+    /* Independent Custom Theme Hidden Scroll Area */
+    .scrollable-issues-region {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding-top: 0.5rem;
+        padding-bottom: 2.5rem;
+        
+        /* Disable visible browser scroll indicators */
+        -ms-overflow-style: none;  /* IE and Edge */
+        scrollbar-width: none;  /* Firefox */
+    }
+    .scrollable-issues-region::-webkit-scrollbar {
+        display: none; /* Chrome, Safari and Opera */
+    }
+
+    /* Metric Cards Pattern for Stats */
+    .metric-card {
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px !important;
+        background: rgba(255, 255, 255, 0.05);
+    }
+    .metric-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.12) !important;
+        border-color: rgba(255, 255, 255, 0.3);
+    }
+
+    /* Refined Issue Cards */
+    .issue-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .issue-card:hover {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .filter-control {
+        background-color: rgba(0, 0, 0, 0.3) !important;
+        color: #ffffff !important;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 0.75rem;
+        height: 34px;
+    }
+
+    /* Theme Matching for Dropdown Option Panels */
+    .filter-control option {
+        background-color: #0b0f19 !important;
+        color: #ffffff !important;
+        padding: 8px;
+    }
+
+    .status-pill {
+        padding: 2px 10px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 600;
+        text-transform: uppercase;
+    }
+
+    .issue-tag-pill {
+        background: rgba(59, 130, 246, 0.1);
+        border: 1px solid rgba(59, 130, 246, 0.3);
+        font-size: 0.7rem;
+        padding: 1px 8px;
+        border-radius: 4px;
+        color: #60a5fa;
+        transition: all 0.2s;
+    }
+    .issue-tag-pill:hover {
+        background: rgba(59, 130, 246, 0.2);
+        transform: translateY(-1px);
+    }
+
+    .search-container-refined {
+        background: rgba(0, 0, 0, 0.3);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+    }
+    
+    /* FIX: Arrow Rotation Logic */
+    .Accordion-arrow-icon {
+        transition: transform 0.2s ease-in-out;
+        display: inline-block;
+    }
+    [data-bs-toggle="collapse"][aria-expanded="true"] .Accordion-arrow-icon {
+        transform: rotate(180deg);
+    }
+
+    /* Target inner rich-text container elements from CKEditor */
+    .rich-text-preview-container {
+        color: rgba(255, 255, 255, 0.75) !important;
+    }
+    .rich-text-preview-container table {
+        width: 100% !important;
+        margin: 0.75rem 0;
+        border-collapse: collapse;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .rich-text-preview-container th {
+        background-color: rgba(255, 255, 255, 0.06) !important;
+    }
+    .rich-text-preview-container th, .rich-text-preview-container td {
+        padding: 6px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        font-size: 0.8rem;
+    }
+    .rich-text-preview-container p:last-child {
+        margin-bottom: 0;
+    }
+
+    /* Ultra-Modern Sleek Pagination UI Component */
+    .custom-pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 2rem;
+        padding-top: 1.25rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .custom-pagination {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.03);
+        padding: 6px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin: 0;
+    }
+
+    .custom-page-item {
+        list-style: none;
+    }
+
+    .custom-page-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 34px;
+        height: 34px;
+        padding: 0 8px;
+        font-size: 0.825rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.6);
+        text-decoration: none;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+        border: none;
+        background: transparent;
+    }
+
+    .custom-page-link:hover {
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+    }
+
+    .custom-page-item.active .custom-page-link {
+        background: #4e73df;
+        color: #ffffff;
+        box-shadow: 0 4px 12px rgba(78, 115, 223, 0.3);
+    }
+
+    .custom-page-item.disabled .custom-page-link {
+        color: rgba(255, 255, 255, 0.15);
+        background: transparent;
+        pointer-events: none;
+    }
+
+    .custom-page-nav-btn {
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+        border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    
+    .custom-page-nav-btn:hover {
+        background: rgba(255, 255, 255, 0.12);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="dashboard-viewport-flex">
+
+    {# --- FIXED PINNED SECTION (HEADER + METRICS + MULTI-FILTER BAR) --- #}
+    <div class="sticky-top-section">
+        {# Header Section #}
+        <div class="row mb-3 align-items-center">
+            <div class="col">
+                <h2 class="text-white fw-bold mb-1">Issues</h2>
+                <p class="text-white-50 small mb-0">Browse and manage issues across all projects.</p>
+            </div>
+        </div>
+
+        {# 1. Metric Summary Cards #}
+        <div class="row g-3 mb-3">
+            <div class="col-6 col-lg-3">
+                <div class="metric-card p-3 text-center text-white">
+                    <span class="material-icons text-primary mb-1">assignment</span>
+                    <h3 class="fw-bold mb-0">{{ paginator.count|default:issues.count }}</h3>
+                    <p class="small mb-0 opacity-50 text-uppercase">Total Issues</p>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card p-3 text-center text-white">
+                    <span class="material-icons text-danger mb-1">priority_high</span>
+                    <h3 class="fw-bold mb-0">{{ metrics.high_priority|default:0 }}</h3>
+                    <p class="small mb-0 opacity-50 text-uppercase">Critical / High</p>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card p-3 text-center text-white">
+                    <span class="material-icons text-info mb-1">bolt</span>
+                    <h3 class="fw-bold mb-0">{{ metrics.open|default:0 }}</h3>
+                    <p class="small mb-0 opacity-50 text-uppercase">Open</p>
+                </div>
+            </div>
+            <div class="col-6 col-lg-3">
+                <div class="metric-card p-3 text-center text-white">
+                    <span class="material-icons text-warning mb-1">sync</span>
+                    <h3 class="fw-bold mb-0">{{ metrics.in_progress|default:0 }}</h3>
+                    <p class="small mb-0 opacity-50 text-uppercase">In Progress</p>
+                </div>
+            </div>
+        </div>
+
+        {# 2. Extensive Multi-Filter Section #}
+        <div class="metric-card p-3 mb-1">
+            <form method="get" class="row g-3 align-items-end">
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Search</label>
+                    <div class="search-container-refined px-2">
+                        <input type="text" name="q" value="{{ request.GET.q|default:'' }}" 
+                               class="form-control form-control-sm bg-transparent border-0 text-white shadow-none p-0" 
+                               placeholder="Title, project, code...">
+                        <span class="material-icons text-white-50 ms-1" style="font-size: 16px;">search</span>
+                    </div>
+                </div>
+
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Project</label>
+                    <select name="project" class="form-select form-select-sm filter-control">
+                        <option value="">All Projects</option>
+                        {% for project in projects %}
+                            <option value="{{ project.id }}" {% if request.GET.project == project.id|stringformat:"s" %}selected{% endif %}>{{ project.name }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Status</label>
+                    <select name="status" class="form-select form-select-sm filter-control">
+                        <option value="">All Statuses</option>
+                        {% for value, label in IssueStatusChoices.choices %}
+                            <option value="{{ value }}" {% if request.GET.status == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Priority</label>
+                    <select name="priority" class="form-select form-select-sm filter-control">
+                        <option value="">All Priorities</option>
+                        {% for value, label in IssuePriorityChoices.choices %}
+                            <option value="{{ value }}" {% if request.GET.priority == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Type</label>
+                    <select name="issue_type" class="form-select form-select-sm filter-control">
+                        <option value="">All Types</option>
+                        {% for value, label in IssueTypeChoices.choices %}
+                            <option value="{{ value }}" {% if request.GET.issue_type == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Environment</label>
+                    <select name="environment" class="form-select form-select-sm filter-control">
+                        <option value="">All Environments</option>
+                        {% for value, label in IssueEnvironmentChoices.choices %}
+                            <option value="{{ value }}" {% if request.GET.environment == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Assignee</label>
+                    <select name="assignee" class="form-select form-select-sm filter-control">
+                        <option value="">All</option>
+                        <option value="me" {% if request.GET.assignee == 'me' %}selected{% endif %}>Assigned to Me</option>
+                        {% for user in assignees %}
+                            <option value="{{ user.id }}" {% if request.GET.assignee == user.id|stringformat:"s" %}selected{% endif %}>{{ user.get_full_name|default:user.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Co-Assignee</label>
+                    <select name="co_assignee" class="form-select form-select-sm filter-control">
+                        <option value="">All</option>
+                        <option value="me" {% if request.GET.co_assignee == 'me' %}selected{% endif %}>Co-Assigned to Me</option>
+                        {% for user in assignees %}
+                            <option value="{{ user.id }}" {% if request.GET.co_assignee == user.id|stringformat:"s" %}selected{% endif %}>{{ user.get_full_name|default:user.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Reporter</label>
+                    <select name="reporter" class="form-select form-select-sm filter-control">
+                        <option value="">All</option>
+                        <option value="me" {% if request.GET.reporter == 'me' %}selected{% endif %}>Reported by Me</option>
+                        {% for user in reporters %}
+                            <option value="{{ user.id }}" {% if request.GET.reporter == user.id|stringformat:"s" %}selected{% endif %}>{{ user.get_full_name|default:user.username }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Related Issue</label>
+                    <select name="related_filter" class="form-select form-select-sm filter-control">
+                        <option value="">Any</option>
+                        <option value="has" {% if request.GET.related_filter == 'has' %}selected{% endif %}>Has Related</option>
+                        <option value="none" {% if request.GET.related_filter == 'none' %}selected{% endif %}>No Related</option>
+                    </select>
+                </div>
+
+                {# Unified Operation Buttons Column Block #}
+                <div class="col-xl-4 col-md-6 col-12 ms-auto d-flex align-items-center justify-content-end gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold w-100" style="height: 34px;">Apply Filters</button>
+                    <a href="{% url 'issues:issue_list' %}" class="btn btn-sm btn-outline-secondary text-white d-flex align-items-center justify-content-center px-3" style="height: 34px; width: 44px;">
+                        <span class="material-icons fs-6">refresh</span>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# --- SCROLLABLE CONTAINER FOR OPERATIONAL RECORDS GRID ARRAY --- #}
+    <div class="scrollable-issues-region mt-1">
+        {% if issues %}
+        <div class="row g-3">
+            {% for issue in issues %}
+                <div class="col-12">
+                    <div class="issue-card p-3 text-white position-relative">
+                        <div class="position-absolute start-0 top-0 bottom-0 bg-{% if issue.status == 'done' %}success{% elif issue.priority == 'critical' %}danger{% else %}primary{% endif %}" style="width: 4px; opacity: 0.7;"></div>
+                        
+                        <div class="ms-2">
+                            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-2" 
+                                 data-bs-toggle="collapse" 
+                                 data-bs-target="#collapseIssue{{ issue.pk }}" 
+                                 style="cursor: pointer;"
+                                 role="button"
+                                 aria-expanded="false" 
+                                 aria-controls="collapseIssue{{ issue.pk }}">
+                                
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                                        <span class="text-primary smaller fw-bold uppercase tracking-wider">{{ issue.project.name }}</span>
+                                        <span class="text-white-50 small">/</span>
+                                        <span class="text-white-50 smaller">
+                                            {% if issue.project.code %}{{ issue.project.code }}-{{ issue.pk }}{% else %}#{{ issue.pk }}{% endif %}
+                                        </span>
+                                        <span class="badge bg-primary-subtle text-primary smaller px-2 py-0 border border-primary border-opacity-25" style="font-size: 0.65rem;">
+                                            {{ issue.get_issue_type_display }}
+                                        </span>
+                                        <span class="badge bg-secondary smaller opacity-75 ms-1">{{ issue.get_priority_display }} Priority</span>
+                                        
+                                        {# Related Issue Indicator Indicator Tag #}
+                                        {% if issue.related_issue %}
+                                            <span class="badge bg-info bg-opacity-10 text-info smaller px-2 py-0 border border-info border-opacity-25 d-inline-flex align-items-center gap-1" style="font-size: 0.65rem;">
+                                                <span class="material-icons" style="font-size: 10px;">link</span>
+                                                Related
+                                            </span>
+                                        {% endif %}
+                                    </div>
+                                    <h6 class="fw-bold mb-0 text-white">
+                                        {{ issue.title }}
+                                    </h6>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-3 align-self-stretch align-self-md-center justify-content-between justify-content-md-end">
+                                    <span class="status-pill bg-{% if issue.status == 'open' %}info{% elif issue.status == 'done' %}success{% else %}warning{% endif %} text-dark text-center" style="width:160px; display: inline-block;">
+                                        {{ issue.get_status_display }}
+                                    </span>
+                                    <span class="material-icons text-white-50 Accordion-arrow-icon">expand_more</span>
+                                </div>
+                            </div>
+
+                            <div class="mb-2 d-flex flex-wrap gap-1">
+                                {% for tag in issue.tags.all %}
+                                    <span class="issue-tag-pill">{{ tag.name }}</span>
+                                {% empty %}
+                                    <span class="text-white-50 smaller italic opacity-50">No tags</span>
+                                {% endfor %}
+                            </div>
+
+                            <div class="d-flex flex-wrap align-items-center gap-y-1 smaller text-white-50 pt-1" style="column-gap: 1.25rem !important;">
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="material-icons text-primary" style="font-size: 0.95rem;">person</span>
+                                    <span>Assignee: 
+                                        <strong class="text-white">
+                                            {% if issue.assignee %}
+                                                {{ issue.assignee.get_short_name|default:issue.assignee.username }}
+                                            {% else %}
+                                                Unassigned
+                                            {% endif %}
+                                        </strong>
+                                    </span>
+                                </div>
+
+                                {# Dynamic Co-Assignees Rendering Meta Grid Block #}
+                                {% if issue.co_assignees.all %}
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="material-icons text-purple align-middle" style="font-size: 0.95rem; color: #a370f7;">group</span>
+                                    <span class="me-1">Co-Assignees:</span>
+                                    <div class="d-inline-flex flex-wrap gap-1 align-middle">
+                                        {% for user in issue.co_assignees.all %}
+                                            <span class="badge rounded-pill px-2 py-1" style="font-size: 0.65rem; color: #c084fc; background-color: rgba(163, 112, 247, 0.1); border: 1px solid rgba(163, 112, 247, 0.25);">
+                                                {{ user.get_short_name|default:user.username }}
+                                            </span>
+                                        {% endfor %}
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="material-icons text-info" style="font-size: 0.95rem;">campaign</span>
+                                    <span>Reporter: 
+                                        <strong class="text-white">
+                                            {% if issue.reporter %}
+                                                {{ issue.reporter.get_short_name|default:issue.reporter.username }}
+                                            {% else %}
+                                                -
+                                            {% endif %}
+                                        </strong>
+                                    </span>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="material-icons text-warning" style="font-size: 0.95rem;">layers</span>
+                                    <span>Env: <strong class="text-white">{{ issue.get_environment_display }}</strong></span>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="material-icons text-success" style="font-size: 0.95rem;">schedule</span>
+                                    <span>Updated: <strong class="text-white">{{ issue.updated_at|date:"M d, H:i" }}</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="collapse" id="collapseIssue{{ issue.pk }}">
+                            <div class="ms-2 mt-3 pt-3 border-top border-secondary border-opacity-25">
+                                <div class="row g-3 mb-4">
+                                    <div class="col-12">
+                                        <div class="bg-dark bg-opacity-25 p-3 rounded border border-secondary border-opacity-10">
+                                            <span class="text-white-50 smaller fw-bold uppercase d-block mb-2">Description</span>
+                                            
+                                            {# Cleaned up container styling block and added safe injection filter #}
+                                            <div class="rich-text-preview-container text-break">
+                                                {% if issue.description %}
+                                                    {{ issue.description|safe }}
+                                                {% else %}
+                                                    <p class="mb-0 smaller text-white-50 italic opacity-50">No description provided.</p>
+                                                {% endif %}
+                                            </div>
+
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="d-flex justify-content-end align-items-center border-top border-secondary border-opacity-10 pt-3">
+                                    <a href="{% url 'issues:issue_detail' issue.pk %}" class="btn btn-sm btn-primary py-1 px-3 smaller fw-bold tracking-tighter">VIEW DETAILS</a>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        {# 3. Modernized Right-Aligned Pagination Controls Component #}
+        {% if is_paginated %}
+        <div class="custom-pagination-container">
+            <div class="text-white-50 small">
+                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} Issues
+            </div>
+            <nav aria-label="Issue pagination">
+                <ul class="custom-pagination">
+                    {% if page_obj.has_previous %}
+                        <li class="custom-page-item">
+                            <a class="custom-page-link custom-page-nav-btn" href="?page=1{% if current_filters %}&{{ current_filters }}{% endif %}" aria-label="First">
+                                <span class="material-icons" style="font-size: 16px;">keyboard_double_arrow_left</span>
+                            </a>
+                        </li>
+                        <li class="custom-page-item">
+                            <a class="custom-page-link custom-page-nav-btn" href="?page={{ page_obj.previous_page_number }}{% if current_filters %}&{{ current_filters }}{% endif %}" aria-label="Previous">
+                                <span class="material-icons" style="font-size: 16px;">chevron_left</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="custom-page-item disabled">
+                            <span class="custom-page-link custom-page-nav-btn">
+                                <span class="material-icons" style="font-size: 16px;">chevron_left</span>
+                            </span>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="custom-page-item active" aria-current="page">
+                                <span class="custom-page-link">{{ num }}</span>
+                            </li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="custom-page-item">
+                                <a class="custom-page-link" href="?page={{ num }}{% if current_filters %}&{{ current_filters }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="custom-page-item">
+                            <a class="custom-page-link custom-page-nav-btn" href="?page={{ page_obj.next_page_number }}{% if current_filters %}&{{ current_filters }}{% endif %}" aria-label="Next">
+                                <span class="material-icons" style="font-size: 16px;">chevron_right</span>
+                            </a>
+                        </li>
+                        <li class="custom-page-item">
+                            <a class="custom-page-link custom-page-nav-btn" href="?page={{ page_obj.paginator.num_pages }}{% if current_filters %}&{{ current_filters }}{% endif %}" aria-label="Last">
+                                <span class="material-icons" style="font-size: 16px;">keyboard_double_arrow_right</span>
+                            </a>
+                        </li>
+                    {% else %}
+                        <li class="custom-page-item disabled">
+                            <span class="custom-page-link custom-page-nav-btn">
+                                <span class="material-icons" style="font-size: 16px;">chevron_right</span>
+                            </span>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        {% else %}
+            <div class="metric-card text-center py-5 text-white mt-3">
+                <span class="material-icons fs-1 text-white-50 mb-2">search_off</span>
+                <p class="text-white-50 mb-0">No issues found matching your current filters.</p>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

@@ -1,0 +1,259 @@
+{% extends "users/index.html" %}
+
+{% block title %}Team Members - Bug Tracker{% endblock %}
+
+{% block nav_teammembers_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+    }
+
+    /* Refined Search Containers */
+    .search-container-refined {
+        background: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 12px;
+    }
+    .search-container-refined .form-control {
+        font-size: 0.85rem;
+    }
+
+    /* Refined Theme-Consistent Member Cards */
+    .member-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+    }
+    .member-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* System Metric Empty Boxes */
+    .metric-empty-box {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+    }
+
+    /* Custom Navigation Filter Tabs Styling */
+    .team-tab {
+        border: none !important;
+        background-color: transparent !important;
+        color: rgba(255, 255, 255, 0.6);
+        border-radius: 8px; 
+        font-size: 0.8rem;
+        font-weight: 600;
+        padding: 6px 16px;
+        transition: all 0.2s ease;
+    }
+    .team-tab.active {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        border-bottom: 2px solid #3b82f6 !important; 
+    }
+    .team-tab:hover {
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        color: #ffffff !important;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+{# Header Section #}
+<div class="row mb-4 align-items-center">
+    <div class="col d-flex align-items-center">
+        <span class="material-icons text-primary fs-2 me-2">group</span>
+        <div>
+            <h2 class="text-white fw-bold mb-1">Team Members</h2>
+            <p class="text-white-50 small mb-0">Manage your developers and assignments.</p>
+        </div>
+    </div>
+    {% if request.user.is_authenticated and request.user.team_member and request.user.team_member.has_management_role or request.user.is_superuser %}
+        <div class="col-auto d-flex align-items-center">
+            <a href="{% url 'users:teammember_create' %}"
+               class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-flex align-items-center">
+                <span class="material-icons me-1 fs-6">add</span>
+                ADD MEMBER
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+{# Tabs + Filter Search Bar Module #}
+<div class="member-card p-3 mb-4">
+    <div class="d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        {# Tabs by team/department #}
+        <ul class="nav nav-tabs border-0 gap-1" id="teamTabs" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link team-tab active"
+                        data-team-filter="all"
+                        type="button">
+                    All Teams
+                </button>
+            </li>
+            {# unique team names #}
+            {% for member in members|dictsort:"team.name" %}
+                {% if member.team %}
+                    {% ifchanged member.team.name %}
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link team-tab"
+                                    data-team-filter="{{ member.team.name|escape }}"
+                                    type="button">
+                                {{ member.team.name }}
+                            </button>
+                        </li>
+                    {% endifchanged %}
+                {% endif %}
+            {% endfor %}
+        </ul>
+
+        {# Clean Interactive Search Input Container #}
+        <div class="ms-md-3 flex-grow-1" style="max-width: 320px;">
+            <div class="input-group input-group-sm search-container-refined p-1">
+                <span class="input-group-text bg-transparent border-0 text-white-50 px-2">
+                    <span class="material-icons style-sm fs-6">search</span>
+                </span>
+                <input id="memberSearchInput"
+                       type="text"
+                       class="form-control bg-transparent border-0 text-white shadow-none ps-1"
+                       placeholder="Name, team, employee ID...">
+            </div>
+        </div>
+    </div>
+</div>
+
+{# Dynamic Team Grid Components #}
+<div class="row g-3" id="teamMembersContainer">
+    {% for member in members %}
+    <div class="col-12 col-md-6 col-lg-4 team-member-card"
+         data-team="{{ member.team.name|default_if_none:'Unassigned' }}"
+         data-name="{{ member.user.get_full_name|default:member.user.username }}"
+         data-employee-id="{{ member.employee_id|default:'' }}">
+        <div class="member-card p-3 h-100 text-white">
+            
+            {# Card Main Body Contents #}
+            <div class="mb-3">
+                <div class="d-flex align-items-start gap-2 mb-2">
+                    <span class="material-icons text-primary" style="font-size: 1.25rem;">person</span>
+                    <div class="flex-grow-1">
+                        <h5 class="fw-bold text-white mb-0">
+                            {{ member.user.get_full_name|default:member.user.username }}
+                        </h5>
+                    </div>
+                </div>
+                
+                {# Single-line formatted layout attributes #}
+                <div class="d-flex flex-column gap-1 smaller text-white-50 mb-3 ps-4">
+                    <div>
+                        Team: 
+                        <strong class="text-white">
+                            {% if member.team %}{{ member.team.name }}{% else %}<span class="fst-italic opacity-50">Unassigned</span>{% endif %}
+                        </strong>
+                    </div>
+                    <div>Employee ID: <strong class="text-white">{{ member.employee_id|default:"-" }}</strong></div>
+                    <div class="d-flex align-items-center gap-1 mt-1">
+                        <span class="material-icons opacity-50" style="font-size: 0.9rem;">calendar_today</span>
+                        <span>Joined: <strong class="text-white">{{ member.date_joined_company|default:"Not Set" }}</strong></span>
+                    </div>
+                </div>
+
+                <div class="ps-4">
+                    <span class="badge {% if member.is_active_developer %}bg-success-subtle text-success border border-success border-opacity-25{% else %}bg-secondary-subtle text-white-50 border border-secondary border-opacity-25{% endif %}" style="font-size: 0.65rem;">
+                        {% if member.is_active_developer %}ACTIVE DEVELOPER{% else %}INACTIVE{% endif %}
+                    </span>
+                </div>
+            </div>
+
+            {# Card Administrative controls footer #}
+            {% if request.user.team_member and request.user.team_member.has_management_role %}
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary border-opacity-10 ms-4">
+                <a href="{% url 'users:teammember_edit' member.pk %}"
+                   class="btn btn-sm btn-outline-light py-1 px-2 smaller fw-bold d-inline-flex align-items-center gap-1">
+                    <span class="material-icons" style="font-size:14px;">edit</span>
+                    Edit
+                </a>
+                <a href="{% url 'users:teammember_delete' member.pk %}"
+                   class="btn btn-sm btn-outline-danger py-1 px-2 smaller fw-bold d-inline-flex align-items-center gap-1">
+                    <span class="material-icons" style="font-size:14px;">delete</span>
+                    Delete
+                </a>
+            </div>
+            {% endif %}
+
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="metric-empty-box text-center py-5 text-white">
+            <span class="material-icons fs-1 text-white-50 mb-2">group</span>
+            <h4 class="text-white-50 fw-bold mb-1">No team members found</h4>
+            <p class="text-white-50 smaller mb-3">Add members to start building your team ecosystem.</p>
+            <a href="{% url 'users:teammember_create' %}"
+               class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-inline-flex align-items-center">
+                <span class="material-icons me-1 fs-6">add</span>
+                ADD MEMBER
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+{# Premium Client-Side Search Processing Script #}
+<script>
+    (function () {
+        const tabs = document.querySelectorAll('#teamTabs .team-tab');
+        const searchInput = document.getElementById('memberSearchInput');
+        const cards = document.querySelectorAll('.team-member-card');
+
+        function normalize(value) {
+            return (value || '').toString().toLowerCase().trim();
+        }
+
+        function applyFilters() {
+            const activeTab = document.querySelector('#teamTabs .team-tab.active');
+            const teamFilter = activeTab ? activeTab.getAttribute('data-team-filter') : 'all';
+            const query = normalize(searchInput.value);
+
+            cards.forEach(function (card) {
+                const cardTeam = normalize(card.getAttribute('data-team'));
+                const name = normalize(card.getAttribute('data-name'));
+                const empId = normalize(card.getAttribute('data-employee-id'));
+
+                const matchTeam = (teamFilter === 'all') || (cardTeam === normalize(teamFilter));
+                const matchSearch = !query || name.includes(query) || cardTeam.includes(query) || empId.includes(query);
+
+                card.style.display = (matchTeam && matchSearch) ? '' : 'none';
+            });
+        }
+
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                tabs.forEach(function (t) { t.classList.remove('active'); });
+                tab.classList.add('active');
+                applyFilters();
+            });
+        });
+
+        if (searchInput) {
+            searchInput.addEventListener('input', applyFilters);
+        }
+    })();
+</script>
+
+{% endblock %}
+{% endblock %}

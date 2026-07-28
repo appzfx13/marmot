@@ -1,0 +1,433 @@
+{% extends "users/index.html" %}
+{% load text_filters %}
+
+{% block title %}{{ issue.title }} | Issue | Bug Tracker{% endblock %}
+
+{% block nav_projects_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Theme matching Dashboard/Login */
+    body {
+        font-size: 0.875rem;
+        background: radial-gradient(circle at top right, #0a102e 0%, #050505 100%);
+    }
+
+    .glass-card {
+        background: rgba(255, 255, 255, 0.05) !important;
+        backdrop-filter: blur(20px);
+        -webkit-backdrop-filter: blur(20px);
+        border-radius: 20px !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        box-shadow: 0 15px 35px rgba(0, 0, 0, 0.2);
+    }
+
+    /* Input & Control styling matching Login "Pill" theme */
+    .glass-card select,
+    .glass-card textarea,
+    .glass-card input {
+        background-color: rgba(0, 0, 0, 0.3) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: white !important;
+        border-radius: 12px !important;
+        font-size: 0.85rem;
+        padding: 10px 15px;
+    }
+
+    .glass-card select option {
+        background-color: #0a102e;
+        color: white;
+    }
+
+    .glass-card select:focus, .glass-card textarea:focus {
+        border-color: #4e73df !important;
+        box-shadow: 0 0 0 3px rgba(78, 115, 223, 0.2) !important;
+        outline: none;
+    }
+
+    /* Badge & Tag Styling */
+    .badge-premium {
+        padding: 5px 12px;
+        border-radius: 50px;
+        font-weight: 600;
+        text-transform: uppercase;
+        font-size: 0.7rem;
+        letter-spacing: 0.5px;
+    }
+
+    .issue-tag-pill {
+        background: rgba(59, 130, 246, 0.1) !important;
+        border: 1px solid rgba(59, 130, 246, 0.3) !important;
+        font-size: 0.7rem;
+        padding: 4px 12px;
+        border-radius: 50px;
+        color: #60a5fa;
+        transition: all 0.2s ease;
+    }
+    .issue-tag-pill:hover {
+        background: rgba(59, 130, 246, 0.2) !important;
+        transform: translateY(-1px);
+    }
+
+    /* Premium Purple Pill Overrides for Co-Assignees Layout Display */
+    .issue-tag-pill-purple {
+        background: rgba(163, 112, 247, 0.15) !important;
+        border: 1px solid rgba(163, 112, 247, 0.3) !important;
+        font-size: 0.7rem;
+        padding: 4px 12px;
+        border-radius: 50px;
+        color: #c084fc;
+        transition: all 0.2s ease;
+    }
+    .issue-tag-pill-purple:hover {
+        background: rgba(163, 112, 247, 0.25) !important;
+        transform: translateY(-1px);
+    }
+
+    .section-label {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.75rem;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        margin-bottom: 0.75rem;
+    }
+
+    .description-box {
+        color: white !important;
+        background: rgba(0, 0, 0, 0.25);
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        padding: 1.25rem;
+    }
+
+    /* Table styling rules inside rich text boxes */
+    .description-box table {
+        width: 100% !important;
+        margin: 1rem 0;
+        border-collapse: collapse;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+    .description-box th {
+        background-color: rgba(255, 255, 255, 0.07) !important;
+        font-weight: 600;
+    }
+    .description-box th, .description-box td {
+        padding: 8px 12px;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    }
+
+    .drive-link-badge {
+        background: linear-gradient(135deg, #3a61d0 0%, #4e73df 100%);
+        transition: transform 0.2s ease;
+        border: none;
+        border-radius: 10px;
+        padding: 8px 15px;
+    }
+    .drive-link-badge:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.1);
+    }
+
+    /* CKEditor Custom Theme adjustments to blend with dark mode UI */
+    .ck-editor__editable_inline {
+        background-color: rgba(0, 0, 0, 0.3) !important;
+        color: white !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
+        min-height: 150px;
+    }
+    .ck.ck-editor__main>.ck-editor__editable:not(.ck-focused) {
+        border-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    .ck.ck-toolbar {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
+    }
+    .ck.ck-button {
+        color: #fff !important;
+        cursor: pointer;
+    }
+    .ck.ck-button:hover, .ck.ck-button.ck-on {
+        background: rgba(255, 255, 255, 0.15) !important;
+    }
+    .ck.ck-dropdown__panel {
+        background: #0a102e !important;
+    }
+    .ck.ck-list__item, .ck.ck-button .ck-button__label {
+        color: white !important;
+    }
+    .ck.ck-list__item .ck-button:hover {
+        background: rgba(255, 255, 255, 0.1) !important;
+    }
+</style>
+<script src="https://cdn.ckeditor.com/ckeditor5/36.0.1/classic/ckeditor.js"></script>
+{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+<div class="row mb-5">
+    <div class="col d-flex align-items-center">
+        <div class="p-3 rounded-4 bg-primary bg-opacity-10 me-3 border border-primary border-opacity-25">
+            <span class="material-icons text-primary fs-1">bug_report</span>
+        </div>
+        <div>
+            <p class="small mb-1 text-white-50">
+                <a href="{% url 'issues:project_detail' issue.project.pk %}" class="text-decoration-none text-primary fw-bold">
+                    {{ issue.project.name }}
+                </a>
+                <span class="mx-2 opacity-50">&raquo;</span> Issue Details
+            </p>
+            <h1 class="text-white fw-bold mb-0 fs-3">{{ issue.title }}</h1>
+        </div>
+    </div>
+    {% if issue.can_edit %}
+    <div class="col-auto d-flex align-items-center">
+        <a href="{% url 'issues:issue_update' issue.pk %}"
+           class="btn btn-primary rounded-pill px-4 fw-bold d-flex align-items-center border-0 shadow-sm">
+            <span class="material-icons me-2 fs-5">edit</span>
+            Edit Issue
+        </a>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-4 mb-4">
+    <div class="col-md-8">
+        <div class="glass-card p-4 mb-4">
+            <div class="d-flex justify-content-between align-items-center mb-4 pb-3 border-bottom border-white border-opacity-10">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="badge badge-premium {% if issue.status == 'open' %}bg-info{% elif issue.status == 'done' %}bg-success{% else %}bg-warning{% endif %} text-dark">
+                        {{ issue.get_status_display }}
+                    </span>
+                    <span class="badge badge-premium bg-secondary">
+                        {{ issue.get_priority_display }}
+                    </span>
+                    <span class="badge badge-premium bg-primary">
+                        {{ issue.get_environment_display }}
+                    </span>
+                </div>
+                <div class="small text-white-50">
+                    <span class="material-icons fs-6 align-middle me-1">history</span>
+                    Updated {{ issue.updated_at|date:"M d, Y H:i" }}
+                </div>
+            </div>
+
+            {% if issue.description %}
+                <h2 class="section-label">Description</h2>
+                <div class="description-box mb-4">{{ issue.description|safe }}</div>
+            {% endif %}
+
+            {% if issue.drive_url %}
+            <h2 class="section-label">Drive Link</h2>
+            <div class="mb-4">
+                <a href="{{ issue.drive_url }}" target="_blank" rel="noopener noreferrer"
+                class="drive-link-badge text-white text-decoration-none d-inline-flex align-items-center">
+                    <span class="material-icons me-2 fs-5">link</span>
+                    <span class="text-truncate" style="max-width: 300px;">{{ issue.drive_url }}</span>
+                </a>
+            </div>
+            {% endif %}
+
+            {% if issue.image_1 or issue.image_2 or issue.image_3 or issue.image_4 %}
+            <h2 class="section-label">Attached Images</h2>
+            <div class="row g-2 mb-4">
+                {% if issue.image_1 %}
+                    <div class="col-6 col-md-3">
+                        <a href="{{ issue.image_1.url }}" target="_blank">
+                            <img src="{{ issue.image_1.url }}" alt="Screenshot" class="img-fluid rounded-3 border border-white border-opacity-10">
+                        </a>
+                    </div>
+                {% endif %}
+                {% if issue.image_2 %}
+                    <div class="col-6 col-md-3">
+                        <a href="{{ issue.image_2.url }}" target="_blank">
+                            <img src="{{ issue.image_2.url }}" alt="Screenshot" class="img-fluid rounded-3 border border-white border-opacity-10">
+                        </a>
+                    </div>
+                {% endif %}
+                {% if issue.image_3 %}
+                    <div class="col-6 col-md-3">
+                        <a href="{{ issue.image_3.url }}" target="_blank">
+                            <img src="{{ issue.image_3.url }}" alt="Screenshot" class="img-fluid rounded-3 border border-white border-opacity-10">
+                        </a>
+                    </div>
+                {% endif %}
+                {% if issue.image_4 %}
+                    <div class="col-6 col-md-3">
+                        <a href="{{ issue.image_4.url }}" target="_blank">
+                            <img src="{{ issue.image_4.url }}" alt="Screenshot" class="img-fluid rounded-3 border border-white border-opacity-10">
+                        </a>
+                    </div>
+                {% endif %}
+            </div>
+            {% endif %}
+
+            {% if issue.remarks %}
+                <h2 class="section-label">Remarks</h2>
+                <div class="description-box mb-4">{{ issue.remarks|safe }}</div>
+            {% endif %}
+
+            {% if issue.qa_note %}
+                <h2 class="section-label">QA Note</h2>
+                <div class="description-box mb-2" style="border-left: 4px solid #4e73df;">{{ issue.qa_note|safe }}</div>
+            {% endif %}
+        </div>
+
+        {# Discussion Section #}
+        <div class="glass-card p-4">
+            <h2 class="h6 text-white mb-4 fw-bold">Discussion / Activity</h2>
+
+            <form method="post" action="{% url 'issues:issue_add_remark' issue.pk %}" class="mb-5">
+                {% csrf_token %}
+                {{ remark_form.issue.as_hidden }}
+                <div class="row">
+                    <div class="col-12 mb-3">
+                        <label class="form-label text-white-50 small" for="{{ remark_form.remark.id_for_label }}">Remark</label>
+                        {{ remark_form.remark }}
+                    </div>
+                </div>
+
+                <button type="submit" class="btn btn-primary rounded-pill px-4 btn-sm fw-bold border-0">
+                    <span class="material-icons fs-6 me-1 align-middle">send</span> Add Discussion
+                </button>
+
+                <script>
+                    ClassicEditor
+                        .create(document.querySelector('#{{ remark_form.remark.id_for_label }}'), {
+                            toolbar: [ 'heading', '|', 'bold', 'italic', 'link', 'bulletedList', 'numberedList', 'blockQuote', 'insertTable', 'undo', 'redo' ]
+                        })
+                        .catch(error => {
+                            console.error(error);
+                        });
+                </script>
+            </form>
+
+            <h2 class="section-label mb-4">Issue History Log</h2>
+            {% if remark_logs %}
+                <div class="d-flex flex-column gap-3">
+                    {% for log in remark_logs %}
+                        <div class="p-3 rounded-4" style="background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.05);">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <div class="text-white fw-bold d-flex align-items-center">
+                                    <span class="material-icons fs-6 me-1 text-primary">account_circle</span>
+                                    {{ log.author.get_short_name|default:log.author.username|default:"System" }}
+                                </div>
+                                <div class="text-white-50 smaller">
+                                    {{ log.created_at|date:"M d, Y H:i" }}
+                                </div>
+                            </div>
+
+                            {% if log.remark %}
+                                <div class="text-white small mb-1 opacity-75">
+                                    <strong class="text-white-50">Remark:</strong> <div>{{ log.remark|safe }}</div>
+                                </div>
+                            {% endif %}
+                            {% if log.qa_note %}
+                                <div class="text-white small mb-0 opacity-75">
+                                    <strong class="text-info opacity-75">QA Note:</strong> <div>{{ log.qa_note|safe }}</div>
+                                </div>
+                            {% endif %}
+                        </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <div class="p-4 text-center rounded-4 border border-white border-opacity-10">
+                    <p class="text-white-50 small mb-0">No activity logs yet.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Right Sidebar #}
+    <div class="col-md-4">
+        <div class="glass-card p-4">
+            <h2 class="h6 text-white mb-4 fw-bold">Issue Details</h2>
+            <div class="d-flex flex-column gap-4">
+                <div>
+                    <label class="section-label">Assignee</label>
+                    <div class="text-white d-flex align-items-center">
+                        <span class="material-icons fs-5 me-2 text-primary">assignment_ind</span>
+                        {% if issue.assignee %}
+                            {{ issue.assignee.get_short_name|default:issue.assignee.username }}
+                        {% else %}
+                            Unassigned
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# Co-Assignees Sidebar Section Layout #}
+                <div>
+                    <label class="section-label">Co-Assignees</label>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        {% for user in issue.co_assignees.all %}
+                            <span class="issue-tag-pill-purple">{{ user.get_short_name|default:user.username }}</span>
+                        {% empty %}
+                            <span class="text-white-50 smaller">No co-assignees</span>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div>
+                    <label class="section-label">Reporter</label>
+                    <div class="text-white d-flex align-items-center">
+                        <span class="material-icons fs-5 me-2 text-info">record_voice_over</span>
+                        {% if issue.reporter %}
+                            {{ issue.reporter.get_short_name|default:issue.reporter.username }}
+                        {% else %}
+                            -
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# Related Issue Sidebar Link Block Matrix #}
+                <div>
+                    <label class="section-label">Related Issue</label>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        {% if issue.related_issue %}
+                            <a href="{% url 'issues:issue_detail' issue.related_issue.pk %}" class="issue-tag-pill text-decoration-none d-inline-flex align-items-center gap-1">
+                                <span class="material-icons" style="font-size: 12px;">link</span>
+                                {{ issue.related_issue.title }}
+                            </a>
+                        {% else %}
+                            <span class="text-white-50 smaller">None</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="section-label">Time Estimate</label>
+                    <div class="text-white d-flex align-items-center">
+                        <span class="material-icons fs-5 me-2 text-warning">timer</span>
+                        {{ issue.time_estimate_hours|default:"Not set" }}{% if issue.time_estimate_hours %} hrs{% endif %}
+                    </div>
+                </div>
+
+                <div>
+                    <label class="section-label">Tags</label>
+                    <div class="d-flex flex-wrap gap-1 mt-1">
+                        {% for tag in issue.tags.all %}
+                            <span class="issue-tag-pill">{{ tag.name }}</span>
+                        {% empty %}
+                            <span class="text-white-50 smaller">No tags</span>
+                        {% endfor %}
+                    </div>
+                </div>
+
+                <div class="pt-3 border-top border-white border-opacity-10 mt-2">
+                    <div class="d-flex justify-content-between mb-2">
+                        <span class="text-white-50 smaller">Created</span>
+                        <span class="text-white smaller">{{ issue.created_at|date:"M d, Y" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span class="text-white-50 smaller">Last Update</span>
+                        <span class="text-white smaller">{{ issue.updated_at|date:"M d, Y" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+{% endblock %}

@@ -1,0 +1,158 @@
+{% extends "users/index.html" %}
+
+{% block title %}Projects - Bug Tracker{% endblock %}
+
+{% block nav_projects_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+    }
+
+    /* Refined Theme-Consistent Project Cards */
+    .project-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+    }
+    .project-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+    
+    .hover-link {
+        transition: color 0.15s ease-in-out;
+    }
+    .hover-link:hover {
+        color: #60a5fa !important;
+    }
+
+    /* System Metric Empty Boxes */
+    .metric-empty-box {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+{# Header Section #}
+<div class="row mb-4 align-items-center">
+    <div class="col d-flex align-items-center">
+        <span class="material-icons text-primary fs-2 me-2">folder</span>
+        <div>
+            <h2 class="text-white fw-bold mb-1">Projects</h2>
+            <p class="text-white-50 small mb-0">Manage your projects and their issues.</p>
+        </div>
+    </div>
+    {% if request.user.is_authenticated and request.user.team_member and request.user.team_member.has_management_role or request.user.is_superuser %}
+        <div class="col-auto d-flex align-items-center">
+            <a href="{% url 'issues:project_create' %}"
+               class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-flex align-items-center">
+                <span class="material-icons me-1 fs-6">add</span>
+                NEW PROJECT
+            </a>
+        </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    {% for project in projects %}
+    <div class="col-12 col-md-6 col-lg-4 d-flex align-items-stretch">
+        <div class="project-card p-3 w-100 text-white">
+            
+            {# Card Main Body Contents #}
+            <div class="mb-3">
+                <div class="d-flex align-items-start gap-2 mb-2">
+                    <span class="material-icons text-info" style="font-size: 1.25rem;">folder</span>
+                    <div class="flex-grow-1">
+                        <h5 class="fw-bold text-white mb-0">
+                            <a href="{% url 'issues:project_detail' project.pk %}" class="text-decoration-none text-white hover-link">
+                                {{ project.name }}
+                            </a>
+                        </h5>
+                    </div>
+                </div>
+                
+                {# Metadata Items #}
+                <div class="d-flex flex-column gap-1 smaller text-white-50 mb-3 ps-4">
+                    {% if project.code %}
+                        <div>Code: <strong class="text-white">{{ project.code }}</strong></div>
+                    {% endif %}
+                    
+                    {% if project.description %}
+                        <p class="text-white-50 smaller lh-base my-1">{{ project.description|truncatewords:15 }}</p>
+                    {% endif %}
+
+                    <div class="d-flex align-items-center gap-1 mt-1">
+                        <span class="material-icons opacity-50" style="font-size: 0.95rem;">person</span>
+                        <span>Owner: 
+                            <strong class="text-white">
+                                {% if project.owner %}{{ project.owner.get_short_name|default:project.owner.username }}{% else %}<span class="fst-italic opacity-50">Unassigned</span>{% endif %}
+                            </strong>
+                        </span>
+                    </div>
+
+                    <div class="d-flex align-items-center gap-1 mt-1">
+                        <span class="material-icons opacity-50" style="font-size: 0.95rem;">bug_report</span>
+                        <span>Issues Tracked: <strong class="text-white">{{ project.issues.count }}</strong></span>
+                    </div>
+                </div>
+
+                <div class="ps-4">
+                    {% if project.is_active %}
+                        <span class="badge bg-success-subtle text-success border border-success border-opacity-25" style="font-size: 0.65rem;">ACTIVE</span>
+                    {% else %}
+                        <span class="badge bg-secondary-subtle text-white-50 border border-secondary border-opacity-25" style="font-size: 0.65rem;">INACTIVE</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Card Controls Footer Action Bar #}
+            <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary border-opacity-10">
+                <a href="{% url 'issues:project_detail' project.pk %}"
+                   class="btn btn-sm btn-outline-light py-1 px-2 smaller fw-bold d-inline-flex align-items-center gap-1">
+                    <span class="material-icons" style="font-size:14px;">visibility</span>
+                    View
+                </a>
+                {% if request.user.is_authenticated and request.user.team_member and request.user.team_member.has_management_role or request.user.is_superuser %}
+                <a href="{% url 'issues:project_update' project.pk %}"
+                   class="btn btn-sm btn-outline-light py-1 px-2 smaller fw-bold d-inline-flex align-items-center gap-1">
+                    <span class="material-icons" style="font-size:14px;">edit</span>
+                    Edit
+                </a>
+                {% endif %}
+            </div>
+
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12">
+        <div class="metric-empty-box text-center py-5 text-white">
+            <span class="material-icons fs-1 text-white-50 mb-2">folder</span>
+            <h4 class="text-white-50 fw-bold mb-1">No projects found</h4>
+            <p class="text-white-50 smaller mb-3">Create your first tracked directory to start routing issue payloads.</p>
+            <a href="{% url 'issues:project_create' %}"
+               class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-inline-flex align-items-center">
+                <span class="material-icons me-1 fs-6">add</span>
+                NEW PROJECT
+            </a>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+{% endblock %}
+{% endblock %}

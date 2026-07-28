@@ -1,0 +1,136 @@
+{% extends "users/index.html" %}
+
+{% block title %}Tags - Bug Tracker{% endblock %}
+
+{% block nav_tags_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+    }
+
+    /* Refined Theme-Consistent Tag Cards */
+    .tag-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        position: relative;
+        overflow: hidden;
+    }
+    .tag-card:hover {
+        transform: translateY(-5px);
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    /* System Metric Empty Boxes */
+    .metric-empty-box {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+{# Header Section #}
+<div class="row mb-4 align-items-center">
+    <div class="col d-flex align-items-center">
+        <span class="material-icons text-primary fs-2 me-2">label</span>
+        <div>
+            <h2 class="text-white fw-bold mb-1">Tags</h2>
+            <p class="text-white-50 small mb-0">Manage tags used to classify issues and projects.</p>
+        </div>
+    </div>
+    <div class="col-auto d-flex align-items-center">
+        <a href="{% url 'issues:tag_create' %}"
+            class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-flex align-items-center">
+            <span class="material-icons me-1 fs-6">add</span>
+            NEW TAG
+        </a>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="row g-3">
+    {% for tag in tags %}
+        <div class="col-12 col-md-6 col-lg-4 d-flex align-items-stretch">
+            <div class="tag-card p-3 w-100 text-white">
+                
+                {# Card Main Body Contents #}
+                <div class="mb-3">
+                    <div class="d-flex align-items-start gap-2 mb-2">
+                        <span class="material-icons text-info" style="font-size: 1.25rem;">label</span>
+                        <div class="flex-grow-1">
+                            <h5 class="fw-bold text-white mb-0">
+                                {{ tag.name }}
+                            </h5>
+                        </div>
+                    </div>
+                    
+                    {# Metadata Items #}
+                    <div class="d-flex flex-column gap-1 smaller text-white-50 mb-3 ps-4">
+                        {% if tag.slug %}
+                            <div>Slug: <strong class="text-white">{{ tag.slug }}</strong></div>
+                        {% endif %}
+                        
+                        <div class="d-flex align-items-center gap-1 mt-1">
+                            <span class="material-icons opacity-50" style="font-size: 0.95rem;">schedule</span>
+                            <span>Created: <strong class="text-white">{{ tag.created_at|date:"Y-m-d H:i" }}</strong></span>
+                        </div>
+                    </div>
+
+                    <div class="ps-4">
+                        {% if tag.is_active %}
+                            <span class="badge bg-success-subtle text-success border border-success border-opacity-25" style="font-size: 0.65rem;">ACTIVE</span>
+                        {% else %}
+                            <span class="badge bg-secondary-subtle text-white-50 border border-secondary border-opacity-25" style="font-size: 0.65rem;">INACTIVE</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                {# Card Controls Footer Action Bar #}
+                <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary border-opacity-10">
+                    <a href="{% url 'issues:tag_edit' tag.pk %}"
+                       class="btn btn-sm btn-outline-light py-1 px-2 smaller fw-bold d-inline-flex align-items-center gap-1">
+                        <span class="material-icons" style="font-size:14px;">edit</span>
+                        Edit
+                    </a>
+                    {% if request.user.is_authenticated and request.user.team_member and request.user.team_member.has_management_role or request.user.is_superuser %}
+                        <a href="{% url 'issues:tag_delete' tag.pk %}"
+                           class="btn btn-sm btn-outline-danger py-1 px-2 smaller fw-bold d-inline-flex align-items-center gap-1">
+                            <span class="material-icons" style="font-size:14px;">delete</span>
+                            Delete
+                        </a>
+                    {% endif %}
+                </div>
+
+            </div>
+        </div>
+    {% empty %}
+        <div class="col-12">
+            <div class="metric-empty-box text-center py-5 text-white">
+                <span class="material-icons fs-1 text-white-50 mb-2">label_off</span>
+                <h4 class="text-white-50 fw-bold mb-1">No tags found</h4>
+                <p class="text-white-50 smaller mb-3">Create your first classification token to start clustering incoming bug payloads.</p>
+                {% if request.user.is_authenticated and request.user.team_member and request.user.team_member.has_management_role or request.user.is_superuser %}
+                    <a href="{% url 'issues:tag_create' %}"
+                       class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-inline-flex align-items-center">
+                        <span class="material-icons me-1 fs-6">add</span>
+                        NEW TAG
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    {% endfor %}
+</div>
+{% endblock %}
+{% endblock %}

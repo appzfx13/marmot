@@ -1,0 +1,52 @@
+<div class="summary-table-container">
+    <table class="table summary-table">
+        <thead>
+            <tr>
+                <th class="ps-4">Assignee</th>
+                <th class="text-center" style="background: rgba(255, 193, 7, 0.05) !important;">Total Pending (All-time)</th>
+                <th class="text-center">Filtered Total</th>
+                <th class="text-center">High Prio</th>
+                {% for status, label in status_choices %}
+                    <th class="text-center">{{ label }}</th>
+                {% endfor %}
+            </tr>
+        </thead>
+        <tbody>
+            {% for member in summary_data %}
+            <tr>
+                <td class="py-3 ps-4">
+                    <div class="d-flex align-items-center gap-2">
+                        <div class="rounded-circle bg-primary d-flex align-items-center justify-content-center text-white fw-bold" style="width: 28px; height: 28px; font-size: 0.8rem;">
+                            {{ member.full_display_name|slice:":1"|upper }}
+                        </div>
+                        <div class="d-flex flex-column">
+                            <span class="text-white fw-medium">{{ member.full_display_name }}</span>
+                            <small class="text-white-50" style="font-size: 0.7rem;">@{{ member.assignee__username }}</small>
+                        </div>
+                    </div>
+                </td>
+                <td class="text-center">
+                    <span class="count-badge badge-pending-total">{{ member.total_pending_all_time }}</span>
+                </td>
+                <td class="text-center">
+                    <span class="count-badge badge-total">{{ member.total }}</span>
+                </td>
+                <td class="text-center">
+                    <span class="count-badge badge-high {% if member.high_priority == 0 %}opacity-25{% endif %}">
+                        {{ member.high_priority }}
+                    </span>
+                </td>
+                {% for stat in member.status_counts_list %}
+                    <td class="text-center">
+                        <span class="count-badge badge-{{ stat.slug|default:'default-status' }} {% if stat.count == 0 %}opacity-25{% endif %}">
+                            {{ stat.count }}
+                        </span>
+                    </td>
+                {% endfor %}
+            </tr>
+            {% empty %}
+            <tr><td colspan="20" class="text-center py-5 text-white-50">No member data available in this category.</td></tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>

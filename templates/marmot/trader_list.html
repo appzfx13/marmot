@@ -1,0 +1,432 @@
+{% extends "marmot/index.html" %}
+{% load text_filters %}
+
+{% block title %}Traders | Bug Tracker{% endblock %}
+
+{% block nav_traders_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Fixed Viewport & Layout Engine */
+    body {
+        font-size: 0.875rem;
+        overflow: hidden;
+    }
+
+    .dashboard-viewport-flex {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 40px);
+        overflow: hidden;
+    }
+
+    .sticky-top-section {
+        flex-shrink: 0;
+        background: transparent; 
+        padding-bottom: 0.5rem;
+    }
+
+    /* Scrollable Container for List Items */
+    .scrollable-issues-region {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding-top: 0.5rem;
+        padding-bottom: 2.5rem;
+        -ms-overflow-style: none;
+        scrollbar-width: none;
+    }
+    .scrollable-issues-region::-webkit-scrollbar {
+        display: none;
+    }
+
+    /* Card System */
+    .metric-card {
+        transition: all 0.3s ease;
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px !important;
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .issue-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        transition: all 0.2s ease;
+        position: relative;
+        overflow: hidden;
+    }
+    .issue-card:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+
+    .filter-control {
+        background-color: rgba(0, 0, 0, 0.4) !important;
+        color: #ffffff !important;
+        border-radius: 8px;
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        font-size: 0.75rem;
+        height: 34px;
+    }
+    .filter-control option {
+        background-color: #0b0f19 !important;
+        color: #ffffff !important;
+    }
+
+    .search-container-refined {
+        background: rgba(0, 0, 0, 0.4);
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        border-radius: 8px;
+        height: 34px;
+        display: flex;
+        align-items: center;
+    }
+
+    /* Fixed Expanded Panel Layout */
+    .expanded-panel-box {
+        background: rgba(0, 0, 0, 0.25);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 10px;
+        padding: 0.75rem 1rem;
+        height: 100%;
+    }
+
+    .status-pill {
+        padding: 3px 12px;
+        border-radius: 20px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.5px;
+    }
+
+    .Accordion-arrow-icon {
+        transition: transform 0.2s ease-in-out;
+    }
+    [data-bs-toggle="collapse"][aria-expanded="true"] .Accordion-arrow-icon {
+        transform: rotate(180deg);
+    }
+
+    /* Modern Pagination Component */
+    .custom-pagination-container {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-top: 1.5rem;
+        padding-top: 1rem;
+        border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+
+    .custom-pagination {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(255, 255, 255, 0.03);
+        padding: 4px 6px;
+        border-radius: 12px;
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        margin: 0;
+    }
+
+    .custom-page-item { list-style: none; }
+    .custom-page-link {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-width: 32px;
+        height: 32px;
+        padding: 0 8px;
+        font-size: 0.8rem;
+        font-weight: 600;
+        color: rgba(255, 255, 255, 0.7);
+        text-decoration: none;
+        border-radius: 6px;
+        border: none;
+        background: transparent;
+    }
+
+    .custom-page-item.active .custom-page-link {
+        background: #4e73df;
+        color: #ffffff;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="dashboard-viewport-flex">
+
+    {# --- FIXED TOP HEADER + 4 FILTERS --- #}
+    <div class="sticky-top-section">
+        <div class="row mb-3 align-items-center">
+            <div class="col">
+                <h2 class="text-white fw-bold mb-1">Marmot Traders</h2>
+                <p class="text-white-50 small mb-0">Browse, manage, and configure Marmot trader accounts.</p>
+            </div>
+            <div class="col-auto">
+                <a href="{% url 'admins:marmot_trader_create' %}" class="btn btn-sm btn-primary fw-bold d-flex align-items-center gap-1" style="height: 34px;">
+                    <span class="material-icons fs-6">add</span> Create Trader
+                </a>
+            </div>
+        </div>
+
+        {# Filter Panel #}
+        <div class="metric-card p-3 mb-1">
+            <form method="get" class="row g-2 align-items-end">
+                {# 1. Search #}
+                <div class="col-xl-3 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Search</label>
+                    <div class="search-container-refined px-2">
+                        <input type="text" name="q" value="{{ request.GET.q|default:'' }}" 
+                               class="form-control form-control-sm bg-transparent border-0 text-white shadow-none p-0" 
+                               placeholder="Name, username, email...">
+                        <span class="material-icons text-white-50 ms-1" style="font-size: 16px;">search</span>
+                    </div>
+                </div>
+
+                {# 2. Broker #}
+                <div class="col-xl-3 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Broker</label>
+                    <select name="broker" class="form-select form-select-sm filter-control">
+                        <option value="">All Brokers</option>
+                        {% for value, label in BrokerChoices.choices %}
+                            <option value="{{ value }}" {% if request.GET.broker == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+
+                {# 3. Phone Number #}
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Phone Number</label>
+                    <div class="search-container-refined px-2">
+                        <input type="text" name="phone_number" value="{{ request.GET.phone_number|default:'' }}" 
+                               class="form-control form-control-sm bg-transparent border-0 text-white shadow-none p-0" 
+                               placeholder="Phone...">
+                        <span class="material-icons text-white-50 ms-1" style="font-size: 16px;">phone</span>
+                    </div>
+                </div>
+
+                {# 4. Trade Eligibility #}
+                <div class="col-xl-2 col-md-3 col-sm-6">
+                    <label class="text-white-50 small mb-1">Trade Eligibility</label>
+                    <select name="trade_eligibility" class="form-select form-select-sm filter-control">
+                        <option value="">All Statuses</option>
+                        <option value="true" {% if request.GET.trade_eligibility == 'true' %}selected{% endif %}>Eligible</option>
+                        <option value="false" {% if request.GET.trade_eligibility == 'false' %}selected{% endif %}>Ineligible</option>
+                    </select>
+                </div>
+
+                {# Actions #}
+                <div class="col-xl-2 col-md-12 col-12 ms-auto d-flex align-items-center justify-content-end gap-2">
+                    <button type="submit" class="btn btn-sm btn-primary fw-bold w-100" style="height: 34px;">Apply</button>
+                    <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-sm btn-outline-secondary text-white d-flex align-items-center justify-content-center px-3" style="height: 34px; width: 44px;">
+                        <span class="material-icons fs-6">refresh</span>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    {# --- SCROLLABLE TRADERS LIST --- #}
+    <div class="scrollable-issues-region mt-1">
+        {% if traders %}
+        <div class="row g-3">
+            {% for trader in traders %}
+                <div class="col-12">
+                    <div class="issue-card p-3 text-white position-relative">
+                        <div class="position-absolute start-0 top-0 bottom-0 bg-{% if trader.is_blocked %}danger{% elif trader.final_freeze or trader.primary_freeze %}warning{% else %}success{% endif %}" style="width: 4px; opacity: 0.8;"></div>
+                        
+                        <div class="ms-2">
+                            {# Card Header Trigger #}
+                            <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-2" 
+                                 data-bs-toggle="collapse" 
+                                 data-bs-target="#collapseTrader{{ trader.pk }}" 
+                                 style="cursor: pointer;"
+                                 role="button"
+                                 aria-expanded="false" 
+                                 aria-controls="collapseTrader{{ trader.pk }}">
+                                
+                                <div class="flex-grow-1">
+                                    <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                                        <span class="badge bg-secondary text-white fw-bold smaller px-2 py-1">
+                                            {{ trader.get_broker_display|default:"No Broker" }}
+                                        </span>
+                                        
+                                        {% if trader.trade_eligibility %}
+                                            <span class="badge bg-success text-white fw-bold smaller px-2 py-1">Eligible</span>
+                                        {% else %}
+                                            <span class="badge bg-danger text-white fw-bold smaller px-2 py-1">Ineligible</span>
+                                        {% endif %}
+
+                                        {% if trader.is_blocked %}
+                                            <span class="badge bg-danger text-white fw-bold smaller px-2 py-1">Blocked</span>
+                                        {% endif %}
+                                    </div>
+                                    <h6 class="fw-bold mb-0 text-white">
+                                        {{ trader.name }}
+                                    </h6>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-3 align-self-stretch align-self-md-center justify-content-between justify-content-md-end">
+                                    <span class="status-pill bg-{% if trader.stats == 'PROFIT' %}success{% elif trader.stats == 'LOSS' %}danger{% else %}info{% endif %} text-white text-center" style="width:140px; display: inline-block;">
+                                        {{ trader.get_stats_display }}
+                                    </span>
+                                    <span class="material-icons text-white-50 Accordion-arrow-icon">expand_more</span>
+                                </div>
+                            </div>
+
+                            {# Compact Meta Bar #}
+                            <div class="d-flex flex-wrap align-items-center gap-y-1 smaller text-white-50 pt-1" style="column-gap: 1.25rem !important;">
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="material-icons text-primary" style="font-size: 0.95rem;">email</span>
+                                    <span>Email: <strong class="text-white">{{ trader.email|default:"-" }}</strong></span>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="material-icons text-info" style="font-size: 0.95rem;">phone</span>
+                                    <span>Phone: <strong class="text-white">{{ trader.phone_number|default:"-" }}</strong></span>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="material-icons text-warning" style="font-size: 0.95rem;">attach_money</span>
+                                    <span>P&L: <strong class="{% if trader.pl_integer > 0 %}text-success{% elif trader.pl_integer < 0 %}text-danger{% else %}text-white{% endif %}">${{ trader.pl_integer }}</strong></span>
+                                </div>
+
+                                <div class="d-flex align-items-center gap-1">
+                                    <span class="material-icons text-success" style="font-size: 0.95rem;">schedule</span>
+                                    <span>Joined: <strong class="text-white">{{ trader.created_at|date:"M d, Y" }}</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {# --- FIXED LAYOUT EXPANDED ACCORDION VIEW --- #}
+                        <div class="collapse" id="collapseTrader{{ trader.pk }}">
+                            <div class="ms-2 mt-3 pt-3 border-top border-secondary border-opacity-25">
+                                
+                                <div class="row g-2 mb-2">
+                                    {# 1. Freeze / Control Flags #}
+                                    <div class="col-md-4">
+                                        <div class="expanded-panel-box">
+                                            <span class="text-white-50 smaller fw-bold uppercase d-block mb-2">Control Flags</span>
+                                            <div class="d-flex flex-wrap gap-1">
+                                                <span class="badge {% if trader.primary_freeze %}bg-warning text-dark{% else %}bg-secondary text-white{% endif %} px-2 py-1">
+                                                    Primary Freeze: {{ trader.primary_freeze|yesno:"Active,Inactive" }}
+                                                </span>
+                                                <span class="badge {% if trader.final_freeze %}bg-danger text-white{% else %}bg-secondary text-white{% endif %} px-2 py-1">
+                                                    Final Freeze: {{ trader.final_freeze|yesno:"Active,Inactive" }}
+                                                </span>
+                                                <span class="badge {% if trader.is_blocked %}bg-danger text-white{% else %}bg-success text-white{% endif %} px-2 py-1">
+                                                    Blocked: {{ trader.is_blocked|yesno:"Yes,No" }}
+                                                </span>
+                                                <span class="badge {% if trader.trade_eligibility %}bg-primary text-white{% else %}bg-warning text-dark{% endif %} px-2 py-1">
+                                                    Eligibility: {{ trader.trade_eligibility|yesno:"Eligible,Ineligible" }}
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {# 2. Primary Freeze Metrics #}
+                                    <div class="col-md-4">
+                                        <div class="expanded-panel-box">
+                                            <span class="text-white-50 smaller fw-bold uppercase d-block mb-1">Primary Freeze Metrics</span>
+                                            <p class="mb-1 smaller">Time: 
+                                                <span class="badge bg-secondary text-white fw-semibold ms-1">
+                                                    {{ trader.primary_freeze_time|date:"M d, Y H:i"|default:"N/A" }}
+                                                </span>
+                                            </p>
+                                            <p class="mb-0 smaller">Freeze P&L: 
+                                                <span class="badge bg-warning text-dark fw-bold ms-1">
+                                                    {% if trader.primary_freeze_pl != None %}${{ trader.primary_freeze_pl }}{% else %}N/A{% endif %}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    </div>
+
+                                    {# 3. Final Freeze Metrics #}
+                                    <div class="col-md-4">
+                                        <div class="expanded-panel-box">
+                                            <span class="text-white-50 smaller fw-bold uppercase d-block mb-1">Final Freeze Metrics</span>
+                                            <p class="mb-1 smaller">Time: 
+                                                <span class="badge bg-secondary text-white fw-semibold ms-1">
+                                                    {{ trader.final_freeze_time|date:"M d, Y H:i"|default:"N/A" }}
+                                                </span>
+                                            </p>
+                                            <p class="mb-0 smaller">Freeze P&L: 
+                                                <span class="badge bg-danger text-white fw-bold ms-1">
+                                                    {% if trader.final_freeze_pl != None %}${{ trader.final_freeze_pl }}{% else %}N/A{% endif %}
+                                                </span>
+                                            </p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {# Action Footer Links #}
+                                <div class="d-flex justify-content-end align-items-center border-top border-secondary border-opacity-10 pt-2 gap-2">
+                                    <a href="{% url 'admins:marmot_trader_edit' trader.pk %}" class="btn btn-sm btn-outline-light py-1 px-3 smaller fw-bold">EDIT</a>
+                                    <a href="{% url 'admins:marmot_trader_detail' trader.pk %}" class="btn btn-sm btn-primary text-white py-1 px-3 smaller fw-bold">VIEW DETAILS</a>
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+
+        {# Pagination Bar #}
+        {% if is_paginated %}
+        <div class="custom-pagination-container">
+            <div class="text-white-50 small">
+                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} Traders
+            </div>
+            <nav aria-label="Trader pagination">
+                <ul class="custom-pagination">
+                    {% if page_obj.has_previous %}
+                        <li class="custom-page-item">
+                            <a class="custom-page-link" href="?page=1{% if current_filters %}&{{ current_filters }}{% endif %}">
+                                <span class="material-icons" style="font-size: 16px;">keyboard_double_arrow_left</span>
+                            </a>
+                        </li>
+                        <li class="custom-page-item">
+                            <a class="custom-page-link" href="?page={{ page_obj.previous_page_number }}{% if current_filters %}&{{ current_filters }}{% endif %}">
+                                <span class="material-icons" style="font-size: 16px;">chevron_left</span>
+                            </a>
+                        </li>
+                    {% endif %}
+
+                    {% for num in page_obj.paginator.page_range %}
+                        {% if page_obj.number == num %}
+                            <li class="custom-page-item active"><span class="custom-page-link">{{ num }}</span></li>
+                        {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                            <li class="custom-page-item">
+                                <a class="custom-page-link" href="?page={{ num }}{% if current_filters %}&{{ current_filters }}{% endif %}">{{ num }}</a>
+                            </li>
+                        {% endif %}
+                    {% endfor %}
+
+                    {% if page_obj.has_next %}
+                        <li class="custom-page-item">
+                            <a class="custom-page-link" href="?page={{ page_obj.next_page_number }}{% if current_filters %}&{{ current_filters }}{% endif %}">
+                                <span class="material-icons" style="font-size: 16px;">chevron_right</span>
+                            </a>
+                        </li>
+                        <li class="custom-page-item">
+                            <a class="custom-page-link" href="?page={{ page_obj.paginator.num_pages }}{% if current_filters %}&{{ current_filters }}{% endif %}">
+                                <span class="material-icons" style="font-size: 16px;">keyboard_double_arrow_right</span>
+                            </a>
+                        </li>
+                    {% endif %}
+                </ul>
+            </nav>
+        </div>
+        {% endif %}
+
+        {% else %}
+            <div class="metric-card text-center py-5 text-white mt-3">
+                <span class="material-icons fs-1 text-white-50 mb-2">search_off</span>
+                <p class="text-white-50 mb-0">No traders found matching your criteria.</p>
+            </div>
+        {% endif %}
+    </div>
+
+</div>
+{% endblock %}

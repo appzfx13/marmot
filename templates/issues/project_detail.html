@@ -1,0 +1,469 @@
+{% extends "users/index.html" %}
+
+{% block title %}{{ project.name }} - Details{% endblock %}
+
+{% block extra_head %}
+<style>
+    body {
+        font-size: 0.875rem;
+        background: radial-gradient(circle at top right, #0a102e 0%, #050505 100%);
+        color: white;
+        min-height: 100vh;
+    }
+
+    /* Fixed Top Section & Independent Scrollable Container Adjustments */
+    .dashboard-fixed-wrapper {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 30px); 
+        overflow: hidden;
+    }
+
+    .dashboard-scrollable-content {
+        flex-grow: 1;
+        overflow-y: auto;
+        padding-right: 0px;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    .dashboard-scrollable-content::-webkit-scrollbar {
+        display: none;
+    }
+
+    .dashboard-scrollable-content {
+        -ms-overflow-style: none;  
+        scrollbar-width: none;  
+    }
+
+    /* Hyperlinked Metric Layout Boxes */
+    .metric-card-link {
+        text-decoration: none !important;
+        color: inherit !important;
+        display: block;
+        height: 100%;
+    }
+
+    .metric-card {
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+        background: rgba(255, 255, 255, 0.05) !important;
+        backdrop-filter: blur(10px);
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        min-height: 85px;
+    }
+    .metric-card:hover {
+        background: rgba(255, 255, 255, 0.12) !important;
+        border-color: rgba(255, 255, 255, 0.3);
+        transform: translateY(-3px);
+    }
+    
+    /* Active Card Visual Ring Indicator */
+    .metric-card.active-filter-ring {
+        background: rgba(59, 130, 246, 0.15) !important;
+        border: 2px solid #3b82f6 !important;
+        box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
+    }
+
+    /* Glassmorphism Table Styling */
+    .summary-table-container {
+        background: rgba(255, 255, 255, 0.02) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        border-radius: 16px;
+        overflow-x: auto;
+        backdrop-filter: blur(15px);
+    }
+
+    .summary-table {
+        margin-bottom: 0 !important;
+        background: transparent !important;
+        min-width: 1200px; 
+    }
+
+    .summary-table thead th {
+        background: rgba(255, 255, 255, 0.06) !important;
+        color: #ffffff !important;
+        font-size: 0.65rem;
+        text-transform: uppercase;
+        border: none !important;
+        padding: 12px !important;
+    }
+
+    .summary-table td {
+        background: transparent !important;
+        color: #ffffff !important;
+        border-top: 1px solid rgba(255, 255, 255, 0.05) !important;
+        vertical-align: middle !important;
+    }
+
+    /* Universal Transparent Count Badges for Tables */
+    .count-badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 8px;
+        font-weight: 600;
+        font-size: 0.75rem;
+        min-width: 35px;
+        text-align: center;
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.8);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .badge-total { background: rgba(255, 255, 255, 0.1); color: #fff; border-color: rgba(255, 255, 255, 0.2); }
+    .badge-pending-total { background: rgba(255, 193, 7, 0.15); color: #ffc107; border: 1px solid rgba(255, 193, 7, 0.3); }
+    .badge-high { background: rgba(220, 53, 69, 0.15); color: #ff6b6b; border-color: rgba(220, 53, 69, 0.3); }
+    
+    /* Specific Table Badges matched to slugs */
+    .badge-open { background: rgba(13, 202, 240, 0.1); color: #0dcaf0; border-color: rgba(13, 202, 240, 0.2); }
+    .badge-dev_in_progress { background: rgba(255, 193, 7, 0.1); color: #ffc107; border-color: rgba(255, 193, 7, 0.2); }
+    .badge-ready_for_qa { background: rgba(102, 16, 242, 0.12); color: #a370f7; border-color: rgba(102, 16, 242, 0.2); }
+    .badge-qa_in_progress { background: rgba(253, 126, 20, 0.1); color: #fd7e14; border-color: rgba(253, 126, 20, 0.2); }
+    .badge-in_review { background: rgba(96, 165, 250, 0.1); color: #60a5fa; border-color: rgba(96, 165, 250, 0.2); }
+    .badge-hold { background: rgba(156, 163, 175, 0.1); color: #9ca3af; border-color: rgba(156, 163, 175, 0.2); }
+    .badge-scope_review { background: rgba(244, 63, 94, 0.1); color: #f43f5e; border-color: rgba(244, 63, 94, 0.2); }
+    .badge-rejected { background: rgba(239, 68, 68, 0.1); color: #ef4444; border-color: rgba(239, 68, 68, 0.2); }
+    .badge-done { background: rgba(25, 135, 84, 0.15); color: #75b798; border-color: rgba(25, 135, 84, 0.2); }
+    .badge-closed { background: rgba(108, 117, 125, 0.15); color: #6c757d; border-color: rgba(108, 117, 125, 0.2); }
+    .badge-reopen { background: rgba(245, 158, 11, 0.1); color: #f59e0b; border-color: rgba(245, 158, 11, 0.2); }
+    .badge-default-status { background: rgba(255, 255, 255, 0.05); color: rgba(255, 255, 255, 0.5); }
+
+    /* Universal Status Colors for Metric Numbers */
+    .metric-text-total { color: #ffffff !important; }
+    .metric-text-high_priority { color: #ff6b6b !important; }
+    .metric-text-open { color: #0dcaf0 !important; }
+    .metric-text-dev_in_progress { color: #ffc107 !important; }
+    .metric-text-ready_for_qa { color: #a370f7 !important; }
+    .metric-text-qa_in_progress { color: #fd7e14 !important; }
+    .metric-text-in_review { color: #60a5fa !important; }
+    .metric-text-hold { color: #9ca3af !important; }
+    .metric-text-scope_review { color: #f43f5e !important; }
+    .metric-text-rejected { color: #ef4444 !important; }
+    .metric-text-done { color: #75b798 !important; }
+    .metric-text-closed { color: #6c757d !important; }
+    .metric-text-reopen { color: #f59e0b !important; }
+
+    /* Issue Card Design elements */
+    .issue-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        transition: background 0.25s ease, border-color 0.25s ease;
+    }
+    .issue-card:hover { background: rgba(255, 255, 255, 0.06); border-color: rgba(255, 255, 255, 0.15); }
+
+    .status-badge-issues-theme {
+        display: inline-block;
+        padding: 4px 12px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.68rem;
+        letter-spacing: 0.06em;
+        text-align: center;
+        text-transform: uppercase;
+        min-width: 110px;
+    }
+    
+    .status-badge-open { background: rgba(13, 202, 240, 0.1) !important; color: #0dcaf0 !important; border: 1px solid rgba(13, 202, 240, 0.25) !important; }
+    .status-badge-dev_in_progress { background: rgba(255, 193, 7, 0.1) !important; color: #ffc107 !important; border: 1px solid rgba(255, 193, 7, 0.25) !important; }
+    .status-badge-ready_for_qa { background: rgba(102, 16, 242, 0.12) !important; color: #a370f7 !important; border: 1px solid rgba(102, 16, 242, 0.25) !important; }
+    .status-badge-done, .status-badge-closed { background: rgba(25, 135, 84, 0.15) !important; color: #75b798 !important; border: 1px solid rgba(25, 135, 84, 0.25) !important; }
+    .status-badge-default { background: rgba(255, 255, 255, 0.05) !important; color: rgba(255, 255, 255, 0.6) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; }
+    
+    .issue-tag-pill {
+        background: rgba(255, 255, 255, 0.05);
+        color: rgba(255, 255, 255, 0.7);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        font-size: 0.65rem;
+        font-weight: 600;
+        padding: 2px 8px;
+        border-radius: 4px;
+    }
+
+    [aria-expanded="true"] .accordion-arrow-icon {
+        transform: rotate(180deg);
+        color: #3b82f6 !important;
+    }
+    
+    .hover-opacity-100 { transition: opacity 0.2s ease; }
+    .hover-opacity-100:hover { opacity: 1 !important; }
+
+    /* CKEditor Custom Reset Styles to match Dark UI seamlessly */
+    .ckeditor-rendered-content {
+        font-size: 0.875rem;
+        color: rgba(255, 255, 255, 0.75);
+    }
+    .ckeditor-rendered-content p { margin-bottom: 0.5rem; }
+    .ckeditor-rendered-content p:last-child { margin-bottom: 0; }
+    .ckeditor-rendered-content ul, .ckeditor-rendered-content ol { padding-left: 1.25rem; margin-bottom: 0.5rem; }
+    .ckeditor-rendered-content a { color: #60a5fa; text-decoration: underline; }
+    .ckeditor-rendered-content code { background: rgba(255,255,255,0.1); padding: 2px 4px; border-radius: 4px; font-size: 85%; }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+<div class="dashboard-fixed-wrapper">
+    {# --- FIXED UPPER CONTAINER --- #}
+    <div>
+        {# 1. Header Section #}
+        <div class="row mb-3 align-items-center">
+            <div class="col">
+                <h2 class="text-white fw-bold mb-1">{{ project.name }}</h2>
+                <p class="text-white-50 small mb-0">Project: <strong>{{ project.code }}</strong> | Owner: {{ project.owner.get_full_name|default:project.owner.username }}</p>
+            </div>
+            <div class="col-auto d-flex align-items-center gap-3">
+                <a href="{% url 'issues:issue_create' project.pk %}" class="btn btn-primary rounded-pill px-4">
+                    <i class="bi bi-plus-lg me-1"></i> Create Issue
+                </a>
+
+                <div class="btn-group p-1" style="background: rgba(255,255,255,0.1); border-radius: 12px;">
+                    <a href="?period=daily{% if current_status %}&status={{ current_status }}{% endif %}" class="btn btn-sm {% if current_period == 'daily' %}btn-primary{% else %}text-white{% endif %} rounded-pill px-3">Daily</a>
+                    <a href="?period=weekly{% if current_status %}&status={{ current_status }}{% endif %}" class="btn btn-sm {% if current_period == 'weekly' %}btn-primary{% else %}text-white{% endif %} rounded-pill px-3">Weekly</a>
+                    <a href="?period=all{% if current_status %}&status={{ current_status }}{% endif %}" class="btn btn-sm {% if current_period == 'all' or not current_period %}btn-primary{% else %}text-white{% endif %} rounded-pill px-3">All Time</a>
+                </div>
+            </div>
+        </div>
+
+        {# 2. Dynamic Adaptive Status Metrics Grid - Click to filter #}
+        <div class="row row-cols-2 row-cols-sm-3 row-cols-md-4 row-cols-lg-6 row-cols-xl-8 g-2 mb-4">
+            <div class="col">
+                <a href="?period={{ current_period }}&status=" class="metric-card-link">
+                    <div class="metric-card p-2 text-center {% if not current_status %}active-filter-ring{% endif %}">
+                        <h4 class="fw-bold mb-0 metric-text-total">{{ metrics.total|default:0 }}</h4>
+                        <p class="mb-0 opacity-50 tracking-wider fw-bold" style="font-size: 0.58rem;">FILTERED TOTAL</p>
+                    </div>
+                </a>
+            </div>
+            <div class="col">
+                <div class="metric-card p-2 text-center">
+                    <h4 class="fw-bold mb-0 metric-text-high_priority">{{ metrics.high_priority|default:0 }}</h4>
+                    <p class="mb-0 opacity-50 tracking-wider fw-bold" style="font-size: 0.58rem;">HIGH PRIORITY</p>
+                </div>
+            </div>
+            {% for status_card in dynamic_status_cards %}
+            <div class="col">
+                <a href="?period={{ current_period }}&status={{ status_card.slug }}" class="metric-card-link">
+                    <div class="metric-card p-2 text-center {% if current_status == status_card.slug %}active-filter-ring{% endif %}">
+                        <h4 class="fw-bold mb-0 metric-text-{{ status_card.slug }}">{{ status_card.count }}</h4>
+                        <p class="mb-0 opacity-50 tracking-wider text-truncate px-1 fw-bold" style="font-size: 0.58rem;" title="{{ status_card.label }}">
+                            {{ status_card.label }}
+                        </p>
+                    </div>
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# --- SCROLLABLE CONTAINER FOR ALL REMAINING SECTIONS --- #}
+    <div class="dashboard-scrollable-content">
+        {# 3. Developer Summary Table #}
+        <div class="mb-5">
+            <h5 class="text-white fw-bold mb-3 d-flex align-items-center">
+                <span class="material-icons me-2">code</span> Developer Summary
+            </h5>
+            {% include "issues/partials/_summary_table.html" with summary_data=dev_summary %}
+        </div>
+
+        {# 4. QA Summary Table #}
+        <div class="mb-5">
+            <h5 class="text-white fw-bold mb-3 d-flex align-items-center">
+                <span class="material-icons me-2">fact_check</span> QA Summary
+            </h5>
+            {% include "issues/partials/_summary_table.html" with summary_data=qa_summary %}
+        </div>
+
+        {# 5. Recent Issues Stream #}
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="text-white fw-bold mb-0">
+                Recent Issues {% if current_status %}(Filtered by status: <span class="text-info">{{ current_status_display }}</span>){% endif %}
+            </h5>
+            {% if current_status %}
+                <a href="?period={{ current_period }}&status=" class="text-warning text-decoration-none smaller fw-semibold me-3">Clear Status Filter</a>
+            {% endif %}
+        </div>
+
+        <div class="row g-3 pb-4">
+            {% for issue in issues %}
+            <div class="col-12">
+                <div class="issue-card p-3 text-white position-relative">
+                    <div class="position-absolute start-0 top-0 bottom-0 bg-{% if issue.status == IssueStatusChoices.DONE.value or issue.status == IssueStatusChoices.CLOSED.value %}success{% elif issue.priority == IssuePriorityChoices.CRITICAL.value or issue.priority == IssuePriorityChoices.HIGH.value %}danger{% else %}primary{% endif %}" style="width: 4px; opacity: 0.7;"></div>
+                    
+                    <div class="ps-2">
+                        <div class="d-flex flex-column flex-md-row justify-content-between align-items-start align-items-md-center gap-3 mb-2" 
+                             data-bs-toggle="collapse" 
+                             data-bs-target="#collapseRecentIssue{{ issue.pk }}" 
+                             style="cursor: pointer;"
+                             role="button"
+                             aria-expanded="false" 
+                             aria-controls="collapseRecentIssue{{ issue.pk }}">
+                            
+                            <div class="flex-grow-1">
+                                <div class="d-flex align-items-center flex-wrap gap-2 mb-1">
+                                    <span class="text-primary smaller fw-bold uppercase tracking-wider" style="font-size: 0.75rem;">{{ issue.project.name }}</span>
+                                    <span class="text-white-50 opacity-50 small">/</span>
+                                    <span class="text-white-50 fw-monospace smaller">
+                                        {% if issue.project.code %}{{ issue.project.code }}-{{ issue.pk }}{% else %}#{{ issue.pk }}{% endif %}
+                                    </span>
+                                    
+                                    <span class="badge {% if issue.issue_type == IssueTypeChoices.BUG.value %}bg-danger-subtle text-danger border-danger{% elif issue.issue_type == IssueTypeChoices.TASK.value %}bg-info-subtle text-info border-info{% else %}bg-primary-subtle text-primary border-primary{% endif %} smaller px-2 py-0.5 border border-opacity-25" style="font-size: 0.65rem;">
+                                        {{ issue.get_issue_type_display }}
+                                    </span>
+                                    
+                                    <span class="badge {% if issue.priority == IssuePriorityChoices.HIGH.value or issue.priority == IssuePriorityChoices.CRITICAL.value %}bg-danger text-white{% elif issue.priority == IssuePriorityChoices.MEDIUM.value %}bg-warning text-dark{% else %}bg-info text-dark{% endif %} smaller px-2 py-0.5 ms-1" style="font-size: 0.65rem; font-weight: 700;">
+                                        {{ issue.get_priority_display }}
+                                    </span>
+                                </div>
+                                <h6 class="fw-bold mb-0 text-white mt-1">
+                                    {{ issue.title }}
+                                </h6>
+                            </div>
+
+                            <div class="d-flex align-items-center gap-3 align-self-stretch align-self-md-center justify-content-between justify-content-md-end">
+                                <span class="status-badge-issues-theme 
+                                    {% if issue.status == 'open' %}status-badge-open
+                                    {% elif issue.status == 'dev_in_progress' %}status-badge-dev_in_progress
+                                    {% elif issue.status == 'ready_for_qa' %}status-badge-ready_for_qa
+                                    {% elif issue.status == 'done' or issue.status == 'closed' %}status-badge-done
+                                    {% else %}status-badge-default{% endif %}">
+                                    {{ issue.get_status_display }}
+                                </span>
+                                <span class="material-icons text-white-50 accordion-arrow-icon" style="transition: transform 0.2s ease; font-size: 1.25rem;">expand_more</span>
+                            </div>
+                        </div>
+
+                        <div class="mb-3 d-flex flex-wrap gap-1 ps-1">
+                            {% for tag in issue.tags.all %}
+                                <span class="issue-tag-pill">{{ tag.name }}</span>
+                            {% empty %}
+                                <span class="text-white-50 smaller fst-italic opacity-25">no tags</span>
+                            {% endfor %}
+                        </div>
+
+                        <div class="d-flex flex-wrap align-items-center gap-y-2 smaller text-white-50 pt-2 border-top border-secondary border-opacity-10 ps-1" style="column-gap: 1.5rem !important;">
+                            {% comment %} <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-primary opacity-75" style="font-size: 0.95rem;">person</span>
+                                <span>Assignee: <strong class="text-white fw-semibold">{{ issue.assignee.get_short_name|default:issue.assignee.username|default:"Unassigned" }}</strong></span>
+                            </div> {% endcomment %}
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-info opacity-75" style="font-size: 0.95rem;">campaign</span>
+                                <span>Reporter: <strong class="text-white fw-semibold">{{ issue.reporter.get_short_name|default:issue.reporter.username|default:"-" }}</strong></span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-warning opacity-75" style="font-size: 0.95rem;">layers</span>
+                                <span>Env: <strong class="text-white fw-semibold">{{ issue.get_environment_display|default:"-" }}</strong></span>
+                            </div>
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-success opacity-75" style="font-size: 0.95rem;">schedule</span>
+                                <span>Updated: <strong class="text-white fw-semibold">{{ issue.updated_at|date:"M d, H:i" }}</strong></span>
+                            </div>
+                            {% if issue.time_estimate_hours %}
+                            <div class="d-flex align-items-center gap-1">
+                                <span class="material-icons text-secondary opacity-75" style="font-size: 0.95rem;">hourglass_empty</span>
+                                <span>Estimate: <strong class="text-white fw-semibold">{{ issue.time_estimate_hours }} hrs</strong></span>
+                            </div>
+                            {% endif %}
+                            <div class="d-flex align-items-center gap-1 ms-auto opacity-75">
+                                <span class="material-icons" style="font-size: 0.95rem;">calendar_today</span>
+                                <span>Created: {{ issue.created_at|date:"M d, Y" }}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="collapse" id="collapseRecentIssue{{ issue.pk }}">
+                        <div class="ps-2 mt-3 pt-3 border-top border-secondary border-opacity-25">
+                            <div class="row g-3 mb-4">
+                                <div class="col-12">
+                                    <div class="bg-dark bg-opacity-50 p-3 rounded-3 border border-secondary border-opacity-10">
+                                        <span class="text-primary smaller fw-bold uppercase tracking-wider d-block mb-2" style="font-size: 0.65rem;">DESCRIPTION BLOCK</span>
+                                        <div class="ckeditor-rendered-content text-break">
+                                            {% if issue.description %}
+                                                {{ issue.description|safe }}
+                                            {% else %}
+                                                <p class="text-white-50 smaller fst-italic m-0">No description payload attached to this record.</p>
+                                            {% endif %}
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {% if issue.remarks %}
+                                <div class="col-12 col-md-6">
+                                    <div class="bg-dark bg-opacity-50 p-3 rounded-3 border border-secondary border-opacity-10">
+                                        <span class="text-warning smaller fw-bold uppercase tracking-wider d-block mb-1" style="font-size: 0.65rem;">ADMIN REMARKS</span>
+                                        <div class="ckeditor-rendered-content text-break">{{ issue.remarks|safe }}</div>
+                                    </div>
+                                </div>
+                                {% endif %}
+
+                                {% if issue.qa_note %}
+                                <div class="col-12 col-md-6">
+                                    <div class="bg-dark bg-opacity-50 p-3 rounded-3 border border-secondary border-opacity-10">
+                                        <span class="text-success smaller fw-bold uppercase tracking-wider d-block mb-1" style="font-size: 0.65rem;">QA FIELD VALIDATION VERDICT</span>
+                                        <div class="ckeditor-rendered-content text-break">{{ issue.qa_note|safe }}</div>
+                                    </div>
+                                </div>
+                                {% endif %}
+                            </div>
+
+                            {% if issue.image_1 or issue.image_2 or issue.image_3 or issue.image_4 %}
+                            <div class="mb-4">
+                                <span class="text-white-50 smaller fw-bold uppercase tracking-wider d-block mb-2" style="font-size: 0.65rem;">VERIFICATION PAYLOADS (SCREENSHOTS)</span>
+                                <div class="d-flex flex-wrap gap-2">
+                                    {% if issue.image_1 %}
+                                        <a href="{{ issue.image_1.url }}" target="_blank" class="d-inline-block border border-secondary border-opacity-25 rounded-3 overflow-hidden" style="width: 72px; height: 72px;">
+                                            <img src="{{ issue.image_1.url }}" alt="Payload Segment 1" class="w-100 h-100 object-fit-cover opacity-75 hover-opacity-100">
+                                        </a>
+                                    {% endif %}
+                                    {% if issue.image_2 %}
+                                        <a href="{{ issue.image_2.url }}" target="_blank" class="d-inline-block border border-secondary border-opacity-25 rounded-3 overflow-hidden" style="width: 72px; height: 72px;">
+                                            <img src="{{ issue.image_2.url }}" alt="Payload Segment 2" class="w-100 h-100 object-fit-cover opacity-75 hover-opacity-100">
+                                        </a>
+                                    {% endif %}
+                                    {% if issue.image_3 %}
+                                        <a href="{{ issue.image_3.url }}" target="_blank" class="d-inline-block border border-secondary border-opacity-25 rounded-3 overflow-hidden" style="width: 72px; height: 72px;">
+                                            <img src="{{ issue.image_3.url }}" alt="Payload Segment 3" class="w-100 h-100 object-fit-cover opacity-75 hover-opacity-100">
+                                        </a>
+                                    {% endif %}
+                                    {% if issue.image_4 %}
+                                        <a href="{{ issue.image_4.url }}" target="_blank" class="d-inline-block border border-secondary border-opacity-25 rounded-3 overflow-hidden" style="width: 72px; height: 72px;">
+                                            <img src="{{ issue.image_4.url }}" alt="Payload Segment 4" class="w-100 h-100 object-fit-cover opacity-75 hover-opacity-100">
+                                        </a>
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endif %}
+
+                            <div class="d-flex justify-content-between align-items-center border-top border-secondary border-opacity-10 pt-3">
+                                <div>
+                                    {% if issue.drive_url %}
+                                    <a href="{{ issue.drive_url }}" target="_blank" class="btn btn-sm btn-outline-info py-1.5 px-3 smaller fw-bold d-inline-flex align-items-center gap-1">
+                                        <span class="material-icons fs-6">cloud_queue</span> GOOGLE STORAGE
+                                    </a>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex align-items-center gap-2">
+                                    <a href="{% url 'issues:issue_detail' issue.id %}" class="btn btn-sm btn-primary py-1.5 px-3 smaller fw-bold tracking-tighter d-inline-flex align-items-center gap-1">
+                                        CORE MANIFEST <span class="material-icons" style="font-size: 14px;">open_in_new</span>
+                                    </a>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+            {% empty %}
+            <div class="col-12">
+                <div class="bg-dark bg-opacity-25 border border-secondary border-opacity-10 text-center py-4 rounded-3 text-white">
+                    <span class="material-icons fs-3 text-white-50 mb-1">search_off</span>
+                    <p class="text-white-50 smaller mb-0">No active operational tasks match this status category choice.</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

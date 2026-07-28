@@ -1,0 +1,298 @@
+{% extends "users/index.html" %}
+
+{% block title %}
+{% if form.instance.pk %}Edit Team Member - Bug Tracker{% else %}Create Team Member - Bug Tracker{% endif %}
+{% endblock %}
+
+{% block nav_teammembers_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+    }
+
+    /* Refined Theme-Consistent Form Card Container */
+    .form-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Premium Input Styling (Text, Select, Dates, and Passwords) */
+    .form-card input:not([type="checkbox"]),
+    .form-card select,
+    .form-card textarea {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        padding: 8px 12px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        width: 100%;
+    }
+
+    .form-card input:not([type="checkbox"]):focus,
+    .form-card select:focus,
+    .form-card textarea:focus {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+        outline: none;
+    }
+
+    /* Handle dynamic dropdown selectors arrow adjustments */
+    .form-card select {
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='%23ffffff' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m2 5 6 6 6-6'/%3e%3c/svg%3e");
+        background-repeat: no-repeat;
+        background-position: right 0.75rem center;
+        background-size: 16px 12px;
+        appearance: none;
+        -webkit-appearance: none;
+    }
+
+    /* Customized Style Checkbox */
+    .form-card input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        vertical-align: middle;
+        appearance: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .form-card input[type="checkbox"]:checked {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+        background-size: 100% 100%;
+    }
+
+    /* Uniform Label Sizing Properties */
+    .form-card .horizontal-label {
+        color: rgba(255, 255, 255, 0.5);
+        font-size: 0.7rem;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        margin-bottom: 0;
+    }
+
+    @media (min-width: 768px) {
+        .form-card .horizontal-label {
+            min-width: 140px;
+            max-width: 140px;
+        }
+        .form-card .horizontal-label-short {
+            min-width: 90px;
+            max-width: 90px;
+        }
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+{# Header Section #}
+<div class="row mb-4 align-items-center">
+    <div class="col d-flex align-items-center">
+        <span class="material-icons text-primary fs-2 me-2">group_add</span>
+        <div>
+            <h2 class="text-white fw-bold mb-1">
+                {% if form.instance.pk %}Edit Team Member{% else %}Create Team Member{% endif %}
+            </h2>
+            <p class="text-white-50 small mb-0">Manage member details and team assignment profiles.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="form-card p-4 text-white">
+    {# Visual Theme Accent Line #}
+    <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
+
+    {% if form.non_field_errors %}
+    <div class="alert alert-danger py-2 px-3 small border-0 bg-danger bg-opacity-25 text-white mb-4 rounded-3 d-flex align-items-center gap-2 ms-2">
+        <span class="material-icons fs-6">error_outline</span>
+        <div>
+            {% for error in form.non_field_errors %}{{ error }}{% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <form method="post" novalidate class="ms-2">
+        {% csrf_token %}
+
+        {# First Name & Last Name Combined Split Row #}
+        <div class="row g-0 g-md-4">
+            {% if form.first_name %}
+            <div class="col-12 col-md-6 mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-2">
+                <label class="form-label horizontal-label" for="{{ form.first_name.id_for_label }}">First Name</label>
+                <div class="flex-grow-1 w-100">
+                    {{ form.first_name }}
+                    {% for error in form.first_name.errors %}
+                        <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+
+            {% if form.last_name %}
+            <div class="col-12 col-md-6 mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-2">
+                <label class="form-label horizontal-label horizontal-label-short" for="{{ form.last_name.id_for_label }}">Last Name</label>
+                <div class="flex-grow-1 w-100">
+                    {{ form.last_name }}
+                    {% for error in form.last_name.errors %}
+                        <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+
+        {# Username Row #}
+        {% if form.username %}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label horizontal-label" for="{{ form.username.id_for_label }}">Username</label>
+            <div class="flex-grow-1 w-100">
+                {{ form.username }}
+                {% for error in form.username.errors %}
+                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Email Row #}
+        {% if form.email %}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label horizontal-label" for="{{ form.email.id_for_label }}">Email</label>
+            <div class="flex-grow-1 w-100">
+                {{ form.email }}
+                {% for error in form.email.errors %}
+                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Team & Phone Split Row #}
+        <div class="row g-0 g-md-4">
+            <div class="col-12 col-md-6 mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-2">
+                <label class="form-label horizontal-label" for="{{ form.team.id_for_label }}">Team</label>
+                <div class="flex-grow-1 w-100">
+                    {{ form.team }}
+                    {% for error in form.team.errors %}
+                        <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-12 col-md-6 mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-2">
+                <label class="form-label horizontal-label horizontal-label-short" for="{{ form.phone.id_for_label }}">Phone</label>
+                <div class="flex-grow-1 w-100">
+                    {{ form.phone }}
+                    {% for error in form.phone.errors %}
+                        <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {# Employee ID & Date Joined Split Row #}
+        <div class="row g-0 g-md-4">
+            <div class="col-12 col-md-6 mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-2">
+                <label class="form-label horizontal-label" for="{{ form.employee_id.id_for_label }}">Employee ID</label>
+                <div class="flex-grow-1 w-100">
+                    {{ form.employee_id }}
+                    {% for error in form.employee_id.errors %}
+                        <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+            <div class="col-12 col-md-6 mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-2">
+                <label class="form-label horizontal-label horizontal-label-short" for="{{ form.date_joined_company.id_for_label }}">Joined Date</label>
+                <div class="flex-grow-1 w-100">
+                    {{ form.date_joined_company }}
+                    {% for error in form.date_joined_company.errors %}
+                        <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+
+        {# Role Selection Row #}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label horizontal-label" for="{{ form.role.id_for_label }}">Role</label>
+            <div class="flex-grow-1 w-100">
+                {{ form.role }}
+                {% for error in form.role.errors %}
+                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Active Checkbox Row #}
+        <div class="mb-3 d-flex align-items-center gap-3">
+            <label class="form-label horizontal-label" for="{{ form.is_active_developer.id_for_label }}">Developer Status</label>
+            <div class="d-flex align-items-center">
+                {{ form.is_active_developer }}
+                <label class="text-white-50 small ms-2 mb-0" for="{{ form.is_active_developer.id_for_label }}">Active Developer</label>
+                {% for error in form.is_active_developer.errors %}
+                    <div class="text-danger smaller ms-2"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Security Section Separator (Conditional Password rendering blocks) #}
+        {% if form.password or form.confirm_password %}
+            <div class="my-4 pt-1 border-top border-secondary border-opacity-10"></div>
+        {% endif %}
+
+        {# Password Row #}
+        {% if form.password %}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label horizontal-label" for="{{ form.password.id_for_label }}">Password</label>
+            <div class="flex-grow-1 w-100">
+                {{ form.password }}
+                {% for error in form.password.errors %}
+                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Confirm Password Row #}
+        {% if form.confirm_password %}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label horizontal-label" for="{{ form.confirm_password.id_for_label }}">Confirm Pass</label>
+            <div class="flex-grow-1 w-100">
+                {{ form.confirm_password }}
+                {% for error in form.confirm_password.errors %}
+                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# Control Action Buttons Footer #}
+        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top border-secondary border-opacity-10">
+            <a href="{% url 'users:teammember_list' %}" class="btn btn-sm btn-outline-light py-2 px-3 smaller fw-bold tracking-tighter">
+                CANCEL
+            </a>
+            <button type="submit" class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter">
+                SAVE MEMBER
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% endblock %}

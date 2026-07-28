@@ -1,0 +1,106 @@
+services:
+  # --- PostgreSQL Database ---
+  db:
+    image: postgres:16-alpine
+    container_name: postgres_db
+    restart: always
+    env_file:
+      - .env
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - app_network
+
+  # --- Adminer Database UI ---
+  adminer:
+    image: adminer:latest
+    container_name: adminer_ui
+    restart: always
+    ports:
+      - "8080:8080"
+    depends_on:
+      - db
+    networks:
+      - app_network
+
+  # --- Redis Cache & Celery Broker ---
+  redis:
+    image: redis:7-alpine
+    container_name: redis_server
+    restart: always
+    ports:
+      - "6379:6379"
+    networks:
+      - app_network
+
+  # --- Django Web App ---
+  web:
+    build: .
+    container_name: django_app
+    command: python manage.py runserver 0.0.0.0:8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - .:/app
+      - static_volume:/app/staticfiles
+    env_file:
+      - .env
+    environment:
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=${POSTGRES_PORT:-5432}
+    stdin_open: true
+    tty: true
+    depends_on:
+      - db
+      - redis
+    networks:
+      - app_network
+
+  # --- Celery Worker ---
+  celery:
+    build: .
+    container_name: celery_worker
+    entrypoint: [] # Bypass entrypoint script so it doesn't run migrations/collectstatic again
+    command: celery -A bugtracker worker --loglevel=info
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DB_ENGINE=django.db.backends.postgresql
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - DB_HOST=db
+      - DB_PORT=${POSTGRES_PORT:-5432}
+    depends_on:
+      - web
+      - redis
+    networks:
+      - app_network
+
+  # --- Go App Service ---
+  go_app:
+    build:
+      context: ./go-app
+    container_name: go_service
+    ports:
+      - "8081:8081"
+    env_file:
+      - .env
+    networks:
+      - app_network
+
+volumes:
+  postgres_data:
+  static_volume:
+
+networks:
+  app_network:
+    driver: bridge

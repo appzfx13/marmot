@@ -1,0 +1,146 @@
+{% extends "users/index.html" %}
+
+{% block title %}{{ title }} - Tags{% endblock %}
+
+{% block nav_tags_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    /* Compact Typography & Design System */
+    body {
+        font-size: 0.875rem;
+    }
+
+    /* Refined Theme-Consistent Form Card Container */
+    .form-card {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        position: relative;
+        overflow: hidden;
+    }
+
+    /* Premium Text Input Styling */
+    .form-card input[type="text"],
+    .form-card input[type="slug"],
+    .form-card input:not([type="checkbox"]) {
+        background: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid rgba(255, 255, 255, 0.1) !important;
+        color: #ffffff !important;
+        border-radius: 8px !important;
+        padding: 8px 12px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+    }
+
+    .form-card input:not([type="checkbox"]):focus {
+        background: rgba(255, 255, 255, 0.08) !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+        outline: none;
+    }
+
+    /* Customized Style Checkbox */
+    .form-card input[type="checkbox"] {
+        width: 16px;
+        height: 16px;
+        background-color: rgba(255, 255, 255, 0.05);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 4px;
+        vertical-align: middle;
+        appearance: none;
+        -webkit-appearance: none;
+        cursor: pointer;
+        transition: all 0.15s ease;
+    }
+
+    .form-card input[type="checkbox"]:checked {
+        background-color: #3b82f6;
+        border-color: #3b82f6;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20'%3e%3cpath fill='none' stroke='%23fff' stroke-linecap='round' stroke-linejoin='round' stroke-width='3' d='m6 10 3 3 6-6'/%3e%3c/svg%3e");
+        background-size: 100% 100%;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+{% block page_header %}
+{# Header Section #}
+<div class="row mb-4 align-items-center">
+    <div class="col d-flex align-items-center">
+        <span class="material-icons text-primary fs-2 me-2">label</span>
+        <div>
+            <h2 class="text-white fw-bold mb-1">{{ title }}</h2>
+            <p class="text-white-50 small mb-0">Manage tags used to classify issues and projects.</p>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block content %}
+<div class="form-card p-4 text-white">
+    {# Visual Theme Accent Line #}
+    <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
+
+    <form method="post" novalidate class="ms-2">
+        {% csrf_token %}
+
+        {# Name Field Row #}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            {% with field=form.name %}
+                <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ field.id_for_label }}" style="min-width: 140px;">
+                    {{ field.label }}{% if field.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+                </label>
+                <div class="flex-grow-1 w-100">
+                    {# Injected Django field widget layout #}
+                    {{ field }}
+                    {% for error in field.errors %}
+                        <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endwith %}
+        </div>
+
+        {# Slug Field Row #}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            {% with field=form.slug %}
+                <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ field.id_for_label }}" style="min-width: 140px;">
+                    {{ field.label }}
+                </label>
+                <div class="flex-grow-1 w-100">
+                    {{ field }}
+                    {% for error in field.errors %}
+                        <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endwith %}
+        </div>
+
+        {# Active Checkbox Row #}
+        <div class="mb-3 d-flex align-items-center gap-3">
+            {% with field=form.is_active %}
+                <label class="form-label text-white-50 smaller fw-bold uppercase mb-0" for="{{ field.id_for_label }}" style="min-width: 140px;">
+                    {{ field.label }}
+                </label>
+                <div class="d-flex align-items-center">
+                    {{ field }}
+                    {% for error in field.errors %}
+                        <div class="text-danger smaller ms-2"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+            {% endwith %}
+        </div>
+
+        {# Control Action Buttons Footer #}
+        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top border-secondary border-opacity-10">
+            <a href="{% url 'issues:tag_list' %}" class="btn btn-sm btn-outline-light py-2 px-3 smaller fw-bold tracking-tighter">
+                CANCEL
+            </a>
+            <button type="submit" class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter">
+                SAVE
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
+{% endblock %}

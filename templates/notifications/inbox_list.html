@@ -1,0 +1,377 @@
+{% extends "users/index.html" %}
+
+{% block title %}Inbox Feed - Bug Tracker{% endblock %}
+
+{% block nav_issues_active %}active{% endblock %}
+
+{% block extra_head %}
+<style>
+    body {
+        font-size: 0.875rem;
+    }
+
+    /* Glassmorphic Filter Controls Navbar row */
+    .filter-pill-box {
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.06);
+        border-radius: 14px;
+        padding: 8px;
+    }
+
+    .filter-btn {
+        background: transparent;
+        border: 1px solid transparent;
+        color: rgba(255, 255, 255, 0.6);
+        border-radius: 10px;
+        padding: 6px 14px;
+        font-weight: 500;
+        font-size: 0.8rem;
+        transition: all 0.25s ease;
+        text-decoration: none !important;
+    }
+    .filter-btn:hover {
+        background: rgba(255, 255, 255, 0.05);
+        color: #fff;
+    }
+    .filter-btn.active {
+        background: rgba(255, 255, 255, 0.1);
+        border-color: rgba(255, 255, 255, 0.15);
+        color: #fff;
+    }
+
+    /* Master Interactive Expandable Grid Card Container */
+    .inbox-interactive-row {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 14px;
+        margin-bottom: 12px;
+        transition: all 0.3s cubic-bezier(.25,.8,.25,1);
+        overflow: hidden;
+    }
+    .inbox-interactive-row:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.18);
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Unread Accent Highlight Indicators */
+    .inbox-interactive-row.unread-highlight {
+        background: rgba(78, 115, 223, 0.04);
+        border-left: 4px solid #4e73df;
+    }
+    .inbox-interactive-row.unread-highlight:hover {
+        background: rgba(78, 115, 223, 0.08);
+    }
+
+    /* Type Specific Border Accent Remaps */
+    .inbox-interactive-row.type-status-changed { border-left: 4px solid #f6c23e; }
+    .inbox-interactive-row.type-issue-assigned { border-left: 4px solid #1cc88a; }
+    .inbox-interactive-row.type-system-alert { border-left: 4px solid #e74a3b; }
+
+    /* Expandable Accordion Header Trigger area reset */
+    .clickable-header-trigger {
+        cursor: pointer;
+        user-select: none;
+        padding: 16px 20px;
+    }
+
+    .accordion-rotation-arrow {
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        color: rgba(255, 255, 255, 0.4);
+    }
+    .inbox-interactive-row.is-open .accordion-rotation-arrow {
+        transform: rotate(180deg);
+        color: #ffffff;
+    }
+
+    /* Custom Inner Collapsible View Deck panel */
+    .collapsible-detail-tray {
+        background: rgba(0, 0, 0, 0.2);
+        border-top: 1px solid rgba(255, 255, 255, 0.04);
+    }
+
+    /* Glassmorphic Pagination Grid links */
+    .custom-pagination {
+        display: flex;
+        gap: 6px;
+        list-style: none;
+        padding: 0;
+    }
+    .custom-page-item .custom-page-link {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        color: rgba(255, 255, 255, 0.7);
+        padding: 6px 12px;
+        border-radius: 8px;
+        font-weight: 700;
+        font-size: 0.8rem;
+        text-decoration: none;
+        transition: all 0.2s ease;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+    .custom-page-item:hover .custom-page-link {
+        background: rgba(255, 255, 255, 0.08);
+        color: #fff;
+        border-color: rgba(255, 255, 255, 0.2);
+    }
+    .custom-page-item.active .custom-page-link {
+        background: #4e73df;
+        color: #fff;
+        border-color: #4e73df;
+    }
+    .custom-page-nav-btn {
+        padding: 6px 8px !important;
+    }
+
+    .metric-empty-box {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 16px;
+    }
+</style>
+{% endblock %}
+
+{% block dashboard_content %}
+    {# Header Row View Section #}
+    <div class="row mb-3 align-items-center">
+        <div class="col">
+            <h2 class="text-white fw-bold mb-1">Notifications Inbox</h2>
+            <p class="text-white-50 small mb-0">Unified timeline tracking historical updates, team assignments, and target task mutations.</p>
+        </div>
+    </div>
+
+    {# Horizontal Functional Filter Ribbon bar #}
+    <div class="row mb-4">
+        <div class="col-12">
+            <div class="filter-pill-box d-flex flex-wrap gap-2 align-items-center">
+                <span class="text-white-50 small px-2 d-none d-sm-inline">Filter By:</span>
+                <a href="?filter=all" class="filter-btn {% if current_filter == 'all' %}active{% endif %}">All Notifications</a>
+                <a href="?filter=unread" class="filter-btn {% if current_filter == 'unread' %}active{% endif %}">Unread Only</a>
+                <a href="?filter=status_changed" class="filter-btn {% if current_filter == 'status_changed' %}active{% endif %}">Status Mutations</a>
+                <a href="?filter=issue_assigned" class="filter-btn {% if current_filter == 'issue_assigned' %}active{% endif %}">Assignments</a>
+                <a href="?filter=system_alert" class="filter-btn {% if current_filter == 'system_alert' %}active{% endif %}">Alerts</a>
+            </div>
+        </div>
+    </div>
+
+    {# Main Data Card Iteration Stack Container #}
+    <div class="row">
+        <div class="col-12">
+            {% if user_notifications %}
+                {% for item in user_notifications %}
+                    <div class="inbox-interactive-row {% if not item.is_read %}unread-highlight{% endif %} type-{{ item.notification.notification_type|lower }}" id="inbox-wrapper-{{ item.id }}">
+                        
+                        {# Visible Summary Header Row with Clickable Dropdown Trigger toggle #}
+                        <div class="clickable-header-trigger d-flex align-items-center justify-content-between gap-3" 
+                             data-bs-toggle="collapse" 
+                             data-bs-target="#collapse-tray-{{ item.id }}" 
+                             aria-expanded="false"
+                             onclick="markInboxRowReadInline({{ item.id }})">
+                            
+                            <div class="d-flex align-items-start gap-3">
+                                <span class="material-icons mt-1 {% if item.notification.notification_type == 'STATUS_CHANGED' %}text-warning{% elif item.notification.notification_type == 'ISSUE_ASSIGNED' %}text-success{% else %}text-info{% endif %}" style="font-size: 1.25rem;">
+                                    {% if item.notification.notification_type == 'STATUS_CHANGED' %}sync{% elif item.notification.notification_type == 'ISSUE_ASSIGNED' %}person_add{% else %}assignment{% endif %}
+                                </span>
+                                
+                                <div>
+                                    <div class="text-white fw-bold d-flex align-items-center flex-wrap gap-2" style="font-size: 0.925rem;">
+                                        {{ item.notification.title }}
+                                        {% if not item.is_read %}
+                                            <span class="badge bg-danger rounded-pill px-2 py-1 unread-pill-tag-element" style="font-size: 0.6rem; font-weight: 800; letter-spacing: 0.5px; text-transform: uppercase;">New</span>
+                                        {% endif %}
+                                    </div>
+                                    <div class="text-white-50 smaller mt-1 text-truncate" style="max-width: 700px;">
+                                        {{ item.notification.message }}
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            {# Localized Timestamp + Rotation Arrow elements #}
+                            <div class="d-flex align-items-center gap-3 flex-shrink-0">
+                                <div class="text-end text-white-50 smaller dynamic-relative-timestamp" data-timestamp="{{ item.notification.created_at|date:'c' }}" style="font-size: 0.775rem; min-width: 110px;">
+                                    {{ item.notification.created_at|date:"M d, H:i" }}
+                                </div>
+                                <span class="material-icons accordion-rotation-arrow">expand_more</span>
+                            </div>
+                        </div>
+
+                        {# Collapsible Extended Inner Content Body Tray #}
+                        <div id="collapse-tray-{{ item.id }}" class="collapse collapsible-detail-tray" data-bs-parent="#notification-inbox-group">
+                            <div class="p-4">
+                                <h6 class="text-white fw-bold mb-2">Message Payload Details</h6>
+                                <p class="text-white-50 lh-base text-break mb-3" style="max-width: 900px;">
+                                    {{ item.notification.message }}
+                                </p>
+                                
+                                <div class="d-flex flex-wrap align-items-center gap-4 pt-2 border-top border-white border-opacity-10 smaller text-white-50">
+                                    <div class="d-flex align-items-center gap-1">
+                                        <span class="material-icons opacity-50" style="font-size: 1rem;">person</span>
+                                        <span>Triggered By: <strong class="text-white">{{ item.notification.sender.get_full_name|default:item.notification.sender.username|default:"System Engine" }}</strong></span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-1">
+                                        <span class="material-icons opacity-50" style="font-size: 1rem;">layers</span>
+                                        <span>Scope Classification: <strong class="text-info text-uppercase">{{ item.notification.get_scope_display }}</strong></span>
+                                    </div>
+                                    
+                                    {# Core contextual deep link anchor targeting issue resolution files #}
+                                    {% if item.notification.content_type.model == 'issue' %}
+                                    <div class="ms-auto">
+                                        <a href="{% url 'issues:issue_detail' item.notification.object_id %}" class="btn btn-sm btn-primary py-1 px-3 fw-bold d-inline-flex align-items-center gap-1">
+                                            <span class="material-icons" style="font-size: 14px;">launch</span>
+                                            Inspect Target Source
+                                        </a>
+                                    </div>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </div>
+
+                    </div>
+                {% endfor %}
+
+                {# Glassmorphic Pagination Matrix Footer #}
+                {% if is_paginated %}
+                <div class="d-flex justify-content-between align-items-center mt-4 pt-3 border-top border-white border-opacity-10">
+                    <div class="text-white-50 smaller">
+                        Showing entries <strong>{{ page_obj.start_index }}</strong> to <strong>{{ page_obj.end_index }}</strong> of total <strong>{{ paginator.count }}</strong> Records
+                    </div>
+                    <nav aria-label="Inbox pagination framework">
+                        <ul class="custom-pagination m-0">
+                            {% if page_obj.has_previous %}
+                                <li class="custom-page-item">
+                                    <a class="custom-page-link custom-page-nav-btn" href="?page={{ page_obj.previous_page_number }}&filter={{ current_filter }}">
+                                        <span class="material-icons" style="font-size: 14px;">chevron_left</span>
+                                    </a>
+                                </li>
+                            {% endif %}
+
+                            {% for num in page_obj.paginator.page_range %}
+                                {% if page_obj.number == num %}
+                                    <li class="custom-page-item active"><span class="custom-page-link">{{ num }}</span></li>
+                                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                                    <li class="custom-page-item"><a class="custom-page-link" href="?page={{ num }}&filter={{ current_filter }}">{{ num }}</a></li>
+                                {% endif %}
+                            {% endfor %}
+
+                            {% if page_obj.has_next %}
+                                <li class="custom-page-item">
+                                    <a class="custom-page-link custom-page-nav-btn" href="?page={{ page_obj.next_page_number }}&filter={{ current_filter }}">
+                                        <span class="material-icons" style="font-size: 14px;">chevron_right</span>
+                                    </a>
+                                </li>
+                            {% endif %}
+                        </ul>
+                    </nav>
+                </div>
+                {% endif %}
+
+            {% else %}
+                {# Fallback Empty Filter States #}
+                <div class="metric-empty-box text-center py-5 text-white">
+                    <span class="material-icons fs-1 text-white-50 mb-2">notifications_off</span>
+                    <h4 class="text-white-50 fw-bold mb-1">No notifications matching criteria</h4>
+                    <p class="text-white-50 smaller mb-0">When matching system mutations or assignments trigger, details log straight to this filter view.</p>
+                </div>
+            {% endif %}
+        </div>
+    </div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    /**
+     * Translates ISO timestamps into localized real-time structural text like "12 minutes ago"
+     */
+    function renderInboxRelativeTimes() {
+        const timeContainers = document.querySelectorAll('.dynamic-relative-timestamp');
+        const now = new Date();
+
+        timeContainers.forEach(el => {
+            const timestampAttr = el.getAttribute('data-timestamp');
+            if (!timestampAttr) return;
+
+            const pastDate = new Date(timestampAttr);
+            const secondsDiff = Math.floor((now - pastDate) / 1000);
+
+            if (secondsDiff < 5) {
+                el.innerHTML = '<span class="text-success fw-medium">Just now</span>';
+                return;
+            }
+            if (secondsDiff < 60) {
+                el.innerText = `${secondsDiff} seconds ago`;
+                return;
+            }
+
+            const minutesDiff = Math.floor(secondsDiff / 60);
+            if (minutesDiff < 60) {
+                el.innerText = `${minutesDiff} minute${minutesDiff > 1 ? 's' : ''} ago`;
+                return;
+            }
+
+            const hoursDiff = Math.floor(minutesDiff / 60);
+            if (hoursDiff < 24) {
+                el.innerText = `${hoursDiff} hour${hoursDiff > 1 ? 's' : ''} ago`;
+                return;
+            }
+
+            // Fallback display format targeting historical logs
+            el.innerText = pastDate.toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+        });
+    }
+
+    /**
+     * Safe inline marking helper interacting cleanly with base notification endpoints
+     */
+    function markInboxRowReadInline(id) {
+        const targetRow = document.getElementById(`inbox-wrapper-${id}`);
+        if (!targetRow || !targetRow.classList.contains('unread-highlight')) return;
+
+        const formData = new FormData();
+        formData.append('notification_id', id);
+
+        fetch('/notifications/api/live/', {
+            method: 'POST',
+            headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' },
+            body: formData
+        })
+        .then(res => res.json())
+        .then(data => {
+            // Instantly transition out unread highlighting states without jarring page jumps
+            targetRow.classList.remove('unread-highlight');
+            const unreadBadge = targetRow.querySelector('.unread-pill-tag-element');
+            if (unreadBadge) unreadBadge.remove();
+
+            // Fire counter synchronize hooks back to base global layout bell badge counter if present
+            const layoutBellBadge = document.getElementById('layoutUniqueBellBadgeCounter');
+            if (layoutBellBadge && data.unread_count !== undefined) {
+                if (data.unread_count > 0) {
+                    layoutBellBadge.textContent = data.unread_count;
+                } else {
+                    layoutBellBadge.style.display = 'none';
+                }
+            }
+        })
+        .catch(err => console.error("Could not sync read status inline:", err));
+    }
+
+    // Initialize layout setup operations 
+    document.addEventListener("DOMContentLoaded", function() {
+        renderInboxRelativeTimes();
+        // Update relative logs every 30 seconds
+        setInterval(renderInboxRelativeTimes, 30000);
+
+        // Track and animate accordion chevron rotation utility hooks
+        const accordionNodes = document.querySelectorAll('.collapsible-detail-tray');
+        accordionNodes.forEach(box => {
+            box.addEventListener('show.bs.collapse', function () {
+                box.closest('.inbox-interactive-row').classList.add('is-open');
+            });
+            box.addEventListener('hide.bs.collapse', function () {
+                box.closest('.inbox-interactive-row').classList.remove('is-open');
+            });
+        });
+    });
+</script>
+{% endblock %}
