@@ -19,7 +19,7 @@ services:
     container_name: adminer_ui
     restart: always
     ports:
-      - "8080:8080"
+      - "8085:8080"  # Changed from 8080 to 8085 to avoid conflict
     depends_on:
       - db
     networks:
@@ -39,6 +39,7 @@ services:
   web:
     build: .
     container_name: django_app
+    entrypoint: ["/usr/local/bin/entrypoint.sh"] 
     command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
