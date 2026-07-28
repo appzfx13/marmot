@@ -9,7 +9,6 @@ from apps.users.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices
 
 
 class User(AbstractUser):
-    name = models.CharField(max_length=100)
     username = models.CharField(max_length=150, unique=True, null=True, blank=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)

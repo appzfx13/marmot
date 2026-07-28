@@ -6,7 +6,6 @@ class UserForm(forms.ModelForm):
     class Meta:
         model = User
         fields = [
-            'name',
             'username',
             'email',
             'phone_number',
@@ -22,7 +21,6 @@ class UserForm(forms.ModelForm):
             'final_freeze',
         ]
         widgets = {
-            'name': forms.TextInput(attrs={'placeholder': 'Full Name'}),
             'username': forms.TextInput(attrs={'placeholder': 'Username'}),
             'email': forms.EmailInput(attrs={'placeholder': 'Email Address'}),
             'phone_number': forms.TextInput(attrs={'placeholder': '+1234567890'}),
