@@ -50,3 +50,6 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"TeamMember profile for '{username}' created."))
         else:
             self.stdout.write(self.style.SUCCESS(f"TeamMember profile for '{username}' already exists."))
+
+
+            

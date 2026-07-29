@@ -1,11 +1,22 @@
-FROM golang:1.22-alpine
+FROM golang:1.25-alpine
+
+ENV GOTOOLCHAIN=auto
 
 WORKDIR /app
 
-COPY . .
+RUN apk add --no-cache git
 
-RUN go build -o main .
+COPY entrypoint.sh /entrypoint.sh
+RUN chmod +x /entrypoint.sh
+
+# Copy dependency definition files first
+COPY go.mod ./
+RUN go mod download
+
+# Copy the rest of the application files
+COPY . .
 
 EXPOSE 8081
 
-CMD ["./main"]
+ENTRYPOINT ["/entrypoint.sh"]
+CMD ["go", "run", "."]

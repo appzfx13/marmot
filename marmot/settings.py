@@ -13,7 +13,6 @@ load_dotenv()
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-
 # Quick-start development settings - unsuitable for production
 SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fjfw&r^h^kc1mrt)rq89=^bvaz%bjs)$wvl!6h3x=5_+guv5$c')
 
@@ -22,31 +21,36 @@ DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = ['*']
 
-
-APPEND_SLASH=False
+APPEND_SLASH = True
 
 # Application definition
 
 INSTALLED_APPS = [
-    'apps.admins',
-    'apps.api',
-    'apps.common',
-    'apps.masters',
-    'apps.notifications',
-    'apps.trade_engine',
+    # Custom User Model App FIRST (fixes admin migration dependency order)
     'apps.users',
 
-    'cloudinary_storage',
-    'cloudinary',
-
-    'apscheduler',
-
+    # Built-in Django Apps
     'django.contrib.admin',
     'django.contrib.auth',
     'django.contrib.contenttypes',
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+
+    # Third-Party Apps
+    'cloudinary_storage',
+    'cloudinary',
+    'apscheduler',
+
+    # Project Apps
+    'apps.admins',
+    'apps.api',
+    'apps.common',
+    'apps.market',
+    'apps.masters',
+    'apps.notifications',
+    'apps.trade_config',
+    'apps.trade_core',
 ]
 
 MIDDLEWARE = [
@@ -78,10 +82,7 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'marmot.wsgi.application'
 
-
 # Database Configuration
-# Uses environment variables set by Docker Compose / .env file
-
 DATABASES = {
     'default': {
         'ENGINE': os.getenv('DB_ENGINE', 'django.db.backends.postgresql'),
@@ -93,38 +94,21 @@ DATABASES = {
     }
 }
 
-
 # Password validation
-
 AUTH_PASSWORD_VALIDATORS = [
-    {
-        'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator',
-    },
-    {
-        'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator',
-    },
+    {'NAME': 'django.contrib.auth.password_validation.UserAttributeSimilarityValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.MinimumLengthValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.CommonPasswordValidator'},
+    {'NAME': 'django.contrib.auth.password_validation.NumericPasswordValidator'},
 ]
 
-
 # Internationalization
-
 LANGUAGE_CODE = 'en-us'
-
 TIME_ZONE = 'Asia/Kolkata'
-
 USE_I18N = True
-
 USE_TZ = True
 
-
 # Static & Media Storage Configuration
-
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
 
@@ -140,30 +124,15 @@ CLOUDINARY_STORAGE = {
 
 # Storage backends depending on DEBUG mode
 if DEBUG:
-    # Standard local file storage for development
     STORAGES = {
-        "default": {
-            "BACKEND": "django.core.files.storage.FileSystemStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage",
-        },
+        "default": {"BACKEND": "django.core.files.storage.FileSystemStorage"},
+        "staticfiles": {"BACKEND": "django.contrib.staticfiles.storage.StaticFilesStorage"},
     }
-    STATICFILES_STORAGE = 'django.contrib.staticfiles.storage.StaticFilesStorage'
-    DEFAULT_FILE_STORAGE = 'django.core.files.storage.FileSystemStorage'
 else:
-    # Production Cloudinary storage
     STORAGES = {
-        "default": {
-            "BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage",
-        },
-        "staticfiles": {
-            "BACKEND": "cloudinary_storage.storage.StaticCloudinaryStorage",
-        },
+        "default": {"BACKEND": "cloudinary_storage.storage.MediaCloudinaryStorage"},
+        "staticfiles": {"BACKEND": "cloudinary_storage.storage.StaticCloudinaryStorage"},
     }
-    STATICFILES_STORAGE = 'cloudinary_storage.storage.StaticCloudinaryStorage'
-    DEFAULT_FILE_STORAGE = 'cloudinary_storage.storage.MediaCloudinaryStorage'
-
 
 # Custom User Model
 AUTH_USER_MODEL = "users.User"

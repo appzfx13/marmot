@@ -39,6 +39,6 @@ urlpatterns = [
     # path('logout/', auth_views.LogoutView.as_view(next_page=reverse_lazy('users:login')), name='logout'),
 
     # MARMOT
-    path('marmot/login/', MarmotLoginView.as_view(), name='marmot-login'),
+    path('', MarmotLoginView.as_view(), name='marmot-login'),
     path('marmot/dashboard/', MarmotDashboardView.as_view(), name='marmot-dashboard'),
 ]

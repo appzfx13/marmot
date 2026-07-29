@@ -1,9 +1,8 @@
 from django.urls import path
-from .views import UserNotificationAPIView, UserNotificationListView
+from .views import LiveNotificationsView
 
 app_name = 'notifications'
 
 urlpatterns = [
-    path('notifications/api/live/', UserNotificationAPIView.as_view(), name='live_api'),
-    path('notifications/inbox/', UserNotificationListView.as_view(), name='inbox_list'),
+    path('api/live/', LiveNotificationsView.as_view(), name='live_notifications'),
 ]

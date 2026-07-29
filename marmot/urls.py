@@ -8,9 +8,11 @@ urlpatterns = [
     path('', include('apps.admins.urls')),
     path('', include('apps.api.urls')),
     path('', include('apps.common.urls')),
+    path('', include('apps.market.urls')),
     path('', include('apps.masters.urls')),
     path('', include('apps.notifications.urls')),
-    path('', include('apps.notifications.urls')),
+    path('', include('apps.trade_config.urls')),
+    path('', include('apps.trade_core.urls')),
     path('', include('apps.users.urls')),
 ]
 

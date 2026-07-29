@@ -1,5 +1,5 @@
 services:
-  # --- PostgreSQL Database ---
+  # --- PostgreSQL Database (Shared by Django & River Queue) ---
   db:
     image: postgres:16-alpine
     container_name: postgres_db
@@ -10,6 +10,28 @@ services:
       - "${POSTGRES_PORT:-5432}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - app_network
+
+  # --- Redis Service (Cache & Pub/Sub Broker for Django Channels & Go) ---
+  redis:
+    image: redis:7-alpine
+    container_name: redis_broker
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
     networks:
       - app_network
 
@@ -19,19 +41,9 @@ services:
     container_name: adminer_ui
     restart: always
     ports:
-      - "8085:8080"  # Changed from 8080 to 8085 to avoid conflict
+      - "8080:8080"
     depends_on:
       - db
-    networks:
-      - app_network
-
-  # --- Redis Cache & Celery Broker ---
-  redis:
-    image: redis:7-alpine
-    container_name: redis_server
-    restart: always
-    ports:
-      - "6379:6379"
     networks:
       - app_network
 
@@ -39,7 +51,6 @@ services:
   web:
     build: .
     container_name: django_app
-    entrypoint: ["/usr/local/bin/entrypoint.sh"] 
     command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8000:8000"
@@ -54,29 +65,53 @@ services:
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_HOST=db
-      - DB_PORT=${POSTGRES_PORT:-5432}
+      - DB_PORT=5432
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379/0
     stdin_open: true
     tty: true
     depends_on:
-      - db
-      - redis
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - app_network
 
-  # --- Go App Service ---
+  # --- Go Worker Service ---
   go_app:
     build:
       context: ./go-app
+      dockerfile: Dockerfile
     container_name: go_service
+    command: go run main.go 
     ports:
       - "8081:8081"
+    volumes:
+      - ./go-app:/app
     env_file:
       - .env
+    environment:
+      - DB_HOST=db
+      - DB_PORT=5432
+      - DB_NAME=${POSTGRES_DB}
+      - DB_USER=${POSTGRES_USER}
+      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_URL=redis://redis:6379/0
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
     networks:
       - app_network
 
 volumes:
   postgres_data:
+  redis_data:
   static_volume:
 
 networks:

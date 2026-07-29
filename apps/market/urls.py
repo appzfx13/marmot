@@ -1,7 +1,8 @@
 from django.urls import path
 
-app_name = 'trade_engine'
+app_name = 'market'
 
 urlpatterns = [
+
 
 ]

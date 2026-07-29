@@ -1,32 +1,39 @@
 #!/bin/sh
-
-# Exit immediately if a command exits with a non-zero status
 set -e
 
-echo "Waiting for PostgreSQL to start..."
+# Ensure variables are set, or provide safe defaults ---
+DB_HOST=${DB_HOST:-db}
+DB_PORT=${DB_PORT:-5432}
 
-# Wait until Postgres is available on port 5432
-while ! nc -z $DB_HOST $DB_PORT; do
-  sleep 0.1
+echo "Waiting for PostgreSQL at $DB_HOST:$DB_PORT..."
+
+# Use a robust loop to prevent infinite hangs if DB fails ---
+count=0
+until nc -z "$DB_HOST" "$DB_PORT" || [ $count -eq 60 ]; do
+  echo "Postgres is unavailable - sleeping (attempt $count/60)"
+  sleep 1
+  count=$((count+1))
 done
+
+if [ $count -eq 60 ]; then
+  echo "Error: Could not connect to PostgreSQL at $DB_HOST:$DB_PORT"
+  exit 1
+fi
 
 echo "PostgreSQL started successfully!"
 
-# Create new migration files for schema changes
-echo "Making database migrations..."
+# --- Migrations ---
+echo "Making and applying migrations..."
 python manage.py makemigrations --noinput
-
-# Apply database migrations
-echo "Applying database migrations..."
 python manage.py migrate --noinput
 
-# Collect static files
+# --- Static Files ---
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
-# Run custom management command to check & create initial admin
+# --- Setup Admin ---
 echo "Checking/Creating Superuser..."
 python manage.py initadmin
 
-# Execute the container's main process (passed from Dockerfile CMD or docker-compose)
+# Execute main container process (e.g., daphne)
 exec "$@"
