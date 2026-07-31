@@ -1,0 +1,263 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}Admin - Bug Tracker{% endblock %}</title>
+
+    <!-- Bootstrap 5 CSS & Google Fonts/Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- HTMX Library -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
+    <style>
+        :root[data-theme="dark"] {
+            --bg-gradient: linear-gradient(to left, #0a102e 0%, #050505 100%);
+            --glass-bg: rgba(18, 24, 36, 0.65);
+            --sidebar-bg: rgba(15, 15, 25, 0.85);
+            --border-color: rgba(255, 255, 255, 0.1);
+            --text-main: rgba(255, 255, 255, 0.9);
+            --text-muted: rgba(255, 255, 255, 0.6);
+            --nav-hover: rgba(255, 255, 255, 0.1);
+            --nav-active: rgba(220, 53, 69, 0.25);
+            --nav-active-border: #dc3545;
+        }
+
+        :root[data-theme="light"] {
+            --bg-gradient: linear-gradient(135deg, #eef2f7 0%, #d9e2ec 100%);
+            --glass-bg: rgba(255, 255, 255, 0.75);
+            --sidebar-bg: rgba(255, 255, 255, 0.9);
+            --border-color: rgba(0, 0, 0, 0.08);
+            --text-main: #0f172a;
+            --text-muted: #475569;
+            --nav-hover: rgba(0, 0, 0, 0.05);
+            --nav-active: rgba(220, 53, 69, 0.15);
+            --nav-active-border: #dc3545;
+        }
+
+        :root {
+            --sidebar-width: 280px;
+        }
+
+        body {
+            font-family: 'Google Sans', sans-serif;
+            background: var(--bg-gradient);
+            min-height: 100vh;
+            font-size: 0.875rem;
+            color: var(--text-main);
+            overflow-x: hidden;
+            transition: background 0.3s ease;
+        }
+
+        /* Sidebar Styling */
+        .sidebar {
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-right: 1px solid var(--border-color);
+            z-index: 1050;
+            transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px);
+            -webkit-backdrop-filter: blur(20px);
+            border-radius: 20px;
+            border: 1px solid var(--border-color);
+        }
+
+        .nav-link {
+            color: var(--text-muted) !important;
+            border-radius: 10px;
+            margin: 3px 12px;
+            padding: 10px 14px !important;
+            font-size: 0.875rem;
+            display: flex;
+            align-items: center;
+            transition: all 0.2s ease;
+        }
+
+        .nav-link .material-icons {
+            font-size: 1.25rem !important;
+            margin-right: 12px;
+        }
+
+        .nav-link:hover {
+            background: var(--nav-hover);
+            color: var(--text-main) !important;
+        }
+
+        .nav-link.active {
+            background: var(--nav-active);
+            color: var(--text-main) !important;
+            border-left: 3px solid var(--nav-active-border);
+        }
+
+        .metric-card {
+            background: var(--glass-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.25rem !important;
+        }
+
+        .main-with-sidebar {
+            padding: 1.5rem !important;
+            margin-left: var(--sidebar-width);
+            transition: margin-left 0.3s ease;
+        }
+
+        /* Theme Switcher Button */
+        .theme-toggle-btn {
+            background: var(--nav-hover);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            border-radius: 30px;
+            padding: 6px 14px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        @media (max-width: 767.98px) {
+            .sidebar {
+                transform: translateX(-100%);
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh !important;
+            }
+            .sidebar.show { transform: translateX(0); }
+            .main-with-sidebar { margin-left: 0 !important; }
+        }
+    </style>
+    {% block extra_head %}{% endblock %}
+</head>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+
+    <div class="d-flex flex-column flex-md-row">
+        <!-- Admin Sidebar -->
+        <div class="sidebar p-3 vh-100 position-fixed d-flex flex-column" id="mainSidebar">
+            <div class="mb-4 d-flex align-items-center justify-content-between px-2 pt-2">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons text-danger fs-3">admin_panel_settings</span>
+                    <div>
+                        <h5 class="fw-bold mb-0">Admin Portal</h5>
+                        <small class="text-muted">Control Panel</small>
+                    </div>
+                </div>
+            </div>
+
+            <nav class="nav flex-column flex-grow-1">
+                <a class="nav-link {% block nav_admin_dashboard_active %}{% endblock %}" href="{% url 'admins:admin-dashboard' %}">
+                    <span class="material-icons">dashboard</span>Dashboard
+                </a>
+                <a class="nav-link {% block nav_traders_active %}{% endblock %}" href="{% url 'admins:marmot_trader_list' %}">
+                    <span class="material-icons">people</span>Manage Traders
+                </a>
+            </nav>
+
+            <div class="pt-3 border-top border-secondary border-opacity-25 d-flex flex-column gap-2">
+                <!-- Theme Toggle Button -->
+                <button class="theme-toggle-btn w-100 justify-content-center" id="themeToggleBtn" type="button">
+                    <span class="material-icons fs-6" id="themeToggleIcon">dark_mode</span>
+                    <span class="small fw-medium" id="themeToggleText">Dark</span>
+                </button>
+
+                <!-- Logout Modal Trigger -->
+                <button type="button" 
+                        class="btn btn-outline-danger d-flex align-items-center justify-content-center gap-2 py-2 w-100"
+                        data-bs-toggle="modal" 
+                        data-bs-target="#adminLogoutModal">
+                    <span class="material-icons fs-6">logout</span>
+                    <span>Logout</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content Area -->
+        <div class="flex-grow-1 p-4 main-with-sidebar" id="mainContentBody">
+            <div class="container-fluid" id="app-main-container">
+                {% block dashboard_content %}{% endblock %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Admin Logout Confirmation Modal -->
+    <div class="modal fade" id="adminLogoutModal" tabindex="-1" aria-labelledby="adminLogoutModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered">
+            <div class="modal-content glass-card p-2">
+                <div class="modal-header border-0">
+                    <h5 class="modal-title" id="adminLogoutModalLabel">Confirm Logout</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-muted">Are you sure you want to log out of the Admin Portal?</div>
+                <div class="modal-footer border-0">
+                    <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <!-- HTMX Logout Trigger -->
+                    <button type="button" 
+                            hx-post="{% url 'admins:admin-logout' %}" 
+                            class="btn btn-danger fw-bold">
+                        Logout
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <script>
+        // HTMX Status Swap Configuration
+        document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
+            if (evt.detail.xhr.status === 422 || evt.detail.xhr.status === 500) {
+                evt.detail.shouldSwap = true;
+                evt.detail.isError = false;
+            }
+        });
+
+        // Dark / Light Mode Switching Engine
+        (function() {
+            const htmlElement = document.documentElement;
+            const toggleBtn = document.getElementById('themeToggleBtn');
+            const toggleIcon = document.getElementById('themeToggleIcon');
+            const toggleText = document.getElementById('themeToggleText');
+
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const currentTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+
+            function applyTheme(theme) {
+                htmlElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+
+                if (theme === 'dark') {
+                    toggleIcon.textContent = 'dark_mode';
+                    toggleText.textContent = 'Dark';
+                } else {
+                    toggleIcon.textContent = 'light_mode';
+                    toggleText.textContent = 'Light';
+                }
+            }
+
+            applyTheme(currentTheme);
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    const activeTheme = htmlElement.getAttribute('data-theme');
+                    const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
+                    applyTheme(newTheme);
+                });
+            }
+        })();
+    </script>
+    {% block extra_js %}{% endblock %}
+</body>
+</html>

@@ -1,0 +1,65 @@
+<form id="login-form"
+      hx-post="{% url 'users:marmot-login' %}" 
+      hx-target="#login-form" 
+      hx-swap="outerHTML" 
+      novalidate>
+    {% csrf_token %}
+
+    <!-- Displays Non-Field Errors & Server Exceptions -->
+    {% if form.non_field_errors %}
+        <div class="alert alert-danger border-0 bg-danger bg-opacity-25 text-white py-2 small mb-4 rounded-3 d-flex align-items-center">
+            <span class="material-icons me-2 fs-6">error_outline</span>
+            <div>
+                {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+    {% endif %}
+
+    <div class="mb-3 text-start">
+        <label for="id_username" class="form-label theme-label small fw-medium">Username</label>
+        <div class="input-group">
+            <span class="input-group-text theme-input-icon border-end-0">
+                <span class="material-icons fs-5">person</span>
+            </span>
+            <input type="text" 
+                   name="username" 
+                   id="id_username" 
+                   class="form-control theme-input border-start-0 ps-0" 
+                   placeholder="Enter your username"
+                   value="{{ form.username.value|default:'' }}" 
+                   required>
+        </div>
+        {% if form.username.errors %}
+            <div class="text-danger small mt-1 d-flex align-items-center">
+                <span class="material-icons fs-6 me-1">warning</span>{{ form.username.errors.0 }}
+            </div>
+        {% endif %}
+    </div>
+
+    <div class="mb-4 text-start">
+        <label for="id_password" class="form-label theme-label small fw-medium">Password</label>
+        <div class="input-group">
+            <span class="input-group-text theme-input-icon border-end-0">
+                <span class="material-icons fs-5">lock</span>
+            </span>
+            <input type="password" 
+                   name="password" 
+                   id="id_password" 
+                   class="form-control theme-input border-start-0 ps-0" 
+                   placeholder="••••••••" 
+                   required>
+        </div>
+        {% if form.password.errors %}
+            <div class="text-danger small mt-1 d-flex align-items-center">
+                <span class="material-icons fs-6 me-1">warning</span>{{ form.password.errors.0 }}
+            </div>
+        {% endif %}
+    </div>
+
+    <button type="submit" class="btn theme-btn-primary w-100 fw-bold py-2 shadow-sm d-flex align-items-center justify-content-center">
+        <span>Sign In</span>
+        <span class="material-icons ms-2 fs-5">arrow_forward</span>
+    </button>
+</form>

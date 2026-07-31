@@ -4,18 +4,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Login - Bug Tracker</title>
+    <title>Admin Login - Bug Tracker</title>
 
-    <!-- Bootstrap 5 CSS & Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    
-    <!-- HTMX Library -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
     <style>
-        /* Dynamic Theme CSS Variables */
         :root[data-theme="dark"] {
             --bg-gradient: linear-gradient(135deg, #0a102e 0%, #050505 100%);
             --glass-bg: rgba(18, 24, 36, 0.65);
@@ -31,7 +27,7 @@
             --btn-hover: #e2e8f0;
             --toggle-bg: rgba(255, 255, 255, 0.1);
             --toggle-border: rgba(255, 255, 255, 0.15);
-            --orb-color-1: rgba(78, 115, 223, 0.25);
+            --orb-color-1: rgba(220, 53, 69, 0.25);
             --orb-color-2: rgba(163, 112, 247, 0.2);
         }
 
@@ -50,7 +46,7 @@
             --btn-hover: #1e293b;
             --toggle-bg: rgba(0, 0, 0, 0.05);
             --toggle-border: rgba(0, 0, 0, 0.1);
-            --orb-color-1: rgba(59, 130, 246, 0.2);
+            --orb-color-1: rgba(220, 53, 69, 0.2);
             --orb-color-2: rgba(139, 92, 246, 0.15);
         }
 
@@ -67,7 +63,6 @@
             transition: background 0.4s ease;
         }
 
-        /* Background Ambient Glows */
         .ambient-orb {
             position: absolute;
             border-radius: 50%;
@@ -79,7 +74,6 @@
         .orb-1 { width: 320px; height: 320px; background: var(--orb-color-1); top: 15%; left: 20%; }
         .orb-2 { width: 380px; height: 380px; background: var(--orb-color-2); bottom: 15%; right: 20%; }
 
-        /* Theme Toggle Button */
         .theme-toggle-btn {
             position: fixed;
             top: 24px;
@@ -99,11 +93,8 @@
             transition: all 0.3s ease;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
         }
-        .theme-toggle-btn:hover {
-            transform: translateY(-2px);
-        }
+        .theme-toggle-btn:hover { transform: translateY(-2px); }
 
-        /* Glassmorphic Container */
         .login-card {
             position: relative;
             z-index: 10;
@@ -136,7 +127,6 @@
         .login-subtitle { color: var(--text-subtitle); transition: color 0.4s ease; }
         .theme-label { color: var(--text-subtitle); }
 
-        /* Form Inputs & Controls */
         .theme-input-icon {
             background: var(--input-bg) !important;
             border-color: var(--input-border) !important;
@@ -151,18 +141,12 @@
             transition: all 0.3s ease;
         }
 
-        .theme-input::placeholder {
-            color: var(--input-placeholder) !important;
-        }
-
-        .theme-input:focus {
-            box-shadow: none !important;
-            border-color: #4e73df !important;
-        }
+        .theme-input::placeholder { color: var(--input-placeholder) !important; }
+        .theme-input:focus { box-shadow: none !important; border-color: #dc3545 !important; }
 
         .input-group:focus-within .theme-input-icon {
-            border-color: #4e73df !important;
-            color: #4e73df !important;
+            border-color: #dc3545 !important;
+            color: #dc3545 !important;
         }
 
         .theme-btn-primary {
@@ -181,41 +165,34 @@
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
-    <!-- Ambient Floating Orbs -->
     <div class="ambient-orb orb-1"></div>
     <div class="ambient-orb orb-2"></div>
 
-    <!-- Theme Switcher Button -->
     <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle light and dark mode">
         <span class="material-icons fs-5" id="themeToggleIcon">dark_mode</span>
         <span class="small fw-medium" id="themeToggleText">Dark</span>
     </button>
 
-    <!-- Main Glass Card Container -->
     <div class="login-card text-center">
         <div class="brand-icon-wrapper">
-            <span class="material-icons fs-3">bug_report</span>
+            <span class="material-icons fs-3 text-danger">admin_panel_settings</span>
         </div>
-        <h3 class="login-title fw-bold mb-1">Bug Tracker</h3>
-        <p class="login-subtitle small mb-4">Sign in to access your dashboard</p>
+        <h3 class="login-title fw-bold mb-1">Admin Portal</h3>
+        <p class="login-subtitle small mb-4">Sign in to access management control</p>
 
-        <!-- HTMX Target Wrapper -->
         <div id="login-form-wrapper">
-            {% include "marmot/partials/login_form.html" %}
+            {% include "admins/partials/login_form.html" %}
         </div>
     </div>
 
     <script>
-        // --- 1. HTMX Error Swap Handling Engine ---
         document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
-            // Force HTMX to swap content for HTTP error codes (422 invalid form, 500 server error)
             if (evt.detail.xhr.status === 422 || evt.detail.xhr.status === 500) {
                 evt.detail.shouldSwap = true;
                 evt.detail.isError = false;
             }
         });
 
-        // --- 2. Dark/Light Theme Switching Engine ---
         (function() {
             const htmlElement = document.documentElement;
             const toggleBtn = document.getElementById('themeToggleBtn');

@@ -4,16 +4,21 @@ from django.conf.urls.static import static
 from django.urls import path, include
 
 urlpatterns = [
+    # Admin Interface
     path('admin/', admin.site.urls),
-    path('', include('apps.admins.urls')),
-    path('', include('apps.api.urls')),
-    path('', include('apps.common.urls')),
-    path('', include('apps.market.urls')),
-    path('', include('apps.masters.urls')),
-    path('', include('apps.notifications.urls')),
-    path('', include('apps.trade_config.urls')),
-    path('', include('apps.trade_core.urls')),
-    path('', include('apps.users.urls')),
+
+    # Core App Routes (Web / HTMX)
+    path('admins/', include(('apps.admins.urls', 'admins'), namespace='admins')),
+    path('common/', include(('apps.common.urls', 'common'), namespace='common')),
+    path('market/', include(('apps.market.urls', 'market'), namespace='market')),
+    path('masters/', include(('apps.masters.urls', 'masters'), namespace='masters')),
+    path('notifications/', include(('apps.notifications.urls', 'notifications'), namespace='notifications')),
+    path('trade-config/', include(('apps.trade_config.urls', 'trade_config'), namespace='trade_config')),
+    path('trade-core/', include(('apps.trade_core.urls', 'trade_core'), namespace='trade_core')),
+    path('users/', include(('apps.users.urls', 'users'), namespace='users')),
+
+    # REST API Routes
+    path('api/', include(('apps.api.urls', 'api'), namespace='api')),
 ]
 
 # Static + Media files (Development only)

@@ -1,49 +1,126 @@
-from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.contrib.auth import login as auth_login, logout as auth_logout
+from django.contrib.auth.views import LoginView
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.http import HttpResponse
+from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
+from django.views import View
 from django.views.generic import (
     CreateView,
     DeleteView,
     DetailView,
     ListView,
+    TemplateView,
     UpdateView,
 )
 from django.db.models import Q
-from .permissions import AdminRequiredMixin
 
 from apps.users.models import User, MemberRoleChoices, BrokerChoices, PLStatusChoices
+from apps.users.mixins import HTMXPartialMixin
+from .permissions import AdminRequiredMixin
 from .forms import UserForm
 
+
+# ==========================================
+# AUTH & DASHBOARD VIEWS
+# ==========================================
+
+class AdminLoginView(HTMXPartialMixin, LoginView):
+    template_name = 'admins/login.html'
+    partial_template_name = 'admins/partials/login_form.html'
+    redirect_authenticated_user = True
+
+    def form_valid(self, form):
+        try:
+            auth_login(self.request, form.get_user())
+            success_url = str(self.get_success_url())
+
+            if self.request.headers.get('HX-Request'):
+                response = HttpResponse(status=204)
+                response['HX-Redirect'] = success_url
+                return response
+
+            return redirect(success_url)
+
+        except Exception as e:
+            form.add_error(None, f"An unexpected error occurred: {str(e)}")
+            return self.form_invalid(form)
+
+    def form_invalid(self, form):
+        if self.request.headers.get('HX-Request'):
+            return render(
+                self.request,
+                self.partial_template_name,
+                self.get_context_data(form=form),
+                status=422
+            )
+        return super().form_invalid(form)
+
+    def get_success_url(self):
+        return reverse_lazy('admins:admin-dashboard')
+
+
+class AdminDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """
+    Protected Admin Dashboard View.
+    """
+    template_name = 'admins/dashboard.html'
+    partial_template_name = 'admins/partials/dashboard_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['total_traders'] = User.objects.filter(role=MemberRoleChoices.TRADERS).count()
+        context['active_traders'] = User.objects.filter(
+            role=MemberRoleChoices.TRADERS, trade_eligibility=True
+        ).count()
+        return context
+
+
+class AdminLogoutView(View):
+    """
+    Logs out the admin user with HTMX client-side redirect support.
+    """
+    def post(self, request, *args, **kwargs):
+        auth_logout(request)
+        login_url = str(reverse_lazy('admins:admin-login'))
+
+        if request.headers.get('HX-Request'):
+            response = HttpResponse(status=204)
+            response['HX-Redirect'] = login_url
+            return response
+
+        return redirect(login_url)
+
+
+# ==========================================
+# TRADER MANAGEMENT VIEWS
+# ==========================================
 
 class AdminMarmotTraderListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
     model = User
     template_name = 'marmot/trader_list.html'
     context_object_name = 'traders'
-    ordering = ['-created_at']
-    paginate_by = 10  # Adjust as needed
+    paginate_by = 10
 
     def get_queryset(self):
         queryset = super().get_queryset().filter(role=MemberRoleChoices.TRADERS)
 
-        # 1. Search Query (Name, Username, Email)
         q = self.request.GET.get('q', '').strip()
         if q:
             queryset = queryset.filter(
-                Q(name__icontains=q) |
+                Q(first_name__icontains=q) |
                 Q(username__icontains=q) |
                 Q(email__icontains=q)
             )
 
-        # 2. Broker Filter
         broker = self.request.GET.get('broker', '').strip()
         if broker:
             queryset = queryset.filter(broker=broker)
 
-        # 3. Phone Number Filter
         phone_number = self.request.GET.get('phone_number', '').strip()
         if phone_number:
             queryset = queryset.filter(phone_number__icontains=phone_number)
 
-        # 4. Trade Eligibility Filter
         trade_eligibility = self.request.GET.get('trade_eligibility', '').strip()
         if trade_eligibility in ['true', 'false']:
             queryset = queryset.filter(trade_eligibility=(trade_eligibility == 'true'))
@@ -52,13 +129,10 @@ class AdminMarmotTraderListView(LoginRequiredMixin, AdminRequiredMixin, ListView
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-
-        # Context choices for filter dropdowns
         context['BrokerChoices'] = BrokerChoices
         context['MemberRoleChoices'] = MemberRoleChoices
         context['PLStatusChoices'] = PLStatusChoices
 
-        # Preserve search filters across pagination links
         query_params = self.request.GET.copy()
         query_params.pop('page', None)
         context['current_filters'] = query_params.urlencode()
@@ -73,7 +147,6 @@ class AdminMarmotTraderCreateView(LoginRequiredMixin, AdminRequiredMixin, Create
     success_url = reverse_lazy('admins:marmot_trader_list')
 
     def form_valid(self, form):
-        # Automatically assign the TRADERS role on creation
         form.instance.role = MemberRoleChoices.TRADERS
         return super().form_valid(form)
 
@@ -85,12 +158,7 @@ class AdminMarmotTraderUpdateView(LoginRequiredMixin, AdminRequiredMixin, Update
     success_url = reverse_lazy('admins:marmot_trader_list')
 
     def get_queryset(self):
-        # Restrict updates strictly to TRADERS
-        return (
-            super()
-            .get_queryset()
-            .filter(role=MemberRoleChoices.TRADERS)
-        )
+        return super().get_queryset().filter(role=MemberRoleChoices.TRADERS)
 
 
 class AdminMarmotTraderDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
@@ -99,16 +167,10 @@ class AdminMarmotTraderDetailView(LoginRequiredMixin, AdminRequiredMixin, Detail
     context_object_name = 'trader'
 
     def get_queryset(self):
-        # Restrict detail view strictly to TRADERS
-        return (
-            super()
-            .get_queryset()
-            .filter(role=MemberRoleChoices.TRADERS)
-        )
+        return super().get_queryset().filter(role=MemberRoleChoices.TRADERS)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        # Fetch execution configuration if it exists
         context['exec_config'] = getattr(self.object, 'exec_config', None)
         return context
 
@@ -119,9 +181,4 @@ class AdminMarmotTraderDeleteView(LoginRequiredMixin, AdminRequiredMixin, Delete
     success_url = reverse_lazy('admins:marmot_trader_list')
 
     def get_queryset(self):
-        # Restrict deletion strictly to TRADERS
-        return (
-            super()
-            .get_queryset()
-            .filter(role=MemberRoleChoices.TRADERS)
-        )
+        return super().get_queryset().filter(role=MemberRoleChoices.TRADERS)

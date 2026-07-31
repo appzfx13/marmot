@@ -24,8 +24,9 @@ echo "PostgreSQL started successfully!"
 
 # --- Migrations ---
 echo "Making and applying migrations..."
-python manage.py makemigrations --noinput
-python manage.py migrate --noinput
+python manage.py makemigrations users --noinput  # <-- STEP 1: Generate users migration first
+python manage.py makemigrations --noinput        # <-- STEP 2: Generate remaining migrations
+python manage.py migrate --noinput               # <-- STEP 3: Apply migrations in order
 
 # --- Static Files ---
 echo "Collecting static files..."
@@ -35,5 +36,5 @@ python manage.py collectstatic --noinput
 echo "Checking/Creating Superuser..."
 python manage.py initadmin
 
-# Execute main container process (e.g., daphne)
+# Execute main container process
 exec "$@"

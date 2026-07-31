@@ -5,10 +5,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>{% block title %}Dashboard - Bug Tracker{% endblock %}</title>
+    
+    <!-- Bootstrap 5 CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     
+    <!-- HTMX Library -->
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 
 <style>
@@ -125,13 +129,6 @@
         transition: margin-left 0.3s ease;
     }
 
-    /* Recent Activity List */
-    .recent-activity-item {
-        padding: 10px 0;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        font-size: 0.85rem;
-    }
-
     /* Toggle Button Reset Custom Styling */
     .toggle-sidebar-btn {
         background: none;
@@ -144,236 +141,7 @@
         justify-content: center;
     }
 
-    /* --- Isolated Custom Glass Notification Component System --- */
-    .floating-notif-center-wrapper {
-        position: fixed;
-        top: 30px;
-        right: 24px;
-        z-index: 1100;
-        display: flex;
-        align-items: center;
-    }
-
-    .layout-bell-wrapper {
-        position: relative;
-        display: inline-block;
-    }
-
-    .floating-bell-pill-btn {
-        width: 56px;
-        height: 56px;
-        border-radius: 50%;
-        background: rgba(18, 24, 36, 0.7);
-        backdrop-filter: blur(14px) saturate(180%);
-        -webkit-backdrop-filter: blur(14px) saturate(180%);
-        border: 1px solid rgba(255, 255, 255, 0.1);
-        color: #ffffff;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
-        cursor: pointer;
-        transition: transform 0.2s, background-color 0.2s;
-    }
-
-    .floating-bell-pill-btn:hover {
-        background: rgba(18, 24, 36, 0.9);
-        transform: translateY(-1px);
-    }
-
-    /* Red Active Counter Badge Micro-Animation Trigger */
-    @keyframes layoutBadgeBounce {
-        0%, 100% { transform: scale(1); }
-        50% { transform: scale(1.18); }
-    }
-
-    .layout-bell-counter-badge {
-        position: absolute;
-        top: -2px;
-        right: -2px;
-        background-color: #fc0a0a; /* Pure red dashboard indicator color */
-        color: white;
-        font-size: 0.75rem;
-        font-weight: 700;
-        min-width: 18px;
-        height: 18px;
-        border-radius: 10px;
-        display: none; /* Managed dynamically via JavaScript */
-        align-items: center;
-        justify-content: center;
-        padding: 0 4px;
-        box-shadow: 0 0 0 2px #0a102e;
-        animation: layoutBadgeBounce 2.5s infinite ease-in-out;
-        z-index: 10;
-    }
-
-    /* Micro-Interaction Animation for Panel Entry */
-    @keyframes layoutDropdownFadeIn {
-        from { opacity: 0; transform: translateY(12px); }
-        to { opacity: 1; transform: translateY(0); }
-    }
-
-    .layout-bell-dropdown-panel {
-        position: absolute;
-        top: 64px;
-        right: 0;
-        width: 360px;
-        background: rgba(18, 24, 36, 0.95);
-        backdrop-filter: blur(25px) saturate(200%);
-        -webkit-backdrop-filter: blur(25px) saturate(200%);
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        border-radius: 16px;
-        box-shadow: 0 24px 48px rgba(0, 0, 0, 0.8);
-        display: none;
-        flex-direction: column;
-        overflow: hidden;
-        z-index: 1110;
-    }
-
-    .layout-bell-dropdown-panel.layout-show {
-        display: flex;
-        animation: layoutDropdownFadeIn 0.25s cubic-bezier(0.4, 0, 0.2, 1) forwards;
-    }
-
-    .layout-bell-dropdown-header {
-        padding: 14px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
-        font-weight: 700;
-        font-size: 0.875rem;
-    }
-
-    /* --- Cleaning / Sweeping Animation Classes --- */
-    .btn-sweep-clean {
-        position: relative;
-        cursor: pointer;
-        font-size: 0.75rem;
-        color: #4e73df !important;
-        font-weight: 700;
-        display: flex;
-        align-items: center;
-        gap: 4px;
-        background: transparent;
-        border: none;
-        padding: 4px 8px;
-        border-radius: 6px;
-        overflow: hidden;
-        transition: color 0.2s easy-in-out, opacity 0.2s;
-    }
-    .btn-sweep-clean:hover {
-        color: #60a5fa !important;
-        background: rgba(255, 255, 255, 0.05);
-    }
-    .btn-sweep-clean .clean-icon {
-        font-size: 14px !important;
-        display: none;
-        opacity: 0;
-        transform: rotate(0deg);
-    }
-
-    /* Active State Class applied by JS during processing */
-    .btn-sweep-clean.is-cleaning {
-        color: #a3e635 !important; /* Bright clean lime tint */
-        pointer-events: none;
-    }
-    .btn-sweep-clean.is-cleaning .clean-icon {
-        display: inline-block;
-        animation: brushWiggleSweep 0.6s infinite ease-in-out, fadeInIcon 0.2s forwards;
-    }
-    .btn-sweep-clean.is-cleaning::after {
-        content: '';
-        position: absolute;
-        top: 0;
-        left: -100%;
-        width: 100%;
-        height: 100%;
-        background: linear-gradient(90deg, transparent, rgba(163, 230, 53, 0.3), transparent);
-        animation: textSweepGlow 1.2s infinite linear;
-    }
-
-    /* Row sweep effect out state */
-    .layout-bell-row-item.sweeping-out {
-        transform: translateX(100%);
-        opacity: 0;
-        height: 0;
-        padding-top: 0 !important;
-        padding-bottom: 0 !important;
-        border: none !important;
-        transition: transform 0.4s cubic-bezier(0.4, 0, 1, 1), opacity 0.3s ease, height 0.3s ease 0.1s;
-    }
-
-    @keyframes fadeInIcon {
-        to { opacity: 1; }
-    }
-    @keyframes brushWiggleSweep {
-        0%, 100% { transform: rotate(0deg) translateY(0); }
-        25% { transform: rotate(-15deg) translateY(-1px); }
-        75% { transform: rotate(15deg) translateY(1px); }
-    }
-    @keyframes textSweepGlow {
-        0% { left: -100%; }
-        100% { left: 100%; }
-    }
-    
-    /* Sleek Custom Scrollbar for Glass Menu Dropdown panel */
-    .layout-bell-scroll-container {
-        max-height: 350px;
-        overflow-y: auto;
-        scrollbar-width: thin;
-        scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
-    }
-    .layout-bell-scroll-container::-webkit-scrollbar {
-        width: 5px;
-    }
-    .layout-bell-scroll-container::-webkit-scrollbar-track {
-        background: transparent;
-    }
-    .layout-bell-scroll-container::-webkit-scrollbar-thumb {
-        background: rgba(255, 255, 255, 0.15);
-        border-radius: 10px;
-    }
-    
-    .layout-bell-row-item {
-        padding: 14px 18px;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-        transition: background-color 0.2s ease, transform 0.3s ease, opacity 0.3s ease, height 0.3s ease;
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
-        gap: 4px;
-        overflow: hidden;
-    }
-    .layout-bell-row-item:hover { background-color: rgba(255, 255, 255, 0.04); }
-    .layout-bell-row-item.layout-unread { background-color: rgba(78, 115, 223, 0.08); }
-    .layout-bell-row-item.layout-unread:hover { background-color: rgba(78, 115, 223, 0.14); }
-    
-    .layout-bell-meta-footer {
-        display: flex;
-        justify-content: space-between;
-        font-size: 0.7rem;
-        opacity: 0.6;
-        margin-top: 2px;
-    }
-
-    .layout-bell-redirect-footer {
-        padding: 14px;
-        text-align: center;
-        border-top: 1px solid rgba(255, 255, 255, 0.08);
-        background: rgba(0, 0, 0, 0.2);
-    }
-    .layout-bell-redirect-footer a {
-        color: #4e73df;
-        text-decoration: none;
-        font-size: 0.825rem;
-        font-weight: 700;
-        display: inline-block;
-        transition: color 0.2s;
-    }
-    .layout-bell-redirect-footer a:hover { color: #60a5fa; }
-
-    /* --- Floating Glass Toast Engine CSS System --- */
+    /* Floating Glass Toast Engine */
     #glass-toast-container {
         position: fixed;
         top: 96px;
@@ -404,26 +172,6 @@
         opacity: 0;
     }
     .glass-toast-card.show { transform: translateX(0); opacity: 1; }
-    .glass-toast-card.status_changed { border-left-color: #f6c23e; }
-    .glass-toast-card.issue_assigned { border-left-color: #1cc88a; }
-    .glass-toast-card.management_announcement { border-left-color: #a370f7; }
-    .glass-toast-card.admin_announcement, .glass-toast-card.system_alert { border-left-color: #e74a3b; }
-
-    .glass-toast-icon { font-size: 20px; margin-top: 2px; }
-    .glass-toast-body { flex: 1; }
-    .glass-toast-title { font-weight: 700; font-size: 0.875rem; margin-bottom: 2px; }
-    .glass-toast-msg { font-size: 0.8rem; color: rgba(255, 255, 255, 0.65); line-height: 1.4; }
-    .glass-toast-close { background: none; border: none; color: rgba(255, 255, 255, 0.4); cursor: pointer; padding: 0; font-size: 16px; }
-    .glass-toast-close:hover { color: #ffffff; }
-
-    /* Accordion Row Modifiers */
-    .Accordion-arrow-icon {
-        transition: transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-        display: inline-block;
-    }
-    .issue-card.is-open .Accordion-arrow-icon {
-        transform: rotate(180deg) !important;
-    }
 
     @media (max-width: 767.98px) {
         .sidebar {
@@ -436,7 +184,6 @@
         }
         .sidebar.show { transform: translateX(0); }
         .main-with-sidebar { margin-left: 0 !important; padding-top: 5rem !important; }
-        .floating-notif-center-wrapper { top: 16px; right: 16px; }
         #glass-toast-container { right: 16px; top: 80px; width: calc(100vw - 32px); }
     }
 
@@ -449,44 +196,16 @@
 </style>
     {% block extra_head %}{% endblock %}
 </head>
-<body>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
     <div id="glass-toast-container"></div>
-
-    <div class="floating-notif-center-wrapper">
-        <div class="layout-bell-wrapper">
-            <div class="floating-bell-pill-btn" id="layoutUniqueBellTriggerBtn" title="Toggle Notifications Panel">
-                <span class="material-icons" style="font-size: 22px;">notifications</span>
-                <span class="layout-bell-counter-badge" id="layoutUniqueBellBadgeCounter">0</span>
-            </div>
-            
-            <div class="layout-bell-dropdown-panel" id="layoutUniqueBellDropdownPanel">
-                <div class="layout-bell-dropdown-header text-white">
-                    <span>Notifications Feed</span>
-                    <button id="layoutUniqueMarkAllReadBtn" class="btn-sweep-clean">
-                        <span class="material-icons clean-icon">auto_fix_high</span>
-                        <span class="btn-text">Mark all as read</span>
-                    </button>
-                </div>
-                
-                <div class="layout-bell-scroll-container" id="layoutUniqueBellItemsContainer">
-                    <div class="text-center py-4 text-white-50 small" id="layoutUniqueEmptyPlaceholder">
-                        <span class="material-icons d-block mb-1 opacity-50">notifications_off</span> No new alerts
-                    </div>
-                </div>
-                
-                <div class="layout-bell-redirect-footer">
-                    <a href="{% url 'notifications:inbox_list' %}" id="layoutUniqueInboxRedirectBtn">Go to Notifications Inbox View →</a>
-                </div>
-            </div>
-        </div>
-    </div>
 
     <button class="mobile-fab-toggle d-md-none" id="mobileSidebarToggle" aria-label="Toggle Navigation Menu">
         <span class="material-icons fs-2" id="mobileToggleIcon">menu</span>
     </button>
 
     <div class="d-flex flex-column flex-md-row">
+        <!-- Sidebar -->
         <div class="sidebar p-4 vh-100 position-fixed d-flex flex-column" id="mainSidebar">
             <div class="mb-4 d-flex align-items-center justify-content-between">
                 <div>
@@ -499,11 +218,16 @@
             </div>
 
             <nav class="nav flex-column flex-grow-1" id="sidebarNavigationContent">
-                <a class="nav-link fs-5 py-2 {% block nav_marmot_traders_active %}{% endblock %}" href="{% url 'admins:marmot_trader_list' %}">
-                    <span class="material-icons me-2">show_chart</span>Marmot Traders
+                <a class="nav-link fs-5 py-2 {% block nav_dashboard_active %}{% endblock %}" href="{% url 'users:marmot-dashboard' %}">
+                    <span class="material-icons me-2">dashboard</span>Dashboard
                 </a>
             </nav>
-            <button type="button" class="btn btn-light d-flex align-items-center mt-5 fs-5 py-2 w-100 justify-content-center" data-bs-toggle="modal" data-bs-target="#logoutModal">
+
+            <!-- Direct HTMX Logout or Trigger Modal -->
+            <button type="button" 
+                    class="btn btn-light d-flex align-items-center mt-5 fs-5 py-2 w-100 justify-content-center"
+                    data-bs-toggle="modal" 
+                    data-bs-target="#logoutModal">
                 <span class="material-icons me-2">logout</span>Logout
             </button>
         </div>
@@ -512,13 +236,15 @@
             <span class="material-icons text-white m-1">menu</span>
         </button>
 
+        <!-- Main Body -->
         <div class="flex-grow-1 p-4 main-with-sidebar" id="mainContentBody">
-            <div class="container-fluid">
+            <div class="container-fluid" id="app-main-container">
                 {% block dashboard_content %}{% endblock %}
             </div>
         </div>
     </div>
 
+    <!-- Glassmorphic HTMX Logout Confirmation Modal -->
     <div class="modal fade" id="logoutModal" tabindex="-1" aria-labelledby="logoutModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content glass-card">
@@ -526,210 +252,23 @@
                     <h5 class="modal-title text-white" id="logoutModalLabel">Confirm Logout</h5>
                     <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
                 </div>
-                <div class="modal-body text-white-50">Are you sure you want to log out?</div>
+                <div class="modal-body text-white-50">Are you sure you want to log out of Bug Tracker?</div>
                 <div class="modal-footer border-0">
                     <button type="button" class="btn btn-outline-light" data-bs-dismiss="modal">Cancel</button>
-                    <form method="post" action="{% url 'users:logout' %}">
-                        {% csrf_token %}
-                        <button type="submit" class="btn btn-light text-primary fw-bold">Logout</button>
-                    </form>
+                    <!-- HTMX Logout Trigger -->
+                    <button type="button" 
+                            hx-post="{% url 'users:marmot-logout' %}" 
+                            class="btn btn-light text-primary fw-bold">
+                        Logout
+                    </button>
                 </div>
             </div>
         </div>
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-    
+
     <script>
-        // Global tracking set to block repeating alert triggers
-        const layoutToastTrackerIds = new Set();
-
-        /**
-         * Parses dates securely to create custom relative outputs like "5 minutes ago"
-         */
-        function layoutFormatRelativeTime(dateString) {
-            if (!dateString) return '';
-            if (dateString.includes('ago') || dateString.includes('now')) {
-                return dateString;
-            }
-
-            try {
-                const now = new Date();
-                let past = new Date(dateString);
-                
-                // Fallback catch parameters for custom short strings lacking explicit descriptors
-                if (isNaN(past.getTime())) {
-                    const currentYear = now.getFullYear();
-                    const testDate = new Date(`${dateString} ${currentYear}`);
-                    if (!isNaN(testDate.getTime())) {
-                        past = testDate;
-                    } else {
-                        return dateString; 
-                    }
-                }
-
-                const secondsDiff = Math.floor((now - past) / 1000);
-                if (secondsDiff < 5 || secondsDiff < 0) return 'Just now';
-                if (secondsDiff < 60) return `${secondsDiff} seconds ago`;
-
-                const minutesDiff = Math.floor(secondsDiff / 60);
-                if (minutesDiff < 60) return `${minutesDiff} minute${minutesDiff > 1 ? 's' : ''} ago`;
-
-                const hoursDiff = Math.floor(minutesDiff / 60);
-                if (hoursDiff < 24) return `${hoursDiff} hour${hoursDiff > 1 ? 's' : ''} ago`;
-
-                const daysDiff = Math.floor(hoursDiff / 24);
-                if (daysDiff < 30) return `${daysDiff} day${daysDiff > 1 ? 's' : ''} ago`;
-
-                return past.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-            } catch (e) {
-                return dateString;
-            }
-        }
-
-        /**
-         * Triggers explosive canvas celebration confetti bursts
-         */
-        function triggerGlobalConfettiExplosion() {
-            if (typeof confetti !== 'function') return;
-            confetti({ particleCount: 60, spread: 70, origin: { y: 0.8 }, zIndex: 1200 });
-        }
-
-        /**
-         * Global Glass-Themed Toast Element Builder Engine
-         */
-        function makeLayoutGlassToast(title, message, type = 'status_changed') {
-            const container = document.getElementById('glass-toast-container');
-            if (!container) return;
-
-            const toast = document.createElement('div');
-            const toastUid = Math.floor(Math.random() * 100000);
-            toast.className = `glass-toast-card ${type}`;
-            toast.id = `layout-toast-${toastUid}`;
-
-            let icon = 'notifications';
-            if (type === 'status_changed') icon = 'sync';
-            if (type === 'issue_assigned') icon = 'person_add';
-            if (type === 'management_announcement') icon = 'campaign';
-            if (type === 'admin_announcement' || type === 'system_alert') icon = 'report_problem';
-
-            const lowerMsg = message.toLowerCase();
-            if (lowerMsg.includes('done') || lowerMsg.includes('success')) {
-                icon = 'check_circle';
-            }
-
-            toast.innerHTML = `
-                <span class="material-icons glass-toast-icon">${icon}</span>
-                <div class="glass-toast-body">
-                    <div class="glass-toast-title">${title}</div>
-                    <div class="glass-toast-msg">${message}</div>
-                </div>
-                <button class="glass-toast-close" onclick="dismissLayoutToast(${toastUid})">
-                    <span class="material-icons" style="font-size: 16px;">close</span>
-                </button>
-            `;
-
-            container.appendChild(toast);
-            setTimeout(() => toast.classList.add('show'), 50);
-
-            if (lowerMsg.includes('done') || lowerMsg.includes('successfully')) {
-                triggerGlobalConfettiExplosion();
-            }
-
-            setTimeout(() => dismissLayoutToast(toastUid), 6000);
-        }
-
-        function dismissLayoutToast(uid) {
-            const element = document.getElementById(`layout-toast-${uid}`);
-            if (element) {
-                element.classList.remove('show');
-                setTimeout(() => element.remove(), 350);
-            }
-        }
-
-        /**
-         * Core AJAX Notification Polling Loop Engine (Runs every 30 seconds)
-         */
-        function pollLiveNotificationCenter() {
-            fetch('/notifications/api/live/', {
-                method: 'GET',
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(res => res.json())
-            .then(data => {
-                const badge = document.getElementById('layoutUniqueBellBadgeCounter');
-                const itemsContainer = document.getElementById('layoutUniqueBellItemsContainer');
-
-                if (!badge || !itemsContainer) return;
-
-                // 1. Manage Navbar Pill Badge Visibility
-                if (data.unread_count > 0) {
-                    badge.textContent = data.unread_count;
-                    badge.style.display = 'flex';
-                } else {
-                    badge.style.display = 'none';
-                }
-
-                // 2. Populate Dropdown Panel Rows
-                if (data.notifications && data.notifications.length > 0) {
-                    let itemsHtml = '';
-                    data.notifications.forEach(item => {
-                        const unreadClass = item.is_read ? '' : 'layout-unread';
-                        const timeAgoText = layoutFormatRelativeTime(item.created_at);
-                        const senderName = item.sender || "System";
-
-                        itemsHtml += `
-                            <div class="layout-bell-row-item ${unreadClass}" data-id="${item.id}" onclick="markSingleNotificationRead(${item.id}, this)">
-                                <span class="text-white fw-bold small" style="font-size:0.8rem;">${item.title}</span>
-                                <span class="text-white-50 smaller mt-1" style="font-size:0.75rem; line-height:1.3;">${item.message}</span>
-                                <div class="layout-bell-meta-footer text-muted">
-                                    <span>From: <strong>${senderName}</strong></span>
-                                    <span>${timeAgoText}</span>
-                                </div>
-                            </div>
-                        `;
-
-                        // 3. Trigger dynamic floating toast for fresh unread arrivals
-                        if (!item.is_read && !layoutToastTrackerIds.has(item.id)) {
-                            layoutToastTrackerIds.add(item.id);
-                            makeLayoutGlassToast(item.title, item.message, item.type);
-                        }
-                    });
-                    itemsContainer.innerHTML = itemsHtml;
-                } else {
-                    itemsContainer.innerHTML = `
-                        <div class="text-center py-4 text-white-50 small" id="layoutUniqueEmptyPlaceholder">
-                            <span class="material-icons d-block mb-1 opacity-50">notifications_off</span> No new alerts
-                        </div>
-                    `;
-                }
-            })
-            .catch(err => console.warn("Live notification frame polling cycle suspended.", err));
-        }
-
-        /**
-         * Interactive Action: Mark a single notification row item as Read via POST with row sweeping transition
-         */
-        function markSingleNotificationRead(id, element) {
-            if (!element) return;
-            
-            // Add individual sweep effect
-            element.classList.add('sweeping-out');
-            
-            const formData = new FormData();
-            formData.append('notification_id', id);
-            
-            setTimeout(() => {
-                fetch('/notifications/api/live/', {
-                    method: 'POST',
-                    headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' },
-                    body: formData
-                })
-                .then(res => res.json())
-                .then(() => pollLiveNotificationCenter());
-            }, 300);
-        }
-
         document.addEventListener("DOMContentLoaded", function() {
             const sidebar = document.getElementById('mainSidebar');
             const mainContentBody = document.getElementById('mainContentBody');
@@ -737,107 +276,7 @@
             const mobileToggleIcon = document.getElementById('mobileToggleIcon');
             const desktopSidebarToggle = document.getElementById('desktopSidebarToggle');
             const floatingOpenBtn = document.getElementById('sidebarFloatingOpenBtn');
-            const sidebarNavigationContent = document.getElementById('sidebarNavigationContent');
 
-            // --- Notification Bell Toggle Trigger Handling ---
-            const bellBtn = document.getElementById('layoutUniqueBellTriggerBtn');
-            const dropdownPanel = document.getElementById('layoutUniqueBellDropdownPanel');
-            const markAllBtn = document.getElementById('layoutUniqueMarkAllReadBtn');
-
-            // Lifecyle Hooks for Accordion States
-            document.addEventListener('show.bs.collapse', function (e) {
-                const targetCard = e.target.closest('.issue-card');
-                if (targetCard) targetCard.classList.add('is-open');
-            });
-
-            document.addEventListener('hide.bs.collapse', function (e) {
-                const targetCard = e.target.closest('.issue-card');
-                if (targetCard) targetCard.classList.remove('is-open');
-            });
-
-            if (bellBtn && dropdownPanel) {
-                bellBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    dropdownPanel.classList.toggle('layout-show');
-                });
-            }
-
-            if (markAllBtn) {
-                markAllBtn.addEventListener('click', function(e) {
-                    e.stopPropagation();
-                    
-                    const btnTextNode = markAllBtn.querySelector('.btn-text');
-                    const unreadRows = document.querySelectorAll('.layout-bell-row-item.layout-unread');
-                    
-                    // Activate cleaning animations
-                    markAllBtn.classList.add('is-cleaning');
-                    if (btnTextNode) btnTextNode.textContent = 'Cleaning...';
-
-                    // Sweep out all current active rows visually
-                    unreadRows.forEach((row, index) => {
-                        setTimeout(() => {
-                            row.classList.add('sweeping-out');
-                        }, index * 60); 
-                    });
-
-                    const formData = new FormData();
-                    formData.append('mark_all', 'true');
-
-                    // Allow time for the visual sweep transition to complete before request resolution
-                    setTimeout(() => {
-                        fetch('/notifications/api/live/', {
-                            method: 'POST',
-                            headers: { 'X-CSRFToken': '{{ csrf_token }}', 'X-Requested-With': 'XMLHttpRequest' },
-                            body: formData
-                        })
-                        .then(res => res.json())
-                        .then(() => {
-                            // Reset button configurations
-                            markAllBtn.classList.remove('is-cleaning');
-                            if (btnTextNode) btnTextNode.textContent = 'Mark all as read';
-                            
-                            triggerGlobalConfettiExplosion();
-                            
-                            setTimeout(() => {
-                                dropdownPanel.classList.remove('layout-show');
-                                pollLiveNotificationCenter();
-                            }, 400);
-                        })
-                        .catch(() => {
-                            markAllBtn.classList.remove('is-cleaning');
-                            if (btnTextNode) btnTextNode.textContent = 'Mark all as read';
-                            pollLiveNotificationCenter();
-                        });
-                    }, Math.max(400, unreadRows.length * 60));
-                });
-            }
-
-            // Close notification panel if clicking outside workspace bounds
-            document.addEventListener('click', function(e) {
-                if (dropdownPanel && !dropdownPanel.contains(e.target) && !bellBtn.contains(e.target)) {
-                    dropdownPanel.classList.remove('layout-show');
-                }
-            });
-
-            // Initial boot cycle triggers
-            pollLiveNotificationCenter();
-            setInterval(pollLiveNotificationCenter, 30000); // 30 seconds interval
-
-            // --- Django Standard Messages Integration Broker Block ---
-            {% if messages %}
-                {% for message in messages %}
-                    let layoutNotifClassTag = 'status_changed';
-                    {% if message.tags == 'error' or message.tags == 'danger' %} layoutNotifClassTag = 'system_alert';
-                    {% elif message.tags == 'success' %} layoutNotifClassTag = 'issue_assigned';
-                    {% endif %}
-                    
-                    setTimeout(() => {
-                        makeLayoutGlassToast("System Update", "{{ message|safe }}", layoutNotifClassTag);
-                    }, 400);
-                {% endfor %}
-            {% endif %}
-
-            // --- Standard Layout Core Responsive Script Interactions ---
             if (mobileSidebarToggle) {
                 mobileSidebarToggle.addEventListener('click', function(e) {
                     e.stopPropagation();
@@ -847,31 +286,6 @@
                     }
                 });
             }
-
-            if (sidebarNavigationContent) {
-                sidebarNavigationContent.addEventListener('click', function(e) {
-                    if (window.innerWidth < 768 && e.target.closest('.nav-link')) {
-                        sidebar.classList.remove('show');
-                        if (mobileToggleIcon) mobileToggleIcon.innerText = 'menu';
-                    }
-                });
-            }
-
-            document.addEventListener('click', function(event) {
-                if (window.innerWidth < 768) {
-                    const isClickInsideSidebar = sidebar.contains(event.target);
-                    const isClickOnToggle = mobileSidebarToggle ? mobileSidebarToggle.contains(event.target) : false;
-                    
-                    if (event.target.closest('.issue-card') || event.target.closest('.modal')) {
-                        return;
-                    }
-
-                    if (!isClickInsideSidebar && !isClickOnToggle && sidebar.classList.contains('show')) {
-                        sidebar.classList.remove('show');
-                        if (mobileToggleIcon) mobileToggleIcon.innerText = 'menu';
-                    }
-                }
-            });
 
             function toggleDesktopSidebar(hide) {
                 if (hide) {
@@ -893,7 +307,6 @@
             }
         });
     </script>
-
     {% block extra_js %}{% endblock %}
 </body>
 </html>

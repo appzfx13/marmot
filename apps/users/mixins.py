@@ -1,37 +1,30 @@
 from django.contrib.auth.mixins import UserPassesTestMixin
-from .models import User, TeamMember, MemberRoleChoices
+from django.shortcuts import redirect
+from .permissions import is_user_authorized_for_dashboard
+
+
+class HTMXPartialMixin:
+    """
+    Renders partial template for HTMX dynamic requests and the full 
+    template for direct browser page reloads/visits.
+    """
+    partial_template_name = None
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Request') and not self.request.headers.get('HX-Boosted'):
+            if self.partial_template_name:
+                return [self.partial_template_name]
+        return [self.template_name]
 
 
 class MarmotRoleRequiredMixin(UserPassesTestMixin):
-    allowed_roles = [
-        MemberRoleChoices.ADMIN,
-        MemberRoleChoices.TRADERS,
-    ]
-
+    """
+    Django View Mixin to restrict access based on dashboard roles.
+    """
     def test_func(self):
-        user = self.request.user
-        if not user.is_authenticated:
-            return False
+        return is_user_authorized_for_dashboard(self.request.user)
 
-        if user.is_superuser:
-            return True
+    def handle_no_permission(self):
+        return redirect('users:marmot-login')
 
-        allowed_values = [
-            role.value if hasattr(role, 'value') else role
-            for role in self.allowed_roles
-        ]
 
-        # 1. Check TeamMember profile linked to auth user
-        if hasattr(user, 'team_member') and user.team_member:
-            if user.team_member.role in allowed_values:
-                return True
-
-        # 2. Check User record matching user's username or email
-        marmot_user = User.objects.filter(
-            name__iexact=user.username
-        ).first()
-        if marmot_user and marmot_user.role in allowed_values:
-            return True
-
-        # 3. Check Django Groups as fallback
-        return user.groups.filter(name__in=allowed_values).exists()
