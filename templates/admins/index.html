@@ -80,12 +80,20 @@
             transition: transform 0.3s ease, background 0.3s ease, border-color 0.3s ease;
         }
 
-
         body.sidebar-collapsed .sidebar {
             transform: translateX(-100%);
         }
         body.sidebar-collapsed .main-with-sidebar {
             margin-left: 0 !important;
+        }
+
+        .sticky-top-navbar {
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+            padding-top: 1.5rem;
+            margin-top: -1.5rem;
+            {% comment %} background: var(--bg-gradient); {% endcomment %}
         }
 
         .glass-card {
@@ -132,23 +140,6 @@
             padding: 1.5rem !important;
             margin-left: var(--sidebar-width);
             transition: margin-left 0.3s ease;
-        }
-
-        /* Glassmorphic Sticky Header */
-        .top-nav-sticky-wrapper {
-            position: sticky;
-            top: 0;
-            z-index: 1000;
-            padding: 1rem 0;
-            margin-bottom: 1rem;
-            background: rgba(18, 24, 36, 0.3); /* Base semi-transparent */
-            backdrop-filter: blur(15px);
-            -webkit-backdrop-filter: blur(15px);
-            border-bottom: 1px solid var(--border-color);
-            margin-left: -1.5rem;
-            margin-right: -1.5rem;
-            padding-left: 1.5rem;
-            padding-right: 1.5rem;
         }
 
         .top-action-bar {
@@ -248,18 +239,14 @@
 </head>
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
-    <!-- Toast Messages Container for Django & HTMX -->
     <div id="django-messages" hx-swap-oob="true">
         {% include "includes/messages.html" %}
     </div>
-    <!-- ADD THIS: Global Action Modal for HTMX -->
     {% include "includes/global_modal.html" %}
 
-    <!-- Mobile Sidebar Backdrop Overlay -->
     <div class="sidebar-overlay" id="sidebarOverlay"></div>
 
     <div class="d-flex flex-column flex-md-row">
-        <!-- Glassmorphic Admin Sidebar -->
         <div class="sidebar p-3 vh-100 position-fixed d-flex flex-column" id="mainSidebar">
             <div class="mb-4 d-flex align-items-center justify-content-between px-2 pt-2">
                 <div class="d-flex align-items-center gap-2">
@@ -275,17 +262,17 @@
             </div>
 
             <nav class="nav flex-column flex-grow-1 px-1">
-                <a class="nav-link {% if request.resolver_match.url_name == 'admin-dashboard' or '/admins/dashboard/' in request.path %}active{% endif %} {% block nav_admin_dashboard_active %}{% endblock %} {% block nav_dashboard_active %}{% endblock %}" 
+                <a class="nav-link {% if request.resolver_match.url_name == 'admin-dashboard' or '/admins/dashboard/' in request.path %}active{% endif %}" 
                    href="{% url 'admins:admin-dashboard' %}">
                     <span class="material-icons">dashboard</span>Dashboard
                 </a>
 
-                <a class="nav-link {% if request.resolver_match.url_name == 'marmot_trader_list' or '/admins/traders/' in request.path %}active{% endif %} {% block nav_traders_active %}{% endblock %}" 
+                <a class="nav-link {% if request.resolver_match.url_name == 'marmot_trader_list' or '/admins/traders/' in request.path %}active{% endif %}" 
                    href="{% url 'admins:marmot_trader_list' %}">
                     <span class="material-icons">people</span>Manage Traders
                 </a>
 
-                <a class="nav-link {% if 'trade-configs' in request.path or request.resolver_match.url_name == 'trade_exec_config_list' %}active{% endif %} {% block nav_trade_configs_active %}{% endblock %}" 
+                <a class="nav-link {% if 'trade-configs' in request.path or request.resolver_match.url_name == 'trade_exec_config_list' %}active{% endif %}" 
                    href="{% url 'admins:trade_exec_config_list' %}">
                     <span class="material-icons">tune</span>Manage Controls
                 </a>
@@ -302,12 +289,10 @@
             </div>
         </div>
 
-        <!-- Main Content Area -->
         <div class="flex-grow-1 p-4 main-with-sidebar" id="mainContentBody">
             
-            <!-- Sticky Top Navbar Header -->
-            <div class="top-nav-sticky-wrapper">
-                <div class="d-flex align-items-center justify-content-between gap-2">
+            <div class="sticky-top-navbar">
+                <div class="d-flex align-items-center justify-content-between mb-4 gap-2">
                     <button class="glass-icon-btn" id="sidebarToggleBtn" type="button" title="Toggle Navigation">
                         <span class="material-icons fs-5">menu</span>
                     </button>
@@ -360,7 +345,6 @@
         </div>
     </div>
 
-    <!-- Admin Logout Modal -->
     <div class="modal fade" id="adminLogoutModal" tabindex="-1" aria-labelledby="adminLogoutModalLabel" aria-hidden="true">
         <div class="modal-dialog modal-dialog-centered">
             <div class="modal-content glass-card p-2">
@@ -382,9 +366,7 @@
     </div>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-
     <script>
-        /* --- Auto-dismiss Toast Messages --- */
         function autoDismissToasts() {
             const toasts = document.querySelectorAll('#toast-container .toast');
             toasts.forEach(toastEl => {
@@ -394,19 +376,14 @@
                 }, 4000);
             });
         }
-
         document.addEventListener('DOMContentLoaded', autoDismissToasts);
         document.body.addEventListener('htmx:afterSwap', autoDismissToasts);
-
-        /* --- HTMX Status Code Handling --- */
         document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
             if (evt.detail.xhr.status === 422 || evt.detail.xhr.status === 500) {
                 evt.detail.shouldSwap = true;
                 evt.detail.isError = false;
             }
         });
-
-        /* --- HTMX Global Modal Logic --- */
         document.body.addEventListener('htmx:afterSwap', function(evt) {
             if (evt.detail.target.id === 'globalHtmxModalDialog') {
                 const modalEl = document.getElementById('globalHtmxModal');
@@ -416,20 +393,15 @@
                 }
             }
         });
-
         function hideGlobalModal() {
             const modalEl = document.getElementById('globalHtmxModal');
             if (modalEl) {
                 const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) {
-                    modal.hide();
-                }
+                if (modal) modal.hide();
             }
         }
-
         document.body.addEventListener('closeDeleteModal', hideGlobalModal);
         document.body.addEventListener('closeGlobalModal', hideGlobalModal);
-
         const globalModalEl = document.getElementById('globalHtmxModal');
         if (globalModalEl) {
             globalModalEl.addEventListener('hidden.bs.modal', function () {
@@ -437,28 +409,19 @@
                 if (dialog) dialog.innerHTML = '';
             });
         }
-
-        /* --- Theme Switcher Logic --- */
         (function() {
             const htmlElement = document.documentElement;
             const toggleBtn = document.getElementById('themeToggleBtn');
             const toggleIcon = document.getElementById('themeToggleIcon');
-
             const savedTheme = localStorage.getItem('theme');
             const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             const currentTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
-
             function applyTheme(theme) {
                 htmlElement.setAttribute('data-theme', theme);
                 localStorage.setItem('theme', theme);
-
-                if (toggleIcon) {
-                    toggleIcon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
-                }
+                if (toggleIcon) toggleIcon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
             }
-
             applyTheme(currentTheme);
-
             if (toggleBtn) {
                 toggleBtn.addEventListener('click', function() {
                     const activeTheme = htmlElement.getAttribute('data-theme');
@@ -467,14 +430,11 @@
                 });
             }
         })();
-
-        /* --- Sidebar Toggle Logic --- */
         (function() {
             const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
             const closeSidebarBtn = document.getElementById('closeSidebarBtn');
             const sidebar = document.getElementById('mainSidebar');
             const overlay = document.getElementById('sidebarOverlay');
-
             function toggleSidebar() {
                 if (window.innerWidth < 768) {
                     sidebar.classList.toggle('show');
@@ -483,18 +443,15 @@
                     document.body.classList.toggle('sidebar-collapsed');
                 }
             }
-
             function closeMobileSidebar() {
                 sidebar.classList.remove('show');
                 overlay.classList.remove('show');
             }
-
             if (sidebarToggleBtn) sidebarToggleBtn.addEventListener('click', toggleSidebar);
             if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeMobileSidebar);
             if (overlay) overlay.addEventListener('click', closeMobileSidebar);
         })();
     </script>
     {% block extra_js %}{% endblock %}
-    
 </body>
 </html>
