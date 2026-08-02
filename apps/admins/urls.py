@@ -8,6 +8,12 @@ from .views import (
     AdminMarmotTraderDetailView,
     AdminMarmotTraderUpdateView,
     AdminMarmotTraderDeleteView,
+    # Trade Exec Config Views
+    AdminTradeExecConfigListView,
+    AdminTradeExecConfigCreateView,
+    AdminTradeExecConfigDetailView,
+    AdminTradeExecConfigUpdateView,
+    AdminTradeExecConfigDeleteView,
 )
 
 app_name = 'admins' 
@@ -24,4 +30,11 @@ urlpatterns = [
     path('marmot/traders/<int:pk>/', AdminMarmotTraderDetailView.as_view(), name='marmot_trader_detail'),
     path('marmot/traders/<int:pk>/edit/', AdminMarmotTraderUpdateView.as_view(), name='marmot_trader_edit'),
     path('marmot/traders/<int:pk>/delete/', AdminMarmotTraderDeleteView.as_view(), name='marmot_trader_delete'),
+
+    # Trade Execution Configurations
+    path('marmot/trade-configs/', AdminTradeExecConfigListView.as_view(), name='trade_exec_config_list'),
+    path('marmot/trade-configs/create/', AdminTradeExecConfigCreateView.as_view(), name='trade_exec_config_create'),
+    path('marmot/trade-configs/<int:pk>/', AdminTradeExecConfigDetailView.as_view(), name='trade_exec_config_detail'),
+    path('marmot/trade-configs/<int:pk>/edit/', AdminTradeExecConfigUpdateView.as_view(), name='trade_exec_config_edit'),
+    path('marmot/trade-configs/<int:pk>/delete/', AdminTradeExecConfigDeleteView.as_view(), name='trade_exec_config_delete'),
 ]

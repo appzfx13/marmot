@@ -1,0 +1,132 @@
+{% extends "admins/index.html" %}
+
+{% block title %}Config Details: {{ object.admins_user.username }} - Bug Tracker{% endblock %}
+
+{% block dashboard_content %}
+<div class="row mb-4">
+    <div class="col-12 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width: 54px; height: 54px; border: 1px solid rgba(13, 110, 253, 0.3);">
+                <span class="material-icons fs-3">tune</span>
+            </div>
+            <div>
+                <h2 class="theme-text-main fw-bold mb-0">Trade Execution Configuration</h2>
+                <div class="theme-text-muted small">Viewing configuration details for <strong>{{ object.admins_user.username }}</strong></div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'admins:trade_exec_config_edit' object.pk %}" class="btn btn-sm btn-primary rounded-pill px-3 py-2 small fw-bold d-flex align-items-center gap-1">
+                <span class="material-icons fs-6">edit</span> EDIT
+            </a>
+            <a href="{% url 'admins:trade_exec_config_list' %}" class="glass-icon-btn text-decoration-none" title="Back to List">
+                <span class="material-icons fs-5">arrow_back</span>
+            </a>
+        </div>
+    </div>
+</div>
+
+<div class="glass-card p-4 mb-4">
+    {# Status Header #}
+    <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4" style="border-color: var(--border-color) !important;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-primary fs-5">person</span>
+            <h5 class="fw-bold mb-0 theme-text-main">{{ object.admins_user.get_full_name|default:object.admins_user.username }}</h5>
+            <span class="text-muted small">(@{{ object.admins_user.username }})</span>
+        </div>
+        <div>
+            {% if object.is_active %}
+                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 px-3 py-2">Master Active</span>
+            {% else %}
+                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 px-3 py-2">Disabled</span>
+            {% endif %}
+        </div>
+    </div>
+
+    {# Config Parameters Grid #}
+    <div class="row g-4">
+        <!-- Risk Limits -->
+        <div class="col-12 col-md-6">
+            <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
+                <h6 class="text-uppercase text-primary small fw-bold mb-3 d-flex align-items-center gap-2">
+                    <span class="material-icons fs-6">shield</span> Risk Controls
+                </h6>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="theme-text-muted small">Max Loss Limit:</span>
+                    <span class="fw-bold text-danger">${{ object.max_loss_limit }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="theme-text-muted small">Max Profit Limit:</span>
+                    <span class="fw-bold text-success">${{ object.max_profit_limit }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Lot & Stop Loss Sizing -->
+        <div class="col-12 col-md-6">
+            <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
+                <h6 class="text-uppercase text-primary small fw-bold mb-3 d-flex align-items-center gap-2">
+                    <span class="material-icons fs-6">calculate</span> Lot & Stop Loss Rules
+                </h6>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="theme-text-muted small">Auto Lot Sizing:</span>
+                    <span class="fw-bold">{{ object.auto_lot_status|yesno:"Enabled,Disabled" }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="theme-text-muted small">Default Lot Size:</span>
+                    <span class="fw-bold">{{ object.default_lot_size }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="theme-text-muted small">Auto Stop Loss:</span>
+                    <span class="fw-bold">{{ object.auto_sl_status|yesno:"Enabled,Disabled" }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="theme-text-muted small">Risk Value / Type:</span>
+                    <span class="fw-bold">{{ object.default_risk_value }} ({{ object.default_risk_type }})</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Layering & Strategy Features -->
+        <div class="col-12 col-md-6">
+            <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
+                <h6 class="text-uppercase text-primary small fw-bold mb-3 d-flex align-items-center gap-2">
+                    <span class="material-icons fs-6">layers</span> Layering & Pyramiding
+                </h6>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="theme-text-muted small">Order Layering:</span>
+                    <span class="fw-bold">{{ object.layer_status|yesno:"Enabled,Disabled" }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="theme-text-muted small">Lots Per Layer Step:</span>
+                    <span class="fw-bold">{{ object.layer_add_in_lot_count }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="theme-text-muted small">Step Distance:</span>
+                    <span class="fw-bold">{{ object.layer_percentage }}%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Toggles & Timestamps -->
+        <div class="col-12 col-md-6">
+            <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
+                <h6 class="text-uppercase text-primary small fw-bold mb-3 d-flex align-items-center gap-2">
+                    <span class="material-icons fs-6">settings</span> Toggles & Info
+                </h6>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="theme-text-muted small">Predictive Forecasting:</span>
+                    <span class="fw-bold">{{ object.forecast_status|yesno:"Active,Inactive" }}</span>
+                </div>
+                <div class="d-flex justify-content-between mb-2">
+                    <span class="theme-text-muted small">Backtest Simulation:</span>
+                    <span class="fw-bold">{{ object.backtest_status|yesno:"Active,Inactive" }}</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="theme-text-muted small">Last Updated:</span>
+                    <span class="small text-muted">{{ object.updated_at|date:"Y-m-d H:i" }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

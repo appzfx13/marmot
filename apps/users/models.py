@@ -1,18 +1,17 @@
-import uuid
 import os
+import uuid
 from django.db import models
-from django.conf import settings    
 from django.contrib.auth.models import AbstractUser
 
+from apps.users.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices
+from apps.common.models import BaseModel, SoftDeleteUserModelManager
 
-from apps.users.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices, MemberRoleChoices
 
-
-class User(AbstractUser):
+class User(AbstractUser, BaseModel):
     username = models.CharField(max_length=150, unique=True, null=True, blank=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
-    
+
     # Verification Flags
     is_mobile_verified = models.BooleanField(default=False)
     is_email_verified = models.BooleanField(default=False)
@@ -23,7 +22,7 @@ class User(AbstractUser):
         default=MemberRoleChoices.TRADERS,
     )
     description = models.TextField(blank=True)
-    
+
     # Broker & API Credentials
     broker = models.CharField(
         max_length=20,
@@ -64,6 +63,9 @@ class User(AbstractUser):
 
     REQUIRED_FIELDS = ['phone_number']
 
+    # Custom Manager to support AbstractUser features (like createsuperuser) + SoftDelete
+    objects = SoftDeleteUserModelManager()
+    all_objects = SoftDeleteUserModelManager(with_deleted=True)
 
     def get_role_prefix(self):
         """
@@ -71,18 +73,13 @@ class User(AbstractUser):
         If ENV is not set, falls back to the first 3 letters of the role.
         """
         role_str = str(self.role).upper()
-        
-        # 1. First 3 letters of the role as default prefix
-        default_prefix = role_str[:3]  # e.g., 'TRA' for 'TRADERS'
-        
-        # 2. Check ENV for custom key (e.g., PREFIX_TRADERS or TRADERS_PREFIX)
+        default_prefix = role_str[:3]
         env_key = f"PREFIX_{role_str}"
         return os.environ.get(env_key, default_prefix)
 
     def generate_unique_username(self):
-        """Generates a username using the role prefix + random string/counter."""
+        """Generates a username using the role prefix + random string."""
         prefix = self.get_role_prefix()
-        # Generates format like: TRA_a1b2c3d4
         unique_suffix = uuid.uuid4().hex[:8]
         return f"{prefix}_{unique_suffix}"
 
@@ -90,14 +87,12 @@ class User(AbstractUser):
         # Generate username on creation if not explicitly provided
         if not self.pk and not self.username:
             new_username = self.generate_unique_username()
-            # Ensure uniqueness check
             while User.objects.filter(username=new_username).exists():
                 new_username = self.generate_unique_username()
             self.username = new_username
-            
+
         super().save(*args, **kwargs)
 
     def __str__(self):
-        return f"{self.name} (@{self.username})"
-
-
+        display_name = self.get_full_name() or self.username or f"User-{self.pk}"
+        return f"{display_name} (@{self.username})"

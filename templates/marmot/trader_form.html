@@ -1,30 +1,19 @@
 {% extends "admins/index.html" %}
 
-{% block title %}{% if form.instance.pk %}Edit Trader: {{ form.instance.name }}{% else %}Create Trader{% endif %} - Bug Tracker{% endblock %}
+{% block title %}{% if form.instance.pk %}Edit Trader: {{ form.instance.username }}{% else %}Create New Trader{% endif %} - Bug Tracker{% endblock %}
 
 {% block nav_traders_active %}active{% endblock %}
 
 {% block extra_head %}
 <style>
-    body {
-        font-size: 0.875rem;
-    }
-
-    .form-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 14px;
-        position: relative;
-        overflow: hidden;
-    }
-
-    .form-card input[type="text"],
-    .form-card input[type="email"],
-    .form-card select,
-    .form-card textarea {
-        background: rgba(255, 255, 255, 0.05) !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        color: #ffffff !important;
+    /* Theme Glass Form Input Overrides */
+    .glass-form-card input[type="text"],
+    .glass-form-card input[type="email"],
+    .glass-form-card select,
+    .glass-form-card textarea {
+        background: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid var(--border-color) !important;
+        color: var(--text-main) !important;
         border-radius: 8px !important;
         padding: 8px 12px;
         font-size: 0.875rem;
@@ -32,196 +21,337 @@
         width: 100%;
     }
 
-    .form-card select option {
-        background-color: #1e293b;
-        color: #ffffff;
+    .glass-form-card select option {
+        background-color: #111827;
+        color: var(--text-main);
     }
 
-    .form-card input:focus,
-    .form-card select:focus,
-    .form-card textarea:focus {
-        background: rgba(255, 255, 255, 0.08) !important;
-        border-color: #3b82f6 !important;
-        box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.25) !important;
+    .glass-form-card input:focus,
+    .glass-form-card select:focus,
+    .glass-form-card textarea:focus {
+        background: rgba(255, 255, 255, 0.07) !important;
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
         outline: none;
     }
 
-    .form-check-input {
-        width: 1.1em;
-        height: 1.1em;
+    /* Fixed & Standardized Checkbox UI */
+    .glass-form-card input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+        min-width: 1.25rem !important;
+        min-height: 1.25rem !important;
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 6px !important;
         cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        padding: 0;
+        vertical-align: middle;
+        transition: all 0.2s ease-in-out;
+        position: relative;
+    }
+
+    .glass-form-card input[type="checkbox"]:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+
+    .glass-form-card input[type="checkbox"]:checked {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+
+    .glass-form-card input[type="checkbox"]:checked::after {
+        content: "";
+        width: 6px;
+        height: 10px;
+        border: solid #ffffff;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+        margin-bottom: 2px;
+    }
+
+    .glass-form-card input[type="checkbox"]:focus {
+        outline: none;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.3) !important;
+    }
+
+    /* Checkbox Label Alignment Helper */
+    .custom-check-item {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        padding: 0.5rem 0.75rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid rgba(255, 255, 255, 0.05);
+        transition: background 0.2s ease;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .custom-check-item:hover {
+        background: rgba(255, 255, 255, 0.04);
+    }
+
+    /* Glass Modal Styling */
+    .glass-modal-content {
+        background: rgba(17, 24, 39, 0.85) !important;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--border-color) !important;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
     }
 </style>
 {% endblock %}
 
 {% block dashboard_content %}
 {% block page_header %}
-<div class="row mb-4 align-items-center">
-    <div class="col d-flex align-items-center justify-content-between">
-        <div class="d-flex align-items-center">
-            <span class="material-icons text-primary fs-2 me-2">manage_accounts</span>
-            <div>
-                <h2 class="text-white fw-bold mb-1">
-                    {% if form.instance.pk %}Edit Trader: {{ form.instance.name }}{% else %}Create New Trader{% endif %}
+<!-- Header Section -->
+<div class="row mb-4">
+    <div class="col-12 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width: 54px; height: 54px; border: 1px solid rgba(13, 110, 253, 0.3);">
+                <span class="material-icons fs-3">manage_accounts</span>
+            </div>
+            <div class="text-break">
+                <h2 class="theme-text-main fw-bold mb-0 text-wrap">
+                    {% if form.instance.pk %}Edit Trader: {{ form.instance.username }}{% else %}Create New Trader{% endif %}
                 </h2>
-                <p class="text-white-50 small mb-0">Configure trader profile, authentication credentials, and freeze flags.</p>
+                <div class="theme-text-muted small">
+                    Configure trader profile, authentication credentials, and freeze flags.
+                </div>
             </div>
         </div>
-        <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-sm btn-outline-light py-2 px-3 smaller fw-bold">
-            Back to List
-        </a>
+        <div class="d-flex align-items-center gap-2">
+            <!-- Arrow-Only Back Button -->
+            <a href="{% url 'admins:marmot_trader_list' %}" class="glass-icon-btn text-decoration-none" title="Back to List">
+                <span class="material-icons fs-5">arrow_back</span>
+            </a>
+        </div>
     </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="form-card p-4 text-white">
-    <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
-
-    <form method="post" novalidate class="ms-2">
+<div class="glass-card glass-form-card p-3 p-sm-4">
+    <form id="traderForm" method="post" novalidate>
         {% csrf_token %}
 
         {% if form.non_field_errors %}
-            <div class="alert alert-danger mb-4">
+            <div class="alert alert-danger mb-4 rounded-3 border-0 bg-danger bg-opacity-25 text-danger">
                 {% for error in form.non_field_errors %}
-                    <div>{{ error }}</div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons fs-6">error_outline</span>
+                        <span>{{ error }}</span>
+                    </div>
                 {% endfor %}
             </div>
         {% endif %}
 
         {# Section 1: Basic Identity Information #}
-        <h6 class="text-primary fw-bold text-uppercase mb-3 smaller tracking-wider">Identity & Account Details</h6>
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">badge</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Identity & Account Details</h6>
+        </div>
         
+        <!-- First Name -->
         <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.name.id_for_label }}" style="min-width: 160px;">
-                Full Name{% if form.name.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.first_name.id_for_label }}" style="min-width: 160px;">
+                First Name{% if form.first_name.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
             </label>
             <div class="flex-grow-1 w-100">
-                {{ form.name }}
-                {% for error in form.name.errors %}
-                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {{ form.first_name }}
+                {% for error in form.first_name.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
                 {% endfor %}
             </div>
         </div>
 
+        <!-- Last Name -->
         <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.username.id_for_label }}" style="min-width: 160px;">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.last_name.id_for_label }}" style="min-width: 160px;">
+                Last Name{% if form.last_name.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.last_name }}
+                {% for error in form.last_name.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <!-- Username -->
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.username.id_for_label }}" style="min-width: 160px;">
                 Username{% if form.username.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
             </label>
             <div class="flex-grow-1 w-100">
                 {{ form.username }}
                 {% for error in form.username.errors %}
-                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
                 {% endfor %}
             </div>
         </div>
 
+        <!-- Email Address -->
         <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.email.id_for_label }}" style="min-width: 160px;">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.email.id_for_label }}" style="min-width: 160px;">
                 Email Address{% if form.email.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
             </label>
             <div class="flex-grow-1 w-100">
                 {{ form.email }}
                 {% for error in form.email.errors %}
-                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
                 {% endfor %}
             </div>
         </div>
 
+        <!-- Phone Number -->
         <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.phone_number.id_for_label }}" style="min-width: 160px;">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.phone_number.id_for_label }}" style="min-width: 160px;">
                 Phone Number{% if form.phone_number.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
             </label>
             <div class="flex-grow-1 w-100">
                 {{ form.phone_number }}
                 {% for error in form.phone_number.errors %}
-                    <div class="text-danger smaller mt-1"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
                 {% endfor %}
             </div>
         </div>
 
         {# Verification Checkboxes #}
         <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" style="min-width: 160px;">Verifications</label>
-            <div class="flex-grow-1 w-100 d-flex gap-4">
-                <div class="form-check d-flex align-items-center gap-2">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" style="min-width: 160px;">Verifications</label>
+            <div class="flex-grow-1 w-100 d-flex flex-wrap gap-3">
+                <label class="custom-check-item">
                     {{ form.is_email_verified }}
-                    <label class="form-check-label text-white-50 smaller fw-bold" for="{{ form.is_email_verified.id_for_label }}">Email Verified</label>
-                </div>
-                <div class="form-check d-flex align-items-center gap-2">
+                    <span class="theme-text-main small fw-bold">Email Verified</span>
+                </label>
+                <label class="custom-check-item">
                     {{ form.is_mobile_verified }}
-                    <label class="form-check-label text-white-50 smaller fw-bold" for="{{ form.is_mobile_verified.id_for_label }}">Mobile Verified</label>
-                </div>
+                    <span class="theme-text-main small fw-bold">Mobile Verified</span>
+                </label>
             </div>
         </div>
 
-        <hr class="border-secondary opacity-25 my-4">
-
         {# Section 2: Broker & API Credentials #}
-        <h6 class="text-primary fw-bold text-uppercase mb-3 smaller tracking-wider">Broker Integration</h6>
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">account_balance</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Broker Integration</h6>
+        </div>
 
         <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.broker.id_for_label }}" style="min-width: 160px;">Broker Platform</label>
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.broker.id_for_label }}" style="min-width: 160px;">Broker Platform</label>
             <div class="flex-grow-1 w-100">{{ form.broker }}</div>
         </div>
 
         <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.api_key.id_for_label }}" style="min-width: 160px;">API Key</label>
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.api_key.id_for_label }}" style="min-width: 160px;">API Key</label>
             <div class="flex-grow-1 w-100">{{ form.api_key }}</div>
         </div>
 
         <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label text-white-50 smaller fw-bold uppercase mb-md-0" for="{{ form.app_id.id_for_label }}" style="min-width: 160px;">App ID</label>
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.app_id.id_for_label }}" style="min-width: 160px;">App ID</label>
             <div class="flex-grow-1 w-100">{{ form.app_id }}</div>
         </div>
 
         <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-start gap-1 gap-md-3">
-            <label class="form-label text-white-50 smaller fw-bold uppercase pt-md-2" for="{{ form.description.id_for_label }}" style="min-width: 160px;">Description / Notes</label>
+            <label class="form-label theme-text-muted small fw-bold text-uppercase pt-md-2" for="{{ form.description.id_for_label }}" style="min-width: 160px;">Description / Notes</label>
             <div class="flex-grow-1 w-100">{{ form.description }}</div>
         </div>
 
-        <hr class="border-secondary opacity-25 my-4">
-
         {# Section 3: Trade Control Flags #}
-        <h6 class="text-primary fw-bold text-uppercase mb-3 smaller tracking-wider">Trade Control & Freeze Flags</h6>
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">security</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Trade Control & Freeze Flags</h6>
+        </div>
 
-        <div class="row g-3">
-            <div class="col-6 col-md-3">
-                <div class="form-check d-flex align-items-center gap-2">
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="custom-check-item w-100">
                     {{ form.trade_eligibility }}
-                    <label class="form-check-label text-white-50 smaller fw-bold" for="{{ form.trade_eligibility.id_for_label }}">Trade Eligible</label>
-                </div>
+                    <span class="text-success small fw-bold">Trade Eligible</span>
+                </label>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="form-check d-flex align-items-center gap-2">
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="custom-check-item w-100">
                     {{ form.is_blocked }}
-                    <label class="form-check-label text-danger smaller fw-bold" for="{{ form.is_blocked.id_for_label }}">Is Blocked</label>
-                </div>
+                    <span class="text-danger small fw-bold">Is Blocked</span>
+                </label>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="form-check d-flex align-items-center gap-2">
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="custom-check-item w-100">
                     {{ form.primary_freeze }}
-                    <label class="form-check-label text-warning smaller fw-bold" for="{{ form.primary_freeze.id_for_label }}">Primary Freeze</label>
-                </div>
+                    <span class="text-warning small fw-bold">Primary Freeze</span>
+                </label>
             </div>
-            <div class="col-6 col-md-3">
-                <div class="form-check d-flex align-items-center gap-2">
+            <div class="col-12 col-sm-6 col-md-3">
+                <label class="custom-check-item w-100">
                     {{ form.final_freeze }}
-                    <label class="form-check-label text-warning smaller fw-bold" for="{{ form.final_freeze.id_for_label }}">Final Freeze</label>
-                </div>
+                    <span class="text-warning small fw-bold">Final Freeze</span>
+                </label>
             </div>
         </div>
 
         {# Action Buttons #}
-        <div class="d-flex justify-content-end gap-2 mt-4 pt-3 border-top border-secondary border-opacity-10">
-            <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-sm btn-outline-light py-2 px-3 smaller fw-bold">
+        <div class="d-flex justify-content-end gap-2 pt-3 border-top" style="border-color: var(--border-color) !important;">
+            <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold text-decoration-none">
                 CANCEL
             </a>
-            <button type="submit" class="btn btn-sm btn-primary py-2 px-3 fw-bold">
+            <!-- Trigger Modal Button -->
+            <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#confirmSaveModal">
                 SAVE TRADER
             </button>
         </div>
     </form>
 </div>
+
+<!-- Glassmorphic Confirmation Modal -->
+<div class="modal fade" id="confirmSaveModal" tabindex="-1" aria-labelledby="confirmSaveModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal-content rounded-4 border-0 p-2">
+            <div class="modal-header border-0 pb-0">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons text-primary fs-4">published_with_changes</span>
+                    <h5 class="modal-title theme-text-main fw-bold" id="confirmSaveModalLabel">Confirm Save</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="theme-text-muted mb-0 small">
+                    Are you sure you want to save changes for this trader profile? This action will update system configurations and credentials immediately.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0 gap-2">
+                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold" data-bs-dismiss="modal">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" id="confirmSubmitBtn">
+                    Confirm & Save
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const confirmBtn = document.getElementById('confirmSubmitBtn');
+        const form = document.getElementById('traderForm');
+
+        if (confirmBtn && form) {
+            confirmBtn.addEventListener('click', function() {
+                form.submit();
+            });
+        }
+    });
+</script>
 {% endblock %}
 {% endblock %}

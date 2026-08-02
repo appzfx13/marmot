@@ -1,7 +1,9 @@
-{% extends "users/index.html" %}
+{% extends "admins/index.html" %}
 
 {% block title %}Dashboard - Bug Tracker{% endblock %}
 
+{# Ensures the Dashboard sidebar option is highlighted active #}
+{% block nav_admin_dashboard_active %}active{% endblock %}
 {% block nav_dashboard_active %}active{% endblock %}
 
 {% block extra_head %}
@@ -46,7 +48,7 @@
         display: none; /* Chrome, Safari and Opera */
     }
 
-    /* Refined Metric Cards (Top 4) - Measurements Kept Identical */
+    /* Refined Metric Cards (Top 4) */
     .metric-card {
         transition: all 0.3s cubic-bezier(.25,.8,.25,1);
         border: 1px solid rgba(255, 255, 255, 0.1);
@@ -58,7 +60,7 @@
         border-color: rgba(255, 255, 255, 0.3);
     }
 
-    /* Compact Status Cards (Grid) - Measurements Kept Identical */
+    /* Compact Status Cards (Grid) */
     .status-card {
         background: rgba(15, 23, 42, 0.65);
         border: 1px solid rgba(255, 255, 255, 0.08);
@@ -85,7 +87,7 @@
     }
     .activity-link:hover {
         opacity: 0.8;
-        color: #4e73df !important;
+        color: #0d6efd !important;
     }
     
     .form-select-sm {
@@ -105,10 +107,10 @@
         letter-spacing: 0.5px;
     }
 
-    /* Ultra-Modern Sleek Pagination UI */
+    /* Modern Pagination UI */
     .custom-pagination-container {
         display: flex;
-        justify-content: flex-end; /* Snaps control perfectly to the right end */
+        justify-content: flex-end;
         margin-top: 1.5rem;
     }
 
@@ -142,6 +144,7 @@
         transition: all 0.2s ease;
         border: none;
         background: transparent;
+        cursor: pointer;
     }
 
     .custom-page-link:hover {
@@ -150,9 +153,9 @@
     }
 
     .custom-page-item.active .custom-page-link {
-        background: #4e73df;
+        background: #0d6efd;
         color: #ffffff;
-        box-shadow: 0 4px 12px rgba(78, 115, 223, 0.3);
+        box-shadow: 0 4px 12px rgba(13, 110, 253, 0.3);
     }
 
     .custom-page-item.disabled .custom-page-link {
@@ -181,15 +184,22 @@
     <div class="dashboard-upper-pinned">
         {# Header Section #}
         <div class="row mb-4 align-items-center">
-            <div class="col">
+            <div class="col-12 col-md-6 mb-2 mb-md-0">
                 <h2 class="text-white fw-bold mb-1">Dashboard</h2>
                 <p class="text-white-50 small mb-0">Here's what's happening with your work today.</p>
             </div>
-            <div class="col-auto d-flex align-items-center gap-2">
-                <form method="get" class="d-flex align-items-center gap-2">
+            <div class="col-12 col-md-6 d-flex align-items-center justify-content-md-end gap-2 flex-wrap">
+                <!-- HTMX-boosted Filter Form -->
+                <form method="get" 
+                      action="." 
+                      hx-get="." 
+                      hx-target="#mainContentBody" 
+                      hx-select="#mainContentBody" 
+                      hx-push-url="true" 
+                      class="d-flex align-items-center gap-2">
                     <div class="d-flex align-items-center">
                         <label class="text-white-50 me-2 small mb-0">Project:</label>
-                        <select name="project" class="form-select form-select-sm bg-dark text-white border-secondary" onchange="this.form.submit()">
+                        <select name="project" class="form-select form-select-sm bg-dark text-white border-secondary" onchange="this.form.requestSubmit()">
                             <option value="">All</option>
                             {% for p in projects %}
                                 <option value="{{ p.id }}" {% if selected_project_id|default_if_none:'' == p.id|stringformat:'s' %}selected{% endif %}>{{ p.name }}</option>
@@ -198,13 +208,14 @@
                     </div>
                     <div class="d-flex align-items-center">
                         <label class="text-white-50 me-2 small mb-0">Source:</label>
-                        <select name="source" class="form-select form-select-sm bg-dark text-white border-secondary" onchange="this.form.submit()">
+                        <select name="source" class="form-select form-select-sm bg-dark text-white border-secondary" onchange="this.form.requestSubmit()">
                             <option value="ALL" {% if selected_source == 'ALL' %}selected{% endif %}>ALL</option>
                             <option value="MINE" {% if selected_source == 'MINE' %}selected{% endif %}>MINE</option>
                         </select>
                     </div>
                 </form>
-                <div class="ms-2 d-none d-sm-inline-flex align-items-center bg-dark px-3 py-1 rounded-pill border border-secondary text-white small" style="margin-right: 50px;">
+
+                <div class="d-none d-sm-inline-flex align-items-center bg-dark px-3 py-1 rounded-pill border border-secondary text-white small ms-2">
                     <span class="me-2">{{ request.user.get_full_name }}</span>
                     <span class="material-icons style-sm" style="font-size: 18px;">account_circle</span>
                 </div>
@@ -355,13 +366,18 @@
                     {% endfor %}
                 </div>
 
-                {# Modernized Right-Aligned Pagination System Links #}
+                {# Modernized HTMX Right-Aligned Pagination System #}
                 {% if recent_activities.has_other_pages %}
                     <div class="custom-pagination-container">
                         <ul class="custom-pagination mb-0">
                             {% if recent_activities.has_previous %}
                                 <li class="custom-page-item">
-                                    <a class="custom-page-link custom-page-nav-btn" href="?project={{ selected_project_id|default:'' }}&source={{ selected_source }}&page={{ recent_activities.previous_page_number }}#activity-section" aria-label="Previous">
+                                    <a class="custom-page-link custom-page-nav-btn" 
+                                       hx-get="?project={{ selected_project_id|default:'' }}&source={{ selected_source }}&page={{ recent_activities.previous_page_number }}#activity-section"
+                                       hx-target="#mainContentBody"
+                                       hx-select="#mainContentBody"
+                                       hx-push-url="true"
+                                       aria-label="Previous">
                                         <span class="material-icons" style="font-size: 16px;">chevron_left</span>
                                     </a>
                                 </li>
@@ -380,14 +396,23 @@
                                     </li>
                                 {% elif i > recent_activities.number|add:-3 and i < recent_activities.number|add:3 %}
                                     <li class="custom-page-item">
-                                        <a class="custom-page-link" href="?project={{ selected_project_id|default:'' }}&source={{ selected_source }}&page={{ i }}#activity-section">{{ i }}</a>
+                                        <a class="custom-page-link" 
+                                           hx-get="?project={{ selected_project_id|default:'' }}&source={{ selected_source }}&page={{ i }}#activity-section"
+                                           hx-target="#mainContentBody"
+                                           hx-select="#mainContentBody"
+                                           hx-push-url="true">{{ i }}</a>
                                     </li>
                                 {% endif %}
                             {% endfor %}
 
                             {% if recent_activities.has_next %}
                                 <li class="custom-page-item">
-                                    <a class="custom-page-link custom-page-nav-btn" href="?project={{ selected_project_id|default:'' }}&source={{ selected_source }}&page={{ recent_activities.next_page_number }}#activity-section" aria-label="Next">
+                                    <a class="custom-page-link custom-page-nav-btn" 
+                                       hx-get="?project={{ selected_project_id|default:'' }}&source={{ selected_source }}&page={{ recent_activities.next_page_number }}#activity-section"
+                                       hx-target="#mainContentBody"
+                                       hx-select="#mainContentBody"
+                                       hx-push-url="true"
+                                       aria-label="Next">
                                         <span class="material-icons" style="font-size: 16px;">chevron_right</span>
                                     </a>
                                 </li>

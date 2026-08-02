@@ -1,0 +1,130 @@
+<!-- Main Glass Card Container -->
+<div class="glass-card overflow-hidden d-flex flex-column min-vh-75" style="min-height: 700px;">
+    
+    <!-- DESKTOP / TABLET VIEW -->
+    <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
+        <table class="table table-hover align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; --bs-table-hover-bg: var(--nav-hover); color: var(--text-main);">
+            <thead>
+                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                    <th scope="col" class="ps-4 py-3 theme-text-muted">
+                        <a href="javascript:void(0);" 
+                           class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
+                           hx-get="{% url 'admins:marmot_trader_list' %}?sort={% if current_sort == 'username' %}-username{% else %}username{% endif %}&{{ current_filters }}"
+                           hx-target="#traderTableContainer"
+                           hx-push-url="true"
+                           title="Sort by Name">
+                            Trader
+                            <span class="material-icons fs-6">
+                                {% if current_sort == 'username' %}arrow_upward{% elif current_sort == '-username' %}arrow_downward{% else %}swap_vert{% endif %}
+                            </span>
+                        </a>
+                    </th>
+                    <th scope="col" class="py-3 theme-text-muted">Contact</th>
+                    <th scope="col" class="py-3 theme-text-muted">Broker</th>
+                    <th scope="col" class="py-3 theme-text-muted">Trade Eligibility</th>
+                    <th scope="col" class="text-end pe-4 py-3 theme-text-muted">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trader in traders %}
+                <tr style="border-color: var(--border-color) !important;">
+                    <td class="ps-4 py-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px; border: 1px solid rgba(220, 53, 69, 0.3);">
+                                {{ trader.first_name|default:trader.username|slice:":1"|upper }}
+                            </div>
+                            <div>
+                                <div class="fw-medium theme-text-main">{{ trader.get_full_name|default:trader.username }}</div>
+                                <small class="theme-text-muted">@{{ trader.username }}</small>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="py-3">
+                        <div class="theme-text-main small">{{ trader.email }}</div>
+                        <small class="theme-text-muted">{{ trader.phone_number|default:"N/A" }}</small>
+                    </td>
+                    <td class="py-3">
+                        <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-3 py-1">
+                            {{ trader.get_broker_display|default:trader.broker|default:"Unassigned" }}
+                        </span>
+                    </td>
+                    <td class="py-3">
+                        {% if trader.trade_eligibility %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Eligible</span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Ineligible</span>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-4 py-3">
+                        <div class="d-flex align-items-center justify-content-end gap-2">
+                            <a href="{% url 'admins:marmot_trader_detail' trader.pk %}" class="glass-icon-btn rounded-circle" style="width: 36px; height: 36px;" title="View Details"><span class="material-icons fs-6">visibility</span></a>
+                            <a href="{% url 'admins:marmot_trader_edit' trader.pk %}" class="glass-icon-btn rounded-circle" style="width: 36px; height: 36px;" title="Edit"><span class="material-icons fs-6">edit</span></a>
+                            <button class="glass-icon-btn text-danger border-0 bg-transparent rounded-circle" 
+                                    style="width: 36px; height: 36px;"
+                                    title="Delete"
+                                    type="button"
+                                    hx-get="{% url 'admins:marmot_trader_delete' trader.pk %}"
+                                    hx-target="#globalHtmxModalDialog">
+                                <span class="material-icons fs-6">delete</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr><td colspan="5" class="text-center py-5 theme-text-muted">No traders found.</td></tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MOBILE VIEW: CARD LIST -->
+    <div class="flex-grow-1 overflow-auto p-3 d-block d-lg-none">
+        {% for trader in traders %}
+        <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold" style="width: 36px; height: 36px;">{{ trader.first_name|slice:":1"|upper }}</div>
+                    <div>
+                        <div class="fw-medium theme-text-main fs-6">{{ trader.get_full_name|default:trader.username }}</div>
+                        <small class="theme-text-muted">@{{ trader.username }}</small>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-1" style="border-color: var(--border-color) !important;">
+                <a href="{% url 'admins:marmot_trader_detail' trader.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill d-flex align-items-center gap-1">
+                    <span class="material-icons fs-6">visibility</span> View
+                </a>
+                <button type="button" 
+                        class="btn btn-sm btn-outline-danger rounded-pill d-flex align-items-center gap-1"
+                        hx-get="{% url 'admins:marmot_trader_delete' trader.id %}"
+                        hx-target="#globalHtmxModalDialog">
+                    <span class="material-icons fs-6">delete</span> Delete
+                </button>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- PAGINATION -->
+    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+            <div class="small theme-text-muted">
+                {% if is_paginated %}
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} traders
+                {% else %}
+                    Showing {{ traders|length }} traders
+                {% endif %}
+            </div>
+            <ul class="pagination mb-0 gap-2 align-items-center">
+                {% if is_paginated and page_obj.has_previous %}
+                <li class="page-item mb-0"><a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 36px; height: 36px;" hx-get="{% url 'admins:marmot_trader_list' %}?page={{ page_obj.previous_page_number }}&{{ current_filters }}" hx-target="#traderTableContainer" hx-push-url="true"><span class="material-icons fs-6">chevron_left</span></a></li>
+                {% endif %}
+                <li class="page-item mb-0"><span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold p-0" style="width: 36px; height: 36px;">{{ page_obj.number|default:1 }}</span></li>
+                {% if is_paginated and page_obj.has_next %}
+                <li class="page-item mb-0"><a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 36px; height: 36px;" hx-get="{% url 'admins:marmot_trader_list' %}?page={{ page_obj.next_page_number }}&{{ current_filters }}" hx-target="#traderTableContainer" hx-push-url="true"><span class="material-icons fs-6">chevron_right</span></a></li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>

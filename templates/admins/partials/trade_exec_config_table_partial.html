@@ -1,0 +1,278 @@
+<!-- Main Glass Card Container (Min-height used instead of fixed height for better mobile flow) -->
+<div class="glass-card overflow-hidden d-flex flex-column min-vh-75" style="min-height: 700px;">
+    
+    <!-- DESKTOP / LARGE TABLET VIEW -->
+    <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
+        <table class="table table-hover align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; --bs-table-hover-bg: var(--nav-hover); color: var(--text-main);">
+            <thead>
+                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                    <th scope="col" class="ps-4 py-3 theme-text-muted">
+                        <a href="javascript:void(0);" 
+                           class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
+                           hx-get="{% url 'admins:trade_exec_config_list' %}?sort={% if current_sort == 'name' %}-name{% else %}name{% endif %}&{{ current_filters }}"
+                           hx-target="#configTableContainer"
+                           hx-push-url="true"
+                           title="Sort by Name">
+                            Config Name
+                            <span class="material-icons fs-6">
+                                {% if current_sort == 'name' %}arrow_upward{% elif current_sort == '-name' %}arrow_downward{% else %}swap_vert{% endif %}
+                            </span>
+                        </a>
+                    </th>
+                    <th scope="col" class="py-3 theme-text-muted">User</th>
+                    <th scope="col" class="py-3 theme-text-muted">Status (Active)</th>
+                    <th scope="col" class="py-3 text-end theme-text-muted">Max Loss</th>
+                    <th scope="col" class="py-3 text-end theme-text-muted">Max Profit</th>
+                    <th scope="col" class="py-3 text-center theme-text-muted">Default Lot</th>
+                    <th scope="col" class="py-3 theme-text-muted">Risk Mode</th>
+                    <th scope="col" class="text-end pe-4 py-3 theme-text-muted">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for config in configs %}
+                <tr style="border-color: var(--border-color) !important;">
+                    <!-- Config Name -->
+                    <td class="ps-4 py-3">
+                        <div class="fw-medium theme-text-main">{{ config.name|default:"—" }}</div>
+                    </td>
+
+                    <!-- Target User -->
+                    <td class="py-3">
+                        {% if config.admins_user %}
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; border: 1px solid rgba(13, 110, 253, 0.3);">
+                                {{ config.admins_user.username|slice:":1"|upper }}
+                            </div>
+                            <div class="fw-medium theme-text-main">@{{ config.admins_user.username }}</div>
+                        </div>
+                        {% else %}
+                        <span class="theme-text-muted">—</span>
+                        {% endif %}
+                    </td>
+
+                    <!-- Interactive Status Toggle for is_active -->
+                    <td class="py-3">
+                        <form method="post" 
+                              hx-post="{% url 'admins:trade_exec_config_edit' config.pk %}" 
+                              hx-target="#configTableContainer" 
+                              hx-swap="innerHTML"
+                              class="d-flex align-items-center gap-2 m-0">
+                            {% csrf_token %}
+                            <div class="form-check form-switch m-0 p-0 d-flex align-items-center">
+                                <input class="form-check-input cursor-pointer m-0" 
+                                       type="checkbox" 
+                                       name="is_active" 
+                                       role="switch" 
+                                       id="isActiveToggleDesktop_{{ config.pk }}" 
+                                       {% if config.is_active %}checked{% endif %}
+                                       hx-trigger="change"
+                                       hx-post="{% url 'admins:trade_exec_config_edit' config.pk %}"
+                                       hx-target="#configTableContainer"
+                                       hx-include="closest tr"
+                                       style="width: 2.5em; height: 1.25em;">
+                            </div>
+                            {% if config.is_active %}
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1 small">Active</span>
+                            {% else %}
+                                <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-2 py-1 small">Inactive</span>
+                            {% endif %}
+                        </form>
+                    </td>
+
+                    <!-- Max Loss -->
+                    <td class="py-3 text-end text-danger fw-semibold">${{ config.max_loss_limit }}</td>
+
+                    <!-- Max Profit -->
+                    <td class="py-3 text-end text-success fw-semibold">${{ config.max_profit_limit }}</td>
+
+                    <!-- Lot Size -->
+                    <td class="py-3 text-center fw-bold theme-text-main">{{ config.default_lot_size }}</td>
+
+                    <!-- Risk Mode -->
+                    <td class="py-3">
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill text-uppercase fw-bold px-3 py-1">{{ config.default_risk_type }}</span>
+                        <small class="theme-text-muted ms-1">({{ config.default_risk_value }})</small>
+                    </td>
+
+                    <!-- Actions -->
+                    <td class="text-end pe-4 py-3">
+                        <div class="d-flex align-items-center justify-content-end gap-2">
+                            <a href="{% url 'admins:trade_exec_config_detail' config.pk %}" class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;" title="View Details">
+                                <span class="material-icons fs-6">visibility</span>
+                            </a>
+                            <a href="{% url 'admins:trade_exec_config_edit' config.pk %}" class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;" title="Edit">
+                                <span class="material-icons fs-6">edit</span>
+                            </a>
+                            <button type="button" 
+                                    class="glass-icon-btn text-danger border-0 rounded-circle d-flex align-items-center justify-content-center" 
+                                    style="width: 36px; height: 36px;" 
+                                    hx-get="{% url 'admins:trade_exec_config_delete' config.pk %}"
+                                    hx-target="#globalHtmxModalDialog"
+                                    title="Delete Configuration">
+                                <span class="material-icons fs-6">delete</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="8" class="text-center py-5 theme-text-muted">
+                        <span class="material-icons fs-1 mb-2 opacity-50">tune</span>
+                        <div>No trade execution configurations found matching your criteria.</div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MOBILE VIEW: CARD LIST -->
+    <div class="flex-grow-1 overflow-auto p-3 d-block d-lg-none">
+        {% for config in configs %}
+        <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+            
+            <!-- Header: Name & Status -->
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+                <div class="d-flex flex-column">
+                    <div class="fw-bold theme-text-main fs-6">{{ config.name|default:"—" }}</div>
+                    {% if config.admins_user %}
+                        <small class="theme-text-muted">@{{ config.admins_user.username }}</small>
+                    {% else %}
+                        <small class="theme-text-muted">Unassigned</small>
+                    {% endif %}
+                </div>
+                
+                <!-- Mobile Status Toggle -->
+                {% comment %} <form method="post" 
+                      hx-post="{% url 'admins:trade_exec_config_edit' config.pk %}" 
+                      hx-target="#configTableContainer" 
+                      hx-swap="innerHTML"
+                      class="m-0">
+                    {% csrf_token %}
+                    <div class="form-check form-switch m-0 p-0 d-flex flex-column align-items-end">
+                        <input class="form-check-input cursor-pointer m-0 mb-1" 
+                               type="checkbox" 
+                               name="is_active" 
+                               role="switch" 
+                               id="isActiveToggleMobile_{{ config.pk }}" 
+                               {% if config.is_active %}checked{% endif %}
+                               hx-trigger="change"
+                               hx-post="{% url 'admins:trade_exec_config_edit' config.pk %}"
+                               hx-target="#configTableContainer"
+                               hx-include="closest form"
+                               style="width: 2.5em; height: 1.25em;">
+                        {% if config.is_active %}
+                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill" style="font-size: 0.65rem;">ACTIVE</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill" style="font-size: 0.65rem;">INACTIVE</span>
+                        {% endif %}
+                    </div>
+                </form> {% endcomment %}
+            </div>
+
+            <!-- Stats Grid -->
+            <div class="row g-2 mb-3">
+                <div class="col-6">
+                    <div class="theme-text-muted" style="font-size: 0.75rem;">Max Loss</div>
+                    <div class="text-danger fw-semibold">${{ config.max_loss_limit }}</div>
+                </div>
+                <div class="col-6">
+                    <div class="theme-text-muted" style="font-size: 0.75rem;">Max Profit</div>
+                    <div class="text-success fw-semibold">${{ config.max_profit_limit }}</div>
+                </div>
+                <div class="col-6">
+                    <div class="theme-text-muted" style="font-size: 0.75rem;">Default Lot</div>
+                    <div class="fw-bold theme-text-main">{{ config.default_lot_size }}</div>
+                </div>
+                <div class="col-6">
+                    <div class="theme-text-muted mb-1" style="font-size: 0.75rem;">Risk Mode</div>
+                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill" style="font-size: 0.7rem;">
+                        {{ config.default_risk_type }} ({{ config.default_risk_value }})
+                    </span>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-1" style="border-color: var(--border-color) !important;">
+                <a href="{% url 'admins:trade_exec_config_detail' config.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill d-flex align-items-center gap-1">
+                    <span class="material-icons fs-6">visibility</span> View
+                </a>
+                <a href="{% url 'admins:trade_exec_config_edit' config.pk %}" class="btn btn-sm btn-outline-info rounded-pill d-flex align-items-center gap-1">
+                    <span class="material-icons fs-6">edit</span> Edit
+                </a>
+                <button type="button" 
+                        class="btn btn-sm btn-outline-danger rounded-pill d-flex align-items-center gap-1"
+                        hx-get="{% url 'admins:trade_exec_config_delete' config.pk %}"
+                        hx-target="#globalHtmxModalDialog">
+                    <span class="material-icons fs-6">delete</span>
+                </button>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-5 theme-text-muted">
+            <span class="material-icons fs-1 mb-2 opacity-50">tune</span>
+            <div>No trade execution configurations found.</div>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pagination Container: Pinned to bottom -->
+    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+            <div class="small theme-text-muted text-center text-sm-start">
+                {% if is_paginated %}
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} configurations
+                {% else %}
+                    Showing {{ configs|length }} of {{ configs|length }} configurations
+                {% endif %}
+            </div>
+            
+            <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
+                {% if is_paginated and page_obj.has_previous %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'admins:trade_exec_config_list' %}?page={{ page_obj.previous_page_number }}&sort={{ current_sort }}&{{ current_filters }}" 
+                       hx-target="#configTableContainer"
+                       hx-push-url="true"
+                       aria-label="Previous">
+                       <span class="material-icons fs-6">chevron_left</span>
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item mb-0 disabled opacity-50">
+                    <span class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 36px; height: 36px;">
+                        <span class="material-icons fs-6">chevron_left</span>
+                    </span>
+                </li>
+                {% endif %}
+
+                <li class="page-item mb-0">
+                    <span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold text-decoration-none p-0" 
+                          style="width: 36px; height: 36px;">
+                        {% if is_paginated %}{{ page_obj.number }}{% else %}1{% endif %}
+                    </span>
+                </li>
+
+                {% if is_paginated and page_obj.has_next %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'admins:trade_exec_config_list' %}?page={{ page_obj.next_page_number }}&sort={{ current_sort }}&{{ current_filters }}" 
+                       hx-target="#configTableContainer"
+                       hx-push-url="true"
+                       aria-label="Next">
+                       <span class="material-icons fs-6">chevron_right</span>
+                    </a>
+                </li>
+                {% else %}
+                <li class="page-item mb-0 disabled opacity-50">
+                    <span class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 36px; height: 36px;">
+                        <span class="material-icons fs-6">chevron_right</span>
+                    </span>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>

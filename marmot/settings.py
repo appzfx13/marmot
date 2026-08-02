@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'cloudinary_storage',
     'cloudinary',
     'apscheduler',
+    'django_filters',
 
     # Project Apps
     'apps.admins',
@@ -57,6 +58,7 @@ MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
+    'django_htmx.middleware.HtmxMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
@@ -152,3 +154,6 @@ handler404 = 'marmot.views.handler404'
 # APScheduler Configuration
 APSCHEDULER_DATETIME_FORMAT = "N j, Y, f:s a"
 APSCHEDULER_TIMEZONE = 'Asia/Kolkata'
+
+
+PAGINATION_COUNT=os.getenv('PAGINATION_COUNT')

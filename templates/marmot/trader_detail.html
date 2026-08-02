@@ -1,51 +1,247 @@
 {% extends "admins/index.html" %}
 
-{% block title %}Trader Detail: {{ trader.name }} - Bug Tracker{% endblock %}
+{% block title %}Trader Detail: {{ trader.get_full_name|default:trader.username }} - Bug Tracker{% endblock %}
 
 {% block nav_traders_active %}active{% endblock %}
 
 {% block dashboard_content %}
-<div class="row mb-4 align-items-center">
-    <div class="col d-flex align-items-center justify-content-between">
-        <div class="d-flex align-items-center">
-            <span class="material-icons text-primary fs-2 me-2">account_circle</span>
-            <div>
-                <h2 class="text-white fw-bold mb-1">{{ trader.name }}</h2>
-                <p class="text-white-50 small mb-0">@{{ trader.username }} &bull; Registered {{ trader.created_at|date:"M d, Y" }}</p>
+<!-- Header Section -->
+<div class="row mb-4">
+    <div class="col-12 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width: 54px; height: 54px; border: 1px solid rgba(220, 53, 69, 0.3);">
+                {{ trader.first_name|default:trader.username|slice:":1"|upper }}
+            </div>
+            <div class="text-break">
+                <h2 class="theme-text-main fw-bold mb-0 text-wrap">{{ trader.get_full_name|default:trader.username }}</h2>
+                <div class="theme-text-muted small">
+                    @{{ trader.username }} &bull; Registered {{ trader.created_at|date:"M d, Y" }}
+                </div>
             </div>
         </div>
-        <div class="d-flex gap-2">
-            <a href="{% url 'admins:marmot_trader_edit' trader.pk %}" class="btn btn-sm btn-primary py-2 px-3 fw-bold">Edit Trader</a>
-            <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-sm btn-outline-light py-2 px-3 fw-bold">Back to List</a>
+        <div class="d-flex align-items-center gap-2">
+            <!-- Arrow-Only Back Button -->
+            <a href="{% url 'admins:marmot_trader_list' %}" class="glass-icon-btn text-decoration-none" title="Back to List">
+                <span class="material-icons fs-5">arrow_back</span>
+            </a>
+            <!-- Edit Trader Button -->
+            <a href="{% url 'admins:marmot_trader_edit' trader.pk %}" class="btn btn-sm btn-primary rounded-pill px-3 py-2 d-inline-flex align-items-center gap-1 shadow-sm">
+                <span class="material-icons fs-6">edit</span>
+                <span>Edit Trader</span>
+            </a>
         </div>
     </div>
 </div>
 
-<div class="row g-4">
-    <div class="col-md-6">
-        <div class="form-card p-4">
-            <h6 class="text-primary fw-bold text-uppercase mb-3 smaller">Contact & Account Information</h6>
-            <table class="table table-dark table-borderless mb-0">
-                <tr><td class="text-white-50">Username:</td><td>@{{ trader.username }}</td></tr>
-                <tr><td class="text-white-50">Email:</td><td>{{ trader.email }} {% if trader.is_email_verified %}<span class="badge bg-success ms-1">Verified</span>{% endif %}</td></tr>
-                <tr><td class="text-white-50">Phone:</td><td>{{ trader.phone_number }} {% if trader.is_mobile_verified %}<span class="badge bg-success ms-1">Verified</span>{% endif %}</td></tr>
-                <tr><td class="text-white-50">Role:</td><td>{{ trader.get_role_display }}</td></tr>
-                <tr><td class="text-white-50">Notes:</td><td>{{ trader.description|default:"None" }}</td></tr>
-            </table>
+<!-- Details Cards -->
+<div class="row g-4 mb-4">
+    <!-- Contact & Account Information -->
+    <div class="col-12 col-lg-6">
+        <div class="glass-card p-3 p-sm-4 h-100 d-flex flex-column">
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                <span class="material-icons text-primary fs-5">badge</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Contact & Account Information</h6>
+            </div>
+            <div class="table-responsive my-auto">
+                <table class="table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main); min-width: 280px;">
+                    <tbody>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap" style="width: 35%;">Username</td>
+                            <td class="pe-0 py-3 fw-medium theme-text-main text-break">@{{ trader.username }}</td>
+                        </tr>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap">Email</td>
+                            <td class="pe-0 py-3 theme-text-main text-break">
+                                <span>{{ trader.email }}</span>
+                                {% if trader.is_email_verified %}
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1 ms-1 small text-nowrap">Verified</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap">Phone</td>
+                            <td class="pe-0 py-3 theme-text-main text-break">
+                                <span>{{ trader.phone_number|default:"N/A" }}</span>
+                                {% if trader.is_mobile_verified %}
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1 ms-1 small text-nowrap">Verified</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap">Role</td>
+                            <td class="pe-0 py-3 theme-text-main">{{ trader.get_role_display|default:"Trader" }}</td>
+                        </tr>
+                        <tr class="border-0">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap align-top">Notes</td>
+                            <td class="pe-0 py-3 theme-text-main text-wrap text-break">{{ trader.description|default:"None" }}</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 
-    <div class="col-md-6">
-        <div class="form-card p-4">
-            <h6 class="text-primary fw-bold text-uppercase mb-3 smaller">Broker Credentials & Status</h6>
-            <table class="table table-dark table-borderless mb-0">
-                <tr><td class="text-white-50">Broker Platform:</td><td>{{ trader.broker|default:"Not set" }}</td></tr>
-                <tr><td class="text-white-50">API Key:</td><td><code>{{ trader.api_key|default:"Not set" }}</code></td></tr>
-                <tr><td class="text-white-50">App ID:</td><td><code>{{ trader.app_id|default:"Not set" }}</code></td></tr>
-                <tr><td class="text-white-50">P&L Status:</td><td>{{ trader.get_stats_display }} ({{ trader.pl_integer }})</td></tr>
-                <tr><td class="text-white-50">Trade Eligible:</td><td>{% if trader.trade_eligibility %}<span class="text-success">Yes</span>{% else %}<span class="text-danger">No</span>{% endif %}</td></tr>
-            </table>
+    <!-- Broker Credentials & Status -->
+    <div class="col-12 col-lg-6">
+        <div class="glass-card p-3 p-sm-4 h-100 d-flex flex-column">
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                <span class="material-icons text-primary fs-5">account_balance</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Broker Credentials & Status</h6>
+            </div>
+            <div class="table-responsive my-auto">
+                <table class="table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main); min-width: 280px;">
+                    <tbody>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap" style="width: 35%;">Broker Platform</td>
+                            <td class="pe-0 py-3">
+                                <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-3 py-1 text-wrap">
+                                    {{ trader.get_broker_display|default:trader.broker|default:"Unassigned" }}
+                                </span>
+                            </td>
+                        </tr>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap">API Key</td>
+                            <td class="pe-0 py-3">
+                                <code class="px-2 py-1 bg-dark bg-opacity-50 text-info border border-secondary border-opacity-25 rounded text-break d-inline-block mw-100">
+                                    {{ trader.api_key|default:"Not set" }}
+                                </code>
+                            </td>
+                        </tr>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap">App ID</td>
+                            <td class="pe-0 py-3">
+                                <code class="px-2 py-1 bg-dark bg-opacity-50 text-info border border-secondary border-opacity-25 rounded text-break d-inline-block mw-100">
+                                    {{ trader.app_id|default:"Not set" }}
+                                </code>
+                            </td>
+                        </tr>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap">P&L Status</td>
+                            <td class="pe-0 py-3 theme-text-main text-break">{{ trader.get_stats_display }} ({{ trader.pl_integer }})</td>
+                        </tr>
+                        <tr class="border-0">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap">Trade Eligible</td>
+                            <td class="pe-0 py-3">
+                                {% if trader.trade_eligibility %}
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Eligible</span>
+                                {% else %}
+                                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Ineligible</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
+    </div>
+</div>
+
+<!-- Dynamic Tabs Section -->
+<div class="glass-card p-3 p-sm-4">
+    <!-- Tab Navigation Bar -->
+    <ul class="nav nav-tabs border-bottom mb-4" id="traderTabs" role="tablist" style="border-color: var(--border-color) !important;">
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active theme-text-main fw-bold d-flex align-items-center gap-2 border-0 bg-transparent pb-3" 
+                    id="controls-tab" data-bs-toggle="tab" data-bs-target="#controls-pane" type="button" role="tab" aria-controls="controls-pane" aria-selected="true">
+                <span class="material-icons fs-5">tune</span>
+                <span>Execution Controls</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link theme-text-muted fw-bold d-flex align-items-center gap-2 border-0 bg-transparent pb-3" 
+                    id="backtest-tab" data-bs-toggle="tab" data-bs-target="#backtest-pane" type="button" role="tab" aria-controls="backtest-pane" aria-selected="false">
+                <span class="material-icons fs-5">insights</span>
+                <span>Backtest</span>
+            </button>
+        </li>
+        <li class="nav-item" role="presentation">
+            <button class="nav-link theme-text-muted fw-bold d-flex align-items-center gap-2 border-0 bg-transparent pb-3" 
+                    id="others-tab" data-bs-toggle="tab" data-bs-target="#others-pane" type="button" role="tab" aria-controls="others-pane" aria-selected="false">
+                <span class="material-icons fs-5">more_horiz</span>
+                <span>Others</span>
+            </button>
+        </li>
+    </ul>
+
+    <!-- Tab Content Panes -->
+    <div class="tab-content" id="traderTabsContent">
+        
+        <!-- Tab 1: Controls (Execution Configuration Expanded View) -->
+        <div class="tab-pane fade show active" id="controls-pane" role="tabpanel" aria-labelledby="controls-tab">
+            {% if exec_config %}
+            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons text-primary fs-5">settings_suggest</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">
+                        Config: {{ exec_config.name|default:"Assigned Execution Configuration" }}
+                    </h6>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    {% if exec_config.is_active %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Active</span>
+                    {% else %}
+                        <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-3 py-1">Inactive</span>
+                    {% endif %}
+                    <a href="{% url 'admins:trade_exec_config_edit' exec_config.pk %}" class="btn btn-sm btn-outline-primary border-primary border-opacity-25 rounded-pill px-3 py-1 d-inline-flex align-items-center gap-1">
+                        <span class="material-icons fs-6">edit</span>
+                        <span>Edit Config</span>
+                    </a>
+                </div>
+            </div>
+
+            <div class="table-responsive">
+                <table class="table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
+                    <tbody>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap" style="width: 25%;">Max Loss Limit</td>
+                            <td class="pe-0 py-3 text-danger fw-semibold">${{ exec_config.max_loss_limit }}</td>
+                            <td class="py-3 theme-text-muted text-nowrap" style="width: 25%;">Max Profit Limit</td>
+                            <td class="pe-0 py-3 text-success fw-semibold">${{ exec_config.max_profit_limit }}</td>
+                        </tr>
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-0 py-3 theme-text-muted text-nowrap">Default Lot Size</td>
+                            <td class="pe-0 py-3 theme-text-main fw-bold">{{ exec_config.default_lot_size }}</td>
+                            <td class="py-3 theme-text-muted text-nowrap">Risk Mode</td>
+                            <td class="pe-0 py-3">
+                                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill text-uppercase fw-bold px-3 py-1">
+                                    {{ exec_config.default_risk_type }}
+                                </span>
+                                <span class="small theme-text-muted ms-1">({{ exec_config.default_risk_value }})</span>
+                            </td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 theme-text-muted">
+                <span class="material-icons fs-1 mb-2 opacity-50">tune</span>
+                <div>No execution controls configured for this trader.</div>
+                <a href="{% url 'admins:trade_exec_config_create' %}?user={{ trader.pk }}" class="btn btn-sm btn-outline-primary rounded-pill px-4 py-2 mt-3 d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6">add</span>
+                    <span>Create Configuration</span>
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        <!-- Tab 2: Backtest (Dummy View) -->
+        <div class="tab-pane fade" id="backtest-pane" role="tabpanel" aria-labelledby="backtest-tab">
+            <div class="text-center py-5 theme-text-muted">
+                <span class="material-icons fs-1 mb-2 opacity-50">analytics</span>
+                <h6 class="fw-bold theme-text-main">Backtest Analysis</h6>
+                <p class="small mb-0">Historical backtesting results and strategy simulation metrics will be rendered here.</p>
+            </div>
+        </div>
+
+        <!-- Tab 3: Others (Dummy View) -->
+        <div class="tab-pane fade" id="others-pane" role="tabpanel" aria-labelledby="others-tab">
+            <div class="text-center py-5 theme-text-muted">
+                <span class="material-icons fs-1 mb-2 opacity-50">folder_open</span>
+                <h6 class="fw-bold theme-text-main">Additional Information</h6>
+                <p class="small mb-0">Audit logs, system events, and additional custom settings will appear here.</p>
+            </div>
+        </div>
+
     </div>
 </div>
 {% endblock %}

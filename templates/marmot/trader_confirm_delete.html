@@ -1,125 +1,36 @@
-{% extends "users/index.html" %}
+{% extends "index.html" %}
 
-{% block title %}{% if form.instance.pk %}Edit Trader{% else %}Create Trader{% endif %} | Bug Tracker{% endblock %}
-
-{% block extra_head %}
-<style>
-    body {
-        font-size: 0.875rem;
-    }
-    .form-card {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid rgba(255, 255, 255, 0.08);
-        border-radius: 16px;
-    }
-    .form-control, .form-select {
-        background-color: rgba(0, 0, 0, 0.3) !important;
-        color: #ffffff !important;
-        border: 1px solid rgba(255, 255, 255, 0.1) !important;
-        border-radius: 8px;
-    }
-    .form-control:focus, .form-select:focus {
-        border-color: #4e73df !important;
-        box-shadow: 0 0 0 0.25rem rgba(78, 115, 223, 0.25);
-    }
-    .form-check-input {
-        background-color: rgba(0, 0, 0, 0.3);
-        border-color: rgba(255, 255, 255, 0.2);
-    }
-    .form-check-input:checked {
-        background-color: #4e73df;
-        border-color: #4e73df;
-    }
-</style>
-{% endblock %}
+{% block title %}Confirm Delete Trader | Bug Tracker{% endblock %}
 
 {% block dashboard_content %}
-<div class="container-fluid py-3">
-    <div class="d-flex justify-content-between align-items-center mb-4">
-        <div>
-            <h2 class="text-white fw-bold mb-1">
-                {% if form.instance.pk %}Edit Trader: {{ form.instance.name }}{% else %}Create New Marmot Trader{% endif %}
-            </h2>
-            <p class="text-white-50 small mb-0">Configure trader details, broker bindings, and freeze parameters.</p>
-        </div>
-        <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-outline-secondary text-white btn-sm px-3">
-            Back to List
-        </a>
-    </div>
+<div class="container-fluid py-4">
+    <div class="row justify-content-center">
+        <div class="col-xl-6 col-lg-8">
+            <!-- Glassmorphic Warning Card -->
+            <div class="glass-card p-4 border-danger shadow-lg">
+                <div class="d-flex align-items-center gap-3 mb-3">
+                    <div class="neo-icon-wrapper-danger rounded-circle d-flex align-items-center justify-content-center" style="width: 48px; height: 48px;">
+                        <span class="material-icons text-danger fs-3">warning_amber</span>
+                    </div>
+                    <div>
+                        <h4 class="theme-text-main fw-bold mb-0">Confirm Deletion</h4>
+                        <span class="theme-text-muted small">This action will soft-delete the trader profile.</span>
+                    </div>
+                </div>
 
-    <div class="row">
-        <div class="col-xl-8 col-lg-10">
-            <div class="form-card p-4 text-white">
-                <form method="post">
+                <hr class="border-secondary opacity-25 my-3">
+
+                <!-- Form Actions -->
+                <form method="post" hx-post="{{ request.path }}" hx-target="#mainContentBody" hx-swap="outerHTML">
                     {% csrf_token %}
-
-                    <div class="row g-3">
-                        <div class="col-md-6">
-                            <label class="form-label small text-white-50">Trader Name / Identifier</label>
-                            {{ form.name }}
-                            {% if form.name.errors %}<div class="text-danger smaller mt-1">{{ form.name.errors }}</div>{% endif %}
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label small text-white-50">Broker Platform</label>
-                            {{ form.broker }}
-                            {% if form.broker.errors %}<div class="text-danger smaller mt-1">{{ form.broker.errors }}</div>{% endif %}
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label small text-white-50">API Key</label>
-                            {{ form.api_key }}
-                            {% if form.api_key.errors %}<div class="text-danger smaller mt-1">{{ form.api_key.errors }}</div>{% endif %}
-                        </div>
-
-                        <div class="col-md-6">
-                            <label class="form-label small text-white-50">App ID</label>
-                            {{ form.app_id }}
-                            {% if form.app_id.errors %}<div class="text-danger smaller mt-1">{{ form.app_id.errors }}</div>{% endif %}
-                        </div>
-
-                        <div class="col-12">
-                            <label class="form-label small text-white-50">Description / Notes</label>
-                            {{ form.description }}
-                            {% if form.description.errors %}<div class="text-danger smaller mt-1">{{ form.description.errors }}</div>{% endif %}
-                        </div>
-
-                        <hr class="border-secondary border-opacity-25 my-3">
-
-                        <h6 class="fw-bold text-white mb-2">Trade Control & Freeze Flags</h6>
-
-                        <div class="col-md-3 col-6">
-                            <div class="form-check">
-                                {{ form.trade_eligibility }}
-                                <label class="form-check-label small">Trade Eligible</label>
-                            </div>
-                        </div>
-
-                        <div class="col-md-3 col-6">
-                            <div class="form-check">
-                                {{ form.is_blocked }}
-                                <label class="form-check-label small text-danger">Is Blocked</label>
-                            </div>
-                        </div>
-
-                        <div class="col-md-3 col-6">
-                            <div class="form-check">
-                                {{ form.primary_freeze }}
-                                <label class="form-check-label small text-warning">Primary Freeze</label>
-                            </div>
-                        </div>
-
-                        <div class="col-md-3 col-6">
-                            <div class="form-check">
-                                {{ form.final_freeze }}
-                                <label class="form-check-label small text-warning">Final Freeze</label>
-                            </div>
-                        </div>
-
-                        <div class="col-12 mt-4 d-flex justify-content-end gap-2">
-                            <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-sm btn-outline-secondary text-white px-4">Cancel</a>
-                            <button type="submit" class="btn btn-sm btn-primary px-4 fw-bold">Save Trader</button>
-                        </div>
+                    <div class="d-flex justify-content-end gap-2">
+                        <a href="{% url 'admins:marmot_trader_list' %}" class="btn btn-outline-light rounded-pill px-4">
+                            Cancel
+                        </a>
+                        <button type="submit" class="btn btn-danger rounded-pill px-4 fw-bold d-flex align-items-center gap-2">
+                            <span class="material-icons fs-6">delete_forever</span>
+                            <span>Confirm & Delete</span>
+                        </button>
                     </div>
                 </form>
             </div>

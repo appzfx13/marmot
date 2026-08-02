@@ -23,17 +23,19 @@ fi
 echo "PostgreSQL started successfully!"
 
 # --- Migrations ---
-echo "Making and applying migrations..."
-python manage.py makemigrations users --noinput  # <-- STEP 1: Generate users migration first
-python manage.py makemigrations --noinput        # <-- STEP 2: Generate remaining migrations
-python manage.py migrate --noinput               # <-- STEP 3: Apply migrations in order
+echo "Making migrations for core and dependent apps..."
+python manage.py makemigrations users common admins api market masters notifications trade_config trade_core --noinput
+python manage.py makemigrations --noinput
+
+echo "Applying database migrations..."
+python manage.py migrate --noinput
 
 # --- Static Files ---
 echo "Collecting static files..."
 python manage.py collectstatic --noinput
 
-# --- Setup Admin ---
-echo "Checking/Creating Superuser..."
+# --- Setup Admin & Dummy Data ---
+echo "Checking/Creating Superuser and Sample Users..."
 python manage.py initadmin
 
 # Execute main container process

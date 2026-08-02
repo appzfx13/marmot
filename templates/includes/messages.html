@@ -1,0 +1,61 @@
+<!-- Toast Messages Container -->
+<div id="toast-container" class="position-fixed top-0 end-0 p-3" style="z-index: 1090; max-width: 420px; width: 100%;">
+    {% if messages %}
+        {% for message in messages %}
+            {% with tag=message.tags|default:'info' %}
+            <div class="toast show glass-card border-0 mb-3 overflow-hidden shadow-lg" 
+                 role="alert" 
+                 aria-live="assertive" 
+                 aria-atomic="true"
+                 style="background: var(--nav-hover, rgba(255, 255, 255, 0.05)); backdrop-filter: blur(12px); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1)) !important;">
+                
+                <div class="d-flex align-items-center justify-content-between p-3">
+                    <div class="d-flex align-items-center gap-3">
+                        
+                        <!-- Status Icon Wrapper (Matches trader list avatar style) -->
+                        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0
+                                    {% if tag == 'success' %}bg-success bg-opacity-25 text-success border-success
+                                    {% elif tag == 'error' or tag == 'danger' %}bg-danger bg-opacity-25 text-danger border-danger
+                                    {% elif tag == 'warning' %}bg-warning bg-opacity-25 text-warning border-warning
+                                    {% else %}bg-secondary bg-opacity-25 theme-text-main border-secondary{% endif %}" 
+                             style="width: 38px; height: 38px; border: 1px solid rgba(255,255,255,0.2);">
+                            <span class="material-icons fs-6">
+                                {% if tag == 'success' %}check_circle
+                                {% elif tag == 'error' or tag == 'danger' %}error
+                                {% elif tag == 'warning' %}warning
+                                {% else %}info{% endif %}
+                            </span>
+                        </div>
+                        
+                        <!-- Message Text -->
+                        <div class="d-flex flex-column">
+                            <small class="fw-bold text-uppercase opacity-75 
+                                          {% if tag == 'success' %}text-success
+                                          {% elif tag == 'error' or tag == 'danger' %}text-danger
+                                          {% elif tag == 'warning' %}text-warning
+                                          {% else %}theme-text-muted{% endif %}" 
+                                   style="font-size: 0.70rem; letter-spacing: 0.5px;">
+                                {% if tag == 'error' or tag == 'danger' %}System Alert
+                                {% elif tag == 'success' %}Success
+                                {% elif tag == 'warning' %}Warning
+                                {% else %}Notification{% endif %}
+                            </small>
+                            <div class="small theme-text-main fw-medium text-break">{{ message }}</div>
+                        </div>
+
+                    </div>
+
+                    <!-- Circular Glass Close Button -->
+                    <button type="button" 
+                            class="glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none ms-2 flex-shrink-0" 
+                            style="width: 32px; height: 32px; background: rgba(255, 255, 255, 0.05); color: var(--text-main, #fff);" 
+                            data-bs-dismiss="toast" 
+                            aria-label="Close">
+                        <span class="material-icons fs-6">close</span>
+                    </button>
+                </div>
+            </div>
+            {% endwith %}
+        {% endfor %}
+    {% endif %}
+</div>

@@ -1,0 +1,101 @@
+{% extends 'admins/index.html' %}
+{% load static %}
+
+{% block title %}Trade Execution Configurations - Admin Portal{% endblock %}
+{% block nav_trade_exec_config_active %}active{% endblock %}
+
+{% block dashboard_content %}
+<!-- Responsive Header Container -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1 theme-text-main">Trade Execution Configurations</h3>
+        <p class="theme-text-muted mb-0">Search, filter, and manage automated trading rules and risk parameters.</p>
+    </div>
+    
+    <!-- Curved / Pill-styled Action Button -->
+    <a href="{% url 'admins:trade_exec_config_create' %}" class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 border-0 shadow-sm transition-all" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
+        <span class="material-icons fs-5">add</span>
+        <span>New Configuration</span>
+    </a>
+</div>
+
+<!-- Search & Filter Controls -->
+<div class="glass-card p-3 p-md-4 mb-4">
+    <form method="GET" action="{% url 'admins:trade_exec_config_list' %}" class="row g-3 align-items-center">
+        
+        <!-- Filter by Config Name (`name`) -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
+                    <span class="material-icons fs-6">tune</span>
+                </span>
+                <input type="text" 
+                       name="name" 
+                       value="{{ request.GET.name }}" 
+                       class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25" 
+                       placeholder="Config Name..."
+                       hx-get="{% url 'admins:trade_exec_config_list' %}"
+                       hx-target="#configTableContainer"
+                       hx-trigger="input changed delay:400ms, search"
+                       hx-include="[name='q'], [name='is_active']"
+                       hx-push-url="true">
+            </div>
+        </div>
+
+        <!-- Filter by Marmot User (`admins_user` details) -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
+                    <span class="material-icons fs-6">search</span>
+                </span>
+                <input type="text" 
+                       name="q" 
+                       value="{{ request.GET.q }}" 
+                       class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25" 
+                       placeholder="User, email..."
+                       hx-get="{% url 'admins:trade_exec_config_list' %}"
+                       hx-target="#configTableContainer"
+                       hx-trigger="input changed delay:400ms, search"
+                       hx-include="[name='name'], [name='is_active']"
+                       hx-push-url="true">
+            </div>
+        </div>
+
+        <!-- Filter by Active Status (`is_active`) -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <select name="is_active" 
+                    class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
+                    hx-get="{% url 'admins:trade_exec_config_list' %}"
+                    hx-target="#configTableContainer"
+                    hx-trigger="change"
+                    hx-include="[name='name'], [name='q']"
+                    hx-push-url="true">
+                <option value="" class="text-dark">All Statuses</option>
+                <option value="true" class="text-dark" {% if request.GET.is_active == 'true' %}selected{% endif %}>Active</option>
+                <option value="false" class="text-dark" {% if request.GET.is_active == 'false' %}selected{% endif %}>Inactive</option>
+            </select>
+        </div>
+
+        <!-- Reset Button -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <a href="{% url 'admins:trade_exec_config_list' %}" 
+               class="btn btn-outline-secondary rounded-pill text-white-50 border-secondary border-opacity-25 w-100 d-inline-flex align-items-center justify-content-center gap-1"
+               hx-get="{% url 'admins:trade_exec_config_list' %}"
+               hx-target="#configTableContainer"
+               hx-push-url="true">
+                <span class="material-icons fs-6">restart_alt</span>
+                <span>Reset</span>
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- FIXED CONTAINER: Now listens for the reloadConfigTable event -->
+<div id="configTableContainer" class="w-100"
+     hx-get="{{ request.get_full_path }}" 
+     hx-trigger="reloadConfigTable from:body" 
+     hx-target="this">
+    {% include 'admins/partials/trade_exec_config_table_partial.html' %}
+</div>
+{% endblock %}

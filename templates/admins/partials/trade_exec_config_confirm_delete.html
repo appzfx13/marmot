@@ -1,0 +1,47 @@
+{% extends "admins/index.html" %}
+
+{% block title %}Delete Trade Config - Bug Tracker{% endblock %}
+
+{% block dashboard_content %}
+<div class="row mb-4">
+    <div class="col-12 d-flex align-items-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width: 54px; height: 54px; border: 1px solid rgba(220, 53, 69, 0.3);">
+                <span class="material-icons fs-3">warning</span>
+            </div>
+            <div>
+                <h2 class="theme-text-main fw-bold mb-0">Confirm Delete</h2>
+                <div class="theme-text-muted small">Delete trade execution rules for this user account.</div>
+            </div>
+        </div>
+        <a href="{% url 'admins:trade_exec_config_list' %}" class="glass-icon-btn text-decoration-none">
+            <span class="material-icons fs-5">arrow_back</span>
+        </a>
+    </div>
+</div>
+
+<div class="glass-card p-4 max-w-2xl mx-auto">
+    <form method="post">
+        {% csrf_token %}
+        <p class="theme-text-main mb-3">
+            Are you sure you want to permanently delete the Trade Execution Configuration for user:
+            <strong>{{ object.admins_user.username }}</strong>?
+        </p>
+        <div class="alert alert-warning bg-warning bg-opacity-10 border-warning border-opacity-25 text-warning small rounded-3 mb-4">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons fs-6">info</span>
+                <span>This action cannot be undone. Automated execution rules and risk safeguards will stop immediately for this trader.</span>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary border-opacity-25">
+            <a href="{% url 'admins:trade_exec_config_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold text-decoration-none">
+                CANCEL
+            </a>
+            <button type="submit" class="btn btn-sm btn-danger rounded-pill px-4 py-2 small fw-bold shadow-sm">
+                CONFIRM & DELETE
+            </button>
+        </div>
+    </form>
+</div>
+{% endblock %}
