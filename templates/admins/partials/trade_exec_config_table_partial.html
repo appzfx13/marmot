@@ -52,31 +52,11 @@
 
                     <!-- Interactive Status Toggle for is_active -->
                     <td class="py-3">
-                        <form method="post" 
-                              hx-post="{% url 'admins:trade_exec_config_edit' config.pk %}" 
-                              hx-target="#configTableContainer" 
-                              hx-swap="innerHTML"
-                              class="d-flex align-items-center gap-2 m-0">
-                            {% csrf_token %}
-                            <div class="form-check form-switch m-0 p-0 d-flex align-items-center">
-                                <input class="form-check-input cursor-pointer m-0" 
-                                       type="checkbox" 
-                                       name="is_active" 
-                                       role="switch" 
-                                       id="isActiveToggleDesktop_{{ config.pk }}" 
-                                       {% if config.is_active %}checked{% endif %}
-                                       hx-trigger="change"
-                                       hx-post="{% url 'admins:trade_exec_config_edit' config.pk %}"
-                                       hx-target="#configTableContainer"
-                                       hx-include="closest tr"
-                                       style="width: 2.5em; height: 1.25em;">
-                            </div>
-                            {% if config.is_active %}
-                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1 small">Active</span>
-                            {% else %}
-                                <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-2 py-1 small">Inactive</span>
-                            {% endif %}
-                        </form>
+                    {% if config.is_active %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill small">Active</span>
+                    {% else %}
+                        <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill small">Inactive</span>
+                    {% endif %}
                     </td>
 
                     <!-- Max Loss -->

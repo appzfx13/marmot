@@ -50,14 +50,11 @@ class AdminLoginView(HTMXPartialMixin, HtmxMessageMixin, LoginView):
     def form_valid(self, form):
         try:
             auth_login(self.request, form.get_user())
-            messages.success(self.request, Messages.LOGIN_SUCCESS)
             success_url = str(self.get_success_url())
-
             if self.request.headers.get('HX-Request'):
                 response = HttpResponse(status=204)
                 response['HX-Redirect'] = success_url
                 return response
-
             return redirect(success_url)
 
         except Exception as e:
