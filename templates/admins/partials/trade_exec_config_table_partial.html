@@ -3,9 +3,9 @@
     
     <!-- DESKTOP / LARGE TABLET VIEW -->
     <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
-        <table class="table table-hover align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; --bs-table-hover-bg: var(--nav-hover); color: var(--text-main);">
+        <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; --bs-table-hover-bg: var(--nav-hover); color: var(--text-main);">
             <thead>
-                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                <tr class="theme-text-muted " style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
                     <th scope="col" class="ps-4 py-3 theme-text-muted">
                         <a href="javascript:void(0);" 
                            class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
@@ -95,8 +95,8 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr>
-                    <td colspan="8" class="text-center py-5 theme-text-muted">
+                <tr class="border-0">
+                    <td colspan="8" class="text-center py-5 theme-text-muted border-0">
                         <span class="material-icons fs-1 mb-2 opacity-50">tune</span>
                         <div>No trade execution configurations found matching your criteria.</div>
                     </td>
@@ -121,33 +121,6 @@
                         <small class="theme-text-muted">Unassigned</small>
                     {% endif %}
                 </div>
-                
-                <!-- Mobile Status Toggle -->
-                {% comment %} <form method="post" 
-                      hx-post="{% url 'admins:trade_exec_config_edit' config.pk %}" 
-                      hx-target="#configTableContainer" 
-                      hx-swap="innerHTML"
-                      class="m-0">
-                    {% csrf_token %}
-                    <div class="form-check form-switch m-0 p-0 d-flex flex-column align-items-end">
-                        <input class="form-check-input cursor-pointer m-0 mb-1" 
-                               type="checkbox" 
-                               name="is_active" 
-                               role="switch" 
-                               id="isActiveToggleMobile_{{ config.pk }}" 
-                               {% if config.is_active %}checked{% endif %}
-                               hx-trigger="change"
-                               hx-post="{% url 'admins:trade_exec_config_edit' config.pk %}"
-                               hx-target="#configTableContainer"
-                               hx-include="closest form"
-                               style="width: 2.5em; height: 1.25em;">
-                        {% if config.is_active %}
-                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill" style="font-size: 0.65rem;">ACTIVE</span>
-                        {% else %}
-                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill" style="font-size: 0.65rem;">INACTIVE</span>
-                        {% endif %}
-                    </div>
-                </form> {% endcomment %}
             </div>
 
             <!-- Stats Grid -->

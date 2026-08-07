@@ -7,7 +7,8 @@ class MemberRoleChoices(models.TextChoices):
     DEVELOPER = "developer", "Developer"
     CUSTOMER = "customer", "Customer"
     TRADERS = "traders", "Traders"
-
+    MEMBER = "member", "Member"
+    
 # Broker Choices
 class BrokerChoices(models.TextChoices):
     FYERS = "fyers", "FYERS"

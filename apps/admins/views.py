@@ -25,7 +25,6 @@ from django.views.generic import (
     UpdateView,
 )
 from django.conf import settings
-# Add this import at the top
 from django_filters.views import FilterView
 
 from apps.users.models import User, MemberRoleChoices, BrokerChoices, PLStatusChoices
@@ -120,7 +119,7 @@ class AdminMarmotTraderListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
     paginate_by = settings.PAGINATION_COUNT
 
     def get_queryset(self):
-        queryset = super().get_queryset().filter(role=MemberRoleChoices.TRADERS, is_deleted=False)
+        queryset = super().get_queryset().filter(role=MemberRoleChoices.MEMBER, is_deleted=False)
 
         # --- Search & Filters ---
         q = self.request.GET.get('q', '').strip()

@@ -1,0 +1,229 @@
+<style>
+    .custom-glass-table > :not(caption) > * > * {
+        background-color: transparent !important;
+        box-shadow: none !important;
+    }
+    .custom-glass-table.table-hover tbody tr:hover > * {
+        background-color: var(--nav-hover) !important;
+    }
+</style>
+
+<!-- Main Glass Card Container with Min-height for optimal layout flow -->
+<div class="glass-card overflow-hidden d-flex flex-column min-vh-75 w-100" style="min-height: 700px;" 
+     id="backup-dashboard-container"
+     hx-get="{{ request.get_full_path }}" 
+     hx-trigger="reloadBackupTable from:body" 
+     hx-target="this">
+    
+    <!-- DESKTOP / LARGE TABLET VIEW -->
+    <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
+        <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
+            <thead>
+                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                    <th scope="col" class="ps-4 py-3 theme-text-muted">
+                        <a href="javascript:void(0);" 
+                           class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
+                           hx-get="{% url 'market:market_backup_list' %}?sort={% if current_sort == 'index_name' %}-index_name{% else %}index_name{% endif %}&{{ current_filters }}"
+                           hx-target="#backup-dashboard-container"
+                           hx-push-url="true"
+                           title="Sort by Index">
+                            Backup ID / Index
+                            <span class="material-icons fs-6">
+                                {% if current_sort == 'index_name' %}arrow_upward{% elif current_sort == '-index_name' %}arrow_downward{% else %}swap_vert{% endif %}
+                            </span>
+                        </a>
+                    </th>
+                    <th scope="col" class="py-3 theme-text-muted">Date Range</th>
+                    <th scope="col" class="py-3 theme-text-muted">Strikes / Storage</th>
+                    <th scope="col" class="py-3 theme-text-muted">Progress</th>
+                    <th scope="col" class="py-3 theme-text-muted">
+                        <a href="javascript:void(0);" 
+                           class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
+                           hx-get="{% url 'market:market_backup_list' %}?sort={% if current_sort == 'status' %}-status{% else %}status{% endif %}&{{ current_filters }}"
+                           hx-target="#backup-dashboard-container"
+                           hx-push-url="true"
+                           title="Sort by Status">
+                            Status
+                            <span class="material-icons fs-6">
+                                {% if current_sort == 'status' %}arrow_upward{% elif current_sort == '-status' %}arrow_downward{% else %}swap_vert{% endif %}
+                            </span>
+                        </a>
+                    </th>
+                    <th scope="col" class="text-end pe-4 py-3 theme-text-muted">Controls & Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for backup in backups %}
+                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+                    <td class="ps-4 py-3 bg-transparent">
+                        <div class="fw-bold theme-text-main">#{{ backup.id|stringformat:"04d" }}</div>
+                        <div class="small text-primary fw-semibold">{{ backup.get_index_name_display }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small theme-text-main">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small theme-text-muted">±{{ backup.strike_count }} ATM</div>
+                        <div class="small theme-text-main">{{ backup.file_size_mb }} MB</div>
+                    </td>
+
+                    <!-- Real-Time Progress Bar -->
+                    <td class="py-3 bg-transparent" style="min-width: 150px;">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <small class="theme-text-muted" style="font-size: 0.7rem;">{{ backup.progress }}%</small>
+                        </div>
+                        <div class="progress" style="height: 6px; background-color: var(--border-color);">
+                            <div class="progress-bar bg-primary progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %}" 
+                                 role="progressbar" 
+                                 style="width: {{ backup.progress }}%;" 
+                                 aria-valuenow="{{ backup.progress }}" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        {% if backup.status == 'completed' %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
+                        {% elif backup.status == 'running' %}
+                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>
+                        {% elif backup.status == 'paused' %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>
+                        {% elif backup.status == 'cancelled' or backup.status == 'error' %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">{{ backup.get_status_display }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">Pending</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-end pe-4 py-3 bg-transparent">
+                        <div class="d-flex align-items-center justify-content-end gap-2">
+                            {% if backup.status == 'running' %}
+                            <button type="button" 
+                                    hx-post="{% url 'market:market_backup_control' backup.pk %}" 
+                                    hx-vals='{"action": "pause"}' 
+                                    hx-target="#backup-dashboard-container" 
+                                    class="glass-icon-btn text-warning rounded-circle d-flex align-items-center justify-content-center" 
+                                    style="width: 36px; height: 36px;" 
+                                    title="Pause Task">
+                                <span class="material-icons fs-6">pause</span>
+                            </button>
+                            {% else %}
+                            <button type="button" 
+                                    hx-post="{% url 'market:market_backup_control' backup.pk %}" 
+                                    hx-vals='{"action": "resume"}' 
+                                    hx-target="#backup-dashboard-container" 
+                                    class="glass-icon-btn text-success rounded-circle d-flex align-items-center justify-content-center" 
+                                    style="width: 36px; height: 36px;" 
+                                    title="Start / Resume Task">
+                                <span class="material-icons fs-6">play_arrow</span>
+                            </button>
+                            {% endif %}
+
+                            <a href="{% url 'market:market_backup_detail' backup.pk %}" 
+                               class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" 
+                               style="width: 36px; height: 36px;" 
+                               title="View Details">
+                                <span class="material-icons fs-6">visibility</span>
+                            </a>
+                            
+                            <button type="button" 
+                                    class="glass-icon-btn text-danger border-0 rounded-circle d-flex align-items-center justify-content-center" 
+                                    style="width: 36px; height: 36px;" 
+                                    hx-get="{% url 'market:market_backup_delete' backup.pk %}"
+                                    hx-target="#globalHtmxModalDialog"
+                                    title="Delete Backup Task">
+                                <span class="material-icons fs-6">delete</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="border-0">
+                    <td colspan="6" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                        <span class="material-icons fs-1 mb-2 opacity-50">cloud_off</span>
+                        <p class="mb-0 fw-medium">No market backup jobs found.</p>
+                        <small class="opacity-75">Adjust your filters or run a new backup.</small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MOBILE VIEW CARD LIST -->
+    <div class="flex-grow-1 overflow-auto p-3 d-block d-lg-none">
+        {% for backup in backups %}
+        <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                <div>
+                    <div class="fw-bold theme-text-main">#{{ backup.id|stringformat:"04d" }} - {{ backup.get_index_name_display }}</div>
+                    <small class="theme-text-muted">{{ backup.start_date }} to {{ backup.end_date }}</small>
+                </div>
+                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-1" style="font-size: 0.65rem;">{{ backup.status|upper }}</span>
+            </div>
+            
+            <div class="mb-3">
+                <div class="d-flex justify-content-between text-muted small mb-1">
+                    <span>Progress</span><span>{{ backup.progress }}%</span>
+                </div>
+                <div class="progress" style="height: 6px;">
+                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ backup.progress }}%;"></div>
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-end gap-2 border-top pt-3" style="border-color: var(--border-color) !important;">
+                <a href="{% url 'market:market_backup_detail' backup.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Details</a>
+                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" hx-get="{% url 'market:market_backup_delete' backup.pk %}" hx-target="#globalHtmxModalDialog">Delete</button>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-5 theme-text-muted">
+            <span class="material-icons fs-1 mb-2 opacity-50">cloud_off</span>
+            <p class="mb-0 fw-medium">No market backup jobs found.</p>
+        </div>
+        {% endfor %}
+    </div>
+
+    <!-- Pinned Pagination Footer -->
+    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+            <div class="small theme-text-muted text-center text-sm-start">
+                {% if is_paginated %}
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} jobs
+                {% else %}
+                    Showing {{ backups|length }} of {{ backups|length }} jobs
+                {% endif %}
+            </div>
+            
+            <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
+                {% if is_paginated and page_obj.has_previous %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'market:market_backup_list' %}?page={{ page_obj.previous_page_number }}&sort={{ current_sort }}&{{ current_filters }}" 
+                       hx-target="#backup-dashboard-container" hx-push-url="true">
+                       <span class="material-icons fs-6">chevron_left</span>
+                    </a>
+                </li>
+                {% endif %}
+                <li class="page-item mb-0">
+                    <span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold text-decoration-none p-0" style="width: 36px; height: 36px;">
+                        {% if is_paginated %}{{ page_obj.number }}{% else %}1{% endif %}
+                    </span>
+                </li>
+                {% if is_paginated and page_obj.has_next %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'market:market_backup_list' %}?page={{ page_obj.next_page_number }}&sort={{ current_sort }}&{{ current_filters }}" 
+                       hx-target="#backup-dashboard-container" hx-push-url="true">
+                       <span class="material-icons fs-6">chevron_right</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>

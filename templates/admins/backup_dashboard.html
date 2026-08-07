@@ -1,0 +1,83 @@
+{% extends 'admins/index.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} - Admin Portal{% endblock %}
+{% block nav_market_backup_active %}active{% endblock %}
+
+{% block dashboard_content %}
+<!-- Responsive Header Container -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1 theme-text-main">{{ page_title }}</h3>
+        <p class="theme-text-muted mb-0">Manage, monitor, and execute market data backups.</p>
+    </div>
+    
+    <!-- Updated: Linked to Market Backup Create View -->
+    <a href="{% url 'market:market_backup_create' %}" class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 border-0 shadow-sm transition-all" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
+        <span class="material-icons fs-5">cloud_sync</span>
+        <span>Run Backup Now</span>
+    </a>
+</div>
+
+<!-- Search & Filter Controls -->
+<div class="glass-card p-3 p-md-4 mb-4">
+    <form method="GET" action="{{ request.path }}" class="row g-3 align-items-center">
+        
+        <!-- Search by Backup Name or Query -->
+        <div class="col-12 col-sm-6 col-lg-4">
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
+                    <span class="material-icons fs-6">search</span>
+                </span>
+                <input type="text" 
+                       name="q" 
+                       value="{{ request.GET.q }}" 
+                       class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25" 
+                       placeholder="Search backups..."
+                       hx-get="{{ request.path }}"
+                       hx-target="#backup-dashboard-container"
+                       hx-trigger="input changed delay:400ms, search"
+                       hx-include="[name='status']"
+                       hx-push-url="true">
+            </div>
+        </div>
+
+        <!-- Filter by Status -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <select name="status" 
+                    class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
+                    hx-get="{{ request.path }}"
+                    hx-target="#backup-dashboard-container"
+                    hx-trigger="change"
+                    hx-include="[name='q']"
+                    hx-push-url="true">
+                <option value="" class="text-dark">All Statuses</option>
+                <option value="completed" class="text-dark" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
+                <option value="in_progress" class="text-dark" {% if request.GET.status == 'in_progress' %}selected{% endif %}>In Progress</option>
+                <option value="failed" class="text-dark" {% if request.GET.status == 'failed' %}selected{% endif %}>Failed</option>
+            </select>
+        </div>
+
+        <!-- Reset Button -->
+        <div class="col-12 col-sm-6 col-lg-3 ms-auto">
+            <a href="{{ request.path }}" 
+               class="btn btn-outline-secondary rounded-pill text-white-50 border-secondary border-opacity-25 w-100 d-inline-flex align-items-center justify-content-center gap-1"
+               hx-get="{{ request.path }}"
+               hx-target="#backup-dashboard-container"
+               hx-push-url="true">
+                <span class="material-icons fs-6">restart_alt</span>
+                <span>Reset</span>
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- FIXED CONTAINER: HTMX target container that holds the table partial -->
+<div id="backup-dashboard-container" class="w-100"
+     hx-get="{{ request.get_full_path }}" 
+     hx-trigger="reloadBackupTable from:body" 
+     hx-target="this">
+    {% include 'admins/partials/backup_dashboard_content.html' %}
+</div>
+{% endblock %}

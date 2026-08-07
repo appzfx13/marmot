@@ -1,0 +1,78 @@
+{% extends 'admins/index.html' %}
+{% load static %}
+
+{% block title %}New Market Backup - Admin Portal{% endblock %}
+{% block nav_market_backup_active %}active{% endblock %}
+
+{% block dashboard_content %}
+<!-- Header Container -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1 theme-text-main">Initialize Market Backup</h3>
+        <p class="theme-text-muted mb-0">Configure parameters for downloading and serializing options market data.</p>
+    </div>
+    <a href="{% url 'market:market_backup_list' %}" class="btn btn-outline-secondary rounded-pill px-4 d-inline-flex align-items-center gap-2">
+        <span class="material-icons fs-6">arrow_back</span>
+        <span>Back to Dashboard</span>
+    </a>
+</div>
+
+<!-- Form Card Container -->
+<div class="glass-card p-4 p-md-5 mx-auto" style="max-width: 650px;">
+    <form method="POST" class="needs-validation" novalidate>
+        {% csrf_token %}
+        
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-3 mb-4">
+                {{ form.non_field_errors }}
+            </div>
+        {% endif %}
+
+        <!-- Start Date -->
+        <div class="mb-3">
+            <label for="{{ form.start_date.id_for_label }}" class="form-label theme-text-main fw-semibold">Start Date</label>
+            {{ form.start_date }}
+            <small class="theme-text-muted d-block mt-1">Beginning date for the options dataset history.</small>
+            {% if form.start_date.errors %}
+                <div class="invalid-feedback d-block">{{ form.start_date.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <!-- End Date -->
+        <div class="mb-3">
+            <label for="{{ form.end_date.id_for_label }}" class="form-label theme-text-main fw-semibold">End Date</label>
+            {{ form.end_date }}
+            <small class="theme-text-muted d-block mt-1">Ending date for the options dataset history.</small>
+            {% if form.end_date.errors %}
+                <div class="invalid-feedback d-block">{{ form.end_date.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Target Index -->
+        <div class="mb-3">
+            <label for="{{ form.index_name.id_for_label }}" class="form-label theme-text-main fw-semibold">Target Index</label>
+            {{ form.index_name }}
+            <small class="theme-text-muted d-block mt-1">Select the underlying trading index for data capture.</small>
+            {% if form.index_name.errors %}
+                <div class="invalid-feedback d-block">{{ form.index_name.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Strike Count -->
+        <div class="mb-4">
+            <label for="{{ form.strike_count.id_for_label }}" class="form-label theme-text-main fw-semibold">Strike Count (± from ATM)</label>
+            {{ form.strike_count }}
+            <small class="theme-text-muted d-block mt-1">Number of strikes to track above and below At-The-Money (e.g., 5).</small>
+            {% if form.strike_count.errors %}
+                <div class="invalid-feedback d-block">{{ form.strike_count.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        <!-- Form Actions -->
+        <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary border-opacity-25">
+            <a href="{% url 'market:market_backup_list' %}" class="btn btn-outline-light rounded-pill px-4">Cancel</a>
+            <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Initialize Backup Task</button>
+        </div>
+    </form>
+</div>
+{% endblock %}
