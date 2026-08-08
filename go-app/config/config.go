@@ -8,7 +8,10 @@ import (
 type Config struct {
 	DatabaseURL string
 	RedisURL    string
-	DBTableName string
+	DBTableName     string
+	WSPort          string
+	DhanClientID    string
+	DhanAccessToken string
 }
 
 func LoadConfig() *Config {
@@ -24,11 +27,17 @@ func LoadConfig() *Config {
 
 	redisURL := getEnv("REDIS_URL", "redis://redis:6379/0")
 	tableName := getEnv("DB_TABLE_NAME", "market_marketbackuptask")
+	wsPort := getEnv("WS_PORT", "8081")
+	dhanClient := getEnv("DHAN_CLIENT_ID", "")
+	dhanToken := getEnv("DHAN_ACCESS_TOKEN", "")
 
 	return &Config{
-		DatabaseURL: dbURL,
-		RedisURL:    redisURL,
-		DBTableName: tableName,
+		DatabaseURL:     dbURL,
+		RedisURL:        redisURL,
+		DBTableName:     tableName,
+		WSPort:          wsPort,
+		DhanClientID:    dhanClient,
+		DhanAccessToken: dhanToken,
 	}
 }
 

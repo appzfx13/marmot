@@ -6,6 +6,7 @@ import (
 	"log"
 	"sync"
 
+	"go-app/config"
 	"go-app/models"
 	"go-app/services"
 )
@@ -13,14 +14,16 @@ import (
 // TaskManager handles the lifecycle of backup tasks and listens for IPC commands
 type TaskManager struct {
 	dbService *services.DBService
+	config    *config.Config
 	activeCtx map[string]context.CancelFunc
 	mu        sync.Mutex
 }
 
 // NewTaskManager creates a new instance of TaskManager
-func NewTaskManager(dbService *services.DBService) *TaskManager {
+func NewTaskManager(dbService *services.DBService, cfg *config.Config) *TaskManager {
 	return &TaskManager{
 		dbService: dbService,
+		config:    cfg,
 		activeCtx: make(map[string]context.CancelFunc),
 	}
 }
@@ -128,6 +131,6 @@ func (m *TaskManager) runWorkerWrapper(ctx context.Context, payload models.Comma
 	}()
 
 	// Initialize and run the backup pipeline
-	job := NewBackupJob(m.dbService, payload)
+	job := NewBackupJob(m.dbService, m.config, payload)
 	job.Run(ctx)
 }

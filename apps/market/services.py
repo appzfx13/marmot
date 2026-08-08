@@ -4,7 +4,7 @@ from django.conf import settings
 from .models import MarketBackupTask
 
 # Initialize Redis Connection (Pulls from your Django settings, falls back to local docker defaults)
-REDIS_URL = getattr(settings, 'REDIS_URL', 'redis://localhost:6379/0')
+REDIS_URL = settings.REDIS_URL
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 REDIS_CHANNEL = 'market_backup_commands'

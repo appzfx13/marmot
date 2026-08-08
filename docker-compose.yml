@@ -1,5 +1,5 @@
 services:
-  # --- PostgreSQL Database (Shared by Django & River Queue) ---
+  # --- PostgreSQL Database ---
   db:
     image: postgres:16-alpine
     container_name: postgres_db
@@ -11,15 +11,15 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-postgres}"]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-postgres}" ]
       interval: 5s
       timeout: 5s
       retries: 5
     networks:
       - app_network
 
-  # --- Redis Service (Cache & Pub/Sub Broker for Django Channels & Go) ---
-  redis:
+  # --- Redis Service ---
+  redis_broker:
     image: redis:7-alpine
     container_name: redis_broker
     restart: always
@@ -28,7 +28,7 @@ services:
     volumes:
       - redis_data:/data
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -60,21 +60,19 @@ services:
     env_file:
       - .env
     environment:
+      # Mapping the .env variables so Django understands them
       - DB_ENGINE=django.db.backends.postgresql
       - DB_NAME=${POSTGRES_DB}
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_HOST=db
-      - DB_PORT=5432
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379/0
+      - DB_PORT=${POSTGRES_PORT:-5432}
     stdin_open: true
     tty: true
     depends_on:
       db:
         condition: service_healthy
-      redis:
+      redis_broker:
         condition: service_healthy
     networks:
       - app_network
@@ -85,26 +83,24 @@ services:
       context: ./go-app
       dockerfile: Dockerfile
     container_name: go_service
-    command: go run main.go 
+    command: go run main.go
     ports:
-      - "8081:8081"
+      - "${WS_PORT:-8082}:${WS_PORT:-8082}"
     volumes:
       - ./go-app:/app
     env_file:
       - .env
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
+      # Mapping the .env variables so Go understands them
       - DB_NAME=${POSTGRES_DB}
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
-      - REDIS_HOST=redis
-      - REDIS_PORT=6379
-      - REDIS_URL=redis://redis:6379/0
+      - DB_HOST=db
+      - DB_PORT=${POSTGRES_PORT:-5432}
     depends_on:
       db:
         condition: service_healthy
-      redis:
+      redis_broker:
         condition: service_healthy
     networks:
       - app_network

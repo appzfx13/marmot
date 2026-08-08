@@ -391,7 +391,7 @@
             if (evt.detail.target.id === 'globalHtmxModalDialog') {
                 const modalEl = document.getElementById('globalHtmxModal');
                 if (modalEl) {
-                    const modal = new bootstrap.Modal(modalEl);
+                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
                     modal.show();
                 }
             }
@@ -405,6 +405,62 @@
         }
         document.body.addEventListener('closeDeleteModal', hideGlobalModal);
         document.body.addEventListener('closeGlobalModal', hideGlobalModal);
+
+        // ── Global showToast handler ──────────────────────────────────────────
+        // Fired by HX-Trigger: {"showToast": {"message": "...", "level": "..."}}
+        // Dynamically injects a styled toast matching the existing messages.html design.
+        document.body.addEventListener('showToast', function (evt) {
+            var msg   = (evt.detail && evt.detail.message) ? evt.detail.message : 'Operation completed.';
+            var level = (evt.detail && evt.detail.level)   ? evt.detail.level   : 'info';
+
+            var iconMap = { success: 'check_circle', error: 'error', danger: 'error', warning: 'warning', info: 'info' };
+            var colorMap = {
+                success: 'bg-success bg-opacity-25 text-success border-success',
+                error:   'bg-danger bg-opacity-25 text-danger border-danger',
+                danger:  'bg-danger bg-opacity-25 text-danger border-danger',
+                warning: 'bg-warning bg-opacity-25 text-warning border-warning',
+                info:    'bg-secondary bg-opacity-25 theme-text-main border-secondary'
+            };
+            var labelMap = { success: 'Success', error: 'System Alert', danger: 'System Alert', warning: 'Warning', info: 'Notification' };
+            var textColorMap = { success: 'text-success', error: 'text-danger', danger: 'text-danger', warning: 'text-warning', info: 'theme-text-muted' };
+
+            var icon      = iconMap[level]      || 'info';
+            var colorCls  = colorMap[level]     || colorMap.info;
+            var labelTxt  = labelMap[level]     || 'Notification';
+            var textCls   = textColorMap[level] || 'theme-text-muted';
+
+            var toastEl = document.createElement('div');
+            toastEl.className = 'toast show glass-card border-0 mb-3 overflow-hidden shadow-lg';
+            toastEl.setAttribute('role', 'alert');
+            toastEl.setAttribute('aria-live', 'assertive');
+            toastEl.setAttribute('aria-atomic', 'true');
+            toastEl.style.cssText = 'background: var(--nav-hover, rgba(255,255,255,0.05)); backdrop-filter: blur(12px); border: 1px solid var(--border-color, rgba(255,255,255,0.1)) !important;';
+            toastEl.innerHTML = '\
+<div class="d-flex align-items-center justify-content-between p-3">\
+  <div class="d-flex align-items-center gap-3">\
+    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 ' + colorCls + '" style="width:38px;height:38px;border:1px solid rgba(255,255,255,0.2);">\
+      <span class="material-icons fs-6">' + icon + '</span>\
+    </div>\
+    <div class="d-flex flex-column">\
+      <small class="fw-bold text-uppercase opacity-75 ' + textCls + '" style="font-size:0.70rem;letter-spacing:0.5px;">' + labelTxt + '</small>\
+      <div class="small theme-text-main fw-medium text-break">' + msg + '</div>\
+    </div>\
+  </div>\
+  <button type="button" class="glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none ms-2 flex-shrink-0" style="width:32px;height:32px;background:rgba(255,255,255,0.05);color:var(--text-main,#fff);" aria-label="Close" onclick="this.closest(\'.toast\').remove();">\
+    <span class="material-icons fs-6">close</span>\
+  </button>\
+</div>';
+
+            var container = document.getElementById('toast-container');
+            if (container) {
+                container.appendChild(toastEl);
+                setTimeout(function () {
+                    toastEl.classList.remove('show');
+                    setTimeout(function () { toastEl.remove(); }, 300);
+                }, 4000);
+            }
+        });
+
         const globalModalEl = document.getElementById('globalHtmxModal');
         if (globalModalEl) {
             globalModalEl.addEventListener('hidden.bs.modal', function () {

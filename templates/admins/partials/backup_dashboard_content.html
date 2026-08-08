@@ -101,9 +101,8 @@
                         <div class="d-flex align-items-center justify-content-end gap-2">
                             {% if backup.status == 'running' %}
                             <button type="button" 
-                                    hx-post="{% url 'market:market_backup_control' backup.pk %}" 
-                                    hx-vals='{"action": "pause"}' 
-                                    hx-target="#backup-dashboard-container" 
+                                    hx-get="{% url 'market:market_backup_control' backup.pk %}?action=pause" 
+                                    hx-target="#globalHtmxModalDialog" 
                                     class="glass-icon-btn text-warning rounded-circle d-flex align-items-center justify-content-center" 
                                     style="width: 36px; height: 36px;" 
                                     title="Pause Task">
@@ -111,9 +110,8 @@
                             </button>
                             {% else %}
                             <button type="button" 
-                                    hx-post="{% url 'market:market_backup_control' backup.pk %}" 
-                                    hx-vals='{"action": "resume"}' 
-                                    hx-target="#backup-dashboard-container" 
+                                    hx-get="{% url 'market:market_backup_control' backup.pk %}?action=resume" 
+                                    hx-target="#globalHtmxModalDialog" 
                                     class="glass-icon-btn text-success rounded-circle d-flex align-items-center justify-content-center" 
                                     style="width: 36px; height: 36px;" 
                                     title="Start / Resume Task">
@@ -175,7 +173,10 @@
 
             <div class="d-flex justify-content-end gap-2 border-top pt-3" style="border-color: var(--border-color) !important;">
                 <a href="{% url 'market:market_backup_detail' backup.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Details</a>
-                <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" hx-get="{% url 'market:market_backup_delete' backup.pk %}" hx-target="#globalHtmxModalDialog">Delete</button>
+                <button type="button" 
+                        class="btn btn-sm btn-outline-danger rounded-pill px-3" 
+                        hx-get="{% url 'market:market_backup_delete' backup.pk %}" 
+                        hx-target="#globalHtmxModalDialog">Delete</button>
             </div>
         </div>
         {% empty %}

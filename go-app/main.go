@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"log"
+	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
@@ -11,6 +13,7 @@ import (
 	"go-app/config"
 	"go-app/services"
 	"go-app/workers"
+	"go-app/ws"
 )
 
 func main() {
@@ -40,22 +43,41 @@ func main() {
 	defer redisService.Close()
 
 	// 5. Initialize Task Manager
-	taskManager := workers.NewTaskManager(dbService)
+	taskManager := workers.NewTaskManager(dbService, cfg)
 
 	// 6. Start Listening for Django IPC Commands on Redis Channel
 	redisChannel := "market_backup_commands"
 	go taskManager.StartListener(ctx, redisService, redisChannel)
 
-	log.Println("⚡ Go Engine initialized successfully. Ready to process market backup tasks!")
+	// 7. Initialize WebSocket Hub
+	hub := ws.NewHub()
+	go hub.Run()
 
-	// 7. Block Main Thread Until Container Shutdown Signal
+	// 8. Start HTTP Server for WebSockets
+	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
+		ws.ServeWs(hub, w, r)
+	})
+	server := &http.Server{Addr: ":" + cfg.WSPort}
+	go func() {
+		log.Printf("🌐 Starting WebSocket Server on port %s...", cfg.WSPort)
+		if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			log.Fatalf("❌ HTTP server error: %v", err)
+		}
+	}()
+
+	log.Println("⚡ Go Engine initialized successfully. Ready to process tasks and WS clients!")
+
+	// 9. Block Main Thread Until Container Shutdown Signal
 	<-ctx.Done()
-	log.Println("\n🛑 Termination signal received. Cleaning up active downloads...")
+	log.Println("\n🛑 Termination signal received. Cleaning up active tasks and connections...")
 
 	// Provide 5-second window for goroutines to save state before exit
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	_ = shutdownCtx
+
+	if err := server.Shutdown(shutdownCtx); err != nil {
+		log.Printf("HTTP server shutdown error: %v", err)
+	}
 
 	log.Println("👋 Marmot Go Engine shutdown complete.")
 }

@@ -12,114 +12,13 @@
         <p class="theme-text-muted mb-0">Detailed view of target index configurations and execution state.</p>
     </div>
     <div class="d-flex gap-2">
-        <a href="{% url 'market:market_backup_list' %}" class="btn btn-outline-secondary rounded-pill px-4 d-inline-flex align-items-center gap-2">
+        <a href="{% url 'market:market_backup_list' %}"
+            class="btn btn-outline-secondary rounded-pill px-4 d-inline-flex align-items-center gap-2">
             <span class="material-icons fs-6">arrow_back</span>
             <span>Back to Dashboard</span>
         </a>
     </div>
 </div>
 
-<div class="row g-4">
-    <!-- Configuration Metrics Card -->
-    <div class="col-12 col-lg-6">
-        <div class="glass-card p-4 h-100">
-            <h5 class="theme-text-main fw-bold mb-3 border-bottom border-secondary border-opacity-25 pb-2">Job Configuration</h5>
-            
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Index Target:</span>
-                <span class="theme-text-main fw-semibold">{{ backup.get_index_name_display }}</span>
-            </div>
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Date Range:</span>
-                <span class="theme-text-main fw-semibold">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</span>
-            </div>
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Strike Spread:</span>
-                <span class="theme-text-main fw-semibold">±{{ backup.strike_count }} ATM</span>
-            </div>
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Current Status:</span>
-                <span>
-                    {% if backup.status == 'completed' %}
-                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3">Completed</span>
-                    {% elif backup.status == 'running' %}
-                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3">Running</span>
-                    {% elif backup.status == 'paused' %}
-                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3">Paused</span>
-                    {% elif backup.status == 'cancelled' or backup.status == 'error' %}
-                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3">{{ backup.get_status_display }}</span>
-                    {% else %}
-                        <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3">Pending</span>
-                    {% endif %}
-                </span>
-            </div>
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Parquet Storage:</span>
-                <span class="theme-text-main fw-semibold">{{ backup.file_size_mb }} MB</span>
-            </div>
-            <div class="mb-0 d-flex justify-content-between">
-                <span class="theme-text-muted">File Path:</span>
-                <span class="theme-text-main text-truncate" style="max-width: 250px;" title="{{ backup.parquet_file_path|default:'N/A' }}">{{ backup.parquet_file_path|default:"N/A" }}</span>
-            </div>
-        </div>
-    </div>
-
-    <!-- Progress & Live Controls Card -->
-    <div class="col-12 col-lg-6">
-        <div class="glass-card p-4 h-100 d-flex flex-column justify-content-between">
-            <div>
-                <h5 class="theme-text-main fw-bold mb-3 border-bottom border-secondary border-opacity-25 pb-2">Execution Progress</h5>
-                
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between text-muted small mb-2">
-                        <span>Completion Rate</span>
-                        <span class="fw-bold theme-text-main">{{ backup.progress }}%</span>
-                    </div>
-                    <div class="progress" style="height: 10px; background-color: var(--border-color);">
-                        <div class="progress-bar bg-primary progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %}" 
-                             role="progressbar" 
-                             style="width: {{ backup.progress }}%;"></div>
-                    </div>
-                </div>
-
-                {% if backup.error_logs %}
-                <div class="mt-4">
-                    <label class="theme-text-muted small fw-semibold">Error Trace Logs:</label>
-                    <pre class="bg-dark text-danger p-3 rounded-3 small mt-1 border border-secondary border-opacity-25" style="max-height: 150px; overflow-y: auto;">{{ backup.error_logs }}</pre>
-                </div>
-                {% endif %}
-            </div>
-
-            <!-- Control Actions (Start/Resume, Pause, Stop) -->
-            <div class="d-flex gap-2 pt-4 border-top border-secondary border-opacity-25 mt-3">
-                {% if backup.status == 'running' %}
-                <button type="button" 
-                        hx-post="{% url 'market:market_backup_control' backup.pk %}" 
-                        hx-vals='{"action": "pause"}' 
-                        hx-target="body" 
-                        class="btn btn-warning rounded-pill px-4 flex-grow-1 fw-semibold d-flex align-items-center justify-content-center gap-1">
-                    <span class="material-icons fs-6">pause</span> Pause Task
-                </button>
-                {% else %}
-                <button type="button" 
-                        hx-post="{% url 'market:market_backup_control' backup.pk %}" 
-                        hx-vals='{"action": "resume"}' 
-                        hx-target="body" 
-                        class="btn btn-success rounded-pill px-4 flex-grow-1 fw-semibold d-flex align-items-center justify-content-center gap-1">
-                    <span class="material-icons fs-6">play_arrow</span> Start / Resume
-                </button>
-                {% endif %}
-
-                <button type="button" 
-                        hx-post="{% url 'market:market_backup_control' backup.pk %}" 
-                        hx-vals='{"action": "stop"}' 
-                        hx-target="body" 
-                        class="btn btn-outline-danger rounded-pill px-3 d-flex align-items-center justify-content-center"
-                        title="Stop / Cancel Task">
-                    <span class="material-icons fs-6">stop</span>
-                </button>
-            </div>
-        </div>
-    </div>
-</div>
+{% include "admins/partials/backup_detail_content.html" %}
 {% endblock %}

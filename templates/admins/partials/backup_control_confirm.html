@@ -1,0 +1,77 @@
+<!-- admins/templates/admins/partials/backup_control_confirm.html -->
+<div class="modal-content glass-card p-2">
+    <div class="modal-header border-0">
+        <div class="d-flex align-items-center gap-3">
+            {% if action == 'pause' %}
+            <div class="rounded-circle bg-warning bg-opacity-25 text-warning d-flex align-items-center justify-content-center flex-shrink-0"
+                style="width: 40px; height: 40px; border: 1px solid rgba(255, 193, 7, 0.3);">
+                <span class="material-icons fs-5">pause_circle</span>
+            </div>
+            <h5 class="modal-title theme-text-main mb-0">Pause Backup Task</h5>
+            {% elif action == 'resume' or action == 'start' %}
+            <div class="rounded-circle bg-success bg-opacity-25 text-success d-flex align-items-center justify-content-center flex-shrink-0"
+                style="width: 40px; height: 40px; border: 1px solid rgba(40, 167, 69, 0.3);">
+                <span class="material-icons fs-5">play_circle</span>
+            </div>
+            <h5 class="modal-title theme-text-main mb-0">Start / Resume Backup Task</h5>
+            {% else %}
+            <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center flex-shrink-0"
+                style="width: 40px; height: 40px; border: 1px solid rgba(220, 53, 69, 0.3);">
+                <span class="material-icons fs-5">stop_circle</span>
+            </div>
+            <h5 class="modal-title theme-text-main mb-0">Stop / Cancel Task</h5>
+            {% endif %}
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <div class="modal-body theme-text-muted">
+        {% if action == 'pause' %}
+        Are you sure you want to <strong class="text-warning">pause</strong> Backup Job
+        <strong class="theme-text-main">#{{ backup.id|stringformat:"04d" }}</strong>?
+        <div
+            class="alert alert-warning bg-warning bg-opacity-10 border-warning border-opacity-25 text-warning small rounded-3 mt-3 mb-0">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons fs-6">info</span>
+                <span>The task will be suspended and can be resumed at any time.</span>
+            </div>
+        </div>
+        {% elif action == 'resume' or action == 'start' %}
+        Are you sure you want to <strong class="text-success">start / resume</strong> Backup Job
+        <strong class="theme-text-main">#{{ backup.id|stringformat:"04d" }}</strong>?
+        <div
+            class="alert alert-success bg-success bg-opacity-10 border-success border-opacity-25 text-success small rounded-3 mt-3 mb-0">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons fs-6">info</span>
+                <span>The task will resume progress execution from the last saved state.</span>
+            </div>
+        </div>
+        {% else %}
+        Are you sure you want to <strong class="text-danger">stop and cancel</strong> Backup Job
+        <strong class="theme-text-main">#{{ backup.id|stringformat:"04d" }}</strong>?
+        <div
+            class="alert alert-danger bg-danger bg-opacity-10 border-danger border-opacity-25 text-danger small rounded-3 mt-3 mb-0">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons fs-6">warning</span>
+                <span>This will permanently cancel the task. Progress will be lost and cannot be undone.</span>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+        <button type="button" hx-post="{% url 'market:market_backup_control' backup.pk %}"
+            hx-vals='{"action": "{{ action }}"}' hx-swap="none"
+            class="btn rounded-pill px-4 fw-semibold {% if action == 'pause' %}btn-warning{% elif action == 'resume' or action == 'start' %}btn-success{% else %}btn-danger{% endif %}"
+            id="confirmControlBtn">
+            {% if action == 'pause' %}
+            <span class="material-icons fs-6 me-1" style="vertical-align: middle;">pause</span> Confirm Pause
+            {% elif action == 'resume' or action == 'start' %}
+            <span class="material-icons fs-6 me-1" style="vertical-align: middle;">play_arrow</span> Confirm Start / Resume
+            {% else %}
+            <span class="material-icons fs-6 me-1" style="vertical-align: middle;">stop</span> Confirm Stop
+            {% endif %}
+        </button>
+    </div>
+</div>

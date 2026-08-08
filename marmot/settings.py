@@ -157,5 +157,7 @@ APSCHEDULER_TIMEZONE = 'Asia/Kolkata'
 
 
 PAGINATION_COUNT=os.getenv('PAGINATION_COUNT')
+REDIS_URL=os.getenv('REDIS_URL')
 
 print("ccccccccccccccccccccc", PAGINATION_COUNT)
+

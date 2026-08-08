@@ -11,7 +11,9 @@
         <h3 class="fw-bold mb-1 theme-text-main">Traders Management</h3>
         <p class="theme-text-muted mb-0">Search, filter, and manage registered traders.</p>
     </div>
-    <a href="{% url 'admins:trader_create' %}" class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 border-0 shadow-sm transition-all" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
+    <a href="{% url 'admins:trader_create' %}"
+        class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 border-0 shadow-sm transition-all"
+        style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
         <span class="material-icons fs-5">person_add</span>
         <span>Add Trader</span>
     </a>
@@ -22,30 +24,50 @@
     <form method="GET" action="{% url 'admins:trader_list' %}" class="row g-3 align-items-center">
         <div class="col-12 col-sm-6 col-lg-3">
             <div class="input-group">
-                <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25"><span class="material-icons fs-6">search</span></span>
-                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25" placeholder="Search name, email..." hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-trigger="input changed delay:400ms, search" hx-include="[name='phone_number'], [name='broker'], [name='trade_eligibility']" hx-push-url="true">
+                <span
+                    class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25"><span
+                        class="material-icons fs-6">search</span></span>
+                <input type="text" name="q" value="{{ request.GET.q }}"
+                    class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25"
+                    placeholder="Search name, email..." hx-get="{% url 'admins:trader_list' %}"
+                    hx-target="#traderTableContainer" hx-trigger="input changed delay:400ms, search"
+                    hx-include="[name='phone_number'], [name='broker'], [name='trade_eligibility']" hx-push-url="true">
             </div>
         </div>
         <div class="col-12 col-sm-6 col-lg-2">
-            <input type="text" name="phone_number" value="{{ request.GET.phone_number }}" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Filter by phone..." hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-trigger="input changed delay:400ms" hx-include="[name='q'], [name='broker'], [name='trade_eligibility']" hx-push-url="true">
+            <input type="text" name="phone_number" value="{{ request.GET.phone_number }}"
+                class="form-control bg-transparent theme-text-main border-secondary border-opacity-25"
+                placeholder="Filter by phone..." hx-get="{% url 'admins:trader_list' %}"
+                hx-target="#traderTableContainer" hx-trigger="input changed delay:400ms"
+                hx-include="[name='q'], [name='broker'], [name='trade_eligibility']" hx-push-url="true">
         </div>
         <div class="col-12 col-sm-6 col-lg-3">
-            <select name="broker" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25" hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-trigger="change" hx-include="[name='q'], [name='phone_number'], [name='trade_eligibility']" hx-push-url="true">
+            <select name="broker" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
+                hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-trigger="change"
+                hx-include="[name='q'], [name='phone_number'], [name='trade_eligibility']" hx-push-url="true">
                 <option value="" class="text-dark">All Brokers</option>
                 {% for value, label in BrokerChoices.choices %}
-                    <option value="{{ value }}" class="text-dark" {% if request.GET.broker == value %}selected{% endif %}>{{ label }}</option>
+                <option value="{{ value }}" class="text-dark" {% if request.GET.broker==value %}selected{% endif %}>{{
+                    label }}</option>
                 {% endfor %}
             </select>
         </div>
         <div class="col-12 col-sm-6 col-lg-2">
-            <select name="trade_eligibility" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25" hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-trigger="change" hx-include="[name='q'], [name='phone_number'], [name='broker']" hx-push-url="true">
+            <select name="trade_eligibility"
+                class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
+                hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-trigger="change"
+                hx-include="[name='q'], [name='phone_number'], [name='broker']" hx-push-url="true">
                 <option value="" class="text-dark">Eligibility (All)</option>
-                <option value="true" class="text-dark" {% if request.GET.trade_eligibility == 'true' %}selected{% endif %}>Eligible</option>
-                <option value="false" class="text-dark" {% if request.GET.trade_eligibility == 'false' %}selected{% endif %}>Not Eligible</option>
+                <option value="true" class="text-dark" {% if request.GET.trade_eligibility=='true' %}selected{% endif
+                    %}>Eligible</option>
+                <option value="false" class="text-dark" {% if request.GET.trade_eligibility=='false' %}selected{% endif
+                    %}>Not Eligible</option>
             </select>
         </div>
         <div class="col-12 col-sm-12 col-lg-2">
-            <a href="{% url 'admins:trader_list' %}" class="btn btn-outline-secondary rounded-pill text-white-50 border-secondary border-opacity-25 w-100 d-inline-flex align-items-center justify-content-center gap-1" hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-push-url="true">
+            <a href="{% url 'admins:trader_list' %}"
+                class="btn btn-outline-secondary rounded-pill text-white-50 border-secondary border-opacity-25 w-100 d-inline-flex align-items-center justify-content-center gap-1"
+                hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-push-url="true">
                 <span class="material-icons fs-6">restart_alt</span><span>Reset</span>
             </a>
         </div>
@@ -53,10 +75,8 @@
 </div>
 
 <!-- FIXED CONTAINER: Now listens for the reloadTraderTable event -->
-<div id="traderTableContainer" class="w-100" 
-     hx-get="{{ request.get_full_path }}" 
-     hx-trigger="reloadTraderTable from:body" 
-     hx-target="this">
+<div id="traderTableContainer" class="w-100" hx-get="{{ request.get_full_path }}"
+    hx-trigger="reloadTraderTable from:body" hx-target="this">
     {% include 'admins/partials/trader_table.html' %}
 </div>
 {% endblock %}
