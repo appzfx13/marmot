@@ -1,4 +1,4 @@
-# marmot/views.py - Add at bottom (main app)
+# admins/views.py - Add at bottom (main app)
 from django.http import Http404
 from django.shortcuts import render
 

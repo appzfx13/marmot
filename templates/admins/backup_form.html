@@ -4,75 +4,264 @@
 {% block title %}New Market Backup - Admin Portal{% endblock %}
 {% block nav_market_backup_active %}active{% endblock %}
 
+{% block extra_head %}
+<style>
+    /* Theme Glass Form Input Overrides */
+    .glass-form-card input[type="text"],
+    .glass-form-card input[type="email"],
+    .glass-form-card input[type="date"],
+    .glass-form-card input[type="number"],
+    .glass-form-card select,
+    .glass-form-card textarea {
+        background: rgba(255, 255, 255, 0.04) !important;
+        border: 1px solid var(--border-color) !important;
+        color: var(--text-main) !important;
+        border-radius: 8px !important;
+        padding: 8px 12px;
+        font-size: 0.875rem;
+        transition: all 0.2s ease;
+        width: 100%;
+        color-scheme: dark; /* Forces native dark mode on date pickers */
+    }
+
+    .glass-form-card select option {
+        background-color: #111827;
+        color: var(--text-main);
+    }
+
+    .glass-form-card input:focus,
+    .glass-form-card select:focus,
+    .glass-form-card textarea:focus {
+        background: rgba(255, 255, 255, 0.07) !important;
+        border-color: #0d6efd !important;
+        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+        outline: none;
+    }
+
+    /* Fixed Number Spinner Visibility */
+    .glass-form-card input[type="number"]::-webkit-inner-spin-button, 
+    .glass-form-card input[type="number"]::-webkit-outer-spin-button {
+        opacity: 1;
+        filter: invert(1);
+    }
+
+    /* Fixed & Standardized Checkbox UI (Kept for consistency if needed later) */
+    .glass-form-card input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+        min-width: 1.25rem !important;
+        min-height: 1.25rem !important;
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 6px !important;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        padding: 0;
+        vertical-align: middle;
+        transition: all 0.2s ease-in-out;
+        position: relative;
+    }
+
+    .glass-form-card input[type="checkbox"]:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+
+    .glass-form-card input[type="checkbox"]:checked {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+
+    .glass-form-card input[type="checkbox"]:checked::after {
+        content: "";
+        width: 6px;
+        height: 10px;
+        border: solid #ffffff;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+        margin-bottom: 2px;
+    }
+
+    .glass-form-card input[type="checkbox"]:focus {
+        outline: none;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.3) !important;
+    }
+
+    /* Glass Modal Styling */
+    .glass-modal-content {
+        background: rgba(17, 24, 39, 0.85) !important;
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid var(--border-color) !important;
+        box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
+    }
+</style>
+{% endblock %}
+
 {% block dashboard_content %}
-<!-- Header Container -->
-<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
-    <div>
-        <h3 class="fw-bold mb-1 theme-text-main">Initialize Market Backup</h3>
-        <p class="theme-text-muted mb-0">Configure parameters for downloading and serializing options market data.</p>
+
+<!-- Header Section -->
+<div class="row mb-4">
+    <div class="col-12 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width: 54px; height: 54px; border: 1px solid rgba(13, 110, 253, 0.3);">
+                <span class="material-icons fs-3">cloud_download</span>
+            </div>
+            <div class="text-break">
+                <h2 class="theme-text-main fw-bold mb-0 text-wrap">Initialize Market Backup</h2>
+                <div class="theme-text-muted small">
+                    Configure parameters for downloading and serializing options market data.
+                </div>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <!-- Arrow-Only Back Button -->
+            <a href="{% url 'market:market_backup_list' %}" class="glass-icon-btn text-decoration-none" title="Back to List">
+                <span class="material-icons fs-5">arrow_back</span>
+            </a>
+        </div>
     </div>
-    <a href="{% url 'market:market_backup_list' %}" class="btn btn-outline-secondary rounded-pill px-4 d-inline-flex align-items-center gap-2">
-        <span class="material-icons fs-6">arrow_back</span>
-        <span>Back to Dashboard</span>
-    </a>
 </div>
 
-<!-- Form Card Container -->
-<div class="glass-card p-4 p-md-5 mx-auto" style="max-width: 650px;">
-    <form method="POST" class="needs-validation" novalidate>
+<div class="glass-card glass-form-card p-3 p-sm-4">
+    <form id="backupForm" method="post" novalidate>
         {% csrf_token %}
-        
+
         {% if form.non_field_errors %}
-            <div class="alert alert-danger bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-3 mb-4">
-                {{ form.non_field_errors }}
+            <div class="alert alert-danger mb-4 rounded-3 border-0 bg-danger bg-opacity-25 text-danger">
+                {% for error in form.non_field_errors %}
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons fs-6">error_outline</span>
+                        <span>{{ error }}</span>
+                    </div>
+                {% endfor %}
             </div>
         {% endif %}
 
+        {# Section 1: Timeframe Selection #}
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">date_range</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Timeframe Selection</h6>
+        </div>
+        
         <!-- Start Date -->
-        <div class="mb-3">
-            <label for="{{ form.start_date.id_for_label }}" class="form-label theme-text-main fw-semibold">Start Date</label>
-            {{ form.start_date }}
-            <small class="theme-text-muted d-block mt-1">Beginning date for the options dataset history.</small>
-            {% if form.start_date.errors %}
-                <div class="invalid-feedback d-block">{{ form.start_date.errors.0 }}</div>
-            {% endif %}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.start_date.id_for_label }}" style="min-width: 160px;">
+                Start Date{% if form.start_date.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.start_date }}
+                <div class="theme-text-muted small mt-1">Beginning date for the options dataset history.</div>
+                {% for error in form.start_date.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
         </div>
 
         <!-- End Date -->
-        <div class="mb-3">
-            <label for="{{ form.end_date.id_for_label }}" class="form-label theme-text-main fw-semibold">End Date</label>
-            {{ form.end_date }}
-            <small class="theme-text-muted d-block mt-1">Ending date for the options dataset history.</small>
-            {% if form.end_date.errors %}
-                <div class="invalid-feedback d-block">{{ form.end_date.errors.0 }}</div>
-            {% endif %}
+        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.end_date.id_for_label }}" style="min-width: 160px;">
+                End Date{% if form.end_date.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.end_date }}
+                <div class="theme-text-muted small mt-1">Ending date for the options dataset history.</div>
+                {% for error in form.end_date.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Section 2: Index & Options Parameters #}
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">settings</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Target Index & Parameters</h6>
         </div>
 
         <!-- Target Index -->
-        <div class="mb-3">
-            <label for="{{ form.index_name.id_for_label }}" class="form-label theme-text-main fw-semibold">Target Index</label>
-            {{ form.index_name }}
-            <small class="theme-text-muted d-block mt-1">Select the underlying trading index for data capture.</small>
-            {% if form.index_name.errors %}
-                <div class="invalid-feedback d-block">{{ form.index_name.errors.0 }}</div>
-            {% endif %}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.index_name.id_for_label }}" style="min-width: 160px;">
+                Target Index{% if form.index_name.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.index_name }}
+                <div class="theme-text-muted small mt-1">Select the underlying trading index for data capture.</div>
+                {% for error in form.index_name.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
         </div>
 
         <!-- Strike Count -->
-        <div class="mb-4">
-            <label for="{{ form.strike_count.id_for_label }}" class="form-label theme-text-main fw-semibold">Strike Count (± from ATM)</label>
-            {{ form.strike_count }}
-            <small class="theme-text-muted d-block mt-1">Number of strikes to track above and below At-The-Money (e.g., 5).</small>
-            {% if form.strike_count.errors %}
-                <div class="invalid-feedback d-block">{{ form.strike_count.errors.0 }}</div>
-            {% endif %}
+        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.strike_count.id_for_label }}" style="min-width: 160px;">
+                Strike Count (± ATM){% if form.strike_count.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.strike_count }}
+                <div class="theme-text-muted small mt-1">Number of strikes to track above and below At-The-Money (e.g., 5).</div>
+                {% for error in form.strike_count.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
         </div>
 
-        <!-- Form Actions -->
-        <div class="d-flex justify-content-end gap-2 pt-3 border-top border-secondary border-opacity-25">
-            <a href="{% url 'market:market_backup_list' %}" class="btn btn-outline-light rounded-pill px-4">Cancel</a>
-            <button type="submit" class="btn btn-primary rounded-pill px-4 fw-bold">Initialize Backup Task</button>
+        {# Action Buttons #}
+        <div class="d-flex justify-content-end gap-2 pt-3 border-top" style="border-color: var(--border-color) !important;">
+            <a href="{% url 'market:market_backup_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold text-decoration-none">
+                CANCEL
+            </a>
+            <!-- Trigger Modal Button -->
+            <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#confirmInitModal">
+                INITIALIZE BACKUP
+            </button>
         </div>
     </form>
 </div>
+
+<!-- Glassmorphic Confirmation Modal -->
+<div class="modal fade" id="confirmInitModal" tabindex="-1" aria-labelledby="confirmInitModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal-content rounded-4 border-0 p-2">
+            <div class="modal-header border-0 pb-0">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons text-primary fs-4">cloud_sync</span>
+                    <h5 class="modal-title theme-text-main fw-bold" id="confirmInitModalLabel">Confirm Initialization</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="theme-text-muted mb-0 small">
+                    Are you sure you want to initialize this market data backup task? This will begin fetching and serializing options data based on the provided parameters.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0 gap-2">
+                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold" data-bs-dismiss="modal">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" id="confirmSubmitBtn">
+                    Confirm & Initialize
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const confirmBtn = document.getElementById('confirmSubmitBtn');
+        const form = document.getElementById('backupForm');
+
+        if (confirmBtn && form) {
+            confirmBtn.addEventListener('click', function() {
+                form.submit();
+            });
+        }
+    });
+</script>
 {% endblock %}

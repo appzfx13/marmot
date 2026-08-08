@@ -12,8 +12,8 @@ from .services import get_user_profile
 
 
 class LoginView(HTMXPartialMixin, LoginView):
-    template_name = 'marmot/login.html'
-    partial_template_name = 'marmot/partials/login_form.html'
+    template_name = 'admins/login.html'
+    partial_template_name = 'admins/partials/login_form.html'
     redirect_authenticated_user = True
 
     def form_valid(self, form):
@@ -55,8 +55,8 @@ class UserDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView)
     Protected Marmot Dashboard View. Uses MarmotRoleRequiredMixin to 
     ensure only authorized roles can access.
     """
-    template_name = 'marmot/dashboard.html'
-    partial_template_name = 'marmot/partials/dashboard_content.html'
+    template_name = 'admins/dashboard.html'
+    partial_template_name = 'admins/partials/dashboard_content.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

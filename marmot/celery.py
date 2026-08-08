@@ -1,4 +1,4 @@
-# marmot/celery.py
+# admins/celery.py
 import os
 from celery import Celery
 

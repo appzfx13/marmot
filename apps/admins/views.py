@@ -111,15 +111,15 @@ class AdminLogoutView(View):
 # TRADER MANAGEMENT VIEWS
 # ==========================================
 
-class AdminMarmotTraderListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
+class AdminTraderListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
     model = User
-    template_name = 'marmot/trader_list.html'
-    partial_template_name = 'marmot/partials/trader_table.html'
+    template_name = 'admins/trader_list.html'
+    partial_template_name = 'admins/partials/trader_table.html'
     context_object_name = 'traders'
     paginate_by = settings.PAGINATION_COUNT
 
     def get_queryset(self):
-        queryset = super().get_queryset().filter(role=MemberRoleChoices.MEMBER, is_deleted=False)
+        queryset = super().get_queryset().filter(role=MemberRoleChoices.TRADERS, is_deleted=False)
 
         # --- Search & Filters ---
         q = self.request.GET.get('q', '').strip()
@@ -171,11 +171,11 @@ class AdminMarmotTraderListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         return context
 
 
-class AdminMarmotTraderCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
+class AdminTraderCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
     model = User
     form_class = UserForm
-    template_name = 'marmot/trader_form.html'
-    success_url = reverse_lazy('admins:marmot_trader_list')
+    template_name = 'admins/trader_form.html'
+    success_url = reverse_lazy('admins:trader_list')
     success_message = Messages.TRADER_CREATED
 
     def form_valid(self, form):
@@ -183,20 +183,20 @@ class AdminMarmotTraderCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminReq
         return super().form_valid(form)
 
 
-class AdminMarmotTraderUpdateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, UpdateView):
+class AdminTraderUpdateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, UpdateView):
     model = User
     form_class = UserForm
-    template_name = 'marmot/trader_form.html'
-    success_url = reverse_lazy('admins:marmot_trader_list')
+    template_name = 'admins/trader_form.html'
+    success_url = reverse_lazy('admins:trader_list')
     success_message = Messages.TRADER_UPDATED
 
     def get_queryset(self):
         return super().get_queryset().filter(role=MemberRoleChoices.TRADERS)
 
 
-class AdminMarmotTraderDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
+class AdminTraderDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
     model = User
-    template_name = 'marmot/trader_detail.html'
+    template_name = 'admins/trader_detail.html'
     context_object_name = 'trader'
 
     def get_queryset(self):
@@ -204,14 +204,12 @@ class AdminMarmotTraderDetailView(LoginRequiredMixin, AdminRequiredMixin, Detail
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['exec_config'] = TradeExecConfig.objects.filter(
-            admins_user=self.object
-        ).first()
+        context['exec_config'] = TradeExecConfig.objects.filter(admins_user=self.object).first()
         return context
 
 
 
-class AdminMarmotTraderDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+class AdminTraderDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, DeleteView):
     model = User
     modal_template_name = 'admins/partials/confirm_delete.html'
     template_name = 'admins/partials/confirm_delete.html'

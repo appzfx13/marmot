@@ -1,14 +1,18 @@
 import json
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponse, JsonResponse
+from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, DetailView, DeleteView, View
+
 from apps.users.mixins import HTMXPartialMixin
 from apps.admins.permissions import AdminRequiredMixin
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
+
 from .models import MarketBackupTask
 from .forms import MarketBackupForm
+from .services import create_and_start_backup_task, send_control_command
 
 
 class MarketBackupListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
@@ -62,7 +66,54 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
     form_class = MarketBackupForm
     template_name = 'admins/backup_form.html'
     success_url = reverse_lazy('market:market_backup_list')
-    success_message = "Market backup job initialized successfully."
+    success_message = "Market backup job initialized successfully. Engine is starting..."
+
+    def form_valid(self, form):
+        # Override standard save to use our Service Layer
+        # This creates the DB record AND fires the 'START' command to Redis
+        self.object = create_and_start_backup_task(
+            start_date=form.cleaned_data['start_date'],
+            end_date=form.cleaned_data['end_date'],
+            index_name=form.cleaned_data['index_name'],
+            strike_count=form.cleaned_data['strike_count'],
+            user=self.request.user
+        )
+        
+        # Add success message and redirect back to the dashboard
+        messages.success(self.request, self.success_message)
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class MarketBackupDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
+    model = MarketBackupTask
+    template_name = 'admins/backup_detail.html'
+    context_object_name = 'backup'
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+
+class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
+    model = MarketBackupTask
+    form_class = MarketBackupForm
+    template_name = 'admins/backup_form.html'
+    success_url = reverse_lazy('market:market_backup_list')
+    success_message = "Market backup job initialized successfully. Engine is starting..."
+
+    def form_valid(self, form):
+        # Override standard save to use our Service Layer
+        # This creates the DB record AND fires the 'START' command to Redis
+        self.object = create_and_start_backup_task(
+            start_date=form.cleaned_data['start_date'],
+            end_date=form.cleaned_data['end_date'],
+            index_name=form.cleaned_data['index_name'],
+            strike_count=form.cleaned_data['strike_count'],
+            user=self.request.user
+        )
+        
+        # Add success message and redirect back to the dashboard
+        messages.success(self.request, self.success_message)
+        return HttpResponseRedirect(self.get_success_url())
 
 
 class MarketBackupDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
@@ -76,26 +127,47 @@ class MarketBackupDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView)
 
 class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):
     """
-    Handles live controls: start, pause, stop/cancel tasks communicating with the backend engine.
+    Handles live controls: start, pause, stop/cancel tasks by pushing commands to the Go Engine via Redis.
     """
     def post(self, request, pk, *args, **kwargs):
         task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
         if not task:
             return JsonResponse({'error': 'Task not found'}, status=404)
 
-        action = request.POST.get('action')
-        if action == 'pause':
-            task.status = MarketBackupTask.StatusChoices.PAUSED
-        elif action == 'resume' or action == 'start':
-            task.status = MarketBackupTask.StatusChoices.RUNNING
-        elif action == 'cancel' or action == 'stop':
-            task.status = MarketBackupTask.StatusChoices.CANCELLED
+        # Get the requested action from HTMX/Frontend
+        action = request.POST.get('action', '').upper()
         
-        task.save()
+        # Map frontend actions to Go Engine commands
+        command_map = {
+            'PAUSE': 'PAUSE',
+            'RESUME': 'RESUME',
+            'START': 'RESUME',
+            'CANCEL': 'CANCEL',
+            'STOP': 'CANCEL'
+        }
+        
+        command = command_map.get(action)
+        
+        if command:
+            try:
+                # Dispatch the command through the Service Layer
+                send_control_command(task.id, command)
+                
+                # Setup UI response
+                msg = f'Task command {command} sent to engine.'
+                level = 'success'
+            except Exception as e:
+                msg = f'Error communicating with engine: {str(e)}'
+                level = 'error'
+        else:
+            msg = 'Invalid control action requested.'
+            level = 'error'
 
-        response = HttpResponse()
+        # Return HTMX trigger to show a toast and immediately reload the table to reflect the new state
+        # FIX: Added status=204 (No Content) so HTMX does not replace the UI with a blank page
+        response = HttpResponse(status=204)
         response['HX-Trigger'] = json.dumps({
-            'showToast': {'message': f'Task status updated to {task.status.upper()}', 'level': 'success'},
+            'showToast': {'message': msg, 'level': level},
             'reloadBackupTable': True
         })
         return response
@@ -112,7 +184,42 @@ class MarketBackupDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixi
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
-        self.object.delete() # Triggers BaseModel soft delete
+        
+        # Optional: If you want deleting a running task to cancel it in Go Engine first
+        if self.object.status in [MarketBackupTask.StatusChoices.RUNNING, MarketBackupTask.StatusChoices.PENDING]:
+             send_control_command(self.object.id, 'CANCEL')
+
+        # Triggers BaseModel soft delete
+        self.object.delete() 
+
+        # FIX: Ensure HTMX processes triggers without wiping layout during a standard form POST delete
+        response = HttpResponse(status=204)
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': str(self.success_message), 'level': 'success'},
+            'reloadBackupTable': True
+        })
+        return response
+
+
+class MarketBackupDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, DeleteView):
+    model = MarketBackupTask
+    modal_template_name = 'admins/partials/confirm_delete.html'
+    template_name = 'admins/partials/confirm_delete.html'
+    success_message = "Market backup task deleted successfully."
+
+    def get_queryset(self):
+        return super().get_queryset().filter(is_deleted=False)
+
+    def post(self, request, *args, **kwargs):
+        self.object = self.get_object()
+        
+        # Optional: If you want deleting a running task to cancel it in Go Engine first
+        if self.object.status in [MarketBackupTask.StatusChoices.RUNNING, MarketBackupTask.StatusChoices.PENDING]:
+             send_control_command(self.object.id, 'CANCEL')
+
+        # Triggers BaseModel soft delete
+        self.object.delete() 
 
         response = HttpResponse()
         response['HX-Trigger'] = json.dumps({
