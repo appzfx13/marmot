@@ -1,0 +1,140 @@
+{% load static %}
+
+<div class="glass-card p-0 overflow-hidden mb-4 border-0">
+    <div class="table-responsive">
+        <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
+            <thead>
+                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                    <th scope="col" class="ps-4 py-3 theme-text-muted text-uppercase small fw-semibold">Timestamp / Broker</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">User Account</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Order ID & Symbol</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Type & Quantity</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Price</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Status</th>
+                    <th scope="col" class="text-end pe-4 py-3 theme-text-muted text-uppercase small fw-semibold">Raw Payload</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in postbacks %}
+                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+                    <td class="ps-4 py-3 bg-transparent">
+                        <div class="fw-bold theme-text-main">{{ log.created_at|date:"M d, Y H:i:s" }}</div>
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.68rem;">{{ log.broker }}</span>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        {% if log.user %}
+                        <div class="fw-semibold text-info">{{ log.user.username }}</div>
+                        {% if log.broker_client_id %}
+                        <div class="small text-warning" style="font-size: 0.75rem;">Client: {{ log.broker_client_id }}</div>
+                        {% else %}
+                        <div class="small theme-text-muted" style="font-size: 0.75rem;">ID: #{{ log.user.id }}</div>
+                        {% endif %}
+                        {% else %}
+                        {% if log.broker_client_id %}
+                        <div class="small text-warning fw-bold">Client: {{ log.broker_client_id }}</div>
+                        <div class="small theme-text-muted" style="font-size: 0.72rem;">Unlinked Account</div>
+                        {% else %}
+                        <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-1">Global Endpoint</span>
+                        {% endif %}
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small theme-text-main fw-bold">{{ log.order_id|default:"N/A" }}</div>
+                        <div class="small text-muted">{{ log.symbol|default:"--" }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        {% if log.transaction_type %}
+                        <span class="badge {% if log.transaction_type == 'BUY' %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25{% endif %} rounded-pill px-3 py-1 fw-bold">
+                            {{ log.transaction_type }}
+                        </span>
+                        {% else %}
+                        <span class="text-muted">--</span>
+                        {% endif %}
+                        <div class="small theme-text-muted mt-1">Qty: {{ log.quantity }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small theme-text-main fw-semibold">₹{{ log.price|floatformat:2 }}</div>
+                        <div class="small theme-text-muted" style="font-size: 0.75rem;">IP: {{ log.ip_address|default:"127.0.0.1" }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        {% if log.order_status == 'TRADED' or log.order_status == 'SUCCESS' %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">TRADED</span>
+                        {% elif log.order_status == 'PENDING' %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">PENDING</span>
+                        {% elif log.order_status == 'CANCELLED' or log.order_status == 'REJECTED' or log.order_status == 'FAILED' %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">{{ log.order_status }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">{{ log.order_status|default:"RECORDED" }}</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="text-end pe-4 py-3 bg-transparent">
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-info rounded-pill px-3 d-inline-flex align-items-center gap-1"
+                                hx-get="{% url 'admins:postback_detail' log.pk %}"
+                                hx-target="#globalHtmxModalDialog"
+                                hx-swap="innerHTML">
+                            <span class="material-icons fs-6">code</span>
+                            <span>Inspect JSON</span>
+                        </button>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="border-0">
+                    <td colspan="7" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                        <span class="material-icons fs-1 mb-2 opacity-50">receipt_long</span>
+                        <p class="mb-0 fw-medium">No postback webhook logs recorded.</p>
+                        <small class="opacity-75">Broker webhooks sent to <code>/api/postback/</code> or <code>/api/postback/&lt;user_id&gt;/</code> will be backed up here.</small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pinned Pagination Footer -->
+    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+            <div class="small theme-text-muted text-center text-sm-start">
+                {% if is_paginated %}
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} postback logs
+                {% else %}
+                    Showing {{ postbacks|length }} of {{ postbacks|length }} postback logs
+                {% endif %}
+            </div>
+            
+            <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
+                {% if is_paginated and page_obj.has_previous %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'admins:postback_list' %}?page={{ page_obj.previous_page_number }}&q={{ current_q }}&user_id={{ current_user_id }}&start_date={{ current_start_date }}&end_date={{ current_end_date }}" 
+                       hx-target="#postback-list-container" hx-push-url="true">
+                       <span class="material-icons fs-6">chevron_left</span>
+                    </a>
+                </li>
+                {% endif %}
+                <li class="page-item mb-0">
+                    <span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold text-decoration-none p-0" style="width: 36px; height: 36px;">
+                        {% if is_paginated %}{{ page_obj.number }}{% else %}1{% endif %}
+                    </span>
+                </li>
+                {% if is_paginated and page_obj.has_next %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'admins:postback_list' %}?page={{ page_obj.next_page_number }}&q={{ current_q }}&user_id={{ current_user_id }}&start_date={{ current_start_date }}&end_date={{ current_end_date }}" 
+                       hx-target="#postback-list-container" hx-push-url="true">
+                       <span class="material-icons fs-6">chevron_right</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>

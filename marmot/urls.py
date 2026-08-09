@@ -9,6 +9,7 @@ urlpatterns = [
 
     # Core App Routes (Web / HTMX)
     path('admins/', include(('apps.admins.urls', 'admins'), namespace='admins')),
+    path('backtest/', include(('apps.backtest.urls', 'backtest'), namespace='backtest')),
     path('common/', include(('apps.common.urls', 'common'), namespace='common')),
     path('market/', include(('apps.market.urls', 'market'), namespace='market')),
     path('masters/', include(('apps.masters.urls', 'masters'), namespace='masters')),
@@ -17,7 +18,8 @@ urlpatterns = [
     path('trade-core/', include(('apps.trade_core.urls', 'trade_core'), namespace='trade_core')),
     path('users/', include(('apps.users.urls', 'users'), namespace='users')),
 
-    # REST API Routes
+    # REST API & Webhook Routes
+    path('api/', include(('apps.postback.urls', 'postback'), namespace='postback')),
     path('api/', include(('apps.api.urls', 'api'), namespace='api')),
 ]
 

@@ -2,61 +2,79 @@
 {% load static %}
 
 {% block title %}{{ page_title }} - Admin Portal{% endblock %}
+{% block nav_backtest_active %}active{% endblock %}
 
 {% block dashboard_content %}
 <!-- Responsive Header Container -->
 <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
         <h3 class="fw-bold mb-1 theme-text-main">{{ page_title }}</h3>
-        <p class="theme-text-muted mb-0">Configure, run, and analyze intraday options strategy backtests.</p>
+        <p class="theme-text-muted mb-0">Configure, execute, and analyze plug-and-play intraday option backtests.</p>
     </div>
     
-    <button type="button" class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 border-0 shadow-sm transition-all" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
+    <a href="{% url 'backtest:backtest_create' %}" class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 border-0 shadow-sm transition-all" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
         <span class="material-icons fs-5">play_circle</span>
         <span>Run New Backtest</span>
-    </button>
+    </a>
 </div>
 
-<!-- Search & Strategy Filter Controls -->
+<!-- Search & Filter Controls -->
 <div class="glass-card p-3 p-md-4 mb-4">
-    <div class="row g-3 align-items-center">
+    <form method="GET" action="{{ request.path }}" class="row g-3 align-items-center">
+        
         <div class="col-12 col-sm-6 col-lg-4">
             <div class="input-group">
                 <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
                     <span class="material-icons fs-6">search</span>
                 </span>
-                <input type="text" class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25" placeholder="Search backtests...">
+                <input type="text" 
+                       name="q" 
+                       value="{{ request.GET.q }}" 
+                       class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25" 
+                       placeholder="Search strategy or ID..."
+                       hx-get="{{ request.path }}"
+                       hx-target="#backtest-dashboard-container"
+                       hx-trigger="input changed delay:400ms, search"
+                       hx-include="[name='status']"
+                       hx-push-url="true">
             </div>
         </div>
+
         <div class="col-12 col-sm-6 col-lg-3">
-            <select class="form-select bg-transparent theme-text-main border-secondary border-opacity-25">
-                <option value="" class="text-dark">All Strategies</option>
-                <option value="920_straddle" class="text-dark">9:20 Short Straddle</option>
-                <option value="momentum" class="text-dark">Options Momentum</option>
-                <option value="delta_hedging" class="text-dark">Delta-Hedging</option>
+            <select name="status" 
+                    class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
+                    hx-get="{{ request.path }}"
+                    hx-target="#backtest-dashboard-container"
+                    hx-trigger="change"
+                    hx-include="[name='q']"
+                    hx-push-url="true">
+                <option value="" class="text-dark">All Statuses</option>
+                <option value="created" class="text-dark" {% if request.GET.status == 'created' %}selected{% endif %}>Created</option>
+                <option value="running" class="text-dark" {% if request.GET.status == 'running' %}selected{% endif %}>Running</option>
+                <option value="completed" class="text-dark" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
+                <option value="error" class="text-dark" {% if request.GET.status == 'error' %}selected{% endif %}>Error</option>
             </select>
         </div>
+
         <div class="col-12 col-sm-6 col-lg-3 ms-auto">
-            <button type="button" class="btn btn-outline-secondary rounded-pill text-white-50 border-secondary border-opacity-25 w-100 d-inline-flex align-items-center justify-content-center gap-1">
-                <span class="material-icons fs-6">filter_alt</span>
-                <span>Apply Filter</span>
-            </button>
+            <a href="{{ request.path }}" 
+               class="btn btn-outline-secondary rounded-pill text-white-50 border-secondary border-opacity-25 w-100 d-inline-flex align-items-center justify-content-center gap-1"
+               hx-get="{{ request.path }}"
+               hx-target="#backtest-dashboard-container"
+               hx-push-url="true">
+                <span class="material-icons fs-6">restart_alt</span>
+                <span>Reset</span>
+            </a>
         </div>
-    </div>
+
+    </form>
 </div>
 
-<!-- Backtest Engine Placeholder Card -->
-<div class="glass-card p-5 text-center my-4">
-    <div class="mb-3">
-        <span class="material-icons text-primary" style="font-size: 4rem; opacity: 0.85;">analytics</span>
-    </div>
-    <h4 class="fw-bold theme-text-main mb-2">Backtest Engine UI Ready</h4>
-    <p class="theme-text-muted mx-auto" style="max-width: 580px;">
-        Select date-partitioned market datasets (<code class="text-primary font-monospace">year=YYYY/month=MM/*.parquet</code>) to evaluate intraday options algorithms, straddles, momentum strategies, and delta-hedging performance metrics.
-    </p>
-    <div class="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 mt-3">
-        <span class="material-icons fs-6">info</span>
-        <span class="small fw-medium">Strategy rules and execution simulator interface ready for configuration.</span>
-    </div>
+<!-- HTMX Container -->
+<div id="backtest-dashboard-container" class="w-100"
+     hx-get="{{ request.get_full_path }}" 
+     hx-trigger="reloadBacktestTable from:body" 
+     hx-target="this">
+    {% include 'admins/partials/backtest_dashboard_content.html' %}
 </div>
 {% endblock %}

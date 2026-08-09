@@ -79,3 +79,56 @@ class LogoutView(View):
             return response
 
         return redirect(login_url)
+
+
+# ==========================================
+# USER PROFILE VIEW & SETTINGS
+# ==========================================
+
+from django.contrib.auth.mixins import LoginRequiredMixin
+from django.views.generic import UpdateView
+from apps.common.mixins import HtmxMessageMixin
+from .models import User
+from .forms import UserProfileForm
+
+class UserProfileView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, UpdateView):
+    model = User
+    form_class = UserProfileForm
+    template_name = 'admins/user_profile.html'
+    success_url = reverse_lazy('users:marmot-profile')
+    success_message = "Profile settings updated successfully!"
+
+    def get_object(self, queryset=None):
+        pk = self.kwargs.get('pk')
+        if pk and (self.request.user.is_superuser or getattr(self.request.user, 'role', '') in ['admin', 'developer']):
+            return User.objects.filter(pk=pk).first() or self.request.user
+        return self.request.user
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request_user'] = self.request.user
+        return kwargs
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Request'):
+            if self.request.GET.get('edit') == '1':
+                return ['admins/partials/user_profile_edit_content.html']
+            return ['admins/partials/user_profile_showcase_content.html']
+        return [self.template_name]
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user_obj = self.object or self.request.user
+        is_edit = self.request.GET.get('edit') == '1' or bool(self.request.POST)
+
+        context['profile_user'] = user_obj
+        context['page_title'] = "User Profile" if not is_edit else "Edit User Profile"
+        context['is_edit'] = is_edit
+        context['is_admin_or_dev'] = (
+            self.request.user.is_superuser or 
+            getattr(self.request.user, 'role', '') in ['admin', 'developer']
+        )
+        context['has_broker_credentials'] = bool(
+            user_obj and (user_obj.broker or user_obj.broker_client_id or user_obj.api_key)
+        )
+        return context

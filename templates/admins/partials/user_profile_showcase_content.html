@@ -1,0 +1,190 @@
+{% load static %}
+
+<!-- Profile Showcase Header Card -->
+<div class="glass-card p-4 p-md-5 mb-4 rounded-4 shadow-lg border-0" style="background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(16px); border: 1px solid var(--border-color) !important;">
+    <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-4 pb-4 border-bottom" style="border-color: var(--border-color) !important;">
+        <div class="d-flex flex-column flex-sm-row align-items-center gap-4 text-center text-sm-start">
+            <div class="position-relative">
+                {% if profile_user.avatar %}
+                    <img src="{{ profile_user.avatar.url }}" alt="{{ profile_user.username }}" class="rounded-circle border border-primary border-opacity-50 shadow" style="width: 90px; height: 90px; object-fit: cover;">
+                {% else %}
+                    <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-1 border border-primary border-opacity-25 shadow-sm" style="width: 90px; height: 90px;">
+                        {{ profile_user.username|slice:":2"|upper }}
+                    </div>
+                {% endif %}
+            </div>
+            <div>
+                <h3 class="fw-bold theme-text-main mb-1">
+                    {% if profile_user.first_name %}{{ profile_user.first_name }} {{ profile_user.last_name }}{% else %}{{ profile_user.username }}{% endif %}
+                </h3>
+                <div class="d-flex align-items-center justify-content-center justify-content-sm-start gap-2 flex-wrap">
+                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold text-uppercase" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                        {{ profile_user.role|default:"Trader"|title }}
+                    </span>
+                    <span class="theme-text-muted">•</span>
+                    <span class="small theme-text-muted">Username: <strong class="theme-text-main">@{{ profile_user.username }}</strong></span>
+                    <span class="theme-text-muted">•</span>
+                    <span class="small theme-text-muted">Joined: {{ profile_user.date_joined|date:"M d, Y" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Edit Profile Action Button -->
+        <a href="{% if profile_user != request.user %}{% url 'users:marmot-profile-user' profile_user.pk %}{% else %}{% url 'users:marmot-profile' %}{% endif %}?edit=1" 
+           class="btn btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+           hx-get="{% if profile_user != request.user %}{% url 'users:marmot-profile-user' profile_user.pk %}{% else %}{% url 'users:marmot-profile' %}{% endif %}?edit=1"
+           hx-target="#user-profile-container"
+           hx-push-url="true">
+            <span class="material-icons fs-5">edit</span>
+            <span>Edit Profile</span>
+        </a>
+    </div>
+
+    <!-- Grid Showcase Cards -->
+    <div class="row g-4 mt-1">
+
+        <!-- Card 1: Account Information -->
+        <div class="col-12 col-md-6">
+            <div class="p-3 p-md-4 rounded-3 border h-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons text-primary fs-5">account_circle</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Account Information</h6>
+                </div>
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Username</span>
+                        <span class="small theme-text-main fw-bold">@{{ profile_user.username }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Email Address</span>
+                        <span class="small theme-text-main fw-semibold">{{ profile_user.email|default:"Not provided" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Phone Number</span>
+                        <span class="small theme-text-main fw-semibold">{{ profile_user.phone_number|default:"Not provided" }}</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Verification Status Badges -->
+        <div class="col-12 col-md-6">
+            <div class="p-3 p-md-4 rounded-3 border h-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons text-primary fs-5">verified_user</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Verification Badges</h6>
+                </div>
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Email Verification</span>
+                        {% if profile_user.is_email_verified %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Verified</span>
+                        {% else %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Unverified</span>
+                        {% endif %}
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Mobile Verification</span>
+                        {% if profile_user.is_mobile_verified %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Verified</span>
+                        {% else %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Unverified</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Broker Integration -->
+        <div class="col-12 col-md-6">
+            <div class="p-3 p-md-4 rounded-3 border h-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons text-primary fs-5">account_balance</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Broker Integration</h6>
+                </div>
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Broker Platform</span>
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold">{{ profile_user.broker|default:"DHAN" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Broker Client ID</span>
+                        <span class="small theme-text-main fw-bold">{{ profile_user.broker_client_id|default:"Not Configured" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">API Key Status</span>
+                        {% if profile_user.api_key %}
+                            <span class="small text-success fw-bold">•••••••• Key Configured</span>
+                        {% else %}
+                            <span class="small theme-text-muted">Not Configured</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Trade Control & Freeze Flags (ALWAYS READ-ONLY) -->
+        <div class="col-12 col-md-6">
+            <div class="p-3 p-md-4 rounded-3 border h-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons text-primary fs-5">security</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Trade Control & Freeze Flags <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill ms-1" style="font-size: 0.65rem;">Read-only</span></h6>
+                </div>
+                <div class="row g-2">
+                    <div class="col-6">
+                        <div class="p-2 rounded border text-center" style="background: rgba(255, 255, 255, 0.01); border-color: var(--border-color) !important;">
+                            <div class="small theme-text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Trade Eligibility</div>
+                            {% if profile_user.trade_eligibility %}
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1">Eligible</span>
+                            {% else %}
+                                <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-1">Ineligible</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded border text-center" style="background: rgba(255, 255, 255, 0.01); border-color: var(--border-color) !important;">
+                            <div class="small theme-text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Account Status</div>
+                            {% if profile_user.is_blocked %}
+                                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-1">Blocked</span>
+                            {% else %}
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1">Active</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded border text-center" style="background: rgba(255, 255, 255, 0.01); border-color: var(--border-color) !important;">
+                            <div class="small theme-text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Primary Freeze</div>
+                            {% if profile_user.primary_freeze %}
+                                <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-1">Frozen</span>
+                            {% else %}
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1">Unfrozen</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                    <div class="col-6">
+                        <div class="p-2 rounded border text-center" style="background: rgba(255, 255, 255, 0.01); border-color: var(--border-color) !important;">
+                            <div class="small theme-text-muted text-uppercase fw-bold mb-1" style="font-size: 0.65rem;">Final Freeze</div>
+                            {% if profile_user.final_freeze %}
+                                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-1">Frozen</span>
+                            {% else %}
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1">Unfrozen</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 5: Profile Notes / Bio -->
+        <div class="col-12">
+            <div class="p-3 p-md-4 rounded-3 border" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
+                <div class="d-flex align-items-center gap-2 mb-2 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons text-primary fs-5">notes</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Profile Notes & Bio</h6>
+                </div>
+                <p class="theme-text-main mb-0 small">{{ profile_user.description|default:"No description or notes provided." }}</p>
+            </div>
+        </div>
+
+    </div>
+</div>

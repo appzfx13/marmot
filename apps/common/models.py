@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.conf import settings    
 from django.contrib.auth.models import AbstractUser, UserManager
 
-from apps.users.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices
+from apps.common.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices
 
 # --- Soft Delete Model & Manager setup ---
 
@@ -62,3 +62,33 @@ class BaseModel(models.Model):
 
     def hard_delete(self):
         super().delete()
+
+
+class PostbackLog(BaseModel):
+    user = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
+        related_name='postback_logs',
+        null=True,
+        blank=True,
+        help_text="User associated with the postback webhook"
+    )
+    broker = models.CharField(max_length=50, default='DHAN', help_text="Broker origin e.g. DHAN, FYERS")
+    broker_client_id = models.CharField(max_length=100, blank=True, null=True, db_index=True, help_text="Generic Broker Client ID")
+    order_id = models.CharField(max_length=100, blank=True, null=True, help_text="Broker Order ID")
+    symbol = models.CharField(max_length=100, blank=True, null=True, help_text="Trading Symbol e.g. NIFTY-Jan2024-21500-CE")
+    order_status = models.CharField(max_length=50, blank=True, null=True, help_text="Order Status e.g. TRADED, CANCELLED")
+    transaction_type = models.CharField(max_length=20, blank=True, null=True, help_text="BUY / SELL")
+    quantity = models.IntegerField(default=0, help_text="Order Quantity")
+    price = models.FloatField(default=0.0, help_text="Execution Price")
+    payload = models.JSONField(default=dict, help_text="Complete raw webhook JSON payload")
+    ip_address = models.GenericIPAddressField(null=True, blank=True)
+
+    class Meta:
+        ordering = ['-created_at']
+        verbose_name = "Postback Log"
+        verbose_name_plural = "Postback Logs"
+
+    def __str__(self):
+        user_str = self.user.username if self.user else "Anonymous"
+        return f"Postback [{self.broker}] - User: {user_str} | Order: {self.order_id} ({self.order_status})"

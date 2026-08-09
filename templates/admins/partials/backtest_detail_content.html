@@ -1,0 +1,249 @@
+{% load static %}
+
+<!-- KPI Cards Grid -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 p-md-4 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-semibold text-uppercase">Net PnL</span>
+                <span class="material-icons text-primary fs-5">account_balance_wallet</span>
+            </div>
+            <h4 class="fw-bold mb-1 {% if backtest.metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {% if backtest.metrics.net_pnl >= 0 %}+{% endif %}₹{{ backtest.metrics.net_pnl|default:0|floatformat:2 }}
+            </h4>
+            <small class="theme-text-muted">Initial Capital: ₹{{ backtest.initial_capital|floatformat:0 }}</small>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 p-md-4 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-semibold text-uppercase">Win Rate</span>
+                <span class="material-icons text-info fs-5">donut_large</span>
+            </div>
+            <h4 class="fw-bold theme-text-main mb-1">{{ backtest.metrics.win_rate|default:0 }}%</h4>
+            <small class="theme-text-muted">Trades: {{ backtest.metrics.winning_trades|default:0 }}W / {{ backtest.metrics.losing_trades|default:0 }}L (Total: {{ backtest.metrics.total_trades|default:0 }})</small>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 p-md-4 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-semibold text-uppercase">Max Drawdown</span>
+                <span class="material-icons text-warning fs-5">trending_down</span>
+            </div>
+            <h4 class="fw-bold text-warning mb-1">₹{{ backtest.metrics.max_drawdown|default:0|floatformat:2 }}</h4>
+            <small class="theme-text-muted">Profit Factor: {{ backtest.metrics.profit_factor|default:0 }}</small>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 p-md-4 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-semibold text-uppercase">Sharpe Ratio</span>
+                <span class="material-icons text-success fs-5">analytics</span>
+            </div>
+            <h4 class="fw-bold theme-text-main mb-1">{{ backtest.metrics.sharpe_ratio|default:0 }}</h4>
+            <small class="theme-text-muted">Risk-adjusted performance score</small>
+        </div>
+    </div>
+</div>
+
+<!-- Chart.js Equity Curve -->
+<div class="glass-card p-4 mb-4">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <h5 class="fw-bold theme-text-main mb-0">Strategy Performance Equity Curve</h5>
+        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Time Series</span>
+    </div>
+    <div style="height: 320px; position: relative;">
+        <canvas id="equityCurveChart"></canvas>
+    </div>
+</div>
+
+<!-- Paginated Trade Signal & Orders Table -->
+<div class="glass-card p-0 overflow-hidden mb-4 border-0" id="backtest-orders-container">
+    <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
+        <div>
+            <h5 class="fw-bold theme-text-main mb-0">Executed Strategy Orders & Signals</h5>
+            <small class="theme-text-muted">Total Executed Signals: {{ total_trades_count }}</small>
+        </div>
+        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Trade Log</span>
+    </div>
+
+    <div class="table-responsive">
+        <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
+            <thead>
+                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                    <th scope="col" class="ps-4 py-3 theme-text-muted text-uppercase small fw-semibold">Timestamp / Contract</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Type & Quantity</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Entry / Exit Price</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Target / SL</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Trade PnL</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Status</th>
+                    <th scope="col" class="pe-4 py-3 theme-text-muted text-uppercase small fw-semibold">Signal Reason</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trade in trades_page %}
+                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+                    <td class="ps-4 py-3 bg-transparent">
+                        <div class="fw-semibold theme-text-main">{{ trade.timestamp }}</div>
+                        <div class="small text-info fw-semibold">{{ trade.symbol }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <span class="badge {% if 'BUY_CE' in trade.trade_type or 'SELL_PE' in trade.trade_type %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25{% endif %} rounded-pill px-3 py-1 fw-bold">
+                            {{ trade.trade_type }}
+                        </span>
+                        <div class="small theme-text-muted mt-1">Qty: {{ trade.quantity }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small theme-text-main fw-semibold">Entry: ₹{{ trade.entry_price|floatformat:2 }}</div>
+                        <div class="small theme-text-muted">Exit: ₹{{ trade.exit_price|floatformat:2 }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small text-success">Target: ₹{{ trade.target_price|floatformat:2 }}</div>
+                        <div class="small text-danger">SL: ₹{{ trade.stop_loss_price|floatformat:2 }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="fw-bold {% if trade.pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if trade.pnl >= 0 %}+{% endif %}₹{{ trade.pnl|floatformat:2 }}
+                        </div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        {% if trade.status == 'WIN' or trade.pnl > 0 %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">WIN</span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">LOSS</span>
+                        {% endif %}
+                    </td>
+
+                    <td class="pe-4 py-3 bg-transparent">
+                        <div class="small theme-text-muted" style="max-width: 220px; white-space: normal;">{{ trade.reason }}</div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="border-0">
+                    <td colspan="7" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                        <span class="material-icons fs-1 mb-2 opacity-50">format_list_bulleted</span>
+                        <p class="mb-0 fw-medium">No order signals recorded for this backtest.</p>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pinned Orders Pagination Footer -->
+    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+            <div class="small theme-text-muted text-center text-sm-start">
+                Showing {{ trades_page.start_index|default:0 }} to {{ trades_page.end_index|default:0 }} of {{ total_trades_count }} order signals
+            </div>
+            
+            <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
+                {% if trades_page.has_previous %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'backtest:backtest_detail' backtest.pk %}?trade_page={{ trades_page.previous_page_number }}" 
+                       hx-target="#backtest-detail-container" hx-push-url="true">
+                       <span class="material-icons fs-6">chevron_left</span>
+                    </a>
+                </li>
+                {% endif %}
+                <li class="page-item mb-0">
+                    <span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold text-decoration-none p-0" style="width: 36px; height: 36px;">
+                        {{ trades_page.number }}
+                    </span>
+                </li>
+                {% if trades_page.has_next %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'backtest:backtest_detail' backtest.pk %}?trade_page={{ trades_page.next_page_number }}" 
+                       hx-target="#backtest-detail-container" hx-push-url="true">
+                       <span class="material-icons fs-6">chevron_right</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<!-- Execution Error Trace Logs Terminal (Last 200 Lines) -->
+{% if backtest.error_logs %}
+<div class="glass-card p-4 mb-4" style="background: rgba(15, 23, 42, 0.85); border-color: rgba(239, 68, 68, 0.3);">
+    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-25">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-danger fs-5">bug_report</span>
+            <h5 class="fw-bold text-danger mb-0">Execution Trace Logs (Last 200 Lines)</h5>
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-danger rounded-pill px-3" onclick="navigator.clipboard.writeText(document.getElementById('backtest-log-terminal').innerText);">
+            Copy Logs
+        </button>
+    </div>
+    <pre id="backtest-log-terminal" class="mb-0 font-monospace text-light p-3 rounded" style="background: #090d16; max-height: 280px; overflow-y: auto; font-size: 0.82rem; white-space: pre-wrap; word-break: break-all; color: #f87171 !important;">{{ backtest.get_last_200_logs }}</pre>
+</div>
+{% endif %}
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+(function() {
+    const ctx = document.getElementById('equityCurveChart');
+    if (!ctx) return;
+
+    const initialCapital = {{ backtest.initial_capital|default:100000 }};
+    const netPnL = {{ backtest.metrics.net_pnl|default:0 }};
+    const totalTrades = {{ backtest.metrics.total_trades|default:10 }};
+
+    // Generate Chart Curve Data Points
+    const labels = ['Start'];
+    const dataPoints = [initialCapital];
+    let stepPnL = netPnL / (totalTrades > 0 ? totalTrades : 1);
+
+    for (let i = 1; i <= Math.max(totalTrades, 8); i++) {
+        labels.push('Trade #' + i);
+        dataPoints.push(initialCapital + (stepPnL * i));
+    }
+
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: labels,
+            datasets: [{
+                label: 'Account Equity (INR)',
+                data: dataPoints,
+                borderColor: netPnL >= 0 ? '#10b981' : '#ef4444',
+                backgroundColor: netPnL >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                fill: true,
+                tension: 0.35,
+                borderWidth: 2,
+                pointRadius: 3
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            plugins: {
+                legend: { display: false }
+            },
+            scales: {
+                x: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8' }
+                },
+                y: {
+                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                    ticks: { color: '#94a3b8' }
+                }
+            }
+        }
+    });
+})();
+</script>

@@ -1,20 +1,12 @@
 import json
 import redis
 from django.conf import settings
+from apps.common.constants import REDIS_CHANNEL, INDEX_INSTRUMENT_MAP
 from .models import MarketBackupTask
 
 # Initialize Redis Connection (Pulls from your Django settings, falls back to local docker defaults)
 REDIS_URL = settings.REDIS_URL
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
-
-REDIS_CHANNEL = 'market_backup_commands'
-
-INDEX_INSTRUMENT_MAP = {
-    'NIFTY': {"security_id": "13", "exchange_segment": "IDX_I", "instrument": "INDEX"},
-    'BANKNIFTY': {"security_id": "25", "exchange_segment": "IDX_I", "instrument": "INDEX"},
-    'FINNIFTY': {"security_id": "27", "exchange_segment": "IDX_I", "instrument": "INDEX"},
-    'MIDCPNIFTY': {"security_id": "26", "exchange_segment": "IDX_I", "instrument": "INDEX"}
-}
 
 def create_and_start_backup_task(start_date, end_date, index_name, strike_count, user):
     """

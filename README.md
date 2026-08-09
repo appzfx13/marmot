@@ -42,6 +42,15 @@ graph TD
 2. **Docstring Limits:** 1 or 2 line docstring max per function/class/module. Keep documentation extremely concise.
 3. **Space Accountability:** Even a blank space change is accountable. Do not introduce trailing spaces or unnecessary blank lines.
 4. **Clean Imports:** Always keep the import clean. Remove unused imports and group them logically.
+5. **Page Uniformity & Profile Policy:**
+   - Maintain strict full-width container uniformity (`col-12`) across all pages including Profile Settings.
+   - User Profile Field Rules:
+     - `username`: Always read-only.
+     - `phone_number`: Read-only for regular users.
+     - Verification Badges: Read-only status indicators for regular users.
+     - Broker Credentials: Cannot be edited by user once created (Admin/Developer role access required to modify).
+     - Trade Control & Freeze Flags (`trade_eligibility`, `is_blocked`, `primary_freeze`, `final_freeze`): Always read-only.
+     - Navigation Placement: Profile settings link belongs exclusively in the top-right profile dropdown menu.
 
 ## 5. Directory Structure
 - `apps/`: Django modules (api, users, trade_core, trade_config, market, notifications, masters, common, ai_agents).

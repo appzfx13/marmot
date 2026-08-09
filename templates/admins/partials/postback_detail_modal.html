@@ -1,0 +1,30 @@
+<!-- templates/admins/partials/postback_detail_modal.html -->
+<div class="modal-content glass-card p-2" style="background: rgba(15, 23, 42, 0.95); border: 1px solid rgba(13, 110, 253, 0.3);">
+    <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-info bg-opacity-25 text-info d-flex align-items-center justify-content-center flex-shrink-0"
+                style="width: 42px; height: 42px; border: 1px solid rgba(14, 165, 233, 0.3);">
+                <span class="material-icons fs-5">receipt_long</span>
+            </div>
+            <div>
+                <h5 class="modal-title theme-text-main mb-0 fw-bold">Postback Webhook JSON Inspector</h5>
+                <small class="theme-text-muted">Log ID: #{{ postback.id }} | Broker: {{ postback.broker }} | Order ID: {{ postback.order_id|default:"N/A" }}</small>
+            </div>
+        </div>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <div class="modal-body p-3">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="small theme-text-muted">Raw Broker Webhook Payload</span>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" onclick="navigator.clipboard.writeText(document.getElementById('postback-raw-json').innerText);">
+                Copy JSON
+            </button>
+        </div>
+        <pre id="postback-raw-json" class="mb-0 font-monospace p-3 rounded" style="background: #090d16; border: 1px solid rgba(255, 255, 255, 0.1); max-height: 360px; overflow-y: auto; font-size: 0.84rem; color: #38bdf8 !important;">{{ formatted_payload }}</pre>
+    </div>
+
+    <div class="modal-footer border-0 pt-2">
+        <button type="button" class="btn btn-outline-light rounded-pill px-4" data-bs-dismiss="modal">Close</button>
+    </div>
+</div>

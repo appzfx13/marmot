@@ -20,6 +20,18 @@ SECRET_KEY = os.getenv('SECRET_KEY', 'django-insecure-fjfw&r^h^kc1mrt)rq89=^bvaz
 DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = ['*']
+CSRF_TRUSTED_ORIGINS = [
+    'https://*.ngrok-free.app',
+    'https://*.ngrok.io',
+    'http://localhost:8000',
+    'http://127.0.0.1:8000',
+    'http://localhost:8005',
+    'http://127.0.0.1:8005',
+]
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
+
+# Role-Based Access Control Settings
+POSTBACK_VIEW_ROLES = ['admin', 'developer']
 
 MARMOT_WS_URL = os.getenv('MARMOT_WS_URL', 'ws://localhost:8082/ws')
 
@@ -48,10 +60,12 @@ INSTALLED_APPS = [
     # Project Apps
     'apps.admins',
     'apps.api',
+    'apps.backtest',
     'apps.common',
     'apps.market',
     'apps.masters',
     'apps.notifications',
+    'apps.postback',
     'apps.trade_config',
     'apps.trade_core',
 ]

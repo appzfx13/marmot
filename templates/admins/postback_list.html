@@ -1,0 +1,107 @@
+{% extends 'admins/index.html' %}
+{% load static %}
+
+{% block title %}{{ page_title }} - Admin Portal{% endblock %}
+{% block nav_postbacks_active %}active{% endblock %}
+
+{% block dashboard_content %}
+<!-- Responsive Header Container -->
+<div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
+    <div>
+        <h3 class="fw-bold mb-1 theme-text-main">{{ page_title }}</h3>
+        <p class="theme-text-muted mb-0">Inspect real-time incoming DhanHQ & broker webhook postback logs per user.</p>
+    </div>
+</div>
+
+<!-- Search & Filter Controls -->
+<div class="glass-card p-3 p-md-4 mb-4">
+    <form method="GET" action="{{ request.path }}" class="row g-3 align-items-center">
+        
+        <!-- Search Input -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
+                    <span class="material-icons fs-6">search</span>
+                </span>
+                <input type="text" 
+                       name="q" 
+                       value="{{ current_q }}" 
+                       class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25" 
+                       placeholder="Order ID, symbol, status..."
+                       hx-get="{{ request.path }}"
+                       hx-target="#postback-list-container"
+                       hx-trigger="input changed delay:400ms, search"
+                       hx-include="[name='user_id'], [name='start_date'], [name='end_date']"
+                       hx-push-url="true">
+            </div>
+        </div>
+
+        <!-- User Filter -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <select name="user_id" 
+                    class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
+                    hx-get="{{ request.path }}"
+                    hx-target="#postback-list-container"
+                    hx-trigger="change"
+                    hx-include="[name='q'], [name='start_date'], [name='end_date']"
+                    hx-push-url="true">
+                <option value="" class="text-dark">All Users</option>
+                {% for u in users_list %}
+                <option value="{{ u.id }}" class="text-dark" {% if current_user_id == u.id|stringformat:"i" %}selected{% endif %}>
+                    {{ u.username }} ({% if u.role %}{{ u.role|title }}{% else %}Trader{% endif %})
+                </option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <!-- Start Date Filter -->
+        <div class="col-12 col-sm-6 col-lg-2">
+            <input type="date" 
+                   name="start_date" 
+                   value="{{ current_start_date }}"
+                   class="form-control bg-transparent theme-text-main border-secondary border-opacity-25"
+                   placeholder="Start Date"
+                   hx-get="{{ request.path }}"
+                   hx-target="#postback-list-container"
+                   hx-trigger="change"
+                   hx-include="[name='q'], [name='user_id'], [name='end_date']"
+                   hx-push-url="true">
+        </div>
+
+        <!-- End Date Filter -->
+        <div class="col-12 col-sm-6 col-lg-2">
+            <input type="date" 
+                   name="end_date" 
+                   value="{{ current_end_date }}"
+                   class="form-control bg-transparent theme-text-main border-secondary border-opacity-25"
+                   placeholder="End Date"
+                   hx-get="{{ request.path }}"
+                   hx-target="#postback-list-container"
+                   hx-trigger="change"
+                   hx-include="[name='q'], [name='user_id'], [name='start_date']"
+                   hx-push-url="true">
+        </div>
+
+        <!-- Reset Button -->
+        <div class="col-12 col-sm-6 col-lg-2 ms-auto">
+            <a href="{{ request.path }}" 
+               class="btn btn-outline-secondary rounded-pill text-white-50 border-secondary border-opacity-25 w-100 d-inline-flex align-items-center justify-content-center gap-1"
+               hx-get="{{ request.path }}"
+               hx-target="#postback-list-container"
+               hx-push-url="true">
+                <span class="material-icons fs-6">restart_alt</span>
+                <span>Reset</span>
+            </a>
+        </div>
+
+    </form>
+</div>
+
+<!-- HTMX Container -->
+<div id="postback-list-container" class="w-100"
+     hx-get="{{ request.get_full_path }}" 
+     hx-trigger="reloadPostbackTable from:body" 
+     hx-target="this">
+    {% include 'admins/partials/postback_list_content.html' %}
+</div>
+{% endblock %}

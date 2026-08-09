@@ -1,0 +1,234 @@
+{% load static %}
+
+<style>
+    .custom-glass-table > :not(caption) > * > * {
+        background-color: transparent !important;
+        box-shadow: none !important;
+    }
+    .custom-glass-table.table-hover tbody tr:hover > * {
+        background-color: var(--nav-hover) !important;
+    }
+</style>
+
+<div class="glass-card p-0 overflow-hidden mb-4 border-0">
+    <div class="table-responsive">
+        <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
+            <thead>
+                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                    <th scope="col" class="ps-4 py-3 theme-text-muted text-uppercase small fw-semibold">ID / Strategy</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Index & Dates</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Capital / Trades</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Net PnL / Win Rate</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Progress</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Status</th>
+                    <th scope="col" class="text-end pe-4 py-3 theme-text-muted text-uppercase small fw-semibold">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for backtest in backtests %}
+                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+                    <td class="ps-4 py-3 bg-transparent">
+                        <div class="fw-bold theme-text-main">#BT-{{ backtest.id|stringformat:"04d" }}</div>
+                        <div class="small text-primary fw-semibold">{{ backtest.get_strategy_name_display }}</div>
+                        {% if backtest.backup_task %}
+                        <div class="small theme-text-muted" style="font-size: 0.75rem;">Source: Backup #{{ backtest.backup_task.id|stringformat:"04d" }}</div>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small fw-semibold text-info">{{ backtest.index_name }}</div>
+                        <div class="small theme-text-muted">{{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small theme-text-main">Capital: ₹{{ backtest.initial_capital|floatformat:0 }}</div>
+                        <div class="small theme-text-muted">Trades: {{ backtest.metrics.total_trades|default:0 }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small fw-bold {% if backtest.metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if backtest.metrics.net_pnl >= 0 %}+{% endif %}₹{{ backtest.metrics.net_pnl|default:0|floatformat:2 }}
+                        </div>
+                        <div class="small theme-text-muted">Win Rate: {{ backtest.metrics.win_rate|default:0 }}%</div>
+                    </td>
+
+                    <!-- Real-Time Progress Bar -->
+                    <td class="py-3 bg-transparent" style="min-width: 140px;">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <small class="theme-text-muted backtest-progress-text" style="font-size: 0.7rem;" id="backtest-progress-text-{{ backtest.pk }}">{{ backtest.progress }}%</small>
+                        </div>
+                        <div class="progress" style="height: 6px; background-color: var(--border-color);">
+                            <div class="progress-bar bg-primary progress-bar-striped {% if backtest.status == 'running' %}progress-bar-animated{% endif %} backtest-progress-bar" 
+                                 id="backtest-progress-{{ backtest.pk }}"
+                                 role="progressbar" 
+                                 style="width: {{ backtest.progress }}%;" 
+                                 aria-valuenow="{{ backtest.progress }}" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <span id="backtest-status-{{ backtest.pk }}" class="backtest-status-badge">
+                        {% if backtest.status == 'completed' %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
+                        {% elif backtest.status == 'running' %}
+                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>
+                        {% elif backtest.status == 'created' %}
+                            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1">Created</span>
+                        {% elif backtest.status == 'paused' %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>
+                        {% elif backtest.status == 'cancelled' or backtest.status == 'error' %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">{{ backtest.get_status_display }}</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">Pending</span>
+                        {% endif %}
+                        </span>
+                    </td>
+
+                    <td class="text-end pe-4 py-3 bg-transparent">
+                        <div class="d-flex align-items-center justify-content-end gap-2">
+                            {% if backtest.status == 'running' %}
+                            <button type="button" 
+                                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
+                                    hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
+                                    class="glass-icon-btn text-warning rounded-circle d-flex align-items-center justify-content-center" 
+                                    style="width: 36px; height: 36px;" 
+                                    title="Pause Backtest">
+                                <span class="material-icons fs-6">pause</span>
+                            </button>
+                            {% else %}
+                            <button type="button" 
+                                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
+                                    hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
+                                    class="glass-icon-btn text-success rounded-circle d-flex align-items-center justify-content-center" 
+                                    style="width: 36px; height: 36px;" 
+                                    title="Start Backtest">
+                                <span class="material-icons fs-6">play_arrow</span>
+                            </button>
+                            {% endif %}
+
+                            <a href="{% url 'backtest:backtest_detail' backtest.pk %}" 
+                               class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" 
+                               style="width: 36px; height: 36px;" 
+                               title="View Analytics">
+                                <span class="material-icons fs-6">analytics</span>
+                            </a>
+                            
+                            <button type="button" 
+                                    class="glass-icon-btn text-danger border-0 rounded-circle d-flex align-items-center justify-content-center" 
+                                    style="width: 36px; height: 36px;" 
+                                    hx-get="{% url 'backtest:backtest_delete' backtest.pk %}"
+                                    hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
+                                    title="Delete Backtest Task">
+                                <span class="material-icons fs-6">delete</span>
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr class="border-0">
+                    <td colspan="7" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                        <span class="material-icons fs-1 mb-2 opacity-50">analytics</span>
+                        <p class="mb-0 fw-medium">No strategy backtests found.</p>
+                        <small class="opacity-75">Click "Run New Backtest" above to initialize a plug-and-play strategy execution.</small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pinned Pagination Footer -->
+    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+            <div class="small theme-text-muted text-center text-sm-start">
+                {% if is_paginated %}
+                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} backtests
+                {% else %}
+                    Showing {{ backtests|length }} of {{ backtests|length }} backtests
+                {% endif %}
+            </div>
+            
+            <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
+                {% if is_paginated and page_obj.has_previous %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'backtest:backtest_dashboard' %}?page={{ page_obj.previous_page_number }}" 
+                       hx-target="#backtest-dashboard-container" hx-push-url="true">
+                       <span class="material-icons fs-6">chevron_left</span>
+                    </a>
+                </li>
+                {% endif %}
+                <li class="page-item mb-0">
+                    <span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold text-decoration-none p-0" style="width: 36px; height: 36px;">
+                        {% if is_paginated %}{{ page_obj.number }}{% else %}1{% endif %}
+                    </span>
+                </li>
+                {% if is_paginated and page_obj.has_next %}
+                <li class="page-item mb-0">
+                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
+                       style="width: 36px; height: 36px;"
+                       hx-get="{% url 'backtest:backtest_dashboard' %}?page={{ page_obj.next_page_number }}" 
+                       hx-target="#backtest-dashboard-container" hx-push-url="true">
+                       <span class="material-icons fs-6">chevron_right</span>
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function applyBacktestListUpdate(data) {
+        if (!data || data.type !== 'backtest_progress') return;
+        const progressBar = document.querySelector('.backtest-progress-bar[id="backtest-progress-' + data.task_id + '"]');
+        const progressText = document.querySelector('.backtest-progress-text[id="backtest-progress-text-' + data.task_id + '"]');
+        const statusBadge = document.querySelector('.backtest-status-badge[id="backtest-status-' + data.task_id + '"]');
+
+        if (progressBar) {
+            progressBar.style.width = data.progress + '%';
+            progressBar.setAttribute('aria-valuenow', data.progress);
+            if (data.status === 'running') {
+                progressBar.classList.add('progress-bar-animated');
+            } else {
+                progressBar.classList.remove('progress-bar-animated');
+            }
+        }
+        if (progressText) progressText.textContent = data.progress + '%';
+
+        if (statusBadge) {
+            const statusMap = {
+                'completed': '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>',
+                'running': '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>',
+                'created': '<span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1">Created</span>',
+                'paused': '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>',
+                'cancelled': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Cancelled</span>',
+                'error': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Error</span>'
+            };
+            statusBadge.innerHTML = statusMap[data.status] || statusMap['created'];
+        }
+    }
+
+    function initSubscriptions() {
+        document.querySelectorAll('.backtest-progress-bar').forEach(function(el) {
+            const taskId = el.id.replace('backtest-progress-', '');
+            if (window.MarmotWS && window.MarmotWS.url) {
+                window.MarmotWS.unsubscribe(taskId);
+                window.MarmotWS.subscribe(taskId, applyBacktestListUpdate);
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSubscriptions);
+    } else {
+        initSubscriptions();
+    }
+})();
+</script>

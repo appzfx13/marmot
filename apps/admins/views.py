@@ -305,3 +305,69 @@ class AdminTradeExecConfigDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequ
             'reloadConfigTable': True  # <-- Triggers the table reload on the list page
         })
         return response
+
+
+# ==========================================
+# POSTBACK & WEBHOOK AUDIT LOG VIEWS
+# ==========================================
+
+from apps.common.models import PostbackLog
+from apps.admins.permissions import DeveloperOrAdminRequiredMixin
+
+class PostbackLogListView(HTMXPartialMixin, LoginRequiredMixin, DeveloperOrAdminRequiredMixin, ListView):
+    model = PostbackLog
+    template_name = 'admins/postback_list.html'
+    partial_template_name = 'admins/partials/postback_list_content.html'
+    context_object_name = 'postbacks'
+    paginate_by = 10
+
+    def get_queryset(self):
+        queryset = PostbackLog.objects.filter(is_deleted=False).select_related('user')
+
+        # Filter by Search Query (Order ID, Symbol, Status, Broker, Dhan Client ID)
+        q = self.request.GET.get('q')
+        if q:
+            queryset = queryset.filter(
+                Q(order_id__icontains=q) |
+                Q(dhan_client_id__icontains=q) |
+                Q(symbol__icontains=q) |
+                Q(order_status__icontains=q) |
+                Q(broker__icontains=q) |
+                Q(user__username__icontains=q)
+            )
+
+        # Filter by User
+        user_id = self.request.GET.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        # Filter by Date Range
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+
+        return queryset.order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = "Postback & Webhook Audit Logs"
+        context['users_list'] = User.objects.filter(is_active=True).order_by('username')
+        context['current_q'] = self.request.GET.get('q', '')
+        context['current_user_id'] = self.request.GET.get('user_id', '')
+        context['current_start_date'] = self.request.GET.get('start_date', '')
+        context['current_end_date'] = self.request.GET.get('end_date', '')
+        return context
+
+
+class PostbackLogDetailView(LoginRequiredMixin, DeveloperOrAdminRequiredMixin, DetailView):
+    model = PostbackLog
+    template_name = 'admins/partials/postback_detail_modal.html'
+    context_object_name = 'postback'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['formatted_payload'] = json.dumps(self.object.payload, indent=2)
+        return context

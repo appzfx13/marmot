@@ -7,11 +7,11 @@ services:
     env_file:
       - .env
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT}:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-postgres} -d $${POSTGRES_DB:-postgres}" ]
+      test: [ "CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -66,7 +66,7 @@ services:
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_HOST=db
-      - DB_PORT=${POSTGRES_PORT:-5432}
+      - DB_PORT=${POSTGRES_PORT}
     stdin_open: true
     tty: true
     depends_on:
@@ -85,7 +85,7 @@ services:
     container_name: go_service
     command: go run main.go
     ports:
-      - "${WS_PORT:-8082}:${WS_PORT:-8082}"
+      - "${WS_PORT}:${WS_PORT}"
     volumes:
       - ./go-app:/app
     env_file:
@@ -96,12 +96,30 @@ services:
       - DB_USER=${POSTGRES_USER}
       - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_HOST=db
-      - DB_PORT=${POSTGRES_PORT:-5432}
+      - DB_PORT=${POSTGRES_PORT}
     depends_on:
       db:
         condition: service_healthy
       redis_broker:
         condition: service_healthy
+    networks:
+      - app_network
+
+  # --- Ngrok Tunnel Container ---
+  ngrok:
+    image: ngrok/ngrok:latest
+    container_name: ngrok_tunnel
+    restart: always
+    command:
+      - "http"
+      - "web:8000"
+      - "--authtoken=${NGROK_AUTHTOKEN}"
+    ports:
+      - "4040:4040"
+    environment:
+      - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
+    depends_on:
+      - web
     networks:
       - app_network
 

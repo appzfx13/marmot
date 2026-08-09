@@ -244,22 +244,4 @@ class MarketBackupDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixi
         })
         return response
 
-
-class BacktestDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
-    """
-    Backtest Management View (Placeholder page for strategy backtesting).
-    """
-    model = MarketBackupTask
-    template_name = 'admins/backtest_dashboard.html'
-    context_object_name = 'backtests'
-    paginate_by = settings.PAGINATION_COUNT
-
-    def get_queryset(self):
-        return MarketBackupTask.objects.filter(is_deleted=False, status=MarketBackupTask.StatusChoices.COMPLETED)
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['page_title'] = "Backtest Management"
-        return context
-
 

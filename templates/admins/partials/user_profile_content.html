@@ -1,0 +1,244 @@
+{% load static %}
+
+<div class="glass-form-card glass-card p-4 p-md-5 mb-4 rounded-4 shadow-lg border-0" style="background: rgba(17, 24, 39, 0.7); backdrop-filter: blur(16px); border: 1px solid var(--border-color) !important;">
+    
+    <!-- User Profile Avatar Card -->
+    <div class="d-flex flex-column flex-sm-row align-items-center gap-4 mb-4 pb-4 border-bottom" style="border-color: var(--border-color) !important;">
+        <div class="position-relative">
+            {% if profile_user.avatar %}
+                <img src="{{ profile_user.avatar.url }}" alt="{{ profile_user.username }}" class="rounded-circle border border-primary border-opacity-50 shadow" style="width: 80px; height: 80px; object-fit: cover;">
+            {% else %}
+                <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-2 border border-primary border-opacity-25 shadow-sm" style="width: 80px; height: 80px;">
+                    {{ profile_user.username|slice:":2"|upper }}
+                </div>
+            {% endif %}
+        </div>
+        <div class="text-center text-sm-start">
+            <h4 class="fw-bold theme-text-main mb-1">
+                {% if profile_user.first_name %}{{ profile_user.first_name }} {{ profile_user.last_name }}{% else %}{{ profile_user.username }}{% endif %}
+            </h4>
+            <div class="d-flex align-items-center justify-content-center justify-content-sm-start gap-2 flex-wrap">
+                <span class="small theme-text-muted">Username: <strong class="theme-text-main">@{{ profile_user.username }}</strong></span>
+                <span class="theme-text-muted">•</span>
+                <span class="small theme-text-muted">Joined: {{ profile_user.date_joined|date:"M d, Y" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <form id="userProfileForm" 
+          method="POST" 
+          enctype="multipart/form-data"
+          action="{% if profile_user != request.user %}{% url 'users:marmot-profile-user' profile_user.pk %}{% else %}{% url 'users:marmot-profile' %}{% endif %}">
+        {% csrf_token %}
+
+        <!-- Section 1: Account Information -->
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">account_circle</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Account Information</h6>
+        </div>
+
+        <!-- Cloudinary Profile Avatar Upload -->
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.avatar.id_for_label }}" style="min-width: 160px;">
+                Profile Avatar
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.avatar }}
+                <div class="small theme-text-muted mt-1" style="font-size: 0.75rem;">Upload custom profile avatar to Cloudinary CDN storage.</div>
+            </div>
+        </div>
+
+        <!-- Username (READ-ONLY ALWAYS) -->
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" style="min-width: 160px;">
+                Username <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill ms-1" style="font-size: 0.65rem;">Read-only</span>
+            </label>
+            <div class="flex-grow-1 w-100">
+                <input type="text" class="form-control bg-transparent border-secondary border-opacity-25 text-muted" value="@{{ profile_user.username }}" readonly disabled>
+            </div>
+        </div>
+
+        <!-- Phone Number -->
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.phone_number.id_for_label }}" style="min-width: 160px;">
+                Phone Number {% if not is_admin_or_dev %}<span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill ms-1" style="font-size: 0.65rem;">Read-only</span>{% endif %}
+            </label>
+            <div class="flex-grow-1 w-100">
+                {% if is_admin_or_dev %}
+                    {{ form.phone_number }}
+                {% else %}
+                    <input type="text" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" value="{{ profile_user.phone_number|default:'Not provided' }}" readonly disabled>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- First Name -->
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.first_name.id_for_label }}" style="min-width: 160px;">
+                First Name
+            </label>
+            <div class="flex-grow-1 w-100">{{ form.first_name }}</div>
+        </div>
+
+        <!-- Last Name -->
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.last_name.id_for_label }}" style="min-width: 160px;">
+                Last Name
+            </label>
+            <div class="flex-grow-1 w-100">{{ form.last_name }}</div>
+        </div>
+
+        <!-- Email Address -->
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.email.id_for_label }}" style="min-width: 160px;">
+                Email Address
+            </label>
+            <div class="flex-grow-1 w-100">{{ form.email }}</div>
+        </div>
+
+        <!-- Description / Bio -->
+        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-start gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase pt-md-2" for="{{ form.description.id_for_label }}" style="min-width: 160px;">
+                Profile Notes
+            </label>
+            <div class="flex-grow-1 w-100">{{ form.description }}</div>
+        </div>
+
+        <!-- Section 2: Verification Badges -->
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">verified_user</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Verification Status Badges</h6>
+        </div>
+
+        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" style="min-width: 160px;">Badges</label>
+            <div class="flex-grow-1 w-100 d-flex flex-wrap gap-3">
+                {% if is_admin_or_dev %}
+                <label class="custom-check-item">
+                    {{ form.is_email_verified }}
+                    <span class="theme-text-main small fw-bold">Email Verified</span>
+                </label>
+                <label class="custom-check-item">
+                    {{ form.is_mobile_verified }}
+                    <span class="theme-text-main small fw-bold">Mobile Verified</span>
+                </label>
+                {% else %}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small theme-text-muted">Email:</span>
+                    {% if profile_user.is_email_verified %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Verified</span>
+                    {% else %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Unverified</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small theme-text-muted">Mobile:</span>
+                    {% if profile_user.is_mobile_verified %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Verified</span>
+                    {% else %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Unverified</span>
+                    {% endif %}
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Section 3: Broker Integration -->
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">account_balance</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Broker Integration</h6>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.broker.id_for_label }}" style="min-width: 160px;">Broker Platform</label>
+            <div class="flex-grow-1 w-100">{{ form.broker }}</div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.broker_client_id.id_for_label }}" style="min-width: 160px;">Broker Client ID</label>
+            <div class="flex-grow-1 w-100">{{ form.broker_client_id }}</div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.api_key.id_for_label }}" style="min-width: 160px;">API Key</label>
+            <div class="flex-grow-1 w-100">{{ form.api_key }}</div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.app_id.id_for_label }}" style="min-width: 160px;">App ID</label>
+            <div class="flex-grow-1 w-100">{{ form.app_id }}</div>
+        </div>
+
+        <!-- Broker Policy Alert Notice -->
+        <div class="alert alert-info bg-info bg-opacity-10 border-info border-opacity-25 text-info rounded-3 p-3 mb-4 d-flex align-items-center gap-2" style="font-size: 0.85rem;">
+            <span class="material-icons fs-5 flex-shrink-0">info</span>
+            <div>
+                Broker credentials cannot be changed by user itself once created. Please contact an Admin or Developer role to request updates to your broker integration settings.
+            </div>
+        </div>
+
+        <!-- Section 4: Trade Control & Freeze Flags (ALWAYS READ-ONLY FOR ALL ROLES) -->
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">security</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Trade Control & Freeze Flags <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill ms-1" style="font-size: 0.65rem;">Read-only Always</span></h6>
+        </div>
+
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-sm-6 col-md-3">
+                <div class="p-3 rounded-3 border text-center" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
+                    <div class="small theme-text-muted text-uppercase fw-bold mb-1" style="font-size: 0.7rem;">Trade Eligibility</div>
+                    {% if profile_user.trade_eligibility %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Eligible</span>
+                    {% else %}
+                        <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1 fw-bold">Ineligible</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <div class="p-3 rounded-3 border text-center" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
+                    <div class="small theme-text-muted text-uppercase fw-bold mb-1" style="font-size: 0.7rem;">Account Status</div>
+                    {% if profile_user.is_blocked %}
+                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 fw-bold">Blocked</span>
+                    {% else %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Active</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <div class="p-3 rounded-3 border text-center" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
+                    <div class="small theme-text-muted text-uppercase fw-bold mb-1" style="font-size: 0.7rem;">Primary Freeze</div>
+                    {% if profile_user.primary_freeze %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Frozen</span>
+                    {% else %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Unfrozen</span>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="col-12 col-sm-6 col-md-3">
+                <div class="p-3 rounded-3 border text-center" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
+                    <div class="small theme-text-muted text-uppercase fw-bold mb-1" style="font-size: 0.7rem;">Final Freeze</div>
+                    {% if profile_user.final_freeze %}
+                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 fw-bold">Frozen</span>
+                    {% else %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Unfrozen</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Form Submit & Action Buttons -->
+        <div class="d-flex align-items-center justify-content-end gap-3 pt-3 border-top" style="border-color: var(--border-color) !important;">
+            <a href="javascript:history.back();" class="btn btn-outline-secondary rounded-pill px-4 py-2 small fw-bold border-secondary border-opacity-25 text-white-50">
+                Cancel
+            </a>
+            <button type="button" 
+                    class="btn btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+                    data-bs-toggle="modal" 
+                    data-bs-target="#confirmSaveProfileModal">
+                <span class="material-icons fs-5">save</span>
+                <span>Save Profile Changes</span>
+            </button>
+        </div>
+
+    </form>
+</div>

@@ -1,22 +1,11 @@
 from django.db import models
-from django.utils import timezone
-from apps.common.models import BaseModel, SoftDeleteUserModelManager
+from apps.common.models import BaseModel
+from apps.common.choices import TaskStatusChoices, IndexChoices
+from apps.common.constants import MAX_LOG_LINES
 
 class MarketBackupTask(BaseModel):
-    class StatusChoices(models.TextChoices):
-        CREATED = 'created', 'Created'
-        PENDING = 'pending', 'Pending'
-        RUNNING = 'running', 'Running'
-        PAUSED = 'paused', 'Paused'
-        CANCELLED = 'cancelled', 'Cancelled'
-        COMPLETED = 'completed', 'Completed'
-        ERROR = 'error', 'Error'
-
-    class IndexChoices(models.TextChoices):
-        NIFTY = 'NIFTY', 'Nifty 50'
-        BANKNIFTY = 'BANKNIFTY', 'Bank Nifty'
-        FINNIFTY = 'FINNIFTY', 'Fin Nifty'
-        MIDCPNIFTY = 'MIDCPNIFTY', 'Midcp Nifty'
+    StatusChoices = TaskStatusChoices
+    IndexChoices = IndexChoices
 
     # 1. User Input Parameters
     start_date = models.DateField(help_text="Start date for options data range")

@@ -65,7 +65,7 @@ func (m *TaskManager) handleMessage(parentCtx context.Context, payloadStr string
 	log.Printf("📩 Received Command: [%s] for Task ID: %s\n", payload.Command, payload.TaskID)
 
 	switch payload.Command {
-	case "START", "RESUME":
+	case "START", "RESUME", "START_BACKTEST":
 		m.startOrResumeTask(parentCtx, payload)
 	case "PAUSE":
 		m.pauseTask(payload.TaskID)
@@ -76,7 +76,7 @@ func (m *TaskManager) handleMessage(parentCtx context.Context, payloadStr string
 	}
 }
 
-// startOrResumeTask spins up a new BackupJob Goroutine safely
+// startOrResumeTask spins up a new BackupJob or BacktestJob Goroutine safely
 func (m *TaskManager) startOrResumeTask(parentCtx context.Context, payload models.CommandPayload) {
 	m.mu.Lock()
 	// If this task is already running, cancel the old instance before starting a new one
@@ -90,7 +90,7 @@ func (m *TaskManager) startOrResumeTask(parentCtx context.Context, payload model
 	m.activeCtx[payload.TaskID] = cancel
 	m.mu.Unlock()
 
-	// Launch the actual backup job in a separate Goroutine
+	// Launch the worker job in a separate Goroutine
 	go m.runWorkerWrapper(taskCtx, payload)
 }
 
@@ -106,8 +106,6 @@ func (m *TaskManager) pauseTask(taskID string) {
 	}
 	m.mu.Unlock()
 
-	// We don't reset progress to 0 for pause, so it can resume where it left off
-	// (Assuming your UI expects progress to stay where it was)
 	_ = m.dbService.UpdateTaskStatus(context.Background(), taskID, "paused") 
 }
 
@@ -132,6 +130,12 @@ func (m *TaskManager) runWorkerWrapper(ctx context.Context, payload models.Comma
 		m.mu.Unlock()
 	}()
 
-	job := NewBackupJob(m.dbService, m.config, payload, m.hub)
-	job.Run(ctx)
+	// Dispatch BacktestJob or BackupJob based on command / params
+	if payload.Command == "START_BACKTEST" || payload.Params.StrategyName != "" {
+		job := NewBacktestJob(m.dbService, m.config, payload, m.hub)
+		job.Run(ctx)
+	} else {
+		job := NewBackupJob(m.dbService, m.config, payload, m.hub)
+		job.Run(ctx)
+	}
 }

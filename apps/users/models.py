@@ -3,7 +3,8 @@ import uuid
 from django.db import models
 from django.contrib.auth.models import AbstractUser
 
-from apps.users.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices
+from cloudinary.models import CloudinaryField
+from apps.common.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices
 from apps.common.models import BaseModel, SoftDeleteUserModelManager
 
 
@@ -11,6 +12,7 @@ class User(AbstractUser, BaseModel):
     username = models.CharField(max_length=150, unique=True, null=True, blank=True)
     email = models.EmailField(unique=True, null=True, blank=True)
     phone_number = models.CharField(max_length=15, unique=True, null=True, blank=True)
+    avatar = CloudinaryField('avatar', blank=True, null=True, help_text="Profile picture stored on Cloudinary")
 
     # Verification Flags
     is_mobile_verified = models.BooleanField(default=False)
@@ -23,15 +25,21 @@ class User(AbstractUser, BaseModel):
     )
     description = models.TextField(blank=True)
 
-    # Broker & API Credentials
+    # Generic Broker & API Credentials
     broker = models.CharField(
         max_length=20,
         choices=BrokerChoices.choices,
         blank=True,
-        null=True
+        null=True,
+        default=BrokerChoices.DHAN
     )
-    api_key = models.CharField(max_length=255, blank=True, null=True)
-    app_id = models.CharField(max_length=255, blank=True, null=True)
+    broker_client_id = models.CharField(max_length=100, blank=True, null=True, db_index=True, help_text="Generic Broker Client ID")
+    api_key = models.CharField(max_length=255, blank=True, null=True, help_text="Generic Broker API Key / Secret")
+    app_id = models.CharField(max_length=255, blank=True, null=True, help_text="Generic Broker App ID / Client Secret")
+
+    @property
+    def client_id(self):
+        return self.broker_client_id
 
     # Freeze / Control Flags
     primary_freeze = models.BooleanField(default=False)

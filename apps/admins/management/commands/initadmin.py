@@ -1,7 +1,7 @@
 import os
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
-from apps.users.choices import MemberRoleChoices
+from apps.common.choices import MemberRoleChoices
 
 
 class Command(BaseCommand):

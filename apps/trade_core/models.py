@@ -1,6 +1,6 @@
 from django.db import models
 from apps.users.models import User
-from . choices import RiskTypeChoices
+from apps.common.choices import RiskTypeChoices
 
 # Create your models here.
 # --- Trade Execution Configuration ---

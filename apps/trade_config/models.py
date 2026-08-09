@@ -1,7 +1,7 @@
 from django.db import models
 from apps.users.models import User
 from apps.common.models import BaseModel
-from .choices import RiskTypeChoices
+from apps.common.choices import RiskTypeChoices
 
 
 # --- Trade Execution Configuration ---
