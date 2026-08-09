@@ -28,6 +28,8 @@
                         <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3">Completed</span>
                     {% elif backup.status == 'running' %}
                         <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3">Running</span>
+                    {% elif backup.status == 'created' %}
+                        <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3">Created</span>
                     {% elif backup.status == 'paused' %}
                         <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3">Paused</span>
                     {% elif backup.status == 'cancelled' or backup.status == 'error' %}
@@ -69,16 +71,24 @@
                     </div>
                 </div>
 
-                {% if backup.error_logs %}
-                <div class="mt-4" id="backup-error-logs">
-                    <label class="theme-text-muted small fw-semibold">Error Trace Logs:</label>
-                    <pre class="bg-dark text-danger p-3 rounded-3 small mt-1 border border-secondary border-opacity-25" style="max-height: 150px; overflow-y: auto;">{{ backup.error_logs }}</pre>
+                <div class="mt-4 {% if not backup.error_logs %}d-none{% endif %}" id="backup-error-logs">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="theme-text-muted small fw-semibold">Error & Execution Logs (Last 200 Lines):</label>
+                    </div>
+                    <pre class="bg-dark text-danger p-3 rounded-3 small border border-secondary border-opacity-25 font-monospace" style="max-height: 250px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;" id="backup-error-pre">{{ backup.get_last_200_logs }}</pre>
                 </div>
-                {% endif %}
             </div>
 
-            <!-- Control Actions (Start/Resume, Pause, Stop) -->
-            <div class="d-flex gap-2 pt-4 border-top border-secondary border-opacity-25 mt-3">
+            <!-- Control Actions (Start/Resume, Pause, Stop, Download) -->
+            <div class="d-flex flex-wrap gap-2 pt-4 border-top border-secondary border-opacity-25 mt-3">
+                {% if backup.parquet_file_path and backup.status != 'error' and backup.file_size_mb > 0 %}
+                <a href="{% url 'market:market_backup_download' backup.pk %}"
+                   class="btn btn-primary rounded-pill px-4 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
+                    <span class="material-icons fs-6">download</span>
+                    <span>Download File</span>
+                </a>
+                {% endif %}
+
                 {% if backup.status == 'running' %}
                 <!-- Pause: requires confirmation → load modal -->
                 <button type="button"
@@ -125,6 +135,7 @@
         const fileSizeEl = document.getElementById('backup-file-size');
         const filePathEl = document.getElementById('backup-file-path');
         const errorLogsEl = document.getElementById('backup-error-logs');
+        const errorPreEl = document.getElementById('backup-error-pre');
 
         if (progressBar) {
             progressBar.style.width = data.progress + '%';
@@ -141,6 +152,7 @@
             const statusMap = {
                 'completed': '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3">Completed</span>',
                 'running': '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3">Running</span>',
+                'created': '<span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3">Created</span>',
                 'paused': '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3">Paused</span>',
                 'cancelled': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3">Cancelled</span>',
                 'error': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3">Error</span>',
@@ -156,9 +168,9 @@
             filePathEl.textContent = data.file_path;
             filePathEl.title = data.file_path;
         }
-        if (errorLogsEl && data.error) {
-            errorLogsEl.innerHTML = '<label class="theme-text-muted small fw-semibold">Error Trace Logs:</label>' +
-                '<pre class="bg-dark text-danger p-3 rounded-3 small mt-1 border border-secondary border-opacity-25" style="max-height: 150px; overflow-y: auto;">' + data.error + '</pre>';
+
+        if (data.status === 'error') {
+            if (container) container.dispatchEvent(new CustomEvent('reloadBackupDetail'));
         }
     }
 

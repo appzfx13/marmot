@@ -4,13 +4,14 @@ import "time"
 
 // TaskParams represents the options dataset user parameters received from Django
 type TaskParams struct {
-	StartDate      string `json:"start_date"`
-	EndDate        string `json:"end_date"`
-	IndexName      string `json:"index_name"`
-	SecurityID     string `json:"security_id"`
+	StartDate       string `json:"start_date"`
+	EndDate         string `json:"end_date"`
+	IndexName       string `json:"index_name"`
+	SecurityID      string `json:"security_id"`
 	ExchangeSegment string `json:"exchange_segment"`
-	Instrument     string `json:"instrument"`
-	StrikeCount    int    `json:"strike_count"`
+	Instrument      string `json:"instrument"`
+	StrikeCount     int    `json:"strike_count"`
+	UserID          string `json:"user_id"`
 }
 
 // CommandPayload represents the JSON IPC command sent over Redis channel

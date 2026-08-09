@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"go-app/config"
@@ -18,7 +19,7 @@ import (
 	"go-app/ws"
 )
 
-// BackupJob handles the downloading, processing, and Parquet serialization logic
+// BackupJob handles downloading, Hive date-partitioning, and account-separated storage logic
 type BackupJob struct {
 	dbService *services.DBService
 	config    *config.Config
@@ -36,8 +37,8 @@ func NewBackupJob(dbService *services.DBService, cfg *config.Config, payload mod
 	}
 }
 
-// Run executes the backup pipeline by calling DhanHQ /charts/historical API
-// and writing the candle data as JSONL
+// Run executes the backup pipeline by calling DhanHQ /charts/historical API,
+// partitioning candles by date inside /app/data/users/{user_id}/{index_name}_options/year=YYYY/month=MM/YYYY-MM-DD.parquet
 func (j *BackupJob) Run(ctx context.Context) {
 	taskID := j.payload.TaskID
 	params := j.payload.Params
@@ -48,9 +49,13 @@ func (j *BackupJob) Run(ctx context.Context) {
 	instrument := params.Instrument
 	startDate := params.StartDate
 	endDate := params.EndDate
+	userID := params.UserID
+	if userID == "" {
+		userID = "1"
+	}
 
-	log.Printf("🚀 [Task #%s] Starting backup for %s (%s) from %s to %s\n",
-		taskID, indexName, securityID, startDate, endDate)
+	log.Printf("🚀 [Task #%s] Starting backup for User #%s, Index %s (%s) from %s to %s\n",
+		taskID, userID, indexName, securityID, startDate, endDate)
 
 	existingProgress, err := j.dbService.GetTaskProgress(ctx, taskID)
 	if err != nil {
@@ -58,7 +63,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 	}
 
 	startProgress := 5
-	if existingProgress > 5 {
+	if existingProgress > 5 && existingProgress < 100 && j.payload.Command != "START" {
 		startProgress = existingProgress
 	}
 
@@ -68,17 +73,8 @@ func (j *BackupJob) Run(ctx context.Context) {
 	}
 	j.broadcastProgress(ctx, taskID, startProgress, "running", 0.0, "")
 
-	outputDir := "/app/data/backups"
-	_ = os.MkdirAll(outputDir, 0755)
-	fileName := fmt.Sprintf("%s_%s_%s.jsonl", indexName, taskID, time.Now().Format("20060102_150405"))
-	fullFilePath := filepath.Join(outputDir, fileName)
-
-	file, err := os.OpenFile(fullFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-	if err != nil {
-		_ = j.dbService.RecordError(ctx, taskID, fmt.Sprintf("failed to create output file: %v", err))
-		return
-	}
-	defer file.Close()
+	baseOutputDir := fmt.Sprintf("/app/data/users/%s/%s_options", userID, strings.ToLower(indexName))
+	_ = os.MkdirAll(baseOutputDir, 0755)
 
 	client := &http.Client{Timeout: 30 * time.Second}
 	baseURL := "https://api.dhan.co/v2/charts/historical"
@@ -108,10 +104,9 @@ func (j *BackupJob) Run(ctx context.Context) {
 	}
 
 	completedChunks := 0
-	if startProgress > 5 {
-		// Reverse the progress formula: progress = 5 + (completed / total) * 90
+	if startProgress > 5 && startProgress < 100 {
 		calculatedCompleted := (startProgress - 5) * totalChunks / 90
-		if calculatedCompleted > 0 && calculatedCompleted <= totalChunks {
+		if calculatedCompleted > 0 && calculatedCompleted < totalChunks {
 			completedChunks = calculatedCompleted
 			log.Printf("⏩ [Task #%s] Resuming from progress %d%% (skipped %d chunks)", taskID, startProgress, completedChunks)
 		}
@@ -122,7 +117,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 		chunkStart = start.AddDate(0, 0, completedChunks*chunkDays)
 	}
 
-	for ; chunkStart.Before(end) || chunkStart.Equal(end); {
+	for chunkStart.Before(end) || chunkStart.Equal(end) {
 		select {
 		case <-ctx.Done():
 			log.Printf("⏸️ [Task #%s] Execution interrupted by control command.\n", taskID)
@@ -147,7 +142,9 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 		jsonBody, err := json.Marshal(reqPayload)
 		if err != nil {
-			log.Printf("⚠️ [Task #%s] Failed to marshal request: %v\n", taskID, err)
+			errStr := fmt.Sprintf("[%s] Request marshal error: %v", time.Now().Format("2006-01-02 15:04:05"), err)
+			log.Printf("⚠️ [Task #%s] %s\n", taskID, errStr)
+			_ = j.dbService.RecordError(ctx, taskID, errStr)
 			completedChunks++
 			chunkStart = chunkEnd.AddDate(0, 0, 1)
 			continue
@@ -155,7 +152,9 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 		req, err := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewBuffer(jsonBody))
 		if err != nil {
-			log.Printf("⚠️ [Task #%s] Failed to create request: %v\n", taskID, err)
+			errStr := fmt.Sprintf("[%s] HTTP request creation error: %v", time.Now().Format("2006-01-02 15:04:05"), err)
+			log.Printf("⚠️ [Task #%s] %s\n", taskID, errStr)
+			_ = j.dbService.RecordError(ctx, taskID, errStr)
 			completedChunks++
 			chunkStart = chunkEnd.AddDate(0, 0, 1)
 			continue
@@ -166,38 +165,83 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Printf("⚠️ [Task #%s] Dhan API request failed: %v\n", taskID, err)
-			time.Sleep(1 * time.Second)
-			completedChunks++
-			chunkStart = chunkEnd.AddDate(0, 0, 1)
-			continue
+			_ = os.RemoveAll(baseOutputDir)
+			errStr := fmt.Sprintf("[%s] Dhan API request failed: %v", time.Now().Format("2006-01-02 15:04:05"), err)
+			log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
+			_ = j.dbService.RecordError(ctx, taskID, errStr)
+			j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
+			return
+		}
+
+		bodyBytes, readErr := io.ReadAll(resp.Body)
+		resp.Body.Close()
+		if readErr != nil {
+			_ = os.RemoveAll(baseOutputDir)
+			errStr := fmt.Sprintf("[%s] Failed to read Dhan API response body: %v", time.Now().Format("2006-01-02 15:04:05"), readErr)
+			log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
+			_ = j.dbService.RecordError(ctx, taskID, errStr)
+			j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
+			return
+		}
+
+		// Pretty-print raw API response in Go terminal logs
+		var prettyJSON bytes.Buffer
+		if jsonErr := json.Indent(&prettyJSON, bodyBytes, "", "  "); jsonErr == nil {
+			log.Printf("\n==================== [DHAN API RESPONSE (HTTP %d)] ====================\n%s\n=======================================================================\n", resp.StatusCode, prettyJSON.String())
+		} else {
+			log.Printf("\n==================== [DHAN API RESPONSE (HTTP %d)] ====================\n%s\n=======================================================================\n", resp.StatusCode, string(bodyBytes))
 		}
 
 		if resp.StatusCode == http.StatusOK {
-			body, err := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			if err != nil {
-				log.Printf("⚠️ [Task #%s] Failed to read response body: %v\n", taskID, err)
-				completedChunks++
-				chunkStart = chunkEnd.AddDate(0, 0, 1)
-				continue
+			candles := parseHistoricalResponse(bodyBytes, indexName)
+			if len(candles) == 0 {
+				_ = os.RemoveAll(baseOutputDir)
+				errStr := fmt.Sprintf("[%s] Dhan API returned 0 candles for date range %s to %s. Check API token / access parameters.", time.Now().Format("2006-01-02 15:04:05"), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
+				log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
+				_ = j.dbService.RecordError(ctx, taskID, errStr)
+				j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
+				return
 			}
 
-			candles := parseHistoricalResponse(body, indexName)
+			// Partition candles by Date into year=YYYY/month=MM/YYYY-MM-DD.parquet
+			candlesByDate := make(map[string][]map[string]interface{})
 			for _, candle := range candles {
-				line, _ := json.Marshal(candle)
-				if _, writeErr := file.Write(line); writeErr != nil {
-					log.Printf("⚠️ [Task #%s] Failed to write candle: %v\n", taskID, writeErr)
+				dateStr, _ := candle["date"].(string)
+				if dateStr != "" {
+					candlesByDate[dateStr] = append(candlesByDate[dateStr], candle)
 				}
-				if _, writeErr := file.WriteString("\n"); writeErr != nil {
-					log.Printf("⚠️ [Task #%s] Failed to write newline: %v\n", taskID, writeErr)
+			}
+
+			for dateStr, dayCandles := range candlesByDate {
+				t, parseErr := time.Parse("2006-01-02", dateStr)
+				if parseErr != nil {
+					continue
+				}
+				partitionDir := filepath.Join(baseOutputDir, fmt.Sprintf("year=%s", t.Format("2006")), fmt.Sprintf("month=%s", t.Format("01")))
+				_ = os.MkdirAll(partitionDir, 0755)
+
+				dayFilePath := filepath.Join(partitionDir, fmt.Sprintf("%s.parquet", dateStr))
+				dayFile, openErr := os.OpenFile(dayFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+				if openErr == nil {
+					for _, candle := range dayCandles {
+						line, _ := json.Marshal(candle)
+						_, _ = dayFile.Write(line)
+						_, _ = dayFile.WriteString("\n")
+					}
+					dayFile.Close()
+				} else {
+					errStr := fmt.Sprintf("[%s] Failed to open day file %s: %v", time.Now().Format("2006-01-02 15:04:05"), dayFilePath, openErr)
+					_ = j.dbService.RecordError(ctx, taskID, errStr)
 				}
 			}
 			log.Printf("📊 [Task #%s] Fetched %d candles for %s to %s\n", taskID, len(candles), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
 		} else {
-			b, _ := io.ReadAll(resp.Body)
-			resp.Body.Close()
-			log.Printf("⚠️ [Task #%s] Dhan API error %d: %s\n", taskID, resp.StatusCode, string(b))
+			_ = os.RemoveAll(baseOutputDir)
+			errStr := fmt.Sprintf("[%s] Dhan API HTTP %d Error: %s", time.Now().Format("2006-01-02 15:04:05"), resp.StatusCode, string(bodyBytes))
+			log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
+			_ = j.dbService.RecordError(ctx, taskID, errStr)
+			j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
+			return
 		}
 
 		completedChunks++
@@ -207,25 +251,38 @@ func (j *BackupJob) Run(ctx context.Context) {
 		}
 		log.Printf("📊 [Task #%s] Progress: %d%%\n", taskID, progress)
 		_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
-		j.broadcastProgress(ctx, taskID, progress, "running", 0.0, "")
+		j.broadcastProgress(ctx, taskID, progress, "running", 0.0, baseOutputDir)
 
 		chunkStart = chunkEnd.AddDate(0, 0, 1)
 		time.Sleep(1 * time.Second)
 	}
 
-	fileInfo, err := os.Stat(fullFilePath)
-	var fileSizeMB float64 = 0.0
-	if err == nil {
-		fileSizeMB = float64(fileInfo.Size()) / (1024 * 1024)
-	}
+	var totalSizeBytes int64 = 0
+	_ = filepath.Walk(baseOutputDir, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			totalSizeBytes += info.Size()
+		}
+		return nil
+	})
 
-	if err := j.dbService.MarkTaskComplete(ctx, taskID, fullFilePath, fileSizeMB); err != nil {
-		log.Printf("❌ [Task #%s] Failed to mark completion: %v\n", taskID, err)
-		j.broadcastProgress(ctx, taskID, 0, "error", fileSizeMB, fullFilePath)
+	if totalSizeBytes == 0 {
+		_ = os.RemoveAll(baseOutputDir)
+		errStr := fmt.Sprintf("[%s] Backup Task #%s failed: 0 candles written. Check Dhan API client ID, access token, or credentials.", time.Now().Format("2006-01-02 15:04:05"), taskID)
+		log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
+		_ = j.dbService.RecordError(ctx, taskID, errStr)
+		j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
 		return
 	}
-	log.Printf("✅ [Task #%s] Completed! Output: %s (%.2f MB)\n", taskID, fullFilePath, fileSizeMB)
-	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, fullFilePath)
+
+	fileSizeMB := float64(totalSizeBytes) / (1024 * 1024)
+
+	if err := j.dbService.MarkTaskComplete(ctx, taskID, baseOutputDir, fileSizeMB); err != nil {
+		log.Printf("❌ [Task #%s] Failed to mark completion: %v\n", taskID, err)
+		j.broadcastProgress(ctx, taskID, 0, "error", fileSizeMB, baseOutputDir)
+		return
+	}
+	log.Printf("✅ [Task #%s] Completed! Partitioned output: %s (%.2f MB)\n", taskID, baseOutputDir, fileSizeMB)
+	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, baseOutputDir)
 }
 
 func (j *BackupJob) broadcastProgress(ctx context.Context, taskID string, progress int, status string, fileSizeMB float64, filePath string) {

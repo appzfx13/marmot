@@ -1,64 +1,127 @@
-<form id="login-form"
-      hx-post="{% url 'admins:admin-login' %}" 
-      hx-target="#login-form" 
-      hx-swap="outerHTML" 
-      novalidate>
+<form id="login-form" hx-post="{% url 'admins:admin-login' %}" hx-target="#login-form" hx-swap="outerHTML" novalidate>
     {% csrf_token %}
 
+    <style>
+        .curved-input-group {
+            border-radius: 16px;
+            overflow: hidden;
+            border: 1px solid var(--input-border);
+            background: var(--input-bg);
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        .curved-input-group:focus-within {
+            border-color: var(--text-title);
+            box-shadow: 0 0 0 3px var(--toggle-border);
+        }
+
+        .curved-input-icon {
+            background: transparent !important;
+            border: none !important;
+            color: var(--text-subtitle) !important;
+            padding-left: 16px;
+            padding-right: 12px;
+            transition: color 0.25s ease;
+        }
+
+        .curved-input-group:focus-within .curved-input-icon {
+            color: var(--text-title) !important;
+        }
+
+        .curved-input {
+            background: transparent !important;
+            border: none !important;
+            color: var(--input-text) !important;
+            box-shadow: none !important;
+            padding: 12px 14px 12px 0;
+            font-size: 0.95rem;
+        }
+
+        .curved-input::placeholder {
+            color: var(--input-placeholder) !important;
+        }
+
+        .password-toggle-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-subtitle);
+            padding: 0 16px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: color 0.2s ease;
+        }
+
+        .password-toggle-btn:hover {
+            color: var(--text-title);
+        }
+    </style>
+
     {% if form.non_field_errors %}
-        <div class="alert alert-danger border-0 bg-danger bg-opacity-25 text-white py-2 small mb-4 rounded-3 d-flex align-items-center">
-            <span class="material-icons me-2 fs-6">error_outline</span>
-            <div>
-                {% for error in form.non_field_errors %}
-                    <div>{{ error }}</div>
-                {% endfor %}
-            </div>
+    <div class="alert alert-danger border-0 bg-danger bg-opacity-25 text-white py-2 px-3 small mb-4 rounded-3 d-flex align-items-center">
+        <span class="material-icons me-2 fs-6">error_outline</span>
+        <div class="text-start">
+            {% for error in form.non_field_errors %}
+            <div>{{ error }}</div>
+            {% endfor %}
         </div>
+    </div>
     {% endif %}
 
     <div class="mb-3 text-start">
         <label for="id_username" class="form-label theme-label small fw-medium">Admin Username</label>
-        <div class="input-group">
-            <span class="input-group-text theme-input-icon border-end-0">
+        <div class="input-group curved-input-group">
+            <span class="input-group-text curved-input-icon">
                 <span class="material-icons fs-5">admin_panel_settings</span>
             </span>
-            <input type="text" 
-                   name="username" 
-                   id="id_username" 
-                   class="form-control theme-input border-start-0 ps-0" 
-                   placeholder="Enter admin username"
-                   value="{{ form.username.value|default:'' }}" 
-                   required>
+            <input type="text" name="username" id="id_username" class="form-control curved-input"
+                placeholder="Enter admin username" value="{{ form.username.value|default:'' }}" required autocomplete="username">
         </div>
         {% if form.username.errors %}
-            <div class="text-danger small mt-1 d-flex align-items-center">
-                <span class="material-icons fs-6 me-1">warning</span>{{ form.username.errors.0 }}
-            </div>
+        <div class="text-danger small mt-1 d-flex align-items-center">
+            <span class="material-icons fs-6 me-1">warning</span>{{ form.username.errors.0 }}
+        </div>
         {% endif %}
     </div>
 
     <div class="mb-4 text-start">
         <label for="id_password" class="form-label theme-label small fw-medium">Password</label>
-        <div class="input-group">
-            <span class="input-group-text theme-input-icon border-end-0">
+        <div class="input-group curved-input-group">
+            <span class="input-group-text curved-input-icon">
                 <span class="material-icons fs-5">lock</span>
             </span>
-            <input type="password" 
-                   name="password" 
-                   id="id_password" 
-                   class="form-control theme-input border-start-0 ps-0" 
-                   placeholder="••••••••" 
-                   required>
+            <input type="password" name="password" id="id_password" class="form-control curved-input"
+                placeholder="••••••••" required autocomplete="current-password">
+            <button type="button" class="password-toggle-btn" id="togglePasswordBtn" aria-label="Toggle password visibility">
+                <span class="material-icons fs-5" id="togglePasswordIcon">visibility_off</span>
+            </button>
         </div>
         {% if form.password.errors %}
-            <div class="text-danger small mt-1 d-flex align-items-center">
-                <span class="material-icons fs-6 me-1">warning</span>{{ form.password.errors.0 }}
-            </div>
+        <div class="text-danger small mt-1 d-flex align-items-center">
+            <span class="material-icons fs-6 me-1">warning</span>{{ form.password.errors.0 }}
+        </div>
         {% endif %}
     </div>
 
-    <button type="submit" class="btn theme-btn-primary w-100 fw-bold py-2 shadow-sm d-flex align-items-center justify-content-center">
+    <button type="submit" class="btn theme-btn-primary w-100 fw-bold py-2.5 shadow-sm d-flex align-items-center justify-content-center">
         <span>Admin Sign In</span>
         <span class="material-icons ms-2 fs-5">arrow_forward</span>
     </button>
 </form>
+
+<script>
+    (function() {
+        const toggleBtn = document.getElementById('togglePasswordBtn');
+        const passwordInput = document.getElementById('id_password');
+        const toggleIcon = document.getElementById('togglePasswordIcon');
+
+        if (toggleBtn && passwordInput && toggleIcon) {
+            toggleBtn.addEventListener('click', function() {
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+                toggleIcon.textContent = isPassword ? 'visibility' : 'visibility_off';
+            });
+        }
+    })();
+</script>

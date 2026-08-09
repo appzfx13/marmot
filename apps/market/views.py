@@ -1,8 +1,11 @@
+import io
 import json
+import os
+import zipfile
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponse, JsonResponse, HttpResponseRedirect
+from django.http import HttpResponse, JsonResponse, HttpResponseRedirect, FileResponse, Http404
 from django.shortcuts import render
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, DetailView, DeleteView, View
@@ -74,7 +77,7 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
     form_class = MarketBackupForm
     template_name = 'admins/backup_form.html'
     success_url = reverse_lazy('market:market_backup_list')
-    success_message = "Market backup job initialized successfully. Engine is starting..."
+    success_message = "Market backup entry created successfully. Click 'Start' in the dashboard to begin download."
 
     def form_valid(self, form):
         # Override standard save to use our Service Layer
@@ -105,6 +108,46 @@ class MarketBackupDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context = super().get_context_data(**kwargs)
         context['ws_url'] = settings.MARMOT_WS_URL
         return context
+
+
+class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Packs date-partitioned Parquet datasets into a ZIP archive and streams it to the user."""
+    def get(self, request, pk, *args, **kwargs):
+        task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
+        if not task or not task.parquet_file_path:
+            raise Http404("Backup storage directory path not found.")
+
+        target_path = task.parquet_file_path
+
+        if not os.path.exists(target_path):
+            user_id = str(task.created_by.id if getattr(task, 'created_by', None) else 1)
+            index_name = task.index_name.lower()
+            alt_path = os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', user_id, f"{index_name}_options")
+            if os.path.exists(alt_path):
+                target_path = alt_path
+            else:
+                filename = os.path.basename(target_path)
+                alt_path_backup = os.path.join(settings.BASE_DIR, 'go-app', 'data', 'backups', filename)
+                if os.path.exists(alt_path_backup):
+                    target_path = alt_path_backup
+                else:
+                    raise Http404("Backup data directory or file not found on disk.")
+
+        zip_buffer = io.BytesIO()
+        zip_filename = f"{task.index_name.lower()}_options_task_{task.id}.zip"
+
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            if os.path.isdir(target_path):
+                for root, _, files in os.walk(target_path):
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(full_path, target_path)
+                        zip_file.write(full_path, arcname=rel_path)
+            else:
+                zip_file.write(target_path, arcname=os.path.basename(target_path))
+
+        zip_buffer.seek(0)
+        return FileResponse(zip_buffer, as_attachment=True, filename=zip_filename)
 
 
 class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -200,5 +243,23 @@ class MarketBackupDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixi
             'reloadBackupTable': True
         })
         return response
+
+
+class BacktestDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
+    """
+    Backtest Management View (Placeholder page for strategy backtesting).
+    """
+    model = MarketBackupTask
+    template_name = 'admins/backtest_dashboard.html'
+    context_object_name = 'backtests'
+    paginate_by = settings.PAGINATION_COUNT
+
+    def get_queryset(self):
+        return MarketBackupTask.objects.filter(is_deleted=False, status=MarketBackupTask.StatusChoices.COMPLETED)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = "Backtest Management"
+        return context
 
 

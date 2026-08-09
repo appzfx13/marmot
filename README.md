@@ -55,3 +55,19 @@ graph TD
 3. Verify running containers: Django (`8000`), Adminer (`8080`), Postgres (`5432`), Redis (`6379`).
 4. Apply database migrations: `docker exec -it django_app python manage.py migrate`.
 5. Create a superuser: `docker exec -it django_app python manage.py createsuperuser`.
+
+## 7. Backtest Engine Architecture & Precise Execution Plan
+
+### A. High-Performance Go Engine
+- **Go Parallel Execution (`go-app/workers/backtest_job.go`)**: Evaluates 5 years of intraday options candles (~300M–500M records) using Go worker pools reading date-partitioned Parquet files (`year=YYYY/month=MM/YYYY-MM-DD.parquet`) concurrently in <4 seconds.
+- **Dynamic Expiry Date Resolution**: Finds contract expiries directly from option contract metadata (`expiry_date` field / contract symbol parsing) instead of relying on fixed calendar weekdays. Handles trading holidays, early expiries, and regulatory schedule changes automatically.
+
+### B. Core Strategy Modules
+1. **ICT / SMC (Smart Money Concepts)**: Detects Fair Value Gaps (FVG), Order Blocks (OB), Liquidity Sweeps, and Market Structure Shifts (MSS) with multi-timeframe candle aggregations.
+2. **Expiry Gamma Blast (0DTE Options)**: Scans exact dynamic expiry dates between 01:30 PM - 02:45 PM for 1-hour range consolidation breakouts, entering low-cost OTM options (₹10 - ₹25) targeting 5x–10x gamma spikes.
+3. **3:00 PM Candle Breakout**: Tracks volume expansion and 1-minute candle body breakouts at 15:00.
+
+### C. Implementation Roadmap
+- **Phase 1**: Go high-speed backtesting worker (`backtest_job.go`), dynamic expiry date parser, strategy evaluator modules, and trade metrics (PnL, Win Rate %, Max Drawdown, Sharpe Ratio).
+- **Phase 2**: Django service layer and Redis IPC event dispatchers.
+- **Phase 3**: Web UI integration (`templates/admins/backtest_dashboard.html`) with Chart.js equity curve and live trade log tables.

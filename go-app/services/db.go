@@ -88,11 +88,18 @@ func (s *DBService) MarkTaskComplete(ctx context.Context, taskID string, filePat
 	return nil
 }
 
-// RecordError updates task status to 'error' and writes timestamped error details
+// RecordError updates task status to 'error', resets file path/size to NULL/0.0, and appends timestamped error details
 func (s *DBService) RecordError(ctx context.Context, taskID string, errorMsg string) error {
 	query := fmt.Sprintf(`
 		UPDATE %s 
-		SET status = 'error', error_logs = $1, updated_at = $2 
+		SET status = 'error', 
+		    parquet_file_path = NULL,
+		    file_size_mb = 0.0,
+		    error_logs = CASE 
+		        WHEN error_logs IS NULL OR error_logs = '' THEN $1 
+		        ELSE error_logs || E'\n' || $1 
+		    END, 
+		    updated_at = $2 
 		WHERE id = $3
 	`, s.TableName)
 

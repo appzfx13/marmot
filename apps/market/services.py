@@ -18,37 +18,16 @@ INDEX_INSTRUMENT_MAP = {
 
 def create_and_start_backup_task(start_date, end_date, index_name, strike_count, user):
     """
-    Creates the backup record in Postgres and signals the Go Engine via Redis to start.
+    Creates the backup record in Postgres in CREATED status without auto-starting the engine.
     """
-    # 1. Create the Shared DB State
     task = MarketBackupTask.objects.create(
         start_date=start_date,
         end_date=end_date,
         index_name=index_name,
         strike_count=strike_count,
-        status=MarketBackupTask.StatusChoices.PENDING,
-        created_by=user  # Assuming your BaseModel handles 'created_by'
+        status=MarketBackupTask.StatusChoices.CREATED,
+        created_by=user
     )
-    
-    # 2. Build the Payload for the Go Engine
-    index_params = INDEX_INSTRUMENT_MAP.get(task.index_name, {})
-    payload = {
-        "task_id": str(task.id),
-        "command": "START",
-        "params": {
-            "start_date": task.start_date.isoformat(),
-            "end_date": task.end_date.isoformat(),
-            "index_name": task.index_name,
-            "strike_count": task.strike_count,
-            "security_id": index_params.get("security_id", ""),
-            "exchange_segment": index_params.get("exchange_segment", ""),
-            "instrument": index_params.get("instrument", "")
-        }
-    }
-    
-    # 3. Publish to Redis IPC
-    redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
-    
     return task
 
 def send_control_command(task_id, command):
@@ -58,7 +37,7 @@ def send_control_command(task_id, command):
     # Ensure the task exists and update the local DB status first
     task = MarketBackupTask.objects.get(id=task_id)
     
-    valid_commands = ['PAUSE', 'RESUME', 'CANCEL']
+    valid_commands = ['PAUSE', 'RESUME', 'START', 'CANCEL']
     if command.upper() not in valid_commands:
         raise ValueError(f"Invalid command. Must be one of {valid_commands}")
 
@@ -67,11 +46,9 @@ def send_control_command(task_id, command):
         task.status = MarketBackupTask.StatusChoices.PAUSED
     elif command.upper() == 'CANCEL':
         task.status = MarketBackupTask.StatusChoices.CANCELLED
-    elif command.upper() == 'RESUME':
+    elif command.upper() in ['RESUME', 'START']:
         task.status = MarketBackupTask.StatusChoices.RUNNING
     task.save(update_fields=['status'])
-
-    print("ccccccccccccccccccccccccccc", command.upper())
 
     index_params = INDEX_INSTRUMENT_MAP.get(task.index_name, {})
     
@@ -89,7 +66,8 @@ def send_control_command(task_id, command):
             "strike_count": task.strike_count,
             "security_id": index_params.get("security_id", ""),
             "exchange_segment": index_params.get("exchange_segment", ""),
-            "instrument": index_params.get("instrument", "")
+            "instrument": index_params.get("instrument", ""),
+            "user_id": str(task.created_by.id if getattr(task, 'created_by', None) else 1)
         }
 
     redis_client.publish(REDIS_CHANNEL, json.dumps(payload))

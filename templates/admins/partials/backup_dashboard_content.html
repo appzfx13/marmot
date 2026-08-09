@@ -90,6 +90,8 @@
                             <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
                         {% elif backup.status == 'running' %}
                             <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>
+                        {% elif backup.status == 'created' %}
+                            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1">Created</span>
                         {% elif backup.status == 'paused' %}
                             <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>
                         {% elif backup.status == 'cancelled' or backup.status == 'error' %}
@@ -98,6 +100,11 @@
                             <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">Pending</span>
                         {% endif %}
                         </span>
+                        {% if backup.error_logs %}
+                        <div class="small text-danger mt-1 text-truncate" style="max-width: 170px;" title="{{ backup.error_logs }}">
+                            <span class="material-icons fs-6 me-1 align-middle">error_outline</span>{{ backup.get_last_200_logs|truncatechars:40 }}
+                        </div>
+                        {% endif %}
                     </td>
 
                     <td class="text-end pe-4 py-3 bg-transparent">
@@ -130,6 +137,15 @@
                                title="View Details">
                                 <span class="material-icons fs-6">visibility</span>
                             </a>
+
+                            {% if backup.parquet_file_path and backup.status != 'error' and backup.file_size_mb > 0 %}
+                            <a href="{% url 'market:market_backup_download' backup.pk %}" 
+                               class="glass-icon-btn text-primary text-decoration-none rounded-circle d-flex align-items-center justify-content-center" 
+                               style="width: 36px; height: 36px;" 
+                               title="Download Backup ZIP">
+                                <span class="material-icons fs-6">download</span>
+                            </a>
+                            {% endif %}
                             
                             <button type="button" 
                                     class="glass-icon-btn text-danger border-0 rounded-circle d-flex align-items-center justify-content-center" 
@@ -256,6 +272,7 @@
                 const statusMap = {
                     'completed': '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>',
                     'running': '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>',
+                    'created': '<span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1">Created</span>',
                     'paused': '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>',
                     'cancelled': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Cancelled</span>',
                     'error': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Error</span>',
