@@ -60,13 +60,9 @@ services:
     env_file:
       - .env
     environment:
-      # Mapping the .env variables so Django understands them
+      # DB_* variables read directly from .env file
       - DB_ENGINE=django.db.backends.postgresql
-      - DB_NAME=${POSTGRES_DB}
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
       - DB_HOST=db
-      - DB_PORT=${POSTGRES_PORT}
     stdin_open: true
     tty: true
     depends_on:
@@ -91,12 +87,8 @@ services:
     env_file:
       - .env
     environment:
-      # Mapping the .env variables so Go understands them
-      - DB_NAME=${POSTGRES_DB}
-      - DB_USER=${POSTGRES_USER}
-      - DB_PASSWORD=${POSTGRES_PASSWORD}
+      # DB_* variables read directly from .env file
       - DB_HOST=db
-      - DB_PORT=${POSTGRES_PORT}
     depends_on:
       db:
         condition: service_healthy

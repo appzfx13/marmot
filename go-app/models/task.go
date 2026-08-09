@@ -6,6 +6,7 @@ import "time"
 type TaskParams struct {
 	StartDate       string                 `json:"start_date"`
 	EndDate         string                 `json:"end_date"`
+	ExpiryDate      string                 `json:"expiry_date"`   // Option expiry date (YYYY-MM-DD), empty for INDEX tasks
 	IndexName       string                 `json:"index_name"`
 	SecurityID      string                 `json:"security_id"`
 	ExchangeSegment string                 `json:"exchange_segment"`
