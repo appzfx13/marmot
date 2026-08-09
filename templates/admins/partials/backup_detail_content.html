@@ -1,7 +1,7 @@
 <div class="row g-4"
      id="backup-detail-container"
      hx-get="{% url 'market:market_backup_detail' backup.pk %}"
-     hx-trigger="reloadBackupDetail from:body{% if backup.status == 'running' or backup.status == 'pending' %}, every 2s [!document.querySelector('#globalHtmxModal.show')]{% endif %}"
+     hx-trigger="reloadBackupDetail from:body"
      hx-target="#backup-detail-container"
      hx-swap="outerHTML">
     <!-- Configuration Metrics Card -->
@@ -23,7 +23,7 @@
             </div>
             <div class="mb-3 d-flex justify-content-between">
                 <span class="theme-text-muted">Current Status:</span>
-                <span>
+                <span id="backup-status-badge">
                     {% if backup.status == 'completed' %}
                         <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3">Completed</span>
                     {% elif backup.status == 'running' %}
@@ -39,11 +39,11 @@
             </div>
             <div class="mb-3 d-flex justify-content-between">
                 <span class="theme-text-muted">Parquet Storage:</span>
-                <span class="theme-text-main fw-semibold">{{ backup.file_size_mb }} MB</span>
+                <span class="theme-text-main fw-semibold" id="backup-file-size">{{ backup.file_size_mb }} MB</span>
             </div>
             <div class="mb-0 d-flex justify-content-between">
                 <span class="theme-text-muted">File Path:</span>
-                <span class="theme-text-main text-truncate" style="max-width: 250px;" title="{{ backup.parquet_file_path|default:'N/A' }}">{{ backup.parquet_file_path|default:"N/A" }}</span>
+                <span class="theme-text-main text-truncate" style="max-width: 250px;" id="backup-file-path" title="{{ backup.parquet_file_path|default:'N/A' }}">{{ backup.parquet_file_path|default:"N/A" }}</span>
             </div>
         </div>
     </div>
@@ -57,17 +57,20 @@
                 <div class="mb-3">
                     <div class="d-flex justify-content-between text-muted small mb-2">
                         <span>Completion Rate</span>
-                        <span class="fw-bold theme-text-main">{{ backup.progress }}%</span>
+                        <span class="fw-bold theme-text-main" id="backup-progress-text">{{ backup.progress }}%</span>
                     </div>
                     <div class="progress" style="height: 10px; background-color: var(--border-color);">
                         <div class="progress-bar bg-primary progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %}" 
+                             id="backup-progress-bar"
                              role="progressbar" 
-                             style="width: {{ backup.progress }}%;"></div>
+                             style="width: {{ backup.progress }}%;"
+                             aria-valuenow="{{ backup.progress }}" aria-valuemin="0" aria-valuemax="100">
+                        </div>
                     </div>
                 </div>
 
                 {% if backup.error_logs %}
-                <div class="mt-4">
+                <div class="mt-4" id="backup-error-logs">
                     <label class="theme-text-muted small fw-semibold">Error Trace Logs:</label>
                     <pre class="bg-dark text-danger p-3 rounded-3 small mt-1 border border-secondary border-opacity-25" style="max-height: 150px; overflow-y: auto;">{{ backup.error_logs }}</pre>
                 </div>
@@ -81,6 +84,7 @@
                 <button type="button"
                         hx-get="{% url 'market:market_backup_control' backup.pk %}?action=pause"
                         hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
                         class="btn btn-warning rounded-pill px-4 flex-grow-1 fw-semibold d-flex align-items-center justify-content-center gap-1">
                     <span class="material-icons fs-6">pause</span> Pause Task
                 </button>
@@ -89,6 +93,7 @@
                 <button type="button"
                         hx-get="{% url 'market:market_backup_control' backup.pk %}?action=resume"
                         hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
                         class="btn btn-success rounded-pill px-4 flex-grow-1 fw-semibold d-flex align-items-center justify-content-center gap-1">
                     <span class="material-icons fs-6">play_arrow</span> Start / Resume
                 </button>
@@ -98,6 +103,7 @@
                 <button type="button"
                         hx-get="{% url 'market:market_backup_control' backup.pk %}?action=stop"
                         hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
                         class="btn btn-outline-danger rounded-pill px-3 d-flex align-items-center justify-content-center"
                         title="Stop / Cancel Task">
                     <span class="material-icons fs-6">stop</span>
@@ -106,3 +112,73 @@
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    const taskID = "{{ backup.pk }}";
+    const container = document.getElementById('backup-detail-container');
+
+    function applyDetailUpdate(data) {
+        const progressBar = document.getElementById('backup-progress-bar');
+        const progressText = document.getElementById('backup-progress-text');
+        const statusBadge = document.getElementById('backup-status-badge');
+        const fileSizeEl = document.getElementById('backup-file-size');
+        const filePathEl = document.getElementById('backup-file-path');
+        const errorLogsEl = document.getElementById('backup-error-logs');
+
+        if (progressBar) {
+            progressBar.style.width = data.progress + '%';
+            progressBar.setAttribute('aria-valuenow', data.progress);
+            if (data.status === 'running') {
+                progressBar.classList.add('progress-bar-animated');
+            } else {
+                progressBar.classList.remove('progress-bar-animated');
+            }
+        }
+        if (progressText) progressText.textContent = data.progress + '%';
+
+        if (statusBadge) {
+            const statusMap = {
+                'completed': '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3">Completed</span>',
+                'running': '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3">Running</span>',
+                'paused': '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3">Paused</span>',
+                'cancelled': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3">Cancelled</span>',
+                'error': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3">Error</span>',
+                'pending': '<span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3">Pending</span>'
+            };
+            statusBadge.innerHTML = statusMap[data.status] || statusMap['pending'];
+        }
+
+        if (fileSizeEl && data.file_size_mb !== undefined) {
+            fileSizeEl.textContent = parseFloat(data.file_size_mb).toFixed(2) + ' MB';
+        }
+        if (filePathEl && data.file_path) {
+            filePathEl.textContent = data.file_path;
+            filePathEl.title = data.file_path;
+        }
+        if (errorLogsEl && data.error) {
+            errorLogsEl.innerHTML = '<label class="theme-text-muted small fw-semibold">Error Trace Logs:</label>' +
+                '<pre class="bg-dark text-danger p-3 rounded-3 small mt-1 border border-secondary border-opacity-25" style="max-height: 150px; overflow-y: auto;">' + data.error + '</pre>';
+        }
+    }
+
+    function initDetailSubscription() {
+        if (window.MarmotWS && window.MarmotWS.url) {
+            window.MarmotWS.unsubscribe(taskID);
+            window.MarmotWS.subscribe(taskID, applyDetailUpdate);
+            console.log('[Detail] Subscribed to task', taskID, 'via WebSocket');
+        } else {
+            console.warn('[Detail] WebSocket manager not available for task', taskID, '- using HTMX fallback');
+            setInterval(function() {
+                if (container) container.dispatchEvent(new CustomEvent('reloadBackupDetail'));
+            }, 3000);
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initDetailSubscription);
+    } else {
+        initDetailSubscription();
+    }
+})();
+</script>

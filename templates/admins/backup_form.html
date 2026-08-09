@@ -217,7 +217,7 @@
                 CANCEL
             </a>
             <!-- Trigger Modal Button -->
-            <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#confirmInitModal">
+            <button type="button" id="initBackupBtn" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm">
                 INITIALIZE BACKUP
             </button>
         </div>
@@ -256,6 +256,38 @@
     document.addEventListener('DOMContentLoaded', function() {
         const confirmBtn = document.getElementById('confirmSubmitBtn');
         const form = document.getElementById('backupForm');
+        const initBtn = document.getElementById('initBackupBtn');
+
+        if (initBtn) {
+            initBtn.addEventListener('click', function(e) {
+                const startDateStr = document.querySelector('input[name="start_date"]').value;
+                const endDateStr = document.querySelector('input[name="end_date"]').value;
+                
+                // Clear any previous custom errors
+                const prevError = document.getElementById('date-validation-error');
+                if (prevError) prevError.remove();
+
+                if (startDateStr && endDateStr) {
+                    const start = new Date(startDateStr);
+                    const end = new Date(endDateStr);
+                    if (start >= end) {
+                        // Show error message under end date
+                        const errorDiv = document.createElement('div');
+                        errorDiv.id = 'date-validation-error';
+                        errorDiv.className = 'text-danger small mt-1 d-flex align-items-center gap-1';
+                        errorDiv.innerHTML = '<span class="material-icons fs-6">error_outline</span>Start date must be earlier than end date.';
+                        
+                        const endDateContainer = document.querySelector('input[name="end_date"]').parentElement;
+                        endDateContainer.appendChild(errorDiv);
+                        return; // Stop here, do not open modal
+                    }
+                }
+                
+                // If valid, open the modal manually
+                var confirmModal = new bootstrap.Modal(document.getElementById('confirmInitModal'));
+                confirmModal.show();
+            });
+        }
 
         if (confirmBtn && form) {
             confirmBtn.addEventListener('click', function() {

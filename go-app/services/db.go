@@ -44,6 +44,34 @@ func (s *DBService) UpdateTaskProgress(ctx context.Context, taskID string, statu
 	return nil
 }
 
+// UpdateTaskStatus updates only the status
+func (s *DBService) UpdateTaskStatus(ctx context.Context, taskID string, status string) error {
+	query := fmt.Sprintf(`
+		UPDATE %s 
+		SET status = $1, updated_at = $2 
+		WHERE id = $3
+	`, s.TableName)
+
+	_, err := s.Pool.Exec(ctx, query, status, time.Now(), taskID)
+	if err != nil {
+		log.Printf("❌ DB Update Status Error [Task %s]: %v\n", taskID, err)
+		return err
+	}
+	return nil
+}
+
+// GetTaskProgress retrieves the current progress percentage from the DB
+func (s *DBService) GetTaskProgress(ctx context.Context, taskID string) (int, error) {
+	query := fmt.Sprintf(`SELECT progress FROM %s WHERE id = $1`, s.TableName)
+	var progress int
+	err := s.Pool.QueryRow(ctx, query, taskID).Scan(&progress)
+	if err != nil {
+		log.Printf("❌ DB Get Progress Error [Task %s]: %v\n", taskID, err)
+		return 0, err
+	}
+	return progress, nil
+}
+
 // MarkTaskComplete marks job as completed, sets progress to 100%, and updates file details
 func (s *DBService) MarkTaskComplete(ctx context.Context, taskID string, filePath string, fileSizeMB float64) error {
 	query := fmt.Sprintf(`

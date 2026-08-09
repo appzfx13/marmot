@@ -54,11 +54,18 @@ class MarketBackupListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMi
         context = super().get_context_data(**kwargs)
         context['page_title'] = "Market Backup Management"
         context['current_sort'] = self.request.GET.get('sort', '-created_at').strip()
+        context['ws_url'] = settings.MARMOT_WS_URL
         
         query_params = self.request.GET.copy()
         query_params.pop('page', None)
         query_params.pop('sort', None)
         context['current_filters'] = query_params.urlencode()
+        
+        backups = context.get('backups')
+        if backups is not None:
+            context['has_active_tasks'] = any(b.status in ['running', 'pending'] for b in backups)
+        else:
+            context['has_active_tasks'] = False
         return context
 
 
@@ -93,6 +100,11 @@ class MarketBackupDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
 
     def get_queryset(self):
         return super().get_queryset().filter(is_deleted=False)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['ws_url'] = settings.MARMOT_WS_URL
+        return context
 
 
 class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):

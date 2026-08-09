@@ -21,6 +21,8 @@ DEBUG = os.getenv('DEBUG', 'True').lower() in ('true', '1', 't')
 
 ALLOWED_HOSTS = ['*']
 
+MARMOT_WS_URL = os.getenv('MARMOT_WS_URL', 'ws://localhost:8082/ws')
+
 APPEND_SLASH = True
 
 # Application definition

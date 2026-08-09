@@ -9,21 +9,24 @@ import (
 	"go-app/config"
 	"go-app/models"
 	"go-app/services"
+	"go-app/ws"
 )
 
 // TaskManager handles the lifecycle of backup tasks and listens for IPC commands
 type TaskManager struct {
 	dbService *services.DBService
 	config    *config.Config
+	hub       *ws.Hub
 	activeCtx map[string]context.CancelFunc
 	mu        sync.Mutex
 }
 
 // NewTaskManager creates a new instance of TaskManager
-func NewTaskManager(dbService *services.DBService, cfg *config.Config) *TaskManager {
+func NewTaskManager(dbService *services.DBService, cfg *config.Config, hub *ws.Hub) *TaskManager {
 	return &TaskManager{
 		dbService: dbService,
 		config:    cfg,
+		hub:       hub,
 		activeCtx: make(map[string]context.CancelFunc),
 	}
 }
@@ -105,7 +108,7 @@ func (m *TaskManager) pauseTask(taskID string) {
 
 	// We don't reset progress to 0 for pause, so it can resume where it left off
 	// (Assuming your UI expects progress to stay where it was)
-	_ = m.dbService.UpdateTaskProgress(context.Background(), taskID, "paused", 0) 
+	_ = m.dbService.UpdateTaskStatus(context.Background(), taskID, "paused") 
 }
 
 // cancelTask cancels the task's context, cleans up map, and updates DB state
@@ -123,14 +126,12 @@ func (m *TaskManager) cancelTask(taskID string) {
 
 // runWorkerWrapper creates the job, runs it, and cleans up the active tracking map when done
 func (m *TaskManager) runWorkerWrapper(ctx context.Context, payload models.CommandPayload) {
-	// Defer cleanup to ensure the map is cleared whether the job finishes naturally, errors, or is cancelled
 	defer func() {
 		m.mu.Lock()
 		delete(m.activeCtx, payload.TaskID)
 		m.mu.Unlock()
 	}()
 
-	// Initialize and run the backup pipeline
-	job := NewBackupJob(m.dbService, m.config, payload)
+	job := NewBackupJob(m.dbService, m.config, payload, m.hub)
 	job.Run(ctx)
 }

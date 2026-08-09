@@ -1,6 +1,7 @@
 package ws
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -47,8 +48,20 @@ func (c *Client) readPump() {
 			}
 			break
 		}
-		// Simply broadcast back as a ping/echo or allow specific logic
-		c.hub.Broadcast <- message
+
+		var subMsg SubscriptionMessage
+		if err := json.Unmarshal(message, &subMsg); err == nil {
+			switch subMsg.Type {
+			case "subscribe":
+				c.hub.Subscribe <- &TaskSubscription{TaskID: subMsg.TaskID, Client: c}
+			case "unsubscribe":
+				c.hub.Unsubscribe <- &TaskSubscription{TaskID: subMsg.TaskID, Client: c}
+			default:
+				c.hub.Broadcast <- message
+			}
+		} else {
+			c.hub.Broadcast <- message
+		}
 	}
 }
 

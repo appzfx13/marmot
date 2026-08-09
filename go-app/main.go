@@ -42,16 +42,16 @@ func main() {
 	}
 	defer redisService.Close()
 
-	// 5. Initialize Task Manager
-	taskManager := workers.NewTaskManager(dbService, cfg)
-
-	// 6. Start Listening for Django IPC Commands on Redis Channel
-	redisChannel := "market_backup_commands"
-	go taskManager.StartListener(ctx, redisService, redisChannel)
-
-	// 7. Initialize WebSocket Hub
+	// 5. Initialize WebSocket Hub
 	hub := ws.NewHub()
 	go hub.Run()
+
+	// 6. Initialize Task Manager
+	taskManager := workers.NewTaskManager(dbService, cfg, hub)
+
+	// 7. Start Listening for Django IPC Commands on Redis Channel
+	redisChannel := "market_backup_commands"
+	go taskManager.StartListener(ctx, redisService, redisChannel)
 
 	// 8. Start HTTP Server for WebSockets
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

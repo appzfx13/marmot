@@ -391,8 +391,10 @@
             if (evt.detail.target.id === 'globalHtmxModalDialog') {
                 const modalEl = document.getElementById('globalHtmxModal');
                 if (modalEl) {
-                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                    modal.show();
+                    requestAnimationFrame(function() {
+                        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                        modal.show();
+                    });
                 }
             }
         });
@@ -509,6 +511,99 @@
             if (sidebarToggleBtn) sidebarToggleBtn.addEventListener('click', toggleSidebar);
             if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeMobileSidebar);
             if (overlay) overlay.addEventListener('click', closeMobileSidebar);
+        })();
+        
+        (function() {
+            const wsUrl = "{{ ws_url|default:'' }}";
+            if (!wsUrl) return;
+            
+            window.MarmotWS = {
+                ws: null,
+                url: wsUrl,
+                subscribers: {},
+                callbacks: {},
+                reconnectDelay: 3000,
+                useFallback: false,
+                fallbackIntervals: {},
+                
+                connect: function() {
+                    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+                        return;
+                    }
+                    try {
+                        this.ws = new WebSocket(this.url);
+                        this.ws.onopen = function() {
+                            console.log('[WS] Connected to', window.MarmotWS.url);
+                            window.MarmotWS.useFallback = false;
+                            Object.keys(window.MarmotWS.subscribers).forEach(function(taskId) {
+                                window.MarmotWS.ws.send(JSON.stringify({type: 'subscribe', task_id: taskId}));
+                            });
+                        };
+                        this.ws.onmessage = function(event) {
+                            try {
+                                const data = JSON.parse(event.data);
+                                if (data.type !== 'progress') return;
+                                console.log('[WS] Progress received for task', data.task_id, ':', data.progress + '%', data.status);
+                                const cbs = window.MarmotWS.callbacks[data.task_id];
+                                if (cbs) cbs.forEach(function(cb) { cb(data); });
+                            } catch (e) {
+                                console.error('[WS] Parse error', e);
+                            }
+                        };
+                        this.ws.onclose = function() {
+                            console.log('[WS] Disconnected. Reconnecting in', window.MarmotWS.reconnectDelay, 'ms');
+                            window.MarmotWS.ws = null;
+                            setTimeout(function() { window.MarmotWS.connect(); }, window.MarmotWS.reconnectDelay);
+                        };
+                        this.ws.onerror = function(err) {
+                            console.error('[WS] Error', err);
+                            window.MarmotWS.enableFallback();
+                        };
+                    } catch (e) {
+                        console.error('[WS] Connect failed', e);
+                        window.MarmotWS.enableFallback();
+                    }
+                },
+                
+                subscribe: function(taskId, callback) {
+                    this.subscribers[taskId] = true;
+                    if (!this.callbacks[taskId]) this.callbacks[taskId] = [];
+                    this.callbacks[taskId].push(callback);
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({type: 'subscribe', task_id: taskId}));
+                    }
+                },
+                
+                unsubscribe: function(taskId) {
+                    delete this.subscribers[taskId];
+                    delete this.callbacks[taskId];
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({type: 'unsubscribe', task_id: taskId}));
+                    }
+                },
+                
+                enableFallback: function() {
+                    if (this.useFallback) return;
+                    this.useFallback = true;
+                    console.warn('[WS] Falling back to HTMX polling');
+                    document.querySelectorAll('[data-ws-fallback]').forEach(function(el) {
+                        const taskId = el.getAttribute('data-ws-fallback');
+                        if (!window.MarmotWS.fallbackIntervals[taskId]) {
+                            window.MarmotWS.fallbackIntervals[taskId] = setInterval(function() {
+                                el.dispatchEvent(new CustomEvent('wsFallbackTick'));
+                            }, 3000);
+                        }
+                    });
+                },
+                
+                disableFallback: function() {
+                    this.useFallback = false;
+                    Object.values(this.fallbackIntervals).forEach(function(interval) { clearInterval(interval); });
+                    this.fallbackIntervals = {};
+                }
+            };
+            
+            window.MarmotWS.connect();
         })();
     </script>
     {% block extra_js %}{% endblock %}

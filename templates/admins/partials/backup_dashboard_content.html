@@ -72,10 +72,11 @@
                     <!-- Real-Time Progress Bar -->
                     <td class="py-3 bg-transparent" style="min-width: 150px;">
                         <div class="d-flex align-items-center justify-content-between mb-1">
-                            <small class="theme-text-muted" style="font-size: 0.7rem;">{{ backup.progress }}%</small>
+                            <small class="theme-text-muted backup-progress-text" style="font-size: 0.7rem;" id="backup-progress-text-{{ backup.pk }}">{{ backup.progress }}%</small>
                         </div>
                         <div class="progress" style="height: 6px; background-color: var(--border-color);">
-                            <div class="progress-bar bg-primary progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %}" 
+                            <div class="progress-bar bg-primary progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %} backup-progress-bar" 
+                                 id="backup-progress-{{ backup.pk }}"
                                  role="progressbar" 
                                  style="width: {{ backup.progress }}%;" 
                                  aria-valuenow="{{ backup.progress }}" aria-valuemin="0" aria-valuemax="100">
@@ -84,6 +85,7 @@
                     </td>
 
                     <td class="py-3 bg-transparent">
+                        <span id="backup-status-{{ backup.pk }}" class="backup-status-badge">
                         {% if backup.status == 'completed' %}
                             <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
                         {% elif backup.status == 'running' %}
@@ -95,6 +97,7 @@
                         {% else %}
                             <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">Pending</span>
                         {% endif %}
+                        </span>
                     </td>
 
                     <td class="text-end pe-4 py-3 bg-transparent">
@@ -102,7 +105,8 @@
                             {% if backup.status == 'running' %}
                             <button type="button" 
                                     hx-get="{% url 'market:market_backup_control' backup.pk %}?action=pause" 
-                                    hx-target="#globalHtmxModalDialog" 
+                                    hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
                                     class="glass-icon-btn text-warning rounded-circle d-flex align-items-center justify-content-center" 
                                     style="width: 36px; height: 36px;" 
                                     title="Pause Task">
@@ -111,7 +115,8 @@
                             {% else %}
                             <button type="button" 
                                     hx-get="{% url 'market:market_backup_control' backup.pk %}?action=resume" 
-                                    hx-target="#globalHtmxModalDialog" 
+                                    hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
                                     class="glass-icon-btn text-success rounded-circle d-flex align-items-center justify-content-center" 
                                     style="width: 36px; height: 36px;" 
                                     title="Start / Resume Task">
@@ -131,6 +136,7 @@
                                     style="width: 36px; height: 36px;" 
                                     hx-get="{% url 'market:market_backup_delete' backup.pk %}"
                                     hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
                                     title="Delete Backup Task">
                                 <span class="material-icons fs-6">delete</span>
                             </button>
@@ -159,15 +165,15 @@
                     <div class="fw-bold theme-text-main">#{{ backup.id|stringformat:"04d" }} - {{ backup.get_index_name_display }}</div>
                     <small class="theme-text-muted">{{ backup.start_date }} to {{ backup.end_date }}</small>
                 </div>
-                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-1" style="font-size: 0.65rem;">{{ backup.status|upper }}</span>
+                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-1" id="backup-status-{{ backup.pk }}" style="font-size: 0.65rem;">{{ backup.status|upper }}</span>
             </div>
             
             <div class="mb-3">
                 <div class="d-flex justify-content-between text-muted small mb-1">
-                    <span>Progress</span><span>{{ backup.progress }}%</span>
+                    <span>Progress</span><span id="backup-progress-text-{{ backup.pk }}">{{ backup.progress }}%</span>
                 </div>
                 <div class="progress" style="height: 6px;">
-                    <div class="progress-bar bg-primary" role="progressbar" style="width: {{ backup.progress }}%;"></div>
+                    <div class="progress-bar bg-primary" id="backup-progress-{{ backup.pk }}" role="progressbar" style="width: {{ backup.progress }}%;"></div>
                 </div>
             </div>
 
@@ -227,4 +233,69 @@
             </ul>
         </div>
     </div>
+
+    <script>
+    (function() {
+        function applyListUpdate(data) {
+            const progressBar = document.querySelector('.backup-progress-bar[id="backup-progress-' + data.task_id + '"]');
+            const progressText = document.querySelector('.backup-progress-text[id="backup-progress-text-' + data.task_id + '"]');
+            const statusBadge = document.querySelector('.backup-status-badge[id="backup-status-' + data.task_id + '"]');
+
+            if (progressBar) {
+                progressBar.style.width = data.progress + '%';
+                progressBar.setAttribute('aria-valuenow', data.progress);
+                if (data.status === 'running') {
+                    progressBar.classList.add('progress-bar-animated');
+                } else {
+                    progressBar.classList.remove('progress-bar-animated');
+                }
+            }
+            if (progressText) progressText.textContent = data.progress + '%';
+
+            if (statusBadge) {
+                const statusMap = {
+                    'completed': '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>',
+                    'running': '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>',
+                    'paused': '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>',
+                    'cancelled': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Cancelled</span>',
+                    'error': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Error</span>',
+                    'pending': '<span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">Pending</span>'
+                };
+                statusBadge.innerHTML = statusMap[data.status] || statusMap['pending'];
+            }
+        }
+
+        function initListSubscriptions() {
+            document.querySelectorAll('.backup-progress-bar').forEach(function(el) {
+                const taskId = el.id.replace('backup-progress-', '');
+                if (window.MarmotWS && window.MarmotWS.url) {
+                    window.MarmotWS.unsubscribe(taskId);
+                    window.MarmotWS.subscribe(taskId, applyListUpdate);
+                    console.log('[List] Subscribed to task', taskId, 'via WebSocket');
+                } else {
+                    console.warn('[List] WebSocket manager not available for task', taskId);
+                }
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initListSubscriptions);
+        } else {
+            initListSubscriptions();
+        }
+
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target.id === 'backup-dashboard-container') {
+                initListSubscriptions();
+            }
+        });
+
+        const dashboardContainer = document.getElementById('backup-dashboard-container');
+        if (dashboardContainer && (!window.MarmotWS || !window.MarmotWS.url)) {
+            setInterval(function() {
+                dashboardContainer.dispatchEvent(new CustomEvent('reloadBackupTable'));
+            }, 3000);
+        }
+    })();
+    </script>
 </div>
