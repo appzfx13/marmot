@@ -38,9 +38,9 @@ func NewBackupJob(dbService *services.DBService, cfg *config.Config, payload mod
 	}
 }
 
-// Run executes the backup pipeline. For INDEX instrument it downloads spot candles.
-// For OPTIDX instrument it loads the scrip master, calculates ATM±StrikeCount strikes,
-// and downloads each CE + PE contract separately.
+// Run executes the unified backup pipeline:
+// Step 1: Downloads Index Spot candles via /v2/charts/intraday into /app/data/users/{uid}/{index}_index/
+// Step 2: Downloads Option Strikes (ATM±strikeCount CE & PE) via /v2/charts/rollingoption into /app/data/users/{uid}/{index}_options/
 func (j *BackupJob) Run(ctx context.Context) {
 	taskID := j.payload.TaskID
 	params := j.payload.Params
@@ -48,7 +48,6 @@ func (j *BackupJob) Run(ctx context.Context) {
 	indexName := params.IndexName
 	securityID := params.SecurityID
 	exchangeSegment := params.ExchangeSegment
-	instrument := params.Instrument
 	startDate := params.StartDate
 	endDate := params.EndDate
 	expiryDate := params.ExpiryDate
@@ -57,9 +56,15 @@ func (j *BackupJob) Run(ctx context.Context) {
 	if userID == "" {
 		userID = "1"
 	}
+	if strikeCount <= 0 {
+		strikeCount = 5
+	}
+	if securityID == "" {
+		securityID = getIndexSecurityID(indexName)
+	}
 
-	log.Printf("🚀 [Task #%s] Starting backup for User #%s | Index=%s | Instrument=%s | Strikes=%d | %s → %s",
-		taskID, userID, indexName, instrument, strikeCount, startDate, endDate)
+	log.Printf("🚀 [Task #%s] Starting Unified Backup (Spot Index + ATM±%d Option Strikes) for User #%s | %s → %s",
+		taskID, strikeCount, userID, startDate, endDate)
 
 	existingProgress, err := j.dbService.GetTaskProgress(ctx, taskID)
 	if err != nil {
@@ -77,13 +82,54 @@ func (j *BackupJob) Run(ctx context.Context) {
 	}
 	j.broadcastProgress(ctx, taskID, startProgress, "running", 0.0, "")
 
-	// Branch: options multi-strike download vs simple index download
-	if strings.ToUpper(instrument) == "OPTIDX" {
-		j.runOptionsDownload(ctx, taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate, strikeCount, startProgress)
+	// ── STEP 1: Download Index Spot Data ─────────────────────────────────────
+	log.Printf("📥 [Task #%s] [Step 1/2] Downloading Index Spot candles (%s)...", taskID, indexName)
+	indexDir := j.downloadIndexSpot(ctx, taskID, userID, indexName, securityID, exchangeSegment, startDate, endDate, startProgress)
+
+	select {
+	case <-ctx.Done():
+		log.Printf("⏸️ [Task #%s] Backup task cancelled after Step 1.", taskID)
+		return
+	default:
+	}
+
+	// ── STEP 2: Download Expired Options Strikes (ATM±N CE & PE) ─────────────
+	log.Printf("📥 [Task #%s] [Step 2/2] Downloading Option Strikes (ATM±%d CE & PE)...", taskID, strikeCount)
+	optsDir := j.runOptionsDownload(ctx, taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate, strikeCount, 45)
+
+	finalOutputDir := optsDir
+	if finalOutputDir == "" {
+		finalOutputDir = indexDir
+	}
+
+	// Calculate total directory storage size
+	var totalSizeBytes int64 = 0
+	baseUserDir := fmt.Sprintf("/app/data/users/%s", userID)
+	_ = filepath.Walk(baseUserDir, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() {
+			totalSizeBytes += info.Size()
+		}
+		return nil
+	})
+
+	fileSizeMB := float64(totalSizeBytes) / (1024 * 1024)
+
+	if err := j.dbService.MarkTaskComplete(ctx, taskID, finalOutputDir, fileSizeMB); err != nil {
+		log.Printf("❌ [Task #%s] Failed to mark completion: %v\n", taskID, err)
+		j.broadcastProgress(ctx, taskID, 0, "error", fileSizeMB, finalOutputDir)
 		return
 	}
 
-	// ── INDEX (spot) download — Intraday API ─────────────────────────────────
+	log.Printf("✅ [Task #%s] Unified Backup Complete! Index Spot & Option Strikes saved (%.2f MB)\n", taskID, fileSizeMB)
+	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, finalOutputDir)
+}
+
+// downloadIndexSpot downloads 1-minute OHLCV candles for the Index spot instrument (/v2/charts/intraday)
+func (j *BackupJob) downloadIndexSpot(
+	ctx context.Context,
+	taskID, userID, indexName, securityID, exchangeSegment, startDate, endDate string,
+	startProgress int,
+) string {
 	baseOutputDir := fmt.Sprintf("/app/data/users/%s/%s_index", userID, strings.ToLower(indexName))
 	_ = os.MkdirAll(baseOutputDir, 0755)
 
@@ -92,16 +138,16 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 	start, err := time.Parse("2006-01-02", startDate)
 	if err != nil {
-		_ = j.dbService.RecordError(ctx, taskID, fmt.Sprintf("invalid start date: %v", err))
-		return
+		log.Printf("⚠️ [Task #%s] Invalid start date: %v", taskID, err)
+		return baseOutputDir
 	}
 	end, err := time.Parse("2006-01-02", endDate)
 	if err != nil {
-		_ = j.dbService.RecordError(ctx, taskID, fmt.Sprintf("invalid end date: %v", err))
-		return
+		log.Printf("⚠️ [Task #%s] Invalid end date: %v", taskID, err)
+		return baseOutputDir
 	}
 
-	chunkDays := 30 // Max 90 days allowed for intraday, using 30 for safety
+	chunkDays := 30
 	totalDays := int(end.Sub(start).Hours()/24) + 1
 	if totalDays <= 0 {
 		totalDays = 1
@@ -115,24 +161,13 @@ func (j *BackupJob) Run(ctx context.Context) {
 	}
 
 	completedChunks := 0
-	if startProgress > 5 && startProgress < 100 {
-		calculatedCompleted := (startProgress - 5) * totalChunks / 90
-		if calculatedCompleted > 0 && calculatedCompleted < totalChunks {
-			completedChunks = calculatedCompleted
-			log.Printf("⏩ [Task #%s] Resuming from progress %d%% (skipped %d chunks)", taskID, startProgress, completedChunks)
-		}
-	}
-
 	chunkStart := start
-	if completedChunks > 0 {
-		chunkStart = start.AddDate(0, 0, completedChunks*chunkDays)
-	}
 
 	for chunkStart.Before(end) || chunkStart.Equal(end) {
 		select {
 		case <-ctx.Done():
-			log.Printf("⏸️ [Task #%s] Execution interrupted by control command.\n", taskID)
-			return
+			log.Printf("⏸️ [Task #%s] Index download interrupted.", taskID)
+			return baseOutputDir
 		default:
 		}
 
@@ -143,30 +178,17 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 		reqPayload := map[string]interface{}{
 			"securityId":      securityID,
-			"exchangeSegment": exchangeSegment,
-			"instrument":      instrument,
+			"exchangeSegment": "IDX_I",
+			"instrument":      "INDEX",
 			"interval":        "1",
 			"oi":              false,
 			"fromDate":        chunkStart.Format("2006-01-02") + " 09:15:00",
 			"toDate":          chunkEnd.Format("2006-01-02") + " 15:30:00",
 		}
 
-		jsonBody, err := json.Marshal(reqPayload)
-		if err != nil {
-			errStr := fmt.Sprintf("[%s] Request marshal error: %v", time.Now().Format("2006-01-02 15:04:05"), err)
-			log.Printf("⚠️ [Task #%s] %s\n", taskID, errStr)
-			_ = j.dbService.RecordError(ctx, taskID, errStr)
-			completedChunks++
-			chunkStart = chunkEnd.AddDate(0, 0, 1)
-			continue
-		}
-
+		jsonBody, _ := json.Marshal(reqPayload)
 		req, err := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewBuffer(jsonBody))
 		if err != nil {
-			errStr := fmt.Sprintf("[%s] HTTP request creation error: %v", time.Now().Format("2006-01-02 15:04:05"), err)
-			log.Printf("⚠️ [Task #%s] %s\n", taskID, errStr)
-			_ = j.dbService.RecordError(ctx, taskID, errStr)
-			completedChunks++
 			chunkStart = chunkEnd.AddDate(0, 0, 1)
 			continue
 		}
@@ -176,115 +198,59 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 		resp, err := client.Do(req)
 		if err != nil {
-			_ = os.RemoveAll(baseOutputDir)
-			errStr := fmt.Sprintf("[%s] Dhan API request failed: %v", time.Now().Format("2006-01-02 15:04:05"), err)
-			log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
-			_ = j.dbService.RecordError(ctx, taskID, errStr)
-			j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
-			return
+			log.Printf("⚠️ [Task #%s] Index API error: %v", taskID, err)
+			chunkStart = chunkEnd.AddDate(0, 0, 1)
+			continue
 		}
-
-		bodyBytes, readErr := io.ReadAll(resp.Body)
+		bodyBytes, _ := io.ReadAll(resp.Body)
 		resp.Body.Close()
-		if readErr != nil {
-			_ = os.RemoveAll(baseOutputDir)
-			errStr := fmt.Sprintf("[%s] Failed to read Dhan API response body: %v", time.Now().Format("2006-01-02 15:04:05"), readErr)
-			log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
-			_ = j.dbService.RecordError(ctx, taskID, errStr)
-			j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
-			return
-		}
 
 		if resp.StatusCode == http.StatusOK {
 			candles := parseHistoricalResponse(bodyBytes, indexName)
-			if len(candles) == 0 {
-				_ = os.RemoveAll(baseOutputDir)
-				errStr := fmt.Sprintf("[%s] Dhan API returned 0 candles for date range %s to %s. Check API token / access parameters.", time.Now().Format("2006-01-02 15:04:05"), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
-				log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
-				_ = j.dbService.RecordError(ctx, taskID, errStr)
-				j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
-				return
-			}
-
-			candlesByDate := make(map[string][]map[string]interface{})
-			for _, candle := range candles {
-				dateStr, _ := candle["date"].(string)
-				if dateStr != "" {
-					candlesByDate[dateStr] = append(candlesByDate[dateStr], candle)
-				}
-			}
-
-			for dateStr, dayCandles := range candlesByDate {
-				t, parseErr := time.Parse("2006-01-02", dateStr)
-				if parseErr != nil {
-					continue
-				}
-				partitionDir := filepath.Join(baseOutputDir, fmt.Sprintf("year=%s", t.Format("2006")), fmt.Sprintf("month=%s", t.Format("01")))
-				_ = os.MkdirAll(partitionDir, 0755)
-
-				dayFilePath := filepath.Join(partitionDir, fmt.Sprintf("%s.parquet", dateStr))
-				dayFile, openErr := os.OpenFile(dayFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-				if openErr == nil {
-					for _, candle := range dayCandles {
-						line, _ := json.Marshal(candle)
-						_, _ = dayFile.Write(line)
-						_, _ = dayFile.WriteString("\n")
+			if len(candles) > 0 {
+				candlesByDate := make(map[string][]map[string]interface{})
+				for _, candle := range candles {
+					dateStr, _ := candle["date"].(string)
+					if dateStr != "" {
+						candlesByDate[dateStr] = append(candlesByDate[dateStr], candle)
 					}
-					dayFile.Close()
-				} else {
-					errStr := fmt.Sprintf("[%s] Failed to open day file %s: %v", time.Now().Format("2006-01-02 15:04:05"), dayFilePath, openErr)
-					_ = j.dbService.RecordError(ctx, taskID, errStr)
 				}
+
+				for dateStr, dayCandles := range candlesByDate {
+					t, parseErr := time.Parse("2006-01-02", dateStr)
+					if parseErr != nil {
+						continue
+					}
+					partitionDir := filepath.Join(baseOutputDir, fmt.Sprintf("year=%s", t.Format("2006")), fmt.Sprintf("month=%s", t.Format("01")))
+					_ = os.MkdirAll(partitionDir, 0755)
+
+					dayFilePath := filepath.Join(partitionDir, fmt.Sprintf("%s.parquet", dateStr))
+					dayFile, openErr := os.OpenFile(dayFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+					if openErr == nil {
+						for _, candle := range dayCandles {
+							line, _ := json.Marshal(candle)
+							_, _ = dayFile.Write(line)
+							_, _ = dayFile.WriteString("\n")
+						}
+						dayFile.Close()
+					}
+				}
+				log.Printf("📊 [Task #%s] Index Spot: Fetched %d candles for %s to %s\n", taskID, len(candles), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
 			}
-			log.Printf("📊 [Task #%s] Fetched %d candles for %s to %s\n", taskID, len(candles), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
 		} else {
-			_ = os.RemoveAll(baseOutputDir)
-			errStr := fmt.Sprintf("[%s] Dhan API HTTP %d Error: %s", time.Now().Format("2006-01-02 15:04:05"), resp.StatusCode, string(bodyBytes))
-			log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
-			_ = j.dbService.RecordError(ctx, taskID, errStr)
-			j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
-			return
+			log.Printf("⚠️ [Task #%s] Index API HTTP %d: %s", taskID, resp.StatusCode, string(bodyBytes))
 		}
 
 		completedChunks++
-		progress := 5 + int((float64(completedChunks)/float64(totalChunks))*90)
-		if progress > 95 {
-			progress = 95
-		}
-		log.Printf("📊 [Task #%s] Progress: %d%%\n", taskID, progress)
+		progress := startProgress + int((float64(completedChunks)/float64(totalChunks))*40)
 		_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
 		j.broadcastProgress(ctx, taskID, progress, "running", 0.0, baseOutputDir)
 
 		chunkStart = chunkEnd.AddDate(0, 0, 1)
-		time.Sleep(250 * time.Millisecond)
+		time.Sleep(200 * time.Millisecond)
 	}
 
-	var totalSizeBytes int64 = 0
-	_ = filepath.Walk(baseOutputDir, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() {
-			totalSizeBytes += info.Size()
-		}
-		return nil
-	})
-
-	if totalSizeBytes == 0 {
-		_ = os.RemoveAll(baseOutputDir)
-		errStr := fmt.Sprintf("[%s] Backup Task #%s failed: 0 candles written. Check Dhan API client ID, access token, or credentials.", time.Now().Format("2006-01-02 15:04:05"), taskID)
-		log.Printf("❌ [Task #%s] %s\n", taskID, errStr)
-		_ = j.dbService.RecordError(ctx, taskID, errStr)
-		j.broadcastProgress(ctx, taskID, startProgress, "error", 0.0, "")
-		return
-	}
-
-	fileSizeMB := float64(totalSizeBytes) / (1024 * 1024)
-
-	if err := j.dbService.MarkTaskComplete(ctx, taskID, baseOutputDir, fileSizeMB); err != nil {
-		log.Printf("❌ [Task #%s] Failed to mark completion: %v\n", taskID, err)
-		j.broadcastProgress(ctx, taskID, 0, "error", fileSizeMB, baseOutputDir)
-		return
-	}
-	log.Printf("✅ [Task #%s] Completed! Partitioned output: %s (%.2f MB)\n", taskID, baseOutputDir, fileSizeMB)
-	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, baseOutputDir)
+	return baseOutputDir
 }
 
 // runOptionsDownload fetches historical options data via DhanHQ v2 Expired Options Rolling API (/v2/charts/rollingoption)
@@ -294,7 +260,7 @@ func (j *BackupJob) runOptionsDownload(
 	ctx context.Context,
 	taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate string,
 	strikeCount, startProgress int,
-) {
+) string {
 	log.Printf("🚀 [Task #%s] Starting Expired Options Rolling Data Download for %s (Strikes count=%d)", taskID, indexName, strikeCount)
 
 	securityID := getIndexSecurityID(indexName)
@@ -312,15 +278,15 @@ func (j *BackupJob) runOptionsDownload(
 			select {
 			case <-ctx.Done():
 				log.Printf("⏸️ [Task #%s] Options download interrupted.", taskID)
-				return
+				return baseOutputDir
 			default:
 			}
 
 			contractDir := fmt.Sprintf("%s/%s/%s", baseOutputDir, drvOptType, strikeName)
 			_ = os.MkdirAll(contractDir, 0755)
 
-			log.Printf("📥 [Task #%s] Downloading %s %s %s | SecurityID=%s | %s → %s",
-				taskID, indexName, drvOptType, strikeName, securityID, startDate, endDate)
+			log.Printf("📥 [Task #%s] Options: %s %s %s | %s → %s",
+				taskID, indexName, drvOptType, strikeName, startDate, endDate)
 
 			j.downloadRollingOptionCandles(
 				ctx, taskID, securityID, "NSE_FNO", "OPTIDX",
@@ -332,26 +298,11 @@ func (j *BackupJob) runOptionsDownload(
 			_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
 			j.broadcastProgress(ctx, taskID, progress, "running", 0.0, contractDir)
 
-			time.Sleep(250 * time.Millisecond) // rate limit buffer
+			time.Sleep(200 * time.Millisecond)
 		}
 	}
 
-	var totalSizeBytes int64
-	_ = filepath.Walk(baseOutputDir, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() {
-			totalSizeBytes += info.Size()
-		}
-		return nil
-	})
-
-	fileSizeMB := float64(totalSizeBytes) / (1024 * 1024)
-	if err := j.dbService.MarkTaskComplete(ctx, taskID, baseOutputDir, fileSizeMB); err != nil {
-		log.Printf("❌ [Task #%s] Failed to mark options download complete: %v", taskID, err)
-		j.broadcastProgress(ctx, taskID, 0, "error", fileSizeMB, baseOutputDir)
-		return
-	}
-	log.Printf("✅ [Task #%s] Options download complete: %s (%.2f MB)", taskID, baseOutputDir, fileSizeMB)
-	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, baseOutputDir)
+	return baseOutputDir
 }
 
 // downloadRollingOptionCandles handles 30-day chunked calls to /v2/charts/rollingoption

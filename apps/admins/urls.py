@@ -19,7 +19,7 @@ from .views import (
     PostbackLogDetailView,
 )
 
-from apps.market.views import MarketBackupListView
+from apps.market.views import MarketBackupListView, MarketBackupChartView
 from apps.backtest.views import BacktestDashboardView
 
 app_name = 'admins' 
@@ -32,6 +32,7 @@ urlpatterns = [
 
     # Control Routes for Market Backup & Backtest
     path('market-backup/', MarketBackupListView.as_view(), name='market_backup_list'),
+    path('market-backup/<int:pk>/chart/', MarketBackupChartView.as_view(), name='market_backup_chart'),
     path('backtest/', BacktestDashboardView.as_view(), name='backtest_dashboard'),
 
     # Traders Management (Aligned with template route names)

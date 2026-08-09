@@ -110,6 +110,25 @@ class MarketBackupDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         return context
 
 
+class MarketBackupChartView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Renders full-screen TradingView Lightweight Chart terminal for a market backup dataset."""
+    def get(self, request, pk, *args, **kwargs):
+        task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
+        if not task:
+            raise Http404("Market backup task not found.")
+
+        ws_port = getattr(settings, 'WS_PORT', '8082')
+        go_chart_api_url = f"http://localhost:{ws_port}/api/chart?task_id={task.id}"
+
+        context = {
+            'backup': task,
+            'go_chart_api_url': go_chart_api_url,
+            'page_title': f"{task.index_name} Interactive Option Chart - Backup #{task.id}",
+        }
+        return render(request, 'admins/market_chart.html', context)
+
+
+
 class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Packs date-partitioned Parquet datasets into a ZIP archive and streams it to the user."""
     def get(self, request, pk, *args, **kwargs):

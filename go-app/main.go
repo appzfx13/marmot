@@ -53,9 +53,17 @@ func main() {
 	redisChannel := "market_backup_commands"
 	go taskManager.StartListener(ctx, redisService, redisChannel)
 
-	// 8. Start HTTP Server for WebSockets
+	// 8. Start HTTP Server for WebSockets, TradingView Chart Data API & UDF Protocol
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {
 		ws.ServeWs(hub, w, r)
+	})
+	http.HandleFunc("/api/chart", func(w http.ResponseWriter, r *http.Request) {
+		services.ServeChartData(dbService, w, r)
+	})
+	http.HandleFunc("/api/udf/config", services.ServeUDFConfig)
+	http.HandleFunc("/api/udf/symbols", services.ServeUDFSymbols)
+	http.HandleFunc("/api/udf/history", func(w http.ResponseWriter, r *http.Request) {
+		services.ServeUDFHistory(dbService, w, r)
 	})
 	server := &http.Server{Addr: ":" + cfg.WSPort}
 	go func() {
