@@ -3,7 +3,12 @@ from django.contrib.auth import get_user_model
 from .models import MemberRoleChoices
 
 User = get_user_model()
-ALLOWED_ROLES = [MemberRoleChoices.ADMIN, MemberRoleChoices.TRADERS]
+ALLOWED_ROLES = [
+    MemberRoleChoices.ADMIN,
+    MemberRoleChoices.TRADERS,
+    MemberRoleChoices.DEVELOPER,
+    MemberRoleChoices.STAFF,
+]
 
 
 def is_user_authorized_for_dashboard(user) -> bool:

@@ -12,7 +12,7 @@ from .services import get_user_profile
 
 
 class LoginView(HTMXPartialMixin, LoginView):
-    template_name = 'admins/login.html'
+    template_name = 'registration/login.html'
     partial_template_name = 'admins/partials/login_form.html'
     redirect_authenticated_user = True
 
@@ -46,6 +46,9 @@ class LoginView(HTMXPartialMixin, LoginView):
 
     def get_success_url(self):
         if is_user_authorized_for_dashboard(self.request.user):
+            user_role = getattr(self.request.user, 'role', '')
+            if self.request.user.is_superuser or user_role in ['admin', 'developer', 'staff']:
+                return reverse_lazy('admins:admin-dashboard')
             return reverse_lazy('users:marmot-dashboard')
         return reverse_lazy('users:marmot-login')
 
@@ -55,12 +58,14 @@ class UserDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView)
     Protected Marmot Dashboard View. Uses MarmotRoleRequiredMixin to 
     ensure only authorized roles can access.
     """
-    template_name = 'admins/dashboard.html'
+    template_name = 'users/dashboard.html'
     partial_template_name = 'admins/partials/dashboard_content.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['marmot_profile'] = get_user_profile(self.request.user.username)
+        context['total_traders'] = User.objects.filter(is_superuser=False).count()
+        context['active_traders'] = User.objects.filter(is_superuser=False, trade_eligibility=True, is_blocked=False).count()
         return context
 
 

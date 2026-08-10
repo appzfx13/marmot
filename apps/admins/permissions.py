@@ -5,8 +5,7 @@ from apps.common.choices import MemberRoleChoices
 
 class AdminRequiredMixin(UserPassesTestMixin):
     """
-    Mixin to restrict view access exclusively to authenticated Admin users,
-    staff members, or superusers.
+    Mixin to restrict view access to authenticated Admin, Developer, Staff, or Superuser accounts.
     """
     def test_func(self):
         user = self.request.user
@@ -14,8 +13,8 @@ class AdminRequiredMixin(UserPassesTestMixin):
             return False
             
         user_role = getattr(user, 'role', None)
-        is_admin_role = user_role == getattr(MemberRoleChoices, 'ADMIN', 'admin')
-        return user.is_superuser or user.is_staff or is_admin_role
+        allowed_admin_roles = ['admin', 'developer', 'staff']
+        return user.is_superuser or user.is_staff or user_role in allowed_admin_roles
 
 
 class DeveloperOrAdminRequiredMixin(UserPassesTestMixin):

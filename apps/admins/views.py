@@ -71,7 +71,10 @@ class AdminLoginView(HTMXPartialMixin, HtmxMessageMixin, LoginView):
         return super().form_invalid(form)
 
     def get_success_url(self):
-        return reverse_lazy('admins:admin-dashboard')
+        user_role = getattr(self.request.user, 'role', '')
+        if self.request.user.is_superuser or user_role in ['admin', 'developer', 'staff']:
+            return reverse_lazy('admins:admin-dashboard')
+        return reverse_lazy('users:marmot-dashboard')
 
 
 class AdminDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):

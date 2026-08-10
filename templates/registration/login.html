@@ -1,188 +1,319 @@
+{% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-    <title>Sign In - Bug Tracker</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Sign In - Bug Tracker</title>
+
+    <!-- Bootstrap 5 CSS & Google Fonts/Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+
     <style>
-        :root { 
-            /* Matching Dashboard Colors */
-            --dashboard-bg: radial-gradient(circle at top right, #0a102e 0%, #050505 100%);
-            --glass-card-bg: rgba(255, 255, 255, 0.05);
-            --glass-border: rgba(255, 255, 255, 0.1);
-            --accent-blue: #4e73df;
+        :root[data-theme="dark"] {
+            --bg-gradient: linear-gradient(135deg, #0a102e 0%, #050505 100%);
+            --glass-bg: rgba(18, 24, 36, 0.65);
+            --glass-border: rgba(255, 255, 255, 0.12);
+            --text-title: #ffffff;
+            --text-subtitle: rgba(255, 255, 255, 0.6);
+            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-border: rgba(255, 255, 255, 0.12);
+            --input-text: #ffffff;
+            --input-placeholder: rgba(255, 255, 255, 0.35);
+            --btn-bg: linear-gradient(135deg, #3a61d0 0%, #4e73df 100%);
+            --btn-text: #ffffff;
+            --btn-hover: linear-gradient(135deg, #2b4cb0 0%, #3a61d0 100%);
+            --toggle-bg: rgba(255, 255, 255, 0.1);
+            --toggle-border: rgba(255, 255, 255, 0.15);
+            --orb-color-1: rgba(58, 97, 208, 0.25);
+            --orb-color-2: rgba(163, 112, 247, 0.2);
+        }
+
+        :root[data-theme="light"] {
+            --bg-gradient: linear-gradient(135deg, #eef2f7 0%, #d9e2ec 100%);
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.8);
+            --text-title: #0f172a;
+            --text-subtitle: #475569;
+            --input-bg: rgba(255, 255, 255, 0.85);
+            --input-border: rgba(203, 213, 225, 0.8);
+            --input-text: #0f172a;
+            --input-placeholder: #94a3b8;
+            --btn-bg: #0f172a;
+            --btn-text: #ffffff;
+            --btn-hover: #1e293b;
+            --toggle-bg: rgba(0, 0, 0, 0.05);
+            --toggle-border: rgba(0, 0, 0, 0.1);
+            --orb-color-1: rgba(59, 130, 246, 0.2);
+            --orb-color-2: rgba(139, 92, 246, 0.15);
         }
 
         body {
             font-family: 'Google Sans', sans-serif;
-            background: var(--dashboard-bg);
-            min-height: 100vh;
-            color: white;
-            overflow-x: hidden;
-            overflow-y: auto;
-        }
-
-        .login-wrapper {
+            background: var(--bg-gradient);
             min-height: 100vh;
             display: flex;
             align-items: center;
             justify-content: center;
-            padding: 1.5rem 1rem;
+            margin: 0;
+            position: relative;
+            overflow: hidden;
+            transition: background 0.4s ease;
         }
 
-        .glass-card {
-            background: var(--glass-card-bg);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            border-radius: 28px;
+        .ambient-orb {
+            position: absolute;
+            border-radius: 50%;
+            filter: blur(90px);
+            z-index: 0;
+            pointer-events: none;
+            transition: background 0.4s ease;
+            will-change: transform;
+        }
+
+        .orb-1 {
+            width: 380px;
+            height: 380px;
+            background: var(--orb-color-1);
+            top: 10%;
+            left: 15%;
+            animation: orbFloat1 18s ease-in-out infinite alternate;
+        }
+
+        .orb-2 {
+            width: 440px;
+            height: 440px;
+            background: var(--orb-color-2);
+            bottom: 10%;
+            right: 15%;
+            animation: orbFloat2 22s ease-in-out infinite alternate;
+        }
+
+        @keyframes orbFloat1 {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(50px, 40px) scale(1.08); }
+            100% { transform: translate(-30px, 70px) scale(0.95); }
+        }
+
+        @keyframes orbFloat2 {
+            0% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(-60px, -50px) scale(1.12); }
+            100% { transform: translate(40px, -30px) scale(0.92); }
+        }
+
+        .theme-toggle-btn {
+            position: fixed;
+            top: 24px;
+            right: 24px;
+            z-index: 100;
+            background: var(--toggle-bg);
+            border: 1px solid var(--toggle-border);
+            color: var(--text-title);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 50px;
+            padding: 8px 18px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .theme-toggle-btn:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
+        }
+
+        .login-card {
+            position: relative;
+            z-index: 10;
+            background: var(--glass-bg);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border-radius: 32px;
             border: 1px solid var(--glass-border);
-            box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+            width: 100%;
+            max-width: 440px;
             zoom: 0.9;
+            padding: 2.75rem 2.25rem 2.25rem 2.25rem;
+            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
+            animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+            transition: background 0.4s ease, border-color 0.4s ease, transform 0.3s ease;
         }
 
-        /* Dashboard-style Pill Inputs */
+        .login-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 28px 56px rgba(0, 0, 0, 0.3);
+        }
+
+        @keyframes cardEntrance {
+            from {
+                opacity: 0;
+                transform: translateY(24px) scale(0.96);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
+        }
+
+        .brand-icon-wrapper {
+            width: 56px;
+            height: 56px;
+            border-radius: 20px;
+            background: var(--toggle-bg);
+            border: 1px solid var(--toggle-border);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            margin-bottom: 1.25rem;
+            color: var(--text-title);
+            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        .login-card:hover .brand-icon-wrapper {
+            transform: scale(1.05) rotate(-4deg);
+        }
+
+        .login-title { color: var(--text-title); transition: color 0.4s ease; }
+        .login-subtitle { color: var(--text-subtitle); transition: color 0.4s ease; }
+
         .input-group {
-            background: rgba(0, 0, 0, 0.2);
-            border: 1px solid var(--glass-border);
+            background: var(--input-bg);
+            border: 1px solid var(--input-border);
             border-radius: 50px !important;
-            padding: 2px 5px;
+            padding: 4px 8px;
             transition: all 0.3s ease;
         }
 
         .input-group:focus-within {
-            border-color: var(--accent-blue);
-            background: rgba(0, 0, 0, 0.4);
-            box-shadow: 0 0 0 4px rgba(78, 115, 223, 0.1);
+            border-color: #4e73df !important;
+            box-shadow: 0 0 0 4px rgba(78, 115, 223, 0.15) !important;
         }
 
         .input-group-text {
             background: transparent !important;
             border: none !important;
-            color: rgba(255, 255, 255, 0.5) !important;
+            color: var(--text-subtitle) !important;
         }
 
         .form-control {
             background: transparent !important;
             border: none !important;
-            color: white !important;
+            color: var(--input-text) !important;
             box-shadow: none !important;
             font-size: 0.95rem;
         }
 
         .form-control::placeholder {
-            color: rgba(255, 255, 255, 0.3);
+            color: var(--input-placeholder) !important;
         }
 
-        /* Premium Gradient Button */
-        .btn-tracker-premium {
-            padding: 14px 0;
-            font-size: 0.9rem;
-            background: linear-gradient(135deg, #3a61d0 0%, #6f42c1 100%);
-            border-radius: 50px;
-            transition: all 0.4s cubic-bezier(.25,.8,.25,1);
-            box-shadow: 0 8px 20px rgba(58, 97, 208, 0.3);
-            border: none;
-            letter-spacing: 1px;
+        .theme-btn-primary {
+            background: var(--btn-bg) !important;
+            color: var(--btn-text) !important;
+            border: none !important;
+            border-radius: 50px !important;
+            padding: 13px 24px !important;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+            box-shadow: 0 8px 20px rgba(58, 97, 208, 0.25);
         }
 
-        .btn-tracker-premium:hover {
+        .theme-btn-primary:hover {
             transform: translateY(-2px);
-            box-shadow: 0 12px 25px rgba(78, 115, 223, 0.5);
-            filter: brightness(1.1);
+            box-shadow: 0 12px 25px rgba(78, 115, 223, 0.4);
+            filter: brightness(1.08);
         }
 
-        .text-white-50 {
-            color: rgba(255, 255, 255, 0.5) !important;
-        }
-
-        /* Responsive typography and sizing refinements */
-        @media (max-width: 576px) {
-            .glass-card {
-                border-radius: 20px;
-            }
-            .brand-icon {
-                font-size: 2.5rem !important;
-            }
-            h2 {
-                font-size: 1.5rem;
-            }
+        .theme-btn-primary:active {
+            transform: translateY(0) scale(0.98);
         }
     </style>
 </head>
-<body>
-    <div class="login-wrapper">
-        <div class="container">
-            <div class="row justify-content-center">
-                <!-- Smooth responsive widths for mobile, tablet, desktop, and large desktop screens -->
-                <div class="col-12 col-sm-10 col-md-8 col-lg-5 col-xl-4">
-                    <div class="glass-card p-4 p-sm-5">
-                        <div class="text-center mb-4 mb-sm-5">
-                            <div class="mb-3 d-inline-block">
-                                <span class="material-icons text-primary brand-icon" style="font-size: 3rem;">bug_report</span>
-                            </div>
-                            <h2 class="fw-bold text-white mb-2">Welcome Back</h2>
-                            <p class="text-white-50 small">Enter your credentials to access the Bug Tracker</p>
-                        </div>
+<body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
-                        <form method="post" novalidate>
-                            {% csrf_token %}
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
 
-                            {% if form.non_field_errors %}
-                            <div class="alert alert-danger py-2 small bg-danger bg-opacity-25 border-danger text-white text-center rounded-4 mb-4">
-                                {% for error in form.non_field_errors %}
-                                    <div>{{ error }}</div>
-                                {% endfor %}
-                            </div>
-                            {% endif %}
+    <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle light and dark mode">
+        <span class="material-icons fs-5" id="themeToggleIcon">dark_mode</span>
+        <span class="small fw-medium" id="themeToggleText">Dark</span>
+    </button>
 
-                            <div class="mb-4">
-                                <label class="form-label text-white-50 small ps-2 mb-2">Username</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">
-                                        <span class="material-icons" style="font-size: 1.2rem;">person_outline</span>
-                                    </span>
-                                    <input type="text"
-                                           name="username"
-                                           class="form-control"
-                                           placeholder="Username"
-                                           required>
-                                </div>
-                            </div>
+    <div class="login-card text-center">
+        <div class="brand-icon-wrapper">
+            <span class="material-icons fs-3 text-primary">bug_report</span>
+        </div>
+        <h3 class="login-title fw-bold mb-1">Welcome Back</h3>
+        <p class="login-subtitle small mb-4">Enter your credentials to access the platform</p>
 
-                            <div class="mb-4">
-                                <label class="form-label text-white-50 small ps-2 mb-2">Password</label>
-                                <div class="input-group">
-                                    <span class="input-group-text">
-                                        <span class="material-icons" style="font-size: 1.2rem;">lock_open</span>
-                                    </span>
-                                    <input type="password"
-                                        id="passwordField"
-                                        name="password"
-                                        class="form-control"
-                                        placeholder="••••••••"
-                                        required>
-                                    <span class="input-group-text" id="togglePassword" style="cursor: pointer;">
-                                        <span class="material-icons" style="font-size: 1.1rem;">visibility_off</span>
-                                    </span>
-                                </div>
-                            </div>
+        <form method="post" novalidate>
+            {% csrf_token %}
 
-                            <button type="submit" class="btn btn-tracker-premium text-white w-100 fw-bold d-flex justify-content-center align-items-center mt-3">
-                                <span class="material-icons me-2" style="font-size: 1.1rem;">login</span>
-                                <span>SIGN IN</span>
-                            </button>
-                        </form>
-                    </div>
-
-                    <div class="text-center mt-4">
-                        <small class="text-white-50">
-                            © 2026 Bug Tracker Dashboard. All rights reserved.
-                        </small>
-                    </div>
-                </div>
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger py-2 small bg-danger bg-opacity-25 border-danger text-danger text-center rounded-4 mb-4">
+                {% for error in form.non_field_errors %}
+                    <div>{{ error }}</div>
+                {% endfor %}
             </div>
+            {% endif %}
+
+            <div class="mb-3 text-start">
+                <label class="form-label login-subtitle small ps-3 mb-1 fw-medium">Username</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <span class="material-icons fs-5">person_outline</span>
+                    </span>
+                    <input type="text"
+                           name="username"
+                           class="form-control"
+                           placeholder="Enter your username"
+                           value="{{ form.username.value|default:'' }}"
+                           required>
+                </div>
+                {% if form.username.errors %}
+                <div class="text-danger small mt-1 ps-3">{{ form.username.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <div class="mb-4 text-start">
+                <label class="form-label login-subtitle small ps-3 mb-1 fw-medium">Password</label>
+                <div class="input-group">
+                    <span class="input-group-text">
+                        <span class="material-icons fs-5">lock_open</span>
+                    </span>
+                    <input type="password"
+                           id="passwordField"
+                           name="password"
+                           class="form-control"
+                           placeholder="••••••••"
+                           required>
+                    <span class="input-group-text pe-3" id="togglePassword" style="cursor: pointer;">
+                        <span class="material-icons fs-6">visibility_off</span>
+                    </span>
+                </div>
+                {% if form.password.errors %}
+                <div class="text-danger small mt-1 ps-3">{{ form.password.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <button type="submit" class="btn theme-btn-primary text-white w-100 fw-bold d-flex justify-content-center align-items-center mt-2">
+                <span class="material-icons me-2 fs-5">login</span>
+                <span>SIGN IN</span>
+            </button>
+        </form>
+
+        <div class="text-center mt-4">
+            <small class="login-subtitle opacity-75">
+                © 2026 Platform Dashboard. All rights reserved.
+            </small>
         </div>
     </div>
 
@@ -190,14 +321,49 @@
         document.addEventListener('DOMContentLoaded', function () {
             const togglePassword = document.querySelector('#togglePassword');
             const password = document.querySelector('#passwordField');
-            const icon = togglePassword.querySelector('.material-icons');
-
-            togglePassword.addEventListener('click', function () {
-                const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
-                password.setAttribute('type', type);
-                icon.textContent = type === 'password' ? 'visibility_off' : 'visibility';
-            });
+            if (togglePassword && password) {
+                const icon = togglePassword.querySelector('.material-icons');
+                togglePassword.addEventListener('click', function () {
+                    const type = password.getAttribute('type') === 'password' ? 'text' : 'password';
+                    password.setAttribute('type', type);
+                    icon.textContent = type === 'password' ? 'visibility_off' : 'visibility';
+                });
+            }
         });
+
+        (function() {
+            const htmlElement = document.documentElement;
+            const toggleBtn = document.getElementById('themeToggleBtn');
+            const toggleIcon = document.getElementById('themeToggleIcon');
+            const toggleText = document.getElementById('themeToggleText');
+
+            const savedTheme = localStorage.getItem('theme');
+            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const currentTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
+
+            function applyTheme(theme) {
+                htmlElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+
+                if (theme === 'dark') {
+                    if (toggleIcon) toggleIcon.textContent = 'dark_mode';
+                    if (toggleText) toggleText.textContent = 'Dark';
+                } else {
+                    if (toggleIcon) toggleIcon.textContent = 'light_mode';
+                    if (toggleText) toggleText.textContent = 'Light';
+                }
+            }
+
+            applyTheme(currentTheme);
+
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    const activeTheme = htmlElement.getAttribute('data-theme');
+                    const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
+                    applyTheme(newTheme);
+                });
+            }
+        })();
     </script>
 </body>
 </html>
