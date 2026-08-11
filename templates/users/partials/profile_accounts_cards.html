@@ -1,0 +1,120 @@
+<!-- templates/users/partials/profile_accounts_cards.html -->
+<div class="user-accounts-cards-container mt-4">
+    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+        <div>
+            <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2">
+                <span class="material-icons text-primary fs-5">account_balance_wallet</span>
+                <span>My Configured Trading Accounts</span>
+            </h5>
+            <small class="theme-text-muted">Manage active broker connections, API keys, and Sandbox paper trading balances.</small>
+        </div>
+        <button type="button" 
+                class="btn btn-sm btn-primary rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                hx-get="{% url 'users:user-account-create-modal' %}"
+                hx-target="#globalHtmxModalDialog">
+            <span class="material-icons fs-6">add</span>Add Trading Account
+        </button>
+    </div>
+
+    <div class="row g-3">
+        {% for acc in user_trading_accounts %}
+            <div class="col-12 col-md-6 col-xl-4">
+                <div class="glass-card p-3 rounded-4 border h-100 position-relative shadow-sm" style="background: var(--glass-bg, rgba(255,255,255,0.03)); border-color: var(--border-color, rgba(255,255,255,0.1)) !important;">
+                    <!-- Card Top Header -->
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 font-monospace fw-bold">
+                                {{ acc.broker.name|upper }}
+                            </span>
+                            {% if acc.is_default %}
+                                <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-1 smaller d-flex align-items-center gap-1">
+                                    <span class="material-icons fs-6" style="font-size: 0.8rem !important;">star</span>DEFAULT
+                                </span>
+                            {% endif %}
+                        </div>
+
+                        <span class="badge {% if acc.account_type == 'LIVE' %}bg-success text-white{% else %}bg-secondary text-white-50{% endif %} rounded-pill px-2 py-1 smaller fw-bold">
+                            {{ acc.account_type }}
+                        </span>
+                    </div>
+
+                    <!-- Account Name -->
+                    <h6 class="fw-bold theme-text-main text-truncate mb-1" title="{{ acc.account_name }}">
+                        {{ acc.account_name }}
+                    </h6>
+
+                    <!-- Details Summary -->
+                    <div class="d-flex flex-column gap-1 my-3 small theme-text-muted">
+                        <div class="d-flex justify-content-between">
+                            <span>Client ID:</span>
+                            <span class="font-monospace theme-text-main fw-bold">{{ acc.broker_client_id|default:"Paper Trading" }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Auth Status:</span>
+                            {% if acc.is_configured %}
+                                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2">VALIDATED</span>
+                            {% else %}
+                                <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-2">UNVERIFIED</span>
+                            {% endif %}
+                        </div>
+                        <div class="d-flex justify-content-between">
+                            <span>Realtime PnL:</span>
+                            <span class="font-monospace fw-bold {% if acc.realtime_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                                ₹{{ acc.realtime_pnl }}
+                            </span>
+                        </div>
+                    </div>
+
+                    <!-- Card Actions -->
+                    <div class="d-flex align-items-center justify-content-between gap-1 pt-2 border-top border-secondary border-opacity-25">
+                        {% if acc.account_type == 'LIVE' %}
+                            <button type="button" 
+                                    class="btn btn-xs btn-outline-info rounded-pill px-2 py-1 smaller fw-bold d-inline-flex align-items-center gap-1"
+                                    title="Run Auth Hit Connection Test"
+                                    hx-post="{% url 'users:user-account-test-auth' acc.id %}"
+                                    hx-swap="none">
+                                <span class="material-icons" style="font-size:0.85rem;">verified</span>Auth Test
+                            </button>
+                        {% else %}
+                            <span class="small theme-text-muted font-monospace">Capital: ₹{{ acc.account_summary.initial_capital|default:"100,000" }}</span>
+                        {% endif %}
+
+                        <div class="d-flex align-items-center gap-1 ms-auto">
+                            {% if not acc.is_default %}
+                                <button type="button" 
+                                        class="btn btn-xs btn-outline-warning rounded-pill px-2 py-1 smaller fw-bold"
+                                        title="Make Primary Default"
+                                        hx-post="{% url 'users:user-account-set-default' acc.id %}"
+                                        hx-swap="none">
+                                    Set Default
+                                </button>
+                            {% endif %}
+
+                            <button type="button" 
+                                    class="btn btn-xs btn-outline-danger rounded-circle p-1 d-flex align-items-center justify-content-center"
+                                    title="Delete Account"
+                                    hx-post="{% url 'users:user-account-delete' acc.id %}"
+                                    hx-confirm="Are you sure you want to delete this trading account?"
+                                    hx-swap="none">
+                                <span class="material-icons" style="font-size:0.85rem;">delete</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        {% empty %}
+            <div class="col-12">
+                <div class="glass-card p-4 rounded-4 border text-center theme-text-muted">
+                    <span class="material-icons fs-1 mb-2 opacity-50">account_balance</span>
+                    <p class="mb-2 fw-bold">No Trading Accounts Configured Yet.</p>
+                    <button type="button" 
+                            class="btn btn-sm btn-primary rounded-pill px-4 fw-bold"
+                            hx-get="{% url 'users:user-account-create-modal' %}"
+                            hx-target="#globalHtmxModalDialog">
+                        Create Your First Account
+                    </button>
+                </div>
+            </div>
+        {% endfor %}
+    </div>
+</div>

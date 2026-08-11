@@ -1,6 +1,19 @@
 from django import forms
 from apps.users.models import User
-from apps.trade_config.models import TradeExecConfig
+from apps.trade_config.models import TradeExecConfig, BrokerMaster
+
+
+class BrokerMasterForm(forms.ModelForm):
+    class Meta:
+        model = BrokerMaster
+        fields = ['name', 'code', 'api_base_url', 'is_active', 'description']
+        widgets = {
+            'name': forms.TextInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'placeholder': 'Broker Name (e.g. DHAN, FYERS)'}),
+            'code': forms.TextInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'placeholder': 'Code / Slug (e.g. dhan, fyers, zerodha)'}),
+            'api_base_url': forms.URLInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'placeholder': 'https://api.dhan.co'}),
+            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'description': forms.Textarea(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'rows': 3, 'placeholder': 'Integration notes...'}),
+        }
 
 
 class UserForm(forms.ModelForm):
@@ -14,10 +27,6 @@ class UserForm(forms.ModelForm):
             'phone_number',
             'is_email_verified',
             'is_mobile_verified',
-            'broker',
-            'broker_client_id',
-            'api_key',
-            'app_id',
             'description',
             'trade_eligibility',
             'is_blocked',
@@ -30,10 +39,6 @@ class UserForm(forms.ModelForm):
             'username': forms.TextInput(attrs={'placeholder': 'Username'}),
             'email': forms.EmailInput(attrs={'placeholder': 'Email Address'}),
             'phone_number': forms.TextInput(attrs={'placeholder': '+1234567890'}),
-            'broker': forms.Select(attrs={'class': 'form-select'}),
-            'broker_client_id': forms.TextInput(attrs={'placeholder': 'Broker Client ID (e.g. 1000000001)'}),
-            'api_key': forms.TextInput(attrs={'placeholder': 'API Key / App Key'}),
-            'app_id': forms.TextInput(attrs={'placeholder': 'App ID / Client Secret'}),
             'description': forms.Textarea(attrs={'rows': 3, 'placeholder': 'Optional description or notes...'}),
             'is_email_verified': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'is_mobile_verified': forms.CheckboxInput(attrs={'class': 'form-check-input'}),

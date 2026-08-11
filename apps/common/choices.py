@@ -77,3 +77,10 @@ class TestLogStatusChoices(models.TextChoices):
 class TestLogEventChoices(models.TextChoices):
     ADMIN_TEST_OTP_DISPATCH = "ADMIN_TEST_OTP_DISPATCH", "Admin Test OTP Dispatch"
     ADMIN_TEST_OTP_VERIFY = "ADMIN_TEST_OTP_VERIFY", "Admin Test OTP Verify"
+
+
+# Account Type Choices
+class AccountTypeChoices(models.TextChoices):
+    LIVE = "LIVE", "Live Account"
+    SANDBOX = "SANDBOX", "Sandbox Account"
+

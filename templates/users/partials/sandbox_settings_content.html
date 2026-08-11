@@ -3,61 +3,112 @@
     <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
         <div>
             <h2 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
-                <span class="material-icons text-primary fs-3">tune</span>
-                <span>Sandbox & Execution Settings</span>
+                <span class="material-icons text-primary fs-3">account_balance_wallet</span>
+                <span>Trading Accounts & Configurations</span>
             </h2>
-            <p class="theme-text-muted small mb-0">Configure paper trading sandbox parameters and Risk/Reward parameters.</p>
+            <p class="theme-text-muted small mb-0">Manage multi-broker live trading accounts, API credentials, and paper trading balances.</p>
         </div>
     </div>
 
-    <!-- Sandbox Configuration Panel -->
-    <div class="row g-4">
-        <div class="col-12 col-lg-6">
-            <div class="glass-card p-4 rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <h5 class="fw-bold theme-text-main mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-                    Sandbox Account Profile
+    <!-- Active Trading Account Summary Card -->
+    <div class="glass-card p-4 rounded-4 border mb-4" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+        <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons text-primary fs-4">account_balance_wallet</span>
+                <h5 class="fw-bold mb-0 theme-text-main">
+                    Active Account: {{ active_trading_account.account_name|default:"Default Sandbox" }}
                 </h5>
-
-                <div class="d-flex flex-column gap-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="small theme-text-muted fw-bold">Environment</span>
-                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold">Sandbox Mode</span>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="small theme-text-muted fw-bold">Auto-SL Engine</span>
-                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Active</span>
-                    </div>
-
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="small theme-text-muted fw-bold">Default Lot Size</span>
-                        <span class="small theme-text-main fw-bold">1 Lot</span>
-                    </div>
-                </div>
             </div>
+            <span class="badge {% if active_trading_account.account_type == 'LIVE' %}bg-success text-white{% else %}bg-secondary text-white-50{% endif %} rounded-pill px-3 py-1 fw-bold fs-6">
+                {{ active_trading_account.account_type|default:"SANDBOX" }} MODE
+            </span>
         </div>
 
-        <div class="col-12 col-lg-6">
-            <div class="glass-card p-4 rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <h5 class="fw-bold theme-text-main mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-                    Account Security & Credentials
-                </h5>
-
-                <div class="d-flex flex-column gap-3">
-                    <a href="{% url 'users:marmot-profile' %}" class="btn btn-outline-secondary d-flex align-items-center justify-content-between p-3 rounded-3 text-decoration-none">
-                        <span class="fw-semibold">Edit Broker & API Key Profile</span>
-                        <span class="material-icons fs-6">chevron_right</span>
-                    </a>
-
-                    <button type="button" 
-                            class="btn btn-outline-warning d-flex align-items-center justify-content-between p-3 rounded-3 text-decoration-none"
-                            hx-get="{% url 'users:marmot-profile-password' %}"
-                            hx-target="#globalHtmxModalDialog">
-                        <span class="fw-semibold">Change Account Password</span>
-                        <span class="material-icons fs-6">security</span>
-                    </button>
-                </div>
+        <div class="row g-3">
+            <div class="col-12 col-md-3">
+                <span class="small theme-text-muted d-block fw-bold mb-1">Broker Platform</span>
+                <span class="fw-bold theme-text-main fs-6">{{ active_trading_account.broker.name|default:"DHAN" }}</span>
             </div>
+            <div class="col-12 col-md-3">
+                <span class="small theme-text-muted d-block fw-bold mb-1">Broker Client ID</span>
+                <span class="fw-bold theme-text-main font-monospace">{{ active_trading_account.broker_client_id|default:"N/A" }}</span>
+            </div>
+            <div class="col-12 col-md-3">
+                <span class="small theme-text-muted d-block fw-bold mb-1">Account Realtime PnL</span>
+                <span class="fw-bold {% if active_trading_account.realtime_pnl >= 0 %}text-success{% else %}text-danger{% endif %} font-monospace fs-6">
+                    ₹{{ active_trading_account.realtime_pnl|default:"0.00" }}
+                </span>
+            </div>
+            <div class="col-12 col-md-3">
+                <span class="small theme-text-muted d-block fw-bold mb-1">Configuration Status</span>
+                {% if active_trading_account.is_configured %}
+                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-3 py-1 fw-bold">CONFIGURED</span>
+                {% else %}
+                    <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-3 py-1 fw-bold">PENDING SETUP</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- All Configured Trading Accounts List -->
+    <div class="glass-card p-4 rounded-4 border mb-4" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+        <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+            <h5 class="fw-bold theme-text-main mb-0">Configured Broker Trading Accounts</h5>
+            <a href="{% url 'users:marmot-profile' %}" class="btn btn-sm btn-primary rounded-pill px-3 fw-bold">
+                <span class="material-icons fs-6 me-1">add</span>Add Broker Account
+            </a>
+        </div>
+
+        <div class="table-responsive">
+            <table class="table align-middle theme-text-main mb-0">
+                <thead>
+                    <tr class="theme-text-muted smaller text-uppercase">
+                        <th>Account Name</th>
+                        <th>Broker</th>
+                        <th>Mode</th>
+                        <th>Client ID</th>
+                        <th>Default</th>
+                        <th>Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for acc in user_trading_accounts %}
+                        <tr class="{% if active_trading_account.id == acc.id %}table-active bg-primary bg-opacity-10{% endif %}">
+                            <td class="fw-bold">
+                                {{ acc.account_name }}
+                                {% if active_trading_account.id == acc.id %}
+                                    <span class="badge bg-primary text-white ms-2 smaller">ACTIVE</span>
+                                {% endif %}
+                            </td>
+                            <td class="fw-semibold">{{ acc.broker.name }}</td>
+                            <td>
+                                <span class="badge {% if acc.account_type == 'LIVE' %}bg-success bg-opacity-25 text-success{% else %}bg-secondary bg-opacity-25 theme-text-muted{% endif %} rounded-pill px-2 py-1">
+                                    {{ acc.account_type }}
+                                </span>
+                            </td>
+                            <td class="font-monospace small">{{ acc.broker_client_id|default:"-" }}</td>
+                            <td>
+                                {% if acc.is_default %}
+                                    <span class="material-icons text-warning fs-6">star</span>
+                                {% else %}
+                                    <span class="theme-text-muted small">-</span>
+                                {% endif %}
+                            </td>
+                            <td>
+                                {% if acc.is_active %}
+                                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill">Active</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill">Inactive</span>
+                                {% endif %}
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="6" class="text-center theme-text-muted py-4">No broker accounts configured.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
         </div>
     </div>
 </div>

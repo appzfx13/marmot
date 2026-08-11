@@ -1,0 +1,21 @@
+<!-- templates/users/partials/account_selector_dropdown.html -->
+<form hx-post="{% url 'users:user-account-select' %}"
+      hx-swap="none"
+      class="d-inline-flex align-items-center gap-2">
+    {% csrf_token %}
+    <div class="glass-card px-2 py-1 rounded-pill d-inline-flex align-items-center gap-1 shadow-sm border border-secondary border-opacity-25" title="Select Active Trading Account">
+        <span class="material-icons text-primary fs-6 ms-1">account_balance_wallet</span>
+        <select name="account_id" 
+                class="form-select form-select-sm bg-transparent border-0 theme-text-main fw-bold font-monospace pe-4 focus-ring-none"
+                style="font-size: 0.8125rem; width: auto; cursor: pointer;"
+                onchange="this.form.requestSubmit();">
+            {% for acc in user_trading_accounts %}
+                <option value="{{ acc.id }}" class="bg-dark text-white" {% if active_trading_account.id == acc.id %}selected{% endif %}>
+                    {% if acc.is_default %}★ {% endif %}{{ acc.account_name }} ({{ acc.broker.name }}) - {{ acc.account_type }}
+                </option>
+            {% empty %}
+                <option value="" class="bg-dark text-white">Default Sandbox Account</option>
+            {% endfor %}
+        </select>
+    </div>
+</form>

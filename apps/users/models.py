@@ -4,7 +4,7 @@ from django.db import models
 from django.contrib.auth.models import AbstractUser
 
 from cloudinary.models import CloudinaryField
-from apps.common.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices
+from apps.common.choices import AccountTypeChoices, BrokerChoices, MemberRoleChoices, PLStatusChoices
 from apps.common.models import BaseModel, SoftDeleteUserModelManager
 
 
@@ -24,22 +24,6 @@ class User(AbstractUser, BaseModel):
         default=MemberRoleChoices.TRADERS,
     )
     description = models.TextField(blank=True)
-
-    # Generic Broker & API Credentials
-    broker = models.CharField(
-        max_length=20,
-        choices=BrokerChoices.choices,
-        blank=True,
-        null=True,
-        default=BrokerChoices.DHAN
-    )
-    broker_client_id = models.CharField(max_length=100, blank=True, null=True, db_index=True, help_text="Generic Broker Client ID")
-    api_key = models.CharField(max_length=255, blank=True, null=True, help_text="Generic Broker API Key / Secret")
-    app_id = models.CharField(max_length=255, blank=True, null=True, help_text="Generic Broker App ID / Client Secret")
-
-    @property
-    def client_id(self):
-        return self.broker_client_id
 
     # Freeze / Control Flags
     primary_freeze = models.BooleanField(default=False)
@@ -75,24 +59,75 @@ class User(AbstractUser, BaseModel):
     objects = SoftDeleteUserModelManager()
     all_objects = SoftDeleteUserModelManager(with_deleted=True)
 
+    @property
+    def broker(self):
+        active = self.get_active_trading_account()
+        return active.broker.code if active and active.broker else 'dhan'
+
+    @property
+    def broker_client_id(self):
+        active = self.get_active_trading_account()
+        return active.broker_client_id if active else ''
+
+    @property
+    def client_id(self):
+        return self.broker_client_id
+
+    def get_active_trading_account(self, request=None):
+        """
+        Resolves active UserTradingAccount for this user.
+        Priority:
+        1. Account ID stored in request session ('active_account_id')
+        2. Account flagged as is_default=True
+        3. First active account
+        4. Auto-creates default Sandbox paper-trading account
+        """
+        from apps.trade_config.models import UserTradingAccount, BrokerMaster
+
+        account_id = None
+        if request and hasattr(request, 'session'):
+            account_id = request.session.get('active_account_id')
+
+        if account_id:
+            account = self.trading_accounts.filter(id=account_id, is_active=True).first()
+            if account:
+                return account
+
+        account = self.trading_accounts.filter(is_default=True, is_active=True).first()
+        if account:
+            return account
+
+        account = self.trading_accounts.filter(is_active=True).first()
+        if account:
+            return account
+
+        # Fallback: auto-seed Sandbox Broker Master and default account
+        sandbox_broker, _ = BrokerMaster.objects.get_or_create(
+            code='sandbox',
+            defaults={'name': 'SANDBOX', 'description': 'Default Paper Trading Broker Platform'}
+        )
+        return UserTradingAccount.objects.create(
+            user=self,
+            broker=sandbox_broker,
+            account_name='Default Sandbox Account',
+            account_type=AccountTypeChoices.SANDBOX,
+            is_default=True,
+            is_active=True,
+            is_configured=True
+        )
+
     def get_role_prefix(self):
-        """
-        Retrieves prefix from ENV using the role name (e.g. PREFIX_TRADERS).
-        If ENV is not set, falls back to the first 3 letters of the role.
-        """
         role_str = str(self.role).upper()
         default_prefix = role_str[:3]
         env_key = f"PREFIX_{role_str}"
         return os.environ.get(env_key, default_prefix)
 
     def generate_unique_username(self):
-        """Generates a username using the role prefix + random string."""
         prefix = self.get_role_prefix()
         unique_suffix = uuid.uuid4().hex[:8]
         return f"{prefix}_{unique_suffix}"
 
     def save(self, *args, **kwargs):
-        # Generate username on creation if not explicitly provided
         if not self.pk and not self.username:
             new_username = self.generate_unique_username()
             while User.objects.filter(username=new_username).exists():
@@ -102,5 +137,4 @@ class User(AbstractUser, BaseModel):
         super().save(*args, **kwargs)
 
     def __str__(self):
-        display_name = self.get_full_name() or self.username or f"User-{self.pk}"
-        return f"{display_name} (@{self.username})"
+        return f"{self.username} ({self.get_role_display()})"

@@ -18,6 +18,13 @@ from .views import (
     # Postback Views
     PostbackLogListView,
     PostbackLogDetailView,
+    # Broker Master Views
+    AdminBrokerMasterListView,
+    AdminBrokerMasterCreateModalView,
+    AdminBrokerMasterSaveView,
+    AdminBrokerMasterUpdateModalView,
+    AdminBrokerMasterDeleteModalView,
+    AdminBrokerMasterDeleteView,
 )
 
 from apps.market.views import MarketBackupListView, MarketBackupChartView
@@ -54,4 +61,13 @@ urlpatterns = [
     path('trade-configs/<int:pk>/', AdminTradeExecConfigDetailView.as_view(), name='trade_exec_config_detail'),
     path('trade-configs/<int:pk>/edit/', AdminTradeExecConfigUpdateView.as_view(), name='trade_exec_config_edit'),
     path('trade-configs/<int:pk>/delete/', AdminTradeExecConfigDeleteView.as_view(), name='trade_exec_config_delete'),
+
+    # Master Brokers Management
+    path('masters/brokers/', AdminBrokerMasterListView.as_view(), name='broker-master-list'),
+    path('masters/brokers/create-modal/', AdminBrokerMasterCreateModalView.as_view(), name='broker-master-create-modal'),
+    path('masters/brokers/create/', AdminBrokerMasterSaveView.as_view(), name='broker-master-create'),
+    path('masters/brokers/<int:pk>/edit-modal/', AdminBrokerMasterUpdateModalView.as_view(), name='broker-master-edit-modal'),
+    path('masters/brokers/<int:pk>/edit/', AdminBrokerMasterSaveView.as_view(), name='broker-master-edit'),
+    path('masters/brokers/<int:pk>/delete-modal/', AdminBrokerMasterDeleteModalView.as_view(), name='broker-master-delete-modal'),
+    path('masters/brokers/<int:pk>/delete/', AdminBrokerMasterDeleteView.as_view(), name='broker-master-delete'),
 ]

@@ -1,0 +1,44 @@
+<!-- templates/users/partials/env_toggle_modal.html -->
+<div class="modal-content glass-card p-2">
+    <div class="modal-header border-0 pb-2">
+        <h5 class="modal-title fw-bold d-flex align-items-center gap-2 theme-text-main">
+            <span class="material-icons {% if request.user.watching_on == 'SANDBOX' %}text-warning{% else %}text-info{% endif %} fs-4">swap_horiz</span>
+            <span>Switch Environment Mode</span>
+        </h5>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <form hx-post="{% url 'users:user-env-toggle' %}" hx-swap="none" class="modal-body pt-1">
+        {% csrf_token %}
+        {% if request.user.watching_on == 'SANDBOX' %}
+            <div class="alert alert-warning border border-warning border-opacity-25 bg-warning bg-opacity-10 rounded-3 mb-3">
+                <div class="d-flex align-items-start gap-2">
+                    <span class="material-icons text-warning fs-5 mt-1">warning</span>
+                    <div>
+                        <strong class="d-block theme-text-main mb-1">Switching to LIVE Environment</strong>
+                        <span class="small theme-text-muted">You are about to switch your global viewing and execution mode to <strong>LIVE Account</strong>. All active strategy signals and market telemetries will reflect real market trades.</span>
+                    </div>
+                </div>
+            </div>
+        {% else %}
+            <div class="alert alert-info border border-info border-opacity-25 bg-info bg-opacity-10 rounded-3 mb-3">
+                <div class="d-flex align-items-start gap-2">
+                    <span class="material-icons text-info fs-5 mt-1">science</span>
+                    <div>
+                        <strong class="d-block theme-text-main mb-1">Switching to SANDBOX Environment</strong>
+                        <span class="small theme-text-muted">You are about to switch your environment to <strong>SANDBOX Paper-Trading</strong> mode. Live trades will be paused and paper-trading data will be displayed.</span>
+                    </div>
+                </div>
+            </div>
+        {% endif %}
+
+        <p class="theme-text-muted small mb-0">Are you sure you want to proceed?</p>
+
+        <div class="modal-footer border-0 px-0 pb-0 pt-3 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn {% if request.user.watching_on == 'SANDBOX' %}btn-warning{% else %}btn-info{% endif %} text-white rounded-pill px-4 fw-bold shadow">
+                Confirm Switch to {% if request.user.watching_on == 'SANDBOX' %}LIVE{% else %}SANDBOX{% endif %}
+            </button>
+        </div>
+    </form>
+</div>

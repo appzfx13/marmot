@@ -614,6 +614,31 @@
                     href="{% url 'admins:postback_list' %}"> 
                     <span class="material-icons">receipt_long</span>Postback Logs
                 </a>
+
+                <!-- Masters Collapsible Section -->
+                <div class="nav-item">
+                    <a class="nav-link d-flex align-items-center justify-content-between {% if '/admins/masters/' in request.path %}active{% endif %}" 
+                       data-bs-toggle="collapse" 
+                       href="#mastersCollapse" 
+                       role="button" 
+                       aria-expanded="{% if '/admins/masters/' in request.path %}true{% else %}false{% endif %}" 
+                       aria-controls="mastersCollapse">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="material-icons">view_module</span>
+                            <span>Masters</span>
+                        </div>
+                        <span class="material-icons fs-6 opacity-75">expand_more</span>
+                    </a>
+                    <div class="collapse {% if '/admins/masters/' in request.path %}show{% endif %} ms-3 ps-2 border-start border-secondary border-opacity-25" id="mastersCollapse">
+                        <a class="nav-link py-2 small {% if '/admins/masters/brokers/' in request.path %}active fw-bold text-primary{% endif %}" 
+                           href="{% url 'admins:broker-master-list' %}"
+                           hx-get="{% url 'admins:broker-master-list' %}"
+                           hx-target="#mainContentBody"
+                           hx-push-url="true">
+                            <span class="material-icons fs-6 me-1">storefront</span>Broker
+                        </a>
+                    </div>
+                </div>
                 {% endif %}
             </nav>
 
@@ -814,6 +839,18 @@
                     setTimeout(function () { toastEl.remove(); }, 300);
                 }, 4000);
             }
+        });
+
+        document.body.addEventListener('closeGlobalModal', function() {
+            const modalEl = document.getElementById('globalHtmxModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) modal.hide();
+            }
+        });
+
+        document.body.addEventListener('reloadPage', function() {
+            window.location.reload();
         });
 
         const globalModalEl = document.getElementById('globalHtmxModal');

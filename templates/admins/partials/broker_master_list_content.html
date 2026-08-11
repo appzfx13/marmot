@@ -1,0 +1,142 @@
+<!-- templates/admins/partials/broker_master_list_content.html -->
+<div class="broker-master-viewport">
+    <!-- Header Controls -->
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div>
+            <h2 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
+                <span class="material-icons text-primary fs-3">storefront</span>
+                <span>Broker Table</span>
+            </h2>
+            <p class="theme-text-muted small mb-0">Manage system-wide broker integrations available for trader accounts.</p>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" 
+                    class="btn btn-primary rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+                    hx-get="{% url 'admins:broker-master-create-modal' %}"
+                    hx-target="#globalHtmxModalDialog">
+                <span class="material-icons fs-5">add</span>Add Broker
+            </button>
+        </div>
+    </div>
+
+    <!-- Summary Metrics Grid -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-md-6">
+            <div class="glass-card p-3 rounded-4 border d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-primary bg-opacity-25 p-3 text-primary d-flex align-items-center justify-content-center">
+                    <span class="material-icons fs-4">storefront</span>
+                </div>
+                <div>
+                    <span class="small theme-text-muted d-block fw-bold">Total Registered Brokers</span>
+                    <h4 class="fw-bold theme-text-main mb-0">{{ total_brokers }}</h4>
+                </div>
+            </div>
+        </div>
+        <div class="col-12 col-md-6">
+            <div class="glass-card p-3 rounded-4 border d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-success bg-opacity-25 p-3 text-success d-flex align-items-center justify-content-center">
+                    <span class="material-icons fs-4">check_circle</span>
+                </div>
+                <div>
+                    <span class="small theme-text-muted d-block fw-bold">Active Brokers</span>
+                    <h4 class="fw-bold text-success mb-0">{{ active_brokers_count }}</h4>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Controls -->
+    <div class="glass-card p-3 mb-4">
+        <form method="GET" action="{% url 'admins:broker-master-list' %}" class="row g-3 align-items-center">
+            <div class="col-12 col-md-6 col-lg-4">
+                <div class="input-group">
+                    <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
+                        <span class="material-icons fs-6">search</span>
+                    </span>
+                    <input type="text" name="q" value="{{ request.GET.q }}"
+                        class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25"
+                        placeholder="Search broker name or code..." 
+                        hx-get="{% url 'admins:broker-master-list' %}"
+                        hx-target="#mainContentBody" 
+                        hx-trigger="input changed delay:300ms, search"
+                        hx-push-url="true">
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Master Brokers Table -->
+    <div class="glass-card overflow-hidden d-flex flex-column border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+        <div class="table-responsive flex-grow-1 overflow-auto">
+            <table class="table table-hover align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; --bs-table-hover-bg: var(--nav-hover); color: var(--text-main);">
+                <thead>
+                    <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                        <th scope="col" class="ps-4 py-3 theme-text-muted">Broker Name</th>
+                        <th scope="col" class="py-3 theme-text-muted">System Code / Slug</th>
+                        <th scope="col" class="py-3 theme-text-muted">API Base URL</th>
+                        <th scope="col" class="py-3 theme-text-muted">Status</th>
+                        <th scope="col" class="text-end pe-4 py-3 theme-text-muted">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for b in brokers %}
+                        <tr style="border-color: var(--border-color) !important;">
+                            <td class="ps-4 py-3 fw-bold">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px; border: 1px solid rgba(13, 110, 253, 0.3);">
+                                        <span class="material-icons fs-5">hub</span>
+                                    </div>
+                                    <div>
+                                        <div class="fw-medium theme-text-main">{{ b.name }}</div>
+                                        <small class="theme-text-muted">code: {{ b.code }}</small>
+                                    </div>
+                                </div>
+                            </td>
+                            <td class="py-3">
+                                <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 font-monospace px-3 py-1">
+                                    {{ b.code }}
+                                </span>
+                            </td>
+                            <td class="py-3 font-monospace small theme-text-muted">
+                                {{ b.api_base_url|default:"Standard Gateway" }}
+                            </td>
+                            <td class="py-3">
+                                {% if b.is_active %}
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">ACTIVE</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-3 py-1 fw-bold">DISABLED</span>
+                                {% endif %}
+                            </td>
+                            <td class="text-end pe-4 py-3">
+                                <div class="d-flex align-items-center justify-content-end gap-2">
+                                    <button type="button" 
+                                            class="glass-icon-btn rounded-circle"
+                                            style="width: 36px; height: 36px;"
+                                            title="Edit Broker"
+                                            hx-get="{% url 'admins:broker-master-edit-modal' b.pk %}"
+                                            hx-target="#globalHtmxModalDialog">
+                                        <span class="material-icons fs-6">edit</span>
+                                    </button>
+
+                                    <button type="button" 
+                                            class="glass-icon-btn text-danger rounded-circle"
+                                            style="width: 36px; height: 36px;"
+                                            title="Delete Broker"
+                                            hx-get="{% url 'admins:broker-master-delete-modal' b.pk %}"
+                                            hx-target="#globalHtmxModalDialog">
+                                        <span class="material-icons fs-6">delete</span>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center theme-text-muted py-4">No master brokers registered.</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

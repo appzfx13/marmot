@@ -30,12 +30,12 @@ from django_filters.views import FilterView
 
 from apps.users.models import User, MemberRoleChoices, BrokerChoices, PLStatusChoices
 from apps.users.mixins import HTMXPartialMixin
-from apps.trade_config.models import TradeExecConfig
+from apps.trade_config.models import TradeExecConfig, BrokerMaster
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 from apps.admins.constants import Messages
 from apps.admins.filters import TradeExecConfigFilter
 from .permissions import AdminRequiredMixin
-from .forms import TradeExecConfigForm, UserForm, AdminTraderPasswordResetForm
+from .forms import TradeExecConfigForm, UserForm, AdminTraderPasswordResetForm, BrokerMasterForm
 
 
 # ==========================================
@@ -208,7 +208,12 @@ class AdminTraderDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['exec_config'] = TradeExecConfig.objects.filter(admins_user=self.object).first()
+        trader = self.object
+        context['profile_user'] = trader
+        context['exec_config'] = TradeExecConfig.objects.filter(admins_user=trader).first()
+        context['user_trading_accounts'] = trader.trading_accounts.filter(is_deleted=False).order_by('-is_default', 'id')
+        context['active_trading_account'] = trader.get_active_trading_account(self.request)
+        context['is_admin_or_dev'] = True
         return context
 
 
@@ -408,3 +413,114 @@ class PostbackLogDetailView(LoginRequiredMixin, DeveloperOrAdminRequiredMixin, D
         context = super().get_context_data(**kwargs)
         context['formatted_payload'] = json.dumps(self.object.payload, indent=2)
         return context
+
+
+# ==========================================
+# BROKER MASTER MANAGEMENT VIEWS
+# ==========================================
+
+class AdminBrokerMasterListView(HTMXPartialMixin, AdminRequiredMixin, ListView):
+    """View to list all Master Brokers configured in the system."""
+    model = BrokerMaster
+    template_name = 'admins/broker_master_list.html'
+    partial_template_name = 'admins/partials/broker_master_list_content.html'
+    context_object_name = 'brokers'
+    paginate_by = 10
+
+    def get_queryset(self):
+        if not BrokerMaster.objects.filter(is_deleted=False).exists():
+            BrokerMaster.objects.get_or_create(code='dhan', defaults={'name': 'DHAN', 'api_base_url': 'https://api.dhan.co', 'description': 'Dhan Broker API Gateway'})
+            BrokerMaster.objects.get_or_create(code='fyers', defaults={'name': 'FYERS', 'api_base_url': 'https://api-v2.fyers.in', 'description': 'Fyers Broker API Gateway'})
+            BrokerMaster.objects.get_or_create(code='sandbox', defaults={'name': 'SANDBOX', 'description': 'Default Paper Trading Broker Platform'})
+
+        qs = BrokerMaster.objects.filter(is_deleted=False).order_by('name')
+        search_query = self.request.GET.get('q', '').strip()
+        if search_query:
+            qs = qs.filter(Q(name__icontains=search_query) | Q(code__icontains=search_query))
+        return qs
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'broker_master'
+        context['total_brokers'] = BrokerMaster.objects.filter(is_deleted=False).count()
+        context['active_brokers_count'] = BrokerMaster.objects.filter(is_deleted=False, is_active=True).count()
+        return context
+
+
+class AdminBrokerMasterCreateModalView(HtmxModalMixin, AdminRequiredMixin, View):
+    """Render modal for creating new master broker."""
+    modal_template_name = 'admins/partials/broker_master_modal.html'
+    template_name = 'admins/partials/broker_master_modal.html'
+
+    def get(self, request, *args, **kwargs):
+        form = BrokerMasterForm()
+        return render(request, self.modal_template_name, {'form': form, 'is_edit': False})
+
+
+class AdminBrokerMasterSaveView(AdminRequiredMixin, View):
+    """Handle creating or updating a Master Broker."""
+    def post(self, request, pk=None, *args, **kwargs):
+        broker = get_object_or_404(BrokerMaster, pk=pk, is_deleted=False) if pk else None
+        form = BrokerMasterForm(request.POST, instance=broker)
+
+        if form.is_valid():
+            broker_obj = form.save()
+            action_txt = "updated" if pk else "created"
+            msg = f"Master Broker '{broker_obj.name}' ({broker_obj.code}) {action_txt} successfully!"
+            messages.success(request, msg)
+
+            response = HttpResponse()
+            response['HX-Trigger'] = json.dumps({
+                'closeGlobalModal': True,
+                'showToast': {'message': msg, 'level': 'success'},
+                'reloadPage': True
+            })
+            return response
+        else:
+            msg = f"Failed to save broker: {form.errors.as_text()}"
+            messages.error(request, msg)
+            response = HttpResponse()
+            response['HX-Trigger'] = json.dumps({'showToast': {'message': msg, 'level': 'error'}})
+            return response
+
+
+class AdminBrokerMasterUpdateModalView(HtmxModalMixin, AdminRequiredMixin, View):
+    """Render modal for editing master broker."""
+    modal_template_name = 'admins/partials/broker_master_modal.html'
+    template_name = 'admins/partials/broker_master_modal.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        broker = get_object_or_404(BrokerMaster, pk=pk, is_deleted=False)
+        form = BrokerMasterForm(instance=broker)
+        return render(request, self.modal_template_name, {'form': form, 'broker': broker, 'is_edit': True})
+
+
+class AdminBrokerMasterDeleteModalView(HtmxModalMixin, AdminRequiredMixin, View):
+    """Render delete confirmation modal for master broker."""
+    modal_template_name = 'admins/partials/broker_master_delete_modal.html'
+    template_name = 'admins/partials/broker_master_delete_modal.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        broker = get_object_or_404(BrokerMaster, pk=pk, is_deleted=False)
+        return render(request, self.modal_template_name, {'broker': broker})
+
+
+class AdminBrokerMasterDeleteView(AdminRequiredMixin, View):
+    """Soft delete a master broker."""
+    def post(self, request, pk, *args, **kwargs):
+        broker = get_object_or_404(BrokerMaster, pk=pk, is_deleted=False)
+        name = broker.name
+        broker.is_deleted = True
+        broker.is_active = False
+        broker.save(update_fields=['is_deleted', 'is_active'])
+
+        msg = f"Master Broker '{name}' soft-deleted successfully!"
+        messages.success(request, msg)
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'success'},
+            'reloadPage': True
+        })
+        return response
