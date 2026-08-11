@@ -357,6 +357,12 @@
                     <span>Backtesting</span>
                 </a>
 
+                <a class="nav-link {% if active_tab == 'backup' or request.resolver_match.url_name == 'user-backup-list' %}active{% endif %}" 
+                   href="{% url 'users:user-backup-list' %}">
+                    <span class="material-icons">cloud_download</span>
+                    <span>Market Backup</span>
+                </a>
+
                 <a class="nav-link {% if active_tab == 'sandbox' or request.resolver_match.url_name == 'user-sandbox' %}active{% endif %}" 
                    href="{% url 'users:user-sandbox' %}">
                     <span class="material-icons">tune</span>
@@ -393,6 +399,22 @@
                     </button>
 
                     <div class="top-action-bar ms-auto d-flex align-items-center gap-2">
+                        <!-- Live Time Widget in Fixed Header -->
+                        <div class="glass-card px-3 py-1 rounded-pill d-inline-flex align-items-center gap-1 theme-text-main small" title="Live Local Time">
+                            <span class="material-icons text-primary fs-6">schedule</span>
+                            <span id="liveClockWidget" class="fw-bold font-monospace">00:00:00 AM</span>
+                        </div>
+
+                        <!-- LIVE / SANDBOX Environment Toggle Badge -->
+                        <button type="button"
+                                class="btn btn-sm rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm {% if request.session.user_trading_env == 'LIVE' %}btn-success text-white{% else %}btn-secondary text-white-50{% endif %}"
+                                hx-post="{% url 'users:user-env-toggle' %}"
+                                hx-swap="none"
+                                title="Toggle Trading Environment (LIVE / SANDBOX)">
+                            <span class="material-icons fs-6">toggle_on</span>
+                            <span>{% if request.session.user_trading_env == 'LIVE' %}LIVE{% else %}SANDBOX{% endif %}</span>
+                        </button>
+
                         <!-- Emergency Kill Switch Button -->
                         <button type="button" 
                                 class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
@@ -557,6 +579,18 @@
                 setTimeout(() => toastEl.remove(), 4000);
             }
         });
+
+        // Live Digital Clock Widget Function
+        function updateLiveClock() {
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: true });
+            const clockEl = document.getElementById('liveClockWidget');
+            if (clockEl) {
+                clockEl.textContent = timeStr;
+            }
+        }
+        setInterval(updateLiveClock, 1000);
+        updateLiveClock();
     </script>
 </body>
 </html>

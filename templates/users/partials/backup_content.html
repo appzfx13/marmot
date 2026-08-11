@@ -1,0 +1,82 @@
+<!-- templates/users/partials/backup_content.html -->
+<div class="user-backup-viewport">
+    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+        <div>
+            <h2 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
+                <span class="material-icons text-primary fs-3">cloud_download</span>
+                <span>Market Data Backups & Downloads</span>
+            </h2>
+            <p class="theme-text-muted small mb-0">Generate options market dataset backups and download Parquet files for your account.</p>
+        </div>
+        <button type="button" 
+                class="btn theme-btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+                hx-get="{% url 'users:user-backup-create' %}"
+                hx-target="#globalHtmxModalDialog">
+            <span class="material-icons fs-5">cloud_upload</span>
+            <span>Request New Backup</span>
+        </button>
+    </div>
+
+    <!-- Backup List Table Container -->
+    <div class="glass-card p-4 rounded-4 border shadow-sm" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold theme-text-main mb-0">My Generated Backup Datasets</h5>
+        </div>
+
+        {% if backup_tasks %}
+            <div class="table-responsive">
+                <table class="table align-middle theme-text-main mb-0">
+                    <thead>
+                        <tr class="theme-text-muted text-uppercase smaller border-bottom" style="border-color: var(--border-color) !important;">
+                            <th>ID</th>
+                            <th>Index</th>
+                            <th>Date Range</th>
+                            <th>Strikes</th>
+                            <th>Status</th>
+                            <th>File Size</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for backup in backup_tasks %}
+                            <tr class="border-bottom" style="border-color: var(--border-color) !important;">
+                                <td class="fw-bold">#{{ backup.id }}</td>
+                                <td><span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 px-2 py-1">{{ backup.index_name }}</span></td>
+                                <td class="small">{{ backup.start_date|date:"M d, Y" }} — {{ backup.end_date|date:"M d, Y" }}</td>
+                                <td class="small">{{ backup.strike_count }} strikes</td>
+                                <td>
+                                    {% if backup.status == 'COMPLETED' or backup.status == 'SUCCESS' %}
+                                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
+                                    {% elif backup.status == 'FAILED' %}
+                                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Failed</span>
+                                    {% else %}
+                                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Processing</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small">{{ backup.file_size_mb|default:"0.0" }} MB</td>
+                                <td class="text-end">
+                                    {% if backup.parquet_file_path or backup.status == 'COMPLETED' or backup.status == 'SUCCESS' %}
+                                        <a href="{% url 'users:user-backup-download' backup.id %}" 
+                                           class="btn btn-sm btn-outline-success rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1">
+                                            <span class="material-icons fs-6">download</span>
+                                            <span>Download Data</span>
+                                        </a>
+                                    {% else %}
+                                        <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled>
+                                            Generating...
+                                        </button>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5 theme-text-muted">
+                <span class="material-icons fs-1 mb-2">cloud_download</span>
+                <p class="mb-0">No market backup tasks generated for your account yet.</p>
+            </div>
+        {% endif %}
+    </div>
+</div>

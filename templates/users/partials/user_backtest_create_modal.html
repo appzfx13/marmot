@@ -1,0 +1,77 @@
+<!-- templates/users/partials/user_backtest_create_modal.html -->
+<div class="modal-content glass-card p-2">
+    <div class="modal-header border-0 pb-2">
+        <h5 class="modal-title theme-text-main fw-bold d-flex align-items-center gap-2">
+            <span class="material-icons text-primary">play_arrow</span>
+            Run New Backtest Simulation
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <form hx-post="{% url 'users:user-backtest-create' %}" hx-swap="none" class="modal-body pt-1">
+        {% csrf_token %}
+        <p class="theme-text-muted small mb-3">
+            Configure strategy backtesting parameters for your account <strong class="theme-text-main">@{{ request.user.username }}</strong>.
+        </p>
+
+        {% if form.non_field_errors %}
+            <div class="alert alert-danger p-2 mb-3 smaller">
+                {% for error in form.non_field_errors %}
+                    <div><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+
+        <div class="row g-3">
+            <div class="col-12 col-md-6">
+                <label class="form-label theme-text-muted smaller fw-bold uppercase mb-1" for="{{ form.strategy_name.id_for_label }}">
+                    Strategy
+                </label>
+                {{ form.strategy_name }}
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label theme-text-muted smaller fw-bold uppercase mb-1" for="{{ form.index_name.id_for_label }}">
+                    Target Index
+                </label>
+                {{ form.index_name }}
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label theme-text-muted smaller fw-bold uppercase mb-1" for="{{ form.start_date.id_for_label }}">
+                    Start Date
+                </label>
+                {{ form.start_date }}
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label theme-text-muted smaller fw-bold uppercase mb-1" for="{{ form.end_date.id_for_label }}">
+                    End Date
+                </label>
+                {{ form.end_date }}
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label theme-text-muted smaller fw-bold uppercase mb-1" for="{{ form.initial_capital.id_for_label }}">
+                    Initial Capital (₹)
+                </label>
+                {{ form.initial_capital }}
+            </div>
+
+            <div class="col-12 col-md-6">
+                <label class="form-label theme-text-muted smaller fw-bold uppercase mb-1" for="{{ form.backup_task.id_for_label }}">
+                    Backup Dataset (Optional)
+                </label>
+                {{ form.backup_task }}
+            </div>
+        </div>
+
+        <div class="modal-footer border-0 px-0 pb-0 pt-3 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn theme-btn-primary rounded-pill px-4 fw-bold shadow-sm">
+                <span class="material-icons align-middle fs-6 me-1">play_arrow</span>
+                Start Simulation
+            </button>
+        </div>
+    </form>
+</div>

@@ -6,20 +6,23 @@
                 <span class="material-icons text-primary fs-3">science</span>
                 <span>Strategy Backtesting</span>
             </h2>
-            <p class="theme-text-muted small mb-0">Simulate market strategies, risk levels, and automated lot sizing rules.</p>
+            <p class="theme-text-muted small mb-0">Simulate market strategies, risk levels, and automated lot sizing rules for your account.</p>
         </div>
-        <a href="{% url 'admins:backtest_dashboard' %}" class="btn theme-btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2">
+        <button type="button" 
+                class="btn theme-btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+                hx-get="{% url 'users:user-backtest-create' %}"
+                hx-target="#globalHtmxModalDialog">
             <span class="material-icons fs-5">play_arrow</span>
             <span>Run New Simulation</span>
-        </a>
+        </button>
     </div>
 
     <!-- Backtest Quick Stats -->
     <div class="row g-3 mb-4">
         <div class="col-12 col-md-4">
             <div class="glass-card p-3 rounded-4 border theme-text-main" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <span class="small theme-text-muted text-uppercase fw-bold">Active Backtest Jobs</span>
-                <h3 class="fw-bold mb-0 mt-1 theme-text-main">0</h3>
+                <span class="small theme-text-muted text-uppercase fw-bold">My Backtest Tasks</span>
+                <h3 class="fw-bold mb-0 mt-1 theme-text-main">{{ total_backtests|default:0 }}</h3>
             </div>
         </div>
         <div class="col-12 col-md-4">
@@ -36,11 +39,62 @@
         </div>
     </div>
 
+    <!-- Backtests Table Container -->
     <div class="glass-card p-4 rounded-4 border shadow-sm" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-        <h5 class="fw-bold theme-text-main mb-3">Simulation Runs</h5>
-        <div class="text-center py-5 theme-text-muted">
-            <span class="material-icons fs-1 mb-2">science</span>
-            <p class="mb-0">No active backtesting simulations available.</p>
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h5 class="fw-bold theme-text-main mb-0">My Simulation Runs</h5>
         </div>
+
+        {% if backtests %}
+            <div class="table-responsive">
+                <table class="table align-middle theme-text-main mb-0">
+                    <thead>
+                        <tr class="theme-text-muted text-uppercase smaller border-bottom" style="border-color: var(--border-color) !important;">
+                            <th>ID</th>
+                            <th>Strategy</th>
+                            <th>Index</th>
+                            <th>Date Range</th>
+                            <th>Status</th>
+                            <th>Capital</th>
+                            <th class="text-end">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for task in backtests %}
+                            <tr class="border-bottom" style="border-color: var(--border-color) !important;">
+                                <td class="fw-bold">#{{ task.id }}</td>
+                                <td><span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 px-2 py-1">{{ task.strategy_name }}</span></td>
+                                <td><span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 px-2 py-1">{{ task.index_name }}</span></td>
+                                <td class="small">{{ task.start_date|date:"M d, Y" }} — {{ task.end_date|date:"M d, Y" }}</td>
+                                <td>
+                                    {% if task.status == 'COMPLETED' or task.status == 'SUCCESS' %}
+                                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
+                                    {% elif task.status == 'FAILED' %}
+                                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Failed</span>
+                                    {% else %}
+                                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Processing</span>
+                                    {% endif %}
+                                </td>
+                                <td class="small fw-semibold">₹{{ task.initial_capital }}</td>
+                                <td class="text-end">
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1"
+                                            hx-get="{% url 'users:user-backtest-detail' task.id %}"
+                                            hx-target="#globalHtmxModalDialog">
+                                        <span class="material-icons fs-6">visibility</span>
+                                        <span>View Results</span>
+                                    </button>
+                                </td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        {% else %}
+            <div class="text-center py-5 theme-text-muted">
+                <span class="material-icons fs-1 mb-2">science</span>
+                <p class="mb-0">No active backtesting simulations available for your account.</p>
+            </div>
+        {% endif %}
     </div>
 </div>
