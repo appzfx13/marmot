@@ -102,7 +102,7 @@
 
     /* Glass Modal Styling */
     .glass-modal-content {
-        background: rgba(17, 24, 39, 0.85) !important;
+        background: var(--modal-bg) !important;
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
         border: 1px solid var(--border-color) !important;
@@ -307,6 +307,14 @@
 
         {# Action Buttons #}
         <div class="d-flex justify-content-end gap-2 pt-3 border-top" style="border-color: var(--border-color) !important;">
+            {% if form.instance.pk %}
+                <button type="button" 
+                        class="btn btn-sm btn-outline-warning rounded-pill px-3 py-2 small fw-bold d-inline-flex align-items-center gap-1"
+                        hx-get="{% url 'admins:trader_password_reset' form.instance.pk %}"
+                        hx-target="#globalHtmxModalDialog">
+                    <span class="material-icons fs-6">vpn_key</span> RESET PASSWORD
+                </button>
+            {% endif %}
             <a href="{% url 'admins:trader_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold text-decoration-none">
                 CANCEL
             </a>

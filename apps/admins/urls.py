@@ -8,6 +8,7 @@ from .views import (
     AdminTraderDetailView,
     AdminTraderUpdateView,
     AdminTraderDeleteView,
+    AdminTraderPasswordResetView,
     # Trade Exec Config Views
     AdminTradeExecConfigListView,
     AdminTradeExecConfigCreateView,
@@ -41,6 +42,7 @@ urlpatterns = [
     path('traders/<int:pk>/', AdminTraderDetailView.as_view(), name='trader_detail'),
     path('traders/<int:pk>/edit/', AdminTraderUpdateView.as_view(), name='trader_edit'),
     path('traders/<int:pk>/delete/', AdminTraderDeleteView.as_view(), name='trader_delete'),
+    path('traders/<int:pk>/password-reset/', AdminTraderPasswordResetView.as_view(), name='trader_password_reset'),
 
     # Postback & Webhook Audit Logs
     path('postbacks/', PostbackLogListView.as_view(), name='postback_list'),

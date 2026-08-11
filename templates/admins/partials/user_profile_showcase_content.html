@@ -1,7 +1,7 @@
 {% load static %}
 
 <!-- Profile Showcase Header Card -->
-<div class="glass-card p-4 p-md-5 mb-4 rounded-4 shadow-lg border-0" style="background: rgba(17, 24, 39, 0.75); backdrop-filter: blur(16px); border: 1px solid var(--border-color) !important;">
+<div class="glass-card p-4 p-md-5 mb-4 rounded-4 shadow-lg border-0" style="background: var(--glass-bg); backdrop-filter: blur(16px); border: 1px solid var(--border-color) !important;">
     <div class="d-flex flex-column flex-md-row align-items-center justify-content-between gap-4 pb-4 border-bottom" style="border-color: var(--border-color) !important;">
         <div class="d-flex flex-column flex-sm-row align-items-center gap-4 text-center text-sm-start">
             <div class="position-relative">
@@ -29,15 +29,34 @@
             </div>
         </div>
 
-        <!-- Edit Profile Action Button -->
-        <a href="{% if profile_user != request.user %}{% url 'users:marmot-profile-user' profile_user.pk %}{% else %}{% url 'users:marmot-profile' %}{% endif %}?edit=1" 
-           class="btn btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
-           hx-get="{% if profile_user != request.user %}{% url 'users:marmot-profile-user' profile_user.pk %}{% else %}{% url 'users:marmot-profile' %}{% endif %}?edit=1"
-           hx-target="#user-profile-container"
-           hx-push-url="true">
-            <span class="material-icons fs-5">edit</span>
-            <span>Edit Profile</span>
-        </a>
+        <!-- Edit Profile & Password Action Buttons -->
+        <div class="d-flex gap-2 flex-wrap">
+            {% if profile_user == request.user %}
+                <button type="button" 
+                        class="btn btn-outline-warning rounded-pill px-3 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+                        hx-get="{% url 'users:marmot-profile-password' %}"
+                        hx-target="#globalHtmxModalDialog">
+                    <span class="material-icons fs-5">security</span>
+                    <span>Change Password</span>
+                </button>
+            {% elif request.user.is_superuser or request.user.role == 'admin' %}
+                <button type="button" 
+                        class="btn btn-outline-warning rounded-pill px-3 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+                        hx-get="{% url 'admins:trader_password_reset' profile_user.pk %}"
+                        hx-target="#globalHtmxModalDialog">
+                    <span class="material-icons fs-5">vpn_key</span>
+                    <span>Reset Password</span>
+                </button>
+            {% endif %}
+            <a href="{% if profile_user != request.user %}{% url 'users:marmot-profile-user' profile_user.pk %}{% else %}{% url 'users:marmot-profile' %}{% endif %}?edit=1" 
+               class="btn btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+               hx-get="{% if profile_user != request.user %}{% url 'users:marmot-profile-user' profile_user.pk %}{% else %}{% url 'users:marmot-profile' %}{% endif %}?edit=1"
+               hx-target="#user-profile-container"
+               hx-push-url="true">
+                <span class="material-icons fs-5">edit</span>
+                <span>Edit Profile</span>
+            </a>
+        </div>
     </div>
 
     <!-- Grid Showcase Cards -->

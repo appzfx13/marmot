@@ -1,0 +1,191 @@
+<!-- templates/users/partials/dashboard_content.html -->
+<div class="user-dashboard-viewport">
+
+    <!-- Header & Account Quick Banner -->
+    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3 mb-4">
+        <div>
+            <h2 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
+                <span>Welcome back, {{ request.user.first_name|default:request.user.username }}!</span>
+            </h2>
+            <p class="theme-text-muted small mb-0">Overview of trader performance, broker health, and execution controls.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            {% if request.user.trade_eligibility and not request.user.is_blocked %}
+                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6">check_circle</span> Trade Eligible
+                </span>
+            {% else %}
+                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6">block</span> Trade Blocked
+                </span>
+            {% endif %}
+
+            {% if request.user.primary_freeze or request.user.final_freeze %}
+                <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6">ac_unit</span> Account Frozen
+                </span>
+            {% endif %}
+        </div>
+    </div>
+
+    <!-- 4 Meaningful Trader Metrics Cards (Replacing Generic Graphs) -->
+    <div class="row g-3 mb-4">
+        <!-- Card 1: P&L Performance -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="metric-card glass-card p-3 h-100 theme-text-main rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="small theme-text-muted text-uppercase fw-bold" style="letter-spacing: 0.5px;">Net P&L</span>
+                    <span class="material-icons text-primary">account_balance_wallet</span>
+                </div>
+                <h3 class="fw-bold mb-1 {% if request.user.pl_integer > 0 %}text-success{% elif request.user.pl_integer < 0 %}text-danger{% else %}theme-text-main{% endif %}">
+                    ₹{{ request.user.pl_integer|default:"0.00" }}
+                </h3>
+                <div class="d-flex align-items-center gap-1 smaller">
+                    <span class="badge {% if request.user.stats == 'PROFIT' %}bg-success bg-opacity-25 text-success{% elif request.user.stats == 'LOSS' %}bg-danger bg-opacity-25 text-danger{% else %}bg-secondary bg-opacity-25 theme-text-muted{% endif %} rounded-pill px-2 py-0.5">
+                        {{ request.user.get_stats_display|default:"No Trade" }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Execution Freeze Controls -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="metric-card glass-card p-3 h-100 theme-text-main rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="small theme-text-muted text-uppercase fw-bold" style="letter-spacing: 0.5px;">Freeze Status</span>
+                    <span class="material-icons text-warning">security</span>
+                </div>
+                <h4 class="fw-bold mb-1 theme-text-main">
+                    {% if request.user.final_freeze %}
+                        <span class="text-danger">Final Freeze</span>
+                    {% elif request.user.primary_freeze %}
+                        <span class="text-warning">Primary Freeze</span>
+                    {% else %}
+                        <span class="text-success">Active / Unfrozen</span>
+                    {% endif %}
+                </h4>
+                <p class="smaller theme-text-muted mb-0">Safety limits and risk controls</p>
+            </div>
+        </div>
+
+        <!-- Card 3: Broker Health & API Status -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="metric-card glass-card p-3 h-100 theme-text-main rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="small theme-text-muted text-uppercase fw-bold" style="letter-spacing: 0.5px;">Broker Health</span>
+                    <span class="material-icons text-info">lan</span>
+                </div>
+                <h4 class="fw-bold mb-1 theme-text-main">
+                    {{ request.user.get_broker_display|default:"Dhan Broker" }}
+                </h4>
+                <div class="d-flex align-items-center gap-1 smaller theme-text-muted">
+                    <span class="badge bg-success rounded-circle p-1 me-1"></span>
+                    <span>Client ID: {{ request.user.broker_client_id|default:"Configured" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Platform Traders Overview -->
+        <div class="col-12 col-sm-6 col-lg-3">
+            <div class="metric-card glass-card p-3 h-100 theme-text-main rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-start mb-2">
+                    <span class="small theme-text-muted text-uppercase fw-bold" style="letter-spacing: 0.5px;">System Traders</span>
+                    <span class="material-icons text-primary">groups</span>
+                </div>
+                <h3 class="fw-bold mb-1 theme-text-main">{{ active_traders|default:0 }} / {{ total_traders|default:0 }}</h3>
+                <p class="smaller theme-text-muted mb-0">Eligible execution accounts</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Meaningful Trader Control Widgets -->
+    <div class="row g-4 mb-4">
+        <!-- Account Status & Integration Health -->
+        <div class="col-12 col-lg-6">
+            <div class="glass-card p-4 rounded-4 border h-100" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons text-primary fs-5">tune</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Account Integration & Security</h6>
+                </div>
+
+                <div class="d-flex flex-column gap-3">
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Primary Freeze Flag</span>
+                        {% if request.user.primary_freeze %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Enabled</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-3 py-1 fw-bold">Disabled</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Final Freeze Flag</span>
+                        {% if request.user.final_freeze %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 fw-bold">Enabled</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-3 py-1 fw-bold">Disabled</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Broker API Connection</span>
+                        {% if request.user.api_key %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Connected</span>
+                        {% else %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Pending API Key</span>
+                        {% endif %}
+                    </div>
+
+                    <div class="d-flex justify-content-between align-items-center">
+                        <span class="small theme-text-muted fw-bold">Email Verification</span>
+                        {% if request.user.is_email_verified %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Verified</span>
+                        {% else %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Unverified</span>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Quick Execution Actions -->
+        <div class="col-12 col-lg-6">
+            <div class="glass-card p-4 rounded-4 border h-100" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons text-primary fs-5">bolt</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Quick Controls & Shortcuts</h6>
+                </div>
+
+                <div class="d-flex flex-column gap-3">
+                    <a href="{% url 'users:marmot-profile' %}" class="btn btn-outline-secondary d-flex align-items-center justify-content-between p-3 rounded-3 text-decoration-none">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="material-icons text-primary">account_circle</span>
+                            <span class="fw-semibold">Update Profile & Credentials</span>
+                        </div>
+                        <span class="material-icons fs-6">chevron_right</span>
+                    </a>
+
+                    <a href="{% url 'admins:trade_exec_config_list' %}" class="btn btn-outline-secondary d-flex align-items-center justify-content-between p-3 rounded-3 text-decoration-none">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="material-icons text-success">settings</span>
+                            <span class="fw-semibold">View Trade Execution Parameters</span>
+                        </div>
+                        <span class="material-icons fs-6">chevron_right</span>
+                    </a>
+
+                    <button type="button" 
+                            class="btn btn-outline-danger d-flex align-items-center justify-content-between p-3 rounded-3 text-start w-100"
+                            hx-get="{% url 'users:user-kill-switch' %}"
+                            hx-target="#globalHtmxModalDialog">
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="material-icons text-danger">bolt</span>
+                            <span class="fw-bold text-danger">Emergency Freeze Account</span>
+                        </div>
+                        <span class="material-icons fs-6 text-danger">chevron_right</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>

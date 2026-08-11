@@ -82,3 +82,33 @@ class TradeExecConfigForm(forms.ModelForm):
             'forecast_status': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'backtest_status': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
+
+
+class AdminTraderPasswordResetForm(forms.Form):
+    """Form for admins to reset a trader's password directly."""
+    new_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter new password',
+            'autocomplete': 'new-password'
+        }),
+        label="New Password",
+        min_length=6
+    )
+    confirm_password = forms.CharField(
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Confirm new password',
+            'autocomplete': 'new-password'
+        }),
+        label="Confirm Password",
+        min_length=6
+    )
+
+    def clean(self):
+        cleaned_data = super().clean()
+        p1 = cleaned_data.get('new_password')
+        p2 = cleaned_data.get('confirm_password')
+        if p1 and p2 and p1 != p2:
+            self.add_error('confirm_password', "Passwords do not match.")
+        return cleaned_data

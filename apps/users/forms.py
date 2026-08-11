@@ -1,4 +1,5 @@
 from django import forms
+from django.contrib.auth.forms import PasswordChangeForm
 from .models import User
 
 
@@ -75,3 +76,29 @@ class UserProfileForm(forms.ModelForm):
                 self.fields['broker_client_id'].disabled = True
                 self.fields['api_key'].disabled = True
                 self.fields['app_id'].disabled = True
+
+
+class UserProfilePasswordChangeForm(PasswordChangeForm):
+    """Form for users and admins to change their own password."""
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if 'old_password' in self.fields:
+            self.fields['old_password'].widget.attrs.update({
+                'class': 'form-control',
+                'placeholder': 'Enter current password',
+                'autocomplete': 'current-password'
+            })
+        if 'new_password1' in self.fields:
+            self.fields['new_password1'].widget.attrs.update({
+                'class': 'form-control',
+                'placeholder': 'Enter new password',
+                'autocomplete': 'new-password'
+            })
+        if 'new_password2' in self.fields:
+            self.fields['new_password2'].widget.attrs.update({
+                'class': 'form-control',
+                'placeholder': 'Confirm new password',
+                'autocomplete': 'new-password'
+            })
+

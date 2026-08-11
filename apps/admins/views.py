@@ -13,13 +13,14 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.db.models import Q
 from django.http import HttpResponse
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import (
     CreateView,
     DeleteView,
     DetailView,
+    FormView,
     ListView,
     TemplateView,
     UpdateView,
@@ -34,7 +35,7 @@ from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 from apps.admins.constants import Messages
 from apps.admins.filters import TradeExecConfigFilter
 from .permissions import AdminRequiredMixin
-from .forms import TradeExecConfigForm, UserForm
+from .forms import TradeExecConfigForm, UserForm, AdminTraderPasswordResetForm
 
 
 # ==========================================
@@ -237,6 +238,39 @@ class AdminTraderDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin
             'reloadTraderTable': True  # <-- NEW TRIGGER added here
         })
         return response
+
+
+class AdminTraderPasswordResetView(HtmxModalMixin, LoginRequiredMixin, AdminRequiredMixin, FormView):
+    """View for admins to reset a trader's password with confirmation modal."""
+    form_class = AdminTraderPasswordResetForm
+    modal_template_name = 'admins/partials/admin_trader_password_modal.html'
+    template_name = 'admins/partials/admin_trader_password_modal.html'
+
+    def get_trader(self):
+        return get_object_or_404(User, pk=self.kwargs.get('pk'), role=MemberRoleChoices.TRADERS, is_deleted=False)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['trader'] = self.get_trader()
+        return context
+
+    def form_valid(self, form):
+        trader = self.get_trader()
+        new_password = form.cleaned_data['new_password']
+        trader.set_password(new_password)
+        trader.save()
+
+        response = HttpResponse()
+        msg = f"Password for trader '{trader.username}' updated successfully!"
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'success'},
+            'reloadTraderTable': True
+        })
+        return response
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
 
 
 # ==========================================

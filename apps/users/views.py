@@ -1,12 +1,17 @@
-from django.contrib.auth import login as auth_login, logout as auth_logout
+import json
+from django.contrib.auth import login as auth_login, logout as auth_logout, update_session_auth_hash
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView
 from django.http import HttpResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views import View
-from django.views.generic import TemplateView
+from django.views.generic import FormView, TemplateView, UpdateView
 
+from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
+from .forms import UserProfileForm, UserProfilePasswordChangeForm
 from .mixins import HTMXPartialMixin, MarmotRoleRequiredMixin
+from .models import User
 from .permissions import is_user_authorized_for_dashboard
 from .services import get_user_profile
 
@@ -54,19 +59,73 @@ class LoginView(HTMXPartialMixin, LoginView):
 
 
 class UserDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
-    """
-    Protected Marmot Dashboard View. Uses MarmotRoleRequiredMixin to 
-    ensure only authorized roles can access.
-    """
+    """Protected Marmot Dashboard View serving dashboard_content.html partial for HTMX."""
     template_name = 'users/dashboard.html'
-    partial_template_name = 'admins/partials/dashboard_content.html'
+    partial_template_name = 'users/partials/dashboard_content.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'dashboard'
         context['marmot_profile'] = get_user_profile(self.request.user.username)
         context['total_traders'] = User.objects.filter(is_superuser=False).count()
         context['active_traders'] = User.objects.filter(is_superuser=False, trade_eligibility=True, is_blocked=False).count()
         return context
+
+
+class UserJournalView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """View for user execution journal."""
+    template_name = 'users/dashboard.html'
+    partial_template_name = 'users/partials/journal_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'journal'
+        return context
+
+
+class UserBacktestView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """View for user strategy backtesting."""
+    template_name = 'users/dashboard.html'
+    partial_template_name = 'users/partials/backtest_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'backtest'
+        return context
+
+
+class UserSandboxSettingsView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """View for user sandbox & risk settings."""
+    template_name = 'users/dashboard.html'
+    partial_template_name = 'users/partials/sandbox_settings_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'sandbox'
+        return context
+
+
+class UserKillSwitchView(HtmxModalMixin, LoginRequiredMixin, View):
+    """View for user emergency kill switch trigger."""
+    modal_template_name = 'users/partials/kill_switch_modal.html'
+    template_name = 'users/partials/kill_switch_modal.html'
+
+    def get(self, request, *args, **kwargs):
+        return render(request, self.modal_template_name)
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        user.primary_freeze = True
+        user.final_freeze = True
+        user.save()
+
+        response = HttpResponse()
+        msg = f"EMERGENCY KILL SWITCH ACTIVATED for @{user.username}! All trade executions frozen."
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'warning'}
+        })
+        return response
 
 
 class LogoutView(View):
@@ -89,12 +148,6 @@ class LogoutView(View):
 # ==========================================
 # USER PROFILE VIEW & SETTINGS
 # ==========================================
-
-from django.contrib.auth.mixins import LoginRequiredMixin
-from django.views.generic import UpdateView
-from apps.common.mixins import HtmxMessageMixin
-from .models import User
-from .forms import UserProfileForm
 
 class UserProfileView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, UpdateView):
     model = User
@@ -137,3 +190,29 @@ class UserProfileView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, Up
             user_obj and (user_obj.broker or user_obj.broker_client_id or user_obj.api_key)
         )
         return context
+
+
+class UserProfilePasswordChangeView(HtmxModalMixin, LoginRequiredMixin, FormView):
+    """View for users and admins to change their own password via modal."""
+    form_class = UserProfilePasswordChangeForm
+    modal_template_name = 'admins/partials/user_password_change_modal.html'
+    template_name = 'admins/partials/user_password_change_modal.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        user = form.save()
+        update_session_auth_hash(self.request, user)
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': "Your password has been changed successfully!", 'level': 'success'}
+        })
+        return response
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
