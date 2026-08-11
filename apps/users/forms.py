@@ -113,15 +113,35 @@ class UserBacktestTaskForm(forms.ModelForm):
         if user:
             self.fields['backup_task'].queryset = MarketBackupTask.objects.filter(is_deleted=False, created_by=user)
 
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+        initial_capital = cleaned_data.get('initial_capital')
+        if start_date and end_date and start_date > end_date:
+            raise forms.ValidationError("Start date cannot be after End date.")
+        if initial_capital is not None and initial_capital <= 0:
+            raise forms.ValidationError("Initial capital must be a positive amount.")
+        return cleaned_data
+
 
 class UserMarketBackupTaskForm(forms.ModelForm):
     class Meta:
         model = MarketBackupTask
         fields = ['index_name', 'start_date', 'end_date', 'strike_count']
         widgets = {
-            'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25'}),
-            'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25'}),
-            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25'}),
-            'strike_count': forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'min': 1, 'max': 20}),
+            'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'required': 'required'}),
+            'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'required': 'required'}),
+            'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'required': 'required'}),
+            'strike_count': forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'min': 1, 'max': 20, 'required': 'required'}),
         }
+
+    def clean(self):
+        cleaned_data = super().clean()
+        start_date = cleaned_data.get('start_date')
+        end_date = cleaned_data.get('end_date')
+        if start_date and end_date and start_date > end_date:
+            raise forms.ValidationError("Start date cannot be after End date.")
+        return cleaned_data
+
 

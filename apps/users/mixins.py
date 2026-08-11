@@ -1,5 +1,7 @@
 from django.contrib.auth.mixins import UserPassesTestMixin
+from django.http import HttpResponse
 from django.shortcuts import redirect
+from django.urls import reverse
 from .permissions import is_user_authorized_for_dashboard
 
 
@@ -16,11 +18,17 @@ class HTMXPartialMixin:
 class MarmotRoleRequiredMixin(UserPassesTestMixin):
     """
     Django View Mixin to restrict access based on dashboard roles.
+    Redirects unauthenticated users to login page.
     """
     def test_func(self):
         return is_user_authorized_for_dashboard(self.request.user)
 
     def handle_no_permission(self):
-        return redirect('users:marmot-login')
+        login_url = reverse('users:marmot-login')
+        if self.request.headers.get('HX-Request'):
+            response = HttpResponse(status=200)
+            response['HX-Redirect'] = login_url
+            return response
+        return redirect(login_url)
 
 

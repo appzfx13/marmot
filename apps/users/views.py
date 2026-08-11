@@ -117,7 +117,7 @@ class UserBacktestView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
         user = self.request.user
         populate_account_context(context, user, self.request)
         context['active_tab'] = 'backtest'
-        user_backtests = BacktestTask.objects.filter(is_deleted=False, created_by=user)
+        user_backtests = BacktestTask.objects.filter(is_deleted=False, created_by=user).order_by('-id')
         context['backtests'] = user_backtests
         context['total_backtests'] = user_backtests.count()
         return context
@@ -140,11 +140,12 @@ class UserBacktestCreateView(HtmxModalMixin, LoginRequiredMixin, FormView):
         task.status = 'CREATED'
         task.save()
 
-        response = HttpResponse()
+        response = HttpResponse(status=204)
         msg = f"Backtest simulation #{task.id} started successfully!"
         response['HX-Trigger'] = json.dumps({
             'closeGlobalModal': True,
-            'showToast': {'message': msg, 'level': 'success'}
+            'showToast': {'message': msg, 'level': 'success'},
+            'reloadBacktestList': True
         })
         return response
 
@@ -169,7 +170,7 @@ class UserBackupListView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['active_tab'] = 'backup'
-        user_backups = MarketBackupTask.objects.filter(is_deleted=False, created_by=self.request.user)
+        user_backups = MarketBackupTask.objects.filter(is_deleted=False, created_by=self.request.user).order_by('-id')
         context['backup_tasks'] = user_backups
         return context
 
@@ -186,11 +187,12 @@ class UserBackupCreateView(HtmxModalMixin, LoginRequiredMixin, FormView):
         backup.status = 'CREATED'
         backup.save()
 
-        response = HttpResponse()
+        response = HttpResponse(status=204)
         msg = f"Market backup request #{backup.id} created successfully!"
         response['HX-Trigger'] = json.dumps({
             'closeGlobalModal': True,
-            'showToast': {'message': msg, 'level': 'success'}
+            'showToast': {'message': msg, 'level': 'success'},
+            'reloadBackupList': True
         })
         return response
 
@@ -393,7 +395,8 @@ class UserAccountCreateView(LoginRequiredMixin, View):
                 trigger_dict['closeGlobalModal'] = True
                 trigger_dict['reloadPage'] = True
 
-            response = HttpResponse()
+            status_code = 204 if level == 'success' else 200
+            response = HttpResponse(status=status_code)
             response['HX-Trigger'] = json.dumps(trigger_dict)
             return response
         else:

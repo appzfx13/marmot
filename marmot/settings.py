@@ -129,6 +129,7 @@ USE_TZ = True
 # Static & Media Storage Configuration
 STATIC_URL = '/static/'
 STATIC_ROOT = BASE_DIR / 'staticfiles'
+STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_URL = '/media/'
 MEDIA_ROOT = BASE_DIR / 'media'
@@ -152,8 +153,11 @@ else:
         "staticfiles": {"BACKEND": "cloudinary_storage.storage.StaticCloudinaryStorage"},
     }
 
-# Custom User Model
+# Custom User Model & Authentication Settings
 AUTH_USER_MODEL = "users.User"
+LOGIN_URL = "users:marmot-login"
+LOGIN_REDIRECT_URL = "users:marmot-dashboard"
+LOGOUT_REDIRECT_URL = "home"
 MANAGEMENT_ROLES = ['admin', 'manager']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'

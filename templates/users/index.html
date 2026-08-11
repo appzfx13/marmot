@@ -276,6 +276,14 @@
             border: 1px solid var(--btn-secondary-border) !important;
         }
 
+        #globalHtmxModal {
+            z-index: 1065 !important;
+        }
+
+        .modal-backdrop {
+            z-index: 1055 !important;
+        }
+
         .modal-content {
             background-color: var(--modal-bg) !important;
             backdrop-filter: blur(20px) !important;
@@ -507,6 +515,26 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <script>
+        // Defensive SelectorEngine Guard: Prevents Bootstrap selector-engine.js:41 illegal invocation when context node is null
+        (function() {
+            if (typeof Element !== 'undefined' && Element.prototype) {
+                const origQS = Element.prototype.querySelector;
+                Element.prototype.querySelector = function(selector) {
+                    if (!this || !(this instanceof Element || this instanceof Document)) {
+                        return document.querySelector(selector);
+                    }
+                    return origQS.call(this, selector);
+                };
+                const origQSA = Element.prototype.querySelectorAll;
+                Element.prototype.querySelectorAll = function(selector) {
+                    if (!this || !(this instanceof Element || this instanceof Document)) {
+                        return document.querySelectorAll(selector);
+                    }
+                    return origQSA.call(this, selector);
+                };
+            }
+        })();
+
         // Theme Engine Logic (Synchronized with Admin Portal Theme System)
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeToggleIcon = document.getElementById('themeToggleIcon');
@@ -547,23 +575,75 @@
         if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeMobileSidebar);
         if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeMobileSidebar);
 
-        // Global HTMX Event Listeners (closeGlobalModal & showToast)
-        document.body.addEventListener('htmx:afterSwap', function(evt) {
-            if (evt.detail.target.id === 'globalHtmxModalDialog') {
-                const modalEl = document.getElementById('globalHtmxModal');
-                if (modalEl) {
-                    const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                    modal.show();
+        // Robust Global HTMX Modal Controller
+        function getGlobalModalEl() {
+            const el = document.getElementById('globalHtmxModal');
+            return (el && el instanceof HTMLElement) ? el : null;
+        }
+
+        function showGlobalModal() {
+            const modalEl = getGlobalModalEl();
+            if (!modalEl) return;
+            try {
+                const existing = bootstrap.Modal.getInstance(modalEl);
+                if (existing) {
+                    existing.dispose();
                 }
+            } catch (e) {}
+
+            try {
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            } catch (err) {
+                console.warn('Error showing global modal:', err);
+            }
+        }
+
+        function hideGlobalModal() {
+            const modalEl = getGlobalModalEl();
+            if (!modalEl) return;
+            try {
+                const instance = bootstrap.Modal.getInstance(modalEl);
+                if (instance) {
+                    instance.hide();
+                }
+            } catch (err) {
+                console.warn('Error hiding global modal:', err);
+            }
+        }
+
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt && evt.detail && evt.detail.target && evt.detail.target.id === 'globalHtmxModalDialog') {
+                requestAnimationFrame(function() {
+                    showGlobalModal();
+                });
             }
         });
 
+        const globalModalElement = getGlobalModalEl();
+        if (globalModalElement) {
+            globalModalElement.addEventListener('hidden.bs.modal', function () {
+                const dialog = document.getElementById('globalHtmxModalDialog');
+                if (dialog) dialog.innerHTML = '';
+                try {
+                    const instance = bootstrap.Modal.getInstance(globalModalElement);
+                    if (instance) instance.dispose();
+                } catch (e) {}
+                document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            });
+        }
+
         document.body.addEventListener('closeGlobalModal', function() {
-            const modalEl = document.getElementById('globalHtmxModal');
-            if (modalEl) {
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
-            }
+            hideGlobalModal();
+            setTimeout(function() {
+                document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+            }, 350);
         });
 
         // Global showToast handler (matches templates/includes/messages.html design)

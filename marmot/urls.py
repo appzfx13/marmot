@@ -2,8 +2,13 @@ from django.contrib import admin
 from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
+from apps.common.views import HomePageView
 
 urlpatterns = [
+    # Enterprise Home Page
+    path('', HomePageView.as_view(), name='home'),
+    path('home/', HomePageView.as_view(), name='home-alias'),
+
     # Admin Interface
     path('admin/', admin.site.urls),
 
