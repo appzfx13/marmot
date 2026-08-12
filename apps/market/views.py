@@ -133,27 +133,31 @@ class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Packs date-partitioned Parquet datasets into a ZIP archive and streams it to the user."""
     def get(self, request, pk, *args, **kwargs):
         task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
-        if not task or not task.parquet_file_path:
-            raise Http404("Backup storage directory path not found.")
+        if not task:
+            raise Http404("Market backup task not found.")
 
-        target_path = task.parquet_file_path
+        user_id = str(task.created_by.id if getattr(task, 'created_by', None) else 1)
+        backup_id = str(task.id)
+        index_name = task.index_name.lower()
 
-        if not os.path.exists(target_path):
-            user_id = str(task.created_by.id if getattr(task, 'created_by', None) else 1)
-            index_name = task.index_name.lower()
-            alt_path = os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', user_id, f"{index_name}_options")
-            if os.path.exists(alt_path):
-                target_path = alt_path
-            else:
-                filename = os.path.basename(target_path)
-                alt_path_backup = os.path.join(settings.BASE_DIR, 'go-app', 'data', 'backups', filename)
-                if os.path.exists(alt_path_backup):
-                    target_path = alt_path_backup
-                else:
-                    raise Http404("Backup data directory or file not found on disk.")
+        candidate_paths = [
+            task.parquet_file_path,
+            os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id),
+            os.path.join('/app', 'backup', user_id, backup_id),
+            os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', user_id, f"{index_name}_options"),
+        ]
+
+        target_path = None
+        for p in candidate_paths:
+            if p and os.path.exists(p):
+                target_path = p
+                break
+
+        if not target_path:
+            raise Http404("Backup data directory or file not found on disk.")
 
         zip_buffer = io.BytesIO()
-        zip_filename = f"{task.index_name.lower()}_options_task_{task.id}.zip"
+        zip_filename = f"{index_name}_backup_task_{task.id}.zip"
 
         with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
             if os.path.isdir(target_path):

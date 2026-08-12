@@ -83,7 +83,36 @@ func (j *BacktestJob) Run(ctx context.Context) {
 		totalDays = 1
 	}
 
-	userDatasetDir := fmt.Sprintf("/app/data/users/%s/%s_options", userID, strings.ToLower(indexName))
+	backupTaskID := params.BackupTaskID
+	idxLower := strings.ToLower(indexName)
+	userDatasetDir := ""
+
+	if backupTaskID != "" && backupTaskID != "<nil>" {
+		candidate := fmt.Sprintf("/app/backup/%s/%s/%s_options", userID, backupTaskID, idxLower)
+		if isDir(candidate) {
+			userDatasetDir = candidate
+		}
+	}
+
+	if userDatasetDir == "" {
+		backupUserParent := fmt.Sprintf("/app/backup/%s", userID)
+		entries, err := os.ReadDir(backupUserParent)
+		if err == nil {
+			for _, entry := range entries {
+				if entry.IsDir() {
+					candidate := filepath.Join(backupUserParent, entry.Name(), fmt.Sprintf("%s_options", idxLower))
+					if isDir(candidate) {
+						userDatasetDir = candidate
+						break
+					}
+				}
+			}
+		}
+	}
+
+	if userDatasetDir == "" {
+		userDatasetDir = fmt.Sprintf("/app/data/users/%s/%s_options", userID, idxLower)
+	}
 	
 	allTrades := make([]strategies.TradeSignal, 0)
 	var totalPnL, peakPnL, maxDD, totalProfit, totalLoss float64
@@ -270,4 +299,12 @@ func (j *BacktestJob) broadcastBacktestProgress(ctx context.Context, taskID stri
 	}
 	data, _ := json.Marshal(msg)
 	j.hub.BroadcastToTask(taskID, data)
+}
+
+func isDir(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }

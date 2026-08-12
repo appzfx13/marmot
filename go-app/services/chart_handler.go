@@ -86,12 +86,21 @@ func ServeChartData(dbService *DBService, w http.ResponseWriter, r *http.Request
 	indexPath := fmt.Sprintf("/app/data/users/%s/%s_index", userID, idxLower)
 	optsPath := fmt.Sprintf("/app/data/users/%s/%s_options", userID, idxLower)
 
-	// If DB parquetPath is set and exists, also include it
+	// If DB parquetPath is set and exists, check task-specific output directories
 	if parquetPath != "" && dirExists(parquetPath) {
 		if strings.HasSuffix(parquetPath, "_index") {
 			indexPath = parquetPath
 		} else if strings.HasSuffix(parquetPath, "_options") {
 			optsPath = parquetPath
+		} else {
+			taskIdxDir := filepath.Join(parquetPath, fmt.Sprintf("%s_index", idxLower))
+			taskOptDir := filepath.Join(parquetPath, fmt.Sprintf("%s_options", idxLower))
+			if dirExists(taskIdxDir) {
+				indexPath = taskIdxDir
+			}
+			if dirExists(taskOptDir) {
+				optsPath = taskOptDir
+			}
 		}
 	}
 
@@ -376,6 +385,23 @@ func ServeUDFHistory(dbService *DBService, w http.ResponseWriter, r *http.Reques
 	idxLower := strings.ToLower(indexName)
 	indexPath := fmt.Sprintf("/app/data/users/%s/%s_index", userID, idxLower)
 	optsPath := fmt.Sprintf("/app/data/users/%s/%s_options", userID, idxLower)
+
+	if parquetPath != "" && dirExists(parquetPath) {
+		if strings.HasSuffix(parquetPath, "_index") {
+			indexPath = parquetPath
+		} else if strings.HasSuffix(parquetPath, "_options") {
+			optsPath = parquetPath
+		} else {
+			taskIdxDir := filepath.Join(parquetPath, fmt.Sprintf("%s_index", idxLower))
+			taskOptDir := filepath.Join(parquetPath, fmt.Sprintf("%s_options", idxLower))
+			if dirExists(taskIdxDir) {
+				indexPath = taskIdxDir
+			}
+			if dirExists(taskOptDir) {
+				optsPath = taskOptDir
+			}
+		}
+	}
 
 	targetDir := indexPath
 	if sub != "" {

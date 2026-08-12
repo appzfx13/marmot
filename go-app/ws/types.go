@@ -13,4 +13,6 @@ type ProgressMessage struct {
 	FileSize float64 `json:"file_size_mb,omitempty"`
 	FilePath string  `json:"file_path,omitempty"`
 	Error    string  `json:"error,omitempty"`
+	Eta      string  `json:"eta,omitempty"`
+	EtaSec   int     `json:"eta_seconds,omitempty"`
 }

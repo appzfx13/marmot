@@ -57,9 +57,12 @@
                 <h5 class="theme-text-main fw-bold mb-3 border-bottom border-secondary border-opacity-25 pb-2">Execution Progress</h5>
                 
                 <div class="mb-3">
-                    <div class="d-flex justify-content-between text-muted small mb-2">
+                    <div class="d-flex justify-content-between align-items-center text-muted small mb-2">
                         <span>Completion Rate</span>
-                        <span class="fw-bold theme-text-main" id="backup-progress-text">{{ backup.progress }}%</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 small" id="backup-eta-text" style="display: none;"></span>
+                            <span class="fw-bold theme-text-main" id="backup-progress-text">{{ backup.progress }}%</span>
+                        </div>
                     </div>
                     <div class="progress" style="height: 10px; background-color: var(--border-color);">
                         <div class="progress-bar bg-primary progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %}" 
@@ -174,6 +177,16 @@
         if (filePathEl && data.file_path) {
             filePathEl.textContent = data.file_path;
             filePathEl.title = data.file_path;
+        }
+
+        const etaText = document.getElementById('backup-eta-text');
+        if (etaText) {
+            if (data.status === 'running' && data.eta) {
+                etaText.textContent = 'ETA: ' + data.eta;
+                etaText.style.display = 'inline-block';
+            } else {
+                etaText.style.display = 'none';
+            }
         }
 
         if (data.status === 'error') {

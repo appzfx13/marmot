@@ -70,9 +70,10 @@
                     </td>
 
                     <!-- Real-Time Progress Bar -->
-                    <td class="py-3 bg-transparent" style="min-width: 150px;">
+                    <td class="py-3 bg-transparent" style="min-width: 160px;">
                         <div class="d-flex align-items-center justify-content-between mb-1">
                             <small class="theme-text-muted backup-progress-text" style="font-size: 0.7rem;" id="backup-progress-text-{{ backup.pk }}">{{ backup.progress }}%</small>
+                            <small class="text-primary fw-semibold backup-eta-text" style="font-size: 0.68rem;" id="backup-eta-{{ backup.pk }}"></small>
                         </div>
                         <div class="progress" style="height: 6px; background-color: var(--border-color);">
                             <div class="progress-bar bg-primary progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %} backup-progress-bar" 
@@ -255,6 +256,7 @@
         function applyListUpdate(data) {
             const progressBar = document.querySelector('.backup-progress-bar[id="backup-progress-' + data.task_id + '"]');
             const progressText = document.querySelector('.backup-progress-text[id="backup-progress-text-' + data.task_id + '"]');
+            const etaText = document.querySelector('#backup-eta-' + data.task_id);
             const statusBadge = document.querySelector('.backup-status-badge[id="backup-status-' + data.task_id + '"]');
 
             if (progressBar) {
@@ -267,6 +269,13 @@
                 }
             }
             if (progressText) progressText.textContent = data.progress + '%';
+            if (etaText) {
+                if (data.status === 'running' && data.eta) {
+                    etaText.textContent = data.eta;
+                } else {
+                    etaText.textContent = '';
+                }
+            }
 
             if (statusBadge) {
                 const statusMap = {

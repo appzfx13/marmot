@@ -11,6 +11,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"time"
 
 	"go-app/config"
@@ -26,6 +28,7 @@ type BackupJob struct {
 	config    *config.Config
 	payload   models.CommandPayload
 	hub       *ws.Hub
+	startTime time.Time
 }
 
 // NewBackupJob creates a new instance of BackupJob
@@ -35,6 +38,7 @@ func NewBackupJob(dbService *services.DBService, cfg *config.Config, payload mod
 		config:    cfg,
 		payload:   payload,
 		hub:       hub,
+		startTime: time.Now(),
 	}
 }
 
@@ -82,6 +86,8 @@ func (j *BackupJob) Run(ctx context.Context) {
 	}
 	j.broadcastProgress(ctx, taskID, startProgress, "running", 0.0, "")
 
+	backupTaskDir := fmt.Sprintf("/app/backup/%s/%s", userID, taskID)
+
 	// ── STEP 1: Download Index Spot Data ─────────────────────────────────────
 	log.Printf("📥 [Task #%s] [Step 1/2] Downloading Index Spot candles (%s)...", taskID, indexName)
 	indexDir := j.downloadIndexSpot(ctx, taskID, userID, indexName, securityID, exchangeSegment, startDate, endDate, startProgress)
@@ -97,15 +103,17 @@ func (j *BackupJob) Run(ctx context.Context) {
 	log.Printf("📥 [Task #%s] [Step 2/2] Downloading Option Strikes (ATM±%d CE & PE)...", taskID, strikeCount)
 	optsDir := j.runOptionsDownload(ctx, taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate, strikeCount, 45)
 
-	finalOutputDir := optsDir
-	if finalOutputDir == "" {
-		finalOutputDir = indexDir
+	finalOutputDir := backupTaskDir
+	if !dirExists(finalOutputDir) {
+		finalOutputDir = optsDir
+		if finalOutputDir == "" {
+			finalOutputDir = indexDir
+		}
 	}
 
 	// Calculate total directory storage size
 	var totalSizeBytes int64 = 0
-	baseUserDir := fmt.Sprintf("/app/data/users/%s", userID)
-	_ = filepath.Walk(baseUserDir, func(path string, info os.FileInfo, err error) error {
+	_ = filepath.Walk(backupTaskDir, func(path string, info os.FileInfo, err error) error {
 		if err == nil && !info.IsDir() {
 			totalSizeBytes += info.Size()
 		}
@@ -120,8 +128,17 @@ func (j *BackupJob) Run(ctx context.Context) {
 		return
 	}
 
-	log.Printf("✅ [Task #%s] Unified Backup Complete! Index Spot & Option Strikes saved (%.2f MB)\n", taskID, fileSizeMB)
+	log.Printf("✅ [Task #%s] Unified Backup Complete! Saved to %s (%.2f MB)\n", taskID, finalOutputDir, fileSizeMB)
 	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, finalOutputDir)
+}
+
+// helper dirExists checks if directory exists
+func dirExists(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return info.IsDir()
 }
 
 // downloadIndexSpot downloads 1-minute OHLCV candles for the Index spot instrument (/v2/charts/intraday)
@@ -130,7 +147,7 @@ func (j *BackupJob) downloadIndexSpot(
 	taskID, userID, indexName, securityID, exchangeSegment, startDate, endDate string,
 	startProgress int,
 ) string {
-	baseOutputDir := fmt.Sprintf("/app/data/users/%s/%s_index", userID, strings.ToLower(indexName))
+	baseOutputDir := fmt.Sprintf("/app/backup/%s/%s/%s_index", userID, taskID, strings.ToLower(indexName))
 	_ = os.MkdirAll(baseOutputDir, 0755)
 
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -227,11 +244,13 @@ func (j *BackupJob) downloadIndexSpot(
 					dayFilePath := filepath.Join(partitionDir, fmt.Sprintf("%s.parquet", dateStr))
 					dayFile, openErr := os.OpenFile(dayFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 					if openErr == nil {
+						var buf bytes.Buffer
 						for _, candle := range dayCandles {
 							line, _ := json.Marshal(candle)
-							_, _ = dayFile.Write(line)
-							_, _ = dayFile.WriteString("\n")
+							buf.Write(line)
+							buf.WriteByte('\n')
 						}
+						_, _ = dayFile.Write(buf.Bytes())
 						dayFile.Close()
 					}
 				}
@@ -254,54 +273,78 @@ func (j *BackupJob) downloadIndexSpot(
 }
 
 // runOptionsDownload fetches historical options data via DhanHQ v2 Expired Options Rolling API (/v2/charts/rollingoption)
-// It fetches relative strikes (ATM, ATM+1..N, ATM-1..N) for both CALL and PUT.
-// Output: /app/data/users/{uid}/{index}_options/{CALL|PUT}/{strike_name}/year=YYYY/month=MM/YYYY-MM-DD.parquet
+// Uses concurrent worker pool for high-throughput parallel data ingestion.
 func (j *BackupJob) runOptionsDownload(
 	ctx context.Context,
 	taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate string,
 	strikeCount, startProgress int,
 ) string {
-	log.Printf("🚀 [Task #%s] Starting Expired Options Rolling Data Download for %s (Strikes count=%d)", taskID, indexName, strikeCount)
+	log.Printf("🚀 [Task #%s] Starting Parallel Options Rolling Data Download for %s (Strikes count=%d)", taskID, indexName, strikeCount)
 
 	securityID := getIndexSecurityID(indexName)
 	relativeStrikes := generateRelativeStrikes(strikeCount)
 	optionTypes := []string{"CALL", "PUT"}
 	totalContracts := len(relativeStrikes) * len(optionTypes)
 
-	client := &http.Client{Timeout: 30 * time.Second}
-	baseURL := "https://api.dhan.co/v2/charts/rollingoption"
-	baseOutputDir := fmt.Sprintf("/app/data/users/%s/%s_options", userID, strings.ToLower(indexName))
-
-	completedContracts := 0
-	for _, drvOptType := range optionTypes {
-		for _, strikeName := range relativeStrikes {
-			select {
-			case <-ctx.Done():
-				log.Printf("⏸️ [Task #%s] Options download interrupted.", taskID)
-				return baseOutputDir
-			default:
-			}
-
-			contractDir := fmt.Sprintf("%s/%s/%s", baseOutputDir, drvOptType, strikeName)
-			_ = os.MkdirAll(contractDir, 0755)
-
-			log.Printf("📥 [Task #%s] Options: %s %s %s | %s → %s",
-				taskID, indexName, drvOptType, strikeName, startDate, endDate)
-
-			j.downloadRollingOptionCandles(
-				ctx, taskID, securityID, "NSE_FNO", "OPTIDX",
-				strikeName, drvOptType, startDate, endDate, contractDir, client, baseURL,
-			)
-
-			completedContracts++
-			progress := startProgress + int(float64(completedContracts)/float64(totalContracts)*float64(95-startProgress))
-			_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
-			j.broadcastProgress(ctx, taskID, progress, "running", 0.0, contractDir)
-
-			time.Sleep(200 * time.Millisecond)
-		}
+	tr := &http.Transport{
+		MaxIdleConns:        100,
+		MaxIdleConnsPerHost: 20,
+		IdleConnTimeout:     90 * time.Second,
+	}
+	client := &http.Client{
+		Transport: tr,
+		Timeout:   30 * time.Second,
 	}
 
+	baseURL := "https://api.dhan.co/v2/charts/rollingoption"
+	baseOutputDir := fmt.Sprintf("/app/backup/%s/%s/%s_options", userID, taskID, strings.ToLower(indexName))
+
+	type strikeItem struct {
+		drvOptType string
+		strikeName string
+	}
+
+	tasks := make(chan strikeItem, totalContracts)
+	for _, drvOptType := range optionTypes {
+		for _, strikeName := range relativeStrikes {
+			tasks <- strikeItem{drvOptType: drvOptType, strikeName: strikeName}
+		}
+	}
+	close(tasks)
+
+	workerCount := 3
+	var wg sync.WaitGroup
+	var completedCount int32
+
+	for i := 0; i < workerCount; i++ {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for item := range tasks {
+				select {
+				case <-ctx.Done():
+					return
+				default:
+				}
+
+				contractDir := fmt.Sprintf("%s/%s/%s", baseOutputDir, item.drvOptType, item.strikeName)
+				_ = os.MkdirAll(contractDir, 0755)
+
+				j.downloadRollingOptionCandles(
+					ctx, taskID, securityID, "NSE_FNO", "OPTIDX",
+					item.strikeName, item.drvOptType, startDate, endDate, contractDir, client, baseURL,
+				)
+
+				done := atomic.AddInt32(&completedCount, 1)
+				progress := startProgress + int(float64(done)/float64(totalContracts)*float64(95-startProgress))
+				_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
+				j.broadcastProgress(ctx, taskID, progress, "running", 0.0, contractDir)
+				time.Sleep(100 * time.Millisecond)
+			}
+		}()
+	}
+
+	wg.Wait()
 	return baseOutputDir
 }
 
@@ -354,25 +397,40 @@ func (j *BackupJob) downloadRollingOptionCandles(
 		}
 
 		jsonBody, _ := json.Marshal(reqPayload)
-		req, err := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewBuffer(jsonBody))
-		if err != nil {
-			continue
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("Accept", "application/json")
-		req.Header.Add("access-token", j.config.DhanAccessToken)
-		req.Header.Add("client-id", j.config.DhanClientID)
 
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Printf("⚠️ [Task #%s] Rolling option API error for strike %s: %v", taskID, strikeName, err)
-			continue
-		}
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		var bodyBytes []byte
+		var respStatusCode int
 
-		if resp.StatusCode != http.StatusOK {
-			log.Printf("⚠️ [Task #%s] HTTP %d for rolling option %s %s: %s", taskID, resp.StatusCode, drvOptionType, strikeName, string(bodyBytes))
+		for attempt := 0; attempt < 3; attempt++ {
+			req, err := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewBuffer(jsonBody))
+			if err != nil {
+				break
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Set("Accept", "application/json")
+			req.Header.Add("access-token", j.config.DhanAccessToken)
+			req.Header.Add("client-id", j.config.DhanClientID)
+
+			resp, err := client.Do(req)
+			if err != nil {
+				log.Printf("⚠️ [Task #%s] Rolling option API error for strike %s: %v", taskID, strikeName, err)
+				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+			bodyBytes, _ = io.ReadAll(resp.Body)
+			respStatusCode = resp.StatusCode
+			resp.Body.Close()
+
+			if respStatusCode == http.StatusTooManyRequests {
+				log.Printf("⚠️ [Task #%s] HTTP 429 Rate Limit for %s %s. Retrying in 1s (Attempt %d/3)...", taskID, drvOptionType, strikeName, attempt+1)
+				time.Sleep(1 * time.Second)
+				continue
+			}
+			break
+		}
+
+		if respStatusCode != http.StatusOK {
+			log.Printf("⚠️ [Task #%s] HTTP %d for rolling option %s %s: %s", taskID, respStatusCode, drvOptionType, strikeName, string(bodyBytes))
 			continue
 		}
 
@@ -400,16 +458,18 @@ func (j *BackupJob) downloadRollingOptionCandles(
 			if openErr != nil {
 				continue
 			}
+			var buf bytes.Buffer
 			for _, candle := range dayCandles {
 				line, _ := json.Marshal(candle)
-				_, _ = dayFile.Write(line)
-				_, _ = dayFile.WriteString("\n")
+				buf.Write(line)
+				buf.WriteByte('\n')
 			}
+			_, _ = dayFile.Write(buf.Bytes())
 			dayFile.Close()
 		}
-		time.Sleep(200 * time.Millisecond)
 	}
 }
+
 
 // generateRelativeStrikes creates ATM, ATM+1..N, ATM-1..N strike strings
 func generateRelativeStrikes(count int) []string {
@@ -515,6 +575,27 @@ func (j *BackupJob) broadcastProgress(ctx context.Context, taskID string, progre
 		log.Printf("🔇 [Task #%s] broadcastProgress skipped: hub is nil\n", taskID)
 		return
 	}
+
+	var etaStr string
+	var etaSec int
+	if progress > 0 && progress < 100 {
+		elapsed := time.Since(j.startTime)
+		estimatedTotal := time.Duration(float64(elapsed) / (float64(progress) / 100.0))
+		remaining := estimatedTotal - elapsed
+		if remaining < 0 {
+			remaining = 0
+		}
+		etaSec = int(remaining.Seconds())
+		if etaSec < 60 {
+			etaStr = fmt.Sprintf("~%ds left", etaSec)
+		} else {
+			etaStr = fmt.Sprintf("~%dm %ds left", etaSec/60, etaSec%60)
+		}
+	} else if progress >= 100 {
+		etaStr = "Complete"
+		etaSec = 0
+	}
+
 	msg := ws.ProgressMessage{
 		Type:     "progress",
 		TaskID:   taskID,
@@ -522,13 +603,15 @@ func (j *BackupJob) broadcastProgress(ctx context.Context, taskID string, progre
 		Status:   status,
 		FileSize: fileSizeMB,
 		FilePath: filePath,
+		Eta:      etaStr,
+		EtaSec:   etaSec,
 	}
 	data, err := json.Marshal(msg)
 	if err != nil {
 		log.Printf("⚠️ [Task #%s] broadcastProgress marshal error: %v\n", taskID, err)
 		return
 	}
-	log.Printf("📡 [Task #%s] Broadcasting progress %d%% status=%s to WS hub\n", taskID, progress, status)
+	log.Printf("📡 [Task #%s] Broadcasting progress %d%% status=%s eta=%s to WS hub\n", taskID, progress, status, etaStr)
 	j.hub.BroadcastToTask(taskID, data)
 }
 

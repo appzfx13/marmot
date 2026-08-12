@@ -45,12 +45,17 @@
                                 <td class="small">{{ backup.start_date|date:"M d, Y" }} — {{ backup.end_date|date:"M d, Y" }}</td>
                                 <td class="small">{{ backup.strike_count }} strikes</td>
                                 <td>
-                                    {% if backup.status == 'COMPLETED' or backup.status == 'SUCCESS' %}
+                                    {% if backup.status == 'COMPLETED' or backup.status == 'SUCCESS' or backup.status == 'completed' %}
                                         <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
-                                    {% elif backup.status == 'FAILED' %}
+                                    {% elif backup.status == 'FAILED' or backup.status == 'error' %}
                                         <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Failed</span>
                                     {% else %}
-                                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Processing</span>
+                                        <div>
+                                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 mb-1">Processing ({{ backup.progress }}%)</span>
+                                            <div class="progress" style="height: 4px; background-color: var(--border-color); width: 100px;">
+                                                <div class="progress-bar bg-warning progress-bar-striped progress-bar-animated" role="progressbar" style="width: {{ backup.progress }}%;"></div>
+                                            </div>
+                                        </div>
                                     {% endif %}
                                 </td>
                                 <td class="small">{{ backup.file_size_mb|default:"0.0" }} MB</td>

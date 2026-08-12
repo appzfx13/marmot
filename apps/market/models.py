@@ -1,7 +1,9 @@
+import os
+import shutil
+from django.conf import settings
 from django.db import models
 from apps.common.models import BaseModel
 from apps.common.choices import TaskStatusChoices, IndexChoices
-from apps.common.constants import MAX_LOG_LINES
 
 class MarketBackupTask(BaseModel):
     StatusChoices = TaskStatusChoices
@@ -27,6 +29,35 @@ class MarketBackupTask(BaseModel):
         verbose_name = "Market Backup Task"
         verbose_name_plural = "Market Backup Tasks"
 
+    def delete_dataset_files(self):
+        """Removes task backup dataset folder from disk."""
+        user_id = str(self.created_by.id if self.created_by else 1)
+        backup_id = str(self.id)
+        candidate_paths = [
+            self.parquet_file_path,
+            os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id),
+            os.path.join('/app', 'backup', user_id, backup_id),
+        ]
+        for p in candidate_paths:
+            if p and os.path.exists(p):
+                if os.path.isdir(p):
+                    shutil.rmtree(p, ignore_errors=True)
+                else:
+                    try:
+                        os.remove(p)
+                    except OSError:
+                        pass
+
+    def delete(self, using=None, keep_parents=False):
+        """Soft deletes task and purges dataset files on disk."""
+        self.delete_dataset_files()
+        super().delete(using=using, keep_parents=keep_parents)
+
+    def hard_delete(self):
+        """Permanently deletes task record and purges dataset files on disk."""
+        self.delete_dataset_files()
+        super().hard_delete()
+
     def get_last_200_logs(self):
         """Returns the last 200 lines of error and trace logs for UI rendering."""
         if not self.error_logs:
@@ -37,4 +68,4 @@ class MarketBackupTask(BaseModel):
         return "\n".join(lines)
 
     def __str__(self):
-        return f"Backup #{self.id} | {self.index_name} ({self.start_date} to {self.end_date}) - [{self.status.upper()}]"
+        return f"Backup #{self.id} | {self.index_name} ({self.start_date} to {self.end_date}) - [{self.status.upper()}]"

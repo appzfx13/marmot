@@ -1,14 +1,17 @@
+import io
 import json
 import logging
 import os
 import uuid
+import zipfile
+from django.conf import settings
 from django.contrib import messages
 
 logger = logging.getLogger(__name__)
 from django.contrib.auth import login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView
-from django.http import FileResponse, HttpResponse, HttpResponseForbidden
+from django.http import FileResponse, HttpResponse, HttpResponseForbidden, Http404
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views import View
@@ -207,13 +210,41 @@ class UserBackupDownloadView(LoginRequiredMixin, View):
         if not backup or (backup.created_by and backup.created_by != request.user and not request.user.is_superuser):
             return HttpResponseForbidden("You do not have access to download this backup dataset.")
 
-        file_path = backup.parquet_file_path
-        if file_path and os.path.exists(file_path):
-            filename = os.path.basename(file_path)
-            return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=filename)
+        user_id = str(backup.created_by.id if getattr(backup, 'created_by', None) else 1)
+        backup_id = str(backup.id)
+        index_name = backup.index_name.lower()
 
-        response = HttpResponse("Backup file is being prepared or is temporarily unavailable.", status=404)
-        return response
+        candidate_paths = [
+            backup.parquet_file_path,
+            os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id),
+            os.path.join('/app', 'backup', user_id, backup_id),
+            os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', user_id, f"{index_name}_options"),
+        ]
+
+        target_path = None
+        for p in candidate_paths:
+            if p and os.path.exists(p):
+                target_path = p
+                break
+
+        if not target_path:
+            raise Http404("Backup data directory or file not found on disk.")
+
+        zip_buffer = io.BytesIO()
+        zip_filename = f"{index_name}_backup_task_{backup.id}.zip"
+
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            if os.path.isdir(target_path):
+                for root, _, files in os.walk(target_path):
+                    for file in files:
+                        full_path = os.path.join(root, file)
+                        rel_path = os.path.relpath(full_path, target_path)
+                        zip_file.write(full_path, arcname=rel_path)
+            else:
+                zip_file.write(target_path, arcname=os.path.basename(target_path))
+
+        zip_buffer.seek(0)
+        return FileResponse(zip_buffer, as_attachment=True, filename=zip_filename)
 
 
 class UserEnvironmentToggleModalView(HtmxModalMixin, LoginRequiredMixin, View):

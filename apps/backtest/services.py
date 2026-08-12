@@ -45,6 +45,7 @@ def send_backtest_control_command(task_id, command):
             "end_date": task.end_date.isoformat(),
             "initial_capital": task.initial_capital,
             "user_id": str(task.created_by.id if getattr(task, 'created_by', None) else 1),
+            "backup_task_id": str(task.backup_task.id) if task.backup_task else "",
             "params": task.parameters or {}
         }
     }

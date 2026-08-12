@@ -9,9 +9,7 @@ REDIS_URL = settings.REDIS_URL
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 def create_and_start_backup_task(start_date, end_date, index_name, strike_count, user):
-    """
-    Creates the backup record in Postgres in CREATED status without auto-starting the engine.
-    """
+    """Creates the backup record in Postgres with pre-stored path."""
     task = MarketBackupTask.objects.create(
         start_date=start_date,
         end_date=end_date,
@@ -20,6 +18,9 @@ def create_and_start_backup_task(start_date, end_date, index_name, strike_count,
         status=MarketBackupTask.StatusChoices.CREATED,
         created_by=user
     )
+    user_id = str(user.id if user else 1)
+    task.parquet_file_path = f"/app/backup/{user_id}/{task.id}"
+    task.save(update_fields=['parquet_file_path'])
     return task
 
 def send_control_command(task_id, command):

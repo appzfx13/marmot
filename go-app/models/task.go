@@ -13,6 +13,7 @@ type TaskParams struct {
 	Instrument      string                 `json:"instrument"`
 	StrikeCount     int                    `json:"strike_count"`
 	UserID          string                 `json:"user_id"`
+	BackupTaskID    string                 `json:"backup_task_id"`
 	StrategyName    string                 `json:"strategy_name"`
 	InitialCapital  float64                `json:"initial_capital"`
 	Params          map[string]interface{} `json:"params"`
