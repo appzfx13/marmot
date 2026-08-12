@@ -496,17 +496,17 @@ class UserAccountDeleteView(LoginRequiredMixin, View):
         return response
 
 
-class UserSandboxSettingsView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
-    """View for user sandbox & risk settings."""
+class UserAccountSettingsView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """View for user account & risk settings."""
     template_name = 'users/dashboard.html'
-    partial_template_name = 'users/partials/sandbox_settings_content.html'
+    partial_template_name = 'users/partials/account_settings_content.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
         active_acc = populate_account_context(context, user, self.request)
 
-        context['active_tab'] = 'sandbox'
+        context['active_tab'] = 'accounts'
         context['strategy_configs'] = TradeExecConfig.objects.filter(
             admins_user=user,
             account_type=active_acc.account_type if active_acc else 'SANDBOX',
