@@ -1,50 +1,72 @@
 {% load static %}
 
-<!-- KPI Cards Grid -->
+<!-- Advanced Analytics KPI Cards Grid -->
 <div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="glass-card p-3 p-md-4 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="theme-text-muted small fw-semibold text-uppercase">Net PnL</span>
-                <span class="material-icons text-primary fs-5">account_balance_wallet</span>
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="glass-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Net PnL</span>
+                <span class="material-icons text-primary fs-6">account_balance_wallet</span>
             </div>
-            <h4 class="fw-bold mb-1 {% if backtest.metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
-                {% if backtest.metrics.net_pnl >= 0 %}+{% endif %}₹{{ backtest.metrics.net_pnl|default:0|floatformat:2 }}
-            </h4>
-            <small class="theme-text-muted">Initial Capital: ₹{{ backtest.initial_capital|floatformat:0 }}</small>
+            <h5 class="fw-bold mb-1 {% if analytics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {% if analytics.net_pnl >= 0 %}+{% endif %}₹{{ analytics.net_pnl|floatformat:2 }}
+            </h5>
+            <small class="theme-text-muted" style="font-size: 0.7rem;">Cap: ₹{{ backtest.initial_capital|floatformat:0 }}</small>
         </div>
     </div>
 
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="glass-card p-3 p-md-4 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="theme-text-muted small fw-semibold text-uppercase">Win Rate</span>
-                <span class="material-icons text-info fs-5">donut_large</span>
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="glass-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Total Profit</span>
+                <span class="material-icons text-success fs-6">trending_up</span>
             </div>
-            <h4 class="fw-bold theme-text-main mb-1">{{ backtest.metrics.win_rate|default:0 }}%</h4>
-            <small class="theme-text-muted">Trades: {{ backtest.metrics.winning_trades|default:0 }}W / {{ backtest.metrics.losing_trades|default:0 }}L (Total: {{ backtest.metrics.total_trades|default:0 }})</small>
+            <h5 class="fw-bold text-success mb-1">+₹{{ analytics.total_profit|floatformat:2 }}</h5>
+            <small class="text-success" style="font-size: 0.7rem;">{{ analytics.winning_trades_count }} Profit Days</small>
         </div>
     </div>
 
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="glass-card p-3 p-md-4 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="theme-text-muted small fw-semibold text-uppercase">Max Drawdown</span>
-                <span class="material-icons text-warning fs-5">trending_down</span>
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="glass-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Total Loss</span>
+                <span class="material-icons text-danger fs-6">trending_down</span>
             </div>
-            <h4 class="fw-bold text-warning mb-1">₹{{ backtest.metrics.max_drawdown|default:0|floatformat:2 }}</h4>
-            <small class="theme-text-muted">Profit Factor: {{ backtest.metrics.profit_factor|default:0 }}</small>
+            <h5 class="fw-bold text-danger mb-1">₹{{ analytics.total_loss|floatformat:2 }}</h5>
+            <small class="text-danger" style="font-size: 0.7rem;">{{ analytics.losing_trades_count }} Loss Days</small>
         </div>
     </div>
 
-    <div class="col-12 col-sm-6 col-xl-3">
-        <div class="glass-card p-3 p-md-4 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-2">
-                <span class="theme-text-muted small fw-semibold text-uppercase">Sharpe Ratio</span>
-                <span class="material-icons text-success fs-5">analytics</span>
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="glass-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Highest Win</span>
+                <span class="material-icons text-success fs-6">emoji_events</span>
             </div>
-            <h4 class="fw-bold theme-text-main mb-1">{{ backtest.metrics.sharpe_ratio|default:0 }}</h4>
-            <small class="theme-text-muted">Risk-adjusted performance score</small>
+            <h5 class="fw-bold text-success mb-1">+₹{{ analytics.highest_win|floatformat:2 }}</h5>
+            <small class="theme-text-muted" style="font-size: 0.7rem;">Max Single Gain</small>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="glass-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Highest Loss</span>
+                <span class="material-icons text-warning fs-6">warning_amber</span>
+            </div>
+            <h5 class="fw-bold text-danger mb-1">₹{{ analytics.highest_loss|floatformat:2 }}</h5>
+            <small class="theme-text-muted" style="font-size: 0.7rem;">Max Single Loss</small>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-2">
+        <div class="glass-card p-3 h-100">
+            <div class="d-flex align-items-center justify-content-between mb-1">
+                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Win Rate</span>
+                <span class="material-icons text-info fs-6">donut_large</span>
+            </div>
+            <h5 class="fw-bold theme-text-main mb-1">{{ backtest.metrics.win_rate|default:0 }}%</h5>
+            <small class="theme-text-muted" style="font-size: 0.7rem;">PF: {{ backtest.metrics.profit_factor|default:0 }}</small>
         </div>
     </div>
 </div>
@@ -55,17 +77,65 @@
         <h5 class="fw-bold theme-text-main mb-0">Strategy Performance Equity Curve</h5>
         <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Time Series</span>
     </div>
-    <div style="height: 320px; position: relative;">
+    <div style="height: 300px; position: relative;">
         <canvas id="equityCurveChart"></canvas>
     </div>
 </div>
 
-<!-- Paginated Trade Signal & Orders Table -->
+<!-- Advanced Trade Log Search & Filter Controls Bar -->
+<div class="glass-card p-3 mb-4">
+    <form method="GET" 
+          hx-get="{% url 'backtest:backtest_detail' backtest.pk %}" 
+          hx-target="#backtest-detail-container" 
+          hx-push-url="true" 
+          hx-trigger="change delay:300ms, submit" 
+          class="row g-2 align-items-center">
+        <div class="col-12 col-sm-6 col-md-3">
+            <label class="form-label theme-text-muted smaller fw-bold mb-1 text-uppercase">Trade Status / Days</label>
+            <select name="trade_status" class="form-select form-select-sm bg-transparent theme-text-main border-secondary border-opacity-25">
+                <option value="all" {% if current_filters.trade_status == 'all' %}selected{% endif %}>All Trades / Days</option>
+                <option value="win" {% if current_filters.trade_status == 'win' %}selected{% endif %}>🟢 Profit Days (Wins)</option>
+                <option value="loss" {% if current_filters.trade_status == 'loss' %}selected{% endif %}>🔴 Loss Days (Losses)</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-2">
+            <label class="form-label theme-text-muted smaller fw-bold mb-1 text-uppercase">Trade Type</label>
+            <select name="trade_type" class="form-select form-select-sm bg-transparent theme-text-main border-secondary border-opacity-25">
+                <option value="all" {% if current_filters.trade_type == 'all' %}selected{% endif %}>All Types</option>
+                <option value="BUY_CE" {% if current_filters.trade_type == 'BUY_CE' %}selected{% endif %}>BUY_CE</option>
+                <option value="BUY_PE" {% if current_filters.trade_type == 'BUY_PE' %}selected{% endif %}>BUY_PE</option>
+            </select>
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-2">
+            <label class="form-label theme-text-muted smaller fw-bold mb-1 text-uppercase">From Date</label>
+            <input type="date" name="date_from" value="{{ current_filters.date_from }}" class="form-control form-control-sm bg-transparent theme-text-main border-secondary border-opacity-25">
+        </div>
+
+        <div class="col-12 col-sm-6 col-md-2">
+            <label class="form-label theme-text-muted smaller fw-bold mb-1 text-uppercase">To Date</label>
+            <input type="date" name="date_to" value="{{ current_filters.date_to }}" class="form-control form-control-sm bg-transparent theme-text-main border-secondary border-opacity-25">
+        </div>
+
+        <div class="col-12 col-md-3">
+            <label class="form-label theme-text-muted smaller fw-bold mb-1 text-uppercase">Search Contract / Strike</label>
+            <div class="input-group input-group-sm">
+                <input type="text" name="q" value="{{ current_filters.q }}" placeholder="Search Strike, Symbol..." class="form-control bg-transparent theme-text-main border-secondary border-opacity-25">
+                <button class="btn btn-primary" type="submit">
+                    <span class="material-icons fs-6">search</span>
+                </button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<!-- 5 Count Serial Paginated Trade Signals & Orders Table -->
 <div class="glass-card p-0 overflow-hidden mb-4 border-0" id="backtest-orders-container">
     <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
         <div>
             <h5 class="fw-bold theme-text-main mb-0">Executed Strategy Orders & Signals</h5>
-            <small class="theme-text-muted">Total Executed Signals: {{ total_trades_count }}</small>
+            <small class="theme-text-muted">Showing {{ filtered_trades_count }} of {{ total_trades_count }} Signals (5 per page)</small>
         </div>
         <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Trade Log</span>
     </div>
@@ -74,21 +144,39 @@
         <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
             <thead>
                 <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
-                    <th scope="col" class="ps-4 py-3 theme-text-muted text-uppercase small fw-semibold">Timestamp / Contract</th>
+                    <th scope="col" class="ps-4 py-3 theme-text-muted text-uppercase small fw-semibold" style="width: 50px;">#</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Contract / Strike</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Entry / Exit Time</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Index Entry & Exit Level</th>
                     <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Type & Quantity</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Entry / Exit Price</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Target / SL</th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Option Price</th>
                     <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Trade PnL</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Status</th>
-                    <th scope="col" class="pe-4 py-3 theme-text-muted text-uppercase small fw-semibold">Signal Reason</th>
+                    <th scope="col" class="pe-4 py-3 theme-text-muted text-uppercase small fw-semibold">Status & Reason</th>
                 </tr>
             </thead>
             <tbody>
                 {% for trade in trades_page %}
                 <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
-                    <td class="ps-4 py-3 bg-transparent">
-                        <div class="fw-semibold theme-text-main">{{ trade.timestamp }}</div>
-                        <div class="small text-info fw-semibold">{{ trade.symbol }}</div>
+                    <td class="ps-4 py-3 bg-transparent font-monospace theme-text-muted fw-bold">
+                        #{{ trade.serial_no }}
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="fw-bold theme-text-main">{{ trade.strike|default:trade.symbol }}</div>
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.68rem;">{{ trade.symbol }}</span>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small fw-semibold text-info"><span class="theme-text-muted">In:</span> {{ trade.timestamp }}</div>
+                        <div class="small text-warning"><span class="theme-text-muted">Out:</span> {{ trade.exit_timestamp|default:trade.timestamp }}</div>
+                    </td>
+
+                    <td class="py-3 bg-transparent">
+                        <div class="small theme-text-main fw-semibold">In: {{ trade.index_entry_price|default:trade.entry_price|floatformat:2 }}</div>
+                        <div class="small theme-text-muted">Out: {{ trade.index_exit_price|default:trade.exit_price|floatformat:2 }}</div>
+                        <div class="smaller {% if trade.index_points >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 0.72rem;">
+                            {% if trade.index_points >= 0 %}+{% endif %}{{ trade.index_points|floatformat:2 }} pts
+                        </div>
                     </td>
 
                     <td class="py-3 bg-transparent">
@@ -104,33 +192,25 @@
                     </td>
 
                     <td class="py-3 bg-transparent">
-                        <div class="small text-success">Target: ₹{{ trade.target_price|floatformat:2 }}</div>
-                        <div class="small text-danger">SL: ₹{{ trade.stop_loss_price|floatformat:2 }}</div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
                         <div class="fw-bold {% if trade.pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
                             {% if trade.pnl >= 0 %}+{% endif %}₹{{ trade.pnl|floatformat:2 }}
                         </div>
                     </td>
 
-                    <td class="py-3 bg-transparent">
-                        {% if trade.status == 'WIN' or trade.pnl > 0 %}
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">WIN</span>
-                        {% else %}
-                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">LOSS</span>
-                        {% endif %}
-                    </td>
-
                     <td class="pe-4 py-3 bg-transparent">
-                        <div class="small theme-text-muted" style="max-width: 220px; white-space: normal;">{{ trade.reason }}</div>
+                        {% if trade.status == 'WIN' or trade.pnl > 0 %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 mb-1">WIN</span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 mb-1">LOSS</span>
+                        {% endif %}
+                        <div class="small theme-text-muted" style="max-width: 200px; white-space: normal; font-size: 0.75rem;">{{ trade.reason }}</div>
                     </td>
                 </tr>
                 {% empty %}
                 <tr class="border-0">
-                    <td colspan="7" class="text-center py-5 theme-text-muted border-0 bg-transparent">
-                        <span class="material-icons fs-1 mb-2 opacity-50">format_list_bulleted</span>
-                        <p class="mb-0 fw-medium">No order signals recorded for this backtest.</p>
+                    <td colspan="8" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                        <span class="material-icons fs-1 mb-2 opacity-50">filter_alt_off</span>
+                        <p class="mb-0 fw-medium">No order signals match your filter criteria.</p>
                     </td>
                 </tr>
                 {% endfor %}
@@ -138,11 +218,11 @@
         </table>
     </div>
 
-    <!-- Pinned Orders Pagination Footer -->
+    <!-- 5 Count Serial Pagination Footer -->
     <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
         <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
             <div class="small theme-text-muted text-center text-sm-start">
-                Showing {{ trades_page.start_index|default:0 }} to {{ trades_page.end_index|default:0 }} of {{ total_trades_count }} order signals
+                Showing {{ trades_page.start_index|default:0 }} to {{ trades_page.end_index|default:0 }} of {{ filtered_trades_count }} signals (5 items per page)
             </div>
             
             <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
@@ -150,7 +230,7 @@
                 <li class="page-item mb-0">
                     <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
                        style="width: 36px; height: 36px;"
-                       hx-get="{% url 'backtest:backtest_detail' backtest.pk %}?trade_page={{ trades_page.previous_page_number }}" 
+                       hx-get="{% url 'backtest:backtest_detail' backtest.pk %}?trade_page={{ trades_page.previous_page_number }}&trade_status={{ current_filters.trade_status }}&trade_type={{ current_filters.trade_type }}&date_from={{ current_filters.date_from }}&date_to={{ current_filters.date_to }}&q={{ current_filters.q }}" 
                        hx-target="#backtest-detail-container" hx-push-url="true">
                        <span class="material-icons fs-6">chevron_left</span>
                     </a>
@@ -165,7 +245,7 @@
                 <li class="page-item mb-0">
                     <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
                        style="width: 36px; height: 36px;"
-                       hx-get="{% url 'backtest:backtest_detail' backtest.pk %}?trade_page={{ trades_page.next_page_number }}" 
+                       hx-get="{% url 'backtest:backtest_detail' backtest.pk %}?trade_page={{ trades_page.next_page_number }}&trade_status={{ current_filters.trade_status }}&trade_type={{ current_filters.trade_type }}&date_from={{ current_filters.date_from }}&date_to={{ current_filters.date_to }}&q={{ current_filters.q }}" 
                        hx-target="#backtest-detail-container" hx-push-url="true">
                        <span class="material-icons fs-6">chevron_right</span>
                     </a>

@@ -193,36 +193,74 @@
         </table>
     </div>
 
-    <!-- MOBILE VIEW CARD LIST -->
+    <!-- MOBILE VIEW EXPANDABLE TILE CARDS -->
     <div class="flex-grow-1 overflow-auto p-3 d-block d-lg-none">
         {% for backup in backups %}
         <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-            <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <div class="d-flex justify-content-between align-items-center gap-2">
                 <div class="d-flex align-items-center gap-2">
                     <input class="form-check-input bulk-item-checkbox me-1" type="checkbox" value="{{ backup.id }}">
                     <div>
                         <div class="fw-bold theme-text-main">#{{ backup.id|stringformat:"04d" }} - {{ backup.get_index_name_display }}</div>
-                        <small class="theme-text-muted">{{ backup.start_date }} to {{ backup.end_date }}</small>
+                        <small class="theme-text-muted">{{ backup.start_date|date:"d M Y" }} → {{ backup.end_date|date:"d M Y" }}</small>
                     </div>
                 </div>
-                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-1" id="backup-status-{{ backup.pk }}" style="font-size: 0.65rem;">{{ backup.status|upper }}</span>
+
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-1" id="mb-status-{{ backup.pk }}" style="font-size: 0.65rem;">{{ backup.status|upper }}</span>
+
+                    <!-- Right Side Dropdown Arrow Icon Button -->
+                    <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
+                            style="width: 34px; height: 34px; background: rgba(255, 255, 255, 0.08); color: var(--text-main);"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#mb-backup-expand-{{ backup.id }}"
+                            aria-expanded="false"
+                            aria-controls="mb-backup-expand-{{ backup.id }}"
+                            title="Expand Details">
+                        <span class="material-icons fs-5 text-primary">keyboard_arrow_down</span>
+                    </button>
+                </div>
             </div>
             
-            <div class="mb-3">
-                <div class="d-flex justify-content-between text-muted small mb-1">
-                    <span>Progress</span><span id="backup-progress-text-{{ backup.pk }}">{{ backup.progress }}%</span>
+            <!-- Collapsible Mobile Details Container -->
+            <div class="collapse mt-3 pt-3 border-top border-secondary border-opacity-25" id="mb-backup-expand-{{ backup.id }}">
+                <div class="d-flex flex-column gap-2 mb-3">
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">Strikes:</span>
+                        <span class="theme-text-main fw-semibold">±{{ backup.strike_count }} ATM</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">File Size:</span>
+                        <span class="theme-text-main fw-semibold">{{ backup.file_size_mb }} MB</span>
+                    </div>
                 </div>
-                <div class="progress" style="height: 6px;">
-                    <div class="progress-bar bg-primary" id="backup-progress-{{ backup.pk }}" role="progressbar" style="width: {{ backup.progress }}%;"></div>
-                </div>
-            </div>
 
-            <div class="d-flex justify-content-end gap-2 border-top pt-3" style="border-color: var(--border-color) !important;">
-                <a href="{% url 'market:market_backup_detail' backup.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3">Details</a>
-                <button type="button" 
-                        class="btn btn-sm btn-outline-danger rounded-pill px-3" 
-                        hx-get="{% url 'market:market_backup_delete' backup.pk %}" 
-                        hx-target="#globalHtmxModalDialog">Delete</button>
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between text-muted small mb-1">
+                        <span>Progress</span><span id="backup-progress-text-{{ backup.pk }}">{{ backup.progress }}%</span>
+                    </div>
+                    <div class="progress" style="height: 6px;">
+                        <div class="progress-bar bg-primary" id="backup-progress-{{ backup.pk }}" role="progressbar" style="width: {{ backup.progress }}%;"></div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-2" style="border-color: var(--border-color) !important;">
+                    <a href="{% url 'market:market_backup_detail' backup.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1">
+                        <span class="material-icons fs-6">visibility</span> Details
+                    </a>
+                    {% if backup.parquet_file_path and backup.status != 'error' and backup.file_size_mb > 0 %}
+                    <a href="{% url 'market:market_backup_download' backup.pk %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1">
+                        <span class="material-icons fs-6">download</span> ZIP
+                    </a>
+                    {% endif %}
+                    <button type="button" 
+                            class="btn btn-sm btn-outline-danger rounded-pill px-3 d-flex align-items-center gap-1" 
+                            hx-get="{% url 'market:market_backup_delete' backup.pk %}" 
+                            hx-target="#globalHtmxModalDialog">
+                        <span class="material-icons fs-6">delete</span> Delete
+                    </button>
+                </div>
             </div>
         </div>
         {% empty %}

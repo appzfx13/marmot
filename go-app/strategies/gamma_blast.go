@@ -132,3 +132,54 @@ func (s *GammaBlastStrategy) Execute(input StrategyInput) StrategyResult {
 
 	return result
 }
+
+// EvaluateLiveSignal processes live 0DTE ticks for Gamma Blast signals in real-time.
+func (s *GammaBlastStrategy) EvaluateLiveSignal(currentCandle map[string]interface{}, prevCandles []map[string]interface{}, indexName string, params map[string]interface{}) *LiveOrderRequest {
+	dateStr, _ := currentCandle["date"].(string)
+	if !stringsContainsTime(dateStr, "13:30") {
+		return nil
+	}
+
+	closePrice, _ := getFloat(currentCandle, "close")
+	openPrice, _ := getFloat(currentCandle, "open")
+	if math.Abs(closePrice-openPrice) < 15.0 {
+		return nil
+	}
+
+	lotsCount := 1
+	if val, ok := params["lots_count"].(float64); ok && val > 0 {
+		lotsCount = int(val)
+	}
+
+	lotSize := 50
+	idxUpper := strings.ToUpper(indexName)
+	if strings.Contains(idxUpper, "BANK") {
+		lotSize = 15
+	} else if strings.Contains(idxUpper, "FIN") {
+		lotSize = 25
+	}
+	totalQuantity := lotSize * lotsCount
+
+	step := 50.0
+	if strings.Contains(idxUpper, "BANK") {
+		step = 100.0
+	}
+	atmStrike := math.Round(closePrice/step) * step
+	optionType := "CE"
+	if closePrice < openPrice {
+		optionType = "PE"
+	}
+
+	tradingSymbol := fmt.Sprintf("%s %.0f %s", indexName, atmStrike, optionType)
+	return &LiveOrderRequest{
+		IndexName:     indexName,
+		TradingSymbol: tradingSymbol,
+		Transaction:   "BUY",
+		OrderType:     "MARKET",
+		Quantity:      totalQuantity,
+		TargetPrice:   closePrice + 30.0,
+		StopLossPrice: closePrice - 15.0,
+		StrategyName:  "gamma_blast",
+		Timestamp:     dateStr,
+	}
+}

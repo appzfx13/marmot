@@ -105,39 +105,82 @@
         </table>
     </div>
 
-    <!-- MOBILE VIEW: CARD LIST -->
+    <!-- MOBILE VIEW: EXPANDABLE TILE CARDS -->
     <div class="flex-grow-1 overflow-auto p-3 d-block d-lg-none">
         {% for trader in traders %}
         <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-            <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
+            <!-- Mobile Tile Header -->
+            <div class="d-flex justify-content-between align-items-center gap-2">
                 <div class="d-flex align-items-center gap-2">
                     <input class="form-check-input bulk-item-checkbox me-1" type="checkbox" value="{{ trader.id }}">
-                    <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold" style="width: 36px; height: 36px;">{{ trader.first_name|slice:":1"|upper }}</div>
+                    <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold flex-shrink-0" style="width: 36px; height: 36px;">{{ trader.first_name|default:trader.username|slice:":1"|upper }}</div>
                     <div>
                         <div class="fw-medium theme-text-main fs-6">{{ trader.get_full_name|default:trader.username }}</div>
                         <small class="theme-text-muted">@{{ trader.username }}</small>
                     </div>
                 </div>
+
+                <!-- Right Side Dropdown Arrow Icon Button -->
+                <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
+                        style="width: 36px; height: 36px; background: rgba(255, 255, 255, 0.08); color: var(--text-main);"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#trader-mobile-expand-{{ trader.id }}"
+                        aria-expanded="false"
+                        aria-controls="trader-mobile-expand-{{ trader.id }}"
+                        title="Expand Details">
+                    <span class="material-icons fs-5 text-primary">keyboard_arrow_down</span>
+                </button>
             </div>
             
-            <div class="d-flex justify-content-end gap-2 border-top pt-3 mt-1" style="border-color: var(--border-color) !important;">
-                <a href="{% url 'admins:trader_detail' trader.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill d-flex align-items-center gap-1">
-                    <span class="material-icons fs-6">visibility</span> View
-                </a>
-                <button type="button" 
-                        class="btn btn-sm btn-outline-warning rounded-pill d-flex align-items-center gap-1"
-                        hx-get="{% url 'admins:trader_password_reset' trader.pk %}"
-                        hx-target="#globalHtmxModalDialog">
-                    <span class="material-icons fs-6">vpn_key</span> Key
-                </button>
-                <button type="button" 
-                        class="btn btn-sm btn-outline-danger rounded-pill d-flex align-items-center gap-1"
-                        hx-get="{% url 'admins:trader_delete' trader.id %}"
-                        hx-target="#globalHtmxModalDialog">
-                    <span class="material-icons fs-6">delete</span> Delete
-                </button>
+            <!-- Collapsible Mobile Details & Actions Container -->
+            <div class="collapse mt-3 pt-3 border-top border-secondary border-opacity-25" id="trader-mobile-expand-{{ trader.id }}">
+                <div class="d-flex flex-column gap-2 mb-3">
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">Email:</span>
+                        <span class="theme-text-main fw-semibold">{{ trader.email }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">Phone:</span>
+                        <span class="theme-text-main">{{ trader.phone_number|default:"N/A" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">Broker:</span>
+                        <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-2 py-0">
+                            {{ trader.get_broker_display|default:trader.broker|default:"Unassigned" }}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">Eligibility:</span>
+                        {% if trader.trade_eligibility %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0">Eligible</span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0">Ineligible</span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-2" style="border-color: var(--border-color) !important;">
+                    <a href="{% url 'admins:trader_detail' trader.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill d-flex align-items-center gap-1">
+                        <span class="material-icons fs-6">visibility</span> View
+                    </a>
+                    <button type="button" 
+                            class="btn btn-sm btn-outline-warning rounded-pill d-flex align-items-center gap-1"
+                            hx-get="{% url 'admins:trader_password_reset' trader.pk %}"
+                            hx-target="#globalHtmxModalDialog">
+                        <span class="material-icons fs-6">vpn_key</span> Key
+                    </button>
+                    <button type="button" 
+                            class="btn btn-sm btn-outline-danger rounded-pill d-flex align-items-center gap-1"
+                            hx-get="{% url 'admins:trader_delete' trader.id %}"
+                            hx-target="#globalHtmxModalDialog">
+                        <span class="material-icons fs-6">delete</span> Delete
+                    </button>
+                </div>
             </div>
         </div>
+        {% empty %}
+        <div class="text-center py-4 theme-text-muted">No traders found.</div>
         {% endfor %}
     </div>
 

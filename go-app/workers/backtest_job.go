@@ -200,10 +200,10 @@ func (j *BacktestJob) Run(ctx context.Context) {
 		"sharpe_ratio":   sharpeRatio,
 	}
 
-	// Write Detailed Trade Log Parquet Result File
+	// Write Detailed Trade Log JSON Result File
 	backtestOutputDir := fmt.Sprintf("/app/data/users/%s/backtests", userID)
 	_ = os.MkdirAll(backtestOutputDir, 0755)
-	resultFilePath := filepath.Join(backtestOutputDir, fmt.Sprintf("backtest_%s.parquet", taskID))
+	resultFilePath := filepath.Join(backtestOutputDir, fmt.Sprintf("backtest_%s.json", taskID))
 
 	resultFile, err := os.Create(resultFilePath)
 	if err == nil {
@@ -243,17 +243,26 @@ func (j *BacktestJob) loadDayCandles(filePath, dateStr string) []map[string]inte
 
 	// If no dataset on disk yet, generate synthetic 1-min baseline candles for simulation
 	if len(candles) == 0 {
-		basePrice := 22000.0
+		var dateHash float64
+		for _, ch := range dateStr {
+			dateHash += float64(ch)
+		}
+		basePrice := 22000.0 + math.Sin(dateHash)*350.0
+		direction := 1.0
+		if int(dateHash)%2 == 0 {
+			direction = -1.0
+		}
+
 		for minute := 0; minute < 375; minute++ {
 			t := time.Date(2024, 1, 1, 9, 15, 0, 0, time.UTC).Add(time.Duration(minute) * time.Minute)
-			p := basePrice + math.Sin(float64(minute)/10.0)*25.0
+			p := basePrice + math.Sin(float64(minute)/12.0)*30.0 + (float64(minute) * 0.1 * direction)
 			candles = append(candles, map[string]interface{}{
 				"date":   fmt.Sprintf("%sT%s", dateStr, t.Format("15:04:00")),
 				"open":   p - 2.0,
-				"high":   p + 5.0,
+				"high":   p + 6.0,
 				"low":    p - 5.0,
-				"close":  p + 2.0,
-				"volume": 1500,
+				"close":  p + (2.5 * direction),
+				"volume": 1500 + int(math.Abs(p))*10,
 			})
 		}
 	}

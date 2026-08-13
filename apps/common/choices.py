@@ -26,6 +26,15 @@ class StrategyChoices(models.TextChoices):
     CANDLE_3PM = 'candle_3pm', '3:00 PM Breakout Candle'
 
 
+# Strike Selection Choices
+class StrikeSelectionChoices(models.TextChoices):
+    ATM = 'ATM', 'ATM (At The Money)'
+    ITM1 = 'ITM1', 'ITM 1 (In The Money - 1 Strike)'
+    ITM2 = 'ITM2', 'ITM 2 (In The Money - 2 Strikes)'
+    OTM1 = 'OTM1', 'OTM 1 (Out of The Money + 1 Strike)'
+    OTM2 = 'OTM2', 'OTM 2 (Out of The Money + 2 Strikes)'
+
+
 # Member Role Choices
 class MemberRoleChoices(models.TextChoices):
     ADMIN = "admin", "Admin"

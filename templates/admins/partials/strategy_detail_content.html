@@ -1,0 +1,158 @@
+{% load static %}
+
+<!-- Breadcrumb & Header Title -->
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <div class="d-flex align-items-center gap-2 mb-1">
+            <a href="{% url 'backtest:strategy_list' %}" class="theme-text-muted text-decoration-none small d-flex align-items-center gap-1">
+                <span class="material-icons fs-6">arrow_back</span> Back to Strategy Hub
+            </a>
+        </div>
+        <h4 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
+            <span class="material-icons text-primary fs-3">code</span>
+            {{ strategy.name }}
+        </h4>
+        <div class="d-flex align-items-center gap-2 mt-1">
+            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold" style="font-size: 0.72rem;">
+                {{ strategy.category }}
+            </span>
+            <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-3 py-1 smaller">
+                {{ strategy.target_index }}
+            </span>
+            <span class="badge bg-dark bg-opacity-50 text-light border border-secondary border-opacity-25 rounded-pill px-3 py-1 font-monospace smaller">
+                {{ strategy.go_file_path }}
+            </span>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center gap-2">
+        <a href="{% url 'backtest:backtest_create' %}?strategy={{ strategy.code_name }}" class="btn btn-primary rounded-pill px-4 py-2 d-flex align-items-center gap-2 shadow-sm">
+            <span class="material-icons fs-5">play_arrow</span>
+            <span>Run Simulation</span>
+        </a>
+        {% if can_delete %}
+        <button type="button" 
+                class="btn btn-outline-danger rounded-circle p-0 d-flex align-items-center justify-content-center" 
+                style="width: 40px; height: 40px;"
+                hx-get="{% url 'backtest:strategy_delete' strategy.pk %}" 
+                hx-target="#global-modal-content" 
+                title="Delete Strategy">
+            <span class="material-icons fs-5">delete</span>
+        </button>
+        {% endif %}
+    </div>
+</div>
+
+<!-- Navigation Tabs -->
+<ul class="nav nav-tabs custom-glass-tabs mb-4 border-bottom border-secondary border-opacity-25" role="tablist">
+    <li class="nav-item" role="presentation">
+        <button class="nav-link active fw-bold d-flex align-items-center gap-2 py-3 px-4" id="code-tab" data-bs-toggle="tab" data-bs-target="#code-editor-pane" type="button" role="tab">
+            <span class="material-icons fs-5">code</span> Go Code & Parameters Web UI Editor
+        </button>
+    </li>
+    <li class="nav-item" role="presentation">
+        <button class="nav-link fw-bold d-flex align-items-center gap-2 py-3 px-4" id="manual-tab" data-bs-toggle="tab" data-bs-target="#user-manual-pane" type="button" role="tab">
+            <span class="material-icons fs-5">menu_book</span> Strategy User Manual & Rules
+        </button>
+    </li>
+</ul>
+
+<!-- Tab Contents -->
+<div class="tab-content">
+    <!-- Tab 1: Web UI Code & Parameters Editor -->
+    <div class="tab-pane fade show active" id="code-editor-pane" role="tabpanel">
+        <form method="POST" hx-post="{% url 'backtest:strategy_save_code' strategy.pk %}" hx-swap="none" class="mb-4">
+            {% csrf_token %}
+            <div class="row g-4">
+                <!-- Left Column: Go Code Editor -->
+                <div class="col-12 col-lg-8">
+                    <div class="glass-card p-0 overflow-hidden h-100 border-0">
+                        <div class="p-3 bg-dark border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="material-icons text-warning fs-5">terminal</span>
+                                <h6 class="fw-bold text-light mb-0 font-monospace">{{ strategy.go_file_path }}</h6>
+                            </div>
+                            {% if can_edit %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Admin Editable</span>
+                            {% else %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Read-Only (Admin Only Edit)</span>
+                            {% endif %}
+                        </div>
+
+                        <div class="position-relative">
+                            <textarea name="go_code" 
+                                      id="go-code-textarea" 
+                                      class="form-control font-monospace text-light p-3 border-0 rounded-0" 
+                                      style="background: #0d1117; color: #58a6ff !important; min-height: 520px; font-size: 0.88rem; line-height: 1.5; resize: vertical;" 
+                                      {% if not can_edit %}readonly{% endif %}>{{ go_code }}</textarea>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Default Parameters & Controls -->
+                <div class="col-12 col-lg-4">
+                    <div class="glass-card p-4 mb-4">
+                        <h6 class="fw-bold theme-text-main mb-3 d-flex align-items-center gap-2">
+                            <span class="material-icons text-primary fs-5">settings</span>
+                            Default Parameters (JSON)
+                        </h6>
+                        <p class="theme-text-muted small mb-3">Modify default lot sizes, risk ratio, stop loss %, and strike selection rules.</p>
+
+                        <textarea name="parameters_json" 
+                                  class="form-control font-monospace theme-text-main bg-transparent border-secondary border-opacity-25 p-3 mb-3" 
+                                  style="min-height: 220px; font-size: 0.85rem;" 
+                                  {% if not can_edit %}readonly{% endif %}>{{ params_json_str }}</textarea>
+
+                        {% if can_edit %}
+                        <button type="submit" class="btn btn-success w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-2 shadow">
+                            <span class="material-icons fs-5">save</span>
+                            <span>Save Code & Parameters</span>
+                        </button>
+                        <small class="form-text theme-text-muted d-block text-center mt-2" style="font-size: 0.72rem;">
+                            Saving will recompile the Go execution container in the background.
+                        </small>
+                        {% else %}
+                        <div class="alert alert-warning py-2 small mb-0 d-flex align-items-center gap-2">
+                            <span class="material-icons fs-5">lock</span>
+                            <span>Only system administrators can save code changes.</span>
+                        </div>
+                        {% endif %}
+                    </div>
+
+                    <!-- Info Card -->
+                    <div class="glass-card p-4">
+                        <h6 class="fw-bold theme-text-main mb-2">Strategy Specifications</h6>
+                        <ul class="list-unstyled theme-text-muted small mb-0 d-flex flex-column gap-2">
+                            <li class="d-flex justify-content-between">
+                                <span>Code Identifier:</span>
+                                <strong class="font-monospace text-primary">{{ strategy.code_name }}</strong>
+                            </li>
+                            <li class="d-flex justify-content-between">
+                                <span>Target Index:</span>
+                                <strong class="theme-text-main">{{ strategy.target_index }}</strong>
+                            </li>
+                            <li class="d-flex justify-content-between">
+                                <span>Execution Latency:</span>
+                                <strong class="text-success">&lt; 10 Microseconds</strong>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </form>
+    </div>
+
+    <!-- Tab 2: Strategy User Manual -->
+    <div class="tab-pane fade" id="user-manual-pane" role="tabpanel">
+        <div class="glass-card p-4 p-md-5">
+            <div class="d-flex align-items-center gap-2 mb-4 pb-3 border-bottom border-secondary border-opacity-25">
+                <span class="material-icons text-primary fs-3">menu_book</span>
+                <h5 class="fw-bold theme-text-main mb-0">Strategy User Manual & Operational Rules</h5>
+            </div>
+
+            <div class="theme-text-main user-manual-content" style="line-height: 1.8; font-size: 0.95rem;">
+                {{ strategy.user_manual|linebreaks }}
+            </div>
+        </div>
+    </div>
+</div>

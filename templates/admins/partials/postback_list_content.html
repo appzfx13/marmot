@@ -50,18 +50,15 @@
                         {% else %}
                         <div class="small theme-text-muted" style="font-size: 0.75rem;">ID: #{{ log.user.id }}</div>
                         {% endif %}
+                        <div class="fw-bold theme-text-main">{{ log.user.get_full_name|default:log.user.username }}</div>
+                        <small class="theme-text-muted">@{{ log.user.username }}</small>
                         {% else %}
-                        {% if log.broker_client_id %}
-                        <div class="small text-warning fw-bold">Client: {{ log.broker_client_id }}</div>
-                        <div class="small theme-text-muted" style="font-size: 0.72rem;">Unlinked Account</div>
-                        {% else %}
-                        <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-1">Global Endpoint</span>
-                        {% endif %}
+                        <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-2 py-0">Unassigned</span>
                         {% endif %}
                     </td>
 
                     <td class="py-3 bg-transparent">
-                        <div class="small theme-text-main fw-bold">{{ log.order_id|default:"N/A" }}</div>
+                        <div class="fw-semibold font-monospace theme-text-main" style="font-size: 0.85rem;">{{ log.order_id|default:"--" }}</div>
                         <div class="small text-muted">{{ log.symbol|default:"--" }}</div>
                     </td>
 
@@ -106,15 +103,84 @@
                 </tr>
                 {% empty %}
                 <tr class="border-0">
-                    <td colspan="8" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                    <td colspan="7" class="text-center py-5 theme-text-muted border-0 bg-transparent">
                         <span class="material-icons fs-1 mb-2 opacity-50">receipt_long</span>
                         <p class="mb-0 fw-medium">No postback webhook logs recorded.</p>
-                        <small class="opacity-75">Broker webhooks sent to <code>/api/postback/</code> or <code>/api/postback/&lt;user_id&gt;/</code> will be backed up here.</small>
                     </td>
                 </tr>
                 {% endfor %}
             </tbody>
         </table>
+    </div>
+
+    <!-- MOBILE VIEW: EXPANDABLE TILE CARDS WITH DROPDOWN ARROW -->
+    <div class="flex-grow-1 overflow-auto p-3 d-block d-md-none">
+        {% for log in postbacks %}
+        <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+            <div class="d-flex justify-content-between align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div>
+                        <div class="fw-bold theme-text-main">#PB-{{ log.id|stringformat:"04d" }}</div>
+                        <small class="theme-text-muted">{{ log.created_at|date:"d M Y, H:i" }}</small>
+                    </div>
+                </div>
+
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge bg-secondary bg-opacity-25 theme-text-main rounded-pill px-2 py-1" style="font-size: 0.68rem;">{{ log.order_status|default:"RECORDED" }}</span>
+
+                    <!-- Right Side Dropdown Arrow Icon Button -->
+                    <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
+                            style="width: 34px; height: 34px; background: rgba(255, 255, 255, 0.08); color: var(--text-main);"
+                            type="button"
+                            data-bs-toggle="collapse"
+                            data-bs-target="#pb-mobile-expand-{{ log.id }}"
+                            aria-expanded="false"
+                            aria-controls="pb-mobile-expand-{{ log.id }}"
+                            title="Expand Details">
+                        <span class="material-icons fs-5 text-primary">keyboard_arrow_down</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Collapsible Mobile Details Container -->
+            <div class="collapse mt-3 pt-3 border-top border-secondary border-opacity-25" id="pb-mobile-expand-{{ log.id }}">
+                <div class="d-flex flex-column gap-2 mb-3">
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">Trader Account:</span>
+                        <span class="theme-text-main fw-semibold">{% if log.user %}@{{ log.user.username }}{% else %}Unassigned{% endif %}</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">Order ID / Symbol:</span>
+                        <span class="theme-text-main font-monospace">{{ log.order_id|default:"--" }} ({{ log.symbol|default:"--" }})</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">Transaction:</span>
+                        <span class="theme-text-main fw-bold">{{ log.transaction_type|default:"--" }} (Qty: {{ log.quantity }})</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">Execution Price:</span>
+                        <span class="theme-text-main fw-bold">₹{{ log.price|floatformat:2 }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between small">
+                        <span class="theme-text-muted">IP Address:</span>
+                        <span class="theme-text-muted">{{ log.ip_address|default:"127.0.0.1" }}</span>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 border-top pt-2" style="border-color: var(--border-color) !important;">
+                    <button type="button" 
+                            class="btn btn-sm btn-outline-info rounded-pill px-3 d-inline-flex align-items-center gap-1"
+                            hx-get="{% url 'admins:postback_detail' log.pk %}"
+                            hx-target="#globalHtmxModalDialog"
+                            hx-swap="innerHTML">
+                        <span class="material-icons fs-6">code</span> Inspect JSON
+                    </button>
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4 theme-text-muted">No postback webhook logs recorded.</div>
+        {% endfor %}
     </div>
 
     <!-- Pinned Pagination Footer -->

@@ -153,6 +153,62 @@ func (s *ICTSMCStrategy) Execute(input StrategyInput) StrategyResult {
 	return result
 }
 
+// EvaluateLiveSignal processes real-time ICT / SMC Fair Value Gaps and Order Blocks for live execution.
+func (s *ICTSMCStrategy) EvaluateLiveSignal(currentCandle map[string]interface{}, prevCandles []map[string]interface{}, indexName string, params map[string]interface{}) *LiveOrderRequest {
+	if len(prevCandles) < 2 {
+		return nil
+	}
+
+	c0 := prevCandles[len(prevCandles)-2]
+	c2 := currentCandle
+
+	high0, ok1 := getFloat(c0, "high")
+	low2, ok2 := getFloat(c2, "low")
+	dateStr, _ := currentCandle["date"].(string)
+
+	if !ok1 || !ok2 {
+		return nil
+	}
+
+	lotsCount := 1
+	if val, ok := params["lots_count"].(float64); ok && val > 0 {
+		lotsCount = int(val)
+	}
+
+	lotSize := 50
+	idxUpper := strings.ToUpper(indexName)
+	if strings.Contains(idxUpper, "BANK") {
+		lotSize = 15
+	} else if strings.Contains(idxUpper, "FIN") {
+		lotSize = 25
+	}
+	totalQuantity := lotSize * lotsCount
+
+	step := 50.0
+	if strings.Contains(idxUpper, "BANK") {
+		step = 100.0
+	}
+
+	// Bullish FVG check
+	if low2 > high0+(step*0.2) {
+		entry, _ := getFloat(c2, "close")
+		atmStrike := math.Round(entry/step) * step
+		tradingSymbol := fmt.Sprintf("%s %.0f CE", indexName, atmStrike)
+		return &LiveOrderRequest{
+			IndexName:     indexName,
+			TradingSymbol: tradingSymbol,
+			Transaction:   "BUY",
+			OrderType:     "MARKET",
+			Quantity:      totalQuantity,
+			TargetPrice:   entry + (step * 0.8),
+			StopLossPrice: entry - (step * 0.4),
+			StrategyName:  "ict_smc",
+			Timestamp:     dateStr,
+		}
+	}
+	return nil
+}
+
 func getFloat(m map[string]interface{}, key string) (float64, bool) {
 	val, ok := m[key]
 	if !ok {
