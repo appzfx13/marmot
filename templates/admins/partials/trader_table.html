@@ -1,12 +1,29 @@
 <!-- Main Glass Card Container -->
 <div class="glass-card overflow-hidden d-flex flex-column min-vh-75" style="min-height: 700px;">
     
+    <!-- Bulk Action Toolbar -->
+    <div class="bulk-action-bar px-4 py-2 border-bottom d-none align-items-center justify-content-between" style="background: rgba(220, 53, 69, 0.12); border-color: rgba(220, 53, 69, 0.25) !important;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-danger fs-5">check_circle</span>
+            <span class="fw-bold theme-text-main small"><span class="bulk-selected-count">0</span> traders marked</span>
+        </div>
+        <button type="button" 
+                class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                onclick="triggerBulkDelete(this, '{% url 'admins:trader_bulk_delete' %}')">
+            <span class="material-icons fs-6">delete</span>
+            <span>Bulk Delete</span>
+        </button>
+    </div>
+
     <!-- DESKTOP / TABLET VIEW -->
     <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
         <table class="table table-hover align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; --bs-table-hover-bg: var(--nav-hover); color: var(--text-main);">
             <thead>
                 <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
-                    <th scope="col" class="ps-4 py-3 theme-text-muted">
+                    <th scope="col" class="ps-4 py-3" style="width: 40px;">
+                        <input class="form-check-input bulk-select-all" type="checkbox" title="Select All">
+                    </th>
+                    <th scope="col" class="py-3 theme-text-muted">
                         <a href="javascript:void(0);" 
                            class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
                            hx-get="{% url 'admins:trader_list' %}?sort={% if current_sort == 'username' %}-username{% else %}username{% endif %}&{{ current_filters }}"
@@ -28,7 +45,10 @@
             <tbody>
                 {% for trader in traders %}
                 <tr style="border-color: var(--border-color) !important;">
-                    <td class="ps-4 py-3">
+                    <td class="ps-4 py-3" style="width: 40px;">
+                        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ trader.id }}">
+                    </td>
+                    <td class="py-3">
                         <div class="d-flex align-items-center gap-3">
                             <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px; border: 1px solid rgba(220, 53, 69, 0.3);">
                                 {{ trader.first_name|default:trader.username|slice:":1"|upper }}
@@ -79,7 +99,7 @@
                     </td>
                 </tr>
                 {% empty %}
-                <tr><td colspan="5" class="text-center py-5 theme-text-muted">No traders found.</td></tr>
+                <tr><td colspan="6" class="text-center py-5 theme-text-muted">No traders found.</td></tr>
                 {% endfor %}
             </tbody>
         </table>
@@ -91,6 +111,7 @@
         <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
             <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
                 <div class="d-flex align-items-center gap-2">
+                    <input class="form-check-input bulk-item-checkbox me-1" type="checkbox" value="{{ trader.id }}">
                     <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold" style="width: 36px; height: 36px;">{{ trader.first_name|slice:":1"|upper }}</div>
                     <div>
                         <div class="fw-medium theme-text-main fs-6">{{ trader.get_full_name|default:trader.username }}</div>

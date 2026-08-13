@@ -1,12 +1,29 @@
 <!-- Main Glass Card Container (Min-height used instead of fixed height for better mobile flow) -->
 <div class="glass-card overflow-hidden d-flex flex-column min-vh-75" style="min-height: 700px;">
     
+    <!-- Bulk Action Toolbar -->
+    <div class="bulk-action-bar px-4 py-2 border-bottom d-none align-items-center justify-content-between" style="background: rgba(220, 53, 69, 0.12); border-color: rgba(220, 53, 69, 0.25) !important;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-danger fs-5">check_circle</span>
+            <span class="fw-bold theme-text-main small"><span class="bulk-selected-count">0</span> configurations marked</span>
+        </div>
+        <button type="button" 
+                class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                onclick="triggerBulkDelete(this, '{% url 'admins:trade_exec_config_bulk_delete' %}')">
+            <span class="material-icons fs-6">delete</span>
+            <span>Bulk Delete</span>
+        </button>
+    </div>
+
     <!-- DESKTOP / LARGE TABLET VIEW -->
     <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
         <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; --bs-table-hover-bg: var(--nav-hover); color: var(--text-main);">
             <thead>
                 <tr class="theme-text-muted " style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
-                    <th scope="col" class="ps-4 py-3 theme-text-muted">
+                    <th scope="col" class="ps-4 py-3" style="width: 40px;">
+                        <input class="form-check-input bulk-select-all" type="checkbox" title="Select All">
+                    </th>
+                    <th scope="col" class="py-3 theme-text-muted">
                         <a href="javascript:void(0);" 
                            class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
                            hx-get="{% url 'admins:trade_exec_config_list' %}?sort={% if current_sort == 'name' %}-name{% else %}name{% endif %}&{{ current_filters }}"
@@ -31,8 +48,11 @@
             <tbody>
                 {% for config in configs %}
                 <tr style="border-color: var(--border-color) !important;">
+                    <td class="ps-4 py-3" style="width: 40px;">
+                        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ config.id }}">
+                    </td>
                     <!-- Config Name -->
-                    <td class="ps-4 py-3">
+                    <td class="py-3">
                         <div class="fw-medium theme-text-main">{{ config.name|default:"—" }}</div>
                     </td>
 
@@ -96,7 +116,7 @@
                 </tr>
                 {% empty %}
                 <tr class="border-0">
-                    <td colspan="8" class="text-center py-5 theme-text-muted border-0">
+                    <td colspan="9" class="text-center py-5 theme-text-muted border-0">
                         <span class="material-icons fs-1 mb-2 opacity-50">tune</span>
                         <div>No trade execution configurations found matching your criteria.</div>
                     </td>
@@ -113,13 +133,16 @@
             
             <!-- Header: Name & Status -->
             <div class="d-flex justify-content-between align-items-start gap-2 mb-3">
-                <div class="d-flex flex-column">
-                    <div class="fw-bold theme-text-main fs-6">{{ config.name|default:"—" }}</div>
-                    {% if config.admins_user %}
-                        <small class="theme-text-muted">@{{ config.admins_user.username }}</small>
-                    {% else %}
-                        <small class="theme-text-muted">Unassigned</small>
-                    {% endif %}
+                <div class="d-flex align-items-center gap-2">
+                    <input class="form-check-input bulk-item-checkbox me-1" type="checkbox" value="{{ config.id }}">
+                    <div class="d-flex flex-column">
+                        <div class="fw-bold theme-text-main fs-6">{{ config.name|default:"—" }}</div>
+                        {% if config.admins_user %}
+                            <small class="theme-text-muted">@{{ config.admins_user.username }}</small>
+                        {% else %}
+                            <small class="theme-text-muted">Unassigned</small>
+                        {% endif %}
+                    </div>
                 </div>
             </div>
 

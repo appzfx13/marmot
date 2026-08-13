@@ -893,6 +893,80 @@
             window.location.reload();
         });
 
+        // ── Global Bulk Selection & Deletion Handler ─────────────────────────
+        function triggerBulkDelete(btn, bulkUrl) {
+            const checkboxes = document.querySelectorAll('.bulk-item-checkbox:checked');
+            const ids = Array.from(checkboxes).map(cb => cb.value).filter(Boolean);
+            if (!ids.length) {
+                const showEvt = new CustomEvent('showToast', { detail: { message: 'Please mark at least one entry to delete.', level: 'warning' } });
+                document.body.dispatchEvent(showEvt);
+                return;
+            }
+            const url = bulkUrl + '?ids=' + ids.join(',');
+            htmx.ajax('GET', url, { target: '#globalHtmxModalDialog' });
+        }
+
+        function updateBulkActionBar(container) {
+            const checkedItems = document.querySelectorAll('.bulk-item-checkbox:checked');
+            const count = checkedItems.length;
+
+            document.querySelectorAll('.bulk-selected-count').forEach(el => {
+                el.textContent = count;
+            });
+
+            document.querySelectorAll('.bulk-dropdown').forEach(dropdown => {
+                if (count > 0) {
+                    dropdown.classList.remove('d-none');
+                    dropdown.classList.add('d-inline-block');
+                } else {
+                    dropdown.classList.remove('d-inline-block');
+                    dropdown.classList.add('d-none');
+                }
+            });
+
+            document.querySelectorAll('.bulk-action-bar').forEach(bar => {
+                if (count > 0) {
+                    bar.classList.remove('d-none');
+                    bar.classList.add('d-flex');
+                } else {
+                    bar.classList.remove('d-flex');
+                    bar.classList.add('d-none');
+                }
+            });
+        }
+
+        document.addEventListener('change', function(evt) {
+            if (evt.target.classList.contains('bulk-select-all')) {
+                const container = evt.target.closest('.glass-card, table, #traderTableContainer, #configTableContainer, #backup-dashboard-container, #backtest-dashboard-container, #postback-list-container, #broker-master-list-container');
+                if (container) {
+                    const itemCheckboxes = container.querySelectorAll('.bulk-item-checkbox');
+                    itemCheckboxes.forEach(cb => cb.checked = evt.target.checked);
+                    updateBulkActionBar(container);
+                }
+            }
+            if (evt.target.classList.contains('bulk-item-checkbox')) {
+                const container = evt.target.closest('.glass-card, table, #traderTableContainer, #configTableContainer, #backup-dashboard-container, #backtest-dashboard-container, #postback-list-container, #broker-master-list-container');
+                if (container) {
+                    const allItems = container.querySelectorAll('.bulk-item-checkbox');
+                    const checkedItems = container.querySelectorAll('.bulk-item-checkbox:checked');
+                    const selectAll = container.querySelector('.bulk-select-all');
+                    if (selectAll) {
+                        selectAll.checked = (allItems.length > 0 && allItems.length === checkedItems.length);
+                    }
+                    updateBulkActionBar(container);
+                }
+            }
+        });
+
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            const container = evt.detail.target;
+            if (container) {
+                const selectAll = container.querySelector('.bulk-select-all');
+                if (selectAll) selectAll.checked = false;
+                updateBulkActionBar(container);
+            }
+        });
+
         const globalModalEl = document.getElementById('globalHtmxModal');
         if (globalModalEl) {
             globalModalEl.addEventListener('hidden.bs.modal', function () {

@@ -11,11 +11,28 @@
 </style>
 
 <div class="glass-card p-0 overflow-hidden mb-4 border-0">
+    <!-- Bulk Action Toolbar -->
+    <div class="bulk-action-bar px-4 py-2 border-bottom d-none align-items-center justify-content-between" style="background: rgba(220, 53, 69, 0.12); border-color: rgba(220, 53, 69, 0.25) !important;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-danger fs-5">check_circle</span>
+            <span class="fw-bold theme-text-main small"><span class="bulk-selected-count">0</span> backtest tasks marked</span>
+        </div>
+        <button type="button" 
+                class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                onclick="triggerBulkDelete(this, '{% url 'backtest:backtest_bulk_delete' %}')">
+            <span class="material-icons fs-6">delete</span>
+            <span>Bulk Delete</span>
+        </button>
+    </div>
+
     <div class="table-responsive">
         <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
             <thead>
                 <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
-                    <th scope="col" class="ps-4 py-3 theme-text-muted text-uppercase small fw-semibold">ID / Strategy</th>
+                    <th scope="col" class="ps-4 py-3" style="width: 40px;">
+                        <input class="form-check-input bulk-select-all" type="checkbox" title="Select All">
+                    </th>
+                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">ID / Strategy</th>
                     <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Index & Dates</th>
                     <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Capital / Trades</th>
                     <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Net PnL / Win Rate</th>
@@ -27,7 +44,10 @@
             <tbody>
                 {% for backtest in backtests %}
                 <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
-                    <td class="ps-4 py-3 bg-transparent">
+                    <td class="ps-4 py-3 bg-transparent" style="width: 40px;">
+                        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backtest.id }}">
+                    </td>
+                    <td class="py-3 bg-transparent">
                         <div class="fw-bold theme-text-main">#BT-{{ backtest.id|stringformat:"04d" }}</div>
                         <div class="small text-primary fw-semibold">{{ backtest.get_strategy_name_display }}</div>
                         {% if backtest.backup_task %}
@@ -130,7 +150,7 @@
                 </tr>
                 {% empty %}
                 <tr class="border-0">
-                    <td colspan="7" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                    <td colspan="8" class="text-center py-5 theme-text-muted border-0 bg-transparent">
                         <span class="material-icons fs-1 mb-2 opacity-50">analytics</span>
                         <p class="mb-0 fw-medium">No strategy backtests found.</p>
                         <small class="opacity-75">Click "Run New Backtest" above to initialize a plug-and-play strategy execution.</small>

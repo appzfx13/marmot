@@ -5,12 +5,14 @@ from .views import (
     BacktestDetailView,
     BacktestControlView,
     BacktestDeleteView,
+    BacktestBulkDeleteView,
 )
 
 app_name = 'backtest'
 
 urlpatterns = [
     path('list/', BacktestDashboardView.as_view(), name='backtest_dashboard'),
+    path('bulk-delete/', BacktestBulkDeleteView.as_view(), name='backtest_bulk_delete'),
     path('create/', BacktestCreateView.as_view(), name='backtest_create'),
     path('<int:pk>/', BacktestDetailView.as_view(), name='backtest_detail'),
     path('<int:pk>/control/', BacktestControlView.as_view(), name='backtest_control'),

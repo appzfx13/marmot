@@ -524,3 +524,147 @@ class AdminBrokerMasterDeleteView(AdminRequiredMixin, View):
             'reloadPage': True
         })
         return response
+
+
+# ==========================================
+# BULK DELETE CBV VIEWS
+# ==========================================
+
+class AdminTraderBulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """CBV for bulk soft-deletion of traders via HTMX."""
+    def get(self, request, *args, **kwargs):
+        ids_raw = request.GET.get('ids', '')
+        ids_list = [i.strip() for i in ids_raw.split(',') if i.strip().isdigit()]
+        count = len(ids_list)
+        context = {
+            'count': count,
+            'ids_str': ','.join(ids_list),
+            'item_name': 'trader' if count == 1 else 'traders',
+            'post_url': reverse_lazy('admins:trader_bulk_delete'),
+        }
+        return render(request, 'admins/partials/confirm_bulk_delete.html', context)
+
+    def post(self, request, *args, **kwargs):
+        ids_raw = request.POST.get('ids', '')
+        ids_list = [int(i.strip()) for i in ids_raw.split(',') if i.strip().isdigit()]
+        if ids_list:
+            qs = User.objects.filter(id__in=ids_list, role=MemberRoleChoices.TRADERS, is_deleted=False)
+            count = qs.count()
+            qs.update(is_deleted=True)
+            msg = f"Successfully deleted {count} trader{'s' if count != 1 else ''}."
+        else:
+            msg = "No valid traders selected."
+            count = 0
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'success' if count > 0 else 'warning'},
+            'reloadTraderTable': True
+        })
+        return response
+
+
+class AdminTradeExecConfigBulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """CBV for bulk deletion of trade configurations via HTMX."""
+    def get(self, request, *args, **kwargs):
+        ids_raw = request.GET.get('ids', '')
+        ids_list = [i.strip() for i in ids_raw.split(',') if i.strip().isdigit()]
+        count = len(ids_list)
+        context = {
+            'count': count,
+            'ids_str': ','.join(ids_list),
+            'item_name': 'configuration' if count == 1 else 'configurations',
+            'post_url': reverse_lazy('admins:trade_exec_config_bulk_delete'),
+        }
+        return render(request, 'admins/partials/confirm_bulk_delete.html', context)
+
+    def post(self, request, *args, **kwargs):
+        ids_raw = request.POST.get('ids', '')
+        ids_list = [int(i.strip()) for i in ids_raw.split(',') if i.strip().isdigit()]
+        if ids_list:
+            qs = TradeExecConfig.objects.filter(id__in=ids_list, is_deleted=False)
+            count = qs.count()
+            qs.update(is_deleted=True)
+            msg = f"Successfully deleted {count} configuration{'s' if count != 1 else ''}."
+        else:
+            msg = "No valid configurations selected."
+            count = 0
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'success' if count > 0 else 'warning'},
+            'reloadConfigTable': True
+        })
+        return response
+
+
+class PostbackLogBulkDeleteView(LoginRequiredMixin, DeveloperOrAdminRequiredMixin, View):
+    """CBV for bulk soft-deletion of postback audit logs via HTMX."""
+    def get(self, request, *args, **kwargs):
+        ids_raw = request.GET.get('ids', '')
+        ids_list = [i.strip() for i in ids_raw.split(',') if i.strip().isdigit()]
+        count = len(ids_list)
+        context = {
+            'count': count,
+            'ids_str': ','.join(ids_list),
+            'item_name': 'postback log' if count == 1 else 'postback logs',
+            'post_url': reverse_lazy('admins:postback_bulk_delete'),
+        }
+        return render(request, 'admins/partials/confirm_bulk_delete.html', context)
+
+    def post(self, request, *args, **kwargs):
+        ids_raw = request.POST.get('ids', '')
+        ids_list = [int(i.strip()) for i in ids_raw.split(',') if i.strip().isdigit()]
+        if ids_list:
+            qs = PostbackLog.objects.filter(id__in=ids_list, is_deleted=False)
+            count = qs.count()
+            qs.update(is_deleted=True)
+            msg = f"Successfully deleted {count} postback log{'s' if count != 1 else ''}."
+        else:
+            msg = "No valid postback logs selected."
+            count = 0
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'success' if count > 0 else 'warning'},
+            'reloadPostbackTable': True
+        })
+        return response
+
+
+class AdminBrokerMasterBulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """CBV for bulk soft-deletion of master brokers via HTMX."""
+    def get(self, request, *args, **kwargs):
+        ids_raw = request.GET.get('ids', '')
+        ids_list = [i.strip() for i in ids_raw.split(',') if i.strip().isdigit()]
+        count = len(ids_list)
+        context = {
+            'count': count,
+            'ids_str': ','.join(ids_list),
+            'item_name': 'master broker' if count == 1 else 'master brokers',
+            'post_url': reverse_lazy('admins:broker-master-bulk-delete'),
+        }
+        return render(request, 'admins/partials/confirm_bulk_delete.html', context)
+
+    def post(self, request, *args, **kwargs):
+        ids_raw = request.POST.get('ids', '')
+        ids_list = [int(i.strip()) for i in ids_raw.split(',') if i.strip().isdigit()]
+        if ids_list:
+            qs = BrokerMaster.objects.filter(id__in=ids_list, is_deleted=False)
+            count = qs.count()
+            qs.update(is_deleted=True, is_active=False)
+            msg = f"Successfully deleted {count} master broker{'s' if count != 1 else ''}."
+        else:
+            msg = "No valid master brokers selected."
+            count = 0
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'success' if count > 0 else 'warning'},
+            'reloadBrokerMasterTable': True
+        })
+        return response

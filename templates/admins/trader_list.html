@@ -11,12 +11,36 @@
         <h3 class="fw-bold mb-1 theme-text-main">Traders Management</h3>
         <p class="theme-text-muted mb-0">Search, filter, and manage registered traders.</p>
     </div>
-    <a href="{% url 'admins:trader_create' %}"
-        class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 border-0 shadow-sm transition-all"
-        style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
-        <span class="material-icons fs-5">person_add</span>
-        <span>Add Trader</span>
-    </a>
+    <div class="d-flex align-items-center gap-2">
+        <div class="dropdown bulk-dropdown d-none">
+            <button class="btn btn-outline-danger rounded-pill px-3 py-2 fw-semibold dropdown-toggle d-inline-flex align-items-center gap-2 shadow-sm transition-all" 
+                    type="button" 
+                    data-bs-toggle="dropdown" 
+                    aria-expanded="false"
+                    title="Bulk Operations">
+                <span class="material-icons fs-5">more_vert</span>
+                <span>Bulk Actions</span>
+                <span class="badge bg-danger rounded-pill bulk-selected-count">0</span>
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end glass-card border shadow-lg p-2 mt-2" style="background: var(--glass-bg); backdrop-filter: blur(12px); border-color: var(--border-color) !important;">
+                <li>
+                    <a class="dropdown-item text-danger rounded-3 d-flex align-items-center gap-2 py-2 fw-medium" 
+                       href="javascript:void(0);" 
+                       onclick="triggerBulkDelete(this, '{% url 'admins:trader_bulk_delete' %}')">
+                        <span class="material-icons fs-6">delete</span>
+                        <span>Delete Selected (<span class="bulk-selected-count">0</span>)</span>
+                    </a>
+                </li>
+            </ul>
+        </div>
+
+        <a href="{% url 'admins:trader_create' %}"
+            class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 border-0 shadow-sm transition-all"
+            style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
+            <span class="material-icons fs-5">person_add</span>
+            <span>Add Trader</span>
+        </a>
+    </div>
 </div>
 
 <!-- Search & Filter Controls -->

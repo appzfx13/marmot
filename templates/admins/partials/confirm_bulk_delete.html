@@ -1,0 +1,32 @@
+<div class="modal-content glass-card p-2">
+    <div class="modal-header border-0">
+        <h5 class="modal-title theme-text-main d-flex align-items-center gap-2">
+            <span class="material-icons text-danger fs-4">delete_sweep</span>
+            <span>Confirm Bulk Deletion</span>
+        </h5>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <div class="modal-body theme-text-muted">
+        {% if count > 0 %}
+            Are you sure you want to delete <strong class="theme-text-main">{{ count }} {{ item_name }}</strong>? Selected entries will be removed.
+        {% else %}
+            No valid items were selected for deletion.
+        {% endif %}
+    </div>
+
+    <div class="modal-footer border-0">
+        <button type="button" class="btn btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+
+        {% if count > 0 %}
+        <button type="button" 
+                hx-post="{{ post_url }}" 
+                hx-vals='{"ids": "{{ ids_str }}"}' 
+                hx-swap="none"
+                class="btn btn-danger rounded-pill px-4 fw-bold d-inline-flex align-items-center gap-2">
+            <span class="material-icons fs-6">delete_forever</span>
+            <span>Confirm Bulk Delete</span>
+        </button>
+        {% endif %}
+    </div>
+</div>

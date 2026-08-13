@@ -94,7 +94,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 	select {
 	case <-ctx.Done():
-		log.Printf("⏸️ [Task #%s] Backup task cancelled after Step 1.", taskID)
+		log.Printf("🛑 [Task #%s] Backup task cancelled after Step 1.", taskID)
 		return
 	default:
 	}
@@ -204,25 +204,40 @@ func (j *BackupJob) downloadIndexSpot(
 		}
 
 		jsonBody, _ := json.Marshal(reqPayload)
-		req, err := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewBuffer(jsonBody))
-		if err != nil {
-			chunkStart = chunkEnd.AddDate(0, 0, 1)
-			continue
-		}
-		req.Header.Set("Content-Type", "application/json")
-		req.Header.Add("access-token", j.config.DhanAccessToken)
-		req.Header.Add("client-id", j.config.DhanClientID)
 
-		resp, err := client.Do(req)
-		if err != nil {
-			log.Printf("⚠️ [Task #%s] Index API error: %v", taskID, err)
-			chunkStart = chunkEnd.AddDate(0, 0, 1)
-			continue
-		}
-		bodyBytes, _ := io.ReadAll(resp.Body)
-		resp.Body.Close()
+		var bodyBytes []byte
+		var respStatusCode int
 
-		if resp.StatusCode == http.StatusOK {
+		for attempt := 0; attempt < 3; attempt++ {
+			req, err := http.NewRequestWithContext(ctx, "POST", baseURL, bytes.NewBuffer(jsonBody))
+			if err != nil {
+				break
+			}
+			req.Header.Set("Content-Type", "application/json")
+			req.Header.Add("access-token", j.config.DhanAccessToken)
+			req.Header.Add("client-id", j.config.DhanClientID)
+
+			resp, err := client.Do(req)
+			if err != nil {
+				log.Printf("⚠️ [Task #%s] Index API error: %v", taskID, err)
+				time.Sleep(300 * time.Millisecond)
+				continue
+			}
+			bodyBytes, _ = io.ReadAll(resp.Body)
+			respStatusCode = resp.StatusCode
+			resp.Body.Close()
+
+			if respStatusCode == http.StatusTooManyRequests {
+				log.Printf("⚠️ [Task #%s] Index API HTTP 429 Rate Limit. Retrying in 1.5s (Attempt %d/3)...", taskID, attempt+1)
+				time.Sleep(1500 * time.Millisecond)
+				continue
+			}
+			break
+		}
+
+		time.Sleep(100 * time.Millisecond)
+
+		if respStatusCode == http.StatusOK {
 			candles := parseHistoricalResponse(bodyBytes, indexName)
 			if len(candles) > 0 {
 				candlesByDate := make(map[string][]map[string]interface{})
@@ -257,7 +272,7 @@ func (j *BackupJob) downloadIndexSpot(
 				log.Printf("📊 [Task #%s] Index Spot: Fetched %d candles for %s to %s\n", taskID, len(candles), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
 			}
 		} else {
-			log.Printf("⚠️ [Task #%s] Index API HTTP %d: %s", taskID, resp.StatusCode, string(bodyBytes))
+			log.Printf("⚠️ [Task #%s] Index API HTTP %d: %s", taskID, respStatusCode, string(bodyBytes))
 		}
 
 		completedChunks++
@@ -271,6 +286,7 @@ func (j *BackupJob) downloadIndexSpot(
 
 	return baseOutputDir
 }
+
 
 // runOptionsDownload fetches historical options data via DhanHQ v2 Expired Options Rolling API (/v2/charts/rollingoption)
 // Uses concurrent worker pool for high-throughput parallel data ingestion.
@@ -312,11 +328,14 @@ func (j *BackupJob) runOptionsDownload(
 	}
 	close(tasks)
 
-	workerCount := 3
+	workerCount := 2
 	var wg sync.WaitGroup
 	var completedCount int32
 
 	for i := 0; i < workerCount; i++ {
+		if i > 0 {
+			time.Sleep(250 * time.Millisecond)
+		}
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
@@ -339,7 +358,7 @@ func (j *BackupJob) runOptionsDownload(
 				progress := startProgress + int(float64(done)/float64(totalContracts)*float64(95-startProgress))
 				_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
 				j.broadcastProgress(ctx, taskID, progress, "running", 0.0, contractDir)
-				time.Sleep(100 * time.Millisecond)
+				time.Sleep(200 * time.Millisecond)
 			}
 		}()
 	}
@@ -422,8 +441,8 @@ func (j *BackupJob) downloadRollingOptionCandles(
 			resp.Body.Close()
 
 			if respStatusCode == http.StatusTooManyRequests {
-				log.Printf("⚠️ [Task #%s] HTTP 429 Rate Limit for %s %s. Retrying in 1s (Attempt %d/3)...", taskID, drvOptionType, strikeName, attempt+1)
-				time.Sleep(1 * time.Second)
+				log.Printf("⚠️ [Task #%s] HTTP 429 Rate Limit for %s %s. Retrying in 2s (Attempt %d/3)...", taskID, drvOptionType, strikeName, attempt+1)
+				time.Sleep(2 * time.Second)
 				continue
 			}
 			break
@@ -467,14 +486,19 @@ func (j *BackupJob) downloadRollingOptionCandles(
 			_, _ = dayFile.Write(buf.Bytes())
 			dayFile.Close()
 		}
+		time.Sleep(250 * time.Millisecond)
 	}
 }
 
 
 // generateRelativeStrikes creates ATM, ATM+1..N, ATM-1..N strike strings
+// Capped at maximum 10 as per official DhanHQ v2 Expired Options API specification (ATM+10 / ATM-10 max)
 func generateRelativeStrikes(count int) []string {
 	if count <= 0 {
 		count = 5
+	}
+	if count > 10 {
+		count = 10
 	}
 	strikes := []string{"ATM"}
 	for i := 1; i <= count; i++ {
@@ -746,6 +770,10 @@ func parseTimestampArray(raw json.RawMessage) []int64 {
 		}
 		log.Printf("[PARSE] Timestamps parsed as strings. Sample[0]: %s -> epoch %d", stringsArr[0], result[0])
 		return result
+	}
+
+	if string(raw) == "[]" || string(raw) == "null" || len(raw) == 0 {
+		return nil
 	}
 
 	log.Printf("[PARSE] parseTimestampArray failed to parse (raw sample: %.80s)", string(raw))

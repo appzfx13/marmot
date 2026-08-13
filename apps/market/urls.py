@@ -7,6 +7,7 @@ from .views import (
     MarketBackupDownloadView,
     MarketBackupControlView,
     MarketBackupDeleteView,
+    MarketBackupBulkDeleteView,
 )
 
 app_name = 'market'
@@ -15,6 +16,7 @@ urlpatterns = [
     # Backup Dashboard / List
     path('backup/', MarketBackupListView.as_view(), name='market_backup_view'),
     path('backup/list/', MarketBackupListView.as_view(), name='market_backup_list'),
+    path('backup/bulk-delete/', MarketBackupBulkDeleteView.as_view(), name='market_backup_bulk_delete'),
     path('backup/create/', MarketBackupCreateView.as_view(), name='market_backup_create'),
     path('backup/<int:pk>/', MarketBackupDetailView.as_view(), name='market_backup_detail'),
     path('backup/<int:pk>/chart/', MarketBackupChartView.as_view(), name='market_backup_chart'),

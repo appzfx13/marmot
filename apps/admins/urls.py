@@ -25,10 +25,14 @@ from .views import (
     AdminBrokerMasterUpdateModalView,
     AdminBrokerMasterDeleteModalView,
     AdminBrokerMasterDeleteView,
+    AdminTraderBulkDeleteView,
+    AdminTradeExecConfigBulkDeleteView,
+    PostbackLogBulkDeleteView,
+    AdminBrokerMasterBulkDeleteView,
 )
 
-from apps.market.views import MarketBackupListView, MarketBackupChartView
-from apps.backtest.views import BacktestDashboardView
+from apps.market.views import MarketBackupListView, MarketBackupChartView, MarketBackupBulkDeleteView
+from apps.backtest.views import BacktestDashboardView, BacktestBulkDeleteView
 
 app_name = 'admins' 
 
@@ -40,11 +44,14 @@ urlpatterns = [
 
     # Control Routes for Market Backup & Backtest
     path('market-backup/', MarketBackupListView.as_view(), name='market_backup_list'),
+    path('market-backup/bulk-delete/', MarketBackupBulkDeleteView.as_view(), name='market_backup_bulk_delete'),
     path('market-backup/<int:pk>/chart/', MarketBackupChartView.as_view(), name='market_backup_chart'),
     path('backtest/', BacktestDashboardView.as_view(), name='backtest_dashboard'),
+    path('backtest/bulk-delete/', BacktestBulkDeleteView.as_view(), name='backtest_bulk_delete'),
 
     # Traders Management (Aligned with template route names)
     path('traders/', AdminTraderListView.as_view(), name='trader_list'),
+    path('traders/bulk-delete/', AdminTraderBulkDeleteView.as_view(), name='trader_bulk_delete'),
     path('traders/create/', AdminTraderCreateView.as_view(), name='trader_create'),
     path('traders/<int:pk>/', AdminTraderDetailView.as_view(), name='trader_detail'),
     path('traders/<int:pk>/edit/', AdminTraderUpdateView.as_view(), name='trader_edit'),
@@ -53,10 +60,12 @@ urlpatterns = [
 
     # Postback & Webhook Audit Logs
     path('postbacks/', PostbackLogListView.as_view(), name='postback_list'),
+    path('postbacks/bulk-delete/', PostbackLogBulkDeleteView.as_view(), name='postback_bulk_delete'),
     path('postbacks/<int:pk>/', PostbackLogDetailView.as_view(), name='postback_detail'),
 
     # Trade Execution Configurations
     path('trade-configs/', AdminTradeExecConfigListView.as_view(), name='trade_exec_config_list'),
+    path('trade-configs/bulk-delete/', AdminTradeExecConfigBulkDeleteView.as_view(), name='trade_exec_config_bulk_delete'),
     path('trade-configs/create/', AdminTradeExecConfigCreateView.as_view(), name='trade_exec_config_create'),
     path('trade-configs/<int:pk>/', AdminTradeExecConfigDetailView.as_view(), name='trade_exec_config_detail'),
     path('trade-configs/<int:pk>/edit/', AdminTradeExecConfigUpdateView.as_view(), name='trade_exec_config_edit'),
@@ -64,6 +73,7 @@ urlpatterns = [
 
     # Master Brokers Management
     path('masters/brokers/', AdminBrokerMasterListView.as_view(), name='broker-master-list'),
+    path('masters/brokers/bulk-delete/', AdminBrokerMasterBulkDeleteView.as_view(), name='broker-master-bulk-delete'),
     path('masters/brokers/create-modal/', AdminBrokerMasterCreateModalView.as_view(), name='broker-master-create-modal'),
     path('masters/brokers/create/', AdminBrokerMasterSaveView.as_view(), name='broker-master-create'),
     path('masters/brokers/<int:pk>/edit-modal/', AdminBrokerMasterUpdateModalView.as_view(), name='broker-master-edit-modal'),

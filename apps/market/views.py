@@ -267,4 +267,40 @@ class MarketBackupDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixi
         })
         return response
 
+
+class MarketBackupBulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """CBV for bulk soft-deletion of market backup tasks via HTMX."""
+    def get(self, request, *args, **kwargs):
+        ids_raw = request.GET.get('ids', '')
+        ids_list = [i.strip() for i in ids_raw.split(',') if i.strip().isdigit()]
+        count = len(ids_list)
+        context = {
+            'count': count,
+            'ids_str': ','.join(ids_list),
+            'item_name': 'backup entry' if count == 1 else 'backup entries',
+            'post_url': reverse_lazy('market:market_backup_bulk_delete'),
+        }
+        return render(request, 'admins/partials/confirm_bulk_delete.html', context)
+
+    def post(self, request, *args, **kwargs):
+        ids_raw = request.POST.get('ids', '')
+        ids_list = [int(i.strip()) for i in ids_raw.split(',') if i.strip().isdigit()]
+        if ids_list:
+            qs = MarketBackupTask.objects.filter(id__in=ids_list, is_deleted=False)
+            count = qs.count()
+            qs.update(is_deleted=True)
+            msg = f"Successfully deleted {count} market backup{'s' if count != 1 else ''}."
+        else:
+            msg = "No valid backup entries selected."
+            count = 0
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'success' if count > 0 else 'warning'},
+            'reloadBackupTable': True
+        })
+        return response
+
+
 
