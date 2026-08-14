@@ -99,9 +99,14 @@ func (j *BackupJob) Run(ctx context.Context) {
 	default:
 	}
 
-	// ── STEP 2: Download Expired Options Strikes (ATM±N CE & PE) ─────────────
-	log.Printf("📥 [Task #%s] [Step 2/2] Downloading Option Strikes (ATM±%d CE & PE)...", taskID, strikeCount)
-	optsDir := j.runOptionsDownload(ctx, taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate, strikeCount, 45)
+	optsDir := ""
+	if strings.EqualFold(indexName, "INDIAVIX") || strikeCount <= 0 {
+		log.Printf("ℹ️ [Task #%s] Skipping Option Strikes Download for %s (Index Spot only).", taskID, indexName)
+	} else {
+		// ── STEP 2: Download Expired Options Strikes (ATM±N CE & PE) ─────────────
+		log.Printf("📥 [Task #%s] [Step 2/2] Downloading Option Strikes (ATM±%d CE & PE)...", taskID, strikeCount)
+		optsDir = j.runOptionsDownload(ctx, taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate, strikeCount, 45)
+	}
 
 	finalOutputDir := backupTaskDir
 	if !dirExists(finalOutputDir) {
@@ -517,6 +522,8 @@ func getIndexSecurityID(indexName string) string {
 		return "27"
 	case "MIDCPNIFTY":
 		return "26"
+	case "INDIAVIX", "INDIA VIX":
+		return "17"
 	default: // NIFTY
 		return "13"
 	}

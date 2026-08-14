@@ -30,7 +30,7 @@
                 {{ form.index_name }}
             </div>
 
-            <div class="col-12 col-md-6">
+            <div id="userStrikeCountCol" class="col-12 col-md-6">
                 <label class="form-label theme-text-muted smaller fw-bold uppercase mb-1" for="{{ form.strike_count.id_for_label }}">
                     Strike Count (ITM / OTM)
                 </label>
@@ -60,4 +60,32 @@
             </button>
         </div>
     </form>
+
+    <script>
+        (function() {
+            const indexSelect = document.querySelector('form select[name="index_name"]');
+            const strikeCol = document.getElementById('userStrikeCountCol');
+            const strikeInput = document.querySelector('form input[name="strike_count"]');
+
+            function toggleUserStrikeField() {
+                if (indexSelect && strikeCol) {
+                    if (indexSelect.value === 'INDIAVIX') {
+                        strikeCol.style.display = 'none';
+                        if (strikeInput) strikeInput.value = '0';
+                    } else {
+                        strikeCol.style.display = '';
+                        if (strikeInput && (strikeInput.value === '0' || !strikeInput.value)) {
+                            strikeInput.value = '5';
+                        }
+                    }
+                }
+            }
+
+            if (indexSelect) {
+                indexSelect.addEventListener('change', toggleUserStrikeField);
+                toggleUserStrikeField();
+            }
+        })();
+    </script>
 </div>
+

@@ -17,6 +17,7 @@ class IndexChoices(models.TextChoices):
     BANKNIFTY = 'BANKNIFTY', 'Bank Nifty'
     FINNIFTY = 'FINNIFTY', 'Fin Nifty'
     MIDCPNIFTY = 'MIDCPNIFTY', 'Midcp Nifty'
+    INDIAVIX = 'INDIAVIX', 'India VIX'
 
 
 # Go Strategy Plugin Choices

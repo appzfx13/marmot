@@ -5,6 +5,7 @@ INDEX_INSTRUMENT_MAP = {
     'BANKNIFTY':  {"security_id": "25",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
     'FINNIFTY':   {"security_id": "27",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
     'MIDCPNIFTY': {"security_id": "26",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
+    'INDIAVIX':   {"security_id": "17",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
 }
 
 # Options download config — instrument & segment for NSE F&O options

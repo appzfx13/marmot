@@ -198,7 +198,7 @@
         </div>
 
         <!-- Strike Count -->
-        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <div id="strikeCountRow" class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
             <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.strike_count.id_for_label }}" style="min-width: 160px;">
                 Strike Count (± ATM){% if form.strike_count.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
             </label>
@@ -257,6 +257,30 @@
         const confirmBtn = document.getElementById('confirmSubmitBtn');
         const form = document.getElementById('backupForm');
         const initBtn = document.getElementById('initBackupBtn');
+        const indexSelect = document.querySelector('select[name="index_name"]');
+        const strikeCountRow = document.getElementById('strikeCountRow');
+        const strikeInput = document.querySelector('input[name="strike_count"]');
+
+        function toggleStrikeField() {
+            if (indexSelect && strikeCountRow) {
+                if (indexSelect.value === 'INDIAVIX') {
+                    strikeCountRow.classList.remove('d-flex');
+                    strikeCountRow.style.display = 'none';
+                    if (strikeInput) strikeInput.value = '0';
+                } else {
+                    strikeCountRow.classList.add('d-flex');
+                    strikeCountRow.style.display = '';
+                    if (strikeInput && (strikeInput.value === '0' || !strikeInput.value)) {
+                        strikeInput.value = '5';
+                    }
+                }
+            }
+        }
+
+        if (indexSelect) {
+            indexSelect.addEventListener('change', toggleStrikeField);
+            toggleStrikeField();
+        }
 
         if (initBtn) {
             initBtn.addEventListener('click', function(e) {
