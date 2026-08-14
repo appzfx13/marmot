@@ -176,6 +176,15 @@ APSCHEDULER_DATETIME_FORMAT = "N j, Y, f:s a"
 APSCHEDULER_TIMEZONE = 'Asia/Kolkata'
 
 
-PAGINATION_COUNT=os.getenv('PAGINATION_COUNT')
-REDIS_URL=os.getenv('REDIS_URL')
+PAGINATION_COUNT = os.getenv('PAGINATION_COUNT')
+REDIS_URL = os.getenv('REDIS_URL')
+WS_PORT = os.getenv('WS_PORT', '8082')
+
+# Master Admin Dhan API credentials — used exclusively for market backup/ingestion (Admin only).
+# User trading credentials are stored per-user in UserTradingAccount.
+DHAN_CLIENT_ID = os.getenv('DHAN_CLIENT_ID', '')
+DHAN_API_KEY = os.getenv('DHAN_API_KEY', '')
+DHAN_API_SECRET = os.getenv('DHAN_API_SECRET', '')
+DHAN_ACCESS_TOKEN = os.getenv('DHAN_ACCESS_TOKEN', '')
+
 

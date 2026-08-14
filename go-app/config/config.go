@@ -30,6 +30,9 @@ func LoadConfig() *Config {
 	wsPort := getEnv("WS_PORT", "8082")
 	dhanClient := getEnv("DHAN_CLIENT_ID", "")
 	dhanToken := getEnv("DHAN_ACCESS_TOKEN", "")
+	if dhanToken == "" {
+		dhanToken = getEnv("DHAN_API_KEY", "")
+	}
 
 	cfg := &Config{
 		DatabaseURL:     dbURL,
@@ -52,11 +55,22 @@ func LoadConfig() *Config {
 	fmt.Printf("[CONFIG] DBTableName    (DB_TABLE_NAME) : %s\n", tableName)
 	fmt.Printf("[CONFIG] WSPort         (WS_PORT)       : %s\n", wsPort)
 	fmt.Printf("[CONFIG] DhanClientID   (DHAN_CLIENT_ID): %s\n", dhanClient)
-	fmt.Printf("[CONFIG] DhanToken      (DHAN_TOKEN)    : %s\n", maskSecret(dhanToken))
+	fmt.Printf("[CONFIG] DhanAccessToken(DHAN_TOKEN)    : len=%d (preview: %s)\n", len(dhanToken), debugTokenPreview(dhanToken))
 	fmt.Println("=====================================")
 
 	return cfg
 }
+
+func debugTokenPreview(s string) string {
+	if s == "" {
+		return "<EMPTY>"
+	}
+	if len(s) > 12 {
+		return s[:6] + "..." + s[len(s)-4:]
+	}
+	return s
+}
+
 
 // maskSecret hides all but the first 4 chars of a secret for safe logging
 func maskSecret(s string) string {

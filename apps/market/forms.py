@@ -10,6 +10,15 @@ class MarketBackupForm(forms.ModelForm):
         widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'min': 0, 'max': 50})
     )
 
+    dhan_access_token = forms.CharField(
+        required=False,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25',
+            'placeholder': 'Optional: Paste 24h Dhan Access Token (starts with eyJ...)'
+        }),
+        help_text="If not already authenticated via 'Auth DhanHQ', paste your 24-hour Access Token directly from web.dhan.co."
+    )
+
     class Meta:
         model = MarketBackupTask
         fields = ['index_name', 'start_date', 'end_date', 'strike_count']

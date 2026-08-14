@@ -28,6 +28,23 @@ class BrokerFactory:
         return adapter_cls(account_or_user)
 
     @classmethod
+    def get_admin_backup_adapter(cls) -> DhanBrokerAdapter:
+        """Returns a DhanBrokerAdapter pre-loaded with admin backup credentials from settings."""
+        client_id, api_key, api_secret = DhanBrokerAdapter.get_admin_dhan_credentials()
+
+        class _AdminCredHolder:
+            """Minimal credential holder used to seed a DhanBrokerAdapter for admin backup."""
+            class broker:
+                code = 'dhan'
+            broker_client_id = client_id
+            api_key = api_key
+            app_id = api_secret
+            account_type = 'LIVE'
+            user = None
+
+        return DhanBrokerAdapter(_AdminCredHolder())
+
+    @classmethod
     def register_adapter(cls, broker_code: str, adapter_cls):
         """Plugin mechanism to register future broker adapters (e.g. Zerodha, AngelOne, etc.)."""
         cls._adapters[broker_code.lower()] = adapter_cls

@@ -1,9 +1,5 @@
-import io
 import json
 import logging
-import os
-import uuid
-import zipfile
 from django.conf import settings
 from django.contrib import messages
 
@@ -11,7 +7,7 @@ logger = logging.getLogger(__name__)
 from django.contrib.auth import login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib.auth.views import LoginView
-from django.http import FileResponse, HttpResponse, HttpResponseForbidden, Http404
+from django.http import HttpResponse, HttpResponseForbidden
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views import View
@@ -23,7 +19,7 @@ from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 from apps.market.models import MarketBackupTask
 from apps.trade_config.models import TradeExecConfig, UserTradingAccount, BrokerMaster
 from apps.trade_core.brokers import BrokerFactory
-from .forms import UserProfileForm, UserProfilePasswordChangeForm, UserBacktestTaskForm, UserMarketBackupTaskForm
+from .forms import UserProfileForm, UserProfilePasswordChangeForm, UserBacktestTaskForm
 from .mixins import HTMXPartialMixin, MarmotRoleRequiredMixin
 from .models import User
 from .permissions import is_user_authorized_for_dashboard
@@ -163,89 +159,6 @@ class UserBacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, View):
         if not backtest or (backtest.created_by and backtest.created_by != request.user and not request.user.is_superuser):
             return HttpResponseForbidden("You do not have permission to view this backtest.")
         return render(request, 'users/partials/user_backtest_detail_modal.html', {'backtest': backtest})
-
-
-class UserBackupListView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
-    """View for user market backups."""
-    template_name = 'users/dashboard.html'
-    partial_template_name = 'users/partials/backup_content.html'
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['active_tab'] = 'backup'
-        user_backups = MarketBackupTask.objects.filter(is_deleted=False, created_by=self.request.user).order_by('-id')
-        context['backup_tasks'] = user_backups
-        return context
-
-
-class UserBackupCreateView(HtmxModalMixin, LoginRequiredMixin, FormView):
-    """Modal view for user to request options data backup."""
-    form_class = UserMarketBackupTaskForm
-    modal_template_name = 'users/partials/user_backup_create_modal.html'
-    template_name = 'users/partials/user_backup_create_modal.html'
-
-    def form_valid(self, form):
-        backup = form.save(commit=False)
-        backup.created_by = self.request.user
-        backup.status = 'CREATED'
-        backup.save()
-
-        response = HttpResponse(status=204)
-        msg = f"Market backup request #{backup.id} created successfully!"
-        response['HX-Trigger'] = json.dumps({
-            'closeGlobalModal': True,
-            'showToast': {'message': msg, 'level': 'success'},
-            'reloadBackupList': True
-        })
-        return response
-
-    def form_invalid(self, form):
-        return self.render_to_response(self.get_context_data(form=form))
-
-
-class UserBackupDownloadView(LoginRequiredMixin, View):
-    """Secure file download view for user's generated backup parquet files."""
-    def get(self, request, pk, *args, **kwargs):
-        backup = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
-        if not backup or (backup.created_by and backup.created_by != request.user and not request.user.is_superuser):
-            return HttpResponseForbidden("You do not have access to download this backup dataset.")
-
-        user_id = str(backup.created_by.id if getattr(backup, 'created_by', None) else 1)
-        backup_id = str(backup.id)
-        index_name = backup.index_name.lower()
-
-        candidate_paths = [
-            backup.parquet_file_path,
-            os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id),
-            os.path.join('/app', 'backup', user_id, backup_id),
-            os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', user_id, f"{index_name}_options"),
-        ]
-
-        target_path = None
-        for p in candidate_paths:
-            if p and os.path.exists(p):
-                target_path = p
-                break
-
-        if not target_path:
-            raise Http404("Backup data directory or file not found on disk.")
-
-        zip_buffer = io.BytesIO()
-        zip_filename = f"{index_name}_backup_task_{backup.id}.zip"
-
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            if os.path.isdir(target_path):
-                for root, _, files in os.walk(target_path):
-                    for file in files:
-                        full_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(full_path, target_path)
-                        zip_file.write(full_path, arcname=rel_path)
-            else:
-                zip_file.write(target_path, arcname=os.path.basename(target_path))
-
-        zip_buffer.seek(0)
-        return FileResponse(zip_buffer, as_attachment=True, filename=zip_filename)
-
 
 class UserEnvironmentToggleModalView(HtmxModalMixin, LoginRequiredMixin, View):
     """Render confirmation modal before switching watching environment mode."""

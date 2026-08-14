@@ -211,6 +211,29 @@
             </div>
         </div>
 
+        {# Section 3: Authentication / Access Token Override #}
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-info fs-5">vpn_key</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">DhanHQ Authentication (Optional)</h6>
+        </div>
+
+        <!-- Dhan Access Token -->
+        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.dhan_access_token.id_for_label }}" style="min-width: 160px;">
+                Access Token
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.dhan_access_token }}
+                <div class="theme-text-muted small mt-1">
+                    Optional: Paste a 24-hour Access Token directly from <a href="https://web.dhan.co" target="_blank" class="text-info text-decoration-none">web.dhan.co</a> (My Profile → Access DhanHQ APIs). If already authenticated via <strong>Auth DhanHQ</strong>, you can leave this blank.
+                </div>
+                {% for error in form.dhan_access_token.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+
         {# Action Buttons #}
         <div class="d-flex justify-content-end gap-2 pt-3 border-top" style="border-color: var(--border-color) !important;">
             <a href="{% url 'market:market_backup_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold text-decoration-none">

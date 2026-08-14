@@ -67,6 +67,32 @@ func (j *BackupJob) Run(ctx context.Context) {
 		securityID = getIndexSecurityID(indexName)
 	}
 
+	// Resolve Dhan credentials: payload-injected token takes priority over global config env vars
+	dhanClientID := params.DhanClientID
+	tokenSource := "payload"
+	if dhanClientID == "" {
+		dhanClientID = j.config.DhanClientID
+		tokenSource = "config_env"
+	}
+	dhanAccessToken := params.DhanAccessToken
+	if dhanAccessToken == "" {
+		dhanAccessToken = j.config.DhanAccessToken
+		tokenSource = "config_env"
+	}
+
+	// ── DEBUG: Print token resolution details ────────────────────────────────
+	tokenPreview := "[EMPTY]"
+	if len(dhanAccessToken) > 12 {
+		tokenPreview = dhanAccessToken[:12] + "..."
+	} else if len(dhanAccessToken) > 0 {
+		tokenPreview = dhanAccessToken[:4] + "..."
+	}
+	log.Printf("🔑 [Task #%s] Dhan Auth | source=%s | client_id=%s | token_preview=%s | token_len=%d",
+		taskID, tokenSource, dhanClientID, tokenPreview, len(dhanAccessToken))
+	log.Printf("🔑 [Task #%s] Payload raw | DhanClientID=%q | DhanAccessToken_len=%d",
+		taskID, params.DhanClientID, len(params.DhanAccessToken))
+	// ─────────────────────────────────────────────────────────────────────────
+
 	log.Printf("🚀 [Task #%s] Starting Unified Backup (Spot Index + ATM±%d Option Strikes) for User #%s | %s → %s",
 		taskID, strikeCount, userID, startDate, endDate)
 
@@ -90,7 +116,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 	// ── STEP 1: Download Index Spot Data ─────────────────────────────────────
 	log.Printf("📥 [Task #%s] [Step 1/2] Downloading Index Spot candles (%s)...", taskID, indexName)
-	indexDir := j.downloadIndexSpot(ctx, taskID, userID, indexName, securityID, exchangeSegment, startDate, endDate, startProgress)
+	indexDir := j.downloadIndexSpot(ctx, taskID, userID, indexName, securityID, exchangeSegment, startDate, endDate, startProgress, dhanClientID, dhanAccessToken)
 
 	select {
 	case <-ctx.Done():
@@ -105,7 +131,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 	} else {
 		// ── STEP 2: Download Expired Options Strikes (ATM±N CE & PE) ─────────────
 		log.Printf("📥 [Task #%s] [Step 2/2] Downloading Option Strikes (ATM±%d CE & PE)...", taskID, strikeCount)
-		optsDir = j.runOptionsDownload(ctx, taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate, strikeCount, 45)
+		optsDir = j.runOptionsDownload(ctx, taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate, strikeCount, 45, dhanClientID, dhanAccessToken)
 	}
 
 	finalOutputDir := backupTaskDir
@@ -151,6 +177,7 @@ func (j *BackupJob) downloadIndexSpot(
 	ctx context.Context,
 	taskID, userID, indexName, securityID, exchangeSegment, startDate, endDate string,
 	startProgress int,
+	dhanClientID, dhanAccessToken string,
 ) string {
 	baseOutputDir := fmt.Sprintf("/app/backup/%s/%s/%s_index", userID, taskID, strings.ToLower(indexName))
 	_ = os.MkdirAll(baseOutputDir, 0755)
@@ -219,8 +246,8 @@ func (j *BackupJob) downloadIndexSpot(
 				break
 			}
 			req.Header.Set("Content-Type", "application/json")
-			req.Header.Add("access-token", j.config.DhanAccessToken)
-			req.Header.Add("client-id", j.config.DhanClientID)
+			req.Header.Add("access-token", dhanAccessToken)
+			req.Header.Add("client-id", dhanClientID)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -277,8 +304,10 @@ func (j *BackupJob) downloadIndexSpot(
 				log.Printf("📊 [Task #%s] Index Spot: Fetched %d candles for %s to %s\n", taskID, len(candles), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
 			}
 		} else {
-			log.Printf("⚠️ [Task #%s] Index API HTTP %d: %s", taskID, respStatusCode, string(bodyBytes))
+			log.Printf("⚠️ [Task #%s] Index API HTTP %d: %s | client_id=%s | token_len=%d | token_preview=%s",
+				taskID, respStatusCode, string(bodyBytes), dhanClientID, len(dhanAccessToken), debugTokenPreview(dhanAccessToken))
 		}
+
 
 		completedChunks++
 		progress := startProgress + int((float64(completedChunks)/float64(totalChunks))*40)
@@ -299,6 +328,7 @@ func (j *BackupJob) runOptionsDownload(
 	ctx context.Context,
 	taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate string,
 	strikeCount, startProgress int,
+	dhanClientID, dhanAccessToken string,
 ) string {
 	log.Printf("🚀 [Task #%s] Starting Parallel Options Rolling Data Download for %s (Strikes count=%d)", taskID, indexName, strikeCount)
 
@@ -357,6 +387,7 @@ func (j *BackupJob) runOptionsDownload(
 				j.downloadRollingOptionCandles(
 					ctx, taskID, securityID, "NSE_FNO", "OPTIDX",
 					item.strikeName, item.drvOptType, startDate, endDate, contractDir, client, baseURL,
+					dhanClientID, dhanAccessToken,
 				)
 
 				done := atomic.AddInt32(&completedCount, 1)
@@ -377,6 +408,7 @@ func (j *BackupJob) downloadRollingOptionCandles(
 	ctx context.Context,
 	taskID, securityID, exchangeSegment, instrument, strikeName, drvOptionType, startDate, endDate, outputDir string,
 	client *http.Client, baseURL string,
+	dhanClientID, dhanAccessToken string,
 ) {
 	start, err := time.Parse("2006-01-02", startDate)
 	if err != nil {
@@ -432,8 +464,8 @@ func (j *BackupJob) downloadRollingOptionCandles(
 			}
 			req.Header.Set("Content-Type", "application/json")
 			req.Header.Set("Accept", "application/json")
-			req.Header.Add("access-token", j.config.DhanAccessToken)
-			req.Header.Add("client-id", j.config.DhanClientID)
+			req.Header.Add("access-token", dhanAccessToken)
+			req.Header.Add("client-id", dhanClientID)
 
 			resp, err := client.Do(req)
 			if err != nil {
@@ -454,7 +486,8 @@ func (j *BackupJob) downloadRollingOptionCandles(
 		}
 
 		if respStatusCode != http.StatusOK {
-			log.Printf("⚠️ [Task #%s] HTTP %d for rolling option %s %s: %s", taskID, respStatusCode, drvOptionType, strikeName, string(bodyBytes))
+			log.Printf("⚠️ [Task #%s] HTTP %d for rolling option %s %s: %s | client_id=%s | token_len=%d | token_preview=%s",
+				taskID, respStatusCode, drvOptionType, strikeName, string(bodyBytes), dhanClientID, len(dhanAccessToken), debugTokenPreview(dhanAccessToken))
 			continue
 		}
 
@@ -800,3 +833,14 @@ func intAt(arr []int, i int) int {
 	}
 	return 0
 }
+
+func debugTokenPreview(s string) string {
+	if s == "" {
+		return "<EMPTY>"
+	}
+	if len(s) > 12 {
+		return s[:6] + "..." + s[len(s)-4:]
+	}
+	return s
+}
+

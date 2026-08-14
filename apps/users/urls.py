@@ -1,14 +1,11 @@
 from django.urls import path
 from .views import (
-    LoginView, 
-    UserDashboardView, 
-    UserJournalView, 
-    UserBacktestView, 
+    LoginView,
+    UserDashboardView,
+    UserJournalView,
+    UserBacktestView,
     UserBacktestCreateView,
     UserBacktestDetailView,
-    UserBackupListView,
-    UserBackupCreateView,
-    UserBackupDownloadView,
     UserEnvironmentToggleView,
     UserEnvironmentToggleModalView,
     UserAccountSelectView,
@@ -17,10 +14,10 @@ from .views import (
     UserAccountTestAuthView,
     UserAccountSetDefaultView,
     UserAccountDeleteView,
-    UserAccountSettingsView, 
-    UserKillSwitchView, 
-    LogoutView, 
-    UserProfileView, 
+    UserAccountSettingsView,
+    UserKillSwitchView,
+    LogoutView,
+    UserProfileView,
     UserProfilePasswordChangeView
 )
 
@@ -33,9 +30,6 @@ urlpatterns = [
     path('backtest/', UserBacktestView.as_view(), name='user-backtest'),
     path('backtest/create/', UserBacktestCreateView.as_view(), name='user-backtest-create'),
     path('backtest/<int:pk>/', UserBacktestDetailView.as_view(), name='user-backtest-detail'),
-    path('backup/', UserBackupListView.as_view(), name='user-backup-list'),
-    path('backup/create/', UserBackupCreateView.as_view(), name='user-backup-create'),
-    path('backup/<int:pk>/download/', UserBackupDownloadView.as_view(), name='user-backup-download'),
     path('account/select/', UserAccountSelectView.as_view(), name='user-account-select'),
     path('account/create-modal/', UserAccountCreateModalView.as_view(), name='user-account-create-modal'),
     path('account/create/', UserAccountCreateView.as_view(), name='user-account-create'),
@@ -51,4 +45,4 @@ urlpatterns = [
     path('profile/', UserProfileView.as_view(), name='marmot-profile'),
     path('profile/<int:pk>/', UserProfileView.as_view(), name='marmot-profile-user'),
     path('profile/change-password/', UserProfilePasswordChangeView.as_view(), name='marmot-profile-password'),
-]
+]

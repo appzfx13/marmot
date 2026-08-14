@@ -16,6 +16,9 @@ type TaskParams struct {
 	BackupTaskID    string                 `json:"backup_task_id"`
 	StrategyName    string                 `json:"strategy_name"`
 	InitialCapital  float64                `json:"initial_capital"`
+	// Dhan authentication: access token generated from API Key + Secret (24h TTL, injected by Django)
+	DhanClientID    string                 `json:"dhan_client_id"`
+	DhanAccessToken string                 `json:"dhan_access_token"`
 	Params          map[string]interface{} `json:"params"`
 }
 

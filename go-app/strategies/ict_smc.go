@@ -1,7 +1,9 @@
 package strategies
 
 import (
+	"fmt"
 	"math"
+	"strings"
 )
 
 // ICTSMCStrategy implements Inner Circle Trader (ICT) / Smart Money Concepts (SMC) backtesting.

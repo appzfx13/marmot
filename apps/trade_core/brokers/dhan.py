@@ -1,6 +1,8 @@
 import logging
 import uuid
-from typing import Dict, Any
+from typing import Dict, Any, Tuple
+from django.conf import settings
+from apps.trade_core.services.dhan_token_service import UserDhanClient
 from .base import BaseBrokerAdapter
 
 logger = logging.getLogger(__name__)
@@ -10,6 +12,22 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
     Active Dhan Broker Plug-and-Play Execution Adapter.
     Handles Dhan REST API & WebSocket execution telemetry for Sandbox & Live modes.
     """
+
+    @classmethod
+    def get_admin_dhan_credentials(cls) -> Tuple[str, str, str]:
+        """Returns (client_id, api_key, api_secret) for the global admin Dhan account from settings."""
+        return (
+            getattr(settings, 'DHAN_CLIENT_ID', ''),
+            getattr(settings, 'DHAN_API_KEY', ''),
+            getattr(settings, 'DHAN_API_SECRET', ''),
+        )
+
+    def get_access_token(self) -> str:
+        """
+        Returns a valid Dhan access token for this user's trading account.
+        Uses UserDhanClient — credentials from UserTradingAccount (broker_client_id, api_key, app_id).
+        """
+        return UserDhanClient(self.account).get_access_token()
 
     def test_connection(self) -> Dict[str, Any]:
         if not self.api_key or not self.client_id:

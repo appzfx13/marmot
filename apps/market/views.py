@@ -82,17 +82,20 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
     def form_valid(self, form):
         # Override standard save to use our Service Layer
         # This creates the DB record AND fires the 'START' command to Redis
+        token = form.cleaned_data.get('dhan_access_token', '').strip()
         self.object = create_and_start_backup_task(
             start_date=form.cleaned_data['start_date'],
             end_date=form.cleaned_data['end_date'],
             index_name=form.cleaned_data['index_name'],
             strike_count=form.cleaned_data['strike_count'],
-            user=self.request.user
+            user=self.request.user,
+            dhan_access_token=token if token else None
         )
         
         # Add success message and redirect back to the dashboard
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
+
 
 
 class MarketBackupDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, DetailView):
