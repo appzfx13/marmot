@@ -106,21 +106,21 @@
                     </td>
 
                     <td class="py-3 bg-transparent">
-                        <span id="backup-status-{{ backup.pk }}" class="backup-status-badge">
-                        {% if backup.status == 'completed' %}
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
-                        {% elif backup.status == 'running' %}
-                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>
-                        {% elif backup.status == 'created' %}
-                            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1">Created</span>
-                        {% elif backup.status == 'paused' %}
-                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>
-                        {% elif backup.status == 'cancelled' or backup.status == 'error' %}
-                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">{{ backup.get_status_display }}</span>
-                        {% else %}
-                            <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">Pending</span>
-                        {% endif %}
-                        </span>
+                     <span id="backup-status-{{ backup.pk }}" class="backup-status-badge">
+                    {% if backup.status == 'completed' %}
+                        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(16,185,129,0.18);color:#10b981;border:1.5px solid rgba(16,185,129,0.4);font-size:0.75rem;">Completed</span>
+                    {% elif backup.status == 'running' %}
+                        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(59,130,246,0.18);color:#3b82f6;border:1.5px solid rgba(59,130,246,0.4);font-size:0.75rem;">Running</span>
+                    {% elif backup.status == 'created' %}
+                        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(14,165,233,0.18);color:#0ea5e9;border:1.5px solid rgba(14,165,233,0.4);font-size:0.75rem;">Created</span>
+                    {% elif backup.status == 'paused' %}
+                        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1.5px solid rgba(245,158,11,0.4);font-size:0.75rem;">Paused</span>
+                    {% elif backup.status == 'cancelled' or backup.status == 'error' %}
+                        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(239,68,68,0.18);color:#ef4444;border:1.5px solid rgba(239,68,68,0.4);font-size:0.75rem;">{{ backup.get_status_display }}</span>
+                    {% else %}
+                        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(100,116,139,0.18);color:#94a3b8;border:1.5px solid rgba(100,116,139,0.4);font-size:0.75rem;">Pending</span>
+                    {% endif %}
+                    </span>
                         {% if backup.error_logs %}
                         <div class="small text-danger mt-1 text-truncate" style="max-width: 170px;" title="{{ backup.error_logs }}">
                             <span class="material-icons fs-6 me-1 align-middle">error_outline</span>{{ backup.get_last_200_logs|truncatechars:40 }}
@@ -130,27 +130,30 @@
 
                     <td class="text-end pe-4 py-3 bg-transparent">
                         <div class="d-flex align-items-center justify-content-end gap-2">
-                            {% if backup.status == 'running' %}
-                            <button type="button" 
-                                    hx-get="{% url 'market:market_backup_control' backup.pk %}?action=pause" 
-                                    hx-target="#globalHtmxModalDialog"
-                                    hx-swap="innerHTML"
-                                    class="glass-icon-btn text-warning rounded-circle d-flex align-items-center justify-content-center" 
-                                    style="width: 36px; height: 36px;" 
-                                    title="Pause Task">
-                                <span class="material-icons fs-6">pause</span>
-                            </button>
-                            {% else %}
-                            <button type="button" 
-                                    hx-get="{% url 'market:market_backup_control' backup.pk %}?action=resume" 
-                                    hx-target="#globalHtmxModalDialog"
-                                    hx-swap="innerHTML"
-                                    class="glass-icon-btn text-success rounded-circle d-flex align-items-center justify-content-center" 
-                                    style="width: 36px; height: 36px;" 
-                                    title="Start / Resume Task">
-                                <span class="material-icons fs-6">play_arrow</span>
-                            </button>
+                            {% if backup.status != 'completed' %}
+                                {% if backup.status == 'running' %}
+                                <button type="button" 
+                                        hx-get="{% url 'market:market_backup_control' backup.pk %}?action=pause" 
+                                        hx-target="#globalHtmxModalDialog"
+                                        hx-swap="innerHTML"
+                                        class="glass-icon-btn text-warning rounded-circle d-flex align-items-center justify-content-center" 
+                                        style="width: 36px; height: 36px;" 
+                                        title="Pause Task">
+                                    <span class="material-icons fs-6">pause</span>
+                                </button>
+                                {% else %}
+                                <button type="button" 
+                                        hx-get="{% url 'market:market_backup_control' backup.pk %}?action=resume" 
+                                        hx-target="#globalHtmxModalDialog"
+                                        hx-swap="innerHTML"
+                                        class="glass-icon-btn text-success rounded-circle d-flex align-items-center justify-content-center" 
+                                        style="width: 36px; height: 36px;" 
+                                        title="Start / Resume Task">
+                                    <span class="material-icons fs-6">play_arrow</span>
+                                </button>
+                                {% endif %}
                             {% endif %}
+
 
                             <a href="{% url 'market:market_backup_detail' backup.pk %}" 
                                class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" 
@@ -314,53 +317,59 @@
 
     <script>
     (function() {
+        // ── Helpers ──────────────────────────────────────────────────────────
+        function pill(bg, color, border, label) {
+            return `<span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:${bg};color:${color};border:1.5px solid ${border};font-size:0.75rem">${label}</span>`;
+        }
+        const STATUS_MAP = {
+            'completed': pill('rgba(16,185,129,0.18)',  '#10b981', 'rgba(16,185,129,0.4)',  'Completed'),
+            'running':   pill('rgba(59,130,246,0.18)',  '#3b82f6', 'rgba(59,130,246,0.4)',  'Running'),
+            'created':   pill('rgba(14,165,233,0.18)',  '#0ea5e9', 'rgba(14,165,233,0.4)',  'Created'),
+            'paused':    pill('rgba(245,158,11,0.18)',  '#f59e0b', 'rgba(245,158,11,0.4)',  'Paused'),
+            'cancelled': pill('rgba(239,68,68,0.18)',   '#ef4444', 'rgba(239,68,68,0.4)',   'Cancelled'),
+            'error':     pill('rgba(239,68,68,0.18)',   '#ef4444', 'rgba(239,68,68,0.4)',   'Error'),
+            'pending':   pill('rgba(100,116,139,0.18)', '#94a3b8', 'rgba(100,116,139,0.4)', 'Pending')
+        };
+
         function applyListUpdate(data) {
-            const progressBar = document.querySelector('.backup-progress-bar[id="backup-progress-' + data.task_id + '"]');
-            const progressText = document.querySelector('.backup-progress-text[id="backup-progress-text-' + data.task_id + '"]');
-            const etaText = document.querySelector('#backup-eta-' + data.task_id);
-            const statusBadge = document.querySelector('.backup-status-badge[id="backup-status-' + data.task_id + '"]');
+            const progressBar  = document.getElementById('backup-progress-'      + data.task_id);
+            const progressText = document.getElementById('backup-progress-text-' + data.task_id);
+            const etaText      = document.getElementById('backup-eta-'           + data.task_id);
+            const statusBadge  = document.getElementById('backup-status-'        + data.task_id);
 
             if (progressBar) {
                 progressBar.style.width = data.progress + '%';
                 progressBar.setAttribute('aria-valuenow', data.progress);
-                if (data.status === 'running') {
-                    progressBar.classList.add('progress-bar-animated');
-                } else {
-                    progressBar.classList.remove('progress-bar-animated');
-                }
+                progressBar.classList.toggle('progress-bar-animated', data.status === 'running');
             }
             if (progressText) progressText.textContent = data.progress + '%';
-            if (etaText) {
-                if (data.status === 'running' && data.eta) {
-                    etaText.textContent = data.eta;
-                } else {
-                    etaText.textContent = '';
-                }
-            }
+            if (etaText) etaText.textContent = (data.status === 'running' && data.eta) ? data.eta : '';
+            if (statusBadge) statusBadge.innerHTML = STATUS_MAP[data.status] || STATUS_MAP['pending'];
+        }
 
-            if (statusBadge) {
-                const statusMap = {
-                    'completed': '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>',
-                    'running': '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>',
-                    'created': '<span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1">Created</span>',
-                    'paused': '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>',
-                    'cancelled': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Cancelled</span>',
-                    'error': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Error</span>',
-                    'pending': '<span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">Pending</span>'
-                };
-                statusBadge.innerHTML = statusMap[data.status] || statusMap['pending'];
-            }
+        // ── Immediate REST fetch on page load for active tasks ───────────────
+        // So status + progress are correct the instant the list renders,
+        // without waiting for the next WS push.
+        function fetchInitialStatus(taskId) {
+            fetch('/market/backup/' + taskId + '/status/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(data) { if (data) applyListUpdate(data); })
+            .catch(function() { /* silent – WS will catch up */ });
         }
 
         function initListSubscriptions() {
             document.querySelectorAll('.backup-progress-bar').forEach(function(el) {
                 const taskId = el.id.replace('backup-progress-', '');
+
+                // 1. Immediate REST poll so the UI is fresh on page-load
+                fetchInitialStatus(taskId);
+
+                // 2. Subscribe to WS for live updates
                 if (window.MarmotWS && window.MarmotWS.url) {
                     window.MarmotWS.unsubscribe(taskId);
                     window.MarmotWS.subscribe(taskId, applyListUpdate);
-                    console.log('[List] Subscribed to task', taskId, 'via WebSocket');
-                } else {
-                    console.warn('[List] WebSocket manager not available for task', taskId);
                 }
             });
         }
@@ -371,17 +380,22 @@
             initListSubscriptions();
         }
 
+        // Re-subscribe after HTMX partial swaps (sort, filter, paginate)
         document.body.addEventListener('htmx:afterSwap', function(evt) {
             if (evt.detail.target.id === 'backup-dashboard-container') {
                 initListSubscriptions();
             }
         });
 
-        const dashboardContainer = document.getElementById('backup-dashboard-container');
-        if (dashboardContainer && (!window.MarmotWS || !window.MarmotWS.url)) {
-            setInterval(function() {
-                dashboardContainer.dispatchEvent(new CustomEvent('reloadBackupTable'));
-            }, 3000);
+        // Fallback: if no WebSocket, poll every 4s via HTMX table reload
+        if (!window.MarmotWS || !window.MarmotWS.url) {
+            const dashboardContainer = document.getElementById('backup-dashboard-container');
+            const hasActive = document.querySelector('.backup-progress-bar') !== null;
+            if (dashboardContainer && hasActive) {
+                setInterval(function() {
+                    dashboardContainer.dispatchEvent(new CustomEvent('reloadBackupTable'));
+                }, 4000);
+            }
         }
     })();
     </script>

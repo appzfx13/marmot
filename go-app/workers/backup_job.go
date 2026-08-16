@@ -21,8 +21,7 @@ import (
 	"go-app/ws"
 )
 
-
-// BackupJob handles downloading, Hive date-partitioning, and account-separated storage logic
+// BackupJob handles downloading, staged Parquet chunking, and consolidated single-file dataset creation.
 type BackupJob struct {
 	dbService *services.DBService
 	config    *config.Config
@@ -43,18 +42,17 @@ func NewBackupJob(dbService *services.DBService, cfg *config.Config, payload mod
 }
 
 // Run executes the unified backup pipeline:
-// Step 1: Downloads Index Spot candles via /v2/charts/intraday into /app/data/users/{uid}/{index}_index/
-// Step 2: Downloads Option Strikes (ATM±strikeCount CE & PE) via /v2/charts/rollingoption into /app/data/users/{uid}/{index}_options/
+// Step 1: Downloads Index Spot candles into staging parquet chunks.
+// Step 2: Downloads Option Strikes (ATM±strikeCount CE & PE) into staging parquet chunks.
+// Step 3: Consolidates all staging chunks into a single binary Apache Parquet file (/app/backup/{uid}/{task_id}/dataset.parquet).
 func (j *BackupJob) Run(ctx context.Context) {
 	taskID := j.payload.TaskID
 	params := j.payload.Params
 
 	indexName := params.IndexName
 	securityID := params.SecurityID
-	exchangeSegment := params.ExchangeSegment
 	startDate := params.StartDate
 	endDate := params.EndDate
-	expiryDate := params.ExpiryDate
 	strikeCount := params.StrikeCount
 	userID := params.UserID
 	if userID == "" {
@@ -80,20 +78,10 @@ func (j *BackupJob) Run(ctx context.Context) {
 		tokenSource = "config_env"
 	}
 
-	// ── DEBUG: Print token resolution details ────────────────────────────────
-	tokenPreview := "[EMPTY]"
-	if len(dhanAccessToken) > 12 {
-		tokenPreview = dhanAccessToken[:12] + "..."
-	} else if len(dhanAccessToken) > 0 {
-		tokenPreview = dhanAccessToken[:4] + "..."
-	}
-	log.Printf("🔑 [Task #%s] Dhan Auth | source=%s | client_id=%s | token_preview=%s | token_len=%d",
-		taskID, tokenSource, dhanClientID, tokenPreview, len(dhanAccessToken))
-	log.Printf("🔑 [Task #%s] Payload raw | DhanClientID=%q | DhanAccessToken_len=%d",
-		taskID, params.DhanClientID, len(params.DhanAccessToken))
-	// ─────────────────────────────────────────────────────────────────────────
+	log.Printf("🔑 [Task #%s] Dhan Auth | source=%s | client_id=%s | token_len=%d (preview: %s)",
+		taskID, tokenSource, dhanClientID, len(dhanAccessToken), debugTokenPreview(dhanAccessToken))
 
-	log.Printf("🚀 [Task #%s] Starting Unified Backup (Spot Index + ATM±%d Option Strikes) for User #%s | %s → %s",
+	log.Printf("🚀 [Task #%s] Starting Unified Parquet Backup (Spot + ATM±%d Option Strikes) for User #%s | %s → %s",
 		taskID, strikeCount, userID, startDate, endDate)
 
 	existingProgress, err := j.dbService.GetTaskProgress(ctx, taskID)
@@ -113,87 +101,101 @@ func (j *BackupJob) Run(ctx context.Context) {
 	j.broadcastProgress(ctx, taskID, startProgress, "running", 0.0, "")
 
 	backupTaskDir := fmt.Sprintf("/app/backup/%s/%s", userID, taskID)
+	stagingDir := filepath.Join(backupTaskDir, "staging")
+	_ = os.MkdirAll(stagingDir, 0755)
 
-	// ── STEP 1: Download Index Spot Data ─────────────────────────────────────
+	// ── STEP 1: Download Index Spot Data into Staging Parquet ─────────────────
 	log.Printf("📥 [Task #%s] [Step 1/2] Downloading Index Spot candles (%s)...", taskID, indexName)
-	indexDir := j.downloadIndexSpot(ctx, taskID, userID, indexName, securityID, exchangeSegment, startDate, endDate, startProgress, dhanClientID, dhanAccessToken)
+	spotFiles := j.downloadIndexSpot(ctx, taskID, stagingDir, indexName, securityID, startDate, endDate, startProgress, dhanClientID, dhanAccessToken)
 
 	select {
 	case <-ctx.Done():
-		log.Printf("🛑 [Task #%s] Backup task cancelled after Step 1.", taskID)
+		log.Printf("⏸️ [Task #%s] Backup task paused/cancelled after Step 1.", taskID)
 		return
 	default:
 	}
 
-	optsDir := ""
+	// ── STEP 2: Download Option Strikes into Staging Parquet ───────────────────
+	var optionFiles []string
 	if strings.EqualFold(indexName, "INDIAVIX") || strikeCount <= 0 {
 		log.Printf("ℹ️ [Task #%s] Skipping Option Strikes Download for %s (Index Spot only).", taskID, indexName)
 	} else {
-		// ── STEP 2: Download Expired Options Strikes (ATM±N CE & PE) ─────────────
 		log.Printf("📥 [Task #%s] [Step 2/2] Downloading Option Strikes (ATM±%d CE & PE)...", taskID, strikeCount)
-		optsDir = j.runOptionsDownload(ctx, taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate, strikeCount, 45, dhanClientID, dhanAccessToken)
+		optionFiles = j.runOptionsDownload(ctx, taskID, stagingDir, indexName, startDate, endDate, strikeCount, 45, dhanClientID, dhanAccessToken)
 	}
 
-	finalOutputDir := backupTaskDir
-	if !dirExists(finalOutputDir) {
-		finalOutputDir = optsDir
-		if finalOutputDir == "" {
-			finalOutputDir = indexDir
-		}
+	select {
+	case <-ctx.Done():
+		log.Printf("⏸️ [Task #%s] Backup task paused/cancelled during Step 2.", taskID)
+		return
+	default:
 	}
 
-	// Calculate total directory storage size
-	var totalSizeBytes int64 = 0
-	_ = filepath.Walk(backupTaskDir, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() {
-			totalSizeBytes += info.Size()
+	// ── STEP 3: Consolidate Staged Chunks into Single Parquet File ────────────
+	log.Printf("📦 [Task #%s] [Step 3/3] Merging staged chunks into consolidated single-file dataset.parquet...", taskID)
+	var allStagedFiles []string
+	allStagedFiles = append(allStagedFiles, spotFiles...)
+	allStagedFiles = append(allStagedFiles, optionFiles...)
+
+	// Find any other .parquet files in stagingDir that may have been created earlier
+	_ = filepath.Walk(stagingDir, func(path string, info os.FileInfo, err error) error {
+		if err == nil && !info.IsDir() && strings.HasSuffix(path, ".parquet") {
+			found := false
+			for _, f := range allStagedFiles {
+				if f == path {
+					found = true
+					break
+				}
+			}
+			if !found {
+				allStagedFiles = append(allStagedFiles, path)
+			}
 		}
 		return nil
 	})
 
-	fileSizeMB := float64(totalSizeBytes) / (1024 * 1024)
-
-	if err := j.dbService.MarkTaskComplete(ctx, taskID, finalOutputDir, fileSizeMB); err != nil {
-		log.Printf("❌ [Task #%s] Failed to mark completion: %v\n", taskID, err)
-		j.broadcastProgress(ctx, taskID, 0, "error", fileSizeMB, finalOutputDir)
+	finalDatasetFile := filepath.Join(backupTaskDir, "dataset.parquet")
+	totalRows, fileSizeMB, mergeErr := services.MergeParquetFiles(finalDatasetFile, allStagedFiles)
+	if mergeErr != nil {
+		log.Printf("❌ [Task #%s] Failed to merge parquet dataset: %v\n", taskID, mergeErr)
+		j.broadcastProgress(ctx, taskID, 0, "error", 0, "")
 		return
 	}
 
-	log.Printf("✅ [Task #%s] Unified Backup Complete! Saved to %s (%.2f MB)\n", taskID, finalOutputDir, fileSizeMB)
-	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, finalOutputDir)
-}
+	// Clean up staging directory after successful consolidation
+	_ = os.RemoveAll(stagingDir)
 
-// helper dirExists checks if directory exists
-func dirExists(path string) bool {
-	info, err := os.Stat(path)
-	if err != nil {
-		return false
+	if err := j.dbService.MarkTaskComplete(ctx, taskID, finalDatasetFile, fileSizeMB); err != nil {
+		log.Printf("❌ [Task #%s] Failed to mark completion in DB: %v\n", taskID, err)
+		j.broadcastProgress(ctx, taskID, 0, "error", fileSizeMB, finalDatasetFile)
+		return
 	}
-	return info.IsDir()
+
+	log.Printf("✅ [Task #%s] Unified Single-File Parquet Backup Complete! Saved: %s (%.2f MB, %d total records)\n",
+		taskID, finalDatasetFile, fileSizeMB, totalRows)
+	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, finalDatasetFile)
 }
 
-// downloadIndexSpot downloads 1-minute OHLCV candles for the Index spot instrument (/v2/charts/intraday)
+// downloadIndexSpot downloads 1-minute OHLCV candles for Index spot into staging Parquet chunks
 func (j *BackupJob) downloadIndexSpot(
 	ctx context.Context,
-	taskID, userID, indexName, securityID, exchangeSegment, startDate, endDate string,
+	taskID, stagingDir, indexName, securityID, startDate, endDate string,
 	startProgress int,
 	dhanClientID, dhanAccessToken string,
-) string {
-	baseOutputDir := fmt.Sprintf("/app/backup/%s/%s/%s_index", userID, taskID, strings.ToLower(indexName))
-	_ = os.MkdirAll(baseOutputDir, 0755)
-
+) []string {
+	var createdFiles []string
 	client := &http.Client{Timeout: 30 * time.Second}
 	baseURL := "https://api.dhan.co/v2/charts/intraday"
 
 	start, err := time.Parse("2006-01-02", startDate)
 	if err != nil {
 		log.Printf("⚠️ [Task #%s] Invalid start date: %v", taskID, err)
-		return baseOutputDir
+		return nil
 	}
 	end, err := time.Parse("2006-01-02", endDate)
 	if err != nil {
 		log.Printf("⚠️ [Task #%s] Invalid end date: %v", taskID, err)
-		return baseOutputDir
+		return nil
 	}
 
 	chunkDays := 30
@@ -215,14 +217,26 @@ func (j *BackupJob) downloadIndexSpot(
 	for chunkStart.Before(end) || chunkStart.Equal(end) {
 		select {
 		case <-ctx.Done():
-			log.Printf("⏸️ [Task #%s] Index download interrupted.", taskID)
-			return baseOutputDir
+			log.Printf("⏸️ [Task #%s] Index download interrupted for pause/cancel.", taskID)
+			return createdFiles
 		default:
 		}
 
 		chunkEnd := chunkStart.AddDate(0, 0, chunkDays-1)
 		if chunkEnd.After(end) {
 			chunkEnd = end
+		}
+
+		chunkFileName := fmt.Sprintf("spot_%s_%s_%s.parquet", strings.ToLower(indexName), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
+		chunkFilePath := filepath.Join(stagingDir, chunkFileName)
+
+		// Checkpoint resume check: if valid chunk already exists on disk, skip download!
+		if rows, _, statErr := services.VerifyParquetFile(chunkFilePath); statErr == nil && rows > 0 {
+			log.Printf("⏩ [Task #%s] Resumed: Skipping already downloaded spot chunk %s (%d rows)", taskID, chunkFileName, rows)
+			createdFiles = append(createdFiles, chunkFilePath)
+			completedChunks++
+			chunkStart = chunkEnd.AddDate(0, 0, 1)
+			continue
 		}
 
 		reqPayload := map[string]interface{}{
@@ -236,7 +250,6 @@ func (j *BackupJob) downloadIndexSpot(
 		}
 
 		jsonBody, _ := json.Marshal(reqPayload)
-
 		var bodyBytes []byte
 		var respStatusCode int
 
@@ -270,67 +283,41 @@ func (j *BackupJob) downloadIndexSpot(
 		time.Sleep(100 * time.Millisecond)
 
 		if respStatusCode == http.StatusOK {
-			candles := parseHistoricalResponse(bodyBytes, indexName)
-			if len(candles) > 0 {
-				candlesByDate := make(map[string][]map[string]interface{})
-				for _, candle := range candles {
-					dateStr, _ := candle["date"].(string)
-					if dateStr != "" {
-						candlesByDate[dateStr] = append(candlesByDate[dateStr], candle)
-					}
+			records := parseHistoricalParquetRecords(bodyBytes, indexName)
+			if len(records) > 0 {
+				if writeErr := services.WriteChunkParquet(chunkFilePath, records); writeErr == nil {
+					createdFiles = append(createdFiles, chunkFilePath)
+					log.Printf("📊 [Task #%s] Index Spot: Written %d records to %s\n", taskID, len(records), chunkFileName)
+				} else {
+					log.Printf("⚠️ [Task #%s] Failed to write parquet chunk: %v", taskID, writeErr)
 				}
-
-				for dateStr, dayCandles := range candlesByDate {
-					t, parseErr := time.Parse("2006-01-02", dateStr)
-					if parseErr != nil {
-						continue
-					}
-					partitionDir := filepath.Join(baseOutputDir, fmt.Sprintf("year=%s", t.Format("2006")), fmt.Sprintf("month=%s", t.Format("01")))
-					_ = os.MkdirAll(partitionDir, 0755)
-
-					dayFilePath := filepath.Join(partitionDir, fmt.Sprintf("%s.parquet", dateStr))
-					dayFile, openErr := os.OpenFile(dayFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-					if openErr == nil {
-						var buf bytes.Buffer
-						for _, candle := range dayCandles {
-							line, _ := json.Marshal(candle)
-							buf.Write(line)
-							buf.WriteByte('\n')
-						}
-						_, _ = dayFile.Write(buf.Bytes())
-						dayFile.Close()
-					}
-				}
-				log.Printf("📊 [Task #%s] Index Spot: Fetched %d candles for %s to %s\n", taskID, len(candles), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
 			}
 		} else {
 			log.Printf("⚠️ [Task #%s] Index API HTTP %d: %s | client_id=%s | token_len=%d | token_preview=%s",
 				taskID, respStatusCode, string(bodyBytes), dhanClientID, len(dhanAccessToken), debugTokenPreview(dhanAccessToken))
 		}
 
-
 		completedChunks++
 		progress := startProgress + int((float64(completedChunks)/float64(totalChunks))*40)
 		_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
-		j.broadcastProgress(ctx, taskID, progress, "running", 0.0, baseOutputDir)
+		j.broadcastProgress(ctx, taskID, progress, "running", 0.0, chunkFilePath)
 
 		chunkStart = chunkEnd.AddDate(0, 0, 1)
 		time.Sleep(200 * time.Millisecond)
 	}
 
-	return baseOutputDir
+	return createdFiles
 }
 
-
-// runOptionsDownload fetches historical options data via DhanHQ v2 Expired Options Rolling API (/v2/charts/rollingoption)
-// Uses concurrent worker pool for high-throughput parallel data ingestion.
+// runOptionsDownload fetches historical options data via DhanHQ v2 Expired Options Rolling API into staging Parquet chunks
 func (j *BackupJob) runOptionsDownload(
 	ctx context.Context,
-	taskID, userID, indexName, exchangeSegment, expiryDate, startDate, endDate string,
+	taskID, stagingDir, indexName, startDate, endDate string,
 	strikeCount, startProgress int,
 	dhanClientID, dhanAccessToken string,
-) string {
-	log.Printf("🚀 [Task #%s] Starting Parallel Options Rolling Data Download for %s (Strikes count=%d)", taskID, indexName, strikeCount)
+) []string {
+	var createdFiles []string
+	var filesMutex sync.Mutex
 
 	securityID := getIndexSecurityID(indexName)
 	relativeStrikes := generateRelativeStrikes(strikeCount)
@@ -342,92 +329,96 @@ func (j *BackupJob) runOptionsDownload(
 		MaxIdleConnsPerHost: 20,
 		IdleConnTimeout:     90 * time.Second,
 	}
-	client := &http.Client{
-		Transport: tr,
-		Timeout:   30 * time.Second,
-	}
-
+	client := &http.Client{Transport: tr, Timeout: 35 * time.Second}
 	baseURL := "https://api.dhan.co/v2/charts/rollingoption"
-	baseOutputDir := fmt.Sprintf("/app/backup/%s/%s/%s_options", userID, taskID, strings.ToLower(indexName))
 
-	type strikeItem struct {
-		drvOptType string
-		strikeName string
+	type optionTask struct {
+		strikeName    string
+		drvOptionType string
 	}
 
-	tasks := make(chan strikeItem, totalContracts)
-	for _, drvOptType := range optionTypes {
-		for _, strikeName := range relativeStrikes {
-			tasks <- strikeItem{drvOptType: drvOptType, strikeName: strikeName}
+	tasksChan := make(chan optionTask, totalContracts)
+	for _, strike := range relativeStrikes {
+		for _, optType := range optionTypes {
+			tasksChan <- optionTask{strikeName: strike, drvOptionType: optType}
 		}
 	}
-	close(tasks)
+	close(tasksChan)
 
-	workerCount := 2
+	workerCount := 4
+	if workerCount > totalContracts {
+		workerCount = totalContracts
+	}
+
+	var completedContracts int32 = 0
 	var wg sync.WaitGroup
-	var completedCount int32
 
-	for i := 0; i < workerCount; i++ {
-		if i > 0 {
-			time.Sleep(250 * time.Millisecond)
-		}
+	for w := 0; w < workerCount; w++ {
 		wg.Add(1)
-		go func() {
+		go func(workerID int) {
 			defer wg.Done()
-			for item := range tasks {
+			for task := range tasksChan {
 				select {
 				case <-ctx.Done():
 					return
 				default:
 				}
 
-				contractDir := fmt.Sprintf("%s/%s/%s", baseOutputDir, item.drvOptType, item.strikeName)
-				_ = os.MkdirAll(contractDir, 0755)
-
-				j.downloadRollingOptionCandles(
-					ctx, taskID, securityID, "NSE_FNO", "OPTIDX",
-					item.strikeName, item.drvOptType, startDate, endDate, contractDir, client, baseURL,
-					dhanClientID, dhanAccessToken,
+				chunkFiles := j.downloadRollingOptionChunks(
+					ctx, client, baseURL, taskID, stagingDir, indexName, securityID,
+					task.strikeName, task.drvOptionType, startDate, endDate, dhanClientID, dhanAccessToken,
 				)
 
-				done := atomic.AddInt32(&completedCount, 1)
-				progress := startProgress + int(float64(done)/float64(totalContracts)*float64(95-startProgress))
-				_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
-				j.broadcastProgress(ctx, taskID, progress, "running", 0.0, contractDir)
-				time.Sleep(200 * time.Millisecond)
+				if len(chunkFiles) > 0 {
+					filesMutex.Lock()
+					createdFiles = append(createdFiles, chunkFiles...)
+					filesMutex.Unlock()
+				}
+
+				done := atomic.AddInt32(&completedContracts, 1)
+				currentProgress := startProgress + int((float64(done)/float64(totalContracts))*50)
+				if currentProgress > 95 {
+					currentProgress = 95
+				}
+
+				_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", currentProgress)
+				j.broadcastProgress(ctx, taskID, currentProgress, "running", 0.0, "")
 			}
-		}()
+		}(w)
 	}
 
 	wg.Wait()
-	return baseOutputDir
+	return createdFiles
 }
 
-// downloadRollingOptionCandles handles 30-day chunked calls to /v2/charts/rollingoption
-func (j *BackupJob) downloadRollingOptionCandles(
+func (j *BackupJob) downloadRollingOptionChunks(
 	ctx context.Context,
-	taskID, securityID, exchangeSegment, instrument, strikeName, drvOptionType, startDate, endDate, outputDir string,
-	client *http.Client, baseURL string,
+	client *http.Client,
+	baseURL, taskID, stagingDir, indexName, securityID, strikeName, drvOptionType, startDate, endDate string,
 	dhanClientID, dhanAccessToken string,
-) {
+) []string {
+	var createdFiles []string
 	start, err := time.Parse("2006-01-02", startDate)
 	if err != nil {
-		log.Printf("⚠️ [Task #%s] Invalid start date %s: %v", taskID, startDate, err)
-		return
+		return nil
 	}
 	end, err := time.Parse("2006-01-02", endDate)
 	if err != nil {
-		log.Printf("⚠️ [Task #%s] Invalid end date %s: %v", taskID, endDate, err)
-		return
+		return nil
 	}
 
-	ist, _ := time.LoadLocation("Asia/Kolkata")
-	chunkDays := 30 // Max 30 days per call as per DhanHQ documentation
+	chunkDays := 30
+	chunkStart := start
 
-	for chunkStart := start; !chunkStart.After(end); chunkStart = chunkStart.AddDate(0, 0, chunkDays) {
+	instrument := "OPTIDX"
+	if strings.EqualFold(indexName, "INDIAVIX") {
+		instrument = "INDEX"
+	}
+
+	for chunkStart.Before(end) || chunkStart.Equal(end) {
 		select {
 		case <-ctx.Done():
-			return
+			return createdFiles
 		default:
 		}
 
@@ -436,11 +427,25 @@ func (j *BackupJob) downloadRollingOptionCandles(
 			chunkEnd = end
 		}
 
+		cleanStrike := strings.ReplaceAll(strikeName, "+", "p")
+		cleanStrike = strings.ReplaceAll(cleanStrike, "-", "m")
+		chunkFileName := fmt.Sprintf("opt_%s_%s_%s_%s_%s.parquet",
+			strings.ToLower(indexName), strings.ToLower(drvOptionType), cleanStrike,
+			chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
+		chunkFilePath := filepath.Join(stagingDir, chunkFileName)
+
+		// Checkpoint resume check: if valid chunk already exists on disk, skip download!
+		if rows, _, statErr := services.VerifyParquetFile(chunkFilePath); statErr == nil && rows > 0 {
+			createdFiles = append(createdFiles, chunkFilePath)
+			chunkStart = chunkEnd.AddDate(0, 0, 1)
+			continue
+		}
+
 		reqPayload := map[string]interface{}{
-			"exchangeSegment": exchangeSegment,
-			"interval":        "1",
 			"securityId":      securityID,
+			"exchangeSegment": "NSE_FNO",
 			"instrument":      instrument,
+			"interval":        "1",
 			"expiryFlag":      "WEEK",
 			"expiryCode":      1,
 			"strike":          strikeName,
@@ -452,8 +457,8 @@ func (j *BackupJob) downloadRollingOptionCandles(
 			"toDate":   chunkEnd.Format("2006-01-02"),
 		}
 
-		jsonBody, _ := json.Marshal(reqPayload)
 
+		jsonBody, _ := json.Marshal(reqPayload)
 		var bodyBytes []byte
 		var respStatusCode int
 
@@ -469,7 +474,6 @@ func (j *BackupJob) downloadRollingOptionCandles(
 
 			resp, err := client.Do(req)
 			if err != nil {
-				log.Printf("⚠️ [Task #%s] Rolling option API error for strike %s: %v", taskID, strikeName, err)
 				time.Sleep(300 * time.Millisecond)
 				continue
 			}
@@ -478,62 +482,37 @@ func (j *BackupJob) downloadRollingOptionCandles(
 			resp.Body.Close()
 
 			if respStatusCode == http.StatusTooManyRequests {
-				log.Printf("⚠️ [Task #%s] HTTP 429 Rate Limit for %s %s. Retrying in 2s (Attempt %d/3)...", taskID, drvOptionType, strikeName, attempt+1)
 				time.Sleep(2 * time.Second)
 				continue
 			}
 			break
 		}
 
-		if respStatusCode != http.StatusOK {
+		if respStatusCode == http.StatusOK {
+			records := parseRollingOptionParquetRecords(bodyBytes, indexName, strikeName, drvOptionType)
+			if len(records) > 0 {
+				if writeErr := services.WriteChunkParquet(chunkFilePath, records); writeErr == nil {
+					createdFiles = append(createdFiles, chunkFilePath)
+					log.Printf("📊 [Task #%s] Options %s %s: Written %d records to %s\n",
+						taskID, drvOptionType, strikeName, len(records), chunkFileName)
+				}
+			}
+		} else {
 			log.Printf("⚠️ [Task #%s] HTTP %d for rolling option %s %s: %s | client_id=%s | token_len=%d | token_preview=%s",
 				taskID, respStatusCode, drvOptionType, strikeName, string(bodyBytes), dhanClientID, len(dhanAccessToken), debugTokenPreview(dhanAccessToken))
-			continue
 		}
 
-		candles := parseRollingOptionResponse(bodyBytes, drvOptionType)
-		if len(candles) == 0 {
-			continue
-		}
-
-		candlesByDate := make(map[string][]map[string]interface{})
-		for _, candle := range candles {
-			if dateStr, _ := candle["date"].(string); dateStr != "" {
-				candlesByDate[dateStr] = append(candlesByDate[dateStr], candle)
-			}
-		}
-
-		for dateStr, dayCandles := range candlesByDate {
-			t, parseErr := time.ParseInLocation("2006-01-02", dateStr, ist)
-			if parseErr != nil {
-				continue
-			}
-			partDir := filepath.Join(outputDir, fmt.Sprintf("year=%s", t.Format("2006")), fmt.Sprintf("month=%s", t.Format("01")))
-			_ = os.MkdirAll(partDir, 0755)
-
-			dayFile, openErr := os.OpenFile(filepath.Join(partDir, dateStr+".parquet"), os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
-			if openErr != nil {
-				continue
-			}
-			var buf bytes.Buffer
-			for _, candle := range dayCandles {
-				line, _ := json.Marshal(candle)
-				buf.Write(line)
-				buf.WriteByte('\n')
-			}
-			_, _ = dayFile.Write(buf.Bytes())
-			dayFile.Close()
-		}
-		time.Sleep(250 * time.Millisecond)
+		chunkStart = chunkEnd.AddDate(0, 0, 1)
+		time.Sleep(200 * time.Millisecond)
 	}
+
+	return createdFiles
 }
 
-
 // generateRelativeStrikes creates ATM, ATM+1..N, ATM-1..N strike strings
-// Capped at maximum 10 as per official DhanHQ v2 Expired Options API specification (ATM+10 / ATM-10 max)
 func generateRelativeStrikes(count int) []string {
 	if count <= 0 {
-		count = 5
+		return []string{"ATM"}
 	}
 	if count > 10 {
 		count = 10
@@ -546,7 +525,6 @@ func generateRelativeStrikes(count int) []string {
 	return strikes
 }
 
-// getIndexSecurityID maps index name to Dhan security ID
 func getIndexSecurityID(indexName string) string {
 	switch strings.ToUpper(indexName) {
 	case "BANKNIFTY":
@@ -562,8 +540,8 @@ func getIndexSecurityID(indexName string) string {
 	}
 }
 
-// parseRollingOptionResponse extracts records from /charts/rollingoption payload
-func parseRollingOptionResponse(body []byte, drvOptionType string) []map[string]interface{} {
+// parseRollingOptionParquetRecords extracts records from /charts/rollingoption payload into MarketCandleRecord
+func parseRollingOptionParquetRecords(body []byte, indexName, strikeName, drvOptionType string) []models.MarketCandleRecord {
 	var resp map[string]json.RawMessage
 	if err := json.Unmarshal(body, &resp); err != nil {
 		return nil
@@ -599,12 +577,11 @@ func parseRollingOptionResponse(body []byte, drvOptionType string) []map[string]
 	ois := parseIntArray(raw["oi"])
 	ivs := parseFloatArray(raw["iv"])
 	spots := parseFloatArray(raw["spot"])
-	strikes := parseFloatArray(raw["strike"])
 	timestamps := parseTimestampArray(raw["timestamp"])
 
 	ist, _ := time.LoadLocation("Asia/Kolkata")
 	count := len(opens)
-	candles := make([]map[string]interface{}, 0, count)
+	records := make([]models.MarketCandleRecord, 0, count)
 
 	for i := 0; i < count; i++ {
 		var tsEpoch int64 = 0
@@ -613,30 +590,95 @@ func parseRollingOptionResponse(body []byte, drvOptionType string) []map[string]
 		}
 		candleTime := time.Unix(tsEpoch, 0).In(ist)
 
-		candle := map[string]interface{}{
-			"timestamp":     tsEpoch,
-			"datetime":      candleTime.Format("2006-01-02 15:04:05"),
-			"date":          candleTime.Format("2006-01-02"),
-			"open":          floatAt(opens, i),
-			"high":          floatAt(highs, i),
-			"low":           floatAt(lows, i),
-			"close":         floatAt(closes, i),
-			"volume":        intAt(volumes, i),
-			"open_interest": intAt(ois, i),
-			"iv":            floatAt(ivs, i),
-			"spot":          floatAt(spots, i),
-			"strike":        floatAt(strikes, i),
+		rec := models.MarketCandleRecord{
+			Timestamp:      tsEpoch,
+			Datetime:       candleTime.Format("2006-01-02 15:04:05"),
+			IndexName:      indexName,
+			InstrumentType: "OPTION",
+			Strike:         strikeName,
+			OptionType:     strings.ToUpper(drvOptionType),
+			Open:           floatAt(opens, i),
+			High:           floatAt(highs, i),
+			Low:            floatAt(lows, i),
+			Close:          floatAt(closes, i),
+			Volume:         int64(intAt(volumes, i)),
+			OI:             int64(intAt(ois, i)),
+			IV:             floatAt(ivs, i),
+			SpotPrice:      floatAt(spots, i),
 		}
-		candles = append(candles, candle)
+		records = append(records, rec)
 	}
-	return candles
+	return records
 }
 
+// parseHistoricalParquetRecords extracts records from /charts/intraday payload into MarketCandleRecord
+func parseHistoricalParquetRecords(body []byte, indexName string) []models.MarketCandleRecord {
+	var resp map[string]json.RawMessage
+	if err := json.Unmarshal(body, &resp); err != nil {
+		return nil
+	}
 
+	var raw map[string]json.RawMessage
+	if dataBytes, ok := resp["data"]; ok && string(dataBytes) != "null" {
+		if err := json.Unmarshal(dataBytes, &raw); err != nil {
+			return nil
+		}
+	} else {
+		raw = resp
+	}
+
+	opens := parseFloatArray(raw["open"])
+	highs := parseFloatArray(raw["high"])
+	lows := parseFloatArray(raw["low"])
+	closes := parseFloatArray(raw["close"])
+	volumes := parseIntArray(raw["volume"])
+
+	timestamps := parseTimestampArray(raw["start_Time"])
+	if len(timestamps) == 0 {
+		timestamps = parseTimestampArray(raw["start_time"])
+	}
+	if len(timestamps) == 0 {
+		timestamps = parseTimestampArray(raw["timestamp"])
+	}
+	if len(timestamps) == 0 {
+		timestamps = parseTimestampArray(raw["date"])
+	}
+
+	ist, _ := time.LoadLocation("Asia/Kolkata")
+	count := len(opens)
+	records := make([]models.MarketCandleRecord, 0, count)
+
+	for i := 0; i < count; i++ {
+		var tsEpoch int64 = 0
+		if i < len(timestamps) {
+			tsEpoch = timestamps[i]
+		}
+		candleTime := time.Unix(tsEpoch, 0).In(ist)
+		closeVal := floatAt(closes, i)
+
+		rec := models.MarketCandleRecord{
+			Timestamp:      tsEpoch,
+			Datetime:       candleTime.Format("2006-01-02 15:04:05"),
+			IndexName:      indexName,
+			InstrumentType: "INDEX",
+			Strike:         "SPOT",
+			OptionType:     "INDEX",
+			Open:           floatAt(opens, i),
+			High:           floatAt(highs, i),
+			Low:            floatAt(lows, i),
+			Close:          closeVal,
+			Volume:         int64(intAt(volumes, i)),
+			OI:             0,
+			IV:             0.0,
+			SpotPrice:      closeVal,
+		}
+		records = append(records, rec)
+	}
+	return records
+}
 
 func (j *BackupJob) broadcastProgress(ctx context.Context, taskID string, progress int, status string, fileSizeMB float64, filePath string) {
 	if j.hub == nil {
-		log.Printf("🔇 [Task #%s] broadcastProgress skipped: hub is nil\n", taskID)
 		return
 	}
 
@@ -672,76 +714,10 @@ func (j *BackupJob) broadcastProgress(ctx context.Context, taskID string, progre
 	}
 	data, err := json.Marshal(msg)
 	if err != nil {
-		log.Printf("⚠️ [Task #%s] broadcastProgress marshal error: %v\n", taskID, err)
 		return
 	}
 	log.Printf("📡 [Task #%s] Broadcasting progress %d%% status=%s eta=%s to WS hub\n", taskID, progress, status, etaStr)
 	j.hub.BroadcastToTask(taskID, data)
-}
-
-func parseHistoricalResponse(body []byte, indexName string) []map[string]interface{} {
-	var resp map[string]json.RawMessage
-	if err := json.Unmarshal(body, &resp); err != nil {
-		log.Printf("⚠️ Failed to parse Dhan response: %v\n", err)
-		return nil
-	}
-
-	var raw map[string]json.RawMessage
-	if dataBytes, ok := resp["data"]; ok && string(dataBytes) != "null" {
-		if err := json.Unmarshal(dataBytes, &raw); err != nil {
-			log.Printf("⚠️ Failed to parse data field: %v\n", err)
-			return nil
-		}
-	} else {
-		raw = resp
-	}
-
-	opens := parseFloatArray(raw["open"])
-	highs := parseFloatArray(raw["high"])
-	lows := parseFloatArray(raw["low"])
-	closes := parseFloatArray(raw["close"])
-	volumes := parseIntArray(raw["volume"])
-
-	timestamps := parseTimestampArray(raw["start_Time"])
-	if len(timestamps) == 0 {
-		timestamps = parseTimestampArray(raw["start_time"])
-	}
-	if len(timestamps) == 0 {
-		timestamps = parseTimestampArray(raw["timestamp"])
-	}
-	if len(timestamps) == 0 {
-		timestamps = parseTimestampArray(raw["date"])
-	}
-	log.Printf("[PARSE] opens=%d highs=%d lows=%d closes=%d volumes=%d timestamps=%d",
-		len(opens), len(highs), len(lows), len(closes), len(volumes), len(timestamps))
-	ois := parseIntArray(raw["open_interest"])
-
-	// IST timezone for correct date partitioning (Indian market sessions)
-	ist, _ := time.LoadLocation("Asia/Kolkata")
-
-	count := len(opens)
-	candles := make([]map[string]interface{}, 0, count)
-	for i := 0; i < count; i++ {
-		var tsEpoch int64 = 0
-		if i < len(timestamps) {
-			tsEpoch = timestamps[i]
-		}
-		candleTime := time.Unix(tsEpoch, 0).In(ist)
-		candle := map[string]interface{}{
-			"index_name":    indexName,
-			"timestamp":     tsEpoch,
-			"datetime":      candleTime.Format("2006-01-02 15:04:05"),
-			"date":          candleTime.Format("2006-01-02"),
-			"open":          floatAt(opens, i),
-			"high":          floatAt(highs, i),
-			"low":           floatAt(lows, i),
-			"close":         floatAt(closes, i),
-			"volume":        intAt(volumes, i),
-			"open_interest": intAt(ois, i),
-		}
-		candles = append(candles, candle)
-	}
-	return candles
 }
 
 func parseFloatArray(raw json.RawMessage) []float64 {
@@ -749,8 +725,10 @@ func parseFloatArray(raw json.RawMessage) []float64 {
 		return nil
 	}
 	var arr []float64
-	_ = json.Unmarshal(raw, &arr)
-	return arr
+	if err := json.Unmarshal(raw, &arr); err == nil {
+		return arr
+	}
+	return nil
 }
 
 func parseIntArray(raw json.RawMessage) []int {
@@ -758,33 +736,31 @@ func parseIntArray(raw json.RawMessage) []int {
 		return nil
 	}
 	var arr []int
-	_ = json.Unmarshal(raw, &arr)
-	return arr
+	if err := json.Unmarshal(raw, &arr); err == nil {
+		return arr
+	}
+	return nil
 }
 
-// parseTimestampArray safely parses Dhan timestamps.
-// Handles numeric float64 arrays (epoch seconds/milliseconds) and string date arrays.
 func parseTimestampArray(raw json.RawMessage) []int64 {
 	if len(raw) == 0 || string(raw) == "null" {
 		return nil
 	}
 
-	// 1. Try parsing float64 slice
-	var floats []float64
-	if err := json.Unmarshal(raw, &floats); err == nil && len(floats) > 0 {
-		result := make([]int64, len(floats))
-		for i, f := range floats {
-			ts := int64(f)
-			if ts > 1_000_000_000_000 { // milliseconds -> seconds
-				ts = ts / 1000
-			}
-			result[i] = ts
+	var floatArr []float64
+	if err := json.Unmarshal(raw, &floatArr); err == nil && len(floatArr) > 0 {
+		result := make([]int64, len(floatArr))
+		for i, f := range floatArr {
+			result[i] = int64(f)
 		}
-		log.Printf("[PARSE] Timestamps parsed as floats. Sample[0]: %d", result[0])
 		return result
 	}
 
-	// 2. Try parsing string slice (e.g. "2024-09-11 09:30:00")
+	var intArr []int64
+	if err := json.Unmarshal(raw, &intArr); err == nil && len(intArr) > 0 {
+		return intArr
+	}
+
 	var stringsArr []string
 	if err := json.Unmarshal(raw, &stringsArr); err == nil && len(stringsArr) > 0 {
 		ist, _ := time.LoadLocation("Asia/Kolkata")
@@ -808,15 +784,9 @@ func parseTimestampArray(raw json.RawMessage) []int64 {
 				result[i] = parsedTime.Unix()
 			}
 		}
-		log.Printf("[PARSE] Timestamps parsed as strings. Sample[0]: %s -> epoch %d", stringsArr[0], result[0])
 		return result
 	}
 
-	if string(raw) == "[]" || string(raw) == "null" || len(raw) == 0 {
-		return nil
-	}
-
-	log.Printf("[PARSE] parseTimestampArray failed to parse (raw sample: %.80s)", string(raw))
 	return nil
 }
 
@@ -843,4 +813,3 @@ func debugTokenPreview(s string) string {
 	}
 	return s
 }
-

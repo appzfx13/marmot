@@ -1,13 +1,20 @@
 import json
 import logging
+import os
 from django.conf import settings
 from django.contrib import messages
+from django.core.mail import send_mail
 
 logger = logging.getLogger(__name__)
 from django.contrib.auth import login as auth_login, logout as auth_logout, update_session_auth_hash
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.contrib.auth.views import LoginView
-from django.http import HttpResponse, HttpResponseForbidden
+from django.contrib.auth.views import (
+    PasswordResetView,
+    PasswordResetDoneView,
+    PasswordResetConfirmView,
+    PasswordResetCompleteView,
+)
+from django.http import HttpResponse, HttpResponseForbidden, FileResponse, Http404, HttpResponseRedirect
 from django.shortcuts import redirect, render
 from django.urls import reverse_lazy
 from django.views import View
@@ -16,25 +23,102 @@ from django.views.generic import FormView, TemplateView, UpdateView
 from apps.backtest.models import BacktestTask
 from apps.common.choices import BrokerChoices
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
+from apps.market.forms import MarketBackupForm
 from apps.market.models import MarketBackupTask
 from apps.trade_config.models import TradeExecConfig, UserTradingAccount, BrokerMaster
 from apps.trade_core.brokers import BrokerFactory
-from .forms import UserProfileForm, UserProfilePasswordChangeForm, UserBacktestTaskForm
+from .forms import (
+    TraderSignUpForm,
+    TraderLoginForm,
+    TraderPasswordResetForm,
+    UserProfileForm,
+    UserProfilePasswordChangeForm,
+    UserBacktestTaskForm,
+)
 from .mixins import HTMXPartialMixin, MarmotRoleRequiredMixin
 from .models import User
 from .permissions import is_user_authorized_for_dashboard
 from .services import get_user_profile
 
 
-class LoginView(HTMXPartialMixin, LoginView):
-    template_name = 'registration/login.html'
-    partial_template_name = 'admins/partials/login_form.html'
-    redirect_authenticated_user = True
+class SignUpView(FormView):
+    template_name = 'registration/signup.html'
+    form_class = TraderSignUpForm
+    success_url = reverse_lazy('users:marmot-dashboard')
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect(self.get_success_url())
+        return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
-        auth_login(self.request, form.get_user())
-        success_url = self.get_success_url()
+        user = form.save()
+        
+        # Send Welcome Email via SMTP (graceful fallback if credentials pending)
+        try:
+            subject = "Welcome to Marmot — Next-Gen Algorithmic Trading Platform"
+            message = (
+                f"Hello {user.first_name},\n\n"
+                f"Welcome to Marmot! Your trading account has been created.\n\n"
+                f"Account Details:\n"
+                f"Username: {user.username}\n"
+                f"Email: {user.email}\n"
+                f"Environment: Default Sandbox Paper-Trading\n\n"
+                f"Log in to your terminal: {self.request.build_absolute_uri(reverse_lazy('users:marmot-login'))}\n\n"
+                f"Happy Trading,\nThe Marmot Core Engine Team"
+            )
+            send_mail(
+                subject,
+                message,
+                getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@marmot.local'),
+                [user.email],
+                fail_silently=True
+            )
+        except Exception as e:
+            logger.warning(f"Could not send welcome email to {user.email}: {e}")
 
+        # Authenticate and set session expiry based on remember_me
+        auth_login(self.request, user)
+        if form.cleaned_data.get('remember_me'):
+            self.request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+        else:
+            self.request.session.set_expiry(0)  # Browser close
+
+        success_url = self.get_success_url()
+        if self.request.headers.get('HX-Request'):
+            response = HttpResponse()
+            response['HX-Redirect'] = str(success_url)
+            return response
+        return redirect(success_url)
+
+    def get_success_url(self):
+        return reverse_lazy('users:marmot-dashboard')
+
+
+class LoginView(FormView):
+    template_name = 'registration/login.html'
+    form_class = TraderLoginForm
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect(self.get_success_url())
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['request'] = self.request
+        return kwargs
+
+    def form_valid(self, form):
+        user = form.get_user()
+        auth_login(self.request, user)
+
+        if form.cleaned_data.get('remember_me'):
+            self.request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+        else:
+            self.request.session.set_expiry(0)
+
+        success_url = self.get_success_url()
         if self.request.headers.get('HX-Request'):
             response = HttpResponse()
             response['HX-Redirect'] = str(success_url)
@@ -42,22 +126,38 @@ class LoginView(HTMXPartialMixin, LoginView):
         return redirect(success_url)
 
     def form_invalid(self, form):
-        if self.request.headers.get('HX-Request'):
-            return render(
-                self.request,
-                self.partial_template_name,
-                self.get_context_data(form=form),
-                status=422
-            )
         return super().form_invalid(form)
 
     def get_success_url(self):
-        if is_user_authorized_for_dashboard(self.request.user):
-            user_role = getattr(self.request.user, 'role', '')
-            if self.request.user.is_superuser or user_role in ['admin', 'developer', 'staff']:
+        user = self.request.user
+        if user.is_authenticated:
+            user_role = getattr(user, 'role', '')
+            if user.is_superuser or user_role in ['admin', 'developer', 'staff']:
                 return reverse_lazy('admins:admin-dashboard')
             return reverse_lazy('users:marmot-dashboard')
         return reverse_lazy('users:marmot-login')
+
+
+class MarmotPasswordResetView(PasswordResetView):
+    template_name = 'registration/password_reset_form.html'
+    form_class = TraderPasswordResetForm
+    email_template_name = 'registration/password_reset_email.html'
+    subject_template_name = 'registration/password_reset_subject.txt'
+    success_url = reverse_lazy('users:password_reset_done')
+
+
+class MarmotPasswordResetDoneView(PasswordResetDoneView):
+    template_name = 'registration/password_reset_done.html'
+
+
+class MarmotPasswordResetConfirmView(PasswordResetConfirmView):
+    template_name = 'registration/password_reset_confirm.html'
+    success_url = reverse_lazy('users:password_reset_complete')
+
+
+class MarmotPasswordResetCompleteView(PasswordResetCompleteView):
+    template_name = 'registration/password_reset_complete.html'
+
 
 
 def populate_account_context(context, user, request):
@@ -159,6 +259,89 @@ class UserBacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, View):
         if not backtest or (backtest.created_by and backtest.created_by != request.user and not request.user.is_superuser):
             return HttpResponseForbidden("You do not have permission to view this backtest.")
         return render(request, 'users/partials/user_backtest_detail_modal.html', {'backtest': backtest})
+
+
+class UserBackupListView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """View for user market backup downloads and tasks."""
+    template_name = 'users/dashboard.html'
+    partial_template_name = 'users/partials/backup_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        populate_account_context(context, user, self.request)
+        context['active_tab'] = 'backup'
+        user_backups = MarketBackupTask.objects.filter(is_deleted=False, created_by=user).order_by('-id')
+        context['backup_tasks'] = user_backups
+        context['total_backups'] = user_backups.count()
+        return context
+
+
+class UserBackupCreateView(HtmxModalMixin, LoginRequiredMixin, FormView):
+    """Modal view for user to trigger a new market data backup task."""
+    form_class = MarketBackupForm
+    modal_template_name = 'users/partials/user_backup_create_modal.html'
+    template_name = 'users/partials/user_backup_create_modal.html'
+
+    def form_valid(self, form):
+        task = form.save(commit=False)
+        task.created_by = self.request.user
+        task.status = MarketBackupTask.StatusChoices.CREATED
+        task.save()
+
+        response = HttpResponse(status=204)
+        msg = f"Market backup task #{task.id} requested successfully!"
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'success'},
+            'reloadBackupList': True
+        })
+        return response
+
+    def form_invalid(self, form):
+        return self.render_to_response(self.get_context_data(form=form))
+
+
+class UserBackupDownloadView(LoginRequiredMixin, View):
+    """View to download generated parquet dataset file for user."""
+    def get(self, request, pk, *args, **kwargs):
+        task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
+        if not task:
+            raise Http404("Market backup task not found.")
+
+        # Check permissions
+        if not (request.user.is_superuser or task.created_by == request.user or getattr(request.user, 'role', '') in ['admin', 'developer']):
+            return HttpResponseForbidden("Access Denied.")
+
+        user_id = str(task.created_by.id if task.created_by else 1)
+        candidates = [
+            task.parquet_file_path,
+            os.path.join(settings.BASE_DIR, 'backup', user_id, str(task.id), 'dataset.parquet'),
+            os.path.join('/app', 'backup', user_id, str(task.id), 'dataset.parquet'),
+            os.path.join(settings.BASE_DIR, 'backup', user_id, str(task.id)),
+            os.path.join('/app', 'backup', user_id, str(task.id)),
+        ]
+
+        target_file = None
+        for p in candidates:
+            if p and os.path.exists(p):
+                if os.path.isfile(p):
+                    target_file = p
+                    break
+                elif os.path.isdir(p):
+                    ds_p = os.path.join(p, 'dataset.parquet')
+                    if os.path.exists(ds_p):
+                        target_file = ds_p
+                        break
+
+        if not target_file:
+            messages.error(request, "Backup dataset file is not available on disk or still in progress.")
+            return HttpResponseRedirect(reverse_lazy('users:user-backup-list'))
+
+        filename = f"{task.index_name.lower()}_{task.start_date}_{task.end_date}.parquet"
+        response = FileResponse(open(target_file, 'rb'), content_type='application/vnd.apache.parquet')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        return response
 
 class UserEnvironmentToggleModalView(HtmxModalMixin, LoginRequiredMixin, View):
     """Render confirmation modal before switching watching environment mode."""

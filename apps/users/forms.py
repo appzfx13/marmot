@@ -1,6 +1,159 @@
 from django import forms
-from django.contrib.auth.forms import PasswordChangeForm
+from django.contrib.auth import authenticate
+from django.contrib.auth.forms import PasswordChangeForm, PasswordResetForm
+from django.core.exceptions import ValidationError
+from apps.common.choices import MemberRoleChoices
 from .models import User
+
+
+class TraderSignUpForm(forms.ModelForm):
+    first_name = forms.CharField(
+        max_length=50,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Your first name',
+            'id': 'firstName'
+        })
+    )
+    last_name = forms.CharField(
+        max_length=50,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Your last name',
+            'id': 'lastName'
+        })
+    )
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Your email address',
+            'id': 'email'
+        })
+    )
+    password = forms.CharField(
+        required=True,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter your password (min 6 characters)',
+            'id': 'password'
+        })
+    )
+    remember_me = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'remember_me'
+        })
+    )
+
+    class Meta:
+        model = User
+        fields = ['first_name', 'last_name', 'email', 'password']
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise ValidationError("An account with this email address already exists.")
+        return email
+
+    def clean_password(self):
+        password = self.cleaned_data.get('password')
+        if len(password) < 6:
+            raise ValidationError("Password must be at least 6 characters.")
+        return password
+
+    def save(self, commit=True):
+        user = super().save(commit=False)
+        user.email = self.cleaned_data['email']
+        user.first_name = self.cleaned_data['first_name']
+        user.last_name = self.cleaned_data['last_name']
+        user.role = MemberRoleChoices.TRADERS
+        user.set_password(self.cleaned_data['password'])
+        if commit:
+            user.save()
+            # Ensure Sandbox trading account is auto-created
+            user.get_active_trading_account()
+        return user
+
+
+class TraderLoginForm(forms.Form):
+    username = forms.CharField(
+        max_length=150,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Your email or username',
+            'id': 'usernameField',
+            'autocomplete': 'username'
+        })
+    )
+    password = forms.CharField(
+        required=True,
+        widget=forms.PasswordInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter your password',
+            'id': 'passwordField',
+            'autocomplete': 'current-password'
+        })
+    )
+    remember_me = forms.BooleanField(
+        required=False,
+        initial=True,
+        widget=forms.CheckboxInput(attrs={
+            'class': 'form-check-input',
+            'id': 'rememberMe'
+        })
+    )
+
+    def __init__(self, request=None, *args, **kwargs):
+        self.request = request
+        self.user_cache = None
+        super().__init__(*args, **kwargs)
+
+    def clean(self):
+        username_or_email = self.cleaned_data.get('username', '').strip()
+        password = self.cleaned_data.get('password')
+
+        if username_or_email and password:
+            # Try authenticating directly by username
+            user = authenticate(self.request, username=username_or_email, password=password)
+
+            # If not authenticated, check if they passed email instead
+            if user is None:
+                user_obj = User.objects.filter(email__iexact=username_or_email).first()
+                if user_obj:
+                    user = authenticate(self.request, username=user_obj.username, password=password)
+
+            if user is None:
+                raise ValidationError("Invalid email/username or password. Please verify your credentials.")
+            elif not user.is_active:
+                raise ValidationError("This account is inactive. Please contact support.")
+            elif getattr(user, 'is_blocked', False):
+                raise ValidationError("This account is currently suspended. Please contact platform administrators.")
+
+            self.user_cache = user
+
+        return self.cleaned_data
+
+    def get_user(self):
+        return self.user_cache
+
+
+class TraderPasswordResetForm(PasswordResetForm):
+    email = forms.EmailField(
+        max_length=254,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Your email address',
+            'id': 'id_email',
+            'autocomplete': 'email'
+        })
+    )
+
 
 
 class UserProfileForm(forms.ModelForm):

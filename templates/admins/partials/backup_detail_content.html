@@ -1,136 +1,315 @@
-<div class="row g-4"
+<div class="backup-detail-wrapper"
      id="backup-detail-container"
      hx-get="{% url 'market:market_backup_detail' backup.pk %}"
      hx-trigger="reloadBackupDetail from:body"
      hx-target="#backup-detail-container"
      hx-swap="outerHTML">
-    <!-- Configuration Metrics Card -->
-    <div class="col-12 col-lg-6">
-        <div class="glass-card p-4 h-100">
-            <h5 class="theme-text-main fw-bold mb-3 border-bottom border-secondary border-opacity-25 pb-2">Job Configuration</h5>
-            
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Index Target:</span>
-                <span class="theme-text-main fw-semibold">{{ backup.get_index_name_display }}</span>
-            </div>
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Date Range:</span>
-                <span class="theme-text-main fw-semibold">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</span>
-            </div>
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Strike Spread:</span>
-                <span class="theme-text-main fw-semibold">±{{ backup.strike_count }} ATM</span>
-            </div>
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Current Status:</span>
-                <span id="backup-status-badge">
-                    {% if backup.status == 'completed' %}
-                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3">Completed</span>
-                    {% elif backup.status == 'running' %}
-                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3">Running</span>
-                    {% elif backup.status == 'created' %}
-                        <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3">Created</span>
-                    {% elif backup.status == 'paused' %}
-                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3">Paused</span>
-                    {% elif backup.status == 'cancelled' or backup.status == 'error' %}
-                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3">{{ backup.get_status_display }}</span>
-                    {% else %}
-                        <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3">Pending</span>
-                    {% endif %}
-                </span>
-            </div>
-            <div class="mb-3 d-flex justify-content-between">
-                <span class="theme-text-muted">Parquet Storage:</span>
-                <span class="theme-text-main fw-semibold" id="backup-file-size">{{ backup.file_size_mb }} MB</span>
-            </div>
-            <div class="mb-0 d-flex justify-content-between">
-                <span class="theme-text-muted">File Path:</span>
-                <span class="theme-text-main text-truncate" style="max-width: 250px;" id="backup-file-path" title="{{ backup.parquet_file_path|default:'N/A' }}">{{ backup.parquet_file_path|default:"N/A" }}</span>
-            </div>
-        </div>
-    </div>
 
-    <!-- Progress & Live Controls Card -->
-    <div class="col-12 col-lg-6" id="backup-detail-controls">
-        <div class="glass-card p-4 h-100 d-flex flex-column justify-content-between">
-            <div>
-                <h5 class="theme-text-main fw-bold mb-3 border-bottom border-secondary border-opacity-25 pb-2">Execution Progress</h5>
-                
-                <div class="mb-3">
-                    <div class="d-flex justify-content-between align-items-center text-muted small mb-2">
-                        <span>Completion Rate</span>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 small" id="backup-eta-text" style="display: none;"></span>
-                            <span class="fw-bold theme-text-main" id="backup-progress-text">{{ backup.progress }}%</span>
-                        </div>
-                    </div>
-                    <div class="progress" style="height: 10px; background-color: var(--border-color);">
-                        <div class="progress-bar bg-primary progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %}" 
-                             id="backup-progress-bar"
-                             role="progressbar" 
-                             style="width: {{ backup.progress }}%;"
-                             aria-valuenow="{{ backup.progress }}" aria-valuemin="0" aria-valuemax="100">
-                        </div>
-                    </div>
+    <style>
+        .detail-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 1.5rem;
+            transition: all 0.25s ease;
+        }
+        .detail-card:hover {
+            border-color: rgba(13, 110, 253, 0.3);
+        }
+
+        .stat-item {
+            padding: 0.85rem 1.1rem;
+            border-radius: 12px;
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 0.65rem;
+        }
+        .stat-item:last-child {
+            margin-bottom: 0;
+        }
+
+        .stat-label {
+            color: var(--text-muted) !important;
+            font-size: 0.85rem;
+            font-weight: 500;
+        }
+
+        .stat-value {
+            color: var(--text-main) !important;
+            font-weight: 600;
+            font-size: 0.875rem;
+        }
+
+        .gradient-progress-bar {
+            background: linear-gradient(90deg, #3b82f6 0%, #06b6d4 50%, #10b981 100%);
+            border-radius: 8px;
+            transition: width 0.3s ease;
+        }
+
+        .terminal-box {
+            background: var(--input-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', 'Fira Code', 'Courier New', monospace;
+            font-size: 0.825rem;
+        }
+
+        .btn-emerald {
+            background: #10b981;
+            color: #ffffff !important;
+            border: none;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+            transition: all 0.2s ease;
+        }
+        .btn-emerald:hover {
+            background: #059669;
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.35);
+        }
+
+        .pulse-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            display: inline-block;
+            animation: pulse-ring 1.8s infinite;
+        }
+        @keyframes pulse-ring {
+            0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+            70% { box-shadow: 0 0 0 7px rgba(59, 130, 246, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0); }
+        }
+    </style>
+
+    <!-- ── 1. TOP HEADER BANNER ───────────────────────────────────────────── -->
+    <div class="detail-card p-4 mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-flex align-items-center justify-content-center rounded-circle" 
+                     style="width: 48px; height: 48px; background: var(--nav-active); color: #0d6efd; border: 1px solid var(--border-color);">
+                    <span class="material-icons fs-4">analytics</span>
                 </div>
-
-                <div class="mt-4 {% if not backup.error_logs %}d-none{% endif %}" id="backup-error-logs">
-                    <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="theme-text-muted small fw-semibold">Error & Execution Logs (Last 200 Lines):</label>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1">
+                        <h4 class="fw-bold mb-0 theme-text-main">{{ backup.get_index_name_display }}</h4>
+                        <span class="badge bg-secondary bg-opacity-15 theme-text-muted border border-secondary border-opacity-20 rounded-pill px-2.5 py-1 small">
+                            1-Min OHLCV + Options
+                        </span>
                     </div>
-                    <pre class="bg-dark text-danger p-3 rounded-3 small border border-secondary border-opacity-25 font-monospace" style="max-height: 250px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;" id="backup-error-pre">{{ backup.get_last_200_logs }}</pre>
+                    <p class="theme-text-muted small mb-0 d-flex align-items-center gap-2">
+                        <span>Job #{{ backup.id|stringformat:"04d" }}</span>
+                        <span>•</span>
+                        <span>Created {{ backup.created_at|date:"M d, Y H:i" }}</span>
+                    </p>
                 </div>
             </div>
 
-            <!-- Control Actions (Start/Resume, Pause, Stop, Download, Chart) -->
-            <div class="d-flex flex-wrap gap-2 pt-4 border-top border-secondary border-opacity-25 mt-3">
-                <a href="{% url 'admins:market_backup_chart' backup.pk %}"
-                   target="_blank"
-                   class="btn btn-emerald rounded-pill px-4 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
-                    <span class="material-icons fs-6">show_chart</span>
-                    <span>View Interactive Chart</span>
-                </a>
-
-                {% if backup.parquet_file_path and backup.status != 'error' and backup.file_size_mb > 0 %}
-                <a href="{% url 'market:market_backup_download' backup.pk %}"
-                   class="btn btn-outline-primary rounded-pill px-4 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
-                    <span class="material-icons fs-6">download</span>
-                    <span>Download File</span>
-                </a>
-                {% endif %}
-
-                {% if backup.status == 'running' %}
-                <!-- Pause: requires confirmation → load modal -->
-                <button type="button"
-                        hx-get="{% url 'market:market_backup_control' backup.pk %}?action=pause"
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        class="btn btn-warning rounded-pill px-4 flex-grow-1 fw-semibold d-flex align-items-center justify-content-center gap-1">
-                    <span class="material-icons fs-6">pause</span> Pause Task
-                </button>
+            <!-- Status Badge -->
+            <div id="backup-status-badge">
+                {% if backup.status == 'completed' %}
+                    <span class="d-inline-flex align-items-center gap-2 rounded-pill px-3 py-2 fw-semibold" 
+                          style="background: rgba(16,185,129,0.18); color: #10b981; border: 1.5px solid rgba(16,185,129,0.4); font-size: 0.875rem;">
+                        <span class="material-icons" style="font-size: 1rem;">check_circle</span>
+                        <span>Completed</span>
+                    </span>
+                {% elif backup.status == 'running' %}
+                    <span class="d-inline-flex align-items-center gap-2 rounded-pill px-3 py-2 fw-semibold"
+                          style="background: rgba(59,130,246,0.18); color: #3b82f6; border: 1.5px solid rgba(59,130,246,0.4); font-size: 0.875rem;">
+                        <span class="pulse-indicator" style="background:#3b82f6;"></span>
+                        <span>Running Ingestion</span>
+                    </span>
+                {% elif backup.status == 'paused' %}
+                    <span class="d-inline-flex align-items-center gap-2 rounded-pill px-3 py-2 fw-semibold"
+                          style="background: rgba(245,158,11,0.18); color: #f59e0b; border: 1.5px solid rgba(245,158,11,0.4); font-size: 0.875rem;">
+                        <span class="material-icons" style="font-size: 1rem;">pause</span>
+                        <span>Paused</span>
+                    </span>
+                {% elif backup.status == 'cancelled' or backup.status == 'error' %}
+                    <span class="d-inline-flex align-items-center gap-2 rounded-pill px-3 py-2 fw-semibold"
+                          style="background: rgba(239,68,68,0.18); color: #ef4444; border: 1.5px solid rgba(239,68,68,0.4); font-size: 0.875rem;">
+                        <span class="material-icons" style="font-size: 1rem;">error_outline</span>
+                        <span>{{ backup.get_status_display }}</span>
+                    </span>
                 {% else %}
-                <!-- Start / Resume: requires confirmation → load modal -->
-                <button type="button"
-                        hx-get="{% url 'market:market_backup_control' backup.pk %}?action=resume"
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        class="btn btn-success rounded-pill px-4 flex-grow-1 fw-semibold d-flex align-items-center justify-content-center gap-1">
-                    <span class="material-icons fs-6">play_arrow</span> Start / Resume
-                </button>
+                    <span class="d-inline-flex align-items-center gap-2 rounded-pill px-3 py-2 fw-semibold"
+                          style="background: rgba(100,116,139,0.18); color: #94a3b8; border: 1.5px solid rgba(100,116,139,0.4); font-size: 0.875rem;">
+                        <span class="material-icons" style="font-size: 1rem;">hourglass_empty</span>
+                        <span>Pending</span>
+                    </span>
                 {% endif %}
-
-                <!-- Stop: requires confirmation → load modal -->
-                <button type="button"
-                        hx-get="{% url 'market:market_backup_control' backup.pk %}?action=stop"
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        class="btn btn-outline-danger rounded-pill px-3 d-flex align-items-center justify-content-center"
-                        title="Stop / Cancel Task">
-                    <span class="material-icons fs-6">stop</span>
-                </button>
             </div>
         </div>
     </div>
+
+    <!-- ── 2. CONFIGURATION & PROGRESS GRID ──────────────────────────────── -->
+    <div class="row g-4 mb-4">
+        <!-- Configuration Card -->
+        <div class="col-12 col-lg-6">
+            <div class="detail-card h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="theme-text-main fw-bold mb-3 d-flex align-items-center gap-2">
+                        <span class="material-icons text-primary fs-5">tune</span>
+                        <span>Job Configuration</span>
+                    </h5>
+
+                    <div class="stat-item">
+                        <span class="stat-label">Target Index</span>
+                        <span class="stat-value">{{ backup.get_index_name_display }}</span>
+                    </div>
+
+                    <div class="stat-item">
+                        <span class="stat-label">Date Range</span>
+                        <span class="stat-value">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</span>
+                    </div>
+
+                    <div class="stat-item">
+                        <span class="stat-label">Strike Spread</span>
+                        <span class="stat-value">±{{ backup.strike_count }} ATM (CE &amp; PE)</span>
+                    </div>
+
+                    <div class="stat-item">
+                        <span class="stat-label">Storage Format</span>
+                        <span class="badge bg-secondary bg-opacity-15 theme-text-main border border-secondary border-opacity-20 rounded-pill px-2.5 py-1 small">
+                            Apache Parquet (Snappy)
+                        </span>
+                    </div>
+
+                    <div class="stat-item">
+                        <span class="stat-label">File Size</span>
+                        <span class="stat-value text-primary fw-bold" id="backup-file-size">{{ backup.file_size_mb }} MB</span>
+                    </div>
+                </div>
+
+                <div class="mt-3 pt-3 border-top border-secondary border-opacity-15 d-flex align-items-center justify-content-between small">
+                    <span class="stat-label">Dataset Location:</span>
+                    <span class="font-monospace text-xs text-truncate text-primary" style="max-width: 250px;" id="backup-file-path" title="{{ backup.parquet_file_path|default:'dataset.parquet' }}">{{ backup.parquet_file_path|default:"dataset.parquet" }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress & Actions Card -->
+        <div class="col-12 col-lg-6" id="backup-detail-controls">
+            <div class="detail-card h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <h5 class="theme-text-main fw-bold mb-3 d-flex align-items-center gap-2">
+                        <span class="material-icons text-emerald fs-5">donut_large</span>
+                        <span>Execution Status</span>
+                    </h5>
+
+                    <!-- Progress Bar -->
+                    <div class="mb-4">
+                        <div class="d-flex justify-content-between align-items-center small mb-2">
+                            <span class="stat-label">Completion Rate</span>
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 small fw-medium" id="backup-eta-text" style="display: none;"></span>
+                                <span class="fw-bold theme-text-main fs-6" id="backup-progress-text">{{ backup.progress }}%</span>
+                            </div>
+                        </div>
+                        <div class="progress" style="height: 10px; background-color: var(--border-color); border-radius: 8px;">
+                            <div class="progress-bar gradient-progress-bar progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %}" 
+                                 id="backup-progress-bar"
+                                 role="progressbar" 
+                                 style="width: {{ backup.progress }}%;"
+                                 aria-valuenow="{{ backup.progress }}" aria-valuemin="0" aria-valuemax="100">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Clean Quick Summary -->
+                    <div class="p-3 rounded-3 mb-3" style="background: var(--input-bg); border: 1px solid var(--border-color);">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="stat-label">Status Summary</span>
+                            <span class="stat-value">{{ backup.get_status_display }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center">
+                            <span class="stat-label">Dataset Engine</span>
+                            <span class="stat-value">Unified Go Parquet Stream</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Action Controls Island -->
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-3 border-top border-secondary border-opacity-15">
+                    <div class="d-flex flex-wrap align-items-center gap-2">
+                        <a href="{% url 'market:market_backup_chart' backup.pk %}"
+                           target="_blank"
+                           class="btn btn-emerald rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
+                            <span class="material-icons fs-6">candlestick_chart</span>
+                            <span>Interactive Chart</span>
+                        </a>
+
+                        {% if backup.file_size_mb > 0 and backup.status != 'error' %}
+                        <a href="{% url 'market:market_backup_download' backup.pk %}"
+                           class="btn btn-primary rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
+                            <span class="material-icons fs-6">download</span>
+                            <span>Download Parquet</span>
+                        </a>
+                        {% endif %}
+                    </div>
+
+                    <!-- Only Show Stop / Start / Pause Buttons when Task is NOT Completed -->
+                    {% if backup.status != 'completed' %}
+                    <div class="d-flex align-items-center gap-2">
+                        {% if backup.status == 'running' %}
+                        <button type="button"
+                                hx-get="{% url 'market:market_backup_control' backup.pk %}?action=pause"
+                                hx-target="#globalHtmxModalDialog"
+                                hx-swap="innerHTML"
+                                class="btn btn-warning rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5">
+                            <span class="material-icons fs-6">pause</span>
+                            <span>Pause</span>
+                        </button>
+                        {% else %}
+                        <button type="button"
+                                hx-get="{% url 'market:market_backup_control' backup.pk %}?action=resume"
+                                hx-target="#globalHtmxModalDialog"
+                                hx-swap="innerHTML"
+                                class="btn btn-success rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-1.5">
+                            <span class="material-icons fs-6">play_arrow</span>
+                            <span>{% if backup.status == 'paused' %}Resume{% else %}Start{% endif %}</span>
+                        </button>
+                        {% endif %}
+
+                        <button type="button"
+                                hx-get="{% url 'market:market_backup_control' backup.pk %}?action=stop"
+                                hx-target="#globalHtmxModalDialog"
+                                hx-swap="innerHTML"
+                                class="btn btn-outline-danger rounded-pill px-3 py-2 d-inline-flex align-items-center justify-content-center"
+                                title="Cancel / Stop Task">
+                            <span class="material-icons fs-6">stop</span>
+                        </button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── 3. DIAGNOSTIC LOGS (ONLY WHEN PRESENT) ────────────────────────── -->
+    {% if backup.error_logs %}
+    <div class="detail-card mb-4" id="backup-error-logs">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons text-danger fs-5">bug_report</span>
+                <h5 class="fw-bold theme-text-main mb-0">Execution &amp; Diagnostic Logs</h5>
+            </div>
+            <button type="button" 
+                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 text-xs"
+                    onclick="const pre = document.getElementById('backup-error-pre'); navigator.clipboard.writeText(pre.innerText); this.innerText='Copied!'; setTimeout(() => this.innerText='Copy Logs', 2000)">
+                Copy Logs
+            </button>
+        </div>
+        <pre class="terminal-box p-3 rounded-3 mb-0" 
+             style="max-height: 200px; overflow-y: auto; white-space: pre-wrap; word-break: break-word;" 
+             id="backup-error-pre">{{ backup.get_last_200_logs }}</pre>
+    </div>
+    {% endif %}
 </div>
 
 <script>
@@ -144,8 +323,7 @@
         const statusBadge = document.getElementById('backup-status-badge');
         const fileSizeEl = document.getElementById('backup-file-size');
         const filePathEl = document.getElementById('backup-file-path');
-        const errorLogsEl = document.getElementById('backup-error-logs');
-        const errorPreEl = document.getElementById('backup-error-pre');
+        const etaText = document.getElementById('backup-eta-text');
 
         if (progressBar) {
             progressBar.style.width = data.progress + '%';
@@ -159,14 +337,20 @@
         if (progressText) progressText.textContent = data.progress + '%';
 
         if (statusBadge) {
+            const S = 'style';
+            const pill = 'd-inline-flex align-items-center gap-2 rounded-pill px-3 py-2 fw-semibold';
+            const icon = (name) => `<span class="material-icons" style="font-size:1rem">${name}</span>`;
+            const badge = (bg, color, border, inner) =>
+                `<span class="${pill}" style="background:${bg};color:${color};border:1.5px solid ${border};font-size:0.875rem">${inner}</span>`;
+
             const statusMap = {
-                'completed': '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3">Completed</span>',
-                'running': '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3">Running</span>',
-                'created': '<span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3">Created</span>',
-                'paused': '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3">Paused</span>',
-                'cancelled': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3">Cancelled</span>',
-                'error': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3">Error</span>',
-                'pending': '<span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3">Pending</span>'
+                'completed':  badge('rgba(16,185,129,0.18)',  '#10b981', 'rgba(16,185,129,0.4)',  icon('check_circle') + '<span>Completed</span>'),
+                'running':    badge('rgba(59,130,246,0.18)',  '#3b82f6', 'rgba(59,130,246,0.4)',  '<span class="pulse-indicator" style="background:#3b82f6"></span><span>Running Ingestion</span>'),
+                'created':    badge('rgba(14,165,233,0.18)',  '#0ea5e9', 'rgba(14,165,233,0.4)',  icon('info') + '<span>Created</span>'),
+                'paused':     badge('rgba(245,158,11,0.18)',  '#f59e0b', 'rgba(245,158,11,0.4)',  icon('pause') + '<span>Paused</span>'),
+                'cancelled':  badge('rgba(239,68,68,0.18)',   '#ef4444', 'rgba(239,68,68,0.4)',   icon('error_outline') + '<span>Cancelled</span>'),
+                'error':      badge('rgba(239,68,68,0.18)',   '#ef4444', 'rgba(239,68,68,0.4)',   icon('error_outline') + '<span>Error</span>'),
+                'pending':    badge('rgba(100,116,139,0.18)', '#94a3b8', 'rgba(100,116,139,0.4)', icon('hourglass_empty') + '<span>Pending</span>')
             };
             statusBadge.innerHTML = statusMap[data.status] || statusMap['pending'];
         }
@@ -179,7 +363,6 @@
             filePathEl.title = data.file_path;
         }
 
-        const etaText = document.getElementById('backup-eta-text');
         if (etaText) {
             if (data.status === 'running' && data.eta) {
                 etaText.textContent = 'ETA: ' + data.eta;
@@ -189,7 +372,7 @@
             }
         }
 
-        if (data.status === 'error') {
+        if (data.status === 'error' || data.status === 'completed') {
             if (container) container.dispatchEvent(new CustomEvent('reloadBackupDetail'));
         }
     }
@@ -198,9 +381,7 @@
         if (window.MarmotWS && window.MarmotWS.url) {
             window.MarmotWS.unsubscribe(taskID);
             window.MarmotWS.subscribe(taskID, applyDetailUpdate);
-            console.log('[Detail] Subscribed to task', taskID, 'via WebSocket');
         } else {
-            console.warn('[Detail] WebSocket manager not available for task', taskID, '- using HTMX fallback');
             setInterval(function() {
                 if (container) container.dispatchEvent(new CustomEvent('reloadBackupDetail'));
             }, 3000);

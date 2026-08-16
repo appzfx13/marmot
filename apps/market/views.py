@@ -241,6 +241,48 @@ class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         return response
 
 
+class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """
+    Serves the single consolidated .parquet dataset file directly for download.
+    """
+    def get(self, request, pk, *args, **kwargs):
+        task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
+        if not task:
+            raise Http404("Market backup task not found.")
+
+        user_id = str(task.created_by.id if task.created_by else 1)
+        candidates = [
+            task.parquet_file_path,
+            os.path.join(settings.BASE_DIR, 'backup', user_id, str(task.id), 'dataset.parquet'),
+            os.path.join('/app', 'backup', user_id, str(task.id), 'dataset.parquet'),
+            os.path.join(settings.BASE_DIR, 'backup', user_id, str(task.id)),
+            os.path.join('/app', 'backup', user_id, str(task.id)),
+        ]
+
+        target_file = None
+        for p in candidates:
+            if p and os.path.exists(p):
+                if os.path.isfile(p):
+                    target_file = p
+                    break
+                elif os.path.isdir(p):
+                    ds_p = os.path.join(p, 'dataset.parquet')
+                    if os.path.exists(ds_p):
+                        target_file = ds_p
+                        break
+
+        if not target_file:
+            messages.error(request, "Backup dataset file is not available or still in progress.")
+            return HttpResponseRedirect(reverse_lazy('market:market_backup_list'))
+
+        filename = f"{task.index_name.lower()}_{task.start_date}_{task.end_date}.parquet"
+        response = FileResponse(open(target_file, 'rb'), content_type='application/vnd.apache.parquet')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = os.path.getsize(target_file)
+        return response
+
+
+
 
 class MarketBackupDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, DeleteView):
     model = MarketBackupTask
@@ -306,4 +348,26 @@ class MarketBackupBulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
         return response
 
 
-
+class MarketBackupStatusView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """
+    Lightweight JSON endpoint — returns the live status and progress
+    for a single backup task. Used by the list view to do an immediate
+    REST fetch on page load (so the UI is current before any WS push).
+
+    GET /market/backup/<pk>/status/
+    Response: { task_id, status, progress, file_size_mb, eta }
+    """
+
+    def get(self, request, pk, *args, **kwargs):
+        try:
+            task = MarketBackupTask.objects.get(pk=pk, is_deleted=False)
+        except MarketBackupTask.DoesNotExist:
+            return JsonResponse({'error': 'not found'}, status=404)
+
+        return JsonResponse({
+            'task_id':     task.pk,
+            'status':      task.status,
+            'progress':    task.progress,
+            'file_size_mb': round(task.file_size_mb or 0.0, 2),
+            'eta':         '',
+        })

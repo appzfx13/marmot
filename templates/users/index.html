@@ -8,8 +8,10 @@
 
     <!-- Bootstrap 5 CSS & Google Fonts/Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
+    <link rel="shortcut icon" href="{% static 'images/ref/logo/logo-icon.png' %}">
 
     <!-- Flatpickr Date Picker CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -79,7 +81,7 @@
         }
 
         #app-main-container {
-            zoom: 0.9;
+            /* zoom removed — use CSS transforms for scaling instead */
         }
 
         body {
@@ -547,15 +549,109 @@
         @media (max-width: 991.98px) {
             .sidebar {
                 transform: translateX(-100%);
+                width: 280px !important;
             }
             .main-with-sidebar {
                 margin-left: 0 !important;
+                width: 100% !important;
             }
             body.sidebar-mobile-open .sidebar {
                 transform: translateX(0);
+                box-shadow: 4px 0 30px rgba(0,0,0,0.4);
             }
             body.sidebar-mobile-open .sidebar-overlay {
                 display: block;
+            }
+            #app-main-container {
+                padding: 0 !important;
+            }
+            .glass-card {
+                border-radius: 14px !important;
+            }
+        }
+
+        /* ─── < 768px (Tablet portrait / Mobile) ─── */
+        @media (max-width: 767.98px) {
+            .main-with-sidebar {
+                padding: 0.75rem !important;
+            }
+            .sticky-top-navbar {
+                padding: 0.5rem 0 !important;
+                margin-top: -0.75rem;
+                margin-bottom: 0.5rem;
+            }
+            .top-action-bar {
+                gap: 6px !important;
+            }
+            .row.g-3 > [class*="col-sm"],
+            .row.g-2 > [class*="col-sm"] {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
+            .modal-dialog {
+                margin: 0.5rem !important;
+                max-width: calc(100vw - 1rem) !important;
+            }
+        }
+
+        /* ─── < 576px (Phone — Samsung Galaxy A73) ─── */
+        @media (max-width: 575.98px) {
+            .glass-card {
+                padding: 0.875rem !important;
+                border-radius: 12px !important;
+            }
+            h3, .h3 { font-size: 1.3rem !important; }
+            h4, .h4 { font-size: 1.15rem !important; }
+            h5, .h5 { font-size: 1rem !important; }
+            h6, .h6 { font-size: 0.9rem !important; }
+            .btn {
+                min-height: 40px;
+                font-size: 0.8125rem !important;
+                padding: 8px 14px !important;
+            }
+            .form-control, .form-select {
+                min-height: 40px;
+                font-size: 0.875rem !important;
+            }
+            .table-responsive {
+                border-radius: 10px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            .row > [class*="col-"] {
+                flex: 0 0 100% !important;
+                max-width: 100% !important;
+            }
+            .d-flex.gap-2:not(.align-items-center),
+            .d-flex.gap-3:not(.align-items-center) {
+                flex-wrap: wrap;
+            }
+            .nav-link {
+                font-size: 0.8125rem !important;
+                padding: 9px 12px !important;
+            }
+            .d-flex.justify-content-between {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            .badge {
+                font-size: 0.7rem !important;
+            }
+            .fs-3, .fs-2 {
+                font-size: 1.5rem !important;
+            }
+            .d-flex.align-items-center.justify-content-between.mb-3,
+            .d-flex.align-items-center.justify-content-between.mb-4 {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 10px;
+            }
+            #mainContentBody {
+                padding: 0 !important;
+            }
+            .container-fluid {
+                padding-left: 0 !important;
+                padding-right: 0 !important;
             }
         }
     </style>
@@ -575,10 +671,13 @@
         <aside class="sidebar p-3 vh-100 position-fixed d-flex flex-column" id="mainSidebar">
             <div class="mb-4 d-flex align-items-center justify-content-between px-2 pt-2">
                 <div class="d-flex align-items-center gap-2">
-                    <span class="material-icons text-primary fs-3">trending_up</span>
+                    <img src="{% static 'images/ref/logo/logo-icon.png' %}" alt="Marmot" height="34" style="filter: drop-shadow(0 2px 8px rgba(122, 90, 248, 0.4));">
                     <div>
-                        <h5 class="fw-bold mb-0 theme-text-main">Trader Portal</h5>
-                        <small class="theme-text-muted">Marmot Execution</small>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="fw-extrabold theme-text-main" style="font-weight: 800; font-size: 1.15rem; letter-spacing: 0.05rem;">MARMOT</span>
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 py-0 px-1" style="font-size: 0.65rem;">TRADER</span>
+                        </div>
+                        <small class="theme-text-muted" style="font-size: 0.75rem;">Terminal Suite</small>
                     </div>
                 </div>
                 <button type="button" class="glass-icon-btn d-md-none" id="closeSidebarBtn" aria-label="Close Sidebar">

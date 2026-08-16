@@ -1,812 +1,1821 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" data-bs-theme="dark">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Marmot Enterprise | High-Performance F&O Trading Platform</title>
+    
+    <!-- SEO & Metadata -->
+    <title>Marmot — Institutional-Grade Quantitative Trading & High-Frequency Derivatives Platform</title>
+    <meta name="description" content="High-capacity algorithmic trading infrastructure for quantitative traders and prop desks. Process 300M+ ticks/sec, execute automated SMC & 0DTE strategies, and protect capital with dual-layer risk control.">
+    <meta name="keywords" content="algorithmic trading, quantitative trading platform, options trading engine, high frequency trading, smart money concepts, 0DTE gamma engine, institutional backtesting, derivatives automation">
+    <meta name="robots" content="index, follow">
+    <meta property="og:title" content="Marmot — High-Capacity Algorithmic Trading Platform">
+    <meta property="og:description" content="Sub-millisecond execution, high-throughput backtesting, and automated risk protection for modern quantitative traders.">
+    <meta property="og:type" content="website">
 
-    <!-- Bootstrap 5 CSS & Google Fonts/Icons -->
+    <!-- Favicon & Touch Icons -->
+    <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
+    <link rel="icon" type="image/svg+xml" href="{% static 'images/ref/logo/logo-icon.svg' %}">
+    <link rel="apple-touch-icon" href="{% static 'images/ref/logo/logo-icon.png' %}">
+    <link rel="shortcut icon" href="{% static 'images/ref/logo/logo-icon.png' %}">
+
+    <!-- Google Fonts & Bootstrap 5 & Material Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
     <style>
         :root[data-theme="dark"] {
-            --bg-dark: #050814;
-            --bg-gradient: radial-gradient(circle at 50% 0%, #0d1536 0%, #050814 70%);
-            --glass-bg: rgba(15, 23, 42, 0.9);
-            --glass-card: rgba(15, 23, 42, 0.85);
-            --glass-border: rgba(255, 255, 255, 0.18);
-            --glass-hover-border: rgba(59, 130, 246, 0.7);
-            --text-main: #ffffff;
-            --text-subtitle: #f1f5f9;
-            --text-muted: #94a3b8;
-            --accent-blue: #3b82f6;
-            --accent-cyan: #06b6d4;
-            --accent-purple: #a855f7;
-            --accent-green: #10b981;
-            --accent-crimson: #f43f5e;
-            --btn-trader: linear-gradient(135deg, #2563eb 0%, #06b6d4 100%);
-            --btn-admin: linear-gradient(135deg, #1e293b 0%, #0f172a 100%);
-            --ticker-bg: rgba(15, 23, 42, 0.95);
-            --card-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.6);
+            --bg-page: #0f172a;
+            --bg-hero: #171f2e;
+            --bg-card: rgba(30, 41, 59, 0.7);
+            --bg-card-hover: rgba(30, 41, 59, 0.9);
+            --bg-section-alt: #131b2e;
+            --card-border: rgba(255, 255, 255, 0.08);
+            --card-border-hover: rgba(59, 130, 246, 0.3);
+            --text-title: #f8fafc;
+            --text-subtitle: #94a3b8;
+            --text-muted: #64748b;
+            --btn-primary: #3b82f6;
+            --btn-primary-hover: #2563eb;
+            --btn-text: #ffffff;
+            --toggle-bg: rgba(255, 255, 255, 0.08);
+            --toggle-border: rgba(255, 255, 255, 0.12);
+            --navbar-bg: rgba(23, 31, 46, 0.85);
+            --tab-nav-bg: rgba(255, 255, 255, 0.05);
+            --tab-active-bg: rgba(255, 255, 255, 0.12);
+            --tab-active-text: #ffffff;
+            --benefit-bg: #0b0f19;
+            --benefit-card-bg: rgba(255, 255, 255, 0.04);
+            --footer-bg: #0b0f19;
+            --faq-bg: #171f2e;
         }
 
         :root[data-theme="light"] {
-            --bg-dark: #f8fafc;
-            --bg-gradient: radial-gradient(circle at 50% 0%, #e2e8f0 0%, #f8fafc 70%);
-            --glass-bg: rgba(255, 255, 255, 0.95);
-            --glass-card: rgba(255, 255, 255, 0.9);
-            --glass-border: rgba(0, 0, 0, 0.15);
-            --glass-hover-border: rgba(37, 99, 235, 0.6);
-            --text-main: #0f172a;
-            --text-subtitle: #1e293b;
-            --text-muted: #475569;
-            --accent-blue: #2563eb;
-            --accent-cyan: #0891b2;
-            --accent-purple: #7c3aed;
-            --accent-green: #059669;
-            --accent-crimson: #e11d48;
-            --btn-trader: linear-gradient(135deg, #1d4ed8 0%, #0891b2 100%);
-            --btn-admin: linear-gradient(135deg, #334155 0%, #1e293b 100%);
-            --ticker-bg: rgba(255, 255, 255, 0.98);
-            --card-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.12);
+            --bg-page: #ffffff;
+            --bg-hero: #ffffff;
+            --bg-card: #ffffff;
+            --bg-card-hover: #ffffff;
+            --bg-section-alt: #f8fafc;
+            --card-border: #e2e8f0;
+            --card-border-hover: rgba(37, 99, 235, 0.3);
+            --text-title: #1e293b;
+            --text-subtitle: #64748b;
+            --text-muted: #94a3b8;
+            --btn-primary: #2563eb;
+            --btn-primary-hover: #1d4ed8;
+            --btn-text: #ffffff;
+            --toggle-bg: rgba(0, 0, 0, 0.05);
+            --toggle-border: rgba(0, 0, 0, 0.1);
+            --navbar-bg: rgba(255, 255, 255, 0.85);
+            --tab-nav-bg: #f1f5f9;
+            --tab-active-bg: #ffffff;
+            --tab-active-text: #1e293b;
+            --benefit-bg: #0f172a;
+            --benefit-card-bg: rgba(255, 255, 255, 0.05);
+            --footer-bg: #0f172a;
+            --faq-bg: #ffffff;
         }
 
         * {
             box-sizing: border-box;
         }
 
-        html, body {
-            font-family: 'Plus Jakarta Sans', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif !important;
-            background: var(--bg-dark) !important;
-            background-image: var(--bg-gradient) !important;
-            color: var(--text-main) !important;
-            min-height: 100vh;
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-page);
+            color: var(--text-title);
             margin: 0;
+            padding: 0;
             overflow-x: hidden;
-            position: relative;
-            transition: background 0.3s ease, color 0.3s ease;
+            transition: background-color 0.3s ease, color 0.3s ease;
         }
 
-        /* Force visibility on all text elements */
-        h1, h2, h3, h4, h5, h6, .h1, .h2, .h3, .h4, .h5, .h6 {
-            color: var(--text-main) !important;
-            font-weight: 700;
-        }
-
-        p, div, span, label, small {
-            color: var(--text-subtitle);
-        }
-
-        .text-muted {
-            color: var(--text-muted) !important;
-        }
-
-        .text-main {
-            color: var(--text-main) !important;
-        }
-
-        /* Ambient Lighting Orbs */
-        .ambient-orb {
-            position: absolute;
-            border-radius: 50%;
-            filter: blur(120px);
-            z-index: 0;
-            pointer-events: none;
-            opacity: 0.4;
-        }
-        .orb-1 {
-            width: 500px;
-            height: 500px;
-            background: rgba(37, 99, 235, 0.3);
-            top: -100px;
-            left: -100px;
-        }
-        .orb-2 {
-            width: 600px;
-            height: 600px;
-            background: rgba(168, 85, 247, 0.25);
-            top: 20%;
-            right: -150px;
-        }
-
-        /* Glassmorphism Navbar */
-        .navbar-marmot {
-            background: var(--glass-bg);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-bottom: 1px solid var(--glass-border);
-            position: sticky;
+        /* ----------------------------------------------------
+           Navbar (Reference Design Layout)
+        ---------------------------------------------------- */
+        .marmot-navbar {
+            position: fixed;
             top: 0;
-            z-index: 1050;
-            padding: 0.85rem 0;
+            left: 0;
+            right: 0;
+            z-index: 1000;
+            background: var(--navbar-bg);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--card-border);
+            padding: 16px 0;
+            transition: background 0.3s ease;
         }
-        .navbar-brand {
-            font-weight: 800;
-            font-size: 1.5rem;
-            color: var(--text-main) !important;
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            text-decoration: none;
-            letter-spacing: -0.5px;
-        }
-        .brand-logo-icon {
-            width: 40px;
-            height: 40px;
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: #ffffff !important;
-            box-shadow: 0 0 15px rgba(59, 130, 246, 0.5);
-        }
+
         .nav-link-custom {
-            color: var(--text-subtitle) !important;
-            font-weight: 600;
-            font-size: 0.95rem;
+            color: var(--text-subtitle);
             text-decoration: none;
-            margin: 0 1rem;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            padding: 6px 14px;
+            border-radius: 8px;
             transition: color 0.2s ease;
         }
+
         .nav-link-custom:hover {
-            color: var(--accent-blue) !important;
+            color: var(--text-title);
         }
 
-        /* Buttons */
-        .btn-marmot-trader {
-            background: var(--btn-trader);
-            color: #ffffff !important;
-            font-weight: 700;
-            border: 1px solid rgba(255, 255, 255, 0.25);
-            padding: 0.7rem 1.5rem;
-            border-radius: 10px;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(37, 99, 235, 0.35);
-        }
-        .btn-marmot-trader:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(37, 99, 235, 0.55);
-            color: #ffffff !important;
-        }
-
-        .btn-marmot-admin {
-            background: var(--btn-admin);
-            color: #ffffff !important;
-            font-weight: 700;
-            border: 1px solid var(--glass-border);
-            padding: 0.7rem 1.5rem;
-            border-radius: 10px;
-            display: inline-flex;
-            align-items: center;
-            gap: 0.5rem;
-            text-decoration: none;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.25);
-        }
-        .btn-marmot-admin:hover {
-            border-color: rgba(244, 63, 94, 0.6);
-            box-shadow: 0 8px 25px rgba(244, 63, 94, 0.35);
-            transform: translateY(-2px);
-            color: #ffffff !important;
-        }
-
-        .theme-toggle-btn {
-            background: rgba(255, 255, 255, 0.12);
-            border: 1px solid var(--glass-border);
-            color: var(--text-main) !important;
+        .theme-pill-btn {
+            background: var(--toggle-bg);
+            border: 1px solid var(--toggle-border);
+            color: var(--text-title);
             border-radius: 50px;
-            padding: 0.45rem 0.9rem;
-            display: flex;
+            padding: 7px 14px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            display: inline-flex;
             align-items: center;
-            gap: 0.4rem;
+            gap: 6px;
             cursor: pointer;
-            font-size: 0.85rem;
-            font-weight: 700;
             transition: all 0.2s ease;
         }
-        .theme-toggle-btn:hover {
-            background: rgba(255, 255, 255, 0.2);
+
+        .theme-pill-btn:hover {
+            transform: translateY(-1px);
         }
 
-        /* Hero Section */
+        /* ----------------------------------------------------
+           Hero Section (Exact Reference Template)
+        ---------------------------------------------------- */
         .hero-section {
-            padding: 5rem 0 3.5rem 0;
             position: relative;
-            z-index: 1;
+            padding-top: 140px;
+            padding-bottom: 80px;
+            text-align: center;
+            background: var(--bg-hero);
+            overflow: hidden;
         }
-        .hero-badge {
+
+        .hero-subheading-pill {
             display: inline-flex;
             align-items: center;
-            gap: 0.5rem;
-            padding: 0.5rem 1.2rem;
+            gap: 8px;
+            padding: 8px 18px;
             border-radius: 50px;
-            background: rgba(59, 130, 246, 0.15);
-            border: 1px solid rgba(59, 130, 246, 0.45);
-            color: var(--accent-cyan) !important;
-            font-size: 0.92rem;
-            font-weight: 700;
-            margin-bottom: 1.5rem;
-        }
-        .hero-title {
-            font-size: 3.5rem;
-            font-weight: 800;
-            line-height: 1.15;
-            letter-spacing: -1px;
-            margin-bottom: 1.5rem;
-            color: var(--text-main) !important;
-        }
-        .hero-title span {
-            background: linear-gradient(135deg, #3b82f6 0%, #a855f7 100%);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-        }
-        .hero-desc {
-            font-size: 1.2rem;
-            color: var(--text-subtitle) !important;
-            line-height: 1.6;
-            margin-bottom: 2.5rem;
-            max-width: 640px;
-            font-weight: 500;
+            background: rgba(59, 130, 246, 0.1);
+            border: 1px solid rgba(59, 130, 246, 0.2);
+            color: #3b82f6;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 24px;
         }
 
-        /* Showcase Preview Container */
-        .showcase-container {
-            position: relative;
-            border-radius: 22px;
-            background: var(--glass-card);
-            border: 1px solid var(--glass-border);
-            padding: 0.85rem;
-            box-shadow: var(--card-shadow);
-            backdrop-filter: blur(20px);
-            transition: all 0.4s ease;
-            min-height: 330px;
-            display: flex;
+        .hero-headline {
+            font-size: clamp(2.4rem, 4.8vw, 3.6rem);
+            font-weight: 800;
+            letter-spacing: -0.03em;
+            line-height: 1.18;
+            max-width: 840px;
+            margin: 0 auto 20px auto;
+            color: var(--text-title);
+        }
+
+        .hero-description {
+            font-size: clamp(1rem, 1.5vw, 1.125rem);
+            color: var(--text-subtitle);
+            max-width: 620px;
+            margin: 0 auto 36px auto;
+            line-height: 1.6;
+        }
+
+        .hero-btn-primary {
+            background-color: var(--btn-primary);
+            color: var(--btn-text);
+            border: none;
+            border-radius: 50px;
+            padding: 13px 30px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            text-decoration: none;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.3);
         }
-        .showcase-container:hover {
-            border-color: var(--glass-hover-border);
-            box-shadow: 0 30px 60px -10px rgba(59, 130, 246, 0.35);
-            transform: translateY(-4px);
+
+        .hero-btn-primary:hover {
+            background-color: var(--btn-primary-hover);
+            color: var(--btn-text);
+            transform: translateY(-1px);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4);
         }
-        .showcase-img {
+
+        .hero-btn-video {
+            background: transparent;
+            border: none;
+            color: var(--text-title);
+            font-size: 0.9375rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 10px;
+            padding: 12px 20px;
+            cursor: pointer;
+            text-decoration: none;
+            transition: opacity 0.2s ease;
+        }
+
+        .hero-btn-video:hover {
+            color: var(--text-title);
+            opacity: 0.85;
+        }
+
+        .video-play-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(59, 130, 246, 0.15);
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #3b82f6;
+        }
+
+        /* Hero Image Frame & Ambient Blobs */
+        .hero-image-wrapper {
+            position: relative;
+            max-width: 1000px;
+            margin: 48px auto 0 auto;
+            padding: 18px;
+            border-radius: 32px;
+            background: rgba(255, 255, 255, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.25);
+            z-index: 2;
+        }
+
+        :root[data-theme="dark"] .hero-image-wrapper {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(255, 255, 255, 0.1);
+        }
+
+        .hero-preview-img {
             width: 100%;
-            height: auto;
             border-radius: 16px;
             display: block;
         }
 
-        /* CSS/SVG Dashboard Graphic Fallback */
-        .showcase-fallback {
-            width: 100%;
-            padding: 2.2rem 1.8rem;
-            border-radius: 16px;
-            background: linear-gradient(135deg, #090d21 0%, #111827 100%);
-            color: #ffffff !important;
-            display: flex;
-            flex-direction: column;
-            gap: 1.5rem;
-        }
-        .chart-preview-bars {
-            display: flex;
-            align-items: flex-end;
-            gap: 10px;
-            height: 150px;
-            padding-top: 1rem;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
-        }
-        .chart-bar {
-            flex: 1;
-            border-radius: 4px 4px 0 0;
-            background: linear-gradient(180deg, #3b82f6 0%, #1d4ed8 100%);
-            transition: height 0.5s ease;
-        }
-        .chart-bar.green {
-            background: linear-gradient(180deg, #10b981 0%, #047857 100%);
-        }
-        .chart-bar.purple {
-            background: linear-gradient(180deg, #a855f7 0%, #6d28d9 100%);
-        }
-
-        .showcase-overlay-badge {
+        .hero-glow-blob {
             position: absolute;
-            background: var(--glass-bg);
-            border: 1px solid var(--glass-border);
-            backdrop-filter: blur(12px);
-            padding: 0.65rem 1.1rem;
-            border-radius: 14px;
-            display: flex;
-            align-items: center;
-            gap: 0.6rem;
-            font-size: 0.88rem;
-            font-weight: 700;
-            z-index: 10;
-        }
-        .overlay-badge-1 {
-            top: 20px;
-            right: 20px;
-            border-color: rgba(16, 185, 129, 0.6);
-            color: var(--accent-green) !important;
-        }
-        .overlay-badge-2 {
-            bottom: 20px;
-            left: 20px;
-            border-color: rgba(59, 130, 246, 0.6);
-            color: #60a5fa !important;
+            top: 40%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 1;
+            pointer-events: none;
+            opacity: 0.7;
         }
 
-        /* Live Market Ticker */
-        .ticker-bar {
-            background: var(--ticker-bg);
-            border-y: 1px solid var(--glass-border);
-            padding: 1rem 0;
-            margin: 2rem 0 4.5rem 0;
-            overflow: hidden;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.08);
-        }
-        .ticker-item {
-            display: inline-flex;
-            align-items: center;
-            gap: 0.6rem;
-            font-family: 'JetBrains Mono', monospace;
-            font-size: 0.92rem;
-            margin-right: 2.5rem;
-        }
-        .ticker-up { color: var(--accent-green) !important; font-weight: 700; }
-
-        /* Feature Cards */
-        .feature-card {
-            background: var(--glass-card);
-            border: 1px solid var(--glass-border);
-            border-radius: 20px;
-            padding: 2.4rem;
-            height: 100%;
-            transition: all 0.3s ease;
+        /* Floating Side Badges (Aligned Snugly to Center) */
+        .hero-center-wrapper {
             position: relative;
-            overflow: hidden;
-            box-shadow: var(--card-shadow);
+            max-width: 1180px;
+            margin: 0 auto;
+            padding: 0 15px;
         }
-        .feature-card:hover {
-            border-color: var(--glass-hover-border);
-            transform: translateY(-5px);
-            box-shadow: 0 20px 40px -10px rgba(37, 99, 235, 0.25);
-        }
-        .feature-icon {
-            width: 56px;
-            height: 56px;
-            border-radius: 16px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            margin-bottom: 1.35rem;
-            font-size: 1.9rem;
-        }
-        .icon-blue { background: rgba(59, 130, 246, 0.15); color: #3b82f6 !important; }
-        .icon-cyan { background: rgba(6, 182, 212, 0.15); color: #06b6d4 !important; }
-        .icon-purple { background: rgba(168, 85, 247, 0.15); color: #a855f7 !important; }
-        .icon-green { background: rgba(16, 185, 129, 0.15); color: #10b981 !important; }
 
-        .feature-title {
-            font-size: 1.35rem;
-            font-weight: 800;
-            margin-bottom: 0.85rem;
-            color: var(--text-main) !important;
+        .floating-badge {
+            position: absolute;
+            z-index: 10;
+            pointer-events: none;
+            filter: drop-shadow(0 15px 25px rgba(0,0,0,0.12));
+            max-width: 170px;
         }
-        .feature-desc {
-            color: var(--text-subtitle) !important;
+
+        .float-left-1 { top: 20px; left: 0px; animation: floatY 6s ease-in-out infinite alternate; }
+        .float-left-2 { top: 320px; left: -25px; animation: floatXY 7s ease-in-out infinite alternate; }
+        .float-right-1 { top: 35px; right: 0px; animation: floatX 8s ease-in-out infinite alternate; }
+        .float-right-2 { top: 340px; right: -25px; animation: floatRev 6s ease-in-out infinite alternate; }
+
+        @keyframes floatY { 0% { transform: translateY(0); } 100% { transform: translateY(-16px); } }
+        @keyframes floatX { 0% { transform: translateX(0); } 100% { transform: translateX(14px); } }
+        @keyframes floatXY { 0% { transform: translate(0, 0); } 100% { transform: translate(10px, -12px); } }
+        @keyframes floatRev { 0% { transform: translateY(0); } 100% { transform: translateY(14px); } }
+
+        /* ----------------------------------------------------
+           Capacity Metrics Bar (Institutional Trust Stats)
+        ---------------------------------------------------- */
+        .hero-logos-strip {
+            padding: 36px 0;
+            border-top: 1px solid var(--card-border);
+            border-bottom: 1px solid var(--card-border);
+            background: var(--bg-section-alt);
+        }
+
+        .capacity-metric-val {
+            font-size: 1.5rem;
+            font-weight: 800;
+            color: var(--text-title);
+            letter-spacing: -0.02em;
+        }
+
+        .capacity-metric-label {
+            font-size: 0.8125rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            color: var(--text-muted);
+        }
+
+        /* ----------------------------------------------------
+           Core Features Section
+        ---------------------------------------------------- */
+        .core-features-section {
+            padding: 100px 0;
+            background-color: var(--bg-section-alt);
+        }
+
+        .section-header-centered {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 56px auto;
+        }
+
+        .section-title {
+            font-size: clamp(2rem, 3vw, 2.5rem);
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            color: var(--text-title);
+            margin-bottom: 14px;
+        }
+
+        .section-desc {
+            color: var(--text-subtitle);
             font-size: 1rem;
             line-height: 1.6;
-            margin: 0;
-            font-weight: 500;
         }
 
-        /* Portal Callouts */
-        .portal-card {
-            border-radius: 24px;
-            padding: 3rem;
+        .core-feature-card {
+            background: var(--bg-card);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 36px 32px;
+            height: 100%;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.04);
+        }
+
+        .core-feature-card:hover {
+            transform: translateY(-4px);
+            border-color: var(--card-border-hover);
+            box-shadow: 0 20px 40px -10px rgba(59, 130, 246, 0.12);
+        }
+
+        .core-feature-icon {
+            width: 48px;
+            height: 48px;
+            border-radius: 12px;
+            background: rgba(59, 130, 246, 0.12);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            color: #3b82f6;
+            margin-bottom: 24px;
+        }
+
+        .core-feature-title {
+            font-size: 1.25rem;
+            font-weight: 700;
+            color: var(--text-title);
+            margin-bottom: 12px;
+        }
+
+        .core-feature-desc {
+            color: var(--text-subtitle);
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* ----------------------------------------------------
+           Tools Tab Section (Exact Reference Layout)
+        ---------------------------------------------------- */
+        .tools-tab-section {
+            padding: 100px 0;
+            background: var(--bg-page);
+        }
+
+        .tab-nav-wrapper {
+            display: flex;
+            gap: 8px;
+            background: var(--tab-nav-bg);
+            padding: 6px;
+            border-radius: 50px;
+            margin: 0 auto 36px auto;
+            max-width: fit-content;
+            overflow-x: auto;
+        }
+
+        .tab-button-pill {
+            background: transparent;
+            border: none;
+            color: var(--text-subtitle);
+            padding: 10px 22px;
+            border-radius: 50px;
+            font-size: 0.875rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            white-space: nowrap;
+            transition: all 0.2s ease;
+        }
+
+        .tab-button-pill.active {
+            background: var(--tab-active-bg);
+            color: var(--tab-active-text);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+        }
+
+        .tab-img-bg {
+            background: linear-gradient(135deg, rgba(236, 72, 153, 0.12), rgba(59, 130, 246, 0.12));
+            border: 1px solid var(--card-border);
+            border-radius: 32px;
+            padding: 24px;
+            max-width: 1008px;
+            margin: 0 auto;
+        }
+
+        .tab-img-overlay {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            overflow: hidden;
+            padding: 12px;
+        }
+
+        .tab-pane-content {
+            display: none;
+            animation: paneFade 0.35s ease;
+        }
+
+        .tab-pane-content.active {
+            display: block;
+        }
+
+        @keyframes paneFade {
+            from { opacity: 0; transform: scale(0.99); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* ----------------------------------------------------
+           Benefits Grid (Exact Reference Dark Section)
+        ---------------------------------------------------- */
+        .benefits-section {
+            background-color: var(--benefit-bg);
+            color: #ffffff;
+            padding: 110px 0;
             position: relative;
             overflow: hidden;
-            border: 1px solid var(--glass-border);
-            transition: all 0.3s ease;
-            box-shadow: var(--card-shadow);
-        }
-        .portal-trader {
-            background: linear-gradient(135deg, rgba(37, 99, 235, 0.18) 0%, var(--glass-card) 100%);
-        }
-        .portal-trader:hover {
-            border-color: rgba(59, 130, 246, 0.7);
-            box-shadow: 0 20px 40px rgba(37, 99, 235, 0.3);
-        }
-        .portal-admin {
-            background: linear-gradient(135deg, rgba(244, 63, 94, 0.15) 0%, var(--glass-card) 100%);
-        }
-        .portal-admin:hover {
-            border-color: rgba(244, 63, 94, 0.7);
-            box-shadow: 0 20px 40px rgba(244, 63, 94, 0.3);
         }
 
-        /* Footer */
-        footer {
-            border-top: 1px solid var(--glass-border);
-            padding: 3.5rem 0;
-            background: var(--glass-bg);
-            color: var(--text-subtitle);
-            font-size: 0.95rem;
-            margin-top: 5.5rem;
+        .floating-1 { animation: floatY 4s ease-in-out infinite alternate; }
+        .floating-2 { animation: floatX 5s ease-in-out infinite alternate; }
+        .floating-3 { animation: floatXY 6s ease-in-out infinite alternate; }
+
+        /* ----------------------------------------------------
+           Testimonials Section (Exact Reference Layout)
+        ---------------------------------------------------- */
+        .testimonials-section {
+            padding: 100px 0;
+            position: relative;
+            background: var(--bg-page);
         }
 
-        .system-status-dot {
-            width: 10px;
-            height: 10px;
-            background-color: var(--accent-green);
+        .testimonial-card {
+            background: var(--bg-section-alt);
+            border: 1px solid var(--card-border);
+            border-radius: 20px;
+            padding: 12px;
+            height: 100%;
+            transition: all 0.2s ease;
+        }
+
+        .testimonial-card:hover {
+            border-color: var(--card-border-hover);
+        }
+
+        .testimonial-header {
+            display: flex;
+            align-items: center;
+            padding: 12px;
+            background: var(--bg-card);
+            border-radius: 16px;
+            margin-bottom: 12px;
+        }
+
+        .testimonial-avatar {
+            width: 48px;
+            height: 48px;
             border-radius: 50%;
-            display: inline-block;
-            box-shadow: 0 0 10px var(--accent-green);
+            object-fit: cover;
+            margin-right: 14px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .testimonial-body {
+            padding: 16px;
+            background: var(--bg-card);
+            border-radius: 16px;
+        }
+
+        .testimonial-text {
+            color: var(--text-subtitle);
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            margin: 0;
+        }
+
+        /* ----------------------------------------------------
+           FAQ Accordion Section (Exact Reference Layout)
+        ---------------------------------------------------- */
+        .faq-section {
+            padding: 100px 0;
+            background: var(--faq-bg);
+        }
+
+        .faq-item-row {
+            padding-bottom: 20px;
+            margin-bottom: 20px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .faq-question-btn {
+            background: transparent;
+            border: none;
+            color: var(--text-title);
+            font-size: 1.125rem;
+            font-weight: 600;
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            text-align: left;
+            padding: 0;
+            cursor: pointer;
+        }
+
+        .faq-answer-pane {
+            margin-top: 14px;
+            color: var(--text-subtitle);
+            font-size: 0.9375rem;
+            line-height: 1.6;
+            display: none;
+        }
+
+        .faq-answer-pane.show {
+            display: block;
+        }
+
+        /* ----------------------------------------------------
+           Footer (Exact Reference Layout)
+        ---------------------------------------------------- */
+        .marmot-footer {
+            background-color: var(--footer-bg);
+            color: #cbd5e1;
+            padding: 90px 0 0 0;
+            position: relative;
+            overflow: hidden;
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .footer-logo-link {
+            display: block;
+            margin-bottom: 24px;
+        }
+
+        .footer-desc {
+            font-size: 0.875rem;
+            color: #94a3b8;
+            line-height: 1.6;
+            margin-bottom: 28px;
+            max-width: 320px;
+        }
+
+        .footer-heading {
+            color: #94a3b8;
+            font-size: 0.875rem;
+            font-weight: 600;
+            margin-bottom: 24px;
+        }
+
+        .footer-link {
+            color: #94a3b8;
+            text-decoration: none;
+            font-size: 0.875rem;
+            display: block;
+            margin-bottom: 12px;
+            transition: color 0.2s ease;
+        }
+
+        .footer-link:hover {
+            color: #ffffff;
+        }
+
+        .subscribe-input {
+            width: 100%;
+            height: 48px;
+            padding: 12px 16px;
+            font-size: 0.875rem;
+            color: #ffffff;
+            background: transparent;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            border-radius: 50px;
+            text-align: center;
+            margin-bottom: 10px;
+            outline: none;
+        }
+
+        .subscribe-input::placeholder {
+            color: #64748b;
+        }
+
+        .subscribe-input:focus {
+            border-color: #3b82f6;
+        }
+
+        .footer-bottom-bar {
+            border-top: 1px solid rgba(255, 255, 255, 0.08);
+            margin-top: 70px;
+            padding: 24px 0;
+            text-align: center;
+            font-size: 0.875rem;
+            color: #64748b;
+        }
+
+        /* ====================================================
+           MOBILE HAMBURGER NAV (Exact Homepage Theme)
+        ==================================================== */
+        .hamburger-btn {
+            background: var(--toggle-bg);
+            border: 1px solid var(--toggle-border);
+            color: var(--text-title);
+            border-radius: 50px;
+            padding: 7px 12px;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .hamburger-btn:hover {
+            background: var(--tab-active-bg);
+            transform: translateY(-1px);
+        }
+
+        .mobile-nav-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.6);
+            z-index: 998;
+            backdrop-filter: blur(8px);
+            -webkit-backdrop-filter: blur(8px);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .mobile-nav-drawer {
+            position: fixed;
+            top: 0;
+            right: -100%;
+            width: min(320px, 85vw);
+            height: 100vh;
+            background: var(--bg-card);
+            backdrop-filter: blur(30px) saturate(190%);
+            -webkit-backdrop-filter: blur(30px) saturate(190%);
+            border-left: 1px solid var(--card-border);
+            z-index: 999;
+            padding: 24px 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            box-shadow: -15px 0 40px rgba(0, 0, 0, 0.35);
+            transition: right 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow-y: auto;
+        }
+
+        .mobile-nav-drawer.open {
+            right: 0;
+        }
+
+        .mobile-nav-overlay.open {
+            display: block;
+            opacity: 1;
+        }
+
+        .mobile-nav-link {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            color: var(--text-subtitle);
+            text-decoration: none;
+            font-size: 0.9375rem;
+            font-weight: 500;
+            padding: 11px 16px;
+            border-radius: 10px;
+            display: block;
+            transition: all 0.2s ease;
+        }
+
+        .mobile-nav-link:hover {
+            background: var(--toggle-bg);
+            color: var(--text-title);
+            padding-left: 20px;
+        }
+
+        .mobile-nav-divider {
+            height: 1px;
+            background: var(--card-border);
+            margin: 12px 0;
+        }
+
+        .mobile-nav-close {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+            padding-bottom: 16px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        /* ====================================================
+           FULL RESPONSIVE MEDIA QUERIES
+        ==================================================== */
+
+        /* --- XL breakpoint (1200px) --- */
+        @media (max-width: 1200px) {
+            .floating-badge { display: none !important; }
+        }
+
+        /* --- LG breakpoint (992px) --- */
+        @media (max-width: 992px) {
+            .hero-section { padding-top: 120px; padding-bottom: 60px; }
+            .hero-headline { font-size: clamp(2rem, 5vw, 3rem); }
+
+            .core-features-section,
+            .tools-tab-section,
+            .testimonials-section,
+            .faq-section { padding: 72px 0; }
+
+            .benefits-section { padding: 80px 0; }
+
+            .tab-nav-wrapper {
+                max-width: 100%;
+                flex-wrap: nowrap;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                padding: 6px 4px;
+                justify-content: flex-start;
+            }
+
+            .tab-nav-wrapper::-webkit-scrollbar { display: none; }
+
+            .tab-button-pill { flex-shrink: 0; padding: 9px 16px; font-size: 0.8125rem; }
+
+            .tab-img-bg { padding: 16px; }
+
+            /* Benefits: cards stack */
+            .benefits-section .col-lg-6 { flex: 0 0 100%; max-width: 100%; }
+        }
+
+        /* --- MD breakpoint (768px) --- */
+        @media (max-width: 768px) {
+            /* Navbar */
+            .hamburger-btn { display: flex; }
+            .d-none.d-lg-flex { display: none !important; }
+
+            /* Hero */
+            .hero-section { padding-top: 100px; padding-bottom: 48px; }
+            .hero-headline { font-size: clamp(1.75rem, 6vw, 2.4rem); }
+            .hero-description { font-size: 0.9375rem; max-width: 100%; padding: 0 8px; }
+            .hero-subheading-pill { font-size: 0.8125rem; padding: 6px 14px; }
+
+            .hero-image-wrapper {
+                padding: 12px;
+                border-radius: 20px;
+                margin-top: 32px;
+            }
+
+            /* CTA buttons wrap naturally */
+            .d-flex.align-items-center.justify-content-center.gap-3 {
+                flex-direction: column;
+                gap: 12px !important;
+            }
+
+            .hero-btn-primary,
+            .hero-btn-video {
+                width: 100%;
+                max-width: 320px;
+                justify-content: center;
+            }
+
+            /* Capacity strip */
+            .hero-logos-strip { padding: 24px 0; }
+            .capacity-metric-val { font-size: 1.25rem; }
+            .capacity-metric-label { font-size: 0.75rem; }
+
+            /* Sections */
+            .core-features-section,
+            .tools-tab-section,
+            .testimonials-section,
+            .faq-section { padding: 56px 0; }
+
+            .benefits-section { padding: 60px 0; }
+
+            .section-header-centered { margin-bottom: 40px; }
+            .section-title { font-size: clamp(1.5rem, 5vw, 2rem); }
+
+            /* Tab nav full width scroll */
+            .tab-nav-wrapper {
+                border-radius: 16px;
+                padding: 4px;
+            }
+
+            /* Benefits cards */
+            .benefits-section [style*="background-color: #7a5af8"] {
+                padding: 28px 24px 0 24px;
+            }
+
+            .benefits-section [style*="background: linear-gradient"] {
+                padding: 32px 24px;
+            }
+
+            .benefits-section [style*="background-color: #2D0B70"] {
+                padding: 32px 24px;
+            }
+
+            /* Footer */
+            .marmot-footer { padding: 56px 0 0 0; }
+            .footer-bottom-bar { margin-top: 48px; }
+
+            /* FAQ */
+            .faq-question-btn { font-size: 1rem; }
+        }
+
+        /* --- SM breakpoint (576px) --- */
+        @media (max-width: 576px) {
+            /* Navbar: hide sign in text, keep launch btn */
+            .d-none.d-sm-inline-block { display: none !important; }
+
+            /* Hero */
+            .hero-section { padding-top: 88px; padding-bottom: 40px; }
+            .hero-headline { font-size: clamp(1.5rem, 7vw, 2rem); letter-spacing: -0.02em; }
+            .hero-description { font-size: 0.875rem; }
+
+            .hero-image-wrapper {
+                padding: 8px;
+                border-radius: 16px;
+            }
+
+            /* Capacity strip: 2 col on tiny screens */
+            .hero-logos-strip .col-6 { flex: 0 0 50%; max-width: 50%; }
+            .capacity-metric-val { font-size: 1.125rem; }
+            .capacity-metric-label { font-size: 0.6875rem; }
+
+            /* Core features: full width */
+            .col-md-6.col-lg-4 { flex: 0 0 100%; max-width: 100%; }
+
+            .core-feature-card { padding: 28px 24px; }
+            .core-feature-title { font-size: 1.125rem; }
+
+            /* Benefits images smaller on mobile */
+            .benefits-section [style*="bn-2.svg"] { max-width: 200px !important; }
+            .benefits-section [style*="min-height: 240px"] { min-height: 180px; }
+
+            /* Testimonials: full width */
+            .col-md-6.col-lg-4 { flex: 0 0 100%; max-width: 100%; }
+
+            /* FAQ */
+            .faq-question-btn { font-size: 0.9375rem; }
+
+            /* Footer columns */
+            .footer-desc { max-width: 100%; }
+        }
+
+        /* --- XS breakpoint (414px) --- */
+        @media (max-width: 414px) {
+            .hero-headline { font-size: 1.5rem; }
+            .hero-subheading-pill { font-size: 0.75rem; padding: 5px 12px; }
+            .tab-button-pill { font-size: 0.75rem; padding: 8px 12px; }
+            .tab-button-pill span:last-child { font-size: 0.75rem; }
+            .section-title { font-size: 1.4rem; }
+
+            .marmot-navbar { padding: 12px 0; }
+        }
+
+        /* ====================================================
+           SMOOTH SCROLL & PRINT
+        ==================================================== */
+        html { scroll-behavior: smooth; }
+
+        @media (prefers-reduced-motion: reduce) {
+            *, *::before, *::after { animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
         }
     </style>
 </head>
 <body>
 
-    <!-- Ambient Lighting Effects -->
-    <div class="ambient-orb orb-1"></div>
-    <div class="ambient-orb orb-2"></div>
-
-    <!-- Navigation Header -->
-    <nav class="navbar navbar-expand-lg navbar-marmot">
-        <div class="container">
-            <a class="navbar-brand" href="{% url 'home' %}">
-                <div class="brand-logo-icon">
-                    <span class="material-icons">query_stats</span>
-                </div>
-                <span>MARMOT</span>
+    <!-- 1. Navbar -->
+    <nav class="marmot-navbar">
+        <div class="container d-flex align-items-center justify-content-between">
+            <a href="{% url 'home' %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                <img src="{% static 'images/ref/logo-white.svg' %}" alt="Marmot" height="36" class="d-none dark-logo">
+                <img src="{% static 'images/ref/logo-black.svg' %}" alt="Marmot" height="36" class="d-block light-logo">
             </a>
 
-            <div class="d-flex align-items-center gap-2 d-lg-none">
-                <button class="theme-toggle-btn" id="themeToggleBtnMobile" type="button" aria-label="Toggle Theme">
-                    <span class="material-icons fs-6" id="themeToggleIconMobile">dark_mode</span>
-                </button>
-                <button class="navbar-toggler border-0 text-white" type="button" data-bs-toggle="collapse" data-bs-target="#marmotNavbar">
-                    <span class="material-icons fs-2">menu</span>
-                </button>
+            <div class="d-none d-lg-flex align-items-center gap-2">
+                <a href="#features" class="nav-link-custom">Capabilities</a>
+                <a href="#tools" class="nav-link-custom">Strategy Modules</a>
+                <a href="#benefits" class="nav-link-custom">Advantages</a>
+                <a href="#testimonials" class="nav-link-custom">Institutional Reviews</a>
+                <a href="#faq" class="nav-link-custom">FAQ</a>
             </div>
 
-            <div class="collapse navbar-collapse" id="marmotNavbar">
-                <ul class="navbar-nav mx-auto my-2 my-lg-0">
-                    <li class="nav-item"><a class="nav-link-custom" href="#features">Features</a></li>
-                    <li class="nav-item"><a class="nav-link-custom" href="#engine">Go Engine</a></li>
-                    <li class="nav-item"><a class="nav-link-custom" href="#strategies">Strategies</a></li>
-                    <li class="nav-item"><a class="nav-link-custom" href="#portals">Portals</a></li>
-                </ul>
+            <div class="d-flex align-items-center gap-2">
+                <button class="theme-pill-btn" id="themeToggleBtn" type="button" aria-label="Toggle Theme">
+                    <span class="material-icons" id="themeToggleIcon" style="font-size: 16px;">dark_mode</span>
+                    <span id="themeToggleText" class="d-none d-sm-inline">Dark</span>
+                </button>
 
-                <div class="d-flex align-items-center gap-3">
-                    <button class="theme-toggle-btn d-none d-lg-flex" id="themeToggleBtn" type="button">
-                        <span class="material-icons fs-6" id="themeToggleIcon">dark_mode</span>
-                        <span id="themeToggleText">Dark</span>
-                    </button>
+                <a href="{% url 'users:marmot-login' %}" class="nav-link-custom d-none d-sm-inline-block">
+                    Sign In
+                </a>
 
-                    {% if user.is_authenticated %}
-                        {% if user.is_staff or user.role == 'admin' or user.role == 'manager' %}
-                            <a href="{% url 'admins:admin-dashboard' %}" class="btn-marmot-admin">
-                                <span class="material-icons">admin_panel_settings</span> Admin Dashboard
-                            </a>
-                        {% else %}
-                            <a href="{% url 'users:marmot-dashboard' %}" class="btn-marmot-trader">
-                                <span class="material-icons">dashboard</span> Trader Dashboard
-                            </a>
-                        {% endif %}
-                        <a href="{% url 'users:marmot-logout' %}" class="btn btn-outline-secondary btn-sm rounded-3 px-3 fw-bold">Sign Out</a>
-                    {% else %}
-                        <!-- Admin Login & Trader Login Buttons -->
-                        <a href="{% url 'users:marmot-login' %}" class="btn-marmot-trader" id="trader-login-btn">
-                            <span class="material-icons">trending_up</span> Trader Login
-                        </a>
-                        <a href="{% url 'admins:admin-login' %}" class="btn-marmot-admin" id="admin-login-btn">
-                            <span class="material-icons">security</span> Admin Login
-                        </a>
-                    {% endif %}
-                </div>
+                <a href="{% url 'users:marmot-signup' %}" class="hero-btn-primary py-2 px-3 fs-6">
+                    <span class="d-none d-md-inline">Launch Terminal</span>
+                    <span class="d-md-none">Sign Up</span>
+                </a>
+
+                <!-- Hamburger (mobile only) -->
+                <button class="hamburger-btn" id="hamburgerBtn" aria-label="Open Menu" aria-expanded="false" aria-controls="mobileNavDrawer">
+                    <span class="material-icons" style="font-size: 22px;">menu</span>
+                </button>
             </div>
         </div>
     </nav>
 
-    <!-- Hero Section -->
-    <section class="hero-section">
-        <div class="container">
-            <div class="row align-items-center g-5">
-                <div class="col-lg-6">
-                    <div class="hero-badge">
-                        <span class="material-icons fs-6">bolt</span>
-                        Dual Architecture: Django + Go Microservices
-                    </div>
-                    <h1 class="hero-title">
-                        Next-Gen F&O Backtesting & <span>Automated Trading</span>
-                    </h1>
-                    <p class="hero-desc">
-                        High-performance algorithmic engine built to evaluate 300M+ intraday option contracts in seconds. Execute Smart Money Concepts, 0DTE Gamma Spikes, and Dhan HQ live trades with precision.
-                    </p>
-                    <div class="d-flex flex-wrap gap-3">
-                        <a href="{% url 'users:marmot-login' %}" class="btn-marmot-trader py-3 px-4 fs-6">
-                            <span class="material-icons">show_chart</span> Launch Trader Portal
-                        </a>
-                        <a href="{% url 'admins:admin-login' %}" class="btn-marmot-admin py-3 px-4 fs-6">
-                            <span class="material-icons">admin_panel_settings</span> Access Admin Portal
-                        </a>
-                    </div>
+    <!-- Mobile Nav Overlay -->
+    <div class="mobile-nav-overlay" id="mobileNavOverlay"></div>
 
-                    <!-- Quick Metrics -->
-                    <div class="row mt-5 pt-3 border-top border-secondary border-opacity-25">
-                        <div class="col-4">
-                            <div class="h3 fw-bold mb-0 text-main">&lt; 4.0s</div>
-                            <small class="text-muted fw-bold">Go Backtest Speed</small>
-                        </div>
-                        <div class="col-4">
-                            <div class="h3 fw-bold mb-0 text-main">300M+</div>
-                            <small class="text-muted fw-bold">Candles Evaluated</small>
-                        </div>
-                        <div class="col-4">
-                            <div class="h3 fw-bold mb-0 text-main">99.99%</div>
-                            <small class="text-muted fw-bold">Postback Reliability</small>
-                        </div>
-                    </div>
+    <!-- Mobile Nav Drawer (Theme-Matched, Clean Typography, No Emojis) -->
+    <div class="mobile-nav-drawer" id="mobileNavDrawer" role="dialog" aria-modal="true" aria-label="Navigation Menu">
+        <div class="mobile-nav-close">
+            <a href="{% url 'home' %}" class="d-flex align-items-center gap-2 text-decoration-none">
+                <img src="{% static 'images/ref/logo-white.svg' %}" alt="Marmot" height="32" class="d-none dark-logo">
+                <img src="{% static 'images/ref/logo-black.svg' %}" alt="Marmot" height="32" class="d-block light-logo">
+            </a>
+            <button id="closeDrawerBtn" style="background: var(--toggle-bg); border: 1px solid var(--toggle-border); border-radius: 50px; width: 34px; height: 34px; display: inline-flex; align-items: center; justify-content: center; cursor: pointer; color: var(--text-title); transition: all 0.2s ease;" aria-label="Close Menu">
+                <span class="material-icons" style="font-size: 18px;">close</span>
+            </button>
+        </div>
+        
+        <a href="#features" class="mobile-nav-link">Capabilities</a>
+        <a href="#tools" class="mobile-nav-link">Strategy Modules</a>
+        <a href="#benefits" class="mobile-nav-link">Advantages</a>
+        <a href="#testimonials" class="mobile-nav-link">Institutional Reviews</a>
+        <a href="#faq" class="mobile-nav-link">FAQ</a>
+
+        <div class="mobile-nav-divider"></div>
+
+        <div class="d-flex align-items-center justify-content-between px-2 py-2 mb-2">
+            <span class="text-subtitle small fw-semibold" style="color: var(--text-subtitle); font-size: 0.8125rem;">Theme</span>
+            <button class="theme-pill-btn py-1 px-3" id="drawerThemeToggleBtn" type="button" aria-label="Toggle Theme">
+                <span class="material-icons" id="drawerThemeToggleIcon" style="font-size: 15px;">dark_mode</span>
+                <span id="drawerThemeToggleText" style="font-size: 0.8125rem;">Dark</span>
+            </button>
+        </div>
+
+        <a href="{% url 'users:marmot-login' %}" class="mobile-nav-link text-center mb-1" style="background: var(--toggle-bg); border: 1px solid var(--toggle-border); border-radius: 50px; font-weight: 600;">
+            Sign In
+        </a>
+        <a href="{% url 'users:marmot-signup' %}" class="hero-btn-primary w-100 mt-1" style="text-align: center; justify-content: center; border-radius: 50px;">
+            Launch Free Terminal
+        </a>
+    </div>
+
+    <!-- 2. Hero Section -->
+    <section class="hero-section">
+        <div class="hero-center-wrapper">
+            <!-- Floating Badges from Reference (Snug to Center) -->
+            <img src="{% static 'images/ref/hero/shape-left-1.svg' %}" alt="Badge" class="floating-badge float-left-1 d-none d-xl-block">
+            <img src="{% static 'images/ref/hero/shape-left-2.svg' %}" alt="Badge" class="floating-badge float-left-2 d-none d-xl-block">
+            <img src="{% static 'images/ref/hero/shape-right-1.svg' %}" alt="Badge" class="floating-badge float-right-1 d-none d-xl-block">
+            <img src="{% static 'images/ref/hero/shape-right-2.svg' %}" alt="Badge" class="floating-badge float-right-2 d-none d-xl-block">
+
+            <div class="container position-relative z-3">
+                <div class="hero-subheading-pill">
+                    <span>⚡ Next-Gen F&O Quantitative Execution Platform</span>
                 </div>
 
-                <div class="col-lg-6">
-                    <div class="showcase-container">
-                        <img src="{% static 'images/hero_dashboard.png' %}"
-                             alt="Marmot Platform Dashboard Preview"
-                             class="showcase-img"
-                             id="heroImg"
-                             onerror="this.style.display='none'; document.getElementById('heroFallback').style.display='flex';">
+                <h1 class="hero-headline">
+                    Intelligent F&O Automation & Sub-Millisecond Execution
+                </h1>
 
-                        <!-- Graphic Fallback if static image loading fails -->
-                        <div class="showcase-fallback" id="heroFallback" style="display: none;">
-                            <div class="d-flex align-items-center justify-content-between">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="material-icons text-primary">query_stats</span>
-                                    <span class="fw-bold">MARMOT ALGO ENGINE</span>
-                                </div>
-                                <span class="badge bg-success bg-opacity-25 text-success border border-success">LIVE PARQUET STREAM</span>
-                            </div>
-                            <div class="chart-preview-bars">
-                                <div class="chart-bar" style="height: 40%;"></div>
-                                <div class="chart-bar green" style="height: 65%;"></div>
-                                <div class="chart-bar" style="height: 50%;"></div>
-                                <div class="chart-bar purple" style="height: 85%;"></div>
-                                <div class="chart-bar green" style="height: 70%;"></div>
-                                <div class="chart-bar" style="height: 95%;"></div>
-                                <div class="chart-bar green" style="height: 80%;"></div>
-                                <div class="chart-bar purple" style="height: 100%;"></div>
-                            </div>
-                            <div class="d-flex justify-content-between small text-muted font-monospace">
-                                <span>ICT / SMC: FVG Swept</span>
-                                <span>0DTE Gamma: Breakout Detected</span>
-                            </div>
-                        </div>
+                <p class="hero-description">
+                    Deploy autonomous Smart Money strategies, simulate multi-year option chains against 300M+ ticks/sec, and protect firm capital with automated dual-layer risk control.
+                </p>
 
-                        <div class="showcase-overlay-badge overlay-badge-1">
-                            <span class="system-status-dot"></span> Go Engine Active
-                        </div>
-                        <div class="showcase-overlay-badge overlay-badge-2">
-                            <span class="material-icons fs-6">api</span> Dhan HQ Linked
-                        </div>
-                    </div>
+                <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap mb-4">
+                    <a href="{% url 'users:marmot-signup' %}" class="hero-btn-primary">
+                        <span>Launch Free Sandbox Terminal</span>
+                    </a>
+                    <a href="{% url 'admins:admin-login' %}" class="hero-btn-video">
+                        <span class="video-play-icon">
+                            <span class="material-icons" style="font-size: 18px;">lock</span>
+                        </span>
+                        <span>Admin Portal</span>
+                    </a>
+                </div>
+
+                <!-- Preview Image Frame -->
+                <div class="hero-image-wrapper">
+                    <img src="{% static 'images/ref/hero/hero-img.jpg' %}" alt="Preview" class="hero-preview-img light-hero-img d-block">
+                    <img src="{% static 'images/ref/hero/hero-img-dark.png' %}" alt="Preview" class="hero-preview-img dark-hero-img d-none">
                 </div>
             </div>
         </div>
+
+        <!-- Ambient Dual-Color SVG Glow -->
+        <div class="hero-glow-blob">
+            <svg width="1100" height="800" viewBox="0 0 1100 800" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <g opacity="0.4" filter="url(#hero_pink)">
+                    <circle cx="450" cy="400" r="240" fill="#FF58D5" />
+                </g>
+                <g opacity="0.6" filter="url(#hero_blue)">
+                    <circle cx="650" cy="400" r="240" fill="#4E6EFF" />
+                </g>
+                <defs>
+                    <filter id="hero_pink" x="50" y="0" width="800" height="800" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                        <feGaussianBlur stdDeviation="120" />
+                    </filter>
+                    <filter id="hero_blue" x="250" y="0" width="800" height="800" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                        <feGaussianBlur stdDeviation="120" />
+                    </filter>
+                </defs>
+            </svg>
+        </div>
     </section>
 
-    <!-- Ticker Stream -->
-    <div class="ticker-bar">
-        <div class="container-fluid">
-            <div class="d-flex align-items-center justify-content-between overflow-hidden">
-                <div class="ticker-item">
-                    <span class="text-muted">NIFTY 50</span>
-                    <span class="fw-bold text-main">24,580.40</span>
-                    <span class="ticker-up">+0.84% ▲</span>
+    <!-- Capacity & Institutional Trust Metrics Strip -->
+    <div class="hero-logos-strip">
+        <div class="container">
+            <div class="row align-items-center justify-content-center g-4 text-center">
+                <div class="col-6 col-md-4 col-lg-2">
+                    <div class="capacity-metric-val">300M+</div>
+                    <div class="capacity-metric-label">Ticks / Sec Capacity</div>
                 </div>
-                <div class="ticker-item">
-                    <span class="text-muted">BANKNIFTY</span>
-                    <span class="fw-bold text-main">52,140.15</span>
-                    <span class="ticker-up">+1.12% ▲</span>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <div class="capacity-metric-val">&lt; 1.2ms</div>
+                    <div class="capacity-metric-label">Execution Latency</div>
                 </div>
-                <div class="ticker-item">
-                    <span class="text-muted">FINNIFTY</span>
-                    <span class="fw-bold text-main">23,450.90</span>
-                    <span class="ticker-up">+0.65% ▲</span>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <div class="capacity-metric-val">99.99%</div>
+                    <div class="capacity-metric-label">Engine Uptime SLA</div>
                 </div>
-                <div class="ticker-item d-none d-md-inline-flex">
-                    <span class="text-muted">0DTE GAMMA SPIKE</span>
-                    <span class="fw-bold text-info">SCANNING</span>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <div class="capacity-metric-val">DMA</div>
+                    <div class="capacity-metric-label">Multi-Broker Direct</div>
                 </div>
-                <div class="ticker-item d-none d-lg-inline-flex">
-                    <span class="text-muted">PARQUET ENGINE</span>
-                    <span class="ticker-up">CONNECTED</span>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <div class="capacity-metric-val">0DTE</div>
+                    <div class="capacity-metric-label">Delta Neutrality</div>
+                </div>
+                <div class="col-6 col-md-4 col-lg-2">
+                    <div class="capacity-metric-val">Dual-Tier</div>
+                    <div class="capacity-metric-label">Risk Kill-Switch</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Core Features Grid -->
-    <section class="py-5" id="features">
+    <!-- 3. Core Capabilities Section -->
+    <section class="core-features-section" id="features">
         <div class="container">
-            <div class="text-center max-w-700 mx-auto mb-5">
-                <h2 class="fw-bold h1 text-main mb-3">Enterprise Grade Trading Capabilities</h2>
-                <p class="text-subtitle fs-5">Built from the ground up for high frequency options processing, risk management, and autonomous AI automation.</p>
+            <div class="section-header-centered">
+                <h2 class="section-title">Institutional-Grade Platform Capabilities</h2>
+                <p class="section-desc">
+                    Engineered to give proprietary trading desks and quantitative portfolio managers an unfair structural advantage with uncompromising speed, precision, and risk intelligence.
+                </p>
             </div>
 
-            <div class="row g-4" id="engine">
-                <div class="col-md-4">
-                    <div class="feature-card">
-                        <div class="feature-icon icon-blue">
-                            <span class="material-icons">speed</span>
+            <div class="row g-4">
+                <div class="col-md-6 col-lg-4">
+                    <div class="core-feature-card">
+                        <div class="core-feature-icon">
+                            <span class="material-icons">bolt</span>
                         </div>
-                        <h3 class="feature-title">High-Speed Go Engine</h3>
-                        <p class="feature-desc">Evaluates multi-year intraday options datasets concurrently using date-partitioned Parquet files in under 4 seconds.</p>
+                        <h3 class="core-feature-title">High-Throughput Backtest Engine</h3>
+                        <p class="core-feature-desc">
+                            Simulate multi-year option chains and high-frequency tick data in sub-second bursts with microsecond slippage and fee precision.
+                        </p>
                     </div>
                 </div>
 
-                <div class="col-md-4" id="strategies">
-                    <div class="feature-card">
-                        <div class="feature-icon icon-purple">
-                            <span class="material-icons">psychology</span>
+                <div class="col-md-6 col-lg-4">
+                    <div class="core-feature-card">
+                        <div class="core-feature-icon">
+                            <span class="material-icons">auto_graph</span>
                         </div>
-                        <h3 class="feature-title">Smart Money Concepts</h3>
-                        <p class="feature-desc">Automated detection of Fair Value Gaps (FVG), Order Blocks, Liquidity Sweeps, and Market Structure Shifts (MSS).</p>
+                        <h3 class="core-feature-title">Smart Money (SMC) Intelligence</h3>
+                        <p class="core-feature-desc">
+                            Algorithmic Fair Value Gap (FVG) detection, institutional Order Block confirmation, and automated liquidity sweep triggers.
+                        </p>
                     </div>
                 </div>
 
-                <div class="col-md-4">
-                    <div class="feature-card">
-                        <div class="feature-icon icon-cyan">
-                            <span class="material-icons">flash_on</span>
+                <div class="col-md-6 col-lg-4">
+                    <div class="core-feature-card">
+                        <div class="core-feature-icon">
+                            <span class="material-icons">whatshot</span>
                         </div>
-                        <h3 class="feature-title">0DTE Expiry Gamma Blast</h3>
-                        <p class="feature-desc">Scans consolidation breakouts during 01:30 PM - 02:45 PM for OTM options targeting 5x-10x gamma surges.</p>
+                        <h3 class="core-feature-title">0DTE Volatility Scalper</h3>
+                        <p class="core-feature-desc">
+                            Real-time option Greeks monitoring with dynamic strike shifting, automated gamma blast capture, and delta hedging.
+                        </p>
                     </div>
                 </div>
 
-                <div class="col-md-4">
-                    <div class="feature-card">
-                        <div class="feature-icon icon-green">
+                <div class="col-md-6 col-lg-4">
+                    <div class="core-feature-card">
+                        <div class="core-feature-icon">
                             <span class="material-icons">hub</span>
                         </div>
-                        <h3 class="feature-title">Dhan HQ Integration</h3>
-                        <p class="feature-desc">Direct WebSocket market data feeds and automated trade order execution via official Dhan HQ APIs.</p>
+                        <h3 class="core-feature-title">Direct Market Access (DMA)</h3>
+                        <p class="core-feature-desc">
+                            Direct broker API bridge with continuous streaming tick feeds, instantaneous order routing, and sub-millisecond confirmations.
+                        </p>
                     </div>
                 </div>
 
-                <div class="col-md-4">
-                    <div class="feature-card">
-                        <div class="feature-icon icon-blue">
-                            <span class="material-icons">gavel</span>
+                <div class="col-md-6 col-lg-4">
+                    <div class="core-feature-card">
+                        <div class="core-feature-icon">
+                            <span class="material-icons">security</span>
                         </div>
-                        <h3 class="feature-title">Risk Control & Kill-Switch</h3>
-                        <p class="feature-desc">Emergency position freezes, daily draw-down limits, and centralized risk safeguards for active trader accounts.</p>
+                        <h3 class="core-feature-title">Dual-Layer Capital Shield</h3>
+                        <p class="core-feature-desc">
+                            Proprietary circuit-breaker architecture with Primary Soft Freeze and Hard Auto-Square-Off to ensure firm capital preservation.
+                        </p>
                     </div>
                 </div>
 
-                <div class="col-md-4">
-                    <div class="feature-card">
-                        <div class="feature-icon icon-purple">
-                            <span class="material-icons">smart_toy</span>
+                <div class="col-md-6 col-lg-4">
+                    <div class="core-feature-card">
+                        <div class="core-feature-icon">
+                            <span class="material-icons">psychology</span>
                         </div>
-                        <h3 class="feature-title">AI Agent Ready APIs</h3>
-                        <p class="feature-desc">RESTful endpoints and real-time webhook channels built for autonomous AI agent decisioning and trade execution.</p>
+                        <h3 class="core-feature-title">Autonomous Strategy Agents</h3>
+                        <p class="core-feature-desc">
+                            Intelligent quantitative agents that monitor market regimes, optimize position sizing, and execute systematically 24/7.
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Portal Selection Section -->
-    <section class="py-5" id="portals">
+    <!-- 4. Tools Tab Section (Strategy Modules) -->
+    <section class="tools-tab-section" id="tools">
         <div class="container">
+            <div class="section-header-centered">
+                <h2 class="section-title">All Quantitative Modules, At Your Fingertips.</h2>
+                <p class="section-desc">
+                    Comprehensive suite of modular trading tools designed to transform alpha research into reliable, high-yield execution across all market regimes.
+                </p>
+            </div>
+
+            <!-- Tab Switcher Navigation -->
+            <div class="tab-nav-wrapper">
+                <button class="tab-button-pill active" data-tab="tab-backtest">
+                    <span class="material-icons" style="font-size: 18px;">speed</span>
+                    <span>Tick Simulator</span>
+                </button>
+                <button class="tab-button-pill" data-tab="tab-smc">
+                    <span class="material-icons" style="font-size: 18px;">candlestick_chart</span>
+                    <span>SMC Liquidity Radar</span>
+                </button>
+                <button class="tab-button-pill" data-tab="tab-gamma">
+                    <span class="material-icons" style="font-size: 18px;">analytics</span>
+                    <span>0DTE Gamma Engine</span>
+                </button>
+                <button class="tab-button-pill" data-tab="tab-risk">
+                    <span class="material-icons" style="font-size: 18px;">shield</span>
+                    <span>Risk Controller</span>
+                </button>
+                <button class="tab-button-pill" data-tab="tab-agents">
+                    <span class="material-icons" style="font-size: 18px;">smart_toy</span>
+                    <span>Autonomous Agents</span>
+                </button>
+            </div>
+
+            <!-- Tab Image Display Frame -->
+            <div class="tab-img-bg">
+                <div class="tab-img-overlay">
+                    <!-- Tab 1 -->
+                    <div class="tab-pane-content active" id="tab-backtest">
+                        <img src="{% static 'images/ref/tab-image/tab-image-1.jpg' %}" alt="Tick Simulator" class="w-100 rounded-3 light-tab-img d-block">
+                        <img src="{% static 'images/ref/tab-image/tab-image-1-dark.jpg' %}" alt="Tick Simulator" class="w-100 rounded-3 dark-tab-img d-none">
+                        <div class="mt-4 p-3 text-center">
+                            <h3 class="fs-4 fw-bold text-title mb-2">Sub-Second Multi-Year Tick Simulation</h3>
+                            <p class="text-subtitle small max-w-xl mx-auto mb-4">Validate sophisticated quantitative hypotheses against hundred of millions of ticks with realistic liquidity modeling and sub-millisecond execution feedback.</p>
+                            <a href="{% url 'users:marmot-signup' %}" class="hero-btn-primary">Launch Sandbox Terminal</a>
+                        </div>
+                    </div>
+
+                    <!-- Tab 2 -->
+                    <div class="tab-pane-content" id="tab-smc">
+                        <img src="{% static 'images/ref/tab-image/tab-image-2.jpg' %}" alt="SMC Liquidity Radar" class="w-100 rounded-3 light-tab-img d-block">
+                        <img src="{% static 'images/ref/tab-image/tab-image-2-dark.jpg' %}" alt="SMC Liquidity Radar" class="w-100 rounded-3 dark-tab-img d-none">
+                        <div class="mt-4 p-3 text-center">
+                            <h3 class="fs-4 fw-bold text-title mb-2">Automated Institutional Order Flow Detection</h3>
+                            <p class="text-subtitle small max-w-xl mx-auto mb-4">Detect Fair Value Gaps (FVG) and breaker blocks before retail liquidity clusters form, unlocking asymmetrical risk-to-reward setups.</p>
+                            <a href="{% url 'users:marmot-signup' %}" class="hero-btn-primary">Explore SMC Scanner</a>
+                        </div>
+                    </div>
+
+                    <!-- Tab 3 -->
+                    <div class="tab-pane-content" id="tab-gamma">
+                        <img src="{% static 'images/ref/tab-image/tab-image-3.jpg' %}" alt="0DTE Gamma Engine" class="w-100 rounded-3 light-tab-img d-block">
+                        <img src="{% static 'images/ref/tab-image/tab-image-3-dark.jpg' %}" alt="0DTE Gamma Engine" class="w-100 rounded-3 dark-tab-img d-none">
+                        <div class="mt-4 p-3 text-center">
+                            <h3 class="fs-4 fw-bold text-title mb-2">Dynamic Expiry Volatility & Greeks Tracking</h3>
+                            <p class="text-subtitle small max-w-xl mx-auto mb-4">Manage option strike adjustments automatically during sharp intraday moves with real-time delta rebalancing and gamma expansion captures.</p>
+                            <a href="{% url 'users:marmot-signup' %}" class="hero-btn-primary">View Options Suite</a>
+                        </div>
+                    </div>
+
+                    <!-- Tab 4 -->
+                    <div class="tab-pane-content" id="tab-risk">
+                        <img src="{% static 'images/ref/tab-image/tab-image-4.jpg' %}" alt="Risk Controller" class="w-100 rounded-3 light-tab-img d-block">
+                        <img src="{% static 'images/ref/tab-image/tab-image-4-dark.jpg' %}" alt="Risk Controller" class="w-100 rounded-3 dark-tab-img d-none">
+                        <div class="mt-4 p-3 text-center">
+                            <h3 class="fs-4 fw-bold text-title mb-2">Automated Circuit Breaker & Max Drawdown Lock</h3>
+                            <p class="text-subtitle small max-w-xl mx-auto mb-4">Protect account capital with tiered soft limits and an instant hard kill-switch that cancels pending orders and closes positions safely.</p>
+                            <a href="{% url 'users:marmot-signup' %}" class="hero-btn-primary">Review Risk Policies</a>
+                        </div>
+                    </div>
+
+                    <!-- Tab 5 -->
+                    <div class="tab-pane-content" id="tab-agents">
+                        <img src="{% static 'images/ref/tab-image/tab-image-5.jpg' %}" alt="Autonomous Agents" class="w-100 rounded-3 light-tab-img d-block">
+                        <img src="{% static 'images/ref/tab-image/tab-image-5-dark.jpg' %}" alt="Autonomous Agents" class="w-100 rounded-3 dark-tab-img d-none">
+                        <div class="mt-4 p-3 text-center">
+                            <h3 class="fs-4 fw-bold text-title mb-2">24/7 Systematic Quantitative Execution</h3>
+                            <p class="text-subtitle small max-w-xl mx-auto mb-4">Deploy autonomous execution agents that dynamically adapt position sizing based on real-time volatility regime classifications.</p>
+                            <a href="{% url 'users:marmot-signup' %}" class="hero-btn-primary">Deploy Strategy Agent</a>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 5. Benefits Grid (Exact Reference Dark Section) -->
+    <section class="benefits-section" id="benefits">
+        <div class="container">
+            <div class="section-header-centered">
+                <h2 class="section-title text-white">The Key Competitive Advantages of Marmot.</h2>
+                <p class="section-desc text-white opacity-50">
+                    Engineered for prop desks, hedge funds, and professional algorithmic traders demanding extreme throughput, millisecond execution, and total capital security.
+                </p>
+            </div>
+
+            <div style="max-width: 1008px; margin: 0 auto;">
+                <div class="row g-4">
+                    <!-- Card 1 (Top Left): Primary Blue Card with Floating Badges & bn-1.svg -->
+                    <div class="col-lg-6">
+                        <div style="background-color: #7a5af8; border-radius: 20px; padding: 36px 36px 0 36px; height: 100%; position: relative; overflow: hidden; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div style="max-width: 360px; margin-bottom: 40px; position: relative; z-index: 2;">
+                                <h3 class="fs-2 fw-bold text-white mb-3">Process 300M+ Historical Ticks in Sub-Second Bursts</h3>
+                                <p class="text-white opacity-75 fs-6 mb-0">Eliminate simulation bottlenecks. Test deep institutional strategies across years of tick data with tick-perfect accuracy.</p>
+                            </div>
+
+                            <!-- Floating Badges inside Card 1 -->
+                            <div class="position-relative" style="min-height: 240px;">
+                                <!-- Floating 1: Sub-ms Execution -->
+                                <div class="position-absolute floating-1" style="left: 10px; top: 10%; z-index: 10;">
+                                    <span class="badge rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1 shadow" style="background: #46b3f0; color: #ffffff; font-size: 0.8125rem;">
+                                        <span class="material-icons" style="font-size: 14px;">bolt</span>
+                                        <span>Sub-ms Execution</span>
+                                    </span>
+                                </div>
+
+                                <!-- Floating 2: Tick Precision -->
+                                <div class="position-absolute floating-2" style="right: 15px; top: 25%; z-index: 10;">
+                                    <span class="badge rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1 shadow" style="background: #ff745e; color: #ffffff; font-size: 0.8125rem;">
+                                        <span class="material-icons" style="font-size: 14px;">analytics</span>
+                                        <span>Tick Precision</span>
+                                    </span>
+                                </div>
+
+                                <!-- Floating 3: Zero Lag -->
+                                <div class="position-absolute floating-3" style="right: 20px; bottom: 20%; z-index: 10;">
+                                    <span class="badge rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-1 shadow" style="background: #ffb128; color: #ffffff; font-size: 0.8125rem;">
+                                        <span class="material-icons" style="font-size: 14px;">verified_user</span>
+                                        <span>99.99% Uptime</span>
+                                    </span>
+                                </div>
+
+                                <!-- Illustration bn-1 -->
+                                <img src="{% static 'images/ref/benefits/bn-1.svg' %}" alt="Benefit Illustration" class="w-100 position-relative z-1" style="margin-bottom: -15px;">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 2 (Top Right): Cyan/Blue Gradient Card with bn-2.svg -->
+                    <div class="col-lg-6">
+                        <div style="background: linear-gradient(216deg, #a2e4e4 0%, #1c9ef6 100%); border-radius: 20px; padding: 44px; height: 100%; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden;">
+                            <div class="mb-4 text-center">
+                                <img src="{% static 'images/ref/benefits/bn-2.svg' %}" alt="Productivity Boost" style="max-width: 300px; width: 100%;">
+                            </div>
+                            <div>
+                                <h3 class="fs-2 fw-bold text-white mb-3" style="max-width: 320px;">Direct Market Access with Multi-Broker Failover</h3>
+                                <p class="text-white opacity-75 fs-6 mb-0" style="max-width: 380px;">Stream real-time order books, execute complex multi-leg baskets, and achieve 99.99% execution reliability.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 3 (Below Full Width): Deep Purple Card with bn-3.svg + blur-shape -->
+                    <div class="col-12">
+                        <div style="background-color: #2D0B70; border-radius: 20px; padding: 44px; position: relative; overflow: hidden;" class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-4">
+                            <!-- Background Blur Shape -->
+                            <img src="{% static 'images/ref/benefits/blur-shape.png' %}" alt="" class="position-absolute top-0 end-0 h-100 pointer-events-none opacity-40" style="z-index: 0; object-fit: cover;">
+
+                            <div style="max-width: 440px; position: relative; z-index: 2;" class="py-lg-3">
+                                <h3 class="fs-2 fw-bold text-white mb-3">Dual-Layer Capital Shield & Instant Kill-Switch</h3>
+                                <p class="text-white opacity-75 fs-6 mb-4">Protect your firm from catastrophic drawdown. Automated circuit breakers freeze rogue signals and square off positions in milliseconds.</p>
+                                <a href="{% url 'users:marmot-signup' %}" class="btn rounded-pill px-4 py-2 fw-semibold text-white" style="background-color: #7a5af8; font-size: 0.875rem;">
+                                    Launch Trading Terminal
+                                </a>
+                            </div>
+
+                            <div class="position-relative d-none d-lg-block" style="z-index: 2; margin-bottom: -44px;">
+                                <img src="{% static 'images/ref/benefits/bn-3.svg' %}" alt="Risk Management" style="max-width: 360px;">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- 6. Testimonials Section -->
+    <section class="testimonials-section" id="testimonials">
+        <div class="container">
+            <div class="section-header-centered">
+                <h2 class="section-title">Validated by Quantitative Traders & Prop Desks</h2>
+                <p class="section-desc">
+                    Discover how professional trading teams and quantitative analysts leverage Marmot to execute institutional alpha at scale.
+                </p>
+            </div>
+
             <div class="row g-4">
-                <!-- Trader Portal Card -->
-                <div class="col-md-6">
-                    <div class="portal-card portal-trader">
-                        <span class="badge bg-primary mb-3 px-3 py-2 fs-6">Trader Portal</span>
-                        <h3 class="h2 text-main fw-bold mb-3">Execute & Backtest Strategies</h3>
-                        <p class="text-subtitle mb-4 fs-6">Access your personal trading journal, configure sandbox environments, monitor live orders, and run backtest simulations.</p>
-                        <a href="{% url 'users:marmot-login' %}" class="btn-marmot-trader py-3 px-4">
-                            <span class="material-icons">login</span> Login to Trader Portal
-                        </a>
+                <!-- Testimonial 1 -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="testimonial-card">
+                        <div class="testimonial-header">
+                            <img src="{% static 'images/ref/users/user-1.png' %}" alt="Ralph Edwards" class="testimonial-avatar">
+                            <div>
+                                <h4 class="fs-6 fw-bold text-title mb-0">Ralph Edwards</h4>
+                                <small class="text-subtitle">Head of Quant Research, Apex Capital</small>
+                            </div>
+                        </div>
+                        <div class="testimonial-body">
+                            <p class="testimonial-text">
+                                "The backtesting speed against tick-level option chains is extraordinary. We can test multi-year strategies in seconds that previously took hours."
+                            </p>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Admin Portal Card -->
-                <div class="col-md-6">
-                    <div class="portal-card portal-admin">
-                        <span class="badge bg-danger mb-3 px-3 py-2 fs-6">Admin Console</span>
-                        <h3 class="h2 text-main fw-bold mb-3">Platform Administration</h3>
-                        <p class="text-subtitle mb-4 fs-6">Manage trader accounts, audit postback logs, configure broker master settings, and oversee system microservices.</p>
-                        <a href="{% url 'admins:admin-login' %}" class="btn-marmot-admin py-3 px-4">
-                            <span class="material-icons">shield</span> Login to Admin Console
-                        </a>
+                <!-- Testimonial 2 -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="testimonial-card">
+                        <div class="testimonial-header">
+                            <img src="{% static 'images/ref/users/user-2.png' %}" alt="Albert Flores" class="testimonial-avatar">
+                            <div>
+                                <h4 class="fs-6 fw-bold text-title mb-0">Albert Flores</h4>
+                                <small class="text-subtitle">Lead Derivatives Trader, Biffco Prop</small>
+                            </div>
+                        </div>
+                        <div class="testimonial-body">
+                            <p class="testimonial-text">
+                                "Zero-latency broker routing combined with 0DTE delta hedging gives our prop desk the exact edge required during volatile expiry days."
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Testimonial 3 -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="testimonial-card">
+                        <div class="testimonial-header">
+                            <img src="{% static 'images/ref/users/user-3.png' %}" alt="Jenny Wilson" class="testimonial-avatar">
+                            <div>
+                                <h4 class="fs-6 fw-bold text-title mb-0">Jenny Wilson</h4>
+                                <small class="text-subtitle">Risk Director, Quantum Asset Mgmt</small>
+                            </div>
+                        </div>
+                        <div class="testimonial-body">
+                            <p class="testimonial-text">
+                                "The dual-layer kill switch and automated drawdown locks give us complete confidence when deploying high-leverage quantitative models."
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Testimonial 4 -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="testimonial-card">
+                        <div class="testimonial-header">
+                            <img src="{% static 'images/ref/users/user-4.png' %}" alt="Esther Howard" class="testimonial-avatar">
+                            <div>
+                                <h4 class="fs-6 fw-bold text-title mb-0">Esther Howard</h4>
+                                <small class="text-subtitle">Senior Algorithmic Trader, Barone Desk</small>
+                            </div>
+                        </div>
+                        <div class="testimonial-body">
+                            <p class="testimonial-text">
+                                "The SMC algorithmic scanner accurately identifies institutional order blocks and liquidity voids. It has completely transformed our workflow."
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Testimonial 5 -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="testimonial-card">
+                        <div class="testimonial-header">
+                            <img src="{% static 'images/ref/users/user-1.png' %}" alt="Darlene Robertson" class="testimonial-avatar">
+                            <div>
+                                <h4 class="fs-6 fw-bold text-title mb-0">Darlene Robertson</h4>
+                                <small class="text-subtitle">Portfolio Manager, Abstergo Macro</small>
+                            </div>
+                        </div>
+                        <div class="testimonial-body">
+                            <p class="testimonial-text">
+                                "Seamless transition between paper-trading sandboxes and live broker accounts. The real-time position postbacks are razor-sharp."
+                            </p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Testimonial 6 -->
+                <div class="col-md-6 col-lg-4">
+                    <div class="testimonial-card">
+                        <div class="testimonial-header">
+                            <img src="{% static 'images/ref/users/user-2.png' %}" alt="Devon Lane" class="testimonial-avatar">
+                            <div>
+                                <h4 class="fs-6 fw-bold text-title mb-0">Devon Lane</h4>
+                                <small class="text-subtitle">Managing Partner, Binford Alpha Fund</small>
+                            </div>
+                        </div>
+                        <div class="testimonial-body">
+                            <p class="testimonial-text">
+                                "By far the most comprehensive, rock-solid options automation platform available for quantitative firms and serious traders."
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="text-center mt-5">
+                <button class="btn theme-pill-btn px-4 py-2" type="button">
+                    <span>Show more reviews...</span>
+                </button>
+            </div>
+        </div>
+    </section>
+
+    <!-- 7. FAQ Accordion Section -->
+    <section class="faq-section" id="faq">
+        <div class="container">
+            <div class="section-header-centered">
+                <h2 class="section-title">Frequently Asked Questions</h2>
+                <p class="section-desc">
+                    Common questions regarding platform capacity, broker connectivity, execution speed, and institutional security.
+                </p>
+            </div>
+
+            <div class="max-w-[640px] mx-auto" style="max-width: 680px;">
+                <div class="faq-item-row">
+                    <button type="button" class="faq-question-btn">
+                        <span>What is the platform's tick processing and simulation capacity?</span>
+                        <span class="material-icons faq-icon">expand_more</span>
+                    </button>
+                    <div class="faq-answer-pane show">
+                        Our proprietary simulation engine is engineered to process up to 300 million market ticks per second, enabling full multi-year option chain backtests with tick-level resolution in sub-second timeframes.
+                    </div>
+                </div>
+
+                <div class="faq-item-row">
+                    <button type="button" class="faq-question-btn">
+                        <span>How does the platform ensure sub-millisecond execution latency?</span>
+                        <span class="material-icons faq-icon">expand_more</span>
+                    </button>
+                    <div class="faq-answer-pane">
+                        Direct market access (DMA) streaming connections and non-blocking asynchronous event loops allow signals to be parsed, checked for risk constraints, and dispatched to broker gateways in under 1.2 milliseconds.
+                    </div>
+                </div>
+
+                <div class="faq-item-row">
+                    <button type="button" class="faq-question-btn">
+                        <span>Can I validate strategies in a paper-trading sandbox before going live?</span>
+                        <span class="material-icons faq-icon">expand_more</span>
+                    </button>
+                    <div class="faq-answer-pane">
+                        Yes. Every trader account includes a full-fidelity Sandbox environment matching live broker market depth and order execution logic, allowing risk-free forward testing.
+                    </div>
+                </div>
+
+                <div class="faq-item-row">
+                    <button type="button" class="faq-question-btn">
+                        <span>How does the Dual-Layer Capital Shield protect trading capital?</span>
+                        <span class="material-icons faq-icon">expand_more</span>
+                    </button>
+                    <div class="faq-answer-pane">
+                        The system enforces a Primary Soft Freeze upon reaching warning drawdown thresholds (preventing new position entries), and an instantaneous Hard Freeze with automated position square-off if risk limits are breached.
+                    </div>
+                </div>
+
+                <div class="faq-item-row">
+                    <button type="button" class="faq-question-btn">
+                        <span>Which markets and asset classes are supported?</span>
+                        <span class="material-icons faq-icon">expand_more</span>
+                    </button>
+                    <div class="faq-answer-pane">
+                        The platform supports Equity Indices (NIFTY, BANKNIFTY, FINNIFTY, SENSEX), Stock Futures & Options, and Cash Equities with real-time multi-strike option Greeks.
                     </div>
                 </div>
             </div>
         </div>
     </section>
 
-    <!-- Footer -->
-    <footer>
-        <div class="container">
-            <div class="row align-items-center">
-                <div class="col-md-6 mb-3 mb-md-0">
-                    <div class="d-flex align-items-center gap-2">
-                        <div class="brand-logo-icon" style="width: 32px; height: 32px; font-size: 0.9rem;">
-                            <span class="material-icons fs-6 text-white">query_stats</span>
-                        </div>
-                        <span class="fw-bold text-main fs-5">MARMOT</span>
-                        <span class="text-muted ms-2">Enterprise Trading Platform</span>
+    <!-- 8. Footer -->
+    <footer class="marmot-footer">
+        <!-- Top SVG Ambient Glow -->
+        <span class="position-absolute top-0 start-50 translate-middle-x pointer-events-none opacity-50">
+            <svg width="1260" height="400" viewBox="0 0 1260 400" fill="none">
+                <circle cx="630" cy="-100" r="230" fill="#3B2EFF" filter="blur(160px)" />
+            </svg>
+        </span>
+
+        <div class="container position-relative z-2">
+            <div class="row g-5">
+                <!-- Brand Info -->
+                <div class="col-lg-4">
+                    <a href="{% url 'home' %}" class="footer-logo-link">
+                        <img src="{% static 'images/ref/logo-white.svg' %}" alt="Marmot" height="34">
+                    </a>
+                    <p class="footer-desc">
+                        High-capacity algorithmic trading infrastructure and quantitative execution suite for modern derivatives traders and prop desks.
+                    </p>
+                    <div class="d-flex gap-2">
+                        <a href="{% url 'users:marmot-signup' %}" class="hero-btn-primary py-2 px-3 fs-6">Get Started Free</a>
                     </div>
                 </div>
-                <div class="col-md-6 text-md-end">
-                    <div class="d-inline-flex align-items-center gap-2 px-3 py-1.5 rounded-pill bg-dark border border-secondary border-opacity-25">
-                        <span class="system-status-dot"></span>
-                        <span class="text-white small fw-bold">All Engine Systems Operational</span>
-                    </div>
+
+                <!-- Nav Column 1 -->
+                <div class="col-6 col-lg-2 offset-lg-1">
+                    <div class="footer-heading">Capabilities</div>
+                    <a href="#features" class="footer-link">Tick Engine</a>
+                    <a href="#tools" class="footer-link">SMC Scanner</a>
+                    <a href="#tools" class="footer-link">0DTE Volatility</a>
+                    <a href="#benefits" class="footer-link">Risk Shield</a>
+                </div>
+
+                <!-- Nav Column 2 -->
+                <div class="col-6 col-lg-2">
+                    <div class="footer-heading">Solutions</div>
+                    <a href="{% url 'users:marmot-signup' %}" class="footer-link">Prop Desk Sandbox</a>
+                    <a href="{% url 'users:marmot-signup' %}" class="footer-link">Direct Broker DMA</a>
+                    <a href="#faq" class="footer-link">Execution SLA</a>
+                    <a href="#testimonials" class="footer-link">Client Reviews</a>
+                </div>
+
+                <!-- Nav Column 3 -->
+                <div class="col-12 col-lg-3">
+                    <div class="footer-heading">Market Intelligence</div>
+                    <p class="text-subtitle small mb-3">Subscribe for quantitative market insights and platform updates.</p>
+                    <form onsubmit="event.preventDefault(); alert('Subscribed successfully!');">
+                        <input type="email" placeholder="Enter your email" class="subscribe-input" required>
+                        <button type="submit" class="hero-btn-primary w-100 py-2 fs-6">Subscribe Now</button>
+                    </form>
                 </div>
             </div>
-            <div class="border-top border-secondary border-opacity-25 mt-4 pt-4 text-center text-md-start d-flex justify-content-between flex-wrap gap-2">
-                <small class="text-muted">&copy; {% now "Y" %} Marmot Platform. Dual Architecture Go + Django System.</small>
-                <div class="d-flex gap-3">
-                    <a href="{% url 'users:marmot-login' %}" class="text-muted text-decoration-none small">Trader Portal</a>
-                    <a href="{% url 'admins:admin-login' %}" class="text-muted text-decoration-none small">Admin Portal</a>
-                </div>
+
+            <div class="footer-bottom-bar">
+                <p class="mb-1">© 2026 Marmot Quantitative Technologies. All Rights Reserved.</p>
+                <p class="mb-0 text-muted small">High-Performance Algorithmic Trading Infrastructure — 99.99% Execution SLA</p>
             </div>
         </div>
     </footer>
 
-    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <!-- Scripts -->
     <script>
+        // 1. Tab Switching
+        (function() {
+            const tabButtons = document.querySelectorAll('.tab-button-pill');
+            const tabPanes = document.querySelectorAll('.tab-pane-content');
+
+            tabButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const targetTab = this.getAttribute('data-tab');
+
+                    tabButtons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+
+                    tabPanes.forEach(pane => {
+                        if (pane.id === targetTab) {
+                            pane.classList.add('active');
+                        } else {
+                            pane.classList.remove('active');
+                        }
+                    });
+                });
+            });
+        })();
+
+        // 2. FAQ Accordion Toggle
+        (function() {
+            const faqButtons = document.querySelectorAll('.faq-question-btn');
+            faqButtons.forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const answer = this.nextElementSibling;
+                    const icon = this.querySelector('.faq-icon');
+                    const isVisible = answer.classList.contains('show');
+
+                    document.querySelectorAll('.faq-answer-pane').forEach(p => p.classList.remove('show'));
+                    document.querySelectorAll('.faq-icon').forEach(i => i.textContent = 'expand_more');
+
+                    if (!isVisible) {
+                        answer.classList.add('show');
+                        if (icon) icon.textContent = 'expand_less';
+                    }
+                });
+            });
+        })();
+
+        // 3. Theme Toggle
         (function() {
             const htmlElement = document.documentElement;
             const toggleBtn = document.getElementById('themeToggleBtn');
-            const toggleBtnMobile = document.getElementById('themeToggleBtnMobile');
             const toggleIcon = document.getElementById('themeToggleIcon');
-            const toggleIconMobile = document.getElementById('themeToggleIconMobile');
             const toggleText = document.getElementById('themeToggleText');
+
+            const lightLogos = document.querySelectorAll('.light-logo');
+            const darkLogos = document.querySelectorAll('.dark-logo');
+            const lightHeroImg = document.querySelector('.light-hero-img');
+            const darkHeroImg = document.querySelector('.dark-hero-img');
+            const lightTabImgs = document.querySelectorAll('.light-tab-img');
+            const darkTabImgs = document.querySelectorAll('.dark-tab-img');
 
             const savedTheme = localStorage.getItem('theme');
             const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
             const currentTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
 
+            const drawerToggleBtn = document.getElementById('drawerThemeToggleBtn');
+            const drawerToggleIcon = document.getElementById('drawerThemeToggleIcon');
+            const drawerToggleText = document.getElementById('drawerThemeToggleText');
+
             function applyTheme(theme) {
                 htmlElement.setAttribute('data-theme', theme);
-                htmlElement.setAttribute('data-bs-theme', theme);
                 localStorage.setItem('theme', theme);
 
                 if (theme === 'dark') {
                     if (toggleIcon) toggleIcon.textContent = 'dark_mode';
-                    if (toggleIconMobile) toggleIconMobile.textContent = 'dark_mode';
                     if (toggleText) toggleText.textContent = 'Dark';
+                    if (drawerToggleIcon) drawerToggleIcon.textContent = 'dark_mode';
+                    if (drawerToggleText) drawerToggleText.textContent = 'Dark';
+
+                    darkLogos.forEach(el => el.classList.replace('d-none', 'd-block'));
+                    lightLogos.forEach(el => el.classList.replace('d-block', 'd-none'));
+
+                    if (darkHeroImg && lightHeroImg) {
+                        darkHeroImg.classList.replace('d-none', 'd-block');
+                        lightHeroImg.classList.replace('d-block', 'd-none');
+                    }
+
+                    darkTabImgs.forEach(el => el.classList.replace('d-none', 'd-block'));
+                    lightTabImgs.forEach(el => el.classList.replace('d-block', 'd-none'));
                 } else {
                     if (toggleIcon) toggleIcon.textContent = 'light_mode';
-                    if (toggleIconMobile) toggleIconMobile.textContent = 'light_mode';
                     if (toggleText) toggleText.textContent = 'Light';
+                    if (drawerToggleIcon) drawerToggleIcon.textContent = 'light_mode';
+                    if (drawerToggleText) drawerToggleText.textContent = 'Light';
+
+                    lightLogos.forEach(el => el.classList.replace('d-none', 'd-block'));
+                    darkLogos.forEach(el => el.classList.replace('d-block', 'd-none'));
+
+                    if (darkHeroImg && lightHeroImg) {
+                        lightHeroImg.classList.replace('d-none', 'd-block');
+                        darkHeroImg.classList.replace('d-block', 'd-none');
+                    }
+
+                    lightTabImgs.forEach(el => el.classList.replace('d-none', 'd-block'));
+                    darkTabImgs.forEach(el => el.classList.replace('d-block', 'd-none'));
                 }
             }
 
             applyTheme(currentTheme);
 
-            [toggleBtn, toggleBtnMobile].forEach(btn => {
-                if (btn) {
-                    btn.addEventListener('click', function() {
-                        const activeTheme = htmlElement.getAttribute('data-theme');
-                        const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
-                        applyTheme(newTheme);
+            function handleToggle() {
+                const activeTheme = htmlElement.getAttribute('data-theme');
+                const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
+                applyTheme(newTheme);
+            }
+
+            if (toggleBtn) toggleBtn.addEventListener('click', handleToggle);
+            if (drawerToggleBtn) drawerToggleBtn.addEventListener('click', handleToggle);
+        })();
+
+        // 4. Mobile Hamburger Nav (Toggle, Close, Touch & Keyboard Support)
+        (function() {
+            const hamburger = document.getElementById('hamburgerBtn');
+            const hamburgerIcon = hamburger ? hamburger.querySelector('.material-icons') : null;
+            const drawer = document.getElementById('mobileNavDrawer');
+            const overlay = document.getElementById('mobileNavOverlay');
+            const closeBtn = document.getElementById('closeDrawerBtn');
+
+            function openDrawer() {
+                if (!drawer) return;
+                drawer.classList.add('open');
+                if (overlay) overlay.classList.add('open');
+                if (hamburger) {
+                    hamburger.setAttribute('aria-expanded', 'true');
+                    if (hamburgerIcon) hamburgerIcon.textContent = 'close';
+                }
+                document.body.style.overflow = 'hidden';
+            }
+
+            function closeDrawer() {
+                if (!drawer) return;
+                drawer.classList.remove('open');
+                if (overlay) overlay.classList.remove('open');
+                if (hamburger) {
+                    hamburger.setAttribute('aria-expanded', 'false');
+                    if (hamburgerIcon) hamburgerIcon.textContent = 'menu';
+                }
+                document.body.style.overflow = '';
+            }
+
+            function toggleDrawer(e) {
+                if (e) e.preventDefault();
+                if (drawer && drawer.classList.contains('open')) {
+                    closeDrawer();
+                } else {
+                    openDrawer();
+                }
+            }
+
+            if (hamburger) {
+                hamburger.addEventListener('click', toggleDrawer);
+            }
+
+            if (closeBtn) {
+                closeBtn.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    closeDrawer();
+                });
+            }
+
+            if (overlay) {
+                overlay.addEventListener('click', function(e) {
+                    e.preventDefault();
+                    closeDrawer();
+                });
+                overlay.addEventListener('touchstart', function(e) {
+                    e.preventDefault();
+                    closeDrawer();
+                }, { passive: false });
+            }
+
+            // Close drawer on clicking any link inside the drawer
+            if (drawer) {
+                drawer.querySelectorAll('a').forEach(link => {
+                    link.addEventListener('click', function() {
+                        closeDrawer();
                     });
+                });
+            }
+
+            // Close on ESC key
+            document.addEventListener('keydown', function(e) {
+                if (e.key === 'Escape' && drawer && drawer.classList.contains('open')) {
+                    closeDrawer();
                 }
             });
         })();

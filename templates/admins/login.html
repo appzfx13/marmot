@@ -1,285 +1,313 @@
 {% load static %}
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
-
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Admin Login - Bug Tracker</title>
+    <title>Admin Portal — Marmot Core Control</title>
 
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
+    <link rel="shortcut icon" href="{% static 'images/ref/logo/logo-icon.png' %}">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
     <style>
         :root[data-theme="dark"] {
-            --bg-gradient: linear-gradient(135deg, #0a102e 0%, #050505 100%);
-            --glass-bg: rgba(18, 24, 36, 0.65);
-            --glass-border: rgba(255, 255, 255, 0.12);
-            --text-title: #ffffff;
-            --text-subtitle: rgba(255, 255, 255, 0.6);
-            --input-bg: rgba(255, 255, 255, 0.05);
-            --input-border: rgba(255, 255, 255, 0.12);
-            --input-text: #ffffff;
+            --bg-page: #0f172a;
+            --bg-card: rgba(30, 41, 59, 0.75);
+            --card-border: rgba(239, 68, 68, 0.25);
+            --text-title: #f8fafc;
+            --text-subtitle: #94a3b8;
+            --text-muted: #64748b;
+            --input-bg: rgba(255, 255, 255, 0.04);
+            --input-border: rgba(255, 255, 255, 0.1);
+            --input-text: #f8fafc;
             --input-placeholder: rgba(255, 255, 255, 0.35);
-            --btn-bg: #ffffff;
-            --btn-text: #0a102e;
-            --btn-hover: #e2e8f0;
-            --toggle-bg: rgba(255, 255, 255, 0.1);
-            --toggle-border: rgba(255, 255, 255, 0.15);
-            --orb-color-1: rgba(220, 53, 69, 0.25);
-            --orb-color-2: rgba(163, 112, 247, 0.2);
+            --btn-admin: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            --btn-admin-hover: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
+            --btn-text: #ffffff;
+            --toggle-bg: rgba(255, 255, 255, 0.08);
+            --toggle-border: rgba(255, 255, 255, 0.12);
+            --badge-bg: rgba(239, 68, 68, 0.12);
+            --badge-text: #f87171;
+            --badge-border: rgba(239, 68, 68, 0.3);
         }
 
         :root[data-theme="light"] {
-            --bg-gradient: linear-gradient(135deg, #f0f4f9 0%, #e2ebf4 50%, #d5e2f0 100%);
-            --glass-bg: rgba(245, 248, 252, 0.85);
-            --glass-border: rgba(213, 226, 240, 0.8);
-            --text-title: #1e293b;
+            --bg-page: #ffffff;
+            --bg-card: #ffffff;
+            --card-border: rgba(239, 68, 68, 0.3);
+            --text-title: #0f172a;
             --text-subtitle: #475569;
-            --input-bg: rgba(235, 241, 248, 0.6);
-            --input-border: rgba(13, 110, 253, 0.25);
-            --input-text: #1e293b;
-            --input-placeholder: #0d6efd;
-            --btn-bg: #0d6efd;
+            --text-muted: #64748b;
+            --input-bg: #f8fafc;
+            --input-border: #cbd5e1;
+            --input-text: #0f172a;
+            --input-placeholder: #94a3b8;
+            --btn-admin: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+            --btn-admin-hover: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
             --btn-text: #ffffff;
-            --btn-hover: #0b5ed7;
-            --toggle-bg: rgba(13, 110, 253, 0.08);
-            --toggle-border: rgba(13, 110, 253, 0.18);
-            --orb-color-1: rgba(13, 110, 253, 0.25);
-            --orb-color-2: rgba(99, 102, 241, 0.2);
+            --toggle-bg: rgba(0, 0, 0, 0.05);
+            --toggle-border: rgba(0, 0, 0, 0.1);
+            --badge-bg: rgba(239, 68, 68, 0.08);
+            --badge-text: #dc2626;
+            --badge-border: rgba(239, 68, 68, 0.2);
+        }
+
+        * {
+            box-sizing: border-box;
+        }
+
+        html, body {
+            width: 100%;
+            max-width: 100%;
+            overflow-x: hidden;
+            margin: 0;
+            padding: 0;
         }
 
         body {
-            font-family: 'Google Sans', sans-serif;
-            background: var(--bg-gradient);
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-page);
             min-height: 100vh;
             display: flex;
+            flex-direction: column;
             align-items: center;
             justify-content: center;
-            margin: 0;
+            padding: 72px 14px 28px 14px;
             position: relative;
-            overflow: hidden;
-            transition: background 0.4s ease;
+            transition: background-color 0.3s ease;
         }
 
-        .ambient-orb {
+        .ambient-blob-container {
             position: absolute;
-            border-radius: 50%;
-            filter: blur(90px);
+            bottom: -100px;
+            left: 50%;
+            transform: translateX(-50%);
             z-index: 0;
             pointer-events: none;
-            transition: background 0.4s ease;
-            will-change: transform;
+            opacity: 0.7;
+            max-width: 100vw;
+            overflow: hidden;
+            display: flex;
+            justify-content: center;
         }
 
-        .orb-1 {
-            width: 360px;
-            height: 360px;
-            background: var(--orb-color-1);
-            top: 12%;
-            left: 18%;
-            animation: orbFloat1 18s ease-in-out infinite alternate;
+        .ambient-blob-container svg {
+            max-width: 100vw;
+            width: 700px;
+            height: auto;
         }
 
-        .orb-2 {
-            width: 420px;
-            height: 420px;
-            background: var(--orb-color-2);
-            bottom: 12%;
-            right: 18%;
-            animation: orbFloat2 22s ease-in-out infinite alternate;
-        }
-
-        @keyframes orbFloat1 {
-            0% {
-                transform: translate(0, 0) scale(1);
-            }
-
-            50% {
-                transform: translate(50px, 40px) scale(1.08);
-            }
-
-            100% {
-                transform: translate(-30px, 70px) scale(0.95);
-            }
-        }
-
-        @keyframes orbFloat2 {
-            0% {
-                transform: translate(0, 0) scale(1);
-            }
-
-            50% {
-                transform: translate(-60px, -50px) scale(1.12);
-            }
-
-            100% {
-                transform: translate(40px, -30px) scale(0.92);
-            }
-        }
-
-        .theme-toggle-btn {
-            position: fixed;
-            top: 24px;
-            right: 24px;
+        .auth-nav-top {
+            position: absolute;
+            top: 14px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
             z-index: 100;
+            max-width: 100%;
+        }
+
+        .auth-nav-btn {
             background: var(--toggle-bg);
             border: 1px solid var(--toggle-border);
             color: var(--text-title);
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-radius: 50px;
-            padding: 8px 18px;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-            cursor: pointer;
-            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-        }
-
-        .theme-toggle-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-        }
-
-        .login-card {
-            position: relative;
-            z-index: 10;
-            background: var(--glass-bg);
-            backdrop-filter: blur(28px) saturate(180%);
-            -webkit-backdrop-filter: blur(28px) saturate(180%);
-            border-radius: 32px;
-            border: 1px solid var(--glass-border);
-            width: 100%;
-            max-width: 430px;
-            zoom: 0.9;
-            padding: 2.75rem 2.25rem 2.25rem 2.25rem;
-            box-shadow: 0 24px 48px rgba(0, 0, 0, 0.25);
-            animation: cardEntrance 0.6s cubic-bezier(0.16, 1, 0.3, 1);
-            transition: background 0.4s ease, border-color 0.4s ease, transform 0.3s ease;
-        }
-
-        .login-card:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 28px 56px rgba(0, 0, 0, 0.3);
-        }
-
-        @keyframes cardEntrance {
-            from {
-                opacity: 0;
-                transform: translateY(24px) scale(0.96);
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0) scale(1);
-            }
-        }
-
-        .brand-icon-wrapper {
-            width: 54px;
-            height: 54px;
-            border-radius: 20px;
-            background: var(--toggle-bg);
-            border: 1px solid var(--toggle-border);
+            padding: 7px 14px;
             display: inline-flex;
             align-items: center;
-            justify-content: center;
-            margin-bottom: 1.25rem;
+            gap: 6px;
+            text-decoration: none;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+        }
+
+        .auth-nav-btn:hover {
             color: var(--text-title);
-            transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+            transform: translateY(-1px);
         }
 
-        .login-card:hover .brand-icon-wrapper {
-            transform: scale(1.05) rotate(-4deg);
+        .auth-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            margin: 0 auto;
+            background: var(--bg-card);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 34px 28px;
+            box-shadow: 0 20px 45px -10px rgba(220, 38, 38, 0.18);
+            animation: cardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        .login-title {
+        @media (max-width: 576px) {
+            body {
+                padding: 64px 12px 24px 12px;
+            }
+            .auth-nav-top {
+                top: 10px;
+                left: 12px;
+                right: 12px;
+            }
+            .auth-nav-btn {
+                padding: 6px 12px;
+                font-size: 0.75rem;
+            }
+            .auth-card {
+                padding: 24px 16px;
+                border-radius: 20px;
+                max-width: 100%;
+            }
+            .auth-title {
+                font-size: 1.35rem !important;
+            }
+            .auth-subtitle {
+                font-size: 0.8125rem !important;
+                margin-bottom: 18px !important;
+            }
+        }
+
+        @keyframes cardFadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .admin-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--badge-bg);
+            color: var(--badge-text);
+            border: 1px solid var(--badge-border);
+            padding: 5px 12px;
+            border-radius: 50px;
+            font-size: 0.6875rem;
+            font-weight: 700;
+            letter-spacing: 0.05em;
+            text-transform: uppercase;
+            margin-bottom: 12px;
+        }
+
+        .auth-title {
             color: var(--text-title);
-            transition: color 0.4s ease;
+            font-size: 1.55rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 4px;
         }
 
-        .login-subtitle {
+        .auth-subtitle {
             color: var(--text-subtitle);
-            transition: color 0.4s ease;
+            font-size: 0.875rem;
+            margin-bottom: 22px;
+            line-height: 1.5;
         }
 
-        .theme-label {
+        .form-label {
             color: var(--text-subtitle);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin-bottom: 5px;
         }
 
-        .theme-input-icon {
-            background: var(--input-bg) !important;
-            border-color: var(--input-border) !important;
-            color: var(--text-subtitle) !important;
-            transition: all 0.3s ease;
-        }
-
-        .theme-input {
-            background: var(--input-bg) !important;
-            border-color: var(--input-border) !important;
+        .form-control {
+            background-color: var(--input-bg) !important;
+            border: 1px solid var(--input-border) !important;
             color: var(--input-text) !important;
-            transition: all 0.3s ease;
+            border-radius: 12px;
+            padding: 9px 14px;
+            font-size: 0.875rem;
+            height: 44px;
+            transition: all 0.2s ease;
         }
 
-        .theme-input::placeholder {
-            color: var(--input-placeholder) !important;
+        .auth-footer-link {
+            color: var(--text-subtitle);
+            font-size: 0.875rem;
+            text-align: center;
+            margin-top: 24px;
         }
 
-        .theme-input:focus {
-            box-shadow: none !important;
-            border-color: var(--text-title) !important;
+        .auth-footer-link a {
+            color: var(--badge-text);
+            text-decoration: none;
+            font-weight: 600;
         }
 
-        .input-group:focus-within .theme-input-icon {
-            border-color: var(--text-title) !important;
-            color: var(--text-title) !important;
-        }
-
-        .theme-btn-primary {
-            background-color: var(--btn-bg) !important;
-            color: var(--btn-text) !important;
-            border: none !important;
-            border-radius: 50px !important;
-            padding: 12px 24px !important;
-            transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
-        }
-
-        .theme-btn-primary:hover {
-            background-color: var(--btn-hover) !important;
-            transform: translateY(-2px);
-            box-shadow: 0 6px 16px rgba(0, 0, 0, 0.18);
-        }
-
-        .theme-btn-primary:active {
-            transform: translateY(0) scale(0.98);
+        .auth-footer-link a:hover {
+            text-decoration: underline;
         }
     </style>
 </head>
-
 <body hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
 
-    <div class="ambient-orb orb-1"></div>
-    <div class="ambient-orb orb-2"></div>
+    <div class="auth-nav-top">
+        <a href="{% url 'home' %}" class="auth-nav-btn">
+            <span class="material-icons" style="font-size: 18px;">arrow_back</span>
+            <span>Home</span>
+        </a>
 
-    <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle light and dark mode">
-        <span class="material-icons fs-5" id="themeToggleIcon">dark_mode</span>
-        <span class="small fw-medium" id="themeToggleText">Dark</span>
-    </button>
+        <button class="auth-nav-btn" id="themeToggleBtn" type="button" aria-label="Toggle Theme">
+            <span class="material-icons" id="themeToggleIcon" style="font-size: 18px;">dark_mode</span>
+            <span id="themeToggleText">Dark</span>
+        </button>
+    </div>
 
-    <div class="login-card text-center">
-        <div class="brand-icon-wrapper">
-            <span class="material-icons fs-3 text-danger">admin_panel_settings</span>
+    <div class="auth-card">
+        <div class="text-center mb-4">
+            <div class="mb-3">
+                <img src="{% static 'images/ref/logo/logo-icon.png' %}" alt="Marmot" height="52" style="filter: drop-shadow(0 4px 16px rgba(220, 38, 38, 0.4));">
+            </div>
+            <div class="admin-badge">
+                <span class="material-icons" style="font-size: 14px;">shield</span>
+                <span>System Administration</span>
+            </div>
+            <h1 class="auth-title">Admin Portal</h1>
+            <p class="auth-subtitle">Elevated authentication required for core engine controls</p>
         </div>
-        <h3 class="login-title fw-bold mb-1">Admin Portal</h3>
-        <p class="login-subtitle small mb-4">Sign in to access management control</p>
 
         <div id="login-form-wrapper">
             {% include "admins/partials/login_form.html" %}
         </div>
+
+        <div class="auth-footer-link">
+            Are you a standard trader? <a href="{% url 'users:marmot-login' %}">Sign in to Trader Terminal</a>
+        </div>
+    </div>
+
+    <!-- Ambient SVG Glow (Red + Blue hue for Admin) -->
+    <div class="ambient-blob-container">
+        <svg width="930" height="760" viewBox="0 0 930 760" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <g opacity="0.35" filter="url(#filter0_f_blob)">
+                <circle cx="380.335" cy="380.335" r="179.665" fill="#EF4444" />
+            </g>
+            <g opacity="0.55" filter="url(#filter1_f_blob)">
+                <circle cx="549.665" cy="380.335" r="179.665" fill="#3B82F6" />
+            </g>
+            <defs>
+                <filter id="filter0_f_blob" x="0.67" y="0.67" width="759.33" height="759.33" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                    <feFlood flood-opacity="0" result="BackgroundImageFix" />
+                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+                    <feGaussianBlur stdDeviation="100" result="effect1_foregroundBlur" />
+                </filter>
+                <filter id="filter1_f_blob" x="170" y="0.67" width="759.33" height="759.33" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
+                    <feFlood flood-opacity="0" result="BackgroundImageFix" />
+                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
+                    <feGaussianBlur stdDeviation="100" result="effect1_foregroundBlur" />
+                </filter>
+            </defs>
+        </svg>
     </div>
 
     <script>
@@ -290,7 +318,8 @@
             }
         });
 
-        (function () {
+        // Theme Toggle
+        (function() {
             const htmlElement = document.documentElement;
             const toggleBtn = document.getElementById('themeToggleBtn');
             const toggleIcon = document.getElementById('themeToggleIcon');
@@ -305,23 +334,24 @@
                 localStorage.setItem('theme', theme);
 
                 if (theme === 'dark') {
-                    toggleIcon.textContent = 'dark_mode';
-                    toggleText.textContent = 'Dark';
+                    if (toggleIcon) toggleIcon.textContent = 'dark_mode';
+                    if (toggleText) toggleText.textContent = 'Dark';
                 } else {
-                    toggleIcon.textContent = 'light_mode';
-                    toggleText.textContent = 'Light';
+                    if (toggleIcon) toggleIcon.textContent = 'light_mode';
+                    if (toggleText) toggleText.textContent = 'Light';
                 }
             }
 
             applyTheme(currentTheme);
 
-            toggleBtn.addEventListener('click', function () {
-                const activeTheme = htmlElement.getAttribute('data-theme');
-                const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
-                applyTheme(newTheme);
-            });
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    const activeTheme = htmlElement.getAttribute('data-theme');
+                    const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
+                    applyTheme(newTheme);
+                });
+            }
         })();
     </script>
 </body>
-
 </html>

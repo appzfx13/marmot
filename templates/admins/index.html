@@ -8,8 +8,10 @@
 
     <!-- Bootstrap 5 CSS & Google Fonts/Icons -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
+    <link rel="shortcut icon" href="{% static 'images/ref/logo/logo-icon.png' %}">
 
     <!-- Flatpickr Date Picker CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -79,7 +81,7 @@
         }
 
         #app-main-container {
-            zoom: 0.9;
+            /* zoom removed — use CSS transforms for scaling instead */
         }
 
         body {
@@ -300,10 +302,19 @@
             background: transparent;
         }
 
-        /* Universal Responsive Layout & Anti-Overflow Guard */
+        /* ═══════════════════════════════════════════════════════════
+           Universal Responsive Layout & Anti-Overflow Guard
+           ═══════════════════════════════════════════════════════════ */
+        *, *::before, *::after {
+            box-sizing: border-box;
+        }
+
         html, body {
+            width: 100%;
             max-width: 100vw;
             overflow-x: hidden !important;
+            margin: 0;
+            padding: 0;
         }
 
         #mainContentBody, .main-with-sidebar {
@@ -311,27 +322,24 @@
             overflow-x: hidden;
         }
 
-        @media (max-width: 575.98px) {
+        img, svg, video, canvas, table {
+            max-width: 100%;
+        }
+
+        /* ─── < 992px (Tablet landscape) ─── */
+        @media (max-width: 991.98px) {
+            #app-main-container {
+                padding: 0 !important;
+            }
             .glass-card {
-                padding: 1rem !important;
-                border-radius: 12px !important;
+                border-radius: 14px !important;
             }
-            .btn, .form-control, .form-select {
-                min-height: 38px;
-            }
-            h4, .h4 {
-                font-size: 1.25rem !important;
-            }
-            h5, .h5 {
-                font-size: 1.1rem !important;
-            }
-            .table-responsive {
-                border-radius: 10px;
-                overflow-x: auto;
-                -webkit-overflow-scrolling: touch;
+            .row > [class*="col-"] {
+                margin-bottom: 0.75rem;
             }
         }
 
+        /* ─── < 768px (Tablet portrait / Mobile) ─── */
         @media (max-width: 767.98px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -339,16 +347,112 @@
                 top: 0;
                 left: 0;
                 height: 100vh !important;
+                width: 280px !important;
+                z-index: 1060;
             }
-            .sidebar.show { 
-                transform: translateX(0); 
+            .sidebar.show {
+                transform: translateX(0);
+                box-shadow: 4px 0 30px rgba(0,0,0,0.4);
             }
             .sidebar-overlay.show {
                 display: block;
             }
-            .main-with-sidebar { 
-                margin-left: 0 !important; 
+            .main-with-sidebar {
+                margin-left: 0 !important;
                 padding: 0.75rem !important;
+                width: 100% !important;
+            }
+            .sticky-top-navbar {
+                padding: 0.5rem 0 !important;
+                margin-top: -0.75rem;
+                margin-bottom: 0.5rem;
+            }
+            /* Stack action bar items */
+            .top-action-bar {
+                gap: 6px !important;
+            }
+            /* Wrap grids to single column */
+            .row.g-3 > [class*="col-sm"],
+            .row.g-2 > [class*="col-sm"] {
+                flex: 0 0 100%;
+                max-width: 100%;
+            }
+            /* Modals fit screen */
+            .modal-dialog {
+                margin: 0.5rem !important;
+                max-width: calc(100vw - 1rem) !important;
+            }
+        }
+
+        /* ─── < 576px (Phone — Samsung Galaxy A73 etc.) ─── */
+        @media (max-width: 575.98px) {
+            .glass-card {
+                padding: 0.875rem !important;
+                border-radius: 12px !important;
+            }
+            /* Typography scale-down */
+            h3, .h3 { font-size: 1.3rem !important; }
+            h4, .h4 { font-size: 1.15rem !important; }
+            h5, .h5 { font-size: 1rem !important; }
+            h6, .h6 { font-size: 0.9rem !important; }
+            /* Touch-friendly controls */
+            .btn {
+                min-height: 40px;
+                font-size: 0.8125rem !important;
+                padding: 8px 14px !important;
+            }
+            .form-control, .form-select {
+                min-height: 40px;
+                font-size: 0.875rem !important;
+            }
+            /* Tables: horizontal scroll on phone */
+            .table-responsive {
+                border-radius: 10px;
+                overflow-x: auto;
+                -webkit-overflow-scrolling: touch;
+            }
+            /* Collapse multi-col rows to 1-col */
+            .row > [class*="col-"] {
+                flex: 0 0 100% !important;
+                max-width: 100% !important;
+            }
+            /* Stack horizontal flex groups */
+            .d-flex.gap-2:not(.align-items-center),
+            .d-flex.gap-3:not(.align-items-center) {
+                flex-wrap: wrap;
+            }
+            /* Nav link text size */
+            .nav-link {
+                font-size: 0.8125rem !important;
+                padding: 9px 12px !important;
+            }
+            /* Action bars wrap */
+            .d-flex.justify-content-between {
+                flex-wrap: wrap;
+                gap: 8px;
+            }
+            /* Badge / chip font */
+            .badge {
+                font-size: 0.7rem !important;
+            }
+            /* Stat card numbers */
+            .fs-3, .fs-2 {
+                font-size: 1.5rem !important;
+            }
+            /* Page heading row */
+            .d-flex.align-items-center.justify-content-between.mb-3,
+            .d-flex.align-items-center.justify-content-between.mb-4 {
+                flex-direction: column;
+                align-items: flex-start !important;
+                gap: 10px;
+            }
+            /* Overflow guard on inner containers */
+            #mainContentBody {
+                padding: 0 !important;
+            }
+            .container-fluid {
+                padding-left: 0 !important;
+                padding-right: 0 !important;
             }
         }
 
@@ -708,10 +812,13 @@
         <div class="sidebar p-3 vh-100 position-fixed d-flex flex-column" id="mainSidebar">
             <div class="mb-4 d-flex align-items-center justify-content-between px-2 pt-2">
                 <div class="d-flex align-items-center gap-2">
-                    <span class="material-icons text-primary fs-3">admin_panel_settings</span>
+                    <img src="{% static 'images/ref/logo/logo-icon.png' %}" alt="Marmot" height="34" style="filter: drop-shadow(0 2px 8px rgba(122, 90, 248, 0.4));">
                     <div>
-                        <h5 class="fw-bold mb-0 theme-text-main">Admin Portal</h5>
-                        <small class="theme-text-muted">Control Panel</small>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="fw-extrabold theme-text-main" style="font-weight: 800; font-size: 1.15rem; letter-spacing: 0.05rem;">MARMOT</span>
+                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 py-0 px-1" style="font-size: 0.65rem;">ADMIN</span>
+                        </div>
+                        <small class="theme-text-muted" style="font-size: 0.75rem;">Control Panel</small>
                     </div>
                 </div>
                 <button type="button" class="glass-icon-btn d-md-none" id="closeSidebarBtn" aria-label="Close Sidebar">
