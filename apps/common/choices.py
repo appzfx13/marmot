@@ -94,3 +94,19 @@ class AccountTypeChoices(models.TextChoices):
     LIVE = "LIVE", "Live Account"
     SANDBOX = "SANDBOX", "Sandbox Account"
 
+
+# ─── New: Market Type Choices ───────────────────────────────────────────────
+class MarketTypeChoices(models.TextChoices):
+    INDEX_FO = "INDEX_FO", "INDEX / F&O (India — Nifty, BankNifty…)"
+    FOREX_FUTURES = "FOREX_FUTURES", "FOREX / Futures (CME Micro Futures)"
+
+
+# ─── New: Forex / CME Micro Futures Instrument Choices ──────────────────────
+class ForexInstrumentChoices(models.TextChoices):
+    XAUUSD_MGC  = "MGC",  "XAUUSD / Gold  →  MGC  (Micro Gold)"
+    EURUSD_M6E  = "M6E",  "EURUSD          →  M6E  (Micro Euro FX)"
+    USDJPY_M6J  = "M6J",  "USDJPY          →  M6J  (Micro Japanese Yen)"
+    US30_MYM    = "MYM",  "US30 / Dow      →  MYM  (Micro Dow)"
+    NAS100_MNQ  = "MNQ",  "NAS100 / Nasdaq →  MNQ  (Micro Nasdaq)"
+    SPX500_MES  = "MES",  "SPX500 / S&P    →  MES  (Micro S&P 500)"
+    USOIL_MCL   = "MCL",  "USOIL / Crude   →  MCL  (Micro Crude Oil)"

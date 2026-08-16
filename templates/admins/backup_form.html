@@ -6,7 +6,6 @@
 
 {% block extra_head %}
 <style>
-    /* Theme Glass Form Input Overrides */
     .glass-form-card input[type="text"],
     .glass-form-card input[type="email"],
     .glass-form-card input[type="date"],
@@ -21,13 +20,10 @@
         font-size: 0.875rem;
         transition: all 0.2s ease;
         width: 100%;
-        color-scheme: dark; /* Forces native dark mode on date pickers */
+        color-scheme: dark;
     }
 
-    .glass-form-card select option {
-        background-color: #111827;
-        color: var(--text-main);
-    }
+    .glass-form-card select option { background-color: #111827; color: var(--text-main); }
 
     .glass-form-card input:focus,
     .glass-form-card select:focus,
@@ -38,61 +34,9 @@
         outline: none;
     }
 
-    /* Fixed Number Spinner Visibility */
-    .glass-form-card input[type="number"]::-webkit-inner-spin-button, 
-    .glass-form-card input[type="number"]::-webkit-outer-spin-button {
-        opacity: 1;
-        filter: invert(1);
-    }
+    .glass-form-card input[type="number"]::-webkit-inner-spin-button,
+    .glass-form-card input[type="number"]::-webkit-outer-spin-button { opacity: 1; filter: invert(1); }
 
-    /* Fixed & Standardized Checkbox UI (Kept for consistency if needed later) */
-    .glass-form-card input[type="checkbox"] {
-        appearance: none;
-        -webkit-appearance: none;
-        width: 1.25rem !important;
-        height: 1.25rem !important;
-        min-width: 1.25rem !important;
-        min-height: 1.25rem !important;
-        background-color: rgba(255, 255, 255, 0.05) !important;
-        border: 1px solid var(--border-color) !important;
-        border-radius: 6px !important;
-        cursor: pointer;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        margin: 0;
-        padding: 0;
-        vertical-align: middle;
-        transition: all 0.2s ease-in-out;
-        position: relative;
-    }
-
-    .glass-form-card input[type="checkbox"]:hover {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        border-color: rgba(255, 255, 255, 0.3) !important;
-    }
-
-    .glass-form-card input[type="checkbox"]:checked {
-        background-color: #0d6efd !important;
-        border-color: #0d6efd !important;
-    }
-
-    .glass-form-card input[type="checkbox"]:checked::after {
-        content: "";
-        width: 6px;
-        height: 10px;
-        border: solid #ffffff;
-        border-width: 0 2px 2px 0;
-        transform: rotate(45deg);
-        margin-bottom: 2px;
-    }
-
-    .glass-form-card input[type="checkbox"]:focus {
-        outline: none;
-        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.3) !important;
-    }
-
-    /* Glass Modal Styling */
     .glass-modal-content {
         background: var(--modal-bg) !important;
         backdrop-filter: blur(16px);
@@ -100,31 +44,101 @@
         border: 1px solid var(--border-color) !important;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
     }
+
+    /* ── Market Type Tabs ─────────────────────────────────────────────────── */
+    .market-tab-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: rgba(255,255,255,0.03);
+        color: var(--text-muted);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex: 1;
+        justify-content: center;
+        text-align: center;
+    }
+    .market-tab-btn.active-index {
+        background: rgba(13,110,253,0.15);
+        border-color: rgba(13,110,253,0.4);
+        color: #60a5fa;
+    }
+    .market-tab-btn.active-forex {
+        background: rgba(16,185,129,0.15);
+        border-color: rgba(16,185,129,0.4);
+        color: #34d399;
+    }
+    :root[data-theme="light"] .market-tab-btn.active-index,
+    [data-theme="light"] .market-tab-btn.active-index {
+        background: rgba(13,110,253,0.15);
+        border-color: rgba(13,110,253,0.4);
+        color: #0d6efd !important;
+    }
+    :root[data-theme="light"] .market-tab-btn.active-forex,
+    [data-theme="light"] .market-tab-btn.active-forex {
+        background: rgba(16,185,129,0.15);
+        border-color: rgba(5,150,105,0.4);
+        color: #059669 !important;
+    }
+    .market-section.hidden { display: none !important; }
+
+    .forex-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(16,185,129,0.1);
+        border: 1px solid rgba(16,185,129,0.25);
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #34d399;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    :root[data-theme="light"] .forex-badge,
+    [data-theme="light"] .forex-badge {
+        background: rgba(16,185,129,0.15);
+        border-color: rgba(5,150,105,0.3);
+        color: #059669 !important;
+    }
+
+    .table, .table th, .table td {
+        background-color: transparent !important;
+        --bs-table-bg: transparent !important;
+        --bs-table-accent-bg: transparent !important;
+        --bs-table-striped-bg: transparent !important;
+        color: var(--text-muted) !important;
+        border-color: var(--border-color) !important;
+    }
+    .table th {
+        color: var(--text-main) !important;
+    }
 </style>
 {% endblock %}
 
 {% block dashboard_content %}
 
-<!-- Header Section -->
+<!-- Header -->
 <div class="row mb-4">
     <div class="col-12 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
         <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width: 54px; height: 54px; border: 1px solid rgba(13, 110, 253, 0.3);">
+            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width:54px;height:54px;border:1px solid rgba(13,110,253,0.3);">
                 <span class="material-icons fs-3">cloud_download</span>
             </div>
             <div class="text-break">
                 <h2 class="theme-text-main fw-bold mb-0 text-wrap">Initialize Market Backup</h2>
-                <div class="theme-text-muted small">
-                    Configure parameters for downloading and serializing options market data.
-                </div>
+                <div class="theme-text-muted small">Configure parameters for downloading and serializing market data.</div>
             </div>
         </div>
-        <div class="d-flex align-items-center gap-2">
-            <!-- Arrow-Only Back Button -->
-            <a href="{% url 'market:market_backup_list' %}" class="glass-icon-btn text-decoration-none" title="Back to List">
-                <span class="material-icons fs-5">arrow_back</span>
-            </a>
-        </div>
+        <a href="{% url 'market:market_backup_list' %}" class="glass-icon-btn text-decoration-none" title="Back to List">
+            <span class="material-icons fs-5">arrow_back</span>
+        </a>
     </div>
 </div>
 
@@ -136,96 +150,112 @@
             <div class="alert alert-danger mb-4 rounded-3 border-0 bg-danger bg-opacity-25 text-danger">
                 {% for error in form.non_field_errors %}
                     <div class="d-flex align-items-center gap-2">
-                        <span class="material-icons fs-6">error_outline</span>
-                        <span>{{ error }}</span>
+                        <span class="material-icons fs-6">error_outline</span><span>{{ error }}</span>
                     </div>
                 {% endfor %}
             </div>
         {% endif %}
 
-        {# Section 1: Timeframe Selection #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+        {# ═══ MARKET TYPE SELECTOR ════════════════════════════════════════ #}
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color:var(--border-color)!important;">
+            <span class="material-icons text-warning fs-5">public</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Market Type</h6>
+            <span class="ms-2 badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 small">Required</span>
+        </div>
+
+        <div class="mb-4">
+            <div class="d-flex gap-2 mb-3" id="marketTabBtns">
+                <button type="button"
+                        class="market-tab-btn active-index"
+                        id="tabIndexFO"
+                        onclick="setMarketType('INDEX_FO')">
+                    <span class="material-icons fs-5">candlestick_chart</span>
+                    <span>INDEX / F&amp;O<br><small class="opacity-75 fw-normal">Nifty · BankNifty · Fin Nifty</small></span>
+                </button>
+                <button type="button"
+                        class="market-tab-btn"
+                        id="tabForex"
+                        onclick="setMarketType('FOREX_FUTURES')">
+                    <span class="material-icons fs-5">currency_exchange</span>
+                    <span>FOREX / Futures<br><small class="opacity-75 fw-normal">CME Micro · MGC · M6E · MNQ…</small></span>
+                </button>
+            </div>
+            <div style="display:none;">{{ form.market_type }}</div>
+            {% if form.market_type.errors %}<div class="text-danger small mt-1">{{ form.market_type.errors.0 }}</div>{% endif %}
+        </div>
+
+        {# ═══ TIMEFRAME SELECTION (shared) ════════════════════════════════ #}
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-2" style="border-color:var(--border-color)!important;">
             <span class="material-icons text-primary fs-5">date_range</span>
             <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Timeframe Selection</h6>
         </div>
-        
-        <!-- Start Date -->
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.start_date.id_for_label }}" style="min-width: 160px;">
-                Start Date{% if form.start_date.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
-            </label>
-            <div class="flex-grow-1 w-100">
+
+        <div class="row g-3 mb-4">
+            <div class="col-12 col-md-6">
+                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.start_date.id_for_label }}">
+                    Start Date{% if form.start_date.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+                </label>
                 {{ form.start_date }}
-                <div class="theme-text-muted small mt-1">Beginning date for the options dataset history.</div>
+                <div class="theme-text-muted small mt-1">Beginning date for the dataset history.</div>
                 {% for error in form.start_date.errors %}
                     <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
                 {% endfor %}
             </div>
-        </div>
-
-        <!-- End Date -->
-        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.end_date.id_for_label }}" style="min-width: 160px;">
-                End Date{% if form.end_date.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
-            </label>
-            <div class="flex-grow-1 w-100">
+            <div class="col-12 col-md-6">
+                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.end_date.id_for_label }}">
+                    End Date{% if form.end_date.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+                </label>
                 {{ form.end_date }}
-                <div class="theme-text-muted small mt-1">Ending date for the options dataset history.</div>
+                <div class="theme-text-muted small mt-1">Ending date for the dataset history.</div>
                 {% for error in form.end_date.errors %}
                     <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
                 {% endfor %}
             </div>
         </div>
 
-        {# Section 2: Index & Options Parameters #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-            <span class="material-icons text-primary fs-5">settings</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Target Index & Parameters</h6>
-        </div>
-
-        <!-- Target Index -->
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.index_name.id_for_label }}" style="min-width: 160px;">
-                Target Index{% if form.index_name.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.index_name }}
-                <div class="theme-text-muted small mt-1">Select the underlying trading index for data capture.</div>
-                {% for error in form.index_name.errors %}
-                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
-                {% endfor %}
+        {# ═══ INDEX / F&O SECTION (hidden when FOREX selected) ════════════ #}
+        <div id="section_index" class="market-section">
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-2" style="border-color:var(--border-color)!important;">
+                <span class="material-icons text-primary fs-5">settings</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Target Index &amp; Parameters</h6>
+                <span class="ms-2 badge" style="background:rgba(13,110,253,0.1);border:1px solid rgba(13,110,253,0.25);color:#60a5fa;font-size:0.7rem;">INDEX / F&amp;O</span>
             </div>
-        </div>
 
-        <!-- Strike Count -->
-        <div id="strikeCountRow" class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.strike_count.id_for_label }}" style="min-width: 160px;">
-                Strike Count (± ATM){% if form.strike_count.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.strike_count }}
-                <div class="theme-text-muted small mt-1">Number of strikes to track above and below At-The-Money (e.g., 5).</div>
-                {% for error in form.strike_count.errors %}
-                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
-                {% endfor %}
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.index_name.id_for_label }}">
+                        Target Index{% if form.index_name.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
+                    </label>
+                    {{ form.index_name }}
+                    <div class="theme-text-muted small mt-1">Select the underlying trading index for data capture.</div>
+                    {% for error in form.index_name.errors %}
+                        <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-12 col-md-6" id="strikeCountRow">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.strike_count.id_for_label }}">
+                        Strike Count (± ATM)
+                    </label>
+                    {{ form.strike_count }}
+                    <div class="theme-text-muted small mt-1">Number of strikes to track above and below ATM (e.g. 5).</div>
+                    {% for error in form.strike_count.errors %}
+                        <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
             </div>
-        </div>
 
-        {# Section 3: Authentication / Access Token Override #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-            <span class="material-icons text-info fs-5">vpn_key</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">DhanHQ Authentication (Optional)</h6>
-        </div>
-
-        <!-- Dhan Access Token -->
-        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.dhan_access_token.id_for_label }}" style="min-width: 160px;">
-                Access Token
-            </label>
-            <div class="flex-grow-1 w-100">
+            {# DhanHQ Auth #}
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-2" style="border-color:var(--border-color)!important;">
+                <span class="material-icons text-info fs-5">vpn_key</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">DhanHQ Authentication (Optional)</h6>
+            </div>
+            <div class="mb-4">
+                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.dhan_access_token.id_for_label }}">Access Token</label>
                 {{ form.dhan_access_token }}
                 <div class="theme-text-muted small mt-1">
-                    Optional: Paste a 24-hour Access Token directly from <a href="https://web.dhan.co" target="_blank" class="text-info text-decoration-none">web.dhan.co</a> (My Profile → Access DhanHQ APIs). If already authenticated via <strong>Auth DhanHQ</strong>, you can leave this blank.
+                    Optional: Paste a 24-hour Access Token from
+                    <a href="https://web.dhan.co" target="_blank" class="text-info text-decoration-none">web.dhan.co</a>
+                    (My Profile → Access DhanHQ APIs). Leave blank if already authenticated.
                 </div>
                 {% for error in form.dhan_access_token.errors %}
                     <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
@@ -233,13 +263,70 @@
             </div>
         </div>
 
+        {# ═══ FOREX / CME FUTURES SECTION (hidden when INDEX selected) ════ #}
+        <div id="section_forex" class="market-section hidden">
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-2" style="border-color:var(--border-color)!important;">
+                <span class="material-icons fs-5 text-primary">currency_exchange</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">CME Micro Futures Instrument</h6>
+                <span class="ms-2 forex-badge">FOREX / FUTURES</span>
+            </div>
+
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.forex_instrument.id_for_label }}">
+                        Select Instrument <span class="text-danger ms-1">*</span>
+                    </label>
+                    {{ form.forex_instrument }}
+                    <div class="theme-text-muted small mt-1">Choose the CME Micro Futures contract to download historical data for.</div>
+                    {% for error in form.forex_instrument.errors %}
+                        <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                    {% endfor %}
+                </div>
+                <div class="col-12 col-md-6 d-flex align-items-center">
+                    <div class="glass-card p-3 w-100" style="border-radius:12px;background:var(--nav-hover);border-color:var(--border-color)!important;">
+                        <div class="small fw-bold mb-2 theme-text-main d-flex align-items-center gap-1">
+                            <span class="material-icons fs-6 me-1 text-primary" style="vertical-align:middle;">info</span>
+                            Data Source
+                        </div>
+                        <div class="theme-text-muted" style="font-size:0.775rem;line-height:1.5;">
+                            CME Micro Futures historical tick data will be fetched from
+                            <strong class="theme-text-main fw-bold">Dukascopy</strong> (free, no account needed).
+                            Data covers up to 10+ years of OHLCV history.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {# CME Quick Reference #}
+            <div class="glass-card p-3 mb-3" style="border-radius:12px;background:var(--nav-hover);border-color:var(--border-color)!important;">
+                <div class="theme-text-main small fw-bold mb-2 d-flex align-items-center gap-1">
+                    <span class="material-icons fs-6 me-1 text-primary" style="vertical-align:middle;">table_chart</span>
+                    CME Micro Futures Quick Reference
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0" style="font-size:0.775rem;color:var(--text-muted);">
+                        <thead><tr style="border-color:var(--border-color);">
+                            <th class="theme-text-main">Code</th><th class="theme-text-main">Market</th><th class="theme-text-main">Size</th><th class="theme-text-main">Tick $</th><th class="theme-text-main">Margin</th>
+                        </tr></thead>
+                        <tbody>
+                            <tr><td><strong class="theme-text-main fw-bold">MGC</strong></td><td>XAUUSD / Gold</td><td>10 oz</td><td>$1.00</td><td>~$800</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">M6E</strong></td><td>EURUSD</td><td>12,500 EUR</td><td>$1.25</td><td>~$220</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">M6J</strong></td><td>USDJPY</td><td>1.25M JPY</td><td>$1.25</td><td>~$200</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">MYM</strong></td><td>US30 / Dow</td><td>$0.50/pt</td><td>$0.50</td><td>~$800</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">MNQ</strong></td><td>NAS100</td><td>$2.00/pt</td><td>$2.00</td><td>~$1,700</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">MES</strong></td><td>SPX500</td><td>$5.00/pt</td><td>$1.25</td><td>~$700</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">MCL</strong></td><td>USOIL / Crude</td><td>100 bbl</td><td>$1.00</td><td>~$500</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
 
         {# Action Buttons #}
-        <div class="d-flex justify-content-end gap-2 pt-3 border-top" style="border-color: var(--border-color) !important;">
-            <a href="{% url 'market:market_backup_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold text-decoration-none">
+        <div class="d-flex justify-content-end gap-2 pt-3 border-top" style="border-color:var(--border-color)!important;">
+            <a href="{% url 'market:market_backup_list' %}" class="btn btn-sm btn-outline-secondary rounded-pill px-4 py-2 small fw-bold text-decoration-none">
                 CANCEL
             </a>
-            <!-- Trigger Modal Button -->
             <button type="button" id="initBackupBtn" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm">
                 INITIALIZE BACKUP
             </button>
@@ -247,7 +334,7 @@
     </form>
 </div>
 
-<!-- Glassmorphic Confirmation Modal -->
+<!-- Confirmation Modal -->
 <div class="modal fade" id="confirmInitModal" tabindex="-1" aria-labelledby="confirmInitModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-modal-content rounded-4 border-0 p-2">
@@ -260,15 +347,13 @@
             </div>
             <div class="modal-body py-3">
                 <p class="theme-text-muted mb-0 small">
-                    Are you sure you want to initialize this market data backup task? This will begin fetching and serializing options data based on the provided parameters.
+                    Are you sure you want to initialize this market data backup task? This will begin fetching and serializing data based on the provided parameters.
                 </p>
             </div>
             <div class="modal-footer border-0 pt-0 gap-2">
-                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold" data-bs-dismiss="modal">
-                    Cancel
-                </button>
+                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" id="confirmSubmitBtn">
-                    Confirm & Initialize
+                    Confirm &amp; Initialize
                 </button>
             </div>
         </div>
@@ -276,71 +361,66 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const confirmBtn = document.getElementById('confirmSubmitBtn');
-        const form = document.getElementById('backupForm');
-        const initBtn = document.getElementById('initBackupBtn');
-        const indexSelect = document.querySelector('select[name="index_name"]');
-        const strikeCountRow = document.getElementById('strikeCountRow');
-        const strikeInput = document.querySelector('input[name="strike_count"]');
+document.addEventListener('DOMContentLoaded', function () {
+    const marketSelect   = document.getElementById('id_market_type');
+    const sectionIndex   = document.getElementById('section_index');
+    const sectionForex   = document.getElementById('section_forex');
+    const tabIndexFO     = document.getElementById('tabIndexFO');
+    const tabForex       = document.getElementById('tabForex');
+    const indexSelect    = document.querySelector('select[name="index_name"]');
+    const strikeCountRow = document.getElementById('strikeCountRow');
+    const strikeInput    = document.querySelector('input[name="strike_count"]');
 
-        function toggleStrikeField() {
-            if (indexSelect && strikeCountRow) {
-                if (indexSelect.value === 'INDIAVIX') {
-                    strikeCountRow.classList.remove('d-flex');
-                    strikeCountRow.style.display = 'none';
-                    if (strikeInput) strikeInput.value = '0';
-                } else {
-                    strikeCountRow.classList.add('d-flex');
-                    strikeCountRow.style.display = '';
-                    if (strikeInput && (strikeInput.value === '0' || !strikeInput.value)) {
-                        strikeInput.value = '5';
-                    }
+    // ── Market type toggle ────────────────────────────────────────────────
+    function applyMarketType(val) {
+        const isForex = (val === 'FOREX_FUTURES');
+        sectionIndex.classList.toggle('hidden', isForex);
+        sectionForex.classList.toggle('hidden', !isForex);
+        tabIndexFO.className = 'market-tab-btn' + (!isForex ? ' active-index' : '');
+        tabForex.className   = 'market-tab-btn' + (isForex  ? ' active-forex' : '');
+        if (marketSelect) marketSelect.value = val;
+    }
+    window.setMarketType = applyMarketType;
+    applyMarketType(marketSelect ? (marketSelect.value || 'INDEX_FO') : 'INDEX_FO');
+
+    // ── Strike count hide for INDIAVIX ────────────────────────────────────
+    function toggleStrikeField() {
+        if (indexSelect && strikeCountRow) {
+            if (indexSelect.value === 'INDIAVIX') {
+                strikeCountRow.style.display = 'none';
+                if (strikeInput) strikeInput.value = '0';
+            } else {
+                strikeCountRow.style.display = '';
+                if (strikeInput && (strikeInput.value === '0' || !strikeInput.value)) {
+                    strikeInput.value = '5';
                 }
             }
         }
+    }
+    if (indexSelect) { indexSelect.addEventListener('change', toggleStrikeField); toggleStrikeField(); }
 
-        if (indexSelect) {
-            indexSelect.addEventListener('change', toggleStrikeField);
-            toggleStrikeField();
+    // ── Init button: validate dates then open modal ───────────────────────
+    document.getElementById('initBackupBtn').addEventListener('click', function () {
+        const startDateStr = document.querySelector('input[name="start_date"]').value;
+        const endDateStr   = document.querySelector('input[name="end_date"]').value;
+        const prevError = document.getElementById('date-validation-error');
+        if (prevError) prevError.remove();
+
+        if (startDateStr && endDateStr && new Date(startDateStr) >= new Date(endDateStr)) {
+            const errorDiv = document.createElement('div');
+            errorDiv.id = 'date-validation-error';
+            errorDiv.className = 'text-danger small mt-1 d-flex align-items-center gap-1';
+            errorDiv.innerHTML = '<span class="material-icons fs-6">error_outline</span>Start date must be earlier than end date.';
+            document.querySelector('input[name="end_date"]').parentElement.appendChild(errorDiv);
+            return;
         }
-
-        if (initBtn) {
-            initBtn.addEventListener('click', function(e) {
-                const startDateStr = document.querySelector('input[name="start_date"]').value;
-                const endDateStr = document.querySelector('input[name="end_date"]').value;
-                
-                // Clear any previous custom errors
-                const prevError = document.getElementById('date-validation-error');
-                if (prevError) prevError.remove();
-
-                if (startDateStr && endDateStr) {
-                    const start = new Date(startDateStr);
-                    const end = new Date(endDateStr);
-                    if (start >= end) {
-                        // Show error message under end date
-                        const errorDiv = document.createElement('div');
-                        errorDiv.id = 'date-validation-error';
-                        errorDiv.className = 'text-danger small mt-1 d-flex align-items-center gap-1';
-                        errorDiv.innerHTML = '<span class="material-icons fs-6">error_outline</span>Start date must be earlier than end date.';
-                        
-                        const endDateContainer = document.querySelector('input[name="end_date"]').parentElement;
-                        endDateContainer.appendChild(errorDiv);
-                        return; // Stop here, do not open modal
-                    }
-                }
-                
-                // If valid, open the modal manually
-                var confirmModal = new bootstrap.Modal(document.getElementById('confirmInitModal'));
-                confirmModal.show();
-            });
-        }
-
-        if (confirmBtn && form) {
-            confirmBtn.addEventListener('click', function() {
-                form.submit();
-            });
-        }
+        new bootstrap.Modal(document.getElementById('confirmInitModal')).show();
     });
+
+    // ── Confirm submit ────────────────────────────────────────────────────
+    document.getElementById('confirmSubmitBtn').addEventListener('click', function () {
+        document.getElementById('backupForm').submit();
+    });
+});
 </script>
 {% endblock %}

@@ -11,13 +11,15 @@ logger = logging.getLogger(__name__)
 REDIS_URL = settings.REDIS_URL
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
-def create_and_start_backup_task(start_date, end_date, index_name, strike_count, user, dhan_access_token=None):
+def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, dhan_access_token=None, market_type='INDEX_FO', forex_instrument=None):
     """Creates the backup record in Postgres with pre-stored path and caches token if provided."""
     task = MarketBackupTask.objects.create(
+        market_type=market_type or MarketBackupTask.MarketTypeChoices.INDEX_FO,
         start_date=start_date,
         end_date=end_date,
         index_name=index_name,
         strike_count=strike_count,
+        forex_instrument=forex_instrument,
         status=MarketBackupTask.StatusChoices.CREATED,
         created_by=user
     )

@@ -1,7 +1,13 @@
 from django.db import models
 from apps.users.models import User
 from apps.common.models import BaseModel
-from apps.common.choices import RiskTypeChoices, AccountTypeChoices, TaskStatusChoices
+from apps.common.choices import (
+    RiskTypeChoices,
+    AccountTypeChoices,
+    TaskStatusChoices,
+    MarketTypeChoices,
+    ForexInstrumentChoices,
+)
 
 
 # --- Master Broker Table (Managed Dynamically by Admin) ---
@@ -61,6 +67,46 @@ class TradeExecConfig(BaseModel):
     trading_account = models.ForeignKey(UserTradingAccount, on_delete=models.CASCADE, related_name='strategy_configs', null=True, blank=True, verbose_name="Target Trading Account")
     # Account Mode
     account_type = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.SANDBOX, help_text="Target execution account mode (LIVE / SANDBOX)")
+
+    # ─── Market Type (NEW) ─────────────────────────────────────────────────
+    # Defaults to INDEX_FO so ALL existing records keep working untouched
+    market_type = models.CharField(
+        max_length=20,
+        choices=MarketTypeChoices.choices,
+        default=MarketTypeChoices.INDEX_FO,
+        help_text="Market segment: INDEX/F&O (India) or FOREX/Futures (CME Micros)"
+    )
+
+    # ─── Forex / CME Futures Fields (NEW — nullable, only used when FOREX_FUTURES) ─
+    forex_instrument = models.CharField(
+        max_length=10,
+        choices=ForexInstrumentChoices.choices,
+        null=True, blank=True,
+        help_text="CME Micro Futures instrument (e.g. MGC, M6E, MNQ)"
+    )
+    forex_broker_api_key = models.TextField(
+        null=True, blank=True,
+        help_text="Rithmic / OANDA / CME API Key for Forex/Futures execution"
+    )
+    forex_account_id = models.CharField(
+        max_length=255,
+        null=True, blank=True,
+        help_text="Forex broker account / sub-account ID"
+    )
+    forex_contract_size = models.DecimalField(
+        max_digits=10, decimal_places=4,
+        null=True, blank=True,
+        help_text="Contract/lot size for the selected CME Micro instrument (e.g. 10 for MGC)"
+    )
+    forex_tick_value = models.DecimalField(
+        max_digits=10, decimal_places=4,
+        null=True, blank=True,
+        help_text="Value per tick in USD (e.g. $1 for MGC, $1.25 for MES)"
+    )
+    forex_max_contracts = models.PositiveSmallIntegerField(
+        null=True, blank=True, default=1,
+        help_text="Maximum number of contracts allowed per trade entry"
+    )
     # General Status
     is_active = models.BooleanField(default=True, help_text="Master toggle to enable or disable auto trade execution features")
     # Risk Controls (Max Limits)

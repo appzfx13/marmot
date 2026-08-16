@@ -86,10 +86,12 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
         self.object = create_and_start_backup_task(
             start_date=form.cleaned_data['start_date'],
             end_date=form.cleaned_data['end_date'],
-            index_name=form.cleaned_data['index_name'],
-            strike_count=form.cleaned_data['strike_count'],
+            index_name=form.cleaned_data.get('index_name'),
+            strike_count=form.cleaned_data.get('strike_count'),
             user=self.request.user,
-            dhan_access_token=token if token else None
+            dhan_access_token=token if token else None,
+            market_type=form.cleaned_data.get('market_type'),
+            forex_instrument=form.cleaned_data.get('forex_instrument'),
         )
         
         # Add success message and redirect back to the dashboard

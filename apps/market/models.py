@@ -3,7 +3,7 @@ import shutil
 from django.conf import settings
 from django.db import models
 from apps.common.models import BaseModel
-from apps.common.choices import TaskStatusChoices, IndexChoices
+from apps.common.choices import TaskStatusChoices, IndexChoices, MarketTypeChoices, ForexInstrumentChoices
 
 class MarketBackupTask(BaseModel):
     StatusChoices = TaskStatusChoices
@@ -12,8 +12,26 @@ class MarketBackupTask(BaseModel):
     # 1. User Input Parameters
     start_date = models.DateField(help_text="Start date for options data range")
     end_date = models.DateField(help_text="End date for options data range")
-    index_name = models.CharField(max_length=50, choices=IndexChoices.choices, default=IndexChoices.NIFTY, help_text="Target trading index")
-    strike_count = models.PositiveIntegerField(default=5, help_text="Number of strikes above/below ATM")
+
+    # Market segment selector (NEW) — defaults to INDEX_FO so all existing records are safe
+    market_type = models.CharField(
+        max_length=20,
+        choices=MarketTypeChoices.choices,
+        default=MarketTypeChoices.INDEX_FO,
+        help_text="Market segment: INDEX/F&O (India) or FOREX/Futures (CME Micros)"
+    )
+
+    # INDEX / F&O fields (existing)
+    index_name = models.CharField(max_length=50, choices=IndexChoices.choices, default=IndexChoices.NIFTY, null=True, blank=True, help_text="Target trading index (INDEX/F&O only)")
+    strike_count = models.PositiveIntegerField(default=5, null=True, blank=True, help_text="Number of strikes above/below ATM (INDEX/F&O only)")
+
+    # FOREX / CME Micro Futures fields (NEW — nullable)
+    forex_instrument = models.CharField(
+        max_length=10,
+        choices=ForexInstrumentChoices.choices,
+        null=True, blank=True,
+        help_text="CME Micro Futures instrument to back up (FOREX/FUTURES only)"
+    )
 
     # 2. Control & Progress State (Tracked by Go Engine & Django UI)
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.CREATED)

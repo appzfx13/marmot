@@ -172,41 +172,63 @@
             transition: margin-left 0.3s ease;
         }
 
-        .top-action-bar {
-            background: var(--glass-bg);
-            backdrop-filter: blur(25px);
-            -webkit-backdrop-filter: blur(25px);
-            border: 1px solid var(--border-color);
-            border-radius: 50px;
-            padding: 5px 12px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            transform: translateY(-3px);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        #sidebarToggleBtn {
-            transform: translateY(-3px);
-            transition: transform 0.2s ease;
-        }
-
         .glass-icon-btn {
             background: var(--nav-hover);
             border: 1px solid var(--border-color);
             color: var(--text-main);
-
-            width: 38px;
-            height: 38px;
+            width: 36px;
+            height: 36px;
             border-radius: 50%;
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
             transition: all 0.2s ease;
             position: relative;
             padding: 0;
+        }
+
+        .top-action-bar {
+            background: var(--glass-bg);
+            backdrop-filter: blur(25px);
+            -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--border-color);
+            border-radius: 50px;
+            padding: 4px 10px;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+            height: 44px;
+            box-sizing: border-box;
+            margin: 0;
+            transition: all 0.2s ease;
+        }
+
+        #sidebarToggleBtn.glass-icon-btn,
+        #sidebarToggleBtn {
+            background: var(--glass-bg) !important;
+            backdrop-filter: blur(25px) !important;
+            -webkit-backdrop-filter: blur(25px) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 50px !important;
+            padding: 0 16px !important;
+            height: 44px !important;
+            width: auto !important;
+            min-width: 44px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: var(--text-main) !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+            margin: 0 !important;
+            transition: all 0.2s ease !important;
+            cursor: pointer !important;
+        }
+
+        #sidebarToggleBtn:hover {
+            background: var(--nav-hover) !important;
+            border-color: var(--nav-active-border) !important;
         }
 
         .glass-icon-btn:hover {
@@ -500,9 +522,19 @@
 
         .table {
             --bs-table-bg: transparent !important;
+            --bs-table-accent-bg: transparent !important;
+            --bs-table-striped-bg: transparent !important;
             --bs-table-color: var(--text-main) !important;
             --bs-table-hover-bg: var(--nav-hover) !important;
+            --bs-table-border-color: var(--border-color) !important;
             color: var(--text-main) !important;
+            background-color: transparent !important;
+        }
+
+        .table th, .table td {
+            background-color: transparent !important;
+            color: inherit !important;
+            border-color: var(--border-color) !important;
         }
 
         /* Button Theme Classes */
@@ -546,20 +578,35 @@
             display: none;
         }
 
+        .sidebar-section-header {
+            font-size: 0.68rem;
+            letter-spacing: 0.08rem;
+            color: var(--text-muted) !important;
+            opacity: 0.85;
+            font-weight: 700;
+            text-transform: uppercase;
+            transition: color 0.3s ease;
+        }
+
         @media (max-width: 991.98px) {
             .sidebar {
                 transform: translateX(-100%);
+                position: fixed;
+                top: 0;
+                left: 0;
+                height: 100vh !important;
                 width: 280px !important;
+                z-index: 1060;
             }
             .main-with-sidebar {
                 margin-left: 0 !important;
                 width: 100% !important;
             }
-            body.sidebar-mobile-open .sidebar {
+            body.sidebar-mobile-open .sidebar, .sidebar.show {
                 transform: translateX(0);
                 box-shadow: 4px 0 30px rgba(0,0,0,0.4);
             }
-            body.sidebar-mobile-open .sidebar-overlay {
+            body.sidebar-mobile-open .sidebar-overlay, .sidebar-overlay.show {
                 display: block;
             }
             #app-main-container {
@@ -582,6 +629,7 @@
             }
             .top-action-bar {
                 gap: 6px !important;
+                padding: 4px 8px !important;
             }
             .row.g-3 > [class*="col-sm"],
             .row.g-2 > [class*="col-sm"] {
@@ -594,33 +642,57 @@
             }
         }
 
-        /* ─── < 576px (Phone — Samsung Galaxy A73) ─── */
+        /* ─── < 576px (Phone — Samsung Galaxy A73 etc.) ─── */
         @media (max-width: 575.98px) {
             .glass-card {
-                padding: 0.875rem !important;
+                padding: 0.75rem !important;
                 border-radius: 12px !important;
             }
-            h3, .h3 { font-size: 1.3rem !important; }
-            h4, .h4 { font-size: 1.15rem !important; }
-            h5, .h5 { font-size: 1rem !important; }
-            h6, .h6 { font-size: 0.9rem !important; }
+            h3, .h3 { font-size: 1.25rem !important; }
+            h4, .h4 { font-size: 1.1rem !important; }
+            h5, .h5 { font-size: 0.95rem !important; }
+            h6, .h6 { font-size: 0.85rem !important; }
             .btn {
-                min-height: 40px;
+                min-height: 38px;
                 font-size: 0.8125rem !important;
-                padding: 8px 14px !important;
+                padding: 6px 12px !important;
             }
             .form-control, .form-select {
-                min-height: 40px;
-                font-size: 0.875rem !important;
+                min-height: 38px;
+                font-size: 0.85rem !important;
             }
             .table-responsive {
                 border-radius: 10px;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+                width: 100% !important;
             }
-            .row > [class*="col-"] {
-                flex: 0 0 100% !important;
-                max-width: 100% !important;
+            .row {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+            /* Compact top action bar and sidebar toggle for small viewports */
+            .top-action-bar {
+                height: 40px !important;
+                padding: 3px 8px !important;
+                gap: 4px !important;
+                border-radius: 30px !important;
+                transform: translateY(0) !important;
+            }
+            #sidebarToggleBtn.glass-icon-btn,
+            #sidebarToggleBtn {
+                height: 40px !important;
+                width: 40px !important;
+                min-width: 40px !important;
+                padding: 0 !important;
+                border-radius: 50% !important;
+                transform: translateY(0) !important;
+                margin: 0 !important;
+            }
+            .glass-icon-btn, .profile-avatar-btn {
+                width: 32px !important;
+                height: 32px !important;
+                font-size: 0.8rem !important;
             }
             .d-flex.gap-2:not(.align-items-center),
             .d-flex.gap-3:not(.align-items-center) {
@@ -638,16 +710,24 @@
                 font-size: 0.7rem !important;
             }
             .fs-3, .fs-2 {
-                font-size: 1.5rem !important;
+                font-size: 1.4rem !important;
             }
-            .d-flex.align-items-center.justify-content-between.mb-3,
-            .d-flex.align-items-center.justify-content-between.mb-4 {
+            .d-flex.align-items-center.justify-content-between.mb-3:not(.sticky-top-navbar > div),
+            .d-flex.align-items-center.justify-content-between.mb-4:not(.sticky-top-navbar > div) {
                 flex-direction: column;
                 align-items: flex-start !important;
-                gap: 10px;
+                gap: 8px;
             }
-            #mainContentBody {
-                padding: 0 !important;
+            .sticky-top-navbar > .d-flex {
+                flex-direction: row !important;
+                align-items: center !important;
+                flex-wrap: nowrap !important;
+            }
+            #mainContentBody, .main-with-sidebar {
+                padding: 0.5rem !important;
+                max-width: 100vw !important;
+                overflow-x: hidden !important;
+                box-sizing: border-box !important;
             }
             .container-fluid {
                 padding-left: 0 !important;
@@ -687,6 +767,9 @@
 
             <!-- User-Related Navigation Menus -->
             <nav class="nav flex-column flex-grow-1 px-1" id="userSidebarNav">
+                <div class="sidebar-section-header px-3 pt-2 pb-1">
+                    Trader Terminal
+                </div>
                 <a class="nav-link {% if active_tab == 'dashboard' or request.resolver_match.url_name == 'marmot-dashboard' %}active{% endif %}" 
                    href="{% url 'users:marmot-dashboard' %}">
                     <span class="material-icons">dashboard</span>
@@ -742,13 +825,13 @@
             <!-- Sticky Top Header Navbar -->
             <div class="sticky-top-navbar">
                 <div class="d-flex align-items-center justify-content-between mb-3 gap-2">
-                    <button class="glass-icon-btn d-md-none" id="sidebarToggleBtn" type="button" title="Toggle Navigation">
+                    <button class="glass-icon-btn d-lg-none" id="sidebarToggleBtn" type="button" title="Toggle Navigation">
                         <span class="material-icons fs-5">menu</span>
                     </button>
 
                     <div class="top-action-bar ms-auto d-flex align-items-center gap-2">
                         <!-- Live Time Widget in Fixed Header -->
-                        <div class="glass-card px-3 py-1 rounded-pill d-inline-flex align-items-center gap-1 theme-text-main small" title="Live Local Time">
+                        <div class="glass-card px-3 py-1 rounded-pill d-none d-sm-inline-flex align-items-center gap-1 theme-text-main small" title="Live Local Time">
                             <span class="material-icons text-primary fs-6">schedule</span>
                             <span id="liveClockWidget" class="fw-bold font-monospace">00:00:00 AM</span>
                         </div>

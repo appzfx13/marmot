@@ -1,6 +1,6 @@
 {% extends "admins/index.html" %}
 
-{% block title %}{% if object %}Edit Trade Config{% else %}New Trade Config{% endif %} - Bug Tracker{% endblock %}
+{% block title %}{% if object %}Edit Trade Config{% else %}New Trade Config{% endif %} - Marmot{% endblock %}
 
 {% block extra_head %}
 <style>
@@ -106,6 +106,92 @@
         border: 1px solid var(--border-color) !important;
         box-shadow: 0 20px 40px rgba(0, 0, 0, 0.5);
     }
+
+    /* ── Market Type Tabs ─────────────────────────────────────────────────── */
+    .market-tab-btn {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 10px 20px;
+        border-radius: 10px;
+        border: 1px solid var(--border-color);
+        background: rgba(255,255,255,0.03);
+        color: var(--text-muted);
+        font-size: 0.8125rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        flex: 1;
+        justify-content: center;
+        text-align: center;
+    }
+
+    .market-tab-btn.active-index {
+        background: rgba(13,110,253,0.15);
+        border-color: rgba(13,110,253,0.4);
+        color: #60a5fa;
+    }
+
+    .market-tab-btn.active-forex {
+        background: rgba(16,185,129,0.15);
+        border-color: rgba(16,185,129,0.4);
+        color: #34d399;
+    }
+    :root[data-theme="light"] .market-tab-btn.active-index,
+    [data-theme="light"] .market-tab-btn.active-index {
+        background: rgba(13,110,253,0.15);
+        border-color: rgba(13,110,253,0.4);
+        color: #0d6efd !important;
+    }
+    :root[data-theme="light"] .market-tab-btn.active-forex,
+    [data-theme="light"] .market-tab-btn.active-forex {
+        background: rgba(16,185,129,0.15);
+        border-color: rgba(5,150,105,0.4);
+        color: #059669 !important;
+    }
+
+    /* Section reveal animation */
+    .market-section {
+        transition: opacity 0.25s ease;
+    }
+
+    .market-section.hidden {
+        display: none !important;
+    }
+
+    /* Forex instrument badge */
+    .forex-badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: rgba(16,185,129,0.1);
+        border: 1px solid rgba(16,185,129,0.25);
+        border-radius: 20px;
+        padding: 2px 10px;
+        font-size: 0.7rem;
+        font-weight: 700;
+        color: #34d399;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    :root[data-theme="light"] .forex-badge,
+    [data-theme="light"] .forex-badge {
+        background: rgba(16,185,129,0.15);
+        border-color: rgba(5,150,105,0.3);
+        color: #059669 !important;
+    }
+
+    .table, .table th, .table td {
+        background-color: transparent !important;
+        --bs-table-bg: transparent !important;
+        --bs-table-accent-bg: transparent !important;
+        --bs-table-striped-bg: transparent !important;
+        color: var(--text-muted) !important;
+        border-color: var(--border-color) !important;
+    }
+    .table th {
+        color: var(--text-main) !important;
+    }
 </style>
 {% endblock %}
 
@@ -142,7 +228,43 @@
             </div>
         {% endif %}
 
-        {# Section 1: Identification & Target User #}
+        {# ═══════════════════════════════════════════════════════════════════
+           SECTION 0: MARKET TYPE SELECTOR  (NEW)
+           ═══════════════════════════════════════════════════════════════════ #}
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-warning fs-5">public</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Market Type</h6>
+            <span class="ms-2 badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 small">Required</span>
+        </div>
+
+        <div class="mb-4">
+            {# Visual toggle buttons — they drive the hidden select field #}
+            <div class="d-flex gap-2 mb-3" id="marketTabBtns">
+                <button type="button"
+                        class="market-tab-btn {% if not object or object.market_type == 'INDEX_FO' %}active-index{% endif %}"
+                        id="tabIndexFO"
+                        onclick="setMarketType('INDEX_FO')">
+                    <span class="material-icons fs-5">candlestick_chart</span>
+                    <span>INDEX / F&amp;O<br><small class="opacity-75 fw-normal">Nifty · BankNifty · Fin Nifty</small></span>
+                </button>
+                <button type="button"
+                        class="market-tab-btn {% if object and object.market_type == 'FOREX_FUTURES' %}active-forex{% endif %}"
+                        id="tabForex"
+                        onclick="setMarketType('FOREX_FUTURES')">
+                    <span class="material-icons fs-5">currency_exchange</span>
+                    <span>FOREX / Futures<br><small class="opacity-75 fw-normal">CME Micro · MGC · M6E · MNQ…</small></span>
+                </button>
+            </div>
+            {# Hidden real form field #}
+            <div style="display:none;">{{ form.market_type }}</div>
+            {% if form.market_type.errors %}
+                <div class="text-danger small mt-1">{{ form.market_type.errors.0 }}</div>
+            {% endif %}
+        </div>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           SECTION 1: IDENTIFICATION & TARGET USER
+           ═══════════════════════════════════════════════════════════════════ #}
         <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
             <span class="material-icons text-primary fs-5">person</span>
             <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">General Settings</h6>
@@ -152,16 +274,12 @@
             <div class="col-12 col-md-5">
                 <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.name.id_for_label }}">Configuration Name</label>
                 {{ form.name }}
-                {% if form.name.errors %}
-                    <div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>
-                {% endif %}
+                {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>{% endif %}
             </div>
             <div class="col-12 col-md-4">
                 <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.admins_user.id_for_label }}">Target User</label>
                 {{ form.admins_user }}
-                {% if form.admins_user.errors %}
-                    <div class="text-danger small mt-1">{{ form.admins_user.errors.0 }}</div>
-                {% endif %}
+                {% if form.admins_user.errors %}<div class="text-danger small mt-1">{{ form.admins_user.errors.0 }}</div>{% endif %}
             </div>
             <div class="col-12 col-md-3">
                 <label class="custom-check-item w-100">
@@ -171,7 +289,9 @@
             </div>
         </div>
 
-        {# Section 2: Risk Control Limits #}
+        {# ═══════════════════════════════════════════════════════════════════
+           SECTION 2: RISK CONTROL LIMITS  (shared — always visible)
+           ═══════════════════════════════════════════════════════════════════ #}
         <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
             <span class="material-icons text-primary fs-5">shield</span>
             <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Risk Control Limits</h6>
@@ -181,69 +301,152 @@
             <div class="col-12 col-md-6">
                 <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.max_loss_limit.id_for_label }}">Max Loss Limit ($)</label>
                 {{ form.max_loss_limit }}
-                {% if form.max_loss_limit.errors %}
-                    <div class="text-danger small mt-1">{{ form.max_loss_limit.errors.0 }}</div>
-                {% endif %}
+                {% if form.max_loss_limit.errors %}<div class="text-danger small mt-1">{{ form.max_loss_limit.errors.0 }}</div>{% endif %}
             </div>
             <div class="col-12 col-md-6">
                 <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.max_profit_limit.id_for_label }}">Max Profit Limit ($)</label>
                 {{ form.max_profit_limit }}
-                {% if form.max_profit_limit.errors %}
-                    <div class="text-danger small mt-1">{{ form.max_profit_limit.errors.0 }}</div>
-                {% endif %}
+                {% if form.max_profit_limit.errors %}<div class="text-danger small mt-1">{{ form.max_profit_limit.errors.0 }}</div>{% endif %}
             </div>
         </div>
 
-        {# Section 3: Lot & Stop Loss #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-            <span class="material-icons text-primary fs-5">calculate</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Lot & Stop Loss Rules</h6>
-        </div>
-
-        <div class="row g-3 mb-4">
-            <div class="col-12 col-md-6">
-                <div class="mb-2">
-                    <label class="custom-check-item w-100">
-                        {{ form.auto_lot_status }}
-                        <span class="theme-text-main small fw-bold">Auto Lot Size Calculation</span>
-                    </label>
-                </div>
-                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_lot_size.id_for_label }}">Default Lot Size</label>
-                {{ form.default_lot_size }}
-                {% if form.default_lot_size.errors %}
-                    <div class="text-danger small mt-1">{{ form.default_lot_size.errors.0 }}</div>
-                {% endif %}
+        {# ═══════════════════════════════════════════════════════════════════
+           SECTION 3: INDEX / F&O — Lot & Stop Loss
+           (hidden when FOREX_FUTURES selected)
+           ═══════════════════════════════════════════════════════════════════ #}
+        <div id="section_index" class="market-section">
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+                <span class="material-icons text-primary fs-5">calculate</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Lot &amp; Stop Loss Rules</h6>
+                <span class="ms-2 forex-badge" style="background:rgba(13,110,253,0.1);border-color:rgba(13,110,253,0.25);color:#60a5fa;">INDEX / F&amp;O</span>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="mb-2">
-                    <label class="custom-check-item w-100">
-                        {{ form.auto_sl_status }}
-                        <span class="theme-text-main small fw-bold">Auto Attach Stop Loss</span>
-                    </label>
-                </div>
-                <div class="row g-2">
-                    <div class="col-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_value.id_for_label }}">Risk Value</label>
-                        {{ form.default_risk_value }}
-                        {% if form.default_risk_value.errors %}
-                            <div class="text-danger small mt-1">{{ form.default_risk_value.errors.0 }}</div>
-                        {% endif %}
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-6">
+                    <div class="mb-2">
+                        <label class="custom-check-item w-100">
+                            {{ form.auto_lot_status }}
+                            <span class="theme-text-main small fw-bold">Auto Lot Size Calculation</span>
+                        </label>
                     </div>
-                    <div class="col-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_type.id_for_label }}">Risk Mode</label>
-                        {{ form.default_risk_type }}
-                        {% if form.default_risk_type.errors %}
-                            <div class="text-danger small mt-1">{{ form.default_risk_type.errors.0 }}</div>
-                        {% endif %}
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_lot_size.id_for_label }}">Default Lot Size</label>
+                    {{ form.default_lot_size }}
+                    {% if form.default_lot_size.errors %}<div class="text-danger small mt-1">{{ form.default_lot_size.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="col-12 col-md-6">
+                    <div class="mb-2">
+                        <label class="custom-check-item w-100">
+                            {{ form.auto_sl_status }}
+                            <span class="theme-text-main small fw-bold">Auto Attach Stop Loss</span>
+                        </label>
+                    </div>
+                    <div class="row g-2">
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_value.id_for_label }}">Risk Value</label>
+                            {{ form.default_risk_value }}
+                            {% if form.default_risk_value.errors %}<div class="text-danger small mt-1">{{ form.default_risk_value.errors.0 }}</div>{% endif %}
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_type.id_for_label }}">Risk Mode</label>
+                            {{ form.default_risk_type }}
+                            {% if form.default_risk_type.errors %}<div class="text-danger small mt-1">{{ form.default_risk_type.errors.0 }}</div>{% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
         </div>
 
-        {# Section 4: Layering & Features #}
+        {# ═══════════════════════════════════════════════════════════════════
+           SECTION 4: FOREX / CME MICRO FUTURES  (NEW)
+           (hidden when INDEX_FO selected)
+           ═══════════════════════════════════════════════════════════════════ #}
+        <div id="section_forex" class="market-section">
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+                <span class="material-icons fs-5 text-primary">currency_exchange</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Forex / CME Micro Futures Settings</h6>
+                <span class="ms-2 forex-badge">FOREX / FUTURES</span>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.forex_instrument.id_for_label }}">CME Micro Instrument</label>
+                    {{ form.forex_instrument }}
+                    <div class="theme-text-muted" style="font-size:0.75rem;margin-top:4px;">
+                        Select the CME Micro Futures contract corresponding to your target market.
+                    </div>
+                    {% if form.forex_instrument.errors %}<div class="text-danger small mt-1">{{ form.forex_instrument.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.forex_max_contracts.id_for_label }}">Max Contracts Per Trade</label>
+                    {{ form.forex_max_contracts }}
+                    <div class="theme-text-muted" style="font-size:0.75rem;margin-top:4px;">
+                        Maximum number of micro contracts per single entry order.
+                    </div>
+                    {% if form.forex_max_contracts.errors %}<div class="text-danger small mt-1">{{ form.forex_max_contracts.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.forex_contract_size.id_for_label }}">Contract Size (units)</label>
+                    {{ form.forex_contract_size }}
+                    <div class="theme-text-muted" style="font-size:0.75rem;margin-top:4px;">
+                        e.g. 10 oz for MGC &nbsp;|&nbsp; 12,500 EUR for M6E &nbsp;|&nbsp; 5 for MCL
+                    </div>
+                    {% if form.forex_contract_size.errors %}<div class="text-danger small mt-1">{{ form.forex_contract_size.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.forex_tick_value.id_for_label }}">Tick Value (USD)</label>
+                    {{ form.forex_tick_value }}
+                    <div class="theme-text-muted" style="font-size:0.75rem;margin-top:4px;">
+                        e.g. $1.00 for MGC &nbsp;|&nbsp; $1.25 for MES &nbsp;|&nbsp; $10.00 for MCL
+                    </div>
+                    {% if form.forex_tick_value.errors %}<div class="text-danger small mt-1">{{ form.forex_tick_value.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.forex_account_id.id_for_label }}">Broker Account ID</label>
+                    {{ form.forex_account_id }}
+                    {% if form.forex_account_id.errors %}<div class="text-danger small mt-1">{{ form.forex_account_id.errors.0 }}</div>{% endif %}
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.forex_broker_api_key.id_for_label }}">API Key / Token</label>
+                    {{ form.forex_broker_api_key }}
+                    {% if form.forex_broker_api_key.errors %}<div class="text-danger small mt-1">{{ form.forex_broker_api_key.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+
+            {# Quick Reference Table #}
+            <div class="glass-card p-3 mb-3" style="border-radius:12px; background:var(--nav-hover); border-color:var(--border-color) !important;">
+                <div class="theme-text-main small fw-bold mb-2 d-flex align-items-center gap-1">
+                    <span class="material-icons fs-6 me-1 text-primary" style="vertical-align:middle;">info</span>
+                    CME Micro Futures Quick Reference
+                </div>
+                <div class="table-responsive">
+                    <table class="table table-sm mb-0" style="font-size:0.775rem; color:var(--text-muted);">
+                        <thead>
+                            <tr style="border-color:var(--border-color);">
+                                <th class="theme-text-main">Instrument</th><th class="theme-text-main">Market</th><th class="theme-text-main">Size</th><th class="theme-text-main">Tick Value</th><th class="theme-text-main">Margin ~</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr><td><strong class="theme-text-main fw-bold">MGC</strong></td><td>XAUUSD / Gold</td><td>10 oz</td><td>$1.00</td><td>~$800</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">M6E</strong></td><td>EURUSD</td><td>12,500 EUR</td><td>$1.25</td><td>~$220</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">M6J</strong></td><td>USDJPY</td><td>1.25M JPY</td><td>$1.25</td><td>~$200</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">MYM</strong></td><td>US30 / Dow</td><td>$0.50/pt</td><td>$0.50</td><td>~$800</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">MNQ</strong></td><td>NAS100</td><td>$2.00/pt</td><td>$2.00</td><td>~$1,700</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">MES</strong></td><td>SPX500</td><td>$5.00/pt</td><td>$1.25</td><td>~$700</td></tr>
+                            <tr><td><strong class="theme-text-main fw-bold">MCL</strong></td><td>USOIL / Crude</td><td>100 bbl</td><td>$1.00</td><td>~$500</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        {# ═══════════════════════════════════════════════════════════════════
+           SECTION 5: LAYERING & ADVANCED FEATURES  (shared)
+           ═══════════════════════════════════════════════════════════════════ #}
         <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
             <span class="material-icons text-primary fs-5">layers</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Layering & Advanced Features</h6>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Layering &amp; Advanced Features</h6>
         </div>
 
         <div class="row g-3 mb-4">
@@ -256,16 +459,12 @@
                 </div>
                 <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.layer_add_in_lot_count.id_for_label }}">Lots Per Layer</label>
                 {{ form.layer_add_in_lot_count }}
-                {% if form.layer_add_in_lot_count.errors %}
-                    <div class="text-danger small mt-1">{{ form.layer_add_in_lot_count.errors.0 }}</div>
-                {% endif %}
+                {% if form.layer_add_in_lot_count.errors %}<div class="text-danger small mt-1">{{ form.layer_add_in_lot_count.errors.0 }}</div>{% endif %}
             </div>
             <div class="col-12 col-md-4 d-flex flex-column justify-content-end">
                 <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.layer_percentage.id_for_label }}">Layer Step Distance (%)</label>
                 {{ form.layer_percentage }}
-                {% if form.layer_percentage.errors %}
-                    <div class="text-danger small mt-1">{{ form.layer_percentage.errors.0 }}</div>
-                {% endif %}
+                {% if form.layer_percentage.errors %}<div class="text-danger small mt-1">{{ form.layer_percentage.errors.0 }}</div>{% endif %}
             </div>
             <div class="col-12 col-md-4 d-flex flex-column justify-content-center gap-2">
                 <label class="custom-check-item w-100">
@@ -284,7 +483,6 @@
             <a href="{% url 'admins:trade_exec_config_list' %}" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold text-decoration-none">
                 CANCEL
             </a>
-            <!-- Trigger Modal Button -->
             <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" data-bs-toggle="modal" data-bs-target="#confirmSaveModal">
                 SAVE CONFIGURATION
             </button>
@@ -313,7 +511,7 @@
                     Cancel
                 </button>
                 <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" id="confirmSubmitBtn">
-                    Confirm & Save
+                    Confirm &amp; Save
                 </button>
             </div>
         </div>
@@ -321,15 +519,43 @@
 </div>
 
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const confirmBtn = document.getElementById('confirmSubmitBtn');
-        const form = document.getElementById('configForm');
+document.addEventListener('DOMContentLoaded', function () {
 
-        if (confirmBtn && form) {
-            confirmBtn.addEventListener('click', function() {
-                form.submit();
-            });
-        }
-    });
+    // ── 1. Confirm & submit ───────────────────────────────────────────────
+    const confirmBtn = document.getElementById('confirmSubmitBtn');
+    const form = document.getElementById('configForm');
+    if (confirmBtn && form) {
+        confirmBtn.addEventListener('click', function () { form.submit(); });
+    }
+
+    // ── 2. Market Type dynamic section toggle ─────────────────────────────
+    const marketSelect  = document.getElementById('id_market_type');
+    const sectionIndex  = document.getElementById('section_index');
+    const sectionForex  = document.getElementById('section_forex');
+    const tabIndexFO    = document.getElementById('tabIndexFO');
+    const tabForex      = document.getElementById('tabForex');
+
+    function applyMarketType(val) {
+        const isForex = (val === 'FOREX_FUTURES');
+
+        // Show / hide sections
+        sectionIndex.classList.toggle('hidden', isForex);
+        sectionForex.classList.toggle('hidden', !isForex);
+
+        // Tab button active states
+        tabIndexFO.className = 'market-tab-btn' + (!isForex ? ' active-index' : '');
+        tabForex.className   = 'market-tab-btn' + (isForex  ? ' active-forex' : '');
+
+        // Keep hidden select in sync
+        if (marketSelect) marketSelect.value = val;
+    }
+
+    // Expose for onclick handlers on buttons
+    window.setMarketType = function(val) { applyMarketType(val); };
+
+    // Initialise based on saved value (edit mode) or default
+    const initial = marketSelect ? marketSelect.value : 'INDEX_FO';
+    applyMarketType(initial || 'INDEX_FO');
+});
 </script>
 {% endblock %}

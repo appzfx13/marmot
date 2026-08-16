@@ -165,10 +165,36 @@
             font-weight: 600;
         }
 
+        .sidebar-section-header {
+            font-size: 0.68rem;
+            letter-spacing: 0.08rem;
+            color: var(--text-muted) !important;
+            opacity: 0.85;
+            font-weight: 700;
+            text-transform: uppercase;
+            transition: color 0.3s ease;
+        }
+
         .main-with-sidebar {
             padding: 1.5rem !important;
             margin-left: var(--sidebar-width);
             transition: margin-left 0.3s ease;
+        }
+
+        .glass-icon-btn {
+            background: var(--nav-hover);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            padding: 0;
         }
 
         .top-action-bar {
@@ -177,35 +203,41 @@
             -webkit-backdrop-filter: blur(25px);
             border: 1px solid var(--border-color);
             border-radius: 50px;
-            padding: 5px 12px;
-            display: flex;
+            padding: 4px 10px;
+            display: inline-flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            transform: translateY(-3px);
-            transition: transform 0.2s ease, box-shadow 0.2s ease;
-        }
-
-        #sidebarToggleBtn {
-            transform: translateY(-3px);
-            transition: transform 0.2s ease;
-        }
-
-        .glass-icon-btn {
-            background: var(--nav-hover);
-            border: 1px solid var(--border-color);
-            color: var(--text-main);
-
-            width: 38px;
-            height: 38px;
-            border-radius: 50%;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            cursor: pointer;
+            height: 44px;
+            box-sizing: border-box;
+            margin: 0;
             transition: all 0.2s ease;
-            position: relative;
-            padding: 0;
+        }
+
+        #sidebarToggleBtn.glass-icon-btn,
+        #sidebarToggleBtn {
+            background: var(--glass-bg) !important;
+            backdrop-filter: blur(25px) !important;
+            -webkit-backdrop-filter: blur(25px) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: 50% !important;
+            padding: 0 !important;
+            height: 44px !important;
+            width: 44px !important;
+            min-width: 44px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            color: var(--text-main) !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15) !important;
+            margin: 0 !important;
+            transition: all 0.2s ease !important;
+            cursor: pointer !important;
+        }
+
+        #sidebarToggleBtn:hover {
+            background: var(--nav-hover) !important;
+            border-color: var(--nav-active-border) !important;
         }
 
         .glass-icon-btn:hover {
@@ -267,6 +299,24 @@
             color: var(--text-main) !important;
         }
 
+        /* Global Theme-Aware Table Overrides */
+        .table {
+            --bs-table-bg: transparent !important;
+            --bs-table-accent-bg: transparent !important;
+            --bs-table-striped-bg: transparent !important;
+            --bs-table-color: var(--text-main) !important;
+            --bs-table-hover-bg: var(--nav-hover) !important;
+            --bs-table-border-color: var(--border-color) !important;
+            color: var(--text-main) !important;
+            background-color: transparent !important;
+        }
+
+        .table th, .table td {
+            background-color: transparent !important;
+            color: inherit !important;
+            border-color: var(--border-color) !important;
+        }
+
         /* Custom Theme-Aligned Glassmorphism Scrollbar */
         * {
             scrollbar-width: thin;
@@ -326,21 +376,11 @@
             max-width: 100%;
         }
 
-        /* ─── < 992px (Tablet landscape) ─── */
+        /* ─── < 992px (Tablet & Mobile — Samsung Galaxy A73 etc.) ─── */
         @media (max-width: 991.98px) {
             #app-main-container {
                 padding: 0 !important;
             }
-            .glass-card {
-                border-radius: 14px !important;
-            }
-            .row > [class*="col-"] {
-                margin-bottom: 0.75rem;
-            }
-        }
-
-        /* ─── < 768px (Tablet portrait / Mobile) ─── */
-        @media (max-width: 767.98px) {
             .sidebar {
                 transform: translateX(-100%);
                 position: fixed;
@@ -350,11 +390,11 @@
                 width: 280px !important;
                 z-index: 1060;
             }
-            .sidebar.show {
+            .sidebar.show, body.sidebar-mobile-open .sidebar {
                 transform: translateX(0);
                 box-shadow: 4px 0 30px rgba(0,0,0,0.4);
             }
-            .sidebar-overlay.show {
+            .sidebar-overlay.show, body.sidebar-mobile-open .sidebar-overlay {
                 display: block;
             }
             .main-with-sidebar {
@@ -362,6 +402,16 @@
                 padding: 0.75rem !important;
                 width: 100% !important;
             }
+            .glass-card {
+                border-radius: 14px !important;
+            }
+            .row > [class*="col-"] {
+                margin-bottom: 0.75rem;
+            }
+        }
+
+        /* ─── < 768px (Mobile viewports) ─── */
+        @media (max-width: 767.98px) {
             .sticky-top-navbar {
                 padding: 0.5rem 0 !important;
                 margin-top: -0.75rem;
@@ -387,34 +437,59 @@
         /* ─── < 576px (Phone — Samsung Galaxy A73 etc.) ─── */
         @media (max-width: 575.98px) {
             .glass-card {
-                padding: 0.875rem !important;
+                padding: 0.75rem !important;
                 border-radius: 12px !important;
             }
             /* Typography scale-down */
-            h3, .h3 { font-size: 1.3rem !important; }
-            h4, .h4 { font-size: 1.15rem !important; }
-            h5, .h5 { font-size: 1rem !important; }
-            h6, .h6 { font-size: 0.9rem !important; }
+            h3, .h3 { font-size: 1.25rem !important; }
+            h4, .h4 { font-size: 1.1rem !important; }
+            h5, .h5 { font-size: 0.95rem !important; }
+            h6, .h6 { font-size: 0.85rem !important; }
             /* Touch-friendly controls */
             .btn {
-                min-height: 40px;
+                min-height: 38px;
                 font-size: 0.8125rem !important;
-                padding: 8px 14px !important;
+                padding: 6px 12px !important;
             }
             .form-control, .form-select {
-                min-height: 40px;
-                font-size: 0.875rem !important;
+                min-height: 38px;
+                font-size: 0.85rem !important;
             }
             /* Tables: horizontal scroll on phone */
             .table-responsive {
                 border-radius: 10px;
                 overflow-x: auto;
                 -webkit-overflow-scrolling: touch;
+                width: 100% !important;
             }
-            /* Collapse multi-col rows to 1-col */
-            .row > [class*="col-"] {
-                flex: 0 0 100% !important;
-                max-width: 100% !important;
+            /* Row margin fix to prevent 12px overflow */
+            .row {
+                margin-left: 0 !important;
+                margin-right: 0 !important;
+            }
+            /* Compact top action bar and sidebar toggle for small viewports */
+            .top-action-bar {
+                height: 40px !important;
+                padding: 3px 8px !important;
+                gap: 4px !important;
+                border-radius: 30px !important;
+                transform: translateY(0) !important;
+                margin: 0 !important;
+            }
+            #sidebarToggleBtn.glass-icon-btn,
+            #sidebarToggleBtn {
+                height: 40px !important;
+                width: 40px !important;
+                min-width: 40px !important;
+                padding: 0 !important;
+                border-radius: 50% !important;
+                transform: translateY(0) !important;
+                margin: 0 !important;
+            }
+            .glass-icon-btn, .profile-avatar-btn {
+                width: 32px !important;
+                height: 32px !important;
+                font-size: 0.8rem !important;
             }
             /* Stack horizontal flex groups */
             .d-flex.gap-2:not(.align-items-center),
@@ -437,18 +512,27 @@
             }
             /* Stat card numbers */
             .fs-3, .fs-2 {
-                font-size: 1.5rem !important;
+                font-size: 1.4rem !important;
             }
             /* Page heading row */
-            .d-flex.align-items-center.justify-content-between.mb-3,
-            .d-flex.align-items-center.justify-content-between.mb-4 {
+            .d-flex.align-items-center.justify-content-between.mb-3:not(.sticky-top-navbar > div),
+            .d-flex.align-items-center.justify-content-between.mb-4:not(.sticky-top-navbar > div) {
                 flex-direction: column;
                 align-items: flex-start !important;
-                gap: 10px;
+                gap: 8px;
+            }
+            /* Force top navbar to stay on same line */
+            .sticky-top-navbar > .d-flex {
+                flex-direction: row !important;
+                align-items: center !important;
+                flex-wrap: nowrap !important;
             }
             /* Overflow guard on inner containers */
-            #mainContentBody {
-                padding: 0 !important;
+            #mainContentBody, .main-with-sidebar {
+                padding: 0.5rem !important;
+                max-width: 100vw !important;
+                overflow-x: hidden !important;
+                box-sizing: border-box !important;
             }
             .container-fluid {
                 padding-left: 0 !important;
@@ -828,7 +912,7 @@
 
             <nav class="nav flex-column flex-grow-1 px-1">
                 <!-- Section 1: CORE PLATFORM -->
-                <div class="sidebar-section-header px-3 pt-2 pb-1 text-uppercase fw-bold text-muted smaller tracking-wider" style="font-size: 0.68rem; letter-spacing: 0.08rem; color: rgba(255, 255, 255, 0.45) !important;">
+                <div class="sidebar-section-header px-3 pt-2 pb-1">
                     Core Platform
                 </div>
                 <a class="nav-link {% if request.resolver_match.url_name == 'admin-dashboard' or '/admins/dashboard/' in request.path %}active{% endif %}" 
@@ -845,7 +929,7 @@
                 </a>
 
                 <!-- Section 2: STRATEGY & BACKTESTING -->
-                <div class="sidebar-section-header px-3 pt-3 pb-1 text-uppercase fw-bold text-muted smaller tracking-wider" style="font-size: 0.68rem; letter-spacing: 0.08rem; color: rgba(255, 255, 255, 0.45) !important;">
+                <div class="sidebar-section-header px-3 pt-3 pb-1">
                     Strategy & Backtesting
                 </div>
                 <a class="nav-link {% if '/backtest/strategies/' in request.path %}active{% endif %}" 
@@ -858,7 +942,7 @@
                 </a>
 
                 <!-- Section 3: MARKET DATA & LOGS -->
-                <div class="sidebar-section-header px-3 pt-3 pb-1 text-uppercase fw-bold text-muted smaller tracking-wider" style="font-size: 0.68rem; letter-spacing: 0.08rem; color: rgba(255, 255, 255, 0.45) !important;">
+                <div class="sidebar-section-header px-3 pt-3 pb-1">
                     Market Data & Logs
                 </div>
                 <a class="nav-link {% if '/market/backup' in request.path %}active{% endif %}" 
@@ -874,7 +958,7 @@
 
                 <!-- Section 4: MASTER MANAGEMENT -->
                 {% if request.user.role == 'admin' or request.user.role == 'developer' or request.user.is_superuser %}
-                <div class="sidebar-section-header px-3 pt-3 pb-1 text-uppercase fw-bold text-muted smaller tracking-wider" style="font-size: 0.68rem; letter-spacing: 0.08rem; color: rgba(255, 255, 255, 0.45) !important;">
+                <div class="sidebar-section-header px-3 pt-3 pb-1">
                     Master Management
                 </div>
                 <a class="nav-link {% if '/admins/masters/brokers/' in request.path %}active{% endif %}" 
@@ -1202,9 +1286,10 @@
             const sidebar = document.getElementById('mainSidebar');
             const overlay = document.getElementById('sidebarOverlay');
             function toggleSidebar() {
-                if (window.innerWidth < 768) {
+                if (window.innerWidth < 992) {
                     sidebar.classList.toggle('show');
                     overlay.classList.toggle('show');
+                    document.body.classList.toggle('sidebar-mobile-open');
                 } else {
                     document.body.classList.toggle('sidebar-collapsed');
                 }
@@ -1212,6 +1297,7 @@
             function closeMobileSidebar() {
                 sidebar.classList.remove('show');
                 overlay.classList.remove('show');
+                document.body.classList.remove('sidebar-mobile-open');
             }
             if (sidebarToggleBtn) sidebarToggleBtn.addEventListener('click', toggleSidebar);
             if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeMobileSidebar);
