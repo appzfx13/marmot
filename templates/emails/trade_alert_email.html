@@ -1,0 +1,78 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Trade Alert: {{ symbol|default:'Market' }} — Marmot Trading{% endblock %}
+
+{% block content %}
+<div style="text-align: center; margin-bottom: 20px;">
+    {% if action_type == 'BUY' or action_type == 'ENTRY' or action_type == 'PROFIT' %}
+    <span class="badge-pill" style="background: rgba(34, 197, 94, 0.15); color: #4ade80; border-color: rgba(34, 197, 94, 0.3);">
+        {{ action_type|default:'EXECUTION' }}
+    </span>
+    {% elif action_type == 'SELL' or action_type == 'EXIT' or action_type == 'LOSS' %}
+    <span class="badge-pill" style="background: rgba(239, 68, 68, 0.15); color: #f87171; border-color: rgba(239, 68, 68, 0.3);">
+        {{ action_type|default:'EXIT' }}
+    </span>
+    {% else %}
+    <span class="badge-pill">{{ action_type|default:'ALERT' }}</span>
+    {% endif %}
+    <h2 style="font-size: 22px; font-weight: 700; margin: 12px 0 6px 0; color: #ffffff; letter-spacing: -0.02em;">
+        {{ title|default:'Algorithmic Trade Alert' }}
+    </h2>
+    <p style="margin: 0; color: rgba(255, 255, 255, 0.6); font-size: 13px;">
+        {{ timestamp|default:'' }}
+    </p>
+</div>
+
+<p style="margin: 0 0 16px 0; color: rgba(255, 255, 255, 0.85); font-size: 15px; line-height: 1.6;">
+    {{ message|safe|linebreaksbr }}
+</p>
+
+<table class="data-table" role="presentation">
+    {% if symbol %}
+    <tr>
+        <td class="label">Symbol / Instrument</td>
+        <td class="val">{{ symbol }}</td>
+    </tr>
+    {% endif %}
+    {% if strategy %}
+    <tr>
+        <td class="label">Strategy Plugin</td>
+        <td class="val">{{ strategy }}</td>
+    </tr>
+    {% endif %}
+    {% if price %}
+    <tr>
+        <td class="label">Execution Price</td>
+        <td class="val">{{ price }}</td>
+    </tr>
+    {% endif %}
+    {% if quantity %}
+    <tr>
+        <td class="label">Quantity / Lots</td>
+        <td class="val">{{ quantity }}</td>
+    </tr>
+    {% endif %}
+    {% if order_id %}
+    <tr>
+        <td class="label">Order ID</td>
+        <td class="val">{{ order_id }}</td>
+    </tr>
+    {% endif %}
+    {% if pnl %}
+    <tr>
+        <td class="label">Realized P&L</td>
+        <td class="val" style="color: {% if is_profit %}#4ade80{% else %}#f87171{% endif %}; font-weight: bold;">
+            {{ pnl }}
+        </td>
+    </tr>
+    {% endif %}
+</table>
+
+{% if action_url %}
+<div style="text-align: center; margin-top: 24px;">
+    <a href="{{ action_url }}" class="email-btn">
+        Open Trading Dashboard
+    </a>
+</div>
+{% endif %}
+{% endblock %}

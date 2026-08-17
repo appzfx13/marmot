@@ -1,0 +1,43 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Welcome to Marmot Platform{% endblock %}
+
+{% block content %}
+<div style="text-align: center; margin-bottom: 20px;">
+    <span class="badge-pill">ACCOUNT CREATED</span>
+    <h2 style="font-size: 22px; font-weight: 700; margin: 12px 0 6px 0; color: #ffffff; letter-spacing: -0.02em;">
+        Welcome to Marmot, {{ user.get_full_name|default:user.username }}!
+    </h2>
+</div>
+
+<p style="margin: 0 0 16px 0; color: rgba(255, 255, 255, 0.85); font-size: 15px; line-height: 1.6;">
+    Your high-frequency algorithmic trading account has been configured and activated successfully. You can now access the trader portal, configure your broker API keys, and monitor real-time strategies.
+</p>
+
+<table class="data-table" role="presentation">
+    <tr>
+        <td class="label">Username</td>
+        <td class="val">{{ user.username }}</td>
+    </tr>
+    <tr>
+        <td class="label">Registered Email</td>
+        <td class="val">{{ user.email }}</td>
+    </tr>
+    {% if user.role %}
+    <tr>
+        <td class="label">Account Role</td>
+        <td class="val">{{ user.get_role_display|default:user.role|title }}</td>
+    </tr>
+    {% endif %}
+</table>
+
+<div style="text-align: center; margin-top: 24px;">
+    <a href="{{ login_url|default:'#' }}" class="email-btn">
+        Access Trading Terminal
+    </a>
+</div>
+
+<p style="font-size: 13px; color: rgba(255, 255, 255, 0.55); margin-top: 20px; margin-bottom: 0;">
+    For your security, never share your account credentials or broker API secret tokens with anyone.
+</p>
+{% endblock %}

@@ -1,0 +1,43 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}{{ title|default:'Notification' }} — Marmot Trading{% endblock %}
+
+{% block content %}
+<div style="text-align: center; margin-bottom: 20px;">
+    {% if badge_text %}
+    <span class="badge-pill">{{ badge_text }}</span>
+    {% endif %}
+    <h2 style="font-size: 22px; font-weight: 700; margin: 12px 0 6px 0; color: #ffffff; letter-spacing: -0.02em;">
+        {{ title }}
+    </h2>
+</div>
+
+<p style="margin: 0 0 16px 0; color: rgba(255, 255, 255, 0.85); font-size: 15px; line-height: 1.6;">
+    {{ message|safe|linebreaksbr }}
+</p>
+
+{% if data_items %}
+<table class="data-table" role="presentation">
+    {% for label, val in data_items.items %}
+    <tr>
+        <td class="label">{{ label }}</td>
+        <td class="val">{{ val }}</td>
+    </tr>
+    {% endfor %}
+</table>
+{% endif %}
+
+{% if action_url %}
+<div style="text-align: center; margin-top: 24px;">
+    <a href="{{ action_url }}" class="email-btn">
+        {{ action_label|default:'View Details in Terminal' }}
+    </a>
+</div>
+{% endif %}
+
+{% if closing_note %}
+<p style="font-size: 13px; color: rgba(255, 255, 255, 0.55); margin-top: 20px; margin-bottom: 0;">
+    {{ closing_note }}
+</p>
+{% endif %}
+{% endblock %}

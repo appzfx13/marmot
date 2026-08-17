@@ -1,0 +1,303 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sign In with Email OTP — Marmot Platform</title>
+    
+    <!-- Google Fonts: Google Sans Flex & Code -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600;700&family=Google+Sans+Flex:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        :root[data-theme="dark"] {
+            --bg-page: #000000;
+            --aurora-1: rgba(122, 90, 248, 0.16);
+            --aurora-2: rgba(26, 115, 232, 0.14);
+            --bg-card: rgba(12, 16, 29, 0.75);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-title: #ffffff;
+            --text-subtitle: rgba(255, 255, 255, 0.7);
+            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-border: rgba(255, 255, 255, 0.15);
+            --input-text: #ffffff;
+            --btn-primary: #7a5af8;
+            --btn-primary-hover: #6941c6;
+            --btn-text: #ffffff;
+            --toggle-bg: rgba(255, 255, 255, 0.08);
+            --toggle-border: rgba(255, 255, 255, 0.15);
+        }
+
+        :root[data-theme="light"] {
+            --bg-page: #f8fafc;
+            --aurora-1: rgba(122, 90, 248, 0.08);
+            --aurora-2: rgba(26, 115, 232, 0.06);
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --card-border: rgba(0, 0, 0, 0.08);
+            --text-title: #0f172a;
+            --text-subtitle: #64748b;
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --input-text: #0f172a;
+            --btn-primary: #7a5af8;
+            --btn-primary-hover: #6941c6;
+            --btn-text: #ffffff;
+            --toggle-bg: rgba(0, 0, 0, 0.05);
+            --toggle-border: rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Google Sans Flex', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-page);
+            background-image: 
+                radial-gradient(circle at 50% 10%, var(--aurora-1) 0%, transparent 60%),
+                radial-gradient(circle at 80% 35%, var(--aurora-2) 0%, transparent 50%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 72px 14px 28px 14px;
+            position: relative;
+            letter-spacing: -0.01em;
+            transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .auth-nav-top {
+            position: fixed;
+            top: 14px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            max-width: 100%;
+            pointer-events: none;
+        }
+
+        .auth-nav-btn {
+            background: var(--toggle-bg);
+            border: 1px solid var(--toggle-border);
+            color: var(--text-title);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 50px;
+            padding: 7px 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            pointer-events: auto;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .auth-nav-btn:hover {
+            color: var(--text-title);
+            transform: translateY(-1px);
+        }
+
+        .auth-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 440px;
+            background: var(--bg-card);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 36px 30px;
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.25);
+            animation: cardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: center;
+        }
+
+        @media (max-width: 576px) {
+            body {
+                padding: 60px 14px 24px 14px;
+            }
+            .auth-card {
+                padding: 24px 18px;
+                border-radius: 20px;
+            }
+        }
+
+        @keyframes cardFadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .auth-title {
+            color: var(--text-title);
+            font-size: 1.55rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 6px;
+        }
+
+        .auth-subtitle {
+            color: var(--text-subtitle);
+            font-size: 0.875rem;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        .form-label {
+            color: var(--text-subtitle);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+            text-align: start;
+            display: block;
+        }
+
+        .form-control {
+            background-color: var(--input-bg) !important;
+            border: 1px solid var(--input-border) !important;
+            color: var(--input-text) !important;
+            border-radius: 12px;
+            padding: 10px 14px;
+            font-size: 0.875rem;
+            height: 46px;
+            transition: all 0.2s ease;
+        }
+
+        .form-control:focus {
+            border-color: var(--btn-primary) !important;
+            box-shadow: 0 0 0 4px rgba(122, 90, 248, 0.25) !important;
+        }
+
+        .btn-submit {
+            background-color: var(--btn-primary);
+            color: var(--btn-text);
+            border: none;
+            border-radius: 50px;
+            padding: 11px 24px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            width: 100%;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(122, 90, 248, 0.35);
+        }
+
+        .btn-submit:hover {
+            background-color: var(--btn-primary-hover);
+            color: var(--btn-text);
+            transform: translateY(-1px);
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fixed Header: Back to Home & Dark/Light Toggle -->
+    <div class="auth-nav-top">
+        <a href="{% url 'users:marmot-login' %}" class="auth-nav-btn" title="Back to Password Login">
+            <span class="material-icons" style="font-size: 16px;">arrow_back</span>
+            <span>Back</span>
+        </a>
+        <button id="themeToggleBtn" class="auth-nav-btn" type="button" title="Toggle color theme">
+            <span class="material-icons" id="themeIcon" style="font-size: 16px;">light_mode</span>
+            <span id="themeText">Light</span>
+        </button>
+    </div>
+
+    <!-- Main Card -->
+    <div class="auth-card">
+        <div class="d-inline-flex align-items-center justify-content-center mb-3 p-3 rounded-circle" style="background: rgba(122, 90, 248, 0.12); color: #7a5af8;">
+            <span class="material-icons" style="font-size: 36px;">key</span>
+        </div>
+
+        <h1 class="auth-title">Email SSO Login</h1>
+        <p class="auth-subtitle">
+            Enter your registered email address. We'll send a 6-digit one-time password (OTP) to sign in securely.
+        </p>
+
+        {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} py-2 px-3 small rounded-3 mb-2 text-start">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if form.errors %}
+        <div class="alert alert-danger py-2 px-3 small rounded-3 mb-3 text-start">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" novalidate>
+            {% csrf_token %}
+
+            <div class="mb-4 text-start">
+                <label class="form-label" for="ssoEmailField">Registered Email Address</label>
+                {{ form.email }}
+            </div>
+
+            <button type="submit" class="btn btn-submit mb-3">
+                <span>Send One-Time Passcode</span>
+                <span class="material-icons" style="font-size: 18px;">arrow_forward</span>
+            </button>
+        </form>
+
+        <div style="border-top: 1px solid var(--card-border); padding-top: 16px; margin-top: 12px;">
+            <a href="{% url 'users:marmot-login' %}" style="color: var(--text-subtitle); font-size: 0.8125rem; text-decoration: none;">
+                Prefer to sign in with password? <strong style="color: var(--btn-primary);">Sign In</strong>
+            </a>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            const htmlElement = document.documentElement;
+            const themeBtn = document.getElementById('themeToggleBtn');
+            const themeIcon = document.getElementById('themeIcon');
+            const themeText = document.getElementById('themeText');
+
+            function applyTheme(theme) {
+                htmlElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+                if (theme === 'dark') {
+                    if (themeIcon) themeIcon.textContent = 'light_mode';
+                    if (themeText) themeText.textContent = 'Light';
+                } else {
+                    if (themeIcon) themeIcon.textContent = 'dark_mode';
+                    if (themeText) themeText.textContent = 'Dark';
+                }
+            }
+
+            const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            applyTheme(savedTheme);
+
+            if (themeBtn) {
+                themeBtn.addEventListener('click', () => {
+                    const currentTheme = htmlElement.getAttribute('data-theme');
+                    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+                });
+            }
+        })();
+    </script>
+</body>
+</html>

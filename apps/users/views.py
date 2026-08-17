@@ -31,6 +31,8 @@ from .forms import (
     TraderSignUpForm,
     TraderLoginForm,
     TraderPasswordResetForm,
+    OtpVerificationForm,
+    EmailSsoRequestForm,
     UserProfileForm,
     UserProfilePasswordChangeForm,
     UserBacktestTaskForm,
@@ -38,51 +40,32 @@ from .forms import (
 from .mixins import HTMXPartialMixin, MarmotRoleRequiredMixin
 from .models import User
 from .permissions import is_user_authorized_for_dashboard
-from .services import get_user_profile
+from .services import get_user_profile, generate_and_send_email_otp, verify_email_otp
 
 
 class SignUpView(FormView):
     template_name = 'registration/signup.html'
     form_class = TraderSignUpForm
-    success_url = reverse_lazy('users:marmot-dashboard')
+    success_url = reverse_lazy('users:marmot-verify-otp')
 
     def dispatch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return redirect(self.get_success_url())
+            return redirect(reverse_lazy('users:marmot-dashboard'))
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
         user = form.save()
-        
-        # Send Welcome Email via SMTP (graceful fallback if credentials pending)
-        try:
-            subject = "Welcome to Marmot — Next-Gen Algorithmic Trading Platform"
-            message = (
-                f"Hello {user.first_name},\n\n"
-                f"Welcome to Marmot! Your trading account has been created.\n\n"
-                f"Account Details:\n"
-                f"Username: {user.username}\n"
-                f"Email: {user.email}\n"
-                f"Environment: Default Sandbox Paper-Trading\n\n"
-                f"Log in to your terminal: {self.request.build_absolute_uri(reverse_lazy('users:marmot-login'))}\n\n"
-                f"Happy Trading,\nThe Marmot Core Engine Team"
-            )
-            send_mail(
-                subject,
-                message,
-                getattr(settings, 'DEFAULT_FROM_EMAIL', 'noreply@marmot.local'),
-                [user.email],
-                fail_silently=True
-            )
-        except Exception as e:
-            logger.warning(f"Could not send welcome email to {user.email}: {e}")
-
-        # Authenticate and set session expiry based on remember_me
-        auth_login(self.request, user)
         if form.cleaned_data.get('remember_me'):
-            self.request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
-        else:
-            self.request.session.set_expiry(0)  # Browser close
+            self.request.session['remember_me_pending'] = True
+
+        # Generate and dispatch 6-digit OTP code to the user's email
+        success, msg = generate_and_send_email_otp(
+            user_or_email=user,
+            request=self.request,
+            purpose='signup_activation'
+        )
+        if not success:
+            messages.warning(self.request, msg)
 
         success_url = self.get_success_url()
         if self.request.headers.get('HX-Request'):
@@ -92,7 +75,97 @@ class SignUpView(FormView):
         return redirect(success_url)
 
     def get_success_url(self):
-        return reverse_lazy('users:marmot-dashboard')
+        return reverse_lazy('users:marmot-verify-otp')
+
+
+class VerifyOtpView(FormView):
+    template_name = 'registration/verify_otp.html'
+    form_class = OtpVerificationForm
+    success_url = reverse_lazy('users:marmot-dashboard')
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect(self.get_success_url())
+        if not request.session.get('auth_otp_email'):
+            messages.info(request, "Please enter your email or credentials first.")
+            return redirect(reverse_lazy('users:marmot-login'))
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['email'] = self.request.session.get('auth_otp_email', '')
+        context['purpose'] = self.request.session.get('auth_otp_purpose', 'signup_activation')
+        context['expiry_minutes'] = self.request.session.get('auth_otp_expiry_minutes', 10)
+        return context
+
+    def form_valid(self, form):
+        otp = form.cleaned_data['otp']
+        valid, user, msg = verify_email_otp(otp, self.request)
+
+        if not valid or not user:
+            form.add_error('otp', msg)
+            return self.form_invalid(form)
+
+        # Authenticate and login verified active user
+        auth_login(self.request, user)
+
+        if self.request.session.pop('remember_me_pending', False):
+            self.request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
+        else:
+            self.request.session.set_expiry(0)
+
+        messages.success(self.request, "Email verified successfully! Welcome to Marmot.")
+
+        success_url = self.get_success_url()
+        if self.request.headers.get('HX-Request'):
+            response = HttpResponse()
+            response['HX-Redirect'] = str(success_url)
+            return response
+        return redirect(success_url)
+
+
+class ResendOtpView(View):
+    def post(self, request, *args, **kwargs):
+        email = request.session.get('auth_otp_email')
+        purpose = request.session.get('auth_otp_purpose', 'signup_activation')
+        if not email:
+            messages.error(request, "No pending email verification session found.")
+            return redirect(reverse_lazy('users:marmot-login'))
+
+        success, msg = generate_and_send_email_otp(email, request, purpose=purpose)
+        if success:
+            messages.success(request, f"New 6-digit verification code sent to {email}.")
+        else:
+            messages.error(request, msg)
+
+        return redirect(reverse_lazy('users:marmot-verify-otp'))
+
+
+class EmailSsoLoginView(FormView):
+    template_name = 'registration/email_sso.html'
+    form_class = EmailSsoRequestForm
+    success_url = reverse_lazy('users:marmot-verify-otp')
+
+    def dispatch(self, request, *args, **kwargs):
+        if request.user.is_authenticated:
+            return redirect(reverse_lazy('users:marmot-dashboard'))
+        return super().dispatch(request, *args, **kwargs)
+
+    def form_valid(self, form):
+        email = form.cleaned_data['email']
+        user = User.objects.filter(email__iexact=email).first()
+
+        success, msg = generate_and_send_email_otp(
+            user_or_email=user or email,
+            request=self.request,
+            purpose='email_sso'
+        )
+        if success:
+            messages.info(self.request, f"A 6-digit verification code has been sent to {email}.")
+        else:
+            messages.error(self.request, msg)
+
+        return redirect(self.get_success_url())
 
 
 class LoginView(FormView):
@@ -126,9 +199,22 @@ class LoginView(FormView):
         return redirect(success_url)
 
     def form_invalid(self, form):
+        unverified_user = getattr(form, 'unverified_user', None)
+        if unverified_user:
+            # Dispatch verification OTP and redirect to OTP screen
+            generate_and_send_email_otp(
+                user_or_email=unverified_user,
+                request=self.request,
+                purpose='signup_activation'
+            )
+            messages.info(self.request, f"Please verify your email address to activate your account. A new code has been sent to {unverified_user.email}.")
+            return redirect(reverse_lazy('users:marmot-verify-otp'))
         return super().form_invalid(form)
 
     def get_success_url(self):
+        next_url = self.request.GET.get('next')
+        if next_url:
+            return next_url
         user = self.request.user
         if user.is_authenticated:
             user_role = getattr(user, 'role', '')

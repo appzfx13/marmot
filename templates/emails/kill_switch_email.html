@@ -1,0 +1,54 @@
+{% extends "emails/base_email.html" %}
+
+{% block title %}Emergency Kill Switch Triggered — Marmot Trading{% endblock %}
+
+{% block content %}
+<div style="text-align: center; margin-bottom: 24px;">
+    <span class="badge-pill" style="background: rgba(239, 68, 68, 0.2); color: #f87171; border-color: rgba(239, 68, 68, 0.4);">
+        CRITICAL RISK ACTION
+    </span>
+    <h2 style="font-size: 22px; font-weight: 700; margin: 12px 0 6px 0; color: #ef4444; letter-spacing: -0.02em;">
+        Emergency Kill Switch Activated
+    </h2>
+    <p style="margin: 0; color: rgba(255, 255, 255, 0.7); font-size: 14px;">
+        All active open positions and pending orders have been automatically squared off / cancelled.
+    </p>
+</div>
+
+<p style="margin: 0 0 16px 0; color: rgba(255, 255, 255, 0.85); font-size: 15px; line-height: 1.6;">
+    {{ reason|default:'An emergency kill switch command was initiated for your trading account. Automated strategy execution has been immediately paused to preserve capital.' }}
+</p>
+
+<table class="data-table" role="presentation">
+    <tr>
+        <td class="label">Account User</td>
+        <td class="val">{{ user.username|default:username }}</td>
+    </tr>
+    <tr>
+        <td class="label">Trigger Source</td>
+        <td class="val">{{ source|default:'Trader Manual Kill Switch' }}</td>
+    </tr>
+    <tr>
+        <td class="label">Timestamp</td>
+        <td class="val">{{ timestamp|default:'' }}</td>
+    </tr>
+    {% if squared_off_count is not None %}
+    <tr>
+        <td class="label">Positions Squared Off</td>
+        <td class="val">{{ squared_off_count }}</td>
+    </tr>
+    {% endif %}
+    {% if cancelled_orders_count is not None %}
+    <tr>
+        <td class="label">Orders Cancelled</td>
+        <td class="val">{{ cancelled_orders_count }}</td>
+    </tr>
+    {% endif %}
+</table>
+
+<div style="text-align: center; margin-top: 24px;">
+    <a href="{{ dashboard_url|default:'#' }}" class="email-btn" style="background-color: #ef4444;">
+        Access Risk Dashboard
+    </a>
+</div>
+{% endblock %}

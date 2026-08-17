@@ -110,3 +110,28 @@ class ForexInstrumentChoices(models.TextChoices):
     NAS100_MNQ  = "MNQ",  "NAS100 / Nasdaq →  MNQ  (Micro Nasdaq)"
     SPX500_MES  = "MES",  "SPX500 / S&P    →  MES  (Micro S&P 500)"
     USOIL_MCL   = "MCL",  "USOIL / Crude   →  MCL  (Micro Crude Oil)"
+
+
+# Logger Category Choices (Marmot Trading Platform Apps & Subsystems)
+class LoggerCategoryChoices(models.TextChoices):
+    TRADING = "TRADING", "Trading Core Engine"
+    TRADE_CONFIG = "TRADE_CONFIG", "Strategy & Trade Config"
+    MARKET = "MARKET", "Market Data Ingestion"
+    NOTIFICATIONS = "NOTIFICATIONS", "Notifications & Alerts"
+    POSTBACK = "POSTBACK", "Broker Webhook Postback"
+    USERS = "USERS", "Trader Accounts & Auth"
+    ADMINS = "ADMINS", "Admin Management"
+    BACKTEST = "BACKTEST", "Backtesting Engine"
+    MASTERS = "MASTERS", "Master Symbols & Instruments"
+    SYSTEM = "SYSTEM", "Core System"
+
+
+class PermanentLogTargets:
+    """Defines target tuples (app, log_type) that should never be cleaned up."""
+    ALL = [
+        ("trade_core", "order_audit"),
+        ("trade_core", "execution_audit"),
+        ("users", "auth_audit"),
+        ("notifications", "email_audit"),
+        ("postback", "webhook_audit"),
+    ]

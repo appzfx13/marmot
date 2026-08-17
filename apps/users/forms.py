@@ -72,12 +72,56 @@ class TraderSignUpForm(forms.ModelForm):
         user.first_name = self.cleaned_data['first_name']
         user.last_name = self.cleaned_data['last_name']
         user.role = MemberRoleChoices.TRADERS
+        user.is_active = False
+        user.is_email_verified = False
         user.set_password(self.cleaned_data['password'])
         if commit:
             user.save()
             # Ensure Sandbox trading account is auto-created
             user.get_active_trading_account()
         return user
+
+
+class OtpVerificationForm(forms.Form):
+    otp = forms.CharField(
+        max_length=6,
+        min_length=6,
+        required=True,
+        widget=forms.TextInput(attrs={
+            'class': 'form-control text-center font-monospace fs-3 fw-bold',
+            'placeholder': '000000',
+            'id': 'otpInput',
+            'maxlength': '6',
+            'inputmode': 'numeric',
+            'pattern': '[0-9]*',
+            'autocomplete': 'one-time-code',
+            'autofocus': 'autofocus'
+        })
+    )
+
+    def clean_otp(self):
+        otp = self.cleaned_data.get('otp', '').strip()
+        if not otp.isdigit() or len(otp) != 6:
+            raise ValidationError("Please enter a valid 6-digit numeric verification code.")
+        return otp
+
+
+class EmailSsoRequestForm(forms.Form):
+    email = forms.EmailField(
+        required=True,
+        widget=forms.EmailInput(attrs={
+            'class': 'form-control',
+            'placeholder': 'Enter your email address',
+            'id': 'ssoEmailField',
+            'autocomplete': 'email'
+        })
+    )
+
+    def clean_email(self):
+        email = self.cleaned_data.get('email', '').strip().lower()
+        if not User.objects.filter(email__iexact=email).exists():
+            raise ValidationError("No registered account found with this email. Please sign up first.")
+        return email
 
 
 class TraderLoginForm(forms.Form):
@@ -129,8 +173,18 @@ class TraderLoginForm(forms.Form):
                     user = authenticate(self.request, username=user_obj.username, password=password)
 
             if user is None:
+                # Check if credentials match an unverified / inactive user
+                candidate = User.objects.filter(username__iexact=username_or_email).first()
+                if not candidate:
+                    candidate = User.objects.filter(email__iexact=username_or_email).first()
+                if candidate and candidate.check_password(password) and not candidate.is_email_verified:
+                    self.unverified_user = candidate
+                    raise ValidationError("EMAIL_NOT_VERIFIED")
                 raise ValidationError("Invalid email/username or password. Please verify your credentials.")
-            elif not user.is_active:
+            elif not user.is_active or not getattr(user, 'is_email_verified', False):
+                if not getattr(user, 'is_email_verified', False):
+                    self.unverified_user = user
+                    raise ValidationError("EMAIL_NOT_VERIFIED")
                 raise ValidationError("This account is inactive. Please contact support.")
             elif getattr(user, 'is_blocked', False):
                 raise ValidationError("This account is currently suspended. Please contact platform administrators.")

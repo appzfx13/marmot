@@ -2,6 +2,9 @@ from django.urls import path
 from .views import (
     LoginView,
     SignUpView,
+    VerifyOtpView,
+    ResendOtpView,
+    EmailSsoLoginView,
     MarmotPasswordResetView,
     MarmotPasswordResetDoneView,
     MarmotPasswordResetConfirmView,
@@ -35,6 +38,9 @@ urlpatterns = [
     # Authentication & Onboarding
     path('login/', LoginView.as_view(), name='marmot-login'),
     path('signup/', SignUpView.as_view(), name='marmot-signup'),
+    path('verify-otp/', VerifyOtpView.as_view(), name='marmot-verify-otp'),
+    path('resend-otp/', ResendOtpView.as_view(), name='marmot-resend-otp'),
+    path('email-login/', EmailSsoLoginView.as_view(), name='marmot-email-sso'),
     path('reset-password/', MarmotPasswordResetView.as_view(), name='marmot-reset-password'),
     path('reset-password/done/', MarmotPasswordResetDoneView.as_view(), name='password_reset_done'),
     path('reset/<uidb64>/<token>/', MarmotPasswordResetConfirmView.as_view(), name='password_reset_confirm'),

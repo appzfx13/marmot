@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Verify Email OTP — Marmot Platform</title>
+    
+    <!-- Google Fonts: Google Sans Flex & Code -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600;700&family=Google+Sans+Flex:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    
+    <!-- Bootstrap CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+
+    <style>
+        :root[data-theme="dark"] {
+            --bg-page: #000000;
+            --aurora-1: rgba(122, 90, 248, 0.16);
+            --aurora-2: rgba(26, 115, 232, 0.14);
+            --bg-card: rgba(12, 16, 29, 0.75);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --text-title: #ffffff;
+            --text-subtitle: rgba(255, 255, 255, 0.7);
+            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-border: rgba(255, 255, 255, 0.15);
+            --input-text: #ffffff;
+            --btn-primary: #7a5af8;
+            --btn-primary-hover: #6941c6;
+            --btn-text: #ffffff;
+            --toggle-bg: rgba(255, 255, 255, 0.08);
+            --toggle-border: rgba(255, 255, 255, 0.15);
+        }
+
+        :root[data-theme="light"] {
+            --bg-page: #f8fafc;
+            --aurora-1: rgba(122, 90, 248, 0.08);
+            --aurora-2: rgba(26, 115, 232, 0.06);
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --card-border: rgba(0, 0, 0, 0.08);
+            --text-title: #0f172a;
+            --text-subtitle: #64748b;
+            --input-bg: #ffffff;
+            --input-border: #cbd5e1;
+            --input-text: #0f172a;
+            --btn-primary: #7a5af8;
+            --btn-primary-hover: #6941c6;
+            --btn-text: #ffffff;
+            --toggle-bg: rgba(0, 0, 0, 0.05);
+            --toggle-border: rgba(0, 0, 0, 0.1);
+        }
+
+        body {
+            font-family: 'Google Sans Flex', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', sans-serif;
+            background-color: var(--bg-page);
+            background-image: 
+                radial-gradient(circle at 50% 10%, var(--aurora-1) 0%, transparent 60%),
+                radial-gradient(circle at 80% 35%, var(--aurora-2) 0%, transparent 50%);
+            background-attachment: fixed;
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            margin: 0;
+            padding: 72px 14px 28px 14px;
+            position: relative;
+            letter-spacing: -0.01em;
+            transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .auth-nav-top {
+            position: fixed;
+            top: 14px;
+            left: 16px;
+            right: 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            z-index: 1000;
+            max-width: 100%;
+            pointer-events: none;
+        }
+
+        .auth-nav-btn {
+            background: var(--toggle-bg);
+            border: 1px solid var(--toggle-border);
+            color: var(--text-title);
+            backdrop-filter: blur(16px);
+            -webkit-backdrop-filter: blur(16px);
+            border-radius: 50px;
+            padding: 7px 14px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            transition: all 0.2s ease;
+            pointer-events: auto;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+        }
+
+        .auth-nav-btn:hover {
+            color: var(--text-title);
+            transform: translateY(-1px);
+        }
+
+        .auth-card {
+            position: relative;
+            z-index: 10;
+            width: 100%;
+            max-width: 460px;
+            background: var(--bg-card);
+            backdrop-filter: blur(28px) saturate(180%);
+            -webkit-backdrop-filter: blur(28px) saturate(180%);
+            border: 1px solid var(--card-border);
+            border-radius: 24px;
+            padding: 36px 30px;
+            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.25);
+            animation: cardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            text-align: center;
+        }
+
+        @media (max-width: 576px) {
+            body {
+                padding: 60px 14px 24px 14px;
+            }
+            .auth-card {
+                padding: 24px 18px;
+                border-radius: 20px;
+            }
+            .otp-box {
+                width: 44px !important;
+                height: 52px !important;
+                font-size: 1.4rem !important;
+            }
+        }
+
+        @keyframes cardFadeIn {
+            from { opacity: 0; transform: translateY(12px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .auth-title {
+            color: var(--text-title);
+            font-size: 1.55rem;
+            font-weight: 800;
+            letter-spacing: -0.02em;
+            margin-bottom: 6px;
+        }
+
+        .auth-subtitle {
+            color: var(--text-subtitle);
+            font-size: 0.875rem;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+
+        /* 6-Digit Segmented PIN Inputs */
+        .otp-inputs-wrapper {
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            margin: 24px 0;
+        }
+
+        .otp-box {
+            width: 52px;
+            height: 60px;
+            text-align: center;
+            font-family: 'Google Sans Code', ui-monospace, monospace;
+            font-size: 1.6rem;
+            font-weight: 700;
+            background-color: var(--input-bg);
+            border: 1px solid var(--input-border);
+            color: var(--input-text);
+            border-radius: 12px;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            outline: none;
+        }
+
+        .otp-box:focus {
+            border-color: var(--btn-primary);
+            box-shadow: 0 0 0 4px rgba(122, 90, 248, 0.25);
+            background-color: var(--bg-card);
+            transform: translateY(-2px);
+        }
+
+        .btn-submit {
+            background-color: var(--btn-primary);
+            color: var(--btn-text);
+            border: none;
+            border-radius: 50px;
+            padding: 11px 24px;
+            font-size: 0.9375rem;
+            font-weight: 600;
+            width: 100%;
+            height: 44px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 14px rgba(122, 90, 248, 0.35);
+        }
+
+        .btn-submit:hover {
+            background-color: var(--btn-primary-hover);
+            color: var(--btn-text);
+            transform: translateY(-1px);
+        }
+
+        .timer-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 14px;
+            background: rgba(122, 90, 248, 0.1);
+            color: #9b8afb;
+            border: 1px solid rgba(122, 90, 248, 0.25);
+            border-radius: 50px;
+            font-size: 0.8125rem;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+
+        .resend-btn {
+            background: transparent;
+            border: none;
+            color: var(--btn-primary);
+            font-size: 0.8125rem;
+            font-weight: 600;
+            cursor: pointer;
+            padding: 0;
+            text-decoration: none;
+        }
+
+        .resend-btn:hover:not(:disabled) {
+            text-decoration: underline;
+        }
+
+        .resend-btn:disabled {
+            color: var(--text-subtitle);
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Fixed Header: Back to Home & Dark/Light Toggle -->
+    <div class="auth-nav-top">
+        <a href="{% url 'home' %}" class="auth-nav-btn" title="Back to Home">
+            <span class="material-icons" style="font-size: 16px;">arrow_back</span>
+            <span>Back</span>
+        </a>
+        <button id="themeToggleBtn" class="auth-nav-btn" type="button" title="Toggle color theme">
+            <span class="material-icons" id="themeIcon" style="font-size: 16px;">light_mode</span>
+            <span id="themeText">Light</span>
+        </button>
+    </div>
+
+    <!-- Main Card -->
+    <div class="auth-card">
+        <div class="d-inline-flex align-items-center justify-content-center mb-3 p-3 rounded-circle" style="background: rgba(122, 90, 248, 0.12); color: #7a5af8;">
+            <span class="material-icons" style="font-size: 36px;">mark_email_read</span>
+        </div>
+
+        <h1 class="auth-title">Verify Your Email</h1>
+        <p class="auth-subtitle">
+            We sent a 6-digit verification code to<br>
+            <strong style="color: var(--text-title);">{{ email|default:'your email address' }}</strong>
+        </p>
+
+        <!-- Dynamic Countdown Timer -->
+        <div class="timer-badge">
+            <span class="material-icons" style="font-size: 16px;">timer</span>
+            <span>Code expires in: <strong id="countdownTimer">10:00</strong></span>
+        </div>
+
+        {% if messages %}
+        <div class="mb-3">
+            {% for message in messages %}
+            <div class="alert alert-{{ message.tags|default:'info' }} py-2 px-3 small rounded-3 mb-2 text-start">
+                {{ message }}
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% if form.errors %}
+        <div class="alert alert-danger py-2 px-3 small rounded-3 mb-3 text-start">
+            {% for field, errors in form.errors.items %}
+                {% for error in errors %}
+                <div>{{ error }}</div>
+                {% endfor %}
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        <form method="post" id="otpForm" novalidate>
+            {% csrf_token %}
+
+            <!-- Hidden actual OTP input submitted to Django -->
+            <input type="hidden" name="otp" id="hiddenOtpInput" value="">
+
+            <!-- 6 Individual Segmented Boxes -->
+            <div class="otp-inputs-wrapper" id="otpBoxContainer">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]*" autofocus autocomplete="one-time-code">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+                <input type="text" class="otp-box" maxlength="1" inputmode="numeric" pattern="[0-9]*">
+            </div>
+
+            <button type="submit" class="btn btn-submit mb-3" id="verifyBtn">
+                <span>Verify & Activate Account</span>
+                <span class="material-icons" style="font-size: 18px;">arrow_forward</span>
+            </button>
+        </form>
+
+        <!-- Resend Code Form -->
+        <form method="post" action="{% url 'users:marmot-resend-otp' %}" id="resendForm">
+            {% csrf_token %}
+            <p style="font-size: 0.8125rem; color: var(--text-subtitle); margin: 0;">
+                Didn't receive the code? 
+                <button type="submit" class="resend-btn" id="resendBtn">Resend Code</button>
+                <span id="resendCooldown" style="display: none;">(<span id="resendSeconds">60</span>s)</span>
+            </p>
+        </form>
+    </div>
+
+    <script>
+        // Segmented OTP Input Navigation & Paste Handling
+        document.addEventListener('DOMContentLoaded', () => {
+            const boxes = Array.from(document.querySelectorAll('.otp-box'));
+            const hiddenInput = document.getElementById('hiddenOtpInput');
+            const form = document.getElementById('otpForm');
+
+            function syncHiddenInput() {
+                const code = boxes.map(b => b.value.trim()).join('');
+                hiddenInput.value = code;
+                return code;
+            }
+
+            boxes.forEach((box, index) => {
+                box.addEventListener('input', (e) => {
+                    const val = e.target.value.replace(/\D/g, '');
+                    box.value = val ? val[0] : '';
+                    if (box.value && index < boxes.length - 1) {
+                        boxes[index + 1].focus();
+                    }
+                    syncHiddenInput();
+                });
+
+                box.addEventListener('keydown', (e) => {
+                    if (e.key === 'Backspace' && !box.value && index > 0) {
+                        boxes[index - 1].focus();
+                    } else if (e.key === 'ArrowLeft' && index > 0) {
+                        boxes[index - 1].focus();
+                    } else if (e.key === 'ArrowRight' && index < boxes.length - 1) {
+                        boxes[index + 1].focus();
+                    }
+                });
+
+                box.addEventListener('paste', (e) => {
+                    e.preventDefault();
+                    const text = (e.clipboardData || window.clipboardData).getData('text').replace(/\D/g, '');
+                    if (!text) return;
+                    for (let i = 0; i < boxes.length; i++) {
+                        boxes[i].value = text[i] || '';
+                    }
+                    syncHiddenInput();
+                    const nextIndex = Math.min(text.length, boxes.length - 1);
+                    boxes[nextIndex].focus();
+                });
+            });
+
+            form.addEventListener('submit', (e) => {
+                const code = syncHiddenInput();
+                if (code.length !== 6) {
+                    e.preventDefault();
+                    alert('Please enter all 6 digits of the verification code.');
+                }
+            });
+
+            // 10-Minute Expiry Countdown Timer
+            let durationSeconds = 10 * 60;
+            const timerEl = document.getElementById('countdownTimer');
+            const countdownInterval = setInterval(() => {
+                durationSeconds--;
+                if (durationSeconds <= 0) {
+                    clearInterval(countdownInterval);
+                    timerEl.textContent = 'Expired';
+                    timerEl.style.color = '#ef4444';
+                    return;
+                }
+                const m = Math.floor(durationSeconds / 60).toString().padStart(2, '0');
+                const s = (durationSeconds % 60).toString().padStart(2, '0');
+                timerEl.textContent = `${m}:${s}`;
+            }, 1000);
+
+            // Resend Cooldown (60 seconds)
+            const resendBtn = document.getElementById('resendBtn');
+            const resendCooldown = document.getElementById('resendCooldown');
+            const resendSeconds = document.getElementById('resendSeconds');
+
+            let cooldown = 60;
+            resendBtn.disabled = true;
+            resendCooldown.style.display = 'inline';
+
+            const cooldownInterval = setInterval(() => {
+                cooldown--;
+                resendSeconds.textContent = cooldown;
+                if (cooldown <= 0) {
+                    clearInterval(cooldownInterval);
+                    resendBtn.disabled = false;
+                    resendCooldown.style.display = 'none';
+                }
+            }, 1000);
+        });
+
+        // Theme Toggle
+        (function() {
+            const htmlElement = document.documentElement;
+            const themeBtn = document.getElementById('themeToggleBtn');
+            const themeIcon = document.getElementById('themeIcon');
+            const themeText = document.getElementById('themeText');
+
+            function applyTheme(theme) {
+                htmlElement.setAttribute('data-theme', theme);
+                localStorage.setItem('theme', theme);
+                if (theme === 'dark') {
+                    if (themeIcon) themeIcon.textContent = 'light_mode';
+                    if (themeText) themeText.textContent = 'Light';
+                } else {
+                    if (themeIcon) themeIcon.textContent = 'dark_mode';
+                    if (themeText) themeText.textContent = 'Dark';
+                }
+            }
+
+            const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+            applyTheme(savedTheme);
+
+            if (themeBtn) {
+                themeBtn.addEventListener('click', () => {
+                    const currentTheme = htmlElement.getAttribute('data-theme');
+                    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+                });
+            }
+        })();
+    </script>
+</body>
+</html>
