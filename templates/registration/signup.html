@@ -1,4 +1,5 @@
 {% load static %}
+{% load socialaccount %}
 <!DOCTYPE html>
 <html lang="en" data-theme="dark">
 <head>
@@ -86,26 +87,29 @@
                 radial-gradient(circle at 80% 40%, var(--aurora-2) 0%, transparent 45%);
             background-attachment: fixed;
             min-height: 100vh;
+            min-height: 100dvh;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            padding: 72px 14px 28px 14px;
+            padding: 36px 14px 16px 14px;
             position: relative;
             letter-spacing: -0.01em;
+            overflow-x: hidden;
             transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
-        /* Ambient Dual-Color Glow Blobs (Constrained to prevent mobile horizontal scroll) */
+        /* Ambient Dual-Color Glow Blobs (Fixed to prevent page scrollbars) */
         .ambient-blob-container {
-            position: absolute;
-            bottom: -100px;
+            position: fixed;
+            bottom: 0;
             left: 50%;
             transform: translateX(-50%);
             z-index: 0;
             pointer-events: none;
-            opacity: 0.7;
+            opacity: 0.45;
             max-width: 100vw;
+            width: 100%;
             overflow: hidden;
             display: flex;
             justify-content: center;
@@ -113,15 +117,15 @@
 
         .ambient-blob-container svg {
             max-width: 100vw;
-            width: 700px;
+            width: min(650px, 90vw);
             height: auto;
         }
 
         .auth-nav-top {
             position: fixed;
-            top: 14px;
-            left: 16px;
-            right: 16px;
+            top: 12px;
+            left: 14px;
+            right: 14px;
             display: flex;
             justify-content: space-between;
             align-items: center;
@@ -137,12 +141,12 @@
             backdrop-filter: blur(16px);
             -webkit-backdrop-filter: blur(16px);
             border-radius: 50px;
-            padding: 7px 14px;
+            padding: 5px 12px;
             display: inline-flex;
             align-items: center;
-            gap: 6px;
+            gap: 5px;
             text-decoration: none;
-            font-size: 0.8125rem;
+            font-size: 0.75rem;
             font-weight: 600;
             transition: all 0.2s ease;
             pointer-events: auto;
@@ -159,42 +163,42 @@
             position: relative;
             z-index: 10;
             width: 100%;
-            max-width: 480px;
+            max-width: 410px;
             margin: 0 auto;
             background: var(--bg-card);
             backdrop-filter: blur(28px) saturate(180%);
             -webkit-backdrop-filter: blur(28px) saturate(180%);
             border: 1px solid var(--card-border);
-            border-radius: 24px;
-            padding: 34px 28px;
+            border-radius: 16px;
+            padding: 22px 22px;
             box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.25);
             animation: cardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         @media (max-width: 576px) {
             body {
-                padding: 64px 12px 24px 12px;
+                padding: 48px 10px 16px 10px;
             }
             .auth-nav-top {
-                top: 10px;
-                left: 12px;
-                right: 12px;
+                top: 8px;
+                left: 10px;
+                right: 10px;
             }
             .auth-nav-btn {
-                padding: 6px 12px;
-                font-size: 0.75rem;
+                padding: 4px 10px;
+                font-size: 0.72rem;
             }
             .auth-card {
-                padding: 24px 16px;
-                border-radius: 20px;
+                padding: 18px 14px;
+                border-radius: 14px;
                 max-width: 100%;
             }
             .auth-title {
-                font-size: 1.35rem !important;
+                font-size: 1.15rem !important;
             }
             .auth-subtitle {
-                font-size: 0.8125rem !important;
-                margin-bottom: 18px !important;
+                font-size: 0.75rem !important;
+                margin-bottom: 12px !important;
             }
         }
 
@@ -205,17 +209,17 @@
 
         .auth-title {
             color: var(--text-title);
-            font-size: 1.55rem;
-            font-weight: 800;
+            font-size: 1.25rem;
+            font-weight: 700;
             letter-spacing: -0.02em;
-            margin-bottom: 4px;
+            margin-bottom: 2px;
         }
 
         .auth-subtitle {
             color: var(--text-subtitle);
-            font-size: 0.875rem;
-            margin-bottom: 22px;
-            line-height: 1.5;
+            font-size: 0.78rem;
+            margin-bottom: 14px;
+            line-height: 1.45;
         }
 
         /* Social Buttons */
@@ -224,16 +228,16 @@
             color: var(--social-btn-text);
             border: 1px solid var(--card-border);
             border-radius: 50px;
-            padding: 10px 20px;
-            font-size: 0.875rem;
+            padding: 6px 12px;
+            font-size: 0.78rem;
             font-weight: 500;
             display: inline-flex;
             align-items: center;
             justify-content: center;
-            gap: 10px;
+            gap: 8px;
             text-decoration: none;
             transition: all 0.2s ease;
-            height: 46px;
+            height: 36px;
         }
 
         .social-btn:hover {
@@ -245,7 +249,7 @@
         /* Divider */
         .auth-divider {
             position: relative;
-            margin: 24px 0;
+            margin: 12px 0;
             text-align: center;
         }
 
@@ -262,27 +266,28 @@
         .auth-divider span {
             position: relative;
             background: var(--bg-card);
-            padding: 0 16px;
+            padding: 0 10px;
             color: var(--text-muted);
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             font-weight: 500;
         }
 
         /* Form Inputs */
         .form-label {
             color: var(--text-subtitle);
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             font-weight: 500;
-            margin-bottom: 6px;
+            margin-bottom: 3px;
         }
 
         .form-control {
             background-color: var(--input-bg) !important;
             border: 1px solid var(--input-border) !important;
             color: var(--input-text) !important;
-            border-radius: 12px;
-            padding: 11px 16px;
-            font-size: 0.9375rem;
+            border-radius: 8px;
+            padding: 6px 12px;
+            font-size: 0.8125rem;
+            height: 36px;
             transition: all 0.2s ease;
         }
 
@@ -301,14 +306,14 @@
 
         .password-toggle-btn {
             position: absolute;
-            right: 14px;
+            right: 12px;
             top: 50%;
             transform: translateY(-50%);
             background: transparent;
             border: none;
             color: var(--text-muted);
             cursor: pointer;
-            padding: 4px;
+            padding: 2px;
             display: flex;
             align-items: center;
             justify-content: center;
@@ -325,10 +330,15 @@
             color: var(--btn-text);
             border: none;
             border-radius: 50px;
-            padding: 13px 24px;
-            font-size: 0.9375rem;
+            padding: 8px 18px;
+            font-size: 0.8125rem;
             font-weight: 600;
             width: 100%;
+            height: 38px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
             transition: all 0.2s ease;
             box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
         }
@@ -393,15 +403,15 @@
 
         .form-check-label {
             color: var(--text-subtitle);
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             user-select: none;
         }
 
         .auth-footer-link {
             color: var(--text-subtitle);
-            font-size: 0.875rem;
+            font-size: 0.75rem;
             text-align: center;
-            margin-top: 24px;
+            margin-top: 14px;
         }
 
         .auth-footer-link a {
@@ -444,7 +454,7 @@
         <!-- Social Auth Options -->
         <div class="row g-2 mb-3">
             <div class="col-sm-6">
-                <button type="button" class="social-btn w-100" onclick="alert('Google Sign-In integration ready. Configure client credentials in settings.')">
+                <a href="{% provider_login_url 'google' %}" class="social-btn w-100">
                     <svg width="20" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg">
                         <path d="M19.2511 10.1943C19.2511 9.47489 19.1915 8.94989 19.0626 8.40546H10.6797V11.6526H15.6003C15.5011 12.4596 14.9654 13.6749 13.7749 14.4915L13.7582 14.6002L16.4087 16.6125L16.5924 16.6305C18.2788 15.104 19.2511 12.8582 19.2511 10.1943Z" fill="#4285F4"/>
                         <path d="M10.6788 18.75C13.0895 18.75 15.1133 17.9722 16.5915 16.6305L13.774 14.4916C13.0201 15.0069 12.0081 15.3666 10.6788 15.3666C8.31773 15.3666 6.31379 13.8402 5.59944 11.7305L5.49473 11.7392L2.73868 13.8295L2.70264 13.9277C4.17087 16.786 7.18674 18.75 10.6788 18.75Z" fill="#34A853"/>
@@ -452,15 +462,15 @@
                         <path d="M10.6789 4.63331C12.3554 4.63331 13.4864 5.34303 14.1312 5.93612L16.6511 3.525C15.1035 2.11528 13.0895 1.25 10.6789 1.25C7.18676 1.25 4.17088 3.21387 2.70264 6.07218L5.58953 8.26943C6.31381 6.15972 8.31776 4.63331 10.6789 4.63331Z" fill="#EB4335"/>
                     </svg>
                     <span>Google</span>
-                </button>
+                </a>
             </div>
             <div class="col-sm-6">
-                <button type="button" class="social-btn w-100" onclick="alert('GitHub OAuth ready. Configure client credentials in settings.')">
+                <a href="{% provider_login_url 'github' %}" class="social-btn w-100">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
                         <path d="M12 2.24902C6.51613 2.24902 2 6.70064 2 12.249C2 16.6361 4.87097 20.3781 8.87097 21.7329C9.3871 21.8297 9.54839 21.5071 9.54839 21.2813C9.54839 21.0555 9.54839 20.4103 9.51613 19.5393C6.74194 20.1845 6.16129 18.1845 6.16129 18.1845C5.70968 17.0555 5.03226 16.7329 5.03226 16.7329C4.12903 16.0877 5.06452 16.0877 5.06452 16.0877C6.06452 16.12 6.6129 17.12 6.6129 17.12C7.48387 18.6684 8.96774 18.2168 9.51613 17.9264C9.6129 17.2813 9.87097 16.8297 10.1613 16.5716C7.96774 16.3458 5.6129 15.4748 5.6129 11.6684C5.6129 10.5716 6.03226 9.70064 6.64516 9.02322C6.54839 8.79741 6.19355 7.76515 6.74194 6.37806C6.74194 6.37806 7.6129 6.11999 9.51613 7.41031C10.3226 7.18451 11.1613 7.05548 12.0323 7.05548C12.9032 7.05548 13.7742 7.15225 14.5484 7.41031C16.4516 6.15225 17.2903 6.37806 17.2903 6.37806C17.8387 7.73289 17.5161 8.79741 17.3871 9.02322C18.0323 9.70064 18.4194 10.6039 18.4194 11.6684C18.4194 15.4748 16.0645 16.3458 13.871 16.5716C14.2258 16.8942 14.5484 17.5393 14.5484 18.4426C14.5484 19.7974 14.5161 20.8619 14.5161 21.1845C14.5161 21.4426 14.7097 21.7329 15.1935 21.6361C19.129 20.3135 22 16.6039 22 12.1845C21.9677 6.70064 17.4839 2.24902 12 2.24902Z"/>
                     </svg>
                     <span>GitHub</span>
-                </button>
+                </a>
             </div>
         </div>
 

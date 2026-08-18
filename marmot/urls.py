@@ -23,6 +23,9 @@ urlpatterns = [
     path('trade-core/', include(('apps.trade_core.urls', 'trade_core'), namespace='trade_core')),
     path('users/', include(('apps.users.urls', 'users'), namespace='users')),
 
+    # Allauth URLs
+    path('accounts/', include('allauth.urls')),
+
     # REST API & Webhook Routes
     path('api/', include(('apps.postback.urls', 'postback'), namespace='postback')),
     path('api/', include(('apps.api.urls', 'api'), namespace='api')),

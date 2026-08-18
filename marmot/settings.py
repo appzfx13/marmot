@@ -23,10 +23,12 @@ ALLOWED_HOSTS = ['*']
 CSRF_TRUSTED_ORIGINS = [
     'https://*.ngrok-free.app',
     'https://*.ngrok.io',
+    'https://*.ngrok-free.dev',
     'http://localhost:8000',
     'http://127.0.0.1:8000',
     'http://localhost:8005',
     'http://127.0.0.1:8005',
+    'https://bug-tracker-z4mi.onrender.com',
 ]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
@@ -50,6 +52,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'django.contrib.sites',
 
     # Third-Party Apps
     'cloudinary_storage',
@@ -68,6 +71,13 @@ INSTALLED_APPS = [
     'apps.postback',
     'apps.trade_config',
     'apps.trade_core',
+
+    # Allauth
+    'allauth',
+    'allauth.account',
+    'allauth.socialaccount',
+    'allauth.socialaccount.providers.google',
+    'allauth.socialaccount.providers.github',
 ]
 
 MIDDLEWARE = [
@@ -79,6 +89,9 @@ MIDDLEWARE = [
     'django.contrib.auth.middleware.AuthenticationMiddleware',
     'django.contrib.messages.middleware.MessageMiddleware',
     'django.middleware.clickjacking.XFrameOptionsMiddleware',
+    
+    # Allauth account middleware
+    'allauth.account.middleware.AccountMiddleware',
 ]
 
 ROOT_URLCONF = 'marmot.urls'
@@ -162,21 +175,13 @@ MANAGEMENT_ROLES = ['admin', 'manager']
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
-# Security & Trusted Origins
-CSRF_TRUSTED_ORIGINS = [
-    'http://127.0.0.1:8000',
-    'http://localhost:8000',
-    'https://bug-tracker-z4mi.onrender.com',
-]
-
 handler404 = 'marmot.views.handler404'
 
 # APScheduler Configuration
 APSCHEDULER_DATETIME_FORMAT = "N j, Y, f:s a"
 APSCHEDULER_TIMEZONE = 'Asia/Kolkata'
 
-
-PAGINATION_COUNT = os.getenv('PAGINATION_COUNT')
+PAGINATION_COUNT = os.getenv('PAGINATION_COUNT', 25)
 REDIS_URL = os.getenv('REDIS_URL')
 WS_PORT = os.getenv('WS_PORT', '8082')
 
@@ -201,5 +206,45 @@ DEFAULT_FROM_EMAIL = os.getenv('DEFAULT_FROM_EMAIL', 'Marmot Trading <noreply@ma
 LOG_DIR = BASE_DIR / 'logs'
 LOG_RETENTION_DAYS = int(os.getenv('LOG_RETENTION_DAYS', 30))
 
+# Allauth Configuration
+SITE_ID = 1
 
+AUTHENTICATION_BACKENDS = [
+    'django.contrib.auth.backends.ModelBackend',
+    'allauth.account.auth_backends.AuthenticationBackend',
+]
 
+ACCOUNT_EMAIL_VERIFICATION = 'none'
+ACCOUNT_LOGIN_METHODS = {'email'}
+ACCOUNT_SIGNUP_FIELDS = ['email*', 'password1*', 'password2*']
+SOCIALACCOUNT_LOGIN_ON_GET = True
+
+# Social Account Providers Configuration
+# Configuring APP credentials in settings prevents SocialApp.DoesNotExist errors
+SOCIALACCOUNT_PROVIDERS = {
+    'google': {
+        'APP': {
+            'client_id': os.getenv('GOOGLE_CLIENT_ID', 'placeholder-google-client-id'),
+            'secret': os.getenv('GOOGLE_CLIENT_SECRET', 'placeholder-google-client-secret'),
+            'key': ''
+        },
+        'SCOPE': [
+            'profile',
+            'email',
+        ],
+        'AUTH_PARAMS': {
+            'access_type': 'online',
+        }
+    },
+    'github': {
+        'APP': {
+            'client_id': os.getenv('GITHUB_CLIENT_ID', 'placeholder-github-client-id'),
+            'secret': os.getenv('GITHUB_CLIENT_SECRET', 'placeholder-github-client-secret'),
+            'key': ''
+        },
+        'SCOPE': [
+            'user:email',
+            'read:user',
+        ],
+    }
+}
