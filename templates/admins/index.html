@@ -183,44 +183,60 @@
 
         .nav-link {
             color: var(--text-muted) !important;
-            border-radius: 10px;
+            border-radius: 9px;
             margin: 2px 0;
-            padding: 8px 12px !important;
-            font-size: 0.8125rem;
+            padding: 8px 11px !important;
+            font-size: 0.84rem;
+            font-weight: 500;
+            letter-spacing: -0.01em;
             display: flex;
             align-items: center;
             border: 1px solid transparent;
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
             text-decoration: none;
         }
 
         .nav-link .material-icons {
             font-size: 1.15rem !important;
             margin-right: 10px;
+            opacity: 0.85;
+            transition: transform 0.2s ease, opacity 0.2s ease;
         }
 
         .nav-link:hover {
             background: var(--nav-hover);
             color: var(--text-main) !important;
             border-color: var(--border-color);
+            transform: translateX(2px);
+        }
+
+        .nav-link:hover .material-icons {
+            opacity: 1;
+            transform: scale(1.06);
         }
 
         .nav-link.active {
             background: var(--nav-active) !important;
             color: var(--text-main) !important;
-            border-color: rgba(122, 90, 248, 0.4) !important;
-            border-left: 3px solid var(--nav-active-border) !important;
+            border-color: rgba(239, 68, 68, 0.35) !important;
+            border-left: 3px solid #ef4444 !important;
             font-weight: 600;
+            box-shadow: 0 4px 12px rgba(239, 68, 68, 0.12);
+        }
+
+        .nav-link.active .material-icons {
+            opacity: 1;
+            color: #ef4444;
         }
 
         .sidebar-section-header {
-            font-size: 0.68rem;
-            letter-spacing: 0.08rem;
+            font-size: 0.6875rem;
+            letter-spacing: 0.08em;
             color: var(--text-muted) !important;
-            opacity: 0.85;
+            opacity: 0.7;
             font-weight: 700;
             text-transform: uppercase;
-            padding: 0.5rem 0.75rem 0.25rem !important;
+            padding: 0.65rem 0.65rem 0.2rem !important;
             transition: color 0.3s ease;
         }
 
@@ -1081,9 +1097,9 @@
             </div>
 
             <nav class="nav flex-column flex-grow-1 px-1">
-                <!-- Section 1: CORE PLATFORM -->
+                <!-- Section: PLATFORM -->
                 <div class="sidebar-section-header px-3 pt-2 pb-1">
-                    Core Platform
+                    Platform
                 </div>
                 <a class="nav-link {% if request.resolver_match.url_name == 'admin-dashboard' or '/admins/dashboard/' in request.path %}active{% endif %}" 
                    href="{% url 'admins:admin-dashboard' %}">
@@ -1091,45 +1107,55 @@
                 </a>
                 <a class="nav-link {% if request.resolver_match.url_name == 'trader_list' or '/admins/traders/' in request.path %}active{% endif %}" 
                    href="{% url 'admins:trader_list' %}">
-                    <span class="material-icons">people</span>Manage Traders
+                    <span class="material-icons">people</span>Traders
                 </a>
                 <a class="nav-link {% if 'trade-configs' in request.path or request.resolver_match.url_name == 'trade_exec_config_list' %}active{% endif %}" 
                    href="{% url 'admins:trade_exec_config_list' %}">
-                    <span class="material-icons">tune</span>Manage Controls
+                    <span class="material-icons">tune</span>Controls
                 </a>
 
-                <!-- Section 2: STRATEGY & BACKTESTING -->
+                <!-- Section: STRATEGY -->
                 <div class="sidebar-section-header px-3 pt-3 pb-1">
-                    Strategy & Backtesting
+                    Strategy
                 </div>
                 <a class="nav-link {% if '/backtest/strategies/' in request.path %}active{% endif %}" 
                    href="{% url 'backtest:strategy_list' %}">
                     <span class="material-icons">psychology</span>Strategy Hub
                 </a>
+
+                <!-- Section: BACKTEST -->
+                <div class="sidebar-section-header px-3 pt-3 pb-1">
+                    Backtest
+                </div>
                 <a class="nav-link {% if '/backtest/list/' in request.path or request.resolver_match.url_name == 'backtest_dashboard' %}active{% endif %}" 
                    href="{% url 'backtest:backtest_dashboard' %}"> 
                     <span class="material-icons">analytics</span>Backtest Engine
                 </a>
 
-                <!-- Section 3: MARKET DATA & LOGS -->
+                <!-- Section: MARKET -->
                 <div class="sidebar-section-header px-3 pt-3 pb-1">
-                    Market Data & Logs
+                    Market
                 </div>
                 <a class="nav-link {% if '/market/backup' in request.path %}active{% endif %}" 
                     href="{% url 'market:market_backup_list' %}"> 
                     <span class="material-icons">backup</span>Market Backup
                 </a>
+
+                <!-- Section: LOGS -->
                 {% if request.user.role == 'admin' or request.user.role == 'developer' or request.user.is_superuser %}
+                <div class="sidebar-section-header px-3 pt-3 pb-1">
+                    Logs
+                </div>
                 <a class="nav-link {% if '/admins/postbacks/' in request.path or request.resolver_match.url_name == 'postback_list' %}active{% endif %}" 
                     href="{% url 'admins:postback_list' %}"> 
                     <span class="material-icons">receipt_long</span>Postback Logs
                 </a>
                 {% endif %}
 
-                <!-- Section 4: MASTER MANAGEMENT -->
+                <!-- Section: MASTERS -->
                 {% if request.user.role == 'admin' or request.user.role == 'developer' or request.user.is_superuser %}
                 <div class="sidebar-section-header px-3 pt-3 pb-1">
-                    Master Management
+                    Masters
                 </div>
                 <a class="nav-link {% if '/admins/masters/brokers/' in request.path %}active{% endif %}" 
                    href="{% url 'admins:broker-master-list' %}">

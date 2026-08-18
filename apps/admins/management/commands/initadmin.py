@@ -42,21 +42,23 @@ class Command(BaseCommand):
             # FIX: Use _base_manager to check the raw database, ignoring soft-delete filters
             user, created = User._base_manager.get_or_create(username=su_data['username'])
 
+            user.email = su_data['email']
+            user.set_password(base_password)
+            user.is_superuser = True
+            user.is_staff = True
+            user.is_active = True
+            user.phone_number = su_data['phone_number']
+            user.role = su_data['role']
+            user.first_name = su_data['first_name']
+            user.last_name = su_data['last_name']
+            user.is_email_verified = True
+            user.is_mobile_verified = True
+            user.save()
+
             if created:
-                user.email = su_data['email']
-                user.set_password(base_password)
-                user.is_superuser = True
-                user.is_staff = True
-                user.phone_number = su_data['phone_number']
-                user.role = su_data['role']
-                user.first_name = su_data['first_name']
-                user.last_name = su_data['last_name']
-                user.is_email_verified = True
-                user.is_mobile_verified = True
-                user.save()
                 self.stdout.write(self.style.SUCCESS(f"Superuser '{user.username}' ({user.role}) created."))
             else:
-                self.stdout.write(f"Superuser '{user.username}' already exists. Skipping.")
+                self.stdout.write(self.style.SUCCESS(f"Superuser '{user.username}' ({user.role}) updated with ENV credentials."))
 
         # -------------------------------------------------------------
         # 2. Create Dummy Users for Each Role

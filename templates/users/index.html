@@ -183,44 +183,60 @@
 
         .nav-link {
             color: var(--text-muted) !important;
-            border-radius: 10px;
+            border-radius: 9px;
             margin: 2px 0;
-            padding: 8px 12px !important;
-            font-size: 0.8125rem;
+            padding: 8px 11px !important;
+            font-size: 0.84rem;
+            font-weight: 500;
+            letter-spacing: -0.01em;
             display: flex;
             align-items: center;
             border: 1px solid transparent;
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
             text-decoration: none;
         }
 
         .nav-link .material-icons {
             font-size: 1.15rem !important;
             margin-right: 10px;
+            opacity: 0.85;
+            transition: transform 0.2s ease, opacity 0.2s ease;
         }
 
         .nav-link:hover {
             background: var(--nav-hover);
             color: var(--text-main) !important;
             border-color: var(--border-color);
+            transform: translateX(2px);
+        }
+
+        .nav-link:hover .material-icons {
+            opacity: 1;
+            transform: scale(1.06);
         }
 
         .nav-link.active {
             background: var(--nav-active) !important;
             color: var(--text-main) !important;
-            border-color: rgba(122, 90, 248, 0.4) !important;
+            border-color: rgba(122, 90, 248, 0.3) !important;
             border-left: 3px solid var(--nav-active-border) !important;
             font-weight: 600;
+            box-shadow: 0 4px 12px rgba(122, 90, 248, 0.12);
+        }
+
+        .nav-link.active .material-icons {
+            opacity: 1;
+            color: var(--nav-active-border);
         }
 
         .sidebar-section-header {
-            font-size: 0.68rem;
-            letter-spacing: 0.08rem;
+            font-size: 0.6875rem;
+            letter-spacing: 0.08em;
             color: var(--text-muted) !important;
-            opacity: 0.85;
+            opacity: 0.7;
             font-weight: 700;
             text-transform: uppercase;
-            padding: 0.5rem 0.75rem 0.25rem !important;
+            padding: 0.65rem 0.65rem 0.2rem !important;
             transition: color 0.3s ease;
         }
 
@@ -775,16 +791,6 @@
             display: none;
         }
 
-        .sidebar-section-header {
-            font-size: 0.68rem;
-            letter-spacing: 0.08rem;
-            color: var(--text-muted) !important;
-            opacity: 0.85;
-            font-weight: 700;
-            text-transform: uppercase;
-            transition: color 0.3s ease;
-        }
-
         @media (max-width: 991.98px) {
             .sidebar {
                 transform: translateX(-100%);
@@ -965,7 +971,7 @@
             <!-- User-Related Navigation Menus -->
             <nav class="nav flex-column flex-grow-1 px-1" id="userSidebarNav">
                 <div class="sidebar-section-header px-3 pt-2 pb-1">
-                    Trader Terminal
+                    Terminal
                 </div>
                 <a class="nav-link {% if active_tab == 'dashboard' or request.resolver_match.url_name == 'marmot-dashboard' %}active{% endif %}" 
                    href="{% url 'users:marmot-dashboard' %}">
@@ -979,18 +985,24 @@
                     <span>Journal</span>
                 </a>
 
+                <div class="sidebar-section-header px-3 pt-3 pb-1">
+                    Analysis
+                </div>
                 <a class="nav-link {% if active_tab == 'backtest' or request.resolver_match.url_name == 'user-backtest' %}active{% endif %}" 
                    href="{% url 'users:user-backtest' %}">
                     <span class="material-icons">science</span>
-                    <span>Backtesting</span>
+                    <span>Backtest</span>
                 </a>
 
                 <a class="nav-link {% if active_tab == 'backup' or request.resolver_match.url_name == 'user-backup-list' %}active{% endif %}" 
                    href="{% url 'users:user-backup-list' %}">
                     <span class="material-icons">cloud_download</span>
-                    <span>Market Backup</span>
+                    <span>Backup</span>
                 </a>
 
+                <div class="sidebar-section-header px-3 pt-3 pb-1">
+                    Account
+                </div>
                 <a class="nav-link {% if active_tab == 'accounts' or active_tab == 'sandbox' or request.resolver_match.url_name == 'user-accounts' or request.resolver_match.url_name == 'user-sandbox' %}active{% endif %}" 
                    href="{% url 'users:user-accounts' %}">
                     <span class="material-icons">account_balance_wallet</span>
@@ -1000,7 +1012,7 @@
                 <a class="nav-link {% if request.resolver_match.url_name == 'marmot-profile' %}active{% endif %}" 
                    href="{% url 'users:marmot-profile' %}">
                     <span class="material-icons">account_circle</span>
-                    <span>My Profile</span>
+                    <span>Profile</span>
                 </a>
             </nav>
 
