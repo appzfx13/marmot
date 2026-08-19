@@ -107,7 +107,7 @@ class VerifyOtpView(FormView):
             return self.form_invalid(form)
 
         # Authenticate and login verified active user
-        auth_login(self.request, user)
+        auth_login(self.request, user, backend='django.contrib.auth.backends.ModelBackend')
 
         if self.request.session.pop('remember_me_pending', False):
             self.request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days
@@ -184,7 +184,7 @@ class LoginView(FormView):
 
     def form_valid(self, form):
         user = form.get_user()
-        auth_login(self.request, user)
+        auth_login(self.request, user, backend='django.contrib.auth.backends.ModelBackend')
 
         if form.cleaned_data.get('remember_me'):
             self.request.session.set_expiry(60 * 60 * 24 * 30)  # 30 days

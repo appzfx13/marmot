@@ -49,7 +49,7 @@ class AdminLoginView(HTMXPartialMixin, HtmxMessageMixin, LoginView):
 
     def form_valid(self, form):
         try:
-            auth_login(self.request, form.get_user())
+            auth_login(self.request, form.get_user(), backend='django.contrib.auth.backends.ModelBackend')
             success_url = str(self.get_success_url())
             if self.request.headers.get('HX-Request'):
                 response = HttpResponse(status=204)

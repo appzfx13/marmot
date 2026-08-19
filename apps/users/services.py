@@ -107,6 +107,7 @@ def verify_email_otp(entered_otp: str, request: Any) -> Tuple[bool, Optional[Use
         user.is_email_verified = True
         user.is_active = True
         user.save(update_fields=['is_email_verified', 'is_active', 'updated_at'])
+        user.backend = 'django.contrib.auth.backends.ModelBackend'
 
         if was_unverified and purpose == 'signup_activation':
             try:
