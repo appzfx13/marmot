@@ -40,10 +40,13 @@
                 </div>
             </div>
 
-            <!-- Health Status & Quick Auth Trigger -->
-            <div class="d-flex align-items-center gap-2 ms-md-auto">
+            <!-- Health Status & Account Switcher & Auth Trigger -->
+            <div class="d-flex align-items-center gap-2 ms-md-auto flex-wrap">
+                <!-- Active Trading Account Switcher -->
+                {% include "users/partials/account_selector_dropdown.html" %}
+
                 {% if has_configured_account %}
-                    <div class="glass-card px-3 py-15 rounded-pill d-inline-flex align-items-center gap-2 border"
+                    <div class="glass-card px-3 py-1.5 rounded-pill d-inline-flex align-items-center gap-2 border"
                          style="background: rgba(255,255,255,0.03); border-color: var(--border-color) !important;">
                         {% if is_token_active %}
                             <span class="position-relative d-flex h-2 w-2">
@@ -62,13 +65,13 @@
                             <a href="{% url 'trade_core:dhan-user-login' %}" 
                                hx-get="{% url 'trade_core:dhan-user-login' %}"
                                hx-target="#globalHtmxModalDialog"
-                               class="btn btn-sm btn-warning rounded-pill px-3 py-15 fw-bold text-dark d-flex align-items-center gap-1 shadow-sm">
+                               class="btn btn-sm btn-warning rounded-pill px-3 py-1.5 fw-bold text-dark d-flex align-items-center gap-1 shadow-sm">
                                 <span class="material-icons fs-6">vpn_key</span>
                                 <span>Dhan Consent Login</span>
                             </a>
                         {% else %}
                             <a href="{% url 'users:user-accounts' %}" 
-                               class="btn btn-sm btn-primary rounded-pill px-3 py-15 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
+                               class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
                                 <span class="material-icons fs-6">settings</span>
                                 <span>Connect {{ broker_name }}</span>
                             </a>
@@ -78,7 +81,7 @@
                     <button type="button" 
                             hx-get="{% url 'users:user-account-create-modal' %}"
                             hx-target="#globalHtmxModalDialog"
-                            class="btn btn-sm btn-primary rounded-pill px-3 py-15 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
+                            class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
                         <span class="material-icons fs-6">add_card</span>
                         <span>Add Trading Account</span>
                     </button>

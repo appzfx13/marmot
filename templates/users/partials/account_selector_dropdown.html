@@ -1,20 +1,20 @@
 <!-- templates/users/partials/account_selector_dropdown.html -->
 <form hx-post="{% url 'users:user-account-select' %}"
       hx-swap="none"
-      class="d-inline-flex align-items-center gap-2">
+      class="d-inline-flex align-items-center m-0 p-0">
     {% csrf_token %}
-    <div class="glass-card px-2 py-1 rounded-pill d-inline-flex align-items-center gap-1 shadow-sm border border-secondary border-opacity-25" title="Select Active Trading Account">
-        <span class="material-icons text-primary fs-6 ms-1">account_balance_wallet</span>
+    <div class="d-inline-flex align-items-center gap-1 px-1 py-0" title="Active Trading Account">
+        <span class="material-icons text-primary" style="font-size: 1.05rem;">account_balance_wallet</span>
         <select name="account_id" 
-                class="form-select form-select-sm bg-transparent border-0 theme-text-main fw-bold font-monospace pe-4 focus-ring-none"
-                style="font-size: 0.8125rem; max-width: 120px; text-overflow: ellipsis; cursor: pointer;"
+                class="form-select form-select-sm bg-transparent border-0 theme-text-main fw-bold font-monospace p-0 pe-3 shadow-none"
+                style="font-size: 0.78rem; max-width: 125px; text-overflow: ellipsis; cursor: pointer; height: 26px; line-height: 26px;"
                 onchange="this.form.requestSubmit();">
             {% for acc in user_trading_accounts %}
                 <option value="{{ acc.id }}" {% if active_trading_account.id == acc.id %}selected{% endif %}>
                     {% if acc.is_default %}★ {% endif %}{{ acc.account_name }} ({{ acc.broker.name }}) - {{ acc.account_type }}
                 </option>
             {% empty %}
-                <option value="">Default Sandbox Account</option>
+                <option value="">Default Sandbox</option>
             {% endfor %}
         </select>
     </div>

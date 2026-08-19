@@ -336,9 +336,27 @@
             border-color: var(--nav-active-border) !important;
         }
 
+        .glass-icon-btn {
+            background: transparent;
+            border: 1px solid transparent;
+            color: var(--text-main);
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+            padding: 0;
+            margin: 0;
+        }
+
         .glass-icon-btn:hover {
-            background: var(--btn-secondary-bg);
-            transform: translateY(-1px);
+            background: var(--nav-hover);
+            color: var(--text-main);
+            transform: scale(1.05);
         }
 
         .glass-icon-btn-danger {
@@ -351,29 +369,31 @@
             background: rgba(220, 53, 69, 0.25) !important;
             border-color: #dc3545 !important;
             color: #ff4d4d !important;
-            transform: translateY(-1px);
+            transform: scale(1.08);
             box-shadow: 0 0 12px rgba(220, 53, 69, 0.4);
         }
 
         .profile-avatar-btn {
-            width: 38px;
-            height: 38px;
+            width: 28px;
+            height: 28px;
             border-radius: 50%;
             background: var(--nav-active-border);
             color: #ffffff;
             font-weight: 700;
-            font-size: 0.85rem;
-            display: flex;
+            font-size: 0.72rem;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             border: none;
             cursor: pointer;
+            padding: 0;
+            margin: 0;
             transition: transform 0.2s ease, box-shadow 0.2s ease;
         }
 
         .profile-avatar-btn:hover {
-            transform: scale(1.05);
-            box-shadow: 0 0 15px rgba(122, 90, 248, 0.4);
+            transform: scale(1.08);
+            box-shadow: 0 0 12px rgba(122, 90, 248, 0.4);
         }
 
         /* Global Dot Pulse Loading Animation */
@@ -816,6 +836,16 @@
             backdrop-filter: blur(4px);
             z-index: 1040;
             display: none;
+            pointer-events: none;
+        }
+
+        #toast-container {
+            pointer-events: none !important;
+        }
+
+        #toast-container .toast,
+        .toast {
+            pointer-events: auto !important;
         }
 
         @media (max-width: 991.98px) {
@@ -1002,19 +1032,31 @@
                     Terminal
                 </div>
                 <a class="nav-link {% if active_tab == 'terminal' or request.resolver_match.url_name == 'user-terminal' %}active{% endif %}" 
-                   href="{% url 'users:user-terminal' %}">
+                   href="{% url 'users:user-terminal' %}"
+                   hx-get="{% url 'users:user-terminal' %}"
+                   hx-target="#user-portal-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
                     <span class="material-icons">terminal</span>
                     <span>Terminal Panel</span>
                 </a>
 
                 <a class="nav-link {% if active_tab == 'dashboard' or request.resolver_match.url_name == 'marmot-dashboard' %}active{% endif %}" 
-                   href="{% url 'users:marmot-dashboard' %}">
+                   href="{% url 'users:marmot-dashboard' %}"
+                   hx-get="{% url 'users:marmot-dashboard' %}"
+                   hx-target="#user-portal-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
                     <span class="material-icons">dashboard</span>
                     <span>Dashboard</span>
                 </a>
 
                 <a class="nav-link {% if active_tab == 'journal' or request.resolver_match.url_name == 'user-journal' %}active{% endif %}" 
-                   href="{% url 'users:user-journal' %}">
+                   href="{% url 'users:user-journal' %}"
+                   hx-get="{% url 'users:user-journal' %}"
+                   hx-target="#user-portal-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
                     <span class="material-icons">menu_book</span>
                     <span>Journal</span>
                 </a>
@@ -1023,13 +1065,21 @@
                     Analysis
                 </div>
                 <a class="nav-link {% if active_tab == 'backtest' or request.resolver_match.url_name == 'user-backtest' %}active{% endif %}" 
-                   href="{% url 'users:user-backtest' %}">
+                   href="{% url 'users:user-backtest' %}"
+                   hx-get="{% url 'users:user-backtest' %}"
+                   hx-target="#user-portal-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
                     <span class="material-icons">science</span>
                     <span>Backtest</span>
                 </a>
 
                 <a class="nav-link {% if active_tab == 'backup' or request.resolver_match.url_name == 'user-backup-list' %}active{% endif %}" 
-                   href="{% url 'users:user-backup-list' %}">
+                   href="{% url 'users:user-backup-list' %}"
+                   hx-get="{% url 'users:user-backup-list' %}"
+                   hx-target="#user-portal-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
                     <span class="material-icons">cloud_download</span>
                     <span>Backup</span>
                 </a>
@@ -1038,7 +1088,11 @@
                     Account
                 </div>
                 <a class="nav-link {% if active_tab == 'accounts' or active_tab == 'sandbox' or request.resolver_match.url_name == 'user-accounts' or request.resolver_match.url_name == 'user-sandbox' %}active{% endif %}" 
-                   href="{% url 'users:user-accounts' %}">
+                   href="{% url 'users:user-accounts' %}"
+                   hx-get="{% url 'users:user-accounts' %}"
+                   hx-target="#user-portal-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
                     <span class="material-icons">account_balance_wallet</span>
                     <span>Accounts</span>
                 </a>
@@ -1068,21 +1122,12 @@
             <!-- Sticky Top Header Navbar -->
             <div class="sticky-top-navbar">
                 <div class="d-flex align-items-center justify-content-between mb-3 gap-2">
-                    <button class="glass-icon-btn d-lg-none" id="sidebarToggleBtn" type="button" title="Toggle Navigation">
+                    <button class="glass-icon-btn" id="sidebarToggleBtn" type="button" title="Toggle Navigation">
                         <span class="material-icons fs-5">menu</span>
                     </button>
 
                     <div class="top-action-bar ms-auto d-flex align-items-center gap-2">
-                        <!-- Live Time Widget in Fixed Header -->
-                        <div class="glass-card px-3 py-1 rounded-pill d-none d-sm-inline-flex align-items-center gap-1 theme-text-main small" title="Live Local Time">
-                            <span class="material-icons text-primary fs-6">schedule</span>
-                            <span id="liveClockWidget" class="fw-bold font-monospace">00:00:00 AM</span>
-                        </div>
-
-                        <!-- Active Trading Account Selector Dropdown -->
-                        {% include "users/partials/account_selector_dropdown.html" %}
-
-                        <!-- Emergency Kill Switch Button (Dhan Broker Users Only) -->
+                        <!-- Emergency Kill Switch Button -->
                         {% if not request.user.broker or request.user.broker == 'dhan' %}
                         <button class="glass-icon-btn glass-icon-btn-danger" 
                                 type="button" 
@@ -1093,6 +1138,22 @@
                         </button>
                         {% endif %}
 
+                        <!-- Notifications Dropdown -->
+                        <div class="dropdown">
+                            <button class="glass-icon-btn" type="button" id="notificationDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Notifications">
+                                <span class="material-icons fs-5">notifications</span>
+                                <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle">
+                                    <span class="visually-hidden">New alerts</span>
+                                </span>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end glass-card shadow-lg mt-2 p-2" aria-labelledby="notificationDropdown" style="min-width: 260px;">
+                                <li class="dropdown-header theme-text-main fw-bold">Notifications</li>
+                                <li><hr class="dropdown-divider border-secondary opacity-25"></li>
+                                <li><a class="dropdown-item rounded theme-text-muted small py-2" href="#">Trading Engine Active</a></li>
+                                <li><a class="dropdown-item rounded theme-text-muted small py-2" href="#">Broker API Connected</a></li>
+                            </ul>
+                        </div>
+
                         <!-- Theme Toggle Button -->
                         <button class="glass-icon-btn" id="themeToggleBtn" type="button" title="Toggle Theme">
                             <span class="material-icons fs-5" id="themeToggleIcon">dark_mode</span>
@@ -1101,35 +1162,19 @@
                         <!-- User Profile Avatar & Dropdown -->
                         <div class="dropdown">
                             <button class="profile-avatar-btn" type="button" id="profileDropdown" data-bs-toggle="dropdown" aria-expanded="false" title="Account Settings">
-                                {% if request.user.first_name and request.user.last_name %}
-                                    {{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}
-                                {% elif request.user.username %}
-                                    {{ request.user.username|slice:":2"|upper }}
-                                {% else %}
-                                    TR
-                                {% endif %}
+                                {% if request.user.first_name and request.user.last_name %}{{ request.user.first_name|slice:":1"|upper }}{{ request.user.last_name|slice:":1"|upper }}{% elif request.user.username %}{{ request.user.username|slice:":2"|upper }}{% else %}TR{% endif %}
                             </button>
                             <ul class="dropdown-menu dropdown-menu-end glass-card shadow-lg mt-2 p-2" aria-labelledby="profileDropdown">
-                                <li class="px-3 py-2 border-bottom border-secondary border-opacity-25 mb-1">
-                                    <div class="fw-bold theme-text-main">
-                                        {% if request.user.first_name %}{{ request.user.first_name }} {{ request.user.last_name }}{% else %}{{ request.user.username }}{% endif %}
-                                    </div>
-                                    <div class="small theme-text-muted">@{{ request.user.username }}</div>
+                                <li class="px-3 py-1">
+                                    <div class="fw-bold theme-text-main">{% if request.user.first_name %}{{ request.user.first_name }}{% else %}{{ request.user.username }}{% endif %}</div>
+                                    <div class="small theme-text-muted">{{ request.user.email|default:"Trader Profile" }}</div>
                                 </li>
+                                <li><hr class="dropdown-divider border-secondary opacity-25"></li>
                                 <li>
                                     <a class="dropdown-item rounded theme-text-main small py-2 d-flex align-items-center gap-2" href="{% url 'users:marmot-profile' %}">
                                         <span class="material-icons fs-6 text-primary">person</span>
                                         <span>My Profile</span>
                                     </a>
-                                </li>
-                                <li>
-                                    <button type="button" 
-                                            class="dropdown-item rounded theme-text-main small py-2 d-flex align-items-center gap-2"
-                                            hx-get="{% url 'users:marmot-profile-password' %}"
-                                            hx-target="#globalHtmxModalDialog">
-                                        <span class="material-icons fs-6 text-warning">security</span>
-                                        <span>Change Password</span>
-                                    </button>
                                 </li>
                                 <li><hr class="dropdown-divider border-secondary opacity-25"></li>
                                 <li>
@@ -1180,26 +1225,6 @@
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
 
     <script>
-        // Defensive SelectorEngine Guard: Prevents Bootstrap selector-engine.js:41 illegal invocation when context node is null
-        (function() {
-            if (typeof Element !== 'undefined' && Element.prototype) {
-                const origQS = Element.prototype.querySelector;
-                Element.prototype.querySelector = function(selector) {
-                    if (!this || !(this instanceof Element || this instanceof Document)) {
-                        return document.querySelector(selector);
-                    }
-                    return origQS.call(this, selector);
-                };
-                const origQSA = Element.prototype.querySelectorAll;
-                Element.prototype.querySelectorAll = function(selector) {
-                    if (!this || !(this instanceof Element || this instanceof Document)) {
-                        return document.querySelectorAll(selector);
-                    }
-                    return origQSA.call(this, selector);
-                };
-            }
-        })();
-
         // Theme Engine Logic (Synchronized with Admin Portal Theme System)
         const themeToggleBtn = document.getElementById('themeToggleBtn');
         const themeToggleIcon = document.getElementById('themeToggleIcon');
@@ -1207,12 +1232,13 @@
         function applyTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
             localStorage.setItem('marmot_theme', theme);
+            localStorage.setItem('theme', theme);
             if (themeToggleIcon) {
-                themeToggleIcon.textContent = theme === 'light' ? 'light_mode' : 'dark_mode';
+                themeToggleIcon.textContent = theme === 'dark' ? 'dark_mode' : 'light_mode';
             }
         }
 
-        const savedTheme = localStorage.getItem('marmot_theme') || 'dark';
+        const savedTheme = localStorage.getItem('marmot_theme') || localStorage.getItem('theme') || 'dark';
         applyTheme(savedTheme);
 
         if (themeToggleBtn) {
@@ -1223,22 +1249,33 @@
             });
         }
 
-        // Mobile Sidebar Controls
-        const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
-        const closeSidebarBtn = document.getElementById('closeSidebarBtn');
-        const sidebarOverlay = document.getElementById('sidebarOverlay');
+        // Sidebar Toggle Controls (Desktop Collapsing + Mobile Drawer)
+        (function() {
+            const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+            const closeSidebarBtn = document.getElementById('closeSidebarBtn');
+            const sidebar = document.getElementById('mainSidebar');
+            const overlay = document.getElementById('sidebarOverlay');
 
-        function openMobileSidebar() {
-            document.body.classList.add('sidebar-mobile-open');
-        }
+            function toggleSidebar() {
+                if (window.innerWidth < 992) {
+                    if (sidebar) sidebar.classList.toggle('show');
+                    if (overlay) overlay.classList.toggle('show');
+                    document.body.classList.toggle('sidebar-mobile-open');
+                } else {
+                    document.body.classList.toggle('sidebar-collapsed');
+                }
+            }
 
-        function closeMobileSidebar() {
-            document.body.classList.remove('sidebar-mobile-open');
-        }
+            function closeMobileSidebar() {
+                if (sidebar) sidebar.classList.remove('show');
+                if (overlay) overlay.classList.remove('show');
+                document.body.classList.remove('sidebar-mobile-open');
+            }
 
-        if (sidebarToggleBtn) sidebarToggleBtn.addEventListener('click', openMobileSidebar);
-        if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeMobileSidebar);
-        if (sidebarOverlay) sidebarOverlay.addEventListener('click', closeMobileSidebar);
+            if (sidebarToggleBtn) sidebarToggleBtn.addEventListener('click', toggleSidebar);
+            if (closeSidebarBtn) closeSidebarBtn.addEventListener('click', closeMobileSidebar);
+            if (overlay) overlay.addEventListener('click', closeMobileSidebar);
+        })();
 
         // Robust Global HTMX Modal Controller
         function getGlobalModalEl() {
@@ -1404,10 +1441,35 @@
             document.addEventListener("htmx:afterSettle", initMacDatePicker);
         })();
 
-        // Glassmorphic Floating Selector Engine
+        // Glassmorphic Floating Selector Engine & Tab Swapping
         (function() {
-            function initSidebarSelector(navId) {
-                var nav = document.getElementById(navId);
+            function updatePosition(nav, targetEl, animate) {
+                if (!nav) return;
+                var selector = nav.querySelector('.nav-glass-selector');
+                if (!selector) return;
+                if (!targetEl) {
+                    selector.style.opacity = '0';
+                    return;
+                }
+                if (animate === false) {
+                    selector.style.transition = 'none';
+                } else {
+                    selector.style.transition = 'transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), height 0.25s ease, width 0.25s ease, opacity 0.2s ease';
+                }
+                selector.style.transform = 'translate3d(0, ' + targetEl.offsetTop + 'px, 0)';
+                selector.style.height = targetEl.offsetHeight + 'px';
+                selector.style.left = targetEl.offsetLeft + 'px';
+                selector.style.width = targetEl.offsetWidth + 'px';
+                selector.style.opacity = '1';
+
+                if (animate === false) {
+                    void selector.offsetWidth;
+                    selector.style.transition = '';
+                }
+            }
+
+            function initSidebarSelector() {
+                var nav = document.getElementById('userSidebarNav');
                 if (!nav) return;
                 nav.style.position = 'relative';
 
@@ -1418,60 +1480,72 @@
                     nav.insertBefore(selector, nav.firstChild);
                 }
 
-                var activeLink = nav.querySelector('.nav-link.active');
-                var currentTarget = activeLink;
-
-                function updatePosition(targetEl, animate) {
-                    if (!targetEl) {
-                        selector.style.opacity = '0';
-                        return;
-                    }
-                    if (animate === false) {
-                        selector.style.transition = 'none';
-                    } else {
-                        selector.style.transition = '';
-                    }
-                    selector.style.transform = 'translate3d(0, ' + targetEl.offsetTop + 'px, 0)';
-                    selector.style.height = targetEl.offsetHeight + 'px';
-                    selector.style.left = targetEl.offsetLeft + 'px';
-                    selector.style.width = targetEl.offsetWidth + 'px';
-                    selector.style.opacity = '1';
-
-                    if (animate === false) {
-                        void selector.offsetWidth;
-                        selector.style.transition = '';
-                    }
-                }
-
-                updatePosition(currentTarget, false);
-
+                // Match active tab based on window.location
+                var currentPath = window.location.pathname;
+                var activeLink = null;
                 var links = nav.querySelectorAll('.nav-link');
                 links.forEach(function(link) {
-                    link.addEventListener('click', function() {
-                        if (link === currentTarget) return;
-                        links.forEach(function(l) { l.classList.remove('active'); });
-                        link.classList.add('active');
-                        currentTarget = link;
-                        updatePosition(link, true);
-                    });
+                    var href = link.getAttribute('href') || '';
+                    if (href && currentPath === href) {
+                        activeLink = link;
+                    }
                 });
-
-                window.addEventListener('resize', function() {
-                    updatePosition(currentTarget, false);
-                });
+                if (!activeLink) {
+                    activeLink = nav.querySelector('.nav-link.active') || links[0];
+                }
+                if (activeLink) {
+                    links.forEach(function(l) { l.classList.remove('active'); });
+                    activeLink.classList.add('active');
+                }
+                updatePosition(nav, activeLink, false);
             }
 
-            function initAllSelectors() {
-                initSidebarSelector('userSidebarNav');
-            }
+            // Single delegated click listener
+            document.addEventListener('click', function(e) {
+                var link = e.target.closest('#userSidebarNav .nav-link');
+                if (!link) return;
+                var nav = document.getElementById('userSidebarNav');
+                if (!nav) return;
+
+                nav.querySelectorAll('.nav-link').forEach(function(l) { l.classList.remove('active'); });
+                link.classList.add('active');
+                updatePosition(nav, link, true);
+
+                // Auto close mobile sidebar
+                if (document.body.classList.contains('sidebar-mobile-open')) {
+                    document.body.classList.remove('sidebar-mobile-open');
+                }
+            });
+
+            // Cleanup any active chart/polling intervals before HTMX swaps new content
+            document.body.addEventListener('htmx:beforeSwap', function(evt) {
+                if (evt && evt.detail && evt.detail.target && evt.detail.target.id === 'user-portal-container') {
+                    if (window.liveTickInterval) {
+                        clearInterval(window.liveTickInterval);
+                        window.liveTickInterval = null;
+                    }
+                }
+            });
+
+            window.addEventListener('resize', function() {
+                var nav = document.getElementById('userSidebarNav');
+                if (nav) {
+                    var activeLink = nav.querySelector('.nav-link.active');
+                    updatePosition(nav, activeLink, false);
+                }
+            });
+
+            window.addEventListener('popstate', function() {
+                setTimeout(initSidebarSelector, 50);
+            });
 
             if (document.readyState === 'loading') {
-                document.addEventListener("DOMContentLoaded", initAllSelectors);
+                document.addEventListener("DOMContentLoaded", initSidebarSelector);
             } else {
-                initAllSelectors();
+                initSidebarSelector();
             }
             document.addEventListener("htmx:afterSettle", function() {
-                initAllSelectors();
+                initSidebarSelector();
             });
         })();
     </script>
