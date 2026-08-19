@@ -1,0 +1,533 @@
+{% load static %}
+<div class="row g-3">
+    <!-- Top Admin Terminal Control Header -->
+    <div class="col-12">
+        <div class="glass-card p-3 rounded-4 border d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3"
+             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+            
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0"
+                     style="width: 48px; height: 48px; border: 1px solid rgba(239, 68, 68, 0.3);">
+                    <span class="material-icons fs-3">terminal</span>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h4 class="theme-text-main fw-bold mb-0">Admin Master Terminal</h4>
+                        {% if has_configured_master %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
+                                <span class="material-icons fs-6 align-middle me-1">admin_panel_settings</span>MASTER CONTROL
+                            </span>
+                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
+                                DHAN &amp; FYERS
+                            </span>
+                        {% else %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
+                                <span class="material-icons fs-6 align-middle me-1">warning</span>CONFIG REQUIRED
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="theme-text-muted small">Global order execution, algorithmic strategy overrides, and broker gateway control.</div>
+                </div>
+            </div>
+
+            <!-- Global Risk Status & Emergency Kill Switch Trigger -->
+            <div class="d-flex align-items-center gap-2 ms-md-auto">
+                {% if has_configured_master %}
+                    <div class="glass-card px-3 py-15 rounded-pill d-inline-flex align-items-center gap-2 border"
+                         style="background: rgba(255,255,255,0.03); border-color: var(--border-color) !important;">
+                        <span class="position-relative d-flex h-2 w-2">
+                            <span class="animate-ping position-absolute inline-flex h-full w-full rounded-circle bg-success opacity-75" style="width:8px;height:8px;"></span>
+                            <span class="relative inline-flex rounded-circle bg-success" style="width:8px;height:8px;"></span>
+                        </span>
+                        <span class="text-success fw-bold small" style="font-size:0.78rem;">GATEWAY ACTIVE</span>
+                    </div>
+
+                    <button class="btn btn-sm btn-danger rounded-pill px-3 py-15 fw-bold d-flex align-items-center gap-1 shadow-sm"
+                            hx-get="{% url 'users:user-kill-switch' %}"
+                            hx-target="#globalHtmxModalDialog">
+                        <span class="material-icons fs-6">bolt</span>
+                        <span>Emergency Kill Switch</span>
+                    </button>
+                {% else %}
+                    <a href="{% url 'admins:trade_exec_config_create' %}" class="btn btn-sm btn-danger rounded-pill px-3 py-15 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
+                        <span class="material-icons fs-6">add</span>
+                        <span>Create Trade Config</span>
+                    </a>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TOP HERO CHART SECTION: TRADINGVIEW LIGHTWEIGHT CANVAS ENGINE
+         ═══════════════════════════════════════════════════════════════════ -->
+    <div class="col-12">
+        <div class="glass-card p-3 p-sm-4 rounded-4 border overflow-hidden"
+             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+            
+            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3 gap-2 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="material-icons text-danger fs-5">show_chart</span>
+                    <h5 class="fw-bold theme-text-main mb-0" id="adminChartTitle">NIFTY 50</h5>
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small font-monospace fs-6 px-2.5 py-1" id="adminChartLtp">
+                        ₹ 24,450.00 <span class="smaller" id="adminPriceDelta">+125.40 (+0.52%)</span>
+                    </span>
+                    
+                    <!-- Live OHLC Legend -->
+                    <div class="d-none d-lg-flex align-items-center gap-2 ms-2 font-monospace theme-text-muted" style="font-size:0.75rem;">
+                        <span>O: <strong class="theme-text-main" id="adminOhlcO">24,395.00</strong></span>
+                        <span>H: <strong class="text-success" id="adminOhlcH">24,480.00</strong></span>
+                        <span>L: <strong class="text-danger" id="adminOhlcL">24,380.00</strong></span>
+                        <span>C: <strong class="theme-text-main" id="adminOhlcC">24,450.00</strong></span>
+                    </div>
+                </div>
+                
+                <!-- Timeframe Selectors -->
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <div class="d-flex align-items-center gap-1">
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 small theme-text-muted admin-tf-btn" onclick="setAdminTimeframe('1M', this)">1M</button>
+                        <button type="button" class="btn btn-xs btn-danger rounded-pill px-2.5 py-1 small fw-bold admin-tf-btn" onclick="setAdminTimeframe('5M', this)">5M</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 small theme-text-muted admin-tf-btn" onclick="setAdminTimeframe('15M', this)">15M</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 small theme-text-muted admin-tf-btn" onclick="setAdminTimeframe('1H', this)">1H</button>
+                    </div>
+
+                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.7rem;">
+                        <span class="material-icons fs-6 align-middle me-1">auto_awesome</span>MASTER CANVAS STREAM
+                    </span>
+                </div>
+            </div>
+
+            <!-- System Listed Symbols Watchlist -->
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">System Listed Symbols &amp; Options Contracts</label>
+                    <small class="theme-text-muted">Master Chart Control</small>
+                </div>
+                <div class="d-flex flex-wrap gap-1.5 align-items-center">
+                    <!-- Indices -->
+                    <span class="theme-text-muted smaller fw-bold text-uppercase me-1">Indices:</span>
+                    <button type="button" class="btn btn-xs btn-danger active rounded-pill px-3 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('NIFTY 50', 24450.00, 'INDEX', this)">NIFTY 50</button>
+                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-3 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('BANKNIFTY', 52300.00, 'INDEX', this)">BANKNIFTY</button>
+                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-3 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('FINNIFTY', 23150.00, 'INDEX', this)">FINNIFTY</button>
+                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-3 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('SENSEX', 80200.00, 'INDEX', this)">SENSEX</button>
+
+                    <!-- Divider -->
+                    <span class="border-end border-secondary border-opacity-25 mx-1" style="height:18px;"></span>
+
+                    <!-- Options Contracts -->
+                    <span class="theme-text-muted smaller fw-bold text-uppercase me-1">Options Contracts:</span>
+                    <button type="button" class="btn btn-xs btn-outline-success rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('NIFTY 24450 CE', 188.50, 'CE', this)">NIFTY 24450 CE</button>
+                    <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('NIFTY 24450 PE', 142.20, 'PE', this)">NIFTY 24450 PE</button>
+                    <button type="button" class="btn btn-xs btn-outline-success rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('BANKNIFTY 52300 CE', 410.00, 'CE', this)">BANKNIFTY 52300 CE</button>
+                    <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('BANKNIFTY 52300 PE', 380.80, 'PE', this)">BANKNIFTY 52300 PE</button>
+
+                    <!-- Divider -->
+                    <span class="border-end border-secondary border-opacity-25 mx-1" style="height:18px;"></span>
+
+                    <!-- Equities -->
+                    <span class="theme-text-muted smaller fw-bold text-uppercase me-1">Equities:</span>
+                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('RELIANCE', 2980.50, 'EQUITY', this)">RELIANCE</button>
+                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('HDFCBANK', 1620.00, 'EQUITY', this)">HDFCBANK</button>
+                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('INFY', 1845.00, 'EQUITY', this)">INFY</button>
+                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('TCS', 4210.00, 'EQUITY', this)">TCS</button>
+                </div>
+            </div>
+
+            <!-- Lightweight Canvas Chart Box -->
+            <div id="admin_marmot_chart_canvas" style="height: 440px; width: 100%; border-radius: 12px; overflow: hidden; background: #0d0e15;" class="border border-secondary border-opacity-25 position-relative"></div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         BOTTOM SECTION: MASTER CONTROL PANEL & BROKER GATEWAY STREAMS
+         ═══════════════════════════════════════════════════════════════════ -->
+    
+    <!-- Master Order Ticket (Left Bottom) -->
+    <div class="col-12 col-xl-5">
+        {% if has_configured_master %}
+            <!-- Configured Master Control Ticket -->
+            <div class="glass-card p-3 p-sm-4 rounded-4 border h-100"
+                 style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+                
+                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-danger fs-5">move_to_inbox</span>
+                        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Master Order Routing Ticket</h6>
+                    </div>
+                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 small font-monospace">
+                        ALL TRADERS
+                    </span>
+                </div>
+
+                <!-- Target User / Multi-Trader Broadcast Selector -->
+                <div class="mb-3">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Execution Target</label>
+                    <select id="adminTargetScope" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 small">
+                        <option value="ALL" selected>BROADCAST TO ALL ACTIVE TRADERS</option>
+                        <option value="DHAN_ONLY">DHAN ACCOUNTS ONLY</option>
+                        <option value="FYERS_ONLY">FYERS ACCOUNTS ONLY</option>
+                        <option value="SPECIFIC">SELECTED TRADER PROFILE</option>
+                    </select>
+                </div>
+
+                <!-- Target Symbol Input -->
+                <div class="mb-3">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Target Symbol</label>
+                    <input type="text" id="adminTerminalSymbolInput" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 font-monospace fw-bold" value="NIFTY 50 (LTP ₹24450.00)">
+                </div>
+
+                <!-- Order Direction Toggle: BUY vs SELL -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <button type="button" id="adminBtnBuy" class="btn w-100 py-2.5 rounded-3 fw-bold btn-success shadow-sm d-flex align-items-center justify-content-center gap-1" onclick="setAdminOrderSide('BUY')">
+                            <span class="material-icons fs-6">trending_up</span>
+                            <span>BUY / LONG</span>
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button type="button" id="adminBtnSell" class="btn w-100 py-2.5 rounded-3 fw-bold btn-outline-danger d-flex align-items-center justify-content-center gap-1" onclick="setAdminOrderSide('SELL')">
+                            <span class="material-icons fs-6">trending_down</span>
+                            <span>SELL / SHORT</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Product Type & Order Mode Selector -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Product Type</label>
+                        <select id="adminProductType" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 small">
+                            <option value="MIS" selected>MIS (Intraday)</option>
+                            <option value="CNC">CNC / NRML (Delivery)</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Order Type</label>
+                        <select id="adminOrderType" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 small">
+                            <option value="MARKET" selected>MARKET</option>
+                            <option value="LIMIT">LIMIT</option>
+                            <option value="SL-M">STOP LOSS (SL-M)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Lots Per Account & Multiplier -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">Lots Per Account</label>
+                        <small class="theme-text-muted font-monospace">Multiplier Enabled</small>
+                    </div>
+                    <div class="input-group mb-2">
+                        <button class="btn btn-outline-secondary border-opacity-25 theme-text-main" type="button" onclick="adjustAdminQty(-25)">-</button>
+                        <input type="number" id="adminQtyInput" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 text-center font-monospace fw-bold" value="100" min="25" step="25">
+                        <button class="btn btn-outline-secondary border-opacity-25 theme-text-main" type="button" onclick="adjustAdminQty(25)">+</button>
+                    </div>
+                </div>
+
+                <!-- Execute Master Order Button -->
+                <button type="button" class="btn btn-danger w-100 py-3 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2"
+                        onclick="triggerAdminMasterOrder()">
+                    <span class="material-icons fs-5">bolt</span>
+                    <span>DISPATCH MASTER ORDER</span>
+                </button>
+            </div>
+        {% else %}
+            <!-- Unconfigured Master Onboarding Banner -->
+            <div class="glass-card p-4 rounded-4 border h-100 d-flex flex-column align-items-center justify-content-center text-center"
+                 style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+                
+                <div class="rounded-circle bg-danger bg-opacity-25 text-danger p-3 mb-3 d-flex align-items-center justify-content-center" style="width:64px;height:64px;">
+                    <span class="material-icons fs-1">tune</span>
+                </div>
+                
+                <h5 class="fw-bold theme-text-main mb-2">Trade Control Configuration Required</h5>
+                <p class="theme-text-muted small mb-4 px-2" style="max-width: 360px;">
+                    No active Trade Execution Configuration or Master Broker rule was found. Create a configuration to enable broadcast master order dispatching.
+                </p>
+
+                <div class="d-flex flex-column flex-sm-row gap-2 w-100" style="max-width: 340px;">
+                    <a href="{% url 'admins:trade_exec_config_create' %}" class="btn btn-danger py-2.5 rounded-3 fw-bold text-white d-flex align-items-center justify-content-center gap-2 shadow-sm flex-grow-1">
+                        <span class="material-icons fs-5">add</span>
+                        <span>Create Trade Config</span>
+                    </a>
+                    <a href="{% url 'admins:broker-master-list' %}" class="btn btn-outline-secondary py-2.5 rounded-3 fw-bold theme-text-main d-flex align-items-center justify-content-center gap-1">
+                        <span class="material-icons fs-5">dns</span>
+                        <span>Master Brokers</span>
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Active Broker Gateway Connections (Right Bottom) -->
+    <div class="col-12 col-xl-7">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column"
+             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+            
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons text-primary fs-5">dns</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Active Broker Gateway Connections</h6>
+                </div>
+                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small font-monospace">2 ONLINE</span>
+            </div>
+
+            <div class="table-responsive flex-grow-1">
+                <table class="table table-hover align-middle mb-0" style="font-size:0.8rem;">
+                    <thead>
+                        <tr class="theme-text-muted text-uppercase" style="font-size:0.7rem; border-color: var(--border-color);">
+                            <th>Broker</th>
+                            <th>Gateway URL</th>
+                            <th>API Status</th>
+                            <th>Latency</th>
+                            <th>Active Accounts</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr style="border-color: var(--border-color);">
+                            <td><strong class="theme-text-main font-monospace"><span class="badge bg-warning bg-opacity-25 text-warning me-1">DHAN</span> Dhan HQ API</strong></td>
+                            <td class="font-monospace theme-text-muted">api.dhan.co / auth.dhan.co</td>
+                            <td><span class="badge bg-success bg-opacity-25 text-success">OPERATIONAL</span></td>
+                            <td class="font-monospace text-success">8 ms</td>
+                            <td class="font-monospace fw-bold theme-text-main">14 Accounts</td>
+                        </tr>
+                        <tr style="border-color: var(--border-color);">
+                            <td><strong class="theme-text-main font-monospace"><span class="badge bg-primary bg-opacity-25 text-primary me-1">FYERS</span> Fyers API v2</strong></td>
+                            <td class="font-monospace theme-text-muted">api-v2.fyers.in</td>
+                            <td><span class="badge bg-success bg-opacity-25 text-success">OPERATIONAL</span></td>
+                            <td class="font-monospace text-success">11 ms</td>
+                            <td class="font-monospace fw-bold theme-text-main">8 Accounts</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Load Lightweight Charts Open Source Library -->
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+    let adminChartInstance = null;
+    let adminCandleSeries = null;
+    let adminEmaSeries = null;
+    let adminLiveTickInterval = null;
+    
+    let adminActiveSymbol = 'NIFTY 50';
+    let adminBaseLtp = 24450.00;
+    let adminOrderSide = 'BUY';
+
+    function generateAdminOHLCData(basePrice, count) {
+        const data = [];
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - count * 5);
+        
+        let price = basePrice * 0.985;
+        for (let i = 0; i < count; i++) {
+            const time = Math.floor(now.getTime() / 1000) + (i * 300);
+            const open = price + (Math.random() - 0.48) * (basePrice * 0.003);
+            const high = open + Math.random() * (basePrice * 0.005);
+            const low = open - Math.random() * (basePrice * 0.005);
+            const close = (low + high) / 2 + (Math.random() - 0.49) * (basePrice * 0.002);
+            price = close;
+            
+            data.push({
+                time: time,
+                open: parseFloat(open.toFixed(2)),
+                high: parseFloat(Math.max(open, close, high).toFixed(2)),
+                low: parseFloat(Math.min(open, close, low).toFixed(2)),
+                close: parseFloat(close.toFixed(2))
+            });
+        }
+        return data;
+    }
+
+    function initAdminMarmotChartCanvas() {
+        const container = document.getElementById('admin_marmot_chart_canvas');
+        if (!container) return;
+        
+        container.innerHTML = '';
+
+        if (typeof LightweightCharts === 'undefined') {
+            container.innerHTML = '<div class="p-4 text-center text-danger">Chart library loading error.</div>';
+            return;
+        }
+
+        adminChartInstance = LightweightCharts.createChart(container, {
+            width: container.clientWidth,
+            height: 440,
+            layout: {
+                background: { type: 'solid', color: '#0d0e15' },
+                textColor: '#a1a5b7',
+                fontSize: 12,
+                fontFamily: 'Inter, system-ui, sans-serif'
+            },
+            grid: {
+                vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                horzLines: { color: 'rgba(255, 255, 255, 0.04)' }
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+            },
+            timeScale: {
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                timeVisible: true,
+                secondsVisible: false
+            }
+        });
+
+        // Add Candlestick Series
+        adminCandleSeries = adminChartInstance.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444'
+        });
+
+        // Add EMA 20 Line Series
+        adminEmaSeries = adminChartInstance.addLineSeries({
+            color: '#ef4444',
+            lineWidth: 2,
+            title: 'EMA 20'
+        });
+
+        // Load initial data
+        loadAdminSymbolChartData(adminBaseLtp);
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            if (adminChartInstance && container) {
+                adminChartInstance.applyOptions({ width: container.clientWidth });
+            }
+        });
+
+        startAdminLiveTickStream();
+    }
+
+    function loadAdminSymbolChartData(price) {
+        if (!adminCandleSeries) return;
+        const ohlc = generateAdminOHLCData(price, 80);
+        adminCandleSeries.setData(ohlc);
+
+        // EMA 20
+        const emaData = [];
+        for (let i = 0; i < ohlc.length; i++) {
+            if (i >= 5) {
+                let sum = 0;
+                for (let j = i - 5; j <= i; j++) sum += ohlc[j].close;
+                emaData.push({ time: ohlc[i].time, value: parseFloat((sum / 6).toFixed(2)) });
+            }
+        }
+        if (adminEmaSeries) adminEmaSeries.setData(emaData);
+
+        const last = ohlc[ohlc.length - 1];
+        updateAdminOHLCHeader(last.open, last.high, last.low, last.close);
+    }
+
+    function updateAdminOHLCHeader(o, h, l, c) {
+        const oEl = document.getElementById('adminOhlcO');
+        if (oEl) oEl.textContent = o.toLocaleString('en-IN', {minimumFractionDigits:2});
+        const hEl = document.getElementById('adminOhlcH');
+        if (hEl) hEl.textContent = h.toLocaleString('en-IN', {minimumFractionDigits:2});
+        const lEl = document.getElementById('adminOhlcL');
+        if (lEl) lEl.textContent = l.toLocaleString('en-IN', {minimumFractionDigits:2});
+        const cEl = document.getElementById('adminOhlcC');
+        if (cEl) cEl.textContent = c.toLocaleString('en-IN', {minimumFractionDigits:2});
+    }
+
+    function startAdminLiveTickStream() {
+        if (adminLiveTickInterval) clearInterval(adminLiveTickInterval);
+        adminLiveTickInterval = setInterval(() => {
+            if (!adminCandleSeries) return;
+            const delta = (Math.random() - 0.49) * (adminBaseLtp * 0.001);
+            adminBaseLtp = Math.max(1, adminBaseLtp + delta);
+
+            const nowSec = Math.floor(Date.now() / 1000);
+            const roundedTime = Math.floor(nowSec / 300) * 300;
+
+            const updatedCandle = {
+                time: roundedTime,
+                open: parseFloat((adminBaseLtp - delta).toFixed(2)),
+                high: parseFloat((adminBaseLtp + Math.abs(delta) * 1.5).toFixed(2)),
+                low: parseFloat((adminBaseLtp - Math.abs(delta) * 1.5).toFixed(2)),
+                close: parseFloat(adminBaseLtp.toFixed(2))
+            };
+
+            adminCandleSeries.update(updatedCandle);
+
+            const ltpEl = document.getElementById('adminChartLtp');
+            if (ltpEl) {
+                ltpEl.innerHTML = `₹ ${adminBaseLtp.toLocaleString('en-IN', {minimumFractionDigits:2})} <span class="${delta >= 0 ? 'text-success' : 'text-danger'} smaller">${delta >= 0 ? '+' : ''}${delta.toFixed(2)}</span>`;
+            }
+            updateAdminOHLCHeader(updatedCandle.open, updatedCandle.high, updatedCandle.low, updatedCandle.close);
+        }, 1500);
+    }
+
+    function switchAdminSystemSymbol(name, price, type, btnEl) {
+        adminActiveSymbol = name;
+        adminBaseLtp = price;
+
+        const titleEl = document.getElementById('adminChartTitle');
+        if (titleEl) titleEl.textContent = name;
+
+        const symInput = document.getElementById('adminTerminalSymbolInput');
+        if (symInput) symInput.value = name + ' (LTP ₹' + price.toFixed(2) + ')';
+
+        loadAdminSymbolChartData(price);
+
+        if (btnEl) {
+            document.querySelectorAll('.admin-symbol-chip').forEach(b => {
+                b.classList.remove('active', 'btn-danger');
+            });
+            btnEl.classList.add('active');
+        }
+    }
+
+    function setAdminTimeframe(tf, btnEl) {
+        if (btnEl) {
+            document.querySelectorAll('.admin-tf-btn').forEach(b => {
+                b.classList.remove('btn-danger', 'fw-bold');
+                b.classList.add('btn-outline-secondary', 'theme-text-muted');
+            });
+            btnEl.classList.remove('btn-outline-secondary', 'theme-text-muted');
+            btnEl.classList.add('btn-danger', 'fw-bold');
+        }
+        loadAdminSymbolChartData(adminBaseLtp);
+    }
+
+    function setAdminOrderSide(side) {
+        adminOrderSide = side;
+        const btnBuy = document.getElementById('adminBtnBuy');
+        const btnSell = document.getElementById('adminBtnSell');
+        if (side === 'BUY') {
+            btnBuy.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-success shadow-sm d-flex align-items-center justify-content-center gap-1';
+            btnSell.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-outline-danger d-flex align-items-center justify-content-center gap-1';
+        } else {
+            btnBuy.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-outline-success d-flex align-items-center justify-content-center gap-1';
+            btnSell.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-danger shadow-sm d-flex align-items-center justify-content-center gap-1';
+        }
+    }
+
+    function adjustAdminQty(amount) {
+        const input = document.getElementById('adminQtyInput');
+        if (input) {
+            let val = parseInt(input.value || 25) + amount;
+            if (val < 25) val = 25;
+            input.value = val;
+        }
+    }
+
+    function triggerAdminMasterOrder() {
+        const sym = document.getElementById('adminTerminalSymbolInput').value;
+        const qty = document.getElementById('adminQtyInput').value;
+        const scope = document.getElementById('adminTargetScope').value;
+        alert(`Master Order Dispatched via ${adminOrderSide}!\nTarget: ${scope}\nSymbol: ${sym}\nQty per Account: ${qty} units`);
+    }
+
+    setTimeout(initAdminMarmotChartCanvas, 150);
+</script>

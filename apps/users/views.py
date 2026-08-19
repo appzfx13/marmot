@@ -279,6 +279,42 @@ class UserDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView)
         return context
 
 
+class UserTerminalView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """View for user absolute trading terminal supporting Dhan & Fyers."""
+    template_name = 'users/dashboard.html'
+    partial_template_name = 'users/partials/terminal_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        active_acc = populate_account_context(context, user, self.request)
+        context['active_tab'] = 'terminal'
+
+        broker_code = getattr(active_acc.broker, 'code', 'dhan').lower() if (active_acc and active_acc.broker) else 'dhan'
+        context['broker_code'] = broker_code
+        context['broker_name'] = active_acc.broker.name if (active_acc and active_acc.broker) else ('DHAN' if broker_code == 'dhan' else 'FYERS')
+        context['account_type'] = active_acc.account_type if active_acc else 'SANDBOX'
+        context['account_id_display'] = active_acc.broker_client_id if active_acc else 'DEMO-8888'
+
+        is_token_active = False
+        if active_acc and broker_code == 'dhan' and active_acc.broker_client_id:
+            try:
+                from apps.trade_core.services.dhan_token_service import UserDhanClient
+                client = UserDhanClient(active_acc.broker_client_id)
+                token = client.get_access_token()
+                if token:
+                    is_token_active = True
+            except Exception:
+                is_token_active = False
+        elif active_acc and broker_code == 'fyers':
+            is_token_active = bool(active_acc.broker_api_secret or active_acc.broker_api_key)
+
+        has_configured_account = bool(active_acc and (active_acc.broker_client_id or active_acc.account_name))
+        context['has_configured_account'] = has_configured_account
+        context['is_token_active'] = is_token_active
+        return context
+
+
 class UserJournalView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
     """View for user execution journal."""
     template_name = 'users/dashboard.html'

@@ -80,29 +80,57 @@
         border: 1px solid rgba(255,255,255,0.2);
     }
 
+    .nav {
+        position: relative;
+    }
+
     /* Compact Nav Links */
     .nav-link {
+        position: relative;
+        z-index: 2;
         color: rgba(255, 255, 255, 0.6) !important;
         border-radius: 8px;
         margin: 2px 12px;
         padding: 8px 12px !important; 
         font-size: 0.85rem;
-        transition: all 0.2s ease;
+        background: transparent !important;
+        transition: color 0.2s ease, transform 0.2s ease;
     }
 
     .nav-link .material-icons {
         font-size: 1.1rem !important; 
         margin-right: 10px;
+        transition: transform 0.2s ease, color 0.2s ease;
     }
     
     .nav-link:hover {
-        background: rgba(255,255,255,0.1);
         color: #fff !important;
+        transform: translateX(2px);
     }
 
     .nav-link.active {
-        background: rgba(255,255,255,0.2);
         color: #fff !important;
+        font-weight: 600;
+    }
+
+    .nav-glass-selector {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 38px;
+        z-index: 1;
+        pointer-events: none;
+        border-radius: 8px;
+        background: linear-gradient(135deg, rgba(239, 68, 68, 0.24) 0%, rgba(239, 68, 68, 0.08) 100%);
+        backdrop-filter: blur(16px) saturate(180%);
+        -webkit-backdrop-filter: blur(16px) saturate(180%);
+        border: 1px solid rgba(239, 68, 68, 0.38);
+        border-left: 3.5px solid #ef4444;
+        box-shadow: 0 4px 20px rgba(239, 68, 68, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+        will-change: transform, height, width, opacity;
+        transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.2, 1), height 0.28s cubic-bezier(0.2, 0.9, 0.2, 1), width 0.28s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.2s ease;
+        opacity: 0;
     }
 
     /* Metric Cards */
@@ -310,6 +338,77 @@
                 floatingOpenBtn.addEventListener('click', () => toggleDesktopSidebar(false));
             }
         });
+
+        // Glassmorphic Floating Selector Engine
+        (function() {
+            function initSidebarSelector(navId) {
+                var nav = document.getElementById(navId);
+                if (!nav) return;
+                nav.style.position = 'relative';
+
+                var selector = nav.querySelector('.nav-glass-selector');
+                if (!selector) {
+                    selector = document.createElement('div');
+                    selector.className = 'nav-glass-selector';
+                    nav.insertBefore(selector, nav.firstChild);
+                }
+
+                var activeLink = nav.querySelector('.nav-link.active');
+                var currentTarget = activeLink;
+
+                function updatePosition(targetEl, animate) {
+                    if (!targetEl) {
+                        selector.style.opacity = '0';
+                        return;
+                    }
+                    if (animate === false) {
+                        selector.style.transition = 'none';
+                    } else {
+                        selector.style.transition = '';
+                    }
+                    selector.style.transform = 'translate3d(0, ' + targetEl.offsetTop + 'px, 0)';
+                    selector.style.height = targetEl.offsetHeight + 'px';
+                    selector.style.left = targetEl.offsetLeft + 'px';
+                    selector.style.width = targetEl.offsetWidth + 'px';
+                    selector.style.opacity = '1';
+
+                    if (animate === false) {
+                        void selector.offsetWidth;
+                        selector.style.transition = '';
+                    }
+                }
+
+                updatePosition(currentTarget, false);
+
+                var links = nav.querySelectorAll('.nav-link');
+                links.forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        if (link === currentTarget) return;
+                        links.forEach(function(l) { l.classList.remove('active'); });
+                        link.classList.add('active');
+                        currentTarget = link;
+                        updatePosition(link, true);
+                    });
+                });
+
+                window.addEventListener('resize', function() {
+                    updatePosition(currentTarget, false);
+                });
+            }
+
+            function initAllSelectors() {
+                initSidebarSelector('sidebarNavigationContent');
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener("DOMContentLoaded", initAllSelectors);
+            } else {
+                initAllSelectors();
+            }
+            document.addEventListener("htmx:afterSettle", function() {
+                initAllSelectors();
+            });
+        })();
     </script>
     {% block extra_js %}{% endblock %}
 </body>

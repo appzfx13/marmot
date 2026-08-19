@@ -2,6 +2,7 @@ from django.urls import path
 from .views import (
     AdminLoginView,
     AdminDashboardView,
+    AdminTerminalView,
     AdminLogoutView,
     AdminTraderListView,
     AdminTraderCreateView,
@@ -40,6 +41,7 @@ urlpatterns = [
     # Auth & Dashboard
     path('login/', AdminLoginView.as_view(), name='admin-login'),
     path('dashboard/', AdminDashboardView.as_view(), name='admin-dashboard'),
+    path('terminal/', AdminTerminalView.as_view(), name='admin-terminal'),
     path('logout/', AdminLogoutView.as_view(), name='admin-logout'),
 
     # Control Routes for Market Backup & Backtest

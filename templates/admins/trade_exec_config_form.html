@@ -8,7 +8,7 @@
     .glass-form-card input[type="text"],
     .glass-form-card input[type="number"],
     .glass-form-card select {
-        background: rgba(255, 255, 255, 0.04) !important;
+        background: var(--input-bg) !important;
         border: 1px solid var(--border-color) !important;
         color: var(--text-main) !important;
         border-radius: 8px !important;
@@ -19,15 +19,15 @@
     }
 
     .glass-form-card select option {
-        background-color: #111827;
-        color: var(--text-main);
+        background-color: var(--dropdown-bg, #111827);
+        color: var(--text-main, #ffffff);
     }
 
     .glass-form-card input:focus,
     .glass-form-card select:focus {
-        background: rgba(255, 255, 255, 0.07) !important;
-        border-color: #0d6efd !important;
-        box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
+        background: var(--input-bg) !important;
+        border-color: #7a5af8 !important;
+        box-shadow: 0 0 0 0.25rem rgba(122, 90, 248, 0.25) !important;
         outline: none;
     }
 
@@ -39,7 +39,7 @@
         height: 1.25rem !important;
         min-width: 1.25rem !important;
         min-height: 1.25rem !important;
-        background-color: rgba(255, 255, 255, 0.05) !important;
+        background-color: var(--input-bg) !important;
         border: 1px solid var(--border-color) !important;
         border-radius: 6px !important;
         cursor: pointer;
@@ -55,13 +55,13 @@
     }
 
     .glass-form-card input[type="checkbox"]:hover {
-        background-color: rgba(255, 255, 255, 0.1) !important;
-        border-color: rgba(255, 255, 255, 0.3) !important;
+        background-color: var(--nav-hover) !important;
+        border-color: rgba(122, 90, 248, 0.4) !important;
     }
 
     .glass-form-card input[type="checkbox"]:checked {
-        background-color: #0d6efd !important;
-        border-color: #0d6efd !important;
+        background-color: #7a5af8 !important;
+        border-color: #7a5af8 !important;
     }
 
     .glass-form-card input[type="checkbox"]:checked::after {
@@ -76,7 +76,7 @@
 
     .glass-form-card input[type="checkbox"]:focus {
         outline: none;
-        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.3) !important;
+        box-shadow: 0 0 0 0.2rem rgba(122, 90, 248, 0.3) !important;
     }
 
     /* Checkbox Label Wrapper Component */
@@ -84,18 +84,19 @@
         display: flex;
         align-items: center;
         gap: 0.6rem;
-        padding: 0.5rem 0.75rem;
+        padding: 0.55rem 0.85rem;
         border-radius: 8px;
-        background: rgba(255, 255, 255, 0.02);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-        transition: background 0.2s ease;
+        background: var(--input-bg);
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease;
         cursor: pointer;
         user-select: none;
         margin-bottom: 0;
     }
 
     .custom-check-item:hover {
-        background: rgba(255, 255, 255, 0.04);
+        background: var(--nav-hover);
+        border-color: rgba(122, 90, 248, 0.3);
     }
 
     /* Glass Modal Styling */
@@ -196,10 +197,10 @@
 {% endblock %}
 
 {% block dashboard_content %}
-<div class="row mb-4">
-    <div class="col-12 d-flex align-items-center justify-content-between gap-3">
+<div class="row">
+    <div class="col-12 mb-4 d-flex align-items-center justify-content-between gap-3">
         <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width: 54px; height: 54px; border: 1px solid rgba(13, 110, 253, 0.3);">
+            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width: 54px; height: 54px; border: 1px solid rgba(122, 90, 248, 0.3);">
                 <span class="material-icons fs-3">tune</span>
             </div>
             <div>
@@ -211,9 +212,9 @@
             <span class="material-icons fs-5">arrow_back</span>
         </a>
     </div>
-</div>
 
-<div class="glass-card glass-form-card p-3 p-sm-4">
+    <div class="col-12">
+        <div class="glass-card glass-form-card p-3 p-sm-4">
     <form id="configForm" method="post" novalidate>
         {% csrf_token %}
 
@@ -488,6 +489,8 @@
             </button>
         </div>
     </form>
+</div>
+</div>
 </div>
 
 <!-- Glassmorphic Confirmation Modal -->

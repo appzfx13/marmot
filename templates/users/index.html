@@ -181,7 +181,13 @@
             padding: 0.75rem 0.85rem !important;
         }
 
+        .nav {
+            position: relative;
+        }
+
         .nav-link {
+            position: relative;
+            z-index: 2;
             color: var(--text-muted) !important;
             border-radius: 9px;
             margin: 2px 0;
@@ -192,7 +198,8 @@
             display: flex;
             align-items: center;
             border: 1px solid transparent;
-            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            background: transparent !important;
+            transition: color 0.2s cubic-bezier(0.16, 1, 0.3, 1), transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
             text-decoration: none;
         }
 
@@ -200,13 +207,11 @@
             font-size: 1.15rem !important;
             margin-right: 10px;
             opacity: 0.85;
-            transition: transform 0.2s ease, opacity 0.2s ease;
+            transition: transform 0.2s ease, opacity 0.2s ease, color 0.2s ease;
         }
 
         .nav-link:hover {
-            background: var(--nav-hover);
             color: var(--text-main) !important;
-            border-color: var(--border-color);
             transform: translateX(2px);
         }
 
@@ -216,17 +221,39 @@
         }
 
         .nav-link.active {
-            background: var(--nav-active) !important;
             color: var(--text-main) !important;
-            border-color: rgba(122, 90, 248, 0.3) !important;
-            border-left: 3px solid var(--nav-active-border) !important;
             font-weight: 600;
-            box-shadow: 0 4px 12px rgba(122, 90, 248, 0.12);
         }
 
         .nav-link.active .material-icons {
             opacity: 1;
             color: var(--nav-active-border);
+        }
+
+        .nav-glass-selector {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 38px;
+            z-index: 1;
+            pointer-events: none;
+            border-radius: 9px;
+            background: linear-gradient(135deg, rgba(122, 90, 248, 0.24) 0%, rgba(122, 90, 248, 0.08) 100%);
+            backdrop-filter: blur(16px) saturate(180%);
+            -webkit-backdrop-filter: blur(16px) saturate(180%);
+            border: 1px solid rgba(122, 90, 248, 0.38);
+            border-left: 3.5px solid var(--nav-active-border);
+            box-shadow: 0 4px 20px rgba(122, 90, 248, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+            will-change: transform, height, width, opacity;
+            transition: transform 0.35s cubic-bezier(0.2, 0.9, 0.2, 1), height 0.28s cubic-bezier(0.2, 0.9, 0.2, 1), width 0.28s cubic-bezier(0.2, 0.9, 0.2, 1), opacity 0.2s ease;
+            opacity: 0;
+        }
+
+        :root[data-theme="light"] .nav-glass-selector {
+            background: linear-gradient(135deg, rgba(122, 90, 248, 0.16) 0%, rgba(122, 90, 248, 0.06) 100%);
+            border-color: rgba(122, 90, 248, 0.25);
+            box-shadow: 0 4px 14px rgba(122, 90, 248, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.7);
         }
 
         .sidebar-section-header {
@@ -970,9 +997,16 @@
 
             <!-- User-Related Navigation Menus -->
             <nav class="nav flex-column flex-grow-1 px-1" id="userSidebarNav">
+                <div class="nav-glass-selector" id="userNavGlassSelector"></div>
                 <div class="sidebar-section-header px-3 pt-2 pb-1">
                     Terminal
                 </div>
+                <a class="nav-link {% if active_tab == 'terminal' or request.resolver_match.url_name == 'user-terminal' %}active{% endif %}" 
+                   href="{% url 'users:user-terminal' %}">
+                    <span class="material-icons">terminal</span>
+                    <span>Terminal Panel</span>
+                </a>
+
                 <a class="nav-link {% if active_tab == 'dashboard' or request.resolver_match.url_name == 'marmot-dashboard' %}active{% endif %}" 
                    href="{% url 'users:marmot-dashboard' %}">
                     <span class="material-icons">dashboard</span>
@@ -1368,6 +1402,77 @@
                 initMacDatePicker();
             }
             document.addEventListener("htmx:afterSettle", initMacDatePicker);
+        })();
+
+        // Glassmorphic Floating Selector Engine
+        (function() {
+            function initSidebarSelector(navId) {
+                var nav = document.getElementById(navId);
+                if (!nav) return;
+                nav.style.position = 'relative';
+
+                var selector = nav.querySelector('.nav-glass-selector');
+                if (!selector) {
+                    selector = document.createElement('div');
+                    selector.className = 'nav-glass-selector';
+                    nav.insertBefore(selector, nav.firstChild);
+                }
+
+                var activeLink = nav.querySelector('.nav-link.active');
+                var currentTarget = activeLink;
+
+                function updatePosition(targetEl, animate) {
+                    if (!targetEl) {
+                        selector.style.opacity = '0';
+                        return;
+                    }
+                    if (animate === false) {
+                        selector.style.transition = 'none';
+                    } else {
+                        selector.style.transition = '';
+                    }
+                    selector.style.transform = 'translate3d(0, ' + targetEl.offsetTop + 'px, 0)';
+                    selector.style.height = targetEl.offsetHeight + 'px';
+                    selector.style.left = targetEl.offsetLeft + 'px';
+                    selector.style.width = targetEl.offsetWidth + 'px';
+                    selector.style.opacity = '1';
+
+                    if (animate === false) {
+                        void selector.offsetWidth;
+                        selector.style.transition = '';
+                    }
+                }
+
+                updatePosition(currentTarget, false);
+
+                var links = nav.querySelectorAll('.nav-link');
+                links.forEach(function(link) {
+                    link.addEventListener('click', function() {
+                        if (link === currentTarget) return;
+                        links.forEach(function(l) { l.classList.remove('active'); });
+                        link.classList.add('active');
+                        currentTarget = link;
+                        updatePosition(link, true);
+                    });
+                });
+
+                window.addEventListener('resize', function() {
+                    updatePosition(currentTarget, false);
+                });
+            }
+
+            function initAllSelectors() {
+                initSidebarSelector('userSidebarNav');
+            }
+
+            if (document.readyState === 'loading') {
+                document.addEventListener("DOMContentLoaded", initAllSelectors);
+            } else {
+                initAllSelectors();
+            }
+            document.addEventListener("htmx:afterSettle", function() {
+                initAllSelectors();
+            });
         })();
     </script>
 </body>

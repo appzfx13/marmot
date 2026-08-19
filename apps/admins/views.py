@@ -94,6 +94,27 @@ class AdminDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
         return context
 
 
+class AdminTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Protected Admin View for absolute trading terminal supporting Dhan & Fyers."""
+    template_name = 'admins/terminal.html'
+    partial_template_name = 'admins/partials/terminal_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        context['user'] = user
+
+        has_configured_master = BrokerMaster.objects.filter(is_active=True).exists() or TradeExecConfig.objects.filter(is_deleted=False).exists()
+        context['has_configured_master'] = has_configured_master
+
+        context['broker_code'] = 'dhan'
+        context['broker_name'] = 'DHAN HQ'
+        context['account_type'] = 'ADMIN MASTER'
+        context['account_id_display'] = getattr(user, 'broker_client_id', '') or 'ADMIN-MASTER-01'
+        context['is_token_active'] = True
+        return context
+
+
 class AdminLogoutView(View):
     """
     Logs out the admin user with HTMX client-side redirect support.

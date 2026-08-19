@@ -10,6 +10,7 @@ from .views import (
     MarmotPasswordResetConfirmView,
     MarmotPasswordResetCompleteView,
     UserDashboardView,
+    UserTerminalView,
     UserJournalView,
     UserBacktestView,
     UserBacktestCreateView,
@@ -47,6 +48,7 @@ urlpatterns = [
     path('reset/done/', MarmotPasswordResetCompleteView.as_view(), name='password_reset_complete'),
 
     # User Terminal & Operations
+    path('terminal/', UserTerminalView.as_view(), name='user-terminal'),
     path('dashboard/', UserDashboardView.as_view(), name='marmot-dashboard'),
 
     path('journal/', UserJournalView.as_view(), name='user-journal'),

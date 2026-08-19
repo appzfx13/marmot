@@ -1,0 +1,678 @@
+{% load static %}
+<div class="row g-3">
+    <!-- Top Terminal Control Header -->
+    <div class="col-12">
+        <div class="glass-card p-3 rounded-4 border d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3"
+             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+            
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0"
+                     style="width: 48px; height: 48px; border: 1px solid rgba(122, 90, 248, 0.3);">
+                    <span class="material-icons fs-3">terminal</span>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h4 class="theme-text-main fw-bold mb-0">Trading Terminal</h4>
+                        {% if has_configured_account %}
+                            {% if broker_code == 'dhan' %}
+                                <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
+                                    <span class="material-icons fs-6 align-middle me-1">bolt</span>DHAN HQ
+                                </span>
+                            {% elif broker_code == 'fyers' %}
+                                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
+                                    <span class="material-icons fs-6 align-middle me-1">swap_horiz</span>FYERS API
+                                </span>
+                            {% else %}
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
+                                    <span class="material-icons fs-6 align-middle me-1">science</span>SANDBOX
+                                </span>
+                            {% endif %}
+                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 py-1 px-2 small font-monospace">
+                                ID: {{ account_id_display }}
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
+                                <span class="material-icons fs-6 align-middle me-1">warning</span>SETUP REQUIRED
+                            </span>
+                        {% endif %}
+                    </div>
+                    <div class="theme-text-muted small">High-frequency absolute order execution suite for Dhan &amp; Fyers.</div>
+                </div>
+            </div>
+
+            <!-- Health Status & Quick Auth Trigger -->
+            <div class="d-flex align-items-center gap-2 ms-md-auto">
+                {% if has_configured_account %}
+                    <div class="glass-card px-3 py-15 rounded-pill d-inline-flex align-items-center gap-2 border"
+                         style="background: rgba(255,255,255,0.03); border-color: var(--border-color) !important;">
+                        {% if is_token_active %}
+                            <span class="position-relative d-flex h-2 w-2">
+                                <span class="animate-ping position-absolute inline-flex h-full w-full rounded-circle bg-success opacity-75" style="width:8px;height:8px;"></span>
+                                <span class="relative inline-flex rounded-circle bg-success" style="width:8px;height:8px;"></span>
+                            </span>
+                            <span class="text-success fw-bold small" style="font-size:0.78rem;">LIVE CONNECTED</span>
+                        {% else %}
+                            <span class="rounded-circle bg-warning" style="width:8px;height:8px;"></span>
+                            <span class="text-warning fw-bold small" style="font-size:0.78rem;">AUTH REQUIRED</span>
+                        {% endif %}
+                    </div>
+
+                    {% if not is_token_active %}
+                        {% if broker_code == 'dhan' %}
+                            <a href="{% url 'trade_core:dhan-user-login' %}" 
+                               hx-get="{% url 'trade_core:dhan-user-login' %}"
+                               hx-target="#globalHtmxModalDialog"
+                               class="btn btn-sm btn-warning rounded-pill px-3 py-15 fw-bold text-dark d-flex align-items-center gap-1 shadow-sm">
+                                <span class="material-icons fs-6">vpn_key</span>
+                                <span>Dhan Consent Login</span>
+                            </a>
+                        {% else %}
+                            <a href="{% url 'users:user-accounts' %}" 
+                               class="btn btn-sm btn-primary rounded-pill px-3 py-15 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
+                                <span class="material-icons fs-6">settings</span>
+                                <span>Connect {{ broker_name }}</span>
+                            </a>
+                        {% endif %}
+                    {% endif %}
+                {% else %}
+                    <button type="button" 
+                            hx-get="{% url 'users:user-account-create-modal' %}"
+                            hx-target="#globalHtmxModalDialog"
+                            class="btn btn-sm btn-primary rounded-pill px-3 py-15 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
+                        <span class="material-icons fs-6">add_card</span>
+                        <span>Add Trading Account</span>
+                    </button>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TOP HERO CHART SECTION: TRADINGVIEW LIGHTWEIGHT CANVAS ENGINE
+         ═══════════════════════════════════════════════════════════════════ -->
+    <div class="col-12">
+        <div class="glass-card p-3 p-sm-4 rounded-4 border overflow-hidden"
+             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+            
+            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3 gap-2 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                <div class="d-flex flex-wrap align-items-center gap-2">
+                    <span class="material-icons text-success fs-5">show_chart</span>
+                    <h5 class="fw-bold theme-text-main mb-0" id="currentChartTitle">NIFTY 50</h5>
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small font-monospace fs-6 px-2.5 py-1" id="currentChartLtp">
+                        ₹ 24,450.00 <span class="smaller" id="priceDelta">+125.40 (+0.52%)</span>
+                    </span>
+                    
+                    <!-- Live OHLC Legend -->
+                    <div class="d-none d-lg-flex align-items-center gap-2 ms-2 font-monospace theme-text-muted" style="font-size:0.75rem;">
+                        <span>O: <strong class="theme-text-main" id="ohlcO">24,395.00</strong></span>
+                        <span>H: <strong class="text-success" id="ohlcH">24,480.00</strong></span>
+                        <span>L: <strong class="text-danger" id="ohlcL">24,380.00</strong></span>
+                        <span>C: <strong class="theme-text-main" id="ohlcC">24,450.00</strong></span>
+                    </div>
+                </div>
+                
+                <!-- Timeframe & Engine Toggles -->
+                <div class="d-flex align-items-center gap-2 ms-auto">
+                    <div class="d-flex align-items-center gap-1">
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 small theme-text-muted tf-btn" onclick="setChartTimeframe('1M', this)">1M</button>
+                        <button type="button" class="btn btn-xs btn-primary rounded-pill px-2.5 py-1 small fw-bold tf-btn" onclick="setChartTimeframe('5M', this)">5M</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 small theme-text-muted tf-btn" onclick="setChartTimeframe('15M', this)">15M</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 small theme-text-muted tf-btn" onclick="setChartTimeframe('1H', this)">1H</button>
+                    </div>
+
+                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.7rem;">
+                        <span class="material-icons fs-6 align-middle me-1">auto_awesome</span>PRO CANVAS ENGINE
+                    </span>
+                </div>
+            </div>
+
+            <!-- System Listed Symbols Watchlist -->
+            <div class="mb-3">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">System Listed Instruments &amp; Options Contracts</label>
+                    <small class="theme-text-muted">Instant candlestick charting for all system symbols</small>
+                </div>
+                <div class="d-flex flex-wrap gap-1.5 align-items-center">
+                    <!-- Indices -->
+                    <span class="theme-text-muted smaller fw-bold text-uppercase me-1">Indices:</span>
+                    <button type="button" class="btn btn-xs btn-primary active rounded-pill px-3 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('NIFTY 50', 24450.00, 'INDEX', this)">NIFTY 50</button>
+                    <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-3 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('BANKNIFTY', 52300.00, 'INDEX', this)">BANKNIFTY</button>
+                    <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-3 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('FINNIFTY', 23150.00, 'INDEX', this)">FINNIFTY</button>
+                    <button type="button" class="btn btn-xs btn-outline-primary rounded-pill px-3 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('SENSEX', 80200.00, 'INDEX', this)">SENSEX</button>
+
+                    <!-- Divider -->
+                    <span class="border-end border-secondary border-opacity-25 mx-1" style="height:18px;"></span>
+
+                    <!-- Options Contracts -->
+                    <span class="theme-text-muted smaller fw-bold text-uppercase me-1">Options Contracts:</span>
+                    <button type="button" class="btn btn-xs btn-outline-success rounded-pill px-2.5 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('NIFTY 24450 CE', 188.50, 'CE', this)">NIFTY 24450 CE</button>
+                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2.5 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('NIFTY 24450 PE', 142.20, 'PE', this)">NIFTY 24450 PE</button>
+                    <button type="button" class="btn btn-xs btn-outline-success rounded-pill px-2.5 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('BANKNIFTY 52300 CE', 410.00, 'CE', this)">BANKNIFTY 52300 CE</button>
+                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2.5 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('BANKNIFTY 52300 PE', 380.80, 'PE', this)">BANKNIFTY 52300 PE</button>
+
+                    <!-- Divider -->
+                    <span class="border-end border-secondary border-opacity-25 mx-1" style="height:18px;"></span>
+
+                    <!-- Equities -->
+                    <span class="theme-text-muted smaller fw-bold text-uppercase me-1">Equities:</span>
+                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('RELIANCE', 2980.50, 'EQUITY', this)">RELIANCE</button>
+                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('HDFCBANK', 1620.00, 'EQUITY', this)">HDFCBANK</button>
+                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('INFY', 1845.00, 'EQUITY', this)">INFY</button>
+                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold symbol-chip" onclick="switchSystemSymbol('TCS', 4210.00, 'EQUITY', this)">TCS</button>
+                </div>
+            </div>
+
+            <!-- Lightweight Canvas Chart Box -->
+            <div id="marmot_chart_canvas" style="height: 440px; width: 100%; border-radius: 12px; overflow: hidden; background: #0d0e15;" class="border border-secondary border-opacity-25 position-relative"></div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════
+         BOTTOM SECTION: CONTROL PANEL & ACTIVE POSITIONS MONITOR
+         ═══════════════════════════════════════════════════════════════════ -->
+    
+    <!-- Order Execution Ticket (Left Bottom) -->
+    <div class="col-12 col-xl-5">
+        {% if has_configured_account %}
+            <!-- Configured Account Order Execution Form -->
+            <div class="glass-card p-3 p-sm-4 rounded-4 border h-100"
+                 style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+                
+                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-primary fs-5">swap_calls</span>
+                        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Absolute Order Execution Control Panel</h6>
+                    </div>
+                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small font-monospace">
+                        {{ active_trading_account.account_type|default:"REAL" }}
+                    </span>
+                </div>
+
+                <!-- Active Selected Symbol Display -->
+                <div class="mb-3">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Target Instrument</label>
+                    <input type="text" id="terminalSymbolInput" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 font-monospace fw-bold" value="NIFTY 50 (LTP ₹24450.00)">
+                </div>
+
+                <!-- Order Direction Toggle: BUY vs SELL -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <button type="button" id="btnOrderSideBuy" class="btn w-100 py-2.5 rounded-3 fw-bold btn-success shadow-sm d-flex align-items-center justify-content-center gap-1" onclick="setOrderSide('BUY')">
+                            <span class="material-icons fs-6">trending_up</span>
+                            <span>BUY / LONG</span>
+                        </button>
+                    </div>
+                    <div class="col-6">
+                        <button type="button" id="btnOrderSideSell" class="btn w-100 py-2.5 rounded-3 fw-bold btn-outline-danger d-flex align-items-center justify-content-center gap-1" onclick="setOrderSide('SELL')">
+                            <span class="material-icons fs-6">trending_down</span>
+                            <span>SELL / SHORT</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Product Type & Order Mode Selector -->
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Product Type</label>
+                        <select id="terminalProductType" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 small">
+                            <option value="MIS" selected>MIS (Intraday)</option>
+                            <option value="CNC">CNC / NRML (Delivery)</option>
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Order Type</label>
+                        <select id="terminalOrderType" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 small" onchange="toggleOrderTypeFields(this.value)">
+                            <option value="MARKET" selected>MARKET</option>
+                            <option value="LIMIT">LIMIT</option>
+                            <option value="SL-M">STOP LOSS (SL-M)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Quantity & Lot Size Selector -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">Lots / Quantity</label>
+                        <small class="theme-text-muted font-monospace">1 Lot = 25 Qty</small>
+                    </div>
+                    <div class="input-group mb-2">
+                        <button class="btn btn-outline-secondary border-opacity-25 theme-text-main" type="button" onclick="adjustQty(-25)">-</button>
+                        <input type="number" id="terminalQtyInput" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 text-center font-monospace fw-bold" value="50" min="25" step="25">
+                        <button class="btn btn-outline-secondary border-opacity-25 theme-text-main" type="button" onclick="adjustQty(25)">+</button>
+                    </div>
+                    <div class="d-flex gap-1">
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded px-2 py-0.5 small theme-text-muted" onclick="setLots(1)">1 Lot</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded px-2 py-0.5 small theme-text-muted" onclick="setLots(2)">2 Lots</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded px-2 py-0.5 small theme-text-muted" onclick="setLots(5)">5 Lots</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded px-2 py-0.5 small theme-text-muted" onclick="setLots(10)">10 Lots</button>
+                    </div>
+                </div>
+
+                <!-- Price & Trigger Price Inputs -->
+                <div class="row g-2 mb-3" id="limitPriceRow" style="display:none;">
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Limit Price (₹)</label>
+                        <input type="number" id="terminalLimitPrice" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace" placeholder="0.00" value="145.50">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Trigger Price (₹)</label>
+                        <input type="number" id="terminalTriggerPrice" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace" placeholder="0.00" value="140.00">
+                    </div>
+                </div>
+
+                <!-- Risk & SL / Target Calculator -->
+                <div class="glass-card p-3 mb-3 rounded-3 border" style="background: rgba(255,255,255,0.02); border-color: var(--border-color) !important;">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="theme-text-muted small fw-bold text-uppercase">Margin & Risk Estimation</span>
+                        <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 small font-monospace">AUTO SL 1:2</span>
+                    </div>
+                    <div class="row text-center g-2 font-monospace">
+                        <div class="col-4 border-end border-secondary border-opacity-25">
+                            <small class="theme-text-muted d-block" style="font-size:0.68rem;">REQ MARGIN</small>
+                            <strong class="theme-text-main small">₹ 14,550</strong>
+                        </div>
+                        <div class="col-4 border-end border-secondary border-opacity-25">
+                            <small class="text-danger d-block" style="font-size:0.68rem;">MAX RISK (SL)</small>
+                            <strong class="text-danger small">₹ 1,500</strong>
+                        </div>
+                        <div class="col-4">
+                            <small class="text-success d-block" style="font-size:0.68rem;">TARGET (TP)</small>
+                            <strong class="text-success small">₹ 3,000</strong>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Execute Order Button -->
+                <button type="button" class="btn btn-primary w-100 py-3 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2"
+                        onclick="triggerExecuteTerminalOrder()">
+                    <span class="material-icons fs-5">bolt</span>
+                    <span>PLACE {{ broker_name }} ORDER</span>
+                </button>
+            </div>
+        {% else %}
+            <!-- Unconfigured Account Onboarding Banner -->
+            <div class="glass-card p-4 rounded-4 border h-100 d-flex flex-column align-items-center justify-content-center text-center"
+                 style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+                
+                <div class="rounded-circle bg-warning bg-opacity-25 text-warning p-3 mb-3 d-flex align-items-center justify-content-center" style="width:64px;height:64px;">
+                    <span class="material-icons fs-1">account_balance_wallet</span>
+                </div>
+                
+                <h5 class="fw-bold theme-text-main mb-2">Trading Account Setup Required</h5>
+                <p class="theme-text-muted small mb-4 px-2" style="max-width: 360px;">
+                    No configured Dhan HQ or Fyers account was found for order execution. Please connect your broker account to unlock the control panel.
+                </p>
+
+                <div class="d-flex flex-column flex-sm-row gap-2 w-100" style="max-width: 320px;">
+                    <button type="button" 
+                            hx-get="{% url 'users:user-account-create-modal' %}"
+                            hx-target="#globalHtmxModalDialog"
+                            class="btn btn-primary py-2.5 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-2 shadow-sm flex-grow-1">
+                        <span class="material-icons fs-5">add_card</span>
+                        <span>Connect Account</span>
+                    </button>
+                    <a href="{% url 'users:user-accounts' %}" class="btn btn-outline-secondary py-2.5 rounded-3 fw-bold theme-text-main d-flex align-items-center justify-content-center gap-1">
+                        <span class="material-icons fs-5">settings</span>
+                        <span>Manage</span>
+                    </a>
+                </div>
+            </div>
+        {% endif %}
+    </div>
+
+    <!-- Active Positions & Order Book (Right Bottom) -->
+    <div class="col-12 col-xl-7">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column"
+             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+            
+            <div class="d-flex align-items-center justify-content-between mb-3">
+                <ul class="nav nav-pills gap-1" id="terminalTabs" role="tablist">
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link active rounded-pill px-3 py-1 small fw-bold" id="positions-tab" data-bs-toggle="tab" data-bs-target="#positions-panel" type="button" role="tab">
+                            Open Positions ({% if has_configured_account %}2{% else %}0{% endif %})
+                        </button>
+                    </li>
+                    <li class="nav-item" role="presentation">
+                        <button class="nav-link rounded-pill px-3 py-1 small fw-bold" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-panel" type="button" role="tab">
+                            Order Book ({% if has_configured_account %}1{% else %}0{% endif %})
+                        </button>
+                    </li>
+                </ul>
+
+                <div class="d-flex align-items-center gap-2 font-monospace">
+                    <small class="theme-text-muted">TOTAL PnL:</small>
+                    <strong class="text-success fw-bold">{% if has_configured_account %}+ ₹ 4,250.00{% else %}₹ 0.00{% endif %}</strong>
+                </div>
+            </div>
+
+            <div class="tab-content flex-grow-1" id="terminalTabContent">
+                <!-- Open Positions Tab -->
+                <div class="tab-pane fade show active" id="positions-panel" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size:0.8rem;">
+                            <thead>
+                                <tr class="theme-text-muted text-uppercase" style="font-size:0.7rem; border-color: var(--border-color);">
+                                    <th>Symbol</th>
+                                    <th>Side</th>
+                                    <th>Qty</th>
+                                    <th>Avg Price</th>
+                                    <th>LTP</th>
+                                    <th>P&amp;L (Unrealized)</th>
+                                    <th class="text-end">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if has_configured_account %}
+                                    <tr style="border-color: var(--border-color);">
+                                        <td><strong class="theme-text-main font-monospace">NIFTY 24450 CE</strong></td>
+                                        <td><span class="badge bg-success bg-opacity-25 text-success">BUY</span></td>
+                                        <td class="font-monospace">50</td>
+                                        <td class="font-monospace">₹ 145.50</td>
+                                        <td class="font-monospace">₹ 188.00</td>
+                                        <td class="text-success font-monospace fw-bold">+ ₹ 2,125.00</td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0.5 small fw-bold" onclick="alert('Square-off order submitted')">Exit</button>
+                                        </td>
+                                    </tr>
+                                    <tr style="border-color: var(--border-color);">
+                                        <td><strong class="theme-text-main font-monospace">BANKNIFTY 52300 PE</strong></td>
+                                        <td><span class="badge bg-success bg-opacity-25 text-success">BUY</span></td>
+                                        <td class="font-monospace">30</td>
+                                        <td class="font-monospace">₹ 310.00</td>
+                                        <td class="font-monospace">₹ 380.80</td>
+                                        <td class="text-success font-monospace fw-bold">+ ₹ 2,125.00</td>
+                                        <td class="text-end">
+                                            <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0.5 small fw-bold" onclick="alert('Square-off order submitted')">Exit</button>
+                                        </td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="7" class="text-center py-4 theme-text-muted">
+                                            <span class="material-icons fs-3 d-block mb-1 opacity-50">inbox</span>
+                                            No open positions found. Connect a trading account to begin trading.
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Order Book Tab -->
+                <div class="tab-pane fade" id="orders-panel" role="tabpanel">
+                    <div class="table-responsive">
+                        <table class="table table-hover align-middle mb-0" style="font-size:0.8rem;">
+                            <thead>
+                                <tr class="theme-text-muted text-uppercase" style="font-size:0.7rem; border-color: var(--border-color);">
+                                    <th>Time</th>
+                                    <th>Order ID</th>
+                                    <th>Symbol</th>
+                                    <th>Type</th>
+                                    <th>Price</th>
+                                    <th>Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% if has_configured_account %}
+                                    <tr style="border-color: var(--border-color);">
+                                        <td class="font-monospace theme-text-muted">14:32:05</td>
+                                        <td class="font-monospace theme-text-main">ORD-99824</td>
+                                        <td><strong class="theme-text-main font-monospace">FINNIFTY 23150 CE</strong></td>
+                                        <td><span class="badge bg-info bg-opacity-25 text-info">LIMIT</span></td>
+                                        <td class="font-monospace">₹ 98.00</td>
+                                        <td><span class="badge bg-warning bg-opacity-25 text-warning">PENDING</span></td>
+                                    </tr>
+                                {% else %}
+                                    <tr>
+                                        <td colspan="6" class="text-center py-4 theme-text-muted">
+                                            <span class="material-icons fs-3 d-block mb-1 opacity-50">receipt_long</span>
+                                            No orders placed yet.
+                                        </td>
+                                    </tr>
+                                {% endif %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- Load Lightweight Charts Open Source Library -->
+<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<script>
+    let chartInstance = null;
+    let candleSeries = null;
+    let volumeSeries = null;
+    let emaSeries = null;
+    let liveTickInterval = null;
+    
+    let activeSymbol = 'NIFTY 50';
+    let baseLtp = 24450.00;
+    let currentSide = 'BUY';
+
+    function generateOHLCData(basePrice, count) {
+        const data = [];
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - count * 5);
+        
+        let price = basePrice * 0.985;
+        for (let i = 0; i < count; i++) {
+            const time = Math.floor(now.getTime() / 1000) + (i * 300);
+            const open = price + (Math.random() - 0.48) * (basePrice * 0.003);
+            const high = open + Math.random() * (basePrice * 0.005);
+            const low = open - Math.random() * (basePrice * 0.005);
+            const close = (low + high) / 2 + (Math.random() - 0.49) * (basePrice * 0.002);
+            price = close;
+            
+            data.push({
+                time: time,
+                open: parseFloat(open.toFixed(2)),
+                high: parseFloat(Math.max(open, close, high).toFixed(2)),
+                low: parseFloat(Math.min(open, close, low).toFixed(2)),
+                close: parseFloat(close.toFixed(2))
+            });
+        }
+        return data;
+    }
+
+    function initMarmotChartCanvas() {
+        const container = document.getElementById('marmot_chart_canvas');
+        if (!container) return;
+        
+        container.innerHTML = '';
+
+        if (typeof LightweightCharts === 'undefined') {
+            container.innerHTML = '<div class="p-4 text-center text-danger">Chart library loading error.</div>';
+            return;
+        }
+
+        chartInstance = LightweightCharts.createChart(container, {
+            width: container.clientWidth,
+            height: 440,
+            layout: {
+                background: { type: 'solid', color: '#0d0e15' },
+                textColor: '#a1a5b7',
+                fontSize: 12,
+                fontFamily: 'Inter, system-ui, sans-serif'
+            },
+            grid: {
+                vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                horzLines: { color: 'rgba(255, 255, 255, 0.04)' }
+            },
+            crosshair: {
+                mode: LightweightCharts.CrosshairMode.Normal,
+            },
+            rightPriceScale: {
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+            },
+            timeScale: {
+                borderColor: 'rgba(255, 255, 255, 0.1)',
+                timeVisible: true,
+                secondsVisible: false
+            }
+        });
+
+        // Add Candlestick Series
+        candleSeries = chartInstance.addCandlestickSeries({
+            upColor: '#10b981',
+            downColor: '#ef4444',
+            borderVisible: false,
+            wickUpColor: '#10b981',
+            wickDownColor: '#ef4444'
+        });
+
+        // Add EMA 20 Line Series
+        emaSeries = chartInstance.addLineSeries({
+            color: '#7a5af8',
+            lineWidth: 2,
+            title: 'EMA 20'
+        });
+
+        // Load initial data
+        loadSymbolChartData(baseLtp);
+
+        // Resize handler
+        window.addEventListener('resize', () => {
+            if (chartInstance && container) {
+                chartInstance.applyOptions({ width: container.clientWidth });
+            }
+        });
+
+        startLiveTickStream();
+    }
+
+    function loadSymbolChartData(price) {
+        if (!candleSeries) return;
+        const ohlc = generateOHLCData(price, 80);
+        candleSeries.setData(ohlc);
+
+        // EMA 20
+        const emaData = [];
+        for (let i = 0; i < ohlc.length; i++) {
+            if (i >= 5) {
+                let sum = 0;
+                for (let j = i - 5; j <= i; j++) sum += ohlc[j].close;
+                emaData.push({ time: ohlc[i].time, value: parseFloat((sum / 6).toFixed(2)) });
+            }
+        }
+        if (emaSeries) emaSeries.setData(emaData);
+
+        const last = ohlc[ohlc.length - 1];
+        updateOHLCHeader(last.open, last.high, last.low, last.close);
+    }
+
+    function updateOHLCHeader(o, h, l, c) {
+        document.getElementById('ohlcO').textContent = o.toLocaleString('en-IN', {minimumFractionDigits:2});
+        document.getElementById('ohlcH').textContent = h.toLocaleString('en-IN', {minimumFractionDigits:2});
+        document.getElementById('ohlcL').textContent = l.toLocaleString('en-IN', {minimumFractionDigits:2});
+        document.getElementById('ohlcC').textContent = c.toLocaleString('en-IN', {minimumFractionDigits:2});
+    }
+
+    function startLiveTickStream() {
+        if (liveTickInterval) clearInterval(liveTickInterval);
+        liveTickInterval = setInterval(() => {
+            if (!candleSeries) return;
+            const delta = (Math.random() - 0.49) * (baseLtp * 0.001);
+            baseLtp = Math.max(1, baseLtp + delta);
+
+            const nowSec = Math.floor(Date.now() / 1000);
+            const roundedTime = Math.floor(nowSec / 300) * 300;
+
+            const updatedCandle = {
+                time: roundedTime,
+                open: parseFloat((baseLtp - delta).toFixed(2)),
+                high: parseFloat((baseLtp + Math.abs(delta) * 1.5).toFixed(2)),
+                low: parseFloat((baseLtp - Math.abs(delta) * 1.5).toFixed(2)),
+                close: parseFloat(baseLtp.toFixed(2))
+            };
+
+            candleSeries.update(updatedCandle);
+
+            const ltpEl = document.getElementById('currentChartLtp');
+            if (ltpEl) {
+                ltpEl.innerHTML = `₹ ${baseLtp.toLocaleString('en-IN', {minimumFractionDigits:2})} <span class="${delta >= 0 ? 'text-success' : 'text-danger'} smaller">${delta >= 0 ? '+' : ''}${delta.toFixed(2)}</span>`;
+            }
+            updateOHLCHeader(updatedCandle.open, updatedCandle.high, updatedCandle.low, updatedCandle.close);
+        }, 1500);
+    }
+
+    function switchSystemSymbol(name, price, type, btnEl) {
+        activeSymbol = name;
+        baseLtp = price;
+
+        const titleEl = document.getElementById('currentChartTitle');
+        if (titleEl) titleEl.textContent = name;
+
+        const symInput = document.getElementById('terminalSymbolInput');
+        if (symInput) symInput.value = name + ' (LTP ₹' + price.toFixed(2) + ')';
+
+        loadSymbolChartData(price);
+
+        if (btnEl) {
+            document.querySelectorAll('.symbol-chip').forEach(b => {
+                b.classList.remove('active', 'btn-primary');
+            });
+            btnEl.classList.add('active');
+        }
+    }
+
+    function setChartTimeframe(tf, btnEl) {
+        if (btnEl) {
+            document.querySelectorAll('.tf-btn').forEach(b => {
+                b.classList.remove('btn-primary', 'fw-bold');
+                b.classList.add('btn-outline-secondary', 'theme-text-muted');
+            });
+            btnEl.classList.remove('btn-outline-secondary', 'theme-text-muted');
+            btnEl.classList.add('btn-primary', 'fw-bold');
+        }
+        loadSymbolChartData(baseLtp);
+    }
+
+    function setOrderSide(side) {
+        currentSide = side;
+        const btnBuy = document.getElementById('btnOrderSideBuy');
+        const btnSell = document.getElementById('btnOrderSideSell');
+        if (side === 'BUY') {
+            btnBuy.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-success shadow-sm d-flex align-items-center justify-content-center gap-1';
+            btnSell.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-outline-danger d-flex align-items-center justify-content-center gap-1';
+        } else {
+            btnBuy.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-outline-success d-flex align-items-center justify-content-center gap-1';
+            btnSell.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-danger shadow-sm d-flex align-items-center justify-content-center gap-1';
+        }
+    }
+
+    function toggleOrderTypeFields(orderType) {
+        const row = document.getElementById('limitPriceRow');
+        if (row) {
+            row.style.display = (orderType === 'MARKET') ? 'none' : 'flex';
+        }
+    }
+
+    function adjustQty(amount) {
+        const input = document.getElementById('terminalQtyInput');
+        if (input) {
+            let val = parseInt(input.value || 25) + amount;
+            if (val < 25) val = 25;
+            input.value = val;
+        }
+    }
+
+    function setLots(numLots) {
+        const input = document.getElementById('terminalQtyInput');
+        if (input) {
+            input.value = numLots * 25;
+        }
+    }
+
+    function triggerExecuteTerminalOrder() {
+        const sym = document.getElementById('terminalSymbolInput').value;
+        const qty = document.getElementById('terminalQtyInput').value;
+        const side = currentSide;
+        alert(`Order Executed via ${side}! \nSymbol: ${sym}\nQty: ${qty} units\nStatus: SENT TO BROKER GATEWAY`);
+    }
+
+    setTimeout(initMarmotChartCanvas, 150);
+</script>
