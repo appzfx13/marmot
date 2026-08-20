@@ -1,82 +1,199 @@
-# Marmot Enterprise Platform
+# Marmot Enterprise Trading & Backtesting Platform
 
-## 1. Project Overview
-Marmot is a high-performance F&O backtesting and automated trading platform built with a dual-architecture.
-It leverages a Domain-Driven Service Layer bridging dynamic HTMX UIs and globally compatible RESTful APIs, designed for seamless AI Agent Automation.
+## 1. Executive Summary & Vision
 
-## 2. Technology Stack
-- **Backend Frameworks:** Django (Python), Go (Microservices)
-- **Frontend:** HTMX
-- **Databases & Brokers:** PostgreSQL (PSQL), Redis
-- **Real-Time Communication:** Websocket
-- **Broker Integration:** Dhan HQ Platform (Planned for all market data ingestion and trade execution)
+**Marmot** is an institutional-grade algorithmic trading and high-performance backtesting platform engineered specifically for Indian Equity Derivatives (NSE F&O). 
 
-## 3. Core Architecture & Flow
-- **HTMX Frontend:** Delivers SPA-like interactions via server-rendered HTML partials with zero JS framework overhead.
-- **Globally Compatible API:** Decoupled JSON REST endpoints built for global accessibility by mobile apps, external platforms, and webhooks.
-- **Go Microservices:** Dedicated Go application (`go-app/`) for handling high-frequency websocket streams and background tasks.
-- **Shared Service Layer:** Business logic, authorization, and data queries live in reusable service modules serving both UI and API.
-- **AI-Ready Engine:** Asynchronous worker infrastructure ready for autonomous trading agents.
+### Vision & Purpose
+- **Ultra-Fast Parallel Backtesting:** Eliminate backtesting bottlenecks by executing multi-year intraday options strategies across hundreds of millions of ticks/candles in seconds using a compiled Go worker engine.
+- **Scientific Market Simulation:** Provide realistic execution modeling with dynamic bid-ask spreads, volume-based market impact slippage, exchange queue latencies, and the complete Indian regulatory fee structure (STT, GST, Exchange turnover, Stamp duty, SEBI charges).
+- **Dual-Architecture Efficiency:** Seamlessly unite Django’s rich domain modeling, ORM, and HTMX server-rendered interfaces with Go’s low-latency concurrency, WebSockets, and zero-copy Apache Parquet processing.
+- **Institutional Risk & Control:** Hardened multi-layer risk controls including dynamic freeze flags, kill switches, capital allocation guards, and strict trader eligibility enforcement.
 
-### Working Flowchart
+---
+
+## 2. System Architecture
+
+Marmot utilizes a dual-engine architecture communicating asynchronously through **PostgreSQL** and **Redis Pub/Sub & Caching**.
+
 ```mermaid
 graph TD
     Client[Web / Mobile / Global API Clients] -->|HTTP / HTMX| Django(Django: UI & Global API)
-    Client -->|WebSocket| GoApp(Go: Real-Time Engine)
+    Client -->|WebSocket| GoApp(Go: Real-Time Stream & WebSockets)
     
-    Django -->|Core Business Logic| Services{Domain Service Layer}
-    Services <--> PSQL[(PostgreSQL)]
-    Services <--> Redis((Redis Cache/PubSub))
+    Django -->|Core Business Logic & Auth| Services{Domain Service Layer}
+    Services <--> PSQL[(PostgreSQL Database)]
+    Services <--> Redis((Redis Cache & IPC PubSub))
     
     GoApp <--> Redis
-    GoApp <-->|Market Data Streams| DhanHQ[Dhan HQ Platform]
+    GoApp <-->|Market Data Streams & Order Slices| DhanHQ[Dhan HQ Broker Platform]
     
-    Services <-->|Trade Execution & Rules| DhanHQ
-    Services <-->|Async Trading Logic| Agents[AI Trading Agents]
-    Agents <--> Redis
+    GoWorkers[Go Worker Pools] -->|Parquet Reader/Writer| Datasets[(Date-Partitioned Parquet Files)]
+    GoWorkers <--> Redis
+    
+    Services <-->|Trade Execution & Postbacks| DhanHQ
+    Services <-->|Autonomous Triggers| Agents[AI & Algorithmic Trading Agents]
 ```
 
-## 4. AI-Driven Development Rules
-**CRITICAL:** All AI agents and developers must strictly adhere to the following rules during code generation and modification:
-1. **Required Changes Only:** Do only required changes. Do not modify unrelated code or apply broad refactoring.
-2. **Docstring Limits:** 1 or 2 line docstring max per function/class/module. Keep documentation extremely concise.
-3. **Space Accountability:** Even a blank space change is accountable. Do not introduce trailing spaces or unnecessary blank lines.
-4. **Clean Imports:** Always keep the import clean. Remove unused imports and group them logically.
+### Technology Stack
+- **Backend Core:** Python 3.12+ (Django 5.x) & Go 1.22+
+- **Database & Storage:** PostgreSQL 16+, Apache Parquet (ZSTD/Snappy compression)
+- **Message Broker & IPC:** Redis 7+
+- **Frontend & UI:** Server-rendered Django Templates + HTMX (zero heavy JS framework overhead) + Bootstrap 5 + Chart.js
+- **Broker Connectivity:** Dhan HQ REST & WebSocket APIs
+- **Containerization:** Docker Compose multi-container environment
+
+---
+
+## 3. Core Subsystems & Functional Modules
+
+### A. Market Data Ingestion & Parquet Backup Engine (`go-app/workers/backup_job.go`)
+- **Automated Data Harvesting:** Ingests intraday 1-minute/tick OHLCV and market depth for underlying indices (NIFTY, BANKNIFTY, FINNIFTY, SENSEX) and their option chains directly from Dhan HQ.
+- **Dynamic Strike Selection:** Automatically resolves ATM $\pm N$ Call (CE) and Put (PE) strike contracts based on spot price at each timestamp.
+- **Partitioned Parquet Architecture:** Consolidates raw streaming data into date-partitioned binary Parquet files (`/app/backup/{user_id}/{task_id}/dataset.parquet` and `/app/backup/{user_id}/{task_id}/{index}_options/`).
+- **Real-Time Telemetry:** Live websocket updates and atomic progress tracking dispatched to Redis and Django UI.
+
+### B. High-Performance Go Backtest Engine (`go-app/workers/backtest_job.go`)
+- **Parallel Worker Pools:** Evaluates 5+ years of multi-strike options datasets concurrently across all CPU cores in under 4 seconds.
+- **Realistic Execution Simulation:**
+  - **Dynamic Slippage:** Volatility and order-size-adjusted market impact modeling ($\sigma \times \sqrt{V_{\text{order}}/V_{\text{bar}}}$).
+  - **Regulatory Tax Matrix:** Automatic deduction of Brokerage (₹20/order), STT (0.125% on option sell), Exchange Turnover Fee (0.05%), GST (18%), Stamp Duty (0.003%), and SEBI charges.
+  - **Dynamic Expiry Resolution:** Resolves holiday shifts, special sessions, and regulatory expiry calendar alterations directly from contract symbol metadata.
+- **Statistical & Quantitative Validation:**
+  - Standard Metrics: Total Trades, Win Rate %, Net PnL, Profit Factor, Max Drawdown (MDD), Drawdown Duration.
+  - Statistical Rigor: Probabilistic Sharpe Ratio (PSR), Deflated Sharpe Ratio (DSR), Sortino Ratio, and Value at Risk (VaR 95/99%).
+
+### C. Strategy Evaluation Registry (`go-app/strategies/`)
+1. **ICT / Smart Money Concepts (`ict_smc.go`):** Identifies Fair Value Gaps (FVG), Order Blocks (OB), Liquidity Pool Sweeps, and Market Structure Shifts (MSS) across multiple timeframe aggregations.
+2. **Expiry 0DTE Gamma Blast (`gamma_blast.go`):** Dynamic scanning between 01:30 PM - 02:45 PM on expiry days for 1-hour range consolidation breakouts, buying low-cost OTM options (₹10 - ₹25) to capture explosive delta/gamma expansion.
+3. **3:00 PM Breakout (`candle_3pm.go`):** Volume-expansion and momentum breakout tracker on the 15:00 1-minute candle body.
+
+### D. Trade Core & Risk Management (`apps/trade_core`, `apps/trade_config`)
+- **Hardened User Controls:** Granular flags for user trade eligibility, broker credential isolation, and emergency system blocks.
+- **Freeze Controls:** Strict multi-tier freezing (`primary_freeze`, `final_freeze`) protecting capital against anomalous volatility or rogue execution loops.
+- **Postback Tracking:** Webhook processing for instantaneous broker order acknowledgements, fills, and rejections.
+
+---
+
+## 4. AI-Driven Development & Engineering Rules
+
+All AI agents, automated contributors, and developers must strictly follow these engineering constraints:
+
+1. **Required Changes Only:** Modify only what is strictly requested or essential. No unsolicited broad refactorings or speculative additions.
+2. **Docstring Limits:** Maximum 1 to 2 lines per docstring across functions, classes, and modules. Keep documentation concise and high-signal.
+3. **Space & Formatting Accountability:** Every whitespace change is strictly accounted for. No trailing spaces, no arbitrary blank lines, and adhere to PEP 8 / `gofmt`.
+4. **Clean Imports:** Maintain clean imports at all times. Group logically (standard library, third-party, local) and remove all unused imports.
 5. **Page Uniformity & Profile Policy:**
    - Maintain strict full-width container uniformity (`col-12`) across all pages including Profile Settings.
-   - User Profile Field Rules:
+   - **User Profile Security Policy:**
      - `username`: Always read-only.
      - `phone_number`: Read-only for regular users.
      - Verification Badges: Read-only status indicators for regular users.
-     - Broker Credentials: Cannot be edited by user once created (Admin/Developer role access required to modify).
-     - Trade Control & Freeze Flags (`trade_eligibility`, `is_blocked`, `primary_freeze`, `final_freeze`): Always read-only.
+     - Broker Credentials: Write-once during setup; cannot be altered by regular users (Admin/Developer role required).
+     - Trade Control & Freeze Flags (`trade_eligibility`, `is_blocked`, `primary_freeze`, `final_freeze`): Always read-only for standard users.
      - Navigation Placement: Profile settings link belongs exclusively in the top-right profile dropdown menu.
 
-## 5. Directory Structure
-- `apps/`: Django modules (api, users, trade_core, trade_config, market, notifications, masters, common, ai_agents).
-- `go-app/`: Go-based workers and websocket handlers (`main.go`, `config`, `models`, `services`, `workers`).
-- `marmot/`: Django core configuration.
-- `templates/`: HTML templates and HTMX partials.
+---
 
-## 6. Quick Start Guide
-1. Clone the repository and configure `.env` (e.g., `cp .env.example .env`).
-2. Build and start services in detached mode: `docker-compose up -d --build`.
-3. Verify running containers: Django (`8000`), Adminer (`8080`), Postgres (`5432`), Redis (`6379`).
-4. Apply database migrations: `docker exec -it django_app python manage.py migrate`.
-5. Create a superuser: `docker exec -it django_app python manage.py createsuperuser`.
+## 5. Repository Structure
 
-## 7. Backtest Engine Architecture & Precise Execution Plan
+```text
+marmot/
+├── .agents/
+│   └── rules/                  # AI agent behavioral rules and execution guardrails
+│       └── readmd.md
+├── apps/                       # Django Domain Apps
+│   ├── admins/                 # Admin operations, dashboards, forms & reports
+│   ├── api/                    # RESTful endpoints for mobile & external access
+│   ├── backtest/               # Backtest management, orchestration & metrics UI
+│   ├── common/                 # Shared utilities, choices, mixins, and base models
+│   ├── market/                 # Market data structures, instruments, and live feed proxies
+│   ├── masters/                # Exchange master lists, holiday calendars, instrument tokens
+│   ├── notifications/          # Alerting channels (Email, SMS, Webhook)
+│   ├── postback/               # Broker webhook postback handlers
+│   ├── trade_config/           # Risk limits, strategy parameters, and freeze configurations
+│   ├── trade_core/             # Broker execution clients, order routers, and accounts
+│   └── users/                  # Custom User model, authentication, RBAC, and permissions
+├── backup/                     # Local parquet datasets and historical raw partitions
+├── go-app/                     # High-Performance Go Microservices
+│   ├── config/                 # Go environment configuration
+│   ├── models/                 # Parquet schemas and IPC command payload definitions
+│   ├── services/               # DB connection, Parquet writer/reader, Redis client, chart handler
+│   ├── strategies/             # Algorithmic strategy evaluators (ICT/SMC, Gamma, 3PM)
+│   ├── workers/                # Parallel backup and backtest worker engines
+│   ├── ws/                     # High-concurrency WebSocket Hub and client handlers
+│   └── main.go                 # Microservice entry point
+├── marmot/                     # Django root configuration and settings
+├── static/ & staticfiles/      # CSS, JS, branding assets, and chart bundles
+├── templates/                  # HTMX partials and server-rendered HTML templates
+├── docker-compose.yml          # Multi-container orchestration (Django, Go, Postgres, Redis, Adminer)
+└── requirements.txt            # Python dependencies
+```
 
-### A. High-Performance Go Engine
-- **Go Parallel Execution (`go-app/workers/backtest_job.go`)**: Evaluates 5 years of intraday options candles (~300M–500M records) using Go worker pools reading date-partitioned Parquet files (`year=YYYY/month=MM/YYYY-MM-DD.parquet`) concurrently in <4 seconds.
-- **Dynamic Expiry Date Resolution**: Finds contract expiries directly from option contract metadata (`expiry_date` field / contract symbol parsing) instead of relying on fixed calendar weekdays. Handles trading holidays, early expiries, and regulatory schedule changes automatically.
+---
 
-### B. Core Strategy Modules
-1. **ICT / SMC (Smart Money Concepts)**: Detects Fair Value Gaps (FVG), Order Blocks (OB), Liquidity Sweeps, and Market Structure Shifts (MSS) with multi-timeframe candle aggregations.
-2. **Expiry Gamma Blast (0DTE Options)**: Scans exact dynamic expiry dates between 01:30 PM - 02:45 PM for 1-hour range consolidation breakouts, entering low-cost OTM options (₹10 - ₹25) targeting 5x–10x gamma spikes.
-3. **3:00 PM Candle Breakout**: Tracks volume expansion and 1-minute candle body breakouts at 15:00.
+## 6. Quick Start & Execution Guide
 
-### C. Implementation Roadmap
-- **Phase 1**: Go high-speed backtesting worker (`backtest_job.go`), dynamic expiry date parser, strategy evaluator modules, and trade metrics (PnL, Win Rate %, Max Drawdown, Sharpe Ratio).
-- **Phase 2**: Django service layer and Redis IPC event dispatchers.
-- **Phase 3**: Web UI integration (`templates/admins/backtest_dashboard.html`) with Chart.js equity curve and live trade log tables.
+### Prerequisites
+- Docker Engine 24.0+ & Docker Compose v2+
+- Valid Dhan HQ API credentials (for live data downloading & real trading)
+
+### Running with Docker Compose
+```bash
+# 1. Clone repository and setup environment
+cp .env.example .env
+
+# 2. Build and launch all microservices in detached mode
+docker compose up -d --build
+
+# 3. Apply database migrations
+docker compose exec django_app python manage.py migrate
+
+# 4. Create an administrator account
+docker compose exec django_app python manage.py createsuperuser
+
+# 5. Verify service endpoints
+# - Django Application: http://localhost:8000
+# - Go WebSocket Hub:   ws://localhost:8080/ws
+# - Adminer DB UI:      http://localhost:8081
+```
+
+---
+
+## 7. Command Payload Specifications (Redis IPC)
+
+Django triggers Go background tasks by publishing JSON payloads to Redis channel `marmot:tasks:control`:
+
+### Data Backup Trigger
+```json
+{
+  "command": "START_BACKUP",
+  "task_id": "b128f731-9043-4ce2-bdf2-f81d5854721a",
+  "params": {
+    "user_id": "1",
+    "index_name": "NIFTY",
+    "security_id": "13",
+    "start_date": "2024-01-01",
+    "end_date": "2024-12-31",
+    "strike_count": 10,
+    "dhan_client_id": "1000000000",
+    "dhan_access_token": "eyJhbGciOi..."
+  }
+}
+```
+
+### Backtest Run Trigger
+```json
+{
+  "command": "START_BACKTEST",
+  "task_id": "96b6f4e2-45e8-46d5-8f6b-12d8a4365319",
+  "params": {
+    "user_id": "1",
+    "backup_task_id": "b128f731-9043-4ce2-bdf2-f81d5854721a",
+    "strategy_name": "ict_smc",
+    "index_name": "NIFTY",
+    "start_date": "2024-01-01",
+    "end_date": "2024-12-31"
+  }
+}
+```
