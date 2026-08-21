@@ -4,10 +4,10 @@ ENV GOTOOLCHAIN=auto
 
 WORKDIR /app
 
-RUN apk add --no-cache git
+RUN apk add --no-cache git dos2unix
 
 COPY entrypoint.sh /entrypoint.sh
-RUN chmod +x /entrypoint.sh
+RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
 
 # Copy dependency files first (if go.sum exists locally, it copies it. If not, it just copies go.mod)
 COPY go.mod go.sum* ./

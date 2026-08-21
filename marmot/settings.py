@@ -111,6 +111,7 @@ TEMPLATES = [
                 'django.template.context_processors.request',
                 'django.contrib.auth.context_processors.auth',
                 'django.contrib.messages.context_processors.messages',
+                'apps.common.context_processors.theme_context',
             ],
         },
     },
@@ -269,3 +270,7 @@ SOCIALACCOUNT_PROVIDERS = {
         ],
     }
 }
+
+# UI Theme Configuration (e.g. 'default', 'shadcn-zinc', 'shadcn-slate', 'shadcn-violet')
+UI_THEME = os.getenv('UI_THEME', 'default')
+
