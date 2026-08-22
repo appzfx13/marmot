@@ -1,4 +1,4 @@
-from apps.notifications.constants import EmailTemplateConstants, EmailSubjectConstants
+from apps.common.constants import EmailTemplateConstants, EmailSubjectConstants
 from apps.notifications.services.email import (
     EmailService,
     send_otp_email,

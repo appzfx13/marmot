@@ -1,0 +1,77 @@
+<div class="row">
+    <div class="col-12">
+
+        <!-- Page Header -->
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-3">
+                <a href="javascript:history.back();" class="glass-icon-btn text-decoration-none" title="Go Back">
+                    <span class="material-icons">arrow_back</span>
+                </a>
+                <div>
+                    <h3 class="fw-bold mb-0 theme-text-main d-flex align-items-center gap-2">
+                        <span>Profile Settings: {{ profile_user.username }}</span>
+                    </h3>
+                    <p class="theme-text-muted mb-0 small">Update user credentials, Cloudinary avatar, and integration details.</p>
+                </div>
+            </div>
+            <div>
+                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
+                    Role: {% if profile_user.role %}{{ profile_user.role|title }}{% else %}Trader{% endif %}
+                </span>
+            </div>
+        </div>
+
+        <!-- HTMX Target Container -->
+        <div id="user-profile-container">
+            {% if is_edit %}
+                {% include 'admins/partials/user_profile_edit_content.html' %}
+            {% else %}
+                {% include 'admins/partials/user_profile_showcase_content.html' %}
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<!-- Glassmorphic Save Confirmation Modal -->
+<div class="modal fade" id="confirmSaveProfileModal" tabindex="-1" aria-labelledby="confirmSaveProfileModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-modal-content rounded-4 border-0 p-2">
+            <div class="modal-header border-0 pb-0">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons text-primary fs-4">published_with_changes</span>
+                    <h5 class="modal-title theme-text-main fw-bold" id="confirmSaveProfileModalLabel">Confirm Profile Save</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="theme-text-muted mb-0 small">
+                    Are you sure you want to save changes to this user profile? Your updated details and avatar image will be updated immediately.
+                </p>
+            </div>
+            <div class="modal-footer border-0 pt-0 gap-2">
+                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold" data-bs-dismiss="modal">
+                    Cancel
+                </button>
+                <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" id="confirmProfileSubmitBtn">
+                    Confirm & Save Changes
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener('click', function(e) {
+        if (e.target && (e.target.id === 'confirmProfileSubmitBtn' || e.target.closest('#confirmProfileSubmitBtn'))) {
+            const form = document.getElementById('userProfileForm');
+            const modalEl = document.getElementById('confirmSaveProfileModal');
+            if (modalEl) {
+                const modal = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+                if (modal) modal.hide();
+            }
+            if (form) {
+                form.submit();
+            }
+        }
+    });
+</script>

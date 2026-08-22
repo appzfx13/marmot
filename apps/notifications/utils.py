@@ -18,7 +18,7 @@ def get_user_event_channel(user_id: int) -> str:
     return f"user_events_{user_hash}" if user_hash else ""
 
 
-from apps.notifications.constants import EmailTemplateConstants, EmailSubjectConstants
+from apps.common.constants import EmailTemplateConstants, EmailSubjectConstants
 from apps.notifications.services.email import (
     EmailService,
     send_otp_email,

@@ -17,30 +17,35 @@ LOG_DIR = os.path.join(BASE_DIR, "logs")
 os.makedirs(LOG_DIR, exist_ok=True)
 
 
-def env_to_bool(key):
+def get_env_var(key):
     val = os.getenv(key)
     if val is None:
-        raise KeyError(f"Environment variable '{key}' is required.")
+        raise KeyError(f"Required environment variable '{key}' is missing from .env.")
+    return val
+
+
+def env_to_bool(key):
+    val = get_env_var(key)
     return val.lower() in ("true", "1", "yes", "on")
 
 
 # Core Environment Configuration & Debug
-SECRET_KEY = os.getenv("SECRET_KEY")
-OTP_SECRET_KEY = os.getenv("OTP_SECRET_KEY")
+SECRET_KEY = get_env_var("SECRET_KEY")
+OTP_SECRET_KEY = get_env_var("OTP_SECRET_KEY")
 DEBUG = env_to_bool("DEBUG")
-ENVIRONMENT = os.getenv("ENVIRONMENT")
-ALLOWED_HOSTS = [host.strip() for host in os.getenv("ALLOWED_HOSTS", "").split(",") if host.strip()]
-CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in os.getenv("CSRF_TRUSTED_ORIGINS", "").split(",") if origin.strip()]
+ENVIRONMENT = get_env_var("ENVIRONMENT")
+ALLOWED_HOSTS = [host.strip() for host in get_env_var("ALLOWED_HOSTS").split(",") if host.strip()]
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in get_env_var("CSRF_TRUSTED_ORIGINS").split(",") if origin.strip()]
 SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 USE_X_FORWARDED_HOST = True
 USE_X_FORWARDED_PORT = True
 
 # WebSockets & Endpoints
-MARMOT_WS_URL = os.getenv("MARMOT_WS_URL")
-WS_PORT = os.getenv("WS_PORT")
+MARMOT_WS_URL = get_env_var("MARMOT_WS_URL")
+WS_PORT = get_env_var("WS_PORT")
 
 # Role-Based Access Control Settings
-POSTBACK_VIEW_ROLES = [role.strip() for role in os.getenv("POSTBACK_VIEW_ROLES", "admin,developer").split(",") if role.strip()]
+POSTBACK_VIEW_ROLES = [role.strip() for role in get_env_var("POSTBACK_VIEW_ROLES").split(",") if role.strip()]
 MANAGEMENT_ROLES = ['admin', 'manager']
 
 APPEND_SLASH = True

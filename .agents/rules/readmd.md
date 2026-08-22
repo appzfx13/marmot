@@ -8,50 +8,71 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
 
 ---
 
-## 1. Scope & Minimality (Required Changes Only)
-- Make **only strictly required changes** to fulfill the specific prompt or task.
-- Never perform unsolicited refactoring, code reorganization, or stylistic rewrites on untouched files or methods.
-- Preserve all existing comments, type annotations, and logic in unrelated code sections.
+## 1. Scope, Minimality & Code Simplicity
+- **Required Changes Only:** Make **only strictly required changes** to fulfill the specific prompt or task. Never perform unsolicited refactoring, code reorganization, or stylistic rewrites on untouched files or methods.
+- **Preserve Unrelated Code:** Preserve all existing comments, type annotations, and logic in untouched code sections.
+- **Straightforward & Readable Code:** Avoid over-engineering, unnecessary abstractions, or overly complex implementations. Write clear, easily understandable, maintainable code.
+- **Dependency Propagation:** When modifying or adding functionality, always update all dependent functions, method call signatures, views, templates, and service layers.
 
 ---
 
-## 2. Docstring & Documentation Limits
-- **Maximum 1 to 2 lines per docstring** across all functions, methods, classes, and modules.
-- Keep comments concise, high-signal, and factual. Avoid verbose explanations or boilerplate commentary.
+## 2. Formatting, Line Length & Spacing Accountability
+- **Single-Line Field Definitions:** Format model fields, form fields, and serializer fields as single lines whenever possible (maximum **170 characters** line length).
+- **PEP 8 Spacing Standards:** Maintain exact spacing standards in Python:
+  - **2 blank lines** between top-level classes and functions.
+  - **1 blank line** between methods inside a class.
+- **Space Accountability:** Never introduce trailing whitespace, arbitrary indentation shifts, or unnecessary blank lines.
 
 ---
 
-## 3. Formatting & Space Accountability
-- **Every whitespace change is accountable.**
-- Never introduce trailing whitespace, unnecessary blank lines, or arbitrary indentation shifts.
-- Maintain standard PEP 8 formatting for Python (`apps/`, `marmot/`) and `gofmt` conventions for Go (`go-app/`).
+## 3. Module Organization (Choices & Constants)
+- **Choices File (`choices.py`):** Keep all model field choices, status enums, and tuple choices exclusively inside `choices.py` within each respective app module (`apps/<app_name>/choices.py`).
+- **Constants & Messages File (`constants.py`):** Keep all configuration constants, default values, error messages, user notification strings, and system status messages inside `constants.py` (`apps/<app_name>/constants.py`).
 
 ---
 
-## 4. Import Hygiene
-- Keep import sections clean and minimal.
-- Remove all unused imports immediately.
-- Group imports logically:
-  1. Standard library imports
-  2. Third-party packages (Django, Go modules)
-  3. Local application imports
+## 4. Environment Variables & Settings Safety
+- **No Environment Variable Fallbacks:** Do NOT provide silent fallback default values for `.env` variables in `settings.py`. Missing environment variables must raise an explicit error (`KeyError` / `ImproperlyConfigured`) so missing environment configurations are immediately noticed by developers.
+- **Docker-First Project Architecture:** Always keep Docker container environment context in mind for file paths, containerized networking (Redis, PostgreSQL hostnames), and background worker containers.
 
 ---
 
-## 5. UI Layout & Profile Security Policy
-- **Page Container Uniformity:** Maintain strict full-width container layout (`col-12`) across all pages, including Profile Settings and Admin Dashboards.
+## 5. Performance & Database Safety
+- **Avoid N+1 Queries Always:** Always optimize database queries using `select_related()` for foreign keys / one-to-one relationships and `prefetch_related()` for many-to-many / reverse foreign keys.
+- **Database Safety:** Always create and verify Django migrations (`python manage.py makemigrations`) for schema changes without breaking relational foreign keys.
+
+---
+
+## 6. Docstrings & Import Hygiene
+- **Docstring Limits:** Maximum **1-2 lines** per docstring across all functions, methods, classes, and modules (concise, factual, medium-length).
+- **Import Hygiene:**
+  - Remove all unused imports immediately.
+  - Group imports logically:
+    1. Standard library imports
+    2. Third-party packages (Django, Go modules)
+    3. Local application imports
+
+---
+
+## 7. UI, SPA & Design System Architecture
+- **Pervasive SPA Experience:** Maintain a Single Page Application (SPA) experience at all times using HTMX dynamic partial rendering, target swapping (`hx-target`, `hx-swap="innerHTML"`, `hx-push-url="true"`), and modals.
+- **Page Container Uniformity:** Maintain a strict full-width container layout (`col-12`) across all pages, including Profile Settings and Admin Dashboards.
+- **Theme & Design Consistency:** Every UI component must be theme-conscious and adhere to common design system variables (glassmorphic dark/light tokens, cards, and buttons). Style elements must be plug-and-play in shared theme CSS files.
+- **Fully Responsive UI:** Ensure optimal responsiveness and proper alignment across mobile, tablet, and desktop viewports.
 - **User Profile Field Security:**
   - `username`: Always read-only.
   - `phone_number`: Read-only for standard users.
   - `Verification Badges`: Read-only status badges for standard users.
   - `Broker Credentials`: Cannot be modified by regular users once created (Admin/Developer role required).
   - `Trade Control & Freeze Flags` (`trade_eligibility`, `is_blocked`, `primary_freeze`, `final_freeze`): Always read-only for standard users.
-- **Navigation Structure:** The Profile settings link belongs exclusively in the top-right profile dropdown menu.
+- **Navigation Structure:** The Profile settings link belongs exclusively in the top-right profile dropdown menu and navigation sidebar.
 
 ---
 
-## 6. Architecture & Dual-Engine Integration Rules
-- **Django Responsibility:** Manages relational entities, authentication, HTMX views, REST APIs, and dispatches background tasks via Redis Pub/Sub (`marmot:tasks:control`).
-- **Go Responsibility:** Handles high-throughput streaming, WebSockets (`ws/hub.go`), Parquet reading/writing, and compute-intensive backtesting worker pools (`workers/`).
+## 8. Modular Strategy & Broker Adapter Architecture
+- **Plug-and-Play Strategy Engine:** Backtesting and trading strategies must follow modular, plug-and-play interfaces.
+- **Plug-and-Play Broker Adapters:** Broker integrations (Dhan, Fyers, etc.) must use isolated plug-and-play adapter classes.
+- **Dual-Engine Integration:**
+  - **Django:** Manages relational entities, authentication, HTMX views, REST APIs, and dispatches background tasks via Redis Pub/Sub (`marmot:tasks:control`).
+  - **Go:** Handles high-throughput streaming, WebSockets (`ws/hub.go`), Parquet reading/writing, and compute-intensive backtesting worker pools (`workers/`).
 - **Data Parquet Storage:** Historical option datasets must always adhere to the date-partitioned structure under `/app/backup/{user_id}/{task_id}/`.
-- **Database Safety:** Always create and verify Django migrations for schema changes (`python manage.py makemigrations`) without breaking existing relational foreign keys.

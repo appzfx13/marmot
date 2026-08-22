@@ -32,7 +32,7 @@ from apps.users.models import User, MemberRoleChoices, BrokerChoices, PLStatusCh
 from apps.users.mixins import HTMXPartialMixin
 from apps.trade_config.models import TradeExecConfig, BrokerMaster
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
-from apps.admins.constants import Messages
+from apps.common.constants import Messages
 from apps.admins.filters import TradeExecConfigFilter
 from .permissions import AdminRequiredMixin
 from .forms import TradeExecConfigForm, UserForm, AdminTraderPasswordResetForm, BrokerMasterForm

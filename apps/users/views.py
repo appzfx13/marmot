@@ -37,6 +37,7 @@ from .forms import (
     UserProfilePasswordChangeForm,
     UserBacktestTaskForm,
 )
+from apps.common.constants import UserMessages
 from .mixins import HTMXPartialMixin, MarmotRoleRequiredMixin
 from .models import User
 from .permissions import is_user_authorized_for_dashboard
@@ -830,7 +831,7 @@ class UserProfileView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, Up
     form_class = UserProfileForm
     template_name = 'admins/user_profile.html'
     success_url = reverse_lazy('users:marmot-profile')
-    success_message = "Profile settings updated successfully!"
+    success_message = UserMessages.PROFILE_UPDATED
 
     def get_object(self, queryset=None):
         pk = self.kwargs.get('pk')
@@ -845,9 +846,12 @@ class UserProfileView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, Up
 
     def get_template_names(self):
         if self.request.headers.get('HX-Request'):
-            if self.request.GET.get('edit') == '1':
-                return ['admins/partials/user_profile_edit_content.html']
-            return ['admins/partials/user_profile_showcase_content.html']
+            target = self.request.headers.get('HX-Target')
+            if target == 'user-profile-container':
+                if self.request.GET.get('edit') == '1':
+                    return ['admins/partials/user_profile_edit_content.html']
+                return ['admins/partials/user_profile_showcase_content.html']
+            return ['admins/partials/user_profile_page_content.html']
         return [self.template_name]
 
     def get_context_data(self, **kwargs):
