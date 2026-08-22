@@ -103,10 +103,13 @@ func maskDBURL(url string) string {
 	return url
 }
 
-// Helper to retrieve environment variables with a fallback default
+// Helper to retrieve environment variables with explicit warning log if default is used
 func getEnv(key, fallback string) string {
 	if value, exists := os.LookupEnv(key); exists && value != "" {
 		return value
+	}
+	if fallback != "" {
+		fmt.Printf("⚠️ [CONFIG] Environment variable '%s' not set. Using fallback: '%s'\n", key, fallback)
 	}
 	return fallback
 }

@@ -11,7 +11,7 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
 ## 1. Scope, Minimality & Code Simplicity
 - **Required Changes Only:** Make **only strictly required changes** to fulfill the specific prompt or task. Never perform unsolicited refactoring, code reorganization, or stylistic rewrites on untouched files or methods.
 - **Preserve Unrelated Code:** Preserve all existing comments, type annotations, and logic in untouched code sections.
-- **Straightforward & Readable Code:** Avoid over-engineering, unnecessary abstractions, or overly complex implementations. Write clear, easily understandable, maintainable code.
+- **Straightforward & Readable Code:** Avoid over-engineering, unnecessary abstractions, or overly complex implementations. Write clear, easily understandable, maintainable code in Python and Go.
 - **Dependency Propagation:** When modifying or adding functionality, always update all dependent functions, method call signatures, views, templates, and service layers.
 
 ---
@@ -21,13 +21,14 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
 - **PEP 8 Spacing Standards:** Maintain exact spacing standards in Python:
   - **2 blank lines** between top-level classes and functions.
   - **1 blank line** between methods inside a class.
+- **Go Formatting (`gofmt`):** Maintain standard `gofmt` indentation (tabs) and formatting across all Go packages.
 - **Space Accountability:** Never introduce trailing whitespace, arbitrary indentation shifts, or unnecessary blank lines.
 
 ---
 
 ## 3. Module Organization (Choices & Constants)
-- **Choices File (`choices.py`):** Keep all model field choices, status enums, and tuple choices exclusively inside `choices.py` within each respective app module (`apps/<app_name>/choices.py`).
-- **Constants & Messages File (`constants.py`):** Keep all configuration constants, default values, error messages, user notification strings, and system status messages inside `constants.py` (`apps/<app_name>/constants.py`).
+- **Choices File (`choices.py`):** Keep all model field choices, status enums, and tuple choices exclusively inside `choices.py` within each respective app module (`apps/<app_name>/choices.py`) or centralized in `apps/common/choices.py`.
+- **Constants & Messages File (`constants.py`):** Keep all configuration constants, default values, error messages, user notification strings, and system status messages inside `apps/common/constants.py`.
 
 ---
 
@@ -76,3 +77,18 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
   - **Django:** Manages relational entities, authentication, HTMX views, REST APIs, and dispatches background tasks via Redis Pub/Sub (`marmot:tasks:control`).
   - **Go:** Handles high-throughput streaming, WebSockets (`ws/hub.go`), Parquet reading/writing, and compute-intensive backtesting worker pools (`workers/`).
 - **Data Parquet Storage:** Historical option datasets must always adhere to the date-partitioned structure under `/app/backup/{user_id}/{task_id}/`.
+
+---
+
+## 9. Go Microservice Engine Standards (`go-app/`)
+- **Formatting & Style:** Enforce standard `gofmt` (tab indentation) and `goimports` formatting on all `.go` files.
+- **Import Grouping:** Group imports into standard library, third-party packages, and internal local packages.
+- **Explicit Error Handling:** Never ignore returned errors (`err`). Check and handle or log every error explicitly.
+- **Concurrency & Goroutine Safety:**
+  - Use `context.Context` for cancellation and timeout propagation across worker pools.
+  - Protect shared state with `sync.RWMutex` or atomic operations.
+  - Ensure goroutines terminate cleanly using `sync.WaitGroup` to avoid goroutine memory leaks.
+- **Modular Strategy Interfaces:** Strategies under `go-app/strategies/` must implement a unified plug-and-play `Strategy` interface.
+- **High-Throughput Streaming & Parquet:**
+  - Parquet dataset reader/writers (`go-app/parquet/`) must follow date-partitioned storage paths (`/app/backup/{user_id}/{task_id}/`).
+  - WebSockets hub (`go-app/ws/hub.go`) must handle broadcast channels safely without blocking worker threads.

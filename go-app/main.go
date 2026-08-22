@@ -17,9 +17,10 @@ import (
 )
 
 func main() {
-	log.Println("==================================================")
-	log.Println("🚀 Starting Marmot Go Market Data Engine...")
-	log.Println("==================================================")
+	goLogger := services.GetLogger()
+	goLogger.Info("==================================================")
+	goLogger.Info("🚀 Starting Marmot Go Market Data Engine...")
+	goLogger.Info("==================================================")
 
 	// 1. Setup Context for Graceful Container Shutdowns (SIGINT / SIGTERM)
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -31,6 +32,7 @@ func main() {
 	// 3. Connect to Shared PostgreSQL DB (State Layer)
 	dbService, err := services.NewDBService(ctx, cfg.DatabaseURL, cfg.DBTableName)
 	if err != nil {
+		goLogger.Exception(err, "❌ DB Connection Error")
 		log.Fatalf("❌ DB Connection Error: %v\n", err)
 	}
 	defer dbService.Close()
@@ -38,6 +40,7 @@ func main() {
 	// 4. Connect to Redis Broker (Pub/Sub IPC Layer)
 	redisService, err := services.NewRedisService(ctx, cfg.RedisURL)
 	if err != nil {
+		goLogger.Exception(err, "❌ Redis Connection Error")
 		log.Fatalf("❌ Redis Connection Error: %v\n", err)
 	}
 	defer redisService.Close()
