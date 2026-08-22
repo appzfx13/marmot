@@ -1,0 +1,28 @@
+{% if page_obj.has_next %}
+<tr id="{{ sentinel_id|default:'table-scroll-sentinel' }}-{{ page_obj.number }}">
+    <td colspan="{{ colspan|default:10 }}" class="text-center py-3 bg-transparent border-0">
+        <button type="button" 
+                hx-get="{{ scroll_url }}?{{ page_kwarg|default:'page' }}={{ page_obj.next_page_number }}&scroll_type=rows&{{ query_params|default:current_filters }}"
+                hx-target="#{{ sentinel_id|default:'table-scroll-sentinel' }}-{{ page_obj.number }}"
+                hx-swap="outerHTML"
+                class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+                style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+                title="{{ button_label|default:'Load More' }}">
+            <span class="load-more-idle d-inline-flex align-items-center gap-2">
+                <span class="material-icons fs-5">keyboard_arrow_down</span>
+                <span class="fw-bold" style="font-size: 0.8rem;">{{ button_label|default:"Load More" }} (Page {{ page_obj.next_page_number }} of {{ paginator.num_pages }})</span>
+            </span>
+            <span class="load-more-loading d-none align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Loading records...</span>
+            </span>
+        </button>
+    </td>
+</tr>
+{% elif paginator.count > 0 %}
+<tr class="border-0">
+    <td colspan="{{ colspan|default:10 }}" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.72rem;">
+        <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ paginator.count }} {{ item_name|default:"items" }} loaded
+    </td>
+</tr>
+{% endif %}

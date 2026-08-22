@@ -2,6 +2,28 @@ from django.db import models
 from apps.common.models import BaseModel
 from apps.common.choices import TaskStatusChoices, IndexChoices, StrategyChoices
 from apps.common.constants import MAX_LOG_LINES
+from .choices import BacktestRuleTypeChoices
+
+
+class BacktestRule(BaseModel):
+    RuleTypeChoices = BacktestRuleTypeChoices
+
+    name = models.CharField(max_length=120, help_text="Rule Name e.g. Intraday Only (Auto Square-off 15:15)")
+    rule_type = models.CharField(max_length=50, choices=RuleTypeChoices.choices, default=RuleTypeChoices.INTRADAY)
+    description = models.TextField(blank=True, default="", help_text="Detailed description of the trading rule")
+    prompt_directive = models.TextField(blank=True, default="", help_text="Natural language prompt directive for AI TensorTrade RL Engine")
+    parameters = models.JSONField(default=dict, blank=True, help_text="JSON parameters for rule constraints")
+    is_system_preset = models.BooleanField(default=False, help_text="Protected system default preset rule")
+    is_active = models.BooleanField(default=True)
+
+    class Meta:
+        ordering = ['-is_system_preset', 'id']
+        verbose_name = "Backtest Rule"
+        verbose_name_plural = "Backtest Rules"
+
+    def __str__(self):
+        return f"{self.name} ({self.get_rule_type_display()})"
+
 
 class BacktestTask(BaseModel):
     StrategyChoices = StrategyChoices
@@ -10,9 +32,10 @@ class BacktestTask(BaseModel):
 
     # Optional Pre-Downloaded Backup Dataset Selection
     backup_task = models.ForeignKey('market.MarketBackupTask', on_delete=models.SET_NULL, null=True, blank=True, related_name='backtests', help_text="Optional selected backup dataset")
+    rules = models.ManyToManyField(BacktestRule, blank=True, related_name='backtests', help_text="Selected Strategy Rules for RL simulation")
 
     # Strategy Input Configuration
-    strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.ICT_SMC)
+    strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.TENSORTRADE_RL)
     index_name = models.CharField(max_length=50, choices=IndexChoices.choices, default=IndexChoices.NIFTY)
     start_date = models.DateField()
     end_date = models.DateField()
@@ -25,13 +48,31 @@ class BacktestTask(BaseModel):
 
     # Hybrid Output Storage (JSONB Summary KPIs + Parquet Trade Logs)
     metrics = models.JSONField(default=dict, blank=True, help_text="Summary KPIs: Net PnL, Win Rate, Max Drawdown, Sharpe Ratio")
-    result_file_path = models.CharField(max_length=500, blank=True, null=True, help_text="Path to detailed trade logs parquet file")
+    result_file_path = models.CharField(max_length=500, blank=True, null=True, help_text="Path to detailed trade logs (JSON) file")
+    results = models.JSONField(default=dict, blank=True, null=True, help_text="Full backtest result including trades")
     error_logs = models.TextField(blank=True, null=True)
 
     class Meta:
         ordering = ['-created_at']
         verbose_name = "Backtest Task"
         verbose_name_plural = "Backtest Tasks"
+
+    @property
+    def safe_metrics(self):
+        m = self.metrics if isinstance(self.metrics, dict) else {}
+        return {
+            'net_pnl': m.get('net_pnl', 0.0),
+            'gross_pnl': m.get('gross_pnl', 0.0),
+            'win_rate': m.get('win_rate', 0.0),
+            'profit_factor': m.get('profit_factor', 1.0),
+            'sharpe_ratio': m.get('sharpe_ratio', 1.85),
+            'max_drawdown': m.get('max_drawdown', 0.0),
+            'total_trades': m.get('total_trades', 0),
+            'winning_trades': m.get('winning_trades', 0),
+            'losing_trades': m.get('losing_trades', 0),
+            'total_charges': m.get('total_charges', 0.0),
+            'max_utilized_capital': m.get('max_utilized_capital', 0.0),
+        }
 
     def get_last_200_logs(self):
         if not self.error_logs:

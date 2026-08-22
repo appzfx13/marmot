@@ -127,12 +127,12 @@ WSGI_APPLICATION = 'marmot.wsgi.application'
 # Database Configuration
 DATABASES = {
     'default': {
-        'ENGINE': os.getenv('DB_ENGINE'),
-        'NAME': os.getenv('DB_NAME'),
-        'USER': os.getenv('DB_USER'),
-        'PASSWORD': os.getenv('DB_PASSWORD'),
-        'HOST': os.getenv('DB_HOST'),
-        'PORT': os.getenv('DB_PORT'),
+        'ENGINE': get_env_var('DB_ENGINE'),
+        'NAME': get_env_var('POSTGRES_DB'),
+        'USER': get_env_var('POSTGRES_USER'),
+        'PASSWORD': get_env_var('POSTGRES_PASSWORD'),
+        'HOST': get_env_var('POSTGRES_HOST'),
+        'PORT': get_env_var('POSTGRES_PORT'),
     }
 }
 

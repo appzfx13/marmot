@@ -1,84 +1,629 @@
 {% load static %}
 
-<!-- Advanced Analytics KPI Cards Grid -->
-<div class="row g-3 mb-4">
-    <div class="col-12 col-sm-6 col-xl-2">
-        <div class="glass-card p-3 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Net PnL</span>
-                <span class="material-icons text-primary fs-6">account_balance_wallet</span>
-            </div>
-            <h5 class="fw-bold mb-1 {% if analytics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
-                {% if analytics.net_pnl >= 0 %}+{% endif %}₹{{ analytics.net_pnl|floatformat:2 }}
-            </h5>
-            <small class="theme-text-muted" style="font-size: 0.7rem;">Cap: ₹{{ backtest.initial_capital|floatformat:0 }}</small>
+<style>
+    .equity-zoom-btn {
+        width: 32px !important;
+        height: 32px !important;
+        min-width: 32px !important;
+        border-radius: 6px !important;
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15)) !important;
+        background: rgba(255, 255, 255, 0.04) !important;
+        color: var(--text-muted, #94a3b8) !important;
+        font-size: 0.75rem !important;
+        font-weight: 700 !important;
+        display: inline-flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        cursor: pointer !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-sizing: border-box !important;
+        line-height: normal !important;
+        transition: all 0.15s ease !important;
+    }
+    .equity-zoom-btn:hover {
+        background: var(--nav-hover, rgba(255, 255, 255, 0.1)) !important;
+        color: var(--text-main, #ffffff) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+    .equity-zoom-btn.active {
+        background: rgba(13, 110, 253, 0.25) !important;
+        border-color: #0d6efd !important;
+        color: #38bdf8 !important;
+        box-shadow: 0 0 8px rgba(13, 110, 253, 0.35) !important;
+    }
+</style>
+
+<!-- Top Header Navigation & Live Controls -->
+<div class="mb-4 pt-2">
+    <div class="d-flex align-items-center justify-content-between mb-3">
+        <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill text-white-50 d-inline-flex align-items-center gap-1.5 shadow-sm" style="border-color: var(--border-color) !important; background: var(--input-bg, rgba(255,255,255,0.04));">
+            <span class="material-icons">arrow_back</span>
+            <span class="fw-medium">Back to Dashboard</span>
+        </a>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'backtest:rule_list' %}" class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm" target="_blank" title="Manage Execution Rules">
+                <span class="material-icons">rule</span>
+                <span class="fw-medium">Strategy Rules</span>
+            </a>
         </div>
     </div>
 
-    <div class="col-12 col-sm-6 col-xl-2">
-        <div class="glass-card p-3 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Total Profit</span>
-                <span class="material-icons text-success fs-6">trending_up</span>
-            </div>
-            <h5 class="fw-bold text-success mb-1">+₹{{ analytics.total_profit|floatformat:2 }}</h5>
-            <small class="text-success" style="font-size: 0.7rem;">{{ analytics.winning_trades_count }} Profit Days</small>
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+        <div>
+            <h3 class="fw-bold mb-1 theme-text-main d-flex align-items-center flex-wrap gap-2">
+                <span>Backtest Analytics #BT-{{ backtest.id|stringformat:"04d" }}</span>
+                <span class="fs-6 fw-normal text-primary">({{ backtest.get_strategy_name_display }})</span>
+                <span id="backtest-status-badge-container">
+                    {% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0 fs-6">● Running</span>
+                    {% elif backtest.status|lower == 'completed' or backtest.status|lower == 'success' %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0 fs-6">● Completed</span>
+                    {% elif backtest.status|lower == 'paused' %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-0 fs-6">● Paused</span>
+                    {% elif backtest.status|lower == 'error' or backtest.status|lower == 'failed' %}
+                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0 fs-6">● Failed</span>
+                    {% else %}
+                        <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-0 fs-6">● Ready</span>
+                    {% endif %}
+                </span>
+            </h3>
+            <p class="theme-text-muted mb-0 small">Index: <strong class="theme-text-main">{{ backtest.index_name }}</strong> | Period: {{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }} | Initial Capital: ₹{{ backtest.initial_capital|floatformat:0 }}</p>
         </div>
-    </div>
 
-    <div class="col-12 col-sm-6 col-xl-2">
-        <div class="glass-card p-3 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Total Loss</span>
-                <span class="material-icons text-danger fs-6">trending_down</span>
-            </div>
-            <h5 class="fw-bold text-danger mb-1">₹{{ analytics.total_loss|floatformat:2 }}</h5>
-            <small class="text-danger" style="font-size: 0.7rem;">{{ analytics.losing_trades_count }} Loss Days</small>
-        </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-2">
-        <div class="glass-card p-3 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Highest Win</span>
-                <span class="material-icons text-success fs-6">emoji_events</span>
-            </div>
-            <h5 class="fw-bold text-success mb-1">+₹{{ analytics.highest_win|floatformat:2 }}</h5>
-            <small class="theme-text-muted" style="font-size: 0.7rem;">Max Single Gain</small>
-        </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-2">
-        <div class="glass-card p-3 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Highest Loss</span>
-                <span class="material-icons text-warning fs-6">warning_amber</span>
-            </div>
-            <h5 class="fw-bold text-danger mb-1">₹{{ analytics.highest_loss|floatformat:2 }}</h5>
-            <small class="theme-text-muted" style="font-size: 0.7rem;">Max Single Loss</small>
-        </div>
-    </div>
-
-    <div class="col-12 col-sm-6 col-xl-2">
-        <div class="glass-card p-3 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-1">
-                <span class="theme-text-muted small fw-semibold text-uppercase" style="font-size: 0.72rem;">Win Rate</span>
-                <span class="material-icons text-info fs-6">donut_large</span>
-            </div>
-            <h5 class="fw-bold theme-text-main mb-1">{{ backtest.metrics.win_rate|default:0 }}%</h5>
-            <small class="theme-text-muted" style="font-size: 0.7rem;">PF: {{ backtest.metrics.profit_factor|default:0 }}</small>
+        <div id="backtest-control-actions" class="d-flex align-items-center gap-2 flex-wrap">
+            {% if backtest.status|lower == 'created' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <span class="material-icons">play_arrow</span>
+                <span>Start Execution</span>
+            </button>
+            {% elif backtest.status|lower == 'paused' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=resume" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <span class="material-icons">play_arrow</span>
+                <span>Resume</span>
+            </button>
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-outline-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <span class="material-icons">stop</span>
+                <span>Cancel</span>
+            </button>
+            {% elif backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <span class="material-icons">pause</span>
+                <span>Pause</span>
+            </button>
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <span class="material-icons">stop</span>
+                <span>Stop</span>
+            </button>
+            {% else %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-outline-success rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <span class="material-icons">replay</span>
+                <span>Re-run Backtest</span>
+            </button>
+            {% endif %}
         </div>
     </div>
 </div>
 
-<!-- Chart.js Equity Curve -->
-<div class="glass-card p-4 mb-4">
-    <div class="d-flex align-items-center justify-content-between mb-3">
-        <h5 class="fw-bold theme-text-main mb-0">Strategy Performance Equity Curve</h5>
-        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Time Series</span>
+<!-- Live Strategy Execution Progress Bar Card -->
+{% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
+<div class="glass-card p-3 mb-4 border border-primary border-opacity-30 position-relative overflow-hidden" 
+     style="background: linear-gradient(135deg, rgba(13, 110, 253, 0.12) 0%, rgba(13, 110, 253, 0.03) 100%);">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <div class="spinner-border spinner-border-sm text-primary" role="status">
+                <span class="visually-hidden">Calculating...</span>
+            </div>
+            <strong class="theme-text-main small text-uppercase tracking-wider">Reinforcement Learning & Options Execution Simulation In Progress</strong>
+        </div>
+        <span id="backtest-live-progress-pct" class="badge bg-primary rounded-pill px-3 py-1 font-monospace fw-bold">{{ backtest.progress|default:0 }}%</span>
     </div>
-    <div style="height: 300px; position: relative;">
-        <canvas id="equityCurveChart"></canvas>
+    
+    <div class="progress rounded-pill bg-dark bg-opacity-50 border border-secondary border-opacity-25" style="height: 10px;">
+        <div id="backtest-live-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-primary" 
+             role="progressbar" 
+             style="width: {{ backtest.progress|default:0 }}%; transition: width 0.4s ease;" 
+             aria-valuenow="{{ backtest.progress|default:0 }}" 
+             aria-valuemin="0" 
+             aria-valuemax="100">
+        </div>
+    </div>
+
+    <div class="row g-2 mt-2 pt-2 border-top border-secondary border-opacity-25 small">
+        <div class="col-6 col-md-3">
+            <span class="theme-text-muted">Task ID:</span> <span class="theme-text-main fw-semibold font-monospace">#BT-{{ backtest.id|stringformat:"04d" }}</span>
+        </div>
+        <div class="col-6 col-md-3">
+            <span class="theme-text-muted">Strategy:</span> <span class="text-info fw-semibold">{{ backtest.get_strategy_name_display }}</span>
+        </div>
+        <div class="col-6 col-md-3">
+            <span class="theme-text-muted">Trades Discovered:</span> <span id="backtest-live-trades" class="text-warning fw-semibold font-monospace">{{ analytics.total_trades|default:0 }}</span>
+        </div>
+        <div class="col-6 col-md-3 text-md-end">
+            <span class="theme-text-muted">Running Net PnL:</span> <span id="backtest-live-pnl" class="fw-bold font-monospace {% if analytics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">₹{{ analytics.net_pnl|floatformat:2 }}</span>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Comprehensive Strategy Configuration & Execution Parameters Card -->
+<div class="glass-card p-3 mb-4 position-relative overflow-hidden" style="background: rgba(15, 23, 42, 0.65); border: 1px solid var(--border-color);">
+    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-3 pb-2 border-bottom border-secondary border-opacity-15">
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle bg-info bg-opacity-20 text-info d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; border: 1px solid rgba(14, 165, 233, 0.3);">
+                <span class="material-icons fs-5">tune</span>
+            </div>
+            <div>
+                <span class="fw-bold theme-text-main small text-uppercase tracking-wider">Strategy Configuration & Execution Parameters</span>
+            </div>
+        </div>
+        <div>
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-outline-primary rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <span class="material-icons">edit</span>
+                <span>Edit Parameters & Regenerate</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Key Parameters Grid -->
+    <div class="row g-3 small">
+        <div class="col-6 col-md-4 col-xl-2">
+            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Strategy Engine</span>
+            <span class="text-info fw-bold">{{ backtest.get_strategy_name_display }}</span>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Target Instrument</span>
+            <span class="theme-text-main fw-bold">{{ backtest.index_name }}</span>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Execution Period</span>
+            <span class="theme-text-main fw-semibold font-monospace">{{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</span>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Initial Capital</span>
+            <span class="text-success fw-bold font-monospace">₹{{ backtest.initial_capital|floatformat:2 }}</span>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Position & Strike</span>
+            <span class="theme-text-main fw-semibold">{{ backtest.parameters.lots_count|default:1 }} Lot(s) | <strong class="text-warning">{{ backtest.parameters.strike_selection|default:"ATM" }}</strong></span>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Stop Loss & Target</span>
+            <span class="text-danger fw-semibold font-monospace">{{ backtest.parameters.stop_loss_points|default:backtest.parameters.sl_pts|default:30 }} pts</span> / <span class="text-success fw-semibold font-monospace">{{ backtest.parameters.rr_ratio|default:2.0 }}x RR</span>
+        </div>
+    </div>
+
+    <!-- Active Strategy Rules Badges -->
+    <div class="mt-3 pt-2 border-top border-secondary border-opacity-10 d-flex flex-wrap align-items-center gap-2">
+        <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Active Rules:</span>
+        {% for rule in backtest.rules.all %}
+        <span class="badge rounded-pill px-3 py-1 fw-bold" 
+              style="font-size: 0.72rem;
+              {% if rule.rule_type == 'intraday' %}background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4);
+              {% elif rule.rule_type == 'risk_management' %}background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4);
+              {% elif rule.rule_type == 'retest_limit' %}background: rgba(16, 185, 129, 0.2); color: #a7f3d0; border: 1px solid rgba(16, 185, 129, 0.4);
+              {% elif rule.rule_type == 'trendline_retest' %}background: rgba(249, 115, 22, 0.2); color: #fed7aa; border: 1px solid rgba(249, 115, 22, 0.4);
+              {% elif rule.rule_type == 'gamma_blast' %}background: rgba(168, 85, 247, 0.2); color: #e9d5ff; border: 1px solid rgba(168, 85, 247, 0.4);
+              {% elif rule.rule_type == 'morning_trend' %}background: rgba(59, 130, 246, 0.2); color: #bfdbfe; border: 1px solid rgba(59, 130, 246, 0.4);
+              {% elif rule.rule_type == 'gap_openings' %}background: rgba(245, 158, 11, 0.2); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.4);
+              {% else %}background: rgba(16, 185, 129, 0.2); color: #a7f3d0; border: 1px solid rgba(16, 185, 129, 0.4);{% endif %}">
+            <span class="material-icons fs-6 align-middle me-1" style="font-size: 0.75rem !important;">check_circle</span>
+            {{ rule.name }}
+        </span>
+        {% empty %}
+            {% for r in backtest.parameters.rules %}
+            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold" style="font-size: 0.72rem;">
+                {{ r.name|default:r }}
+            </span>
+            {% empty %}
+            <span class="theme-text-muted small fst-italic">Standard Execution Rules</span>
+            {% endfor %}
+        {% endfor %}
+
+        {% if backtest.backup_task %}
+        <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-1 ms-auto" style="font-size: 0.7rem;">
+            <span class="material-icons align-middle me-1" style="font-size: 0.75rem !important;">storage</span>
+            Linked Dataset #{{ backtest.backup_task.id }} ({{ backtest.backup_task.start_date }} to {{ backtest.backup_task.end_date }})
+        </span>
+        {% endif %}
+    </div>
+
+    {% if backtest.parameters.prompt_directives %}
+    <div class="mt-2 pt-2 border-top border-secondary border-opacity-10 small d-flex align-items-start gap-2">
+        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0 fw-bold" style="font-size: 0.68rem;">AI DIRECTIVES</span>
+        <span class="theme-text-main fst-italic" style="color: #e2e8f0 !important;">"{{ backtest.parameters.prompt_directives }}"</span>
+    </div>
+    {% endif %}
+</div>
+
+<!-- Full-Width Horizontal Capital Accounting & In-Hand Cash Bridge Card -->
+<div class="glass-card p-3 mb-4 position-relative overflow-hidden">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Capital Accounting & In-Hand Cash Bridge</span>
+        <span class="badge {% if analytics.net_pnl >= 0 %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-25 border border-opacity-25 rounded-pill px-2 py-0 fs-7">
+            {% if analytics.roi_on_capital >= 0 %}+{% endif %}{{ analytics.roi_on_capital|floatformat:2 }}% Net Growth
+        </span>
+    </div>
+    <h4 class="fw-bolder mb-2 text-success font-monospace">
+        ₹{{ analytics.ending_equity|floatformat:2 }} <small class="theme-text-muted fs-6 fw-normal ms-1">(Net Withdrawable from Starting Principal: ₹{{ backtest.initial_capital|floatformat:2 }})</small>
+    </h4>
+    <div class="row g-2 pt-2 border-top border-secondary border-opacity-10 small font-monospace">
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted">1. Starting Capital:</div>
+            <div class="theme-text-main fw-semibold">₹{{ backtest.initial_capital|floatformat:2 }}</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted">2. (+) Gross Profits:</div>
+            <div class="text-success fw-semibold">+₹{{ analytics.gross_profit|floatformat:2 }}</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted">3. (-) Gross Losses:</div>
+            <div class="text-danger fw-semibold">₹{{ analytics.total_loss|floatformat:2 }}</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted">4. (➔) Gross Realized PnL:</div>
+            <div class="{% if analytics.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">{% if analytics.gross_pnl >= 0 %}+{% endif %}₹{{ analytics.gross_pnl|floatformat:2 }}</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted">5. (-) Brokerage & Taxes:</div>
+            <div class="text-warning fw-semibold">-₹{{ analytics.total_charges|floatformat:2 }}</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted">6. (=) Final In-Hand Cash:</div>
+            <div class="text-success fw-bold">₹{{ analytics.ending_equity|floatformat:2 }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- Advanced Analytics Institutional KPI Cards (3-Column Grid) -->
+<div class="row g-3 mb-4">
+    <!-- Card 1: Net Realized PnL -->
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="glass-card p-3 h-100 position-relative overflow-hidden">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Net Realized PnL</span>
+                <span class="badge rounded-pill px-2 py-0 fs-7 fw-semibold" style="{% if analytics.net_pnl >= 0 %}background: rgba(16, 185, 129, 0.2) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;{% else %}background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;{% endif %}">
+                    {% if analytics.roi_on_capital >= 0 %}+{% endif %}{{ analytics.roi_on_capital|floatformat:2 }}% ROI
+                </span>
+            </div>
+            <h4 class="fw-bolder mb-2 font-monospace" style="{% if analytics.net_pnl >= 0 %}color: #34d399 !important;{% else %}color: #f87171 !important;{% endif %}">
+                {% if analytics.net_pnl >= 0 %}+{% endif %}₹{{ analytics.net_pnl|floatformat:2 }}
+            </h4>
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-10 small font-monospace">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Total Profit (Gross Wins):</span>
+                    <span class="fw-semibold" style="color: #34d399 !important;">+₹{{ analytics.total_profit|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Total Loss (Gross Losses):</span>
+                    <span class="fw-semibold" style="color: #f87171 !important;">₹{{ analytics.total_loss|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Ending Equity:</span>
+                    <span class="theme-text-main fw-bold">₹{{ analytics.ending_equity|floatformat:2 }} <small class="text-muted fw-normal">(from ₹{{ backtest.initial_capital|floatformat:0 }})</small></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Profit Factor & Payoff Ratio -->
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="glass-card p-3 h-100 position-relative overflow-hidden">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Profit Factor & Expectancy</span>
+                <span class="badge rounded-pill px-2 py-0 fs-7 fw-semibold" style="background: rgba(59, 130, 246, 0.2) !important; color: #93c5fd !important; border: 1px solid rgba(59, 130, 246, 0.35) !important;">
+                    Sharpe {{ analytics.sharpe_ratio|default:1.85 }}
+                </span>
+            </div>
+            <h4 class="fw-bolder mb-2 theme-text-main font-monospace" style="color: #f8fafc !important;">
+                {{ analytics.profit_factor|default:1.00 }} <small class="theme-text-muted fs-6 fw-normal">Profit Factor</small>
+            </h4>
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-10 small font-monospace">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Avg Win Trade:</span>
+                    <span class="fw-semibold" style="color: #34d399 !important;">+₹{{ analytics.avg_win_pnl|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Avg Loss Trade:</span>
+                    <span class="fw-semibold" style="color: #f87171 !important;">-₹{{ analytics.avg_loss_pnl|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Win / Loss Payoff:</span>
+                    <span class="fw-semibold" style="color: #38bdf8 !important;">{{ analytics.win_loss_ratio|floatformat:2 }}x</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Win Rate & Trade Distribution -->
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="glass-card p-3 h-100 position-relative overflow-hidden">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Win Rate & Execution</span>
+                <span class="badge rounded-pill px-2 py-0 fs-7 fw-semibold" style="background: rgba(14, 165, 233, 0.2) !important; color: #38bdf8 !important; border: 1px solid rgba(14, 165, 233, 0.35) !important;">
+                    {{ analytics.total_trades }} Trades
+                </span>
+            </div>
+            <h4 class="fw-bolder mb-2 font-monospace d-flex align-items-baseline gap-1" style="color: #f8fafc !important;">
+                <span class="fw-bold fs-3" style="color: #60a5fa !important;">{{ analytics.win_rate|default:0 }}</span>
+                <span class="fw-semibold fs-5" style="color: #60a5fa !important;">%</span>
+                <span class="theme-text-muted fs-6 fw-normal ms-2">Win Rate</span>
+            </h4>
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-10 small font-monospace">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Winning Trades:</span>
+                    <span class="fw-semibold" style="color: #34d399 !important;">{{ analytics.winning_trades_count }} <span class="theme-text-muted">({{ analytics.win_rate }}%)</span></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Losing Trades:</span>
+                    <span class="fw-semibold" style="color: #f87171 !important;">{{ analytics.losing_trades_count }} <span class="theme-text-muted">({% if analytics.total_trades > 0 %}{% widthratio analytics.losing_trades_count analytics.total_trades 100 %}{% else %}0{% endif %}%)</span></span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Highest Win / Loss:</span>
+                    <span class="theme-text-main fw-semibold"><span style="color: #34d399 !important;">+₹{{ analytics.highest_win|floatformat:0 }}</span> / <span style="color: #f87171 !important;">₹{{ analytics.highest_loss|floatformat:0 }}</span></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Capital Utilization & Margin Efficiency -->
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="glass-card p-3 h-100 position-relative overflow-hidden">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Capital & Margin Efficiency</span>
+                <span class="badge rounded-pill px-2 py-0 fs-7 fw-semibold" style="background: rgba(245, 158, 11, 0.2) !important; color: #fbbf24 !important; border: 1px solid rgba(245, 158, 11, 0.35) !important;">
+                    {{ analytics.capital_utilization_pct }}% Peak
+                </span>
+            </div>
+            <h4 class="fw-bolder mb-2 font-monospace" style="color: #fbbf24 !important;">
+                ₹{{ analytics.max_utilized_capital|floatformat:2 }}
+            </h4>
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-10 small font-monospace">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">ROI on Utilized Capital:</span>
+                    <span class="fw-bold" style="color: #34d399 !important;">{% if analytics.roi_on_utilized >= 0 %}+{% endif %}{{ analytics.roi_on_utilized|floatformat:2 }}%</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Average Utilized Margin:</span>
+                    <span class="theme-text-main fw-semibold font-monospace">₹{{ analytics.avg_utilized_capital|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Total Initial Capital:</span>
+                    <span class="theme-text-main font-monospace">₹{{ backtest.initial_capital|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 5: Risk Profile & Max Drawdown -->
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="glass-card p-3 h-100 position-relative overflow-hidden">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Risk & Drawdown Profile</span>
+                <span class="badge rounded-pill px-2 py-0 fs-7 fw-semibold" style="background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;">
+                    Max DD {{ analytics.max_drawdown|floatformat:2 }}%
+                </span>
+            </div>
+            <h4 class="fw-bolder mb-2 font-monospace" style="color: #f87171 !important;">
+                -{{ analytics.max_drawdown|floatformat:2 }}%
+            </h4>
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-10 small font-monospace">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Max Peak Drawdown:</span>
+                    <span class="fw-semibold" style="color: #f87171 !important;">₹{{ analytics.max_drawdown_amount|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Peak Portfolio High:</span>
+                    <span class="fw-semibold" style="color: #34d399 !important;">₹{{ analytics.peak_equity|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Recovery Ratio:</span>
+                    <span class="fw-semibold" style="color: #38bdf8 !important;">{% if analytics.max_drawdown_amount > 0 %}{% widthratio analytics.net_pnl analytics.max_drawdown_amount 1 %}.0x{% else %}N/A{% endif %}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 6: Brokerage, Taxes & Friction -->
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="glass-card p-3 h-100 position-relative overflow-hidden">
+            <div class="d-flex align-items-center justify-content-between mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Brokerage & Taxes Friction</span>
+                <span class="badge rounded-pill px-2 py-0 fs-7 fw-semibold" style="background: rgba(255, 255, 255, 0.08) !important; color: #f1f5f9 !important; border: 1px solid rgba(255, 255, 255, 0.15) !important;">
+                    Statutory
+                </span>
+            </div>
+            <h4 class="fw-bolder mb-2 font-monospace" style="color: #fbbf24 !important;">
+                ₹{{ analytics.total_charges|floatformat:2 }}
+            </h4>
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-10 small font-monospace">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Flat Brokerage:</span>
+                    <span class="theme-text-main fw-semibold font-monospace">₹{{ analytics.total_brokerage|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">STT, Exchange & GST:</span>
+                    <span class="fw-semibold font-monospace" style="color: #fbbf24 !important;">₹{{ analytics.other_charges|default:analytics.total_tax_govt|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted">Friction vs Gross Profit:</span>
+                    <span class="fw-semibold font-monospace" style="color: #f87171 !important;">{% if analytics.gross_profit > 0 %}{% widthratio analytics.total_charges analytics.gross_profit 100 %}%{% else %}0%{% endif %}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Primary Visualizer Suite Row (Full-Width Interactive Equity Curve) -->
+<div class="row g-3 mb-4" id="equityVisualizerRow">
+    <!-- Full-Width Ultra-Accurate Interactive Equity Curve (Scrollable & Zoomable) -->
+    <div class="col-12" id="equityCurveCol">
+        <div class="glass-card p-4 h-100 d-flex flex-column justify-content-between position-relative">
+            <div>
+                <!-- Header & Key Stats Badges -->
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                    <div>
+                        <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2">
+                            <span class="material-icons text-primary fs-5">show_chart</span>
+                            <span>Strategy Performance Equity Curve</span>
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.7rem;">Live Time Series</span>
+                        </h5>
+                        <small class="theme-text-muted">Interactive trade-by-trade portfolio equity progression & high-watermark trajectory (100% of {{ total_trades_count }} trades plotted).</small>
+                    </div>
+                    <div class="d-flex align-items-center gap-1 flex-wrap">
+                        <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-1 font-monospace" style="font-size: 0.7rem;">
+                            Start: ₹{{ backtest.initial_capital|floatformat:0 }}
+                        </span>
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1 font-monospace" style="font-size: 0.7rem;">
+                            Peak: ₹{{ analytics.peak_equity|floatformat:0 }}
+                        </span>
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1 font-monospace" style="font-size: 0.7rem;">
+                            Final: ₹{{ analytics.ending_equity|floatformat:0 }}
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Interactive Trading Controls Toolbar (Zoom, Pan, Expand) -->
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 p-2 rounded mb-3" style="background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06);">
+                    <!-- Zoom Presets Square Button Group -->
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="theme-text-muted smaller fw-bold text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.05em;">Zoom:</span>
+                        <div class="d-flex align-items-center gap-1.5" id="equityZoomBtnGroup">
+                            <button type="button" class="equity-zoom-btn active font-monospace" data-zoom="1" title="Fit to width (1x)">1x</button>
+                            <button type="button" class="equity-zoom-btn font-monospace" data-zoom="2" title="Zoom 2x">2x</button>
+                            <button type="button" class="equity-zoom-btn font-monospace" data-zoom="4" title="Zoom 4x">4x</button>
+                            <button type="button" class="equity-zoom-btn font-monospace" data-zoom="8" title="Zoom 8x">8x</button>
+                            <button type="button" class="equity-zoom-btn font-monospace" data-zoom="16" title="Zoom 16x Max">16x</button>
+                        </div>
+                    </div>
+
+                    <!-- Pan & Expand Controls -->
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-1 font-monospace d-none d-sm-inline-flex align-items-center gap-1" style="font-size: 0.68rem;">
+                            <span class="material-icons fs-6" style="font-size: 0.75rem !important;">pan_tool</span>
+                            <span>Drag Canvas to Pan Trades</span>
+                        </span>
+                        <button type="button" id="btnToggleEquityExpand" class="btn btn-sm btn-outline-secondary py-0 px-2 d-inline-flex align-items-center gap-1 text-light border-opacity-50" style="font-size: 0.72rem;">
+                            <span class="material-icons fs-6" id="expandIcon" style="font-size: 0.85rem !important;">unfold_more</span>
+                            <span id="expandLabel">Expand Height</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Scrollable & Panning Chart Viewport Container -->
+                <div id="equityChartScrollWrapper" 
+                     class="w-100 overflow-auto position-relative custom-chart-scrollbar" 
+                     style="height: 360px; cursor: grab; user-select: none; border-radius: 8px; background: rgba(10, 15, 30, 0.4); border: 1px solid rgba(255, 255, 255, 0.04);">
+                    <div id="equityChartCanvasWrapper" style="width: 100%; height: 100%; min-width: 100%; position: relative; transition: width 0.25s cubic-bezier(0.4, 0, 0.2, 1);">
+                        <canvas id="equityCurveChart"></canvas>
+                    </div>
+                </div>
+
+                <!-- Live Interactive Trade Inspector HUD -->
+                <div id="equityTradeInspector" class="p-2 rounded mt-2 d-flex flex-wrap align-items-center justify-content-between gap-2 font-monospace" style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.74rem;">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0" id="hudTradeNum">Trade #{{ total_trades_count }}</span>
+                        <span class="theme-text-muted" id="hudTradeDate">Session: Ending Balance</span>
+                        <span class="theme-text-main fw-semibold" id="hudTradeContract">{{ backtest.index_name }}</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3">
+                        <span id="hudTradePnl" class="fw-bold {% if analytics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">Net PnL: {% if analytics.net_pnl >= 0 %}+{% endif %}₹{{ analytics.net_pnl|floatformat:2 }}</span>
+                        <span id="hudTradeEquity" class="text-info fw-semibold">Portfolio: ₹{{ analytics.ending_equity|floatformat:2 }}</span>
+                        <span id="hudTradeDrawdown" class="text-warning fw-semibold">Max DD: -{{ analytics.max_drawdown|floatformat:1 }}%</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Secondary Execution & Regime Breakdown Row -->
+<div class="row g-3 mb-4">
+    <!-- 1. Directional CE vs PE Mix -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase">Directional Bias (CE vs PE)</span>
+                <span class="theme-text-main small font-monospace">{{ analytics.ce_trades_count }} CE / {{ analytics.pe_trades_count }} PE</span>
+            </div>
+            <div class="progress rounded-pill mb-2" style="height: 8px; background: rgba(239, 68, 68, 0.3);">
+                <div class="progress-bar bg-success rounded-pill" role="progressbar" 
+                     style="width: {% if analytics.total_trades > 0 %}{% widthratio analytics.ce_trades_count analytics.total_trades 100 %}{% else %}50{% endif %}%;"></div>
+            </div>
+            <div class="d-flex justify-content-between small font-monospace">
+                <span class="text-success">CE: {{ analytics.ce_win_rate }}% Win ({% if analytics.ce_net_pnl >= 0 %}+{% endif %}₹{{ analytics.ce_net_pnl|floatformat:0 }})</span>
+                <span class="text-danger">PE: {{ analytics.pe_win_rate }}% Win ({% if analytics.pe_net_pnl >= 0 %}+{% endif %}₹{{ analytics.pe_net_pnl|floatformat:0 }})</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Expiry Schedule Distribution -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 h-100">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase">Expiry Regime Breakdown</span>
+                <span class="badge bg-purple bg-opacity-25 text-light border border-purple border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.7rem;">0DTE & Weekly</span>
+            </div>
+            <div class="d-flex flex-column gap-1 small font-monospace pt-1">
+                <div class="d-flex justify-content-between">
+                    <span class="theme-text-muted">0DTE Expiry Sessions:</span>
+                    <span class="text-info fw-semibold">{{ analytics.dte0_count }} Trades ({% if analytics.dte0_net_pnl >= 0 %}+{% endif %}₹{{ analytics.dte0_net_pnl|floatformat:0 }})</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="theme-text-muted">Non-Expiry Trend Days:</span>
+                    <span class="theme-text-main fw-semibold">{{ analytics.non_dte0_count }} Trades ({% if analytics.non_dte0_net_pnl >= 0 %}+{% endif %}₹{{ analytics.non_dte0_net_pnl|floatformat:0 }})</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 3. Exit Attribution -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 h-100">
+            <span class="theme-text-muted small fw-bold text-uppercase d-block mb-2">Exit Trigger Attribution</span>
+            <div class="d-flex flex-column gap-1 small font-monospace">
+                <div class="d-flex justify-content-between">
+                    <span class="text-success">🎯 Target Hit:</span>
+                    <span class="fw-semibold text-success">{{ analytics.target_hit_count }} Trades</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-danger">🛑 Stop Loss Hit:</span>
+                    <span class="fw-semibold text-danger">{{ analytics.sl_hit_count }} Trades</span>
+                </div>
+                <div class="d-flex justify-content-between">
+                    <span class="text-warning">⏳ 15:15 Intraday Square-off:</span>
+                    <span class="fw-semibold text-warning">{{ analytics.squareoff_count }} Trades</span>
+                </div>
+            </div>
+        </div>
     </div>
 </div>
 
@@ -103,8 +648,8 @@
             <label class="form-label theme-text-muted smaller fw-bold mb-1 text-uppercase">Trade Type</label>
             <select name="trade_type" class="form-select form-select-sm bg-transparent theme-text-main border-secondary border-opacity-25">
                 <option value="all" {% if current_filters.trade_type == 'all' %}selected{% endif %}>All Types</option>
-                <option value="BUY_CE" {% if current_filters.trade_type == 'BUY_CE' %}selected{% endif %}>BUY_CE</option>
-                <option value="BUY_PE" {% if current_filters.trade_type == 'BUY_PE' %}selected{% endif %}>BUY_PE</option>
+                <option value="BUY_CE" {% if current_filters.trade_type == 'BUY_CE' %}selected{% endif %}>BUY CE (Call)</option>
+                <option value="BUY_PE" {% if current_filters.trade_type == 'BUY_PE' %}selected{% endif %}>BUY PE (Put)</option>
             </select>
         </div>
 
@@ -130,128 +675,93 @@
     </form>
 </div>
 
-<!-- 5 Count Serial Paginated Trade Signals & Orders Table -->
+<!-- Infinite Scrolling Trade Signals & Orders Table -->
 <div class="glass-card p-0 overflow-hidden mb-4 border-0" id="backtest-orders-container">
     <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
         <div>
             <h5 class="fw-bold theme-text-main mb-0">Executed Strategy Orders & Signals</h5>
-            <small class="theme-text-muted">Showing {{ filtered_trades_count }} of {{ total_trades_count }} Signals (5 per page)</small>
+            <small class="theme-text-muted">Total {{ total_trades_count }} Signals recorded | Infinite scroll auto-appends on scroll</small>
         </div>
         <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Trade Log</span>
     </div>
 
-    <div class="table-responsive">
-        <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
+    <!-- DESKTOP / LAPTOP: COMPACT INSTITUTIONAL TRADES TABLE -->
+    <div class="w-100 d-none d-lg-block">
+        <table class="table table-hover custom-glass-table align-middle mb-0 border-0 w-100" style="width: 100%; table-layout: fixed; --bs-table-bg: transparent; color: var(--text-main);">
             <thead>
                 <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
-                    <th scope="col" class="ps-4 py-3 theme-text-muted text-uppercase small fw-semibold" style="width: 50px;">#</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Contract / Strike</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Entry / Exit Time</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Index Entry & Exit Level</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Type & Quantity</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Option Price</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Trade PnL</th>
-                    <th scope="col" class="pe-4 py-3 theme-text-muted text-uppercase small fw-semibold">Status & Reason</th>
+                    <th scope="col" class="ps-2 py-1.5 theme-text-muted text-uppercase text-center small fw-semibold" style="width: 4%; min-width: 32px; font-size: 0.7rem;">#</th>
+                    <th scope="col" class="py-1.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 15%; font-size: 0.7rem;">Contract / Strike</th>
+                    <th scope="col" class="py-1.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 13%; font-size: 0.7rem;">Entry / Exit Time</th>
+                    <th scope="col" class="py-1.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 12%; font-size: 0.7rem;">Spot Index</th>
+                    <th scope="col" class="py-1.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 14%; font-size: 0.7rem;">Type & Qty</th>
+                    <th scope="col" class="py-1.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 14%; font-size: 0.7rem;">Option & Margin</th>
+                    <th scope="col" class="py-1.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 15%; font-size: 0.7rem;">Net PnL & Equity</th>
+                    <th scope="col" class="py-1.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 8%; font-size: 0.7rem;">Outcome</th>
+                    <th scope="col" class="text-center py-1.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 7%; min-width: 48px; font-size: 0.7rem;" title="Expand Details">Action</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for trade in trades_page %}
-                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
-                    <td class="ps-4 py-3 bg-transparent font-monospace theme-text-muted fw-bold">
-                        #{{ trade.serial_no }}
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="fw-bold theme-text-main">{{ trade.strike|default:trade.symbol }}</div>
-                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.68rem;">{{ trade.symbol }}</span>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="small fw-semibold text-info"><span class="theme-text-muted">In:</span> {{ trade.timestamp }}</div>
-                        <div class="small text-warning"><span class="theme-text-muted">Out:</span> {{ trade.exit_timestamp|default:trade.timestamp }}</div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="small theme-text-main fw-semibold">In: {{ trade.index_entry_price|default:trade.entry_price|floatformat:2 }}</div>
-                        <div class="small theme-text-muted">Out: {{ trade.index_exit_price|default:trade.exit_price|floatformat:2 }}</div>
-                        <div class="smaller {% if trade.index_points >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 0.72rem;">
-                            {% if trade.index_points >= 0 %}+{% endif %}{{ trade.index_points|floatformat:2 }} pts
-                        </div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <span class="badge {% if 'BUY_CE' in trade.trade_type or 'SELL_PE' in trade.trade_type %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25{% endif %} rounded-pill px-3 py-1 fw-bold">
-                            {{ trade.trade_type }}
-                        </span>
-                        <div class="small theme-text-muted mt-1">Qty: {{ trade.quantity }}</div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="small theme-text-main fw-semibold">Entry: ₹{{ trade.entry_price|floatformat:2 }}</div>
-                        <div class="small theme-text-muted">Exit: ₹{{ trade.exit_price|floatformat:2 }}</div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="fw-bold {% if trade.pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            {% if trade.pnl >= 0 %}+{% endif %}₹{{ trade.pnl|floatformat:2 }}
-                        </div>
-                    </td>
-
-                    <td class="pe-4 py-3 bg-transparent">
-                        {% if trade.status == 'WIN' or trade.pnl > 0 %}
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 mb-1">WIN</span>
-                        {% else %}
-                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 mb-1">LOSS</span>
-                        {% endif %}
-                        <div class="small theme-text-muted" style="max-width: 200px; white-space: normal; font-size: 0.75rem;">{{ trade.reason }}</div>
-                    </td>
-                </tr>
-                {% empty %}
+            <tbody id="trades-table-body">
+                {% if trades_page.object_list %}
+                    {% include "admins/partials/backtest_trades_rows.html" %}
+                {% else %}
                 <tr class="border-0">
-                    <td colspan="8" class="text-center py-5 theme-text-muted border-0 bg-transparent">
-                        <span class="material-icons fs-1 mb-2 opacity-50">filter_alt_off</span>
-                        <p class="mb-0 fw-medium">No order signals match your filter criteria.</p>
+                    <td colspan="10" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                        {% if backtest.status|lower == 'created' %}
+                            <span class="material-icons fs-1 mb-2 text-primary opacity-75">hourglass_empty</span>
+                            <p class="mb-1 fw-bold theme-text-main">Backtest Ready for Execution</p>
+                            <small class="opacity-75">Click "Start Execution" above to run the simulation and generate trade results.</small>
+                        {% elif backtest.status|lower == 'running' or backtest.status|lower == 'in_progress' %}
+                            <span class="spinner-border spinner-border-sm mb-2 text-warning" style="width: 28px; height: 28px;"></span>
+                            <p class="mb-1 fw-bold text-warning">Simulation Running...</p>
+                            <small class="opacity-75">Generating trade signals in real-time. Results will appear as orders execute.</small>
+                        {% elif total_trades_count == 0 %}
+                            <span class="material-icons fs-1 mb-2 opacity-50">event_busy</span>
+                            <p class="mb-1 fw-bold theme-text-main">No Trades Generated During Simulation</p>
+                            <small class="opacity-75">0 order signals met the strategy entry conditions for {{ backtest.index_name }} across {{ backtest.start_date|date:"M d, Y" }} – {{ backtest.end_date|date:"M d, Y" }}.</small>
+                        {% else %}
+                            <span class="material-icons fs-1 mb-2 opacity-50">filter_alt_off</span>
+                            <p class="mb-1 fw-bold theme-text-main">No order signals match your filter criteria.</p>
+                            <small class="opacity-75">Try clearing your search query or adjusting your date and trade type filters.</small>
+                        {% endif %}
                     </td>
                 </tr>
-                {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>
 
-    <!-- 5 Count Serial Pagination Footer -->
-    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
-            <div class="small theme-text-muted text-center text-sm-start">
-                Showing {{ trades_page.start_index|default:0 }} to {{ trades_page.end_index|default:0 }} of {{ filtered_trades_count }} signals (5 items per page)
-            </div>
-            
-            <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
-                {% if trades_page.has_previous %}
-                <li class="page-item mb-0">
-                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
-                       style="width: 36px; height: 36px;"
-                       hx-get="{% url 'backtest:backtest_detail' backtest.pk %}?trade_page={{ trades_page.previous_page_number }}&trade_status={{ current_filters.trade_status }}&trade_type={{ current_filters.trade_type }}&date_from={{ current_filters.date_from }}&date_to={{ current_filters.date_to }}&q={{ current_filters.q }}" 
-                       hx-target="#backtest-detail-container" hx-push-url="true">
-                       <span class="material-icons fs-6">chevron_left</span>
-                    </a>
-                </li>
-                {% endif %}
-                <li class="page-item mb-0">
-                    <span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold text-decoration-none p-0" style="width: 36px; height: 36px;">
-                        {{ trades_page.number }}
-                    </span>
-                </li>
-                {% if trades_page.has_next %}
-                <li class="page-item mb-0">
-                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
-                       style="width: 36px; height: 36px;"
-                       hx-get="{% url 'backtest:backtest_detail' backtest.pk %}?trade_page={{ trades_page.next_page_number }}&trade_status={{ current_filters.trade_status }}&trade_type={{ current_filters.trade_type }}&date_from={{ current_filters.date_from }}&date_to={{ current_filters.date_to }}&q={{ current_filters.q }}" 
-                       hx-target="#backtest-detail-container" hx-push-url="true">
-                       <span class="material-icons fs-6">chevron_right</span>
-                    </a>
-                </li>
-                {% endif %}
-            </ul>
+    <!-- MOBILE & TABLET VIEW: COMPACT TRADE CARDS WITH ACCORDION DRAWER -->
+    <div class="flex-grow-1 overflow-auto p-2 d-block d-lg-none" id="trades-mobile-container">
+        {% if trades_page.object_list %}
+            {% include "admins/partials/backtest_trades_cards.html" %}
+        {% else %}
+        <div class="text-center py-4 theme-text-muted">
+            {% if backtest.status|lower == 'created' %}
+                <span class="material-icons fs-2 mb-2 text-primary opacity-75">hourglass_empty</span>
+                <p class="mb-1 fw-bold theme-text-main">Backtest Ready for Execution</p>
+                <small class="opacity-75">Click "Start Execution" above to run the simulation.</small>
+            {% elif backtest.status|lower == 'running' or backtest.status|lower == 'in_progress' %}
+                <span class="spinner-border spinner-border-sm mb-2 text-warning" style="width: 24px; height: 24px;"></span>
+                <p class="mb-1 fw-bold text-warning">Simulation Running...</p>
+            {% elif total_trades_count == 0 %}
+                <span class="material-icons fs-2 mb-2 opacity-50">event_busy</span>
+                <p class="mb-1 fw-bold theme-text-main">No Trades Generated</p>
+                <small class="opacity-75">0 signals met entry conditions for this date range.</small>
+            {% else %}
+                <span class="material-icons fs-2 mb-2 opacity-50">filter_alt_off</span>
+                <p class="mb-1 fw-bold theme-text-main">No order signals match your filter criteria.</p>
+                <small class="opacity-75">Try clearing your search query or filters.</small>
+            {% endif %}
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Infinite Scroll Footer Status -->
+    <div class="border-top pt-2 pb-2 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+        <div class="d-flex justify-content-between align-items-center small theme-text-muted">
+            <span>Showing {{ filtered_trades_count }} matching orders (auto-extends on scroll)</span>
+            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-1" style="font-size: 0.68rem;">Continuous Scroll Active</span>
         </div>
     </div>
 </div>
@@ -272,57 +782,421 @@
 </div>
 {% endif %}
 
-<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
 (function() {
-    const ctx = document.getElementById('equityCurveChart');
-    if (!ctx) return;
+    let currentZoom = 1;
+    let isExpanded = false;
 
-    const initialCapital = {{ backtest.initial_capital|default:100000 }};
-    const netPnL = {{ backtest.metrics.net_pnl|default:0 }};
-    const totalTrades = {{ backtest.metrics.total_trades|default:10 }};
+    function initEquityCurveChart() {
+        const ctx = document.getElementById('equityCurveChart');
+        if (!ctx) return;
 
-    // Generate Chart Curve Data Points
-    const labels = ['Start'];
-    const dataPoints = [initialCapital];
-    let stepPnL = netPnL / (totalTrades > 0 ? totalTrades : 1);
+        if (typeof Chart === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js';
+            script.onload = initEquityCurveChart;
+            document.head.appendChild(script);
+            return;
+        }
 
-    for (let i = 1; i <= Math.max(totalTrades, 8); i++) {
-        labels.push('Trade #' + i);
-        dataPoints.push(initialCapital + (stepPnL * i));
-    }
+        if (window.marmotEquityChart) {
+            try { window.marmotEquityChart.destroy(); } catch (e) {}
+            window.marmotEquityChart = null;
+        }
 
-    new Chart(ctx, {
-        type: 'line',
-        data: {
-            labels: labels,
-            datasets: [{
-                label: 'Account Equity (INR)',
-                data: dataPoints,
-                borderColor: netPnL >= 0 ? '#10b981' : '#ef4444',
-                backgroundColor: netPnL >= 0 ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                fill: true,
-                tension: 0.35,
-                borderWidth: 2,
-                pointRadius: 3
-            }]
-        },
-        options: {
-            responsive: true,
-            maintainAspectRatio: false,
-            plugins: {
-                legend: { display: false }
-            },
-            scales: {
-                x: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#94a3b8' }
-                },
-                y: {
-                    grid: { color: 'rgba(255, 255, 255, 0.05)' },
-                    ticks: { color: '#94a3b8' }
+        const initialCapital = {{ backtest.initial_capital|default:100000 }};
+        const rawPoints = {{ equity_curve_json|default:'[]'|safe }};
+        const labels = [];
+        const dataPoints = [];
+        const rawTradeData = [];
+
+        if (Array.isArray(rawPoints) && rawPoints.length > 0) {
+            rawPoints.forEach(function(pt) {
+                labels.push(pt.label || '');
+                dataPoints.push(pt.equity !== undefined ? pt.equity : initialCapital);
+                rawTradeData.push(pt);
+            });
+        } else {
+            labels.push('Start');
+            dataPoints.push(initialCapital);
+        }
+
+        const isProfitable = (dataPoints[dataPoints.length - 1] >= initialCapital);
+        const lineColor = isProfitable ? '#10b981' : '#ef4444';
+        const fillColor = isProfitable ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)';
+
+        // HUD elements
+        const hudTradeNum = document.getElementById('hudTradeNum');
+        const hudTradeDate = document.getElementById('hudTradeDate');
+        const hudTradeContract = document.getElementById('hudTradeContract');
+        const hudTradePnl = document.getElementById('hudTradePnl');
+        const hudTradeEquity = document.getElementById('hudTradeEquity');
+        const hudTradeDrawdown = document.getElementById('hudTradeDrawdown');
+
+        function updateHUD(idx) {
+            const pt = rawTradeData[idx];
+            if (!pt) return;
+            if (hudTradeNum) hudTradeNum.textContent = pt.trade_num ? ('Trade #' + pt.trade_num) : 'Initial Principal';
+            if (hudTradeDate) hudTradeDate.textContent = pt.label ? ('Date: ' + pt.label) : '';
+            if (hudTradeContract) hudTradeContract.textContent = (pt.strike ? pt.strike : '{{ backtest.index_name }}') + (pt.type ? (' (' + pt.type + ')') : '');
+            if (hudTradePnl) {
+                if (pt.trade_num > 0 && pt.pnl !== undefined) {
+                    hudTradePnl.textContent = 'Trade PnL: ' + (pt.pnl >= 0 ? '+₹' : '₹') + Number(pt.pnl).toLocaleString('en-IN', {minimumFractionDigits: 2});
+                    hudTradePnl.className = 'fw-bold ' + (pt.pnl >= 0 ? 'text-success' : 'text-danger');
+                } else {
+                    hudTradePnl.textContent = 'Trade PnL: ₹0.00';
+                    hudTradePnl.className = 'fw-bold theme-text-muted';
                 }
             }
+            if (hudTradeEquity) {
+                hudTradeEquity.textContent = 'Portfolio: ₹' + Number(pt.equity).toLocaleString('en-IN', {minimumFractionDigits: 2});
+            }
+            if (hudTradeDrawdown) {
+                hudTradeDrawdown.textContent = 'Drawdown: -' + (pt.drawdown || 0) + '%';
+            }
+        }
+
+        window.marmotEquityChart = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Account Equity (INR)',
+                    data: dataPoints,
+                    borderColor: lineColor,
+                    backgroundColor: fillColor,
+                    fill: true,
+                    tension: 0.25,
+                    borderWidth: 2.2,
+                    pointRadius: currentZoom > 1 ? (currentZoom >= 4 ? 4.5 : 3) : (dataPoints.length < 60 ? 3 : 0),
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: lineColor,
+                    pointHoverBackgroundColor: '#ffffff',
+                    pointBorderColor: '#0f172a',
+                    pointBorderWidth: 1.5
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                onHover: function(event, activeElements) {
+                    if (activeElements && activeElements.length > 0) {
+                        const idx = activeElements[0].index;
+                        updateHUD(idx);
+                    }
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        titleColor: '#f1f5f9',
+                        bodyColor: '#cbd5e1',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderWidth: 1,
+                        padding: 10,
+                        titleFont: { family: 'monospace', size: 12, weight: 'bold' },
+                        bodyFont: { family: 'monospace', size: 12 },
+                        callbacks: {
+                            title: function(items) {
+                                if (!items || !items.length) return '';
+                                const idx = items[0].dataIndex;
+                                const pt = rawTradeData[idx];
+                                if (pt && pt.trade_num) {
+                                    return 'Trade #' + pt.trade_num + ' (' + pt.label + ')';
+                                }
+                                return items[0].label || 'Starting Portfolio';
+                            },
+                            label: function(ctx) {
+                                return ' Portfolio Equity: ₹' + Number(ctx.parsed.y).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            },
+                            afterLabel: function(ctx) {
+                                const idx = ctx.dataIndex;
+                                const pt = rawTradeData[idx];
+                                if (!pt) return '';
+                                const lines = [];
+                                if (pt.strike) {
+                                    lines.push(' Contract: ' + pt.strike + (pt.type ? (' (' + pt.type + ')') : ''));
+                                }
+                                if (pt.pnl !== undefined && pt.trade_num > 0) {
+                                    const formattedPnl = (pt.pnl >= 0 ? '+₹' : '₹') + Number(pt.pnl).toLocaleString('en-IN', {minimumFractionDigits: 2});
+                                    lines.push(' Realized PnL: ' + formattedPnl);
+                                }
+                                if (pt.drawdown !== undefined && pt.drawdown > 0) {
+                                    lines.push(' Peak Drawdown: -' + pt.drawdown + '%');
+                                }
+                                if (pt.exit_reason) {
+                                    lines.push(' Exit: ' + pt.exit_reason);
+                                }
+                                return lines;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.04)' },
+                        ticks: { 
+                            color: '#94a3b8', 
+                            font: { family: 'monospace', size: 10 },
+                            maxTicksLimit: currentZoom > 1 ? (12 * currentZoom) : 12
+                        }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { 
+                            color: '#94a3b8',
+                            font: { family: 'monospace', size: 11 },
+                            callback: function(v) { return '₹' + Number(v).toLocaleString('en-IN'); }
+                        }
+                    }
+                }
+            }
+        });
+
+        // Initialize Zoom Buttons
+        const zoomGroup = document.getElementById('equityZoomBtnGroup');
+        if (zoomGroup) {
+            const buttons = zoomGroup.querySelectorAll('button[data-zoom]');
+            buttons.forEach(function(btn) {
+                btn.onclick = function() {
+                    buttons.forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+
+                    const zoomVal = parseInt(this.getAttribute('data-zoom'), 10) || 1;
+                    applyEquityZoom(zoomVal);
+                };
+            });
+        }
+
+        // Initialize Drag-to-Pan on Scroll Wrapper
+        setupEquityChartPan();
+
+        // Initialize Expand / Collapse View Button
+        const btnExpand = document.getElementById('btnToggleEquityExpand');
+        if (btnExpand) {
+            btnExpand.onclick = toggleEquityExpand;
+        }
+    }
+
+    function applyEquityZoom(zoom) {
+        currentZoom = zoom;
+        const canvasWrapper = document.getElementById('equityChartCanvasWrapper');
+        const scrollWrapper = document.getElementById('equityChartScrollWrapper');
+        if (!canvasWrapper || !scrollWrapper) return;
+
+        canvasWrapper.style.width = (zoom * 100) + '%';
+        if (window.marmotEquityChart) {
+            const ds = window.marmotEquityChart.data.datasets[0];
+            if (ds) {
+                ds.pointRadius = zoom > 1 ? (zoom >= 4 ? 4.5 : 3) : (window.marmotEquityChart.data.labels.length < 60 ? 3 : 0);
+            }
+            window.marmotEquityChart.options.scales.x.ticks.maxTicksLimit = zoom > 1 ? (12 * zoom) : 12;
+            window.marmotEquityChart.resize();
+        }
+    }
+
+    function toggleEquityExpand() {
+        isExpanded = !isExpanded;
+        const scrollWrapper = document.getElementById('equityChartScrollWrapper');
+        const expandIcon = document.getElementById('expandIcon');
+        const expandLabel = document.getElementById('expandLabel');
+
+        if (scrollWrapper) {
+            if (isExpanded) {
+                scrollWrapper.style.height = '520px';
+                if (expandIcon) expandIcon.textContent = 'unfold_less';
+                if (expandLabel) expandLabel.textContent = 'Collapse Height';
+            } else {
+                scrollWrapper.style.height = '360px';
+                if (expandIcon) expandIcon.textContent = 'unfold_more';
+                if (expandLabel) expandLabel.textContent = 'Expand Height';
+            }
+        }
+
+        setTimeout(function() {
+            if (window.marmotEquityChart) window.marmotEquityChart.resize();
+        }, 150);
+    }
+
+    function setupEquityChartPan() {
+        const slider = document.getElementById('equityChartScrollWrapper');
+        if (!slider) return;
+
+        let isDown = false;
+        let startX;
+        let scrollLeft;
+
+        slider.addEventListener('mousedown', function(e) {
+            isDown = true;
+            slider.style.cursor = 'grabbing';
+            startX = e.pageX - slider.offsetLeft;
+            scrollLeft = slider.scrollLeft;
+        });
+
+        slider.addEventListener('mouseleave', function() {
+            isDown = false;
+            slider.style.cursor = 'grab';
+        });
+
+        slider.addEventListener('mouseup', function() {
+            isDown = false;
+            slider.style.cursor = 'grab';
+        });
+
+        slider.addEventListener('mousemove', function(e) {
+            if (!isDown) return;
+            e.preventDefault();
+            const x = e.pageX - slider.offsetLeft;
+            const walk = (x - startX) * 1.5; // Drag scroll velocity
+            slider.scrollLeft = scrollLeft - walk;
+        });
+
+        // Enable horizontal mouse wheel scroll
+        slider.addEventListener('wheel', function(e) {
+            if (e.deltaY !== 0 && currentZoom > 1) {
+                slider.scrollLeft += e.deltaY;
+            }
+        }, { passive: true });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initEquityCurveChart);
+    } else {
+        setTimeout(initEquityCurveChart, 50);
+    }
+})();
+</script>
+
+<!-- Real-Time WebSocket Progress Updates & Auto-Reload for RL Backtest Engine -->
+<script>
+(function() {
+    const taskId = "{{ backtest.id }}";
+    const taskStatus = "{{ backtest.status }}";
+    let isFinished = (taskStatus === 'completed' || taskStatus === 'error' || taskStatus === 'cancelled');
+
+    function applyBacktestProgressUpdate(data) {
+        if (!data) return;
+        const progress = data.progress !== undefined ? data.progress : 0;
+        const status = data.status || '';
+        const stepInfo = data.step_info || '';
+        const tradesCount = data.total_trades !== undefined ? data.total_trades : null;
+        const netPnL = data.net_pnl !== undefined ? data.net_pnl : null;
+
+        const progressBar = document.getElementById('backtest-progress-bar');
+        const progressPercent = document.getElementById('backtest-progress-percent');
+        const stepStatus = document.getElementById('backtest-step-status');
+        const liveTrades = document.getElementById('backtest-live-trades');
+        const livePnL = document.getElementById('backtest-live-pnl');
+
+        if (progressBar) {
+            progressBar.style.width = Math.max(5, progress) + '%';
+            progressBar.setAttribute('aria-valuenow', progress);
+        }
+        if (progressPercent) {
+            progressPercent.textContent = progress + '%';
+        }
+        if (stepStatus && stepInfo) {
+            stepStatus.textContent = stepInfo;
+        }
+        if (liveTrades && tradesCount !== null) {
+            liveTrades.textContent = tradesCount;
+        }
+        if (livePnL && netPnL !== null) {
+            const formatted = (netPnL >= 0 ? '+₹' : '₹') + Number(netPnL).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            livePnL.textContent = formatted;
+            livePnL.className = 'fw-bold font-monospace ' + (netPnL >= 0 ? 'text-success' : 'text-danger');
+        }
+
+        if ((progress >= 100 || status === 'completed' || status === 'error') && !isFinished) {
+            isFinished = true;
+            console.log('⚡ [Backtest WS] Completed! Updating controls and loading analytics...');
+
+            // 1. Immediately replace Pause/Stop buttons with Re-run Backtest button in DOM
+            const actionsContainer = document.getElementById('backtest-control-actions');
+            if (actionsContainer) {
+                actionsContainer.innerHTML = `<button type="button" 
+                        hx-get="/backtest/${taskId}/control/?action=start" 
+                        hx-target="#globalHtmxModalDialog" 
+                        hx-swap="innerHTML" 
+                        class="btn btn-outline-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 px-4 shadow-sm">
+                    <span class="material-icons fs-5">replay</span>
+                    <span>Re-run Backtest</span>
+                </button>`;
+                if (window.htmx) {
+                    window.htmx.process(actionsContainer);
+                }
+            }
+
+            // 2. Immediately update status badge
+            const badgeContainer = document.getElementById('backtest-status-badge-container');
+            if (badgeContainer) {
+                badgeContainer.innerHTML = status === 'error' 
+                    ? '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0 fs-6">● Failed</span>'
+                    : '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0 fs-6">● Completed</span>';
+            }
+
+            // 3. Immediately update step status
+            if (stepStatus) {
+                stepStatus.textContent = '✨ Backtest Execution Completed! Rendering full trade analytics...';
+                stepStatus.className = 'text-success font-monospace fw-semibold';
+            }
+
+            // 4. Reload full container via HTMX to swap in trade tables, KPI summary, and equity chart
+            setTimeout(function() {
+                const container = document.getElementById('backtest-detail-container') || document.getElementById('mainContentBody');
+                if (container && window.htmx) {
+                    window.htmx.ajax('GET', window.location.pathname + window.location.search, {
+                        target: container.id === 'backtest-detail-container' ? '#backtest-detail-container' : '#mainContentBody',
+                        swap: 'innerHTML'
+                    });
+                } else {
+                    window.location.reload();
+                }
+            }, 600);
+        }
+    }
+
+    // 1. WebSocket Hub Subscription
+    if (window.MarmotWS && window.MarmotWS.url) {
+        window.MarmotWS.unsubscribe(taskId);
+        window.MarmotWS.subscribe(taskId, applyBacktestProgressUpdate);
+    }
+
+    // 2. Active Polling while task is running or pending
+    if (taskStatus === 'running' || taskStatus === 'pending') {
+        const pollTimer = setInterval(function() {
+            if (isFinished) {
+                clearInterval(pollTimer);
+                return;
+            }
+            fetch('/backtest/' + taskId + '/status/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function(res) { return res.ok ? res.json() : null; })
+            .then(function(data) {
+                if (data) {
+                    applyBacktestProgressUpdate(data);
+                    if (data.status === 'completed' || data.status === 'error' || data.status === 'cancelled') {
+                        clearInterval(pollTimer);
+                    }
+                }
+            })
+            .catch(function(e) { /* silent poll error */ });
+        }, 1200);
+    }
+
+    // 3. Listen for reloadBacktestDetail event from modal confirmations
+    document.body.addEventListener('reloadBacktestDetail', function() {
+        const container = document.getElementById('backtest-detail-container') || document.getElementById('mainContentBody');
+        if (container && window.htmx) {
+            window.htmx.ajax('GET', window.location.pathname + window.location.search, {
+                target: container.id === 'backtest-detail-container' ? '#backtest-detail-container' : '#mainContentBody',
+                swap: 'innerHTML'
+            });
         }
     });
 })();

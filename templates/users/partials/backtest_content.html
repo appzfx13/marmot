@@ -46,10 +46,11 @@
         </div>
 
         {% if backtests %}
-            <div class="table-responsive flex-grow-1 overflow-auto">
+            <div class="table-responsive flex-grow-1 overflow-auto d-none d-md-block">
                 <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
                     <thead>
                         <tr class="theme-text-muted text-uppercase smaller border-bottom" style="border-color: var(--border-color) !important;">
+                            <th style="width: 36px;"></th>
                             <th>ID</th>
                             <th>Strategy</th>
                             <th>Index</th>
@@ -62,14 +63,25 @@
                     <tbody>
                         {% for task in backtests %}
                             <tr class="border-bottom" style="border-color: var(--border-color) !important;">
+                                <td class="ps-2 py-2 text-center" style="width: 36px;">
+                                    <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center border-0"
+                                            style="width: 26px; height: 26px;"
+                                            type="button"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#user-bt-exp-{{ task.id }}"
+                                            aria-expanded="false"
+                                            title="Expand Details">
+                                        <span class="material-icons fs-6 text-primary">keyboard_arrow_down</span>
+                                    </button>
+                                </td>
                                 <td class="fw-bold">#{{ task.id }}</td>
                                 <td><span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 px-2 py-1">{{ task.strategy_name }}</span></td>
                                 <td><span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 px-2 py-1">{{ task.index_name }}</span></td>
                                 <td class="small">{{ task.start_date|date:"M d, Y" }} — {{ task.end_date|date:"M d, Y" }}</td>
                                 <td>
-                                    {% if task.status == 'COMPLETED' or task.status == 'SUCCESS' %}
+                                    {% if task.status == 'COMPLETED' or task.status == 'SUCCESS' or task.status == 'completed' %}
                                         <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
-                                    {% elif task.status == 'FAILED' %}
+                                    {% elif task.status == 'FAILED' or task.status == 'error' %}
                                         <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Failed</span>
                                     {% else %}
                                         <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Processing</span>
@@ -86,9 +98,62 @@
                                     </button>
                                 </td>
                             </tr>
+                            <!-- Collapsible Drawer -->
+                            <tr class="collapse border-0" id="user-bt-exp-{{ task.id }}">
+                                <td colspan="8" class="p-0 border-0">
+                                    <div class="p-3 mx-2 my-1 rounded-3 small" style="background: var(--nav-hover); border: 1px solid var(--border-color);">
+                                        <div class="d-flex justify-content-between flex-wrap gap-2">
+                                            <div><span class="theme-text-muted">Algorithm Engine:</span> <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0">RL PPO Model</span></div>
+                                            <div><span class="theme-text-muted">Dynamic Lots:</span> <span class="text-success fw-bold">Date-Aware</span></div>
+                                            <div><span class="theme-text-muted">Capital Base:</span> <span class="theme-text-main fw-semibold">₹{{ task.initial_capital }}</span></div>
+                                            <div><span class="theme-text-muted">Execution Logs:</span> <span class="text-info font-monospace">Parquet Date-Partitioned</span></div>
+                                        </div>
+                                    </div>
+                                </td>
+                            </tr>
                         {% endfor %}
                     </tbody>
                 </table>
+            </div>
+
+            <!-- Mobile View -->
+            <div class="d-block d-md-none">
+                {% for task in backtests %}
+                <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <div>
+                            <div class="fw-bold theme-text-main">#{{ task.id }} — {{ task.strategy_name }}</div>
+                            <small class="theme-text-muted">{{ task.index_name }} | {{ task.start_date|date:"M d" }} → {{ task.end_date|date:"M d, Y" }}</small>
+                        </div>
+                        <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
+                                style="width: 32px; height: 32px;"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#user-bt-mb-{{ task.id }}"
+                                aria-expanded="false">
+                            <span class="material-icons fs-5 text-primary">keyboard_arrow_down</span>
+                        </button>
+                    </div>
+                    <div class="collapse pt-2 border-top border-secondary border-opacity-25 small" id="user-bt-mb-{{ task.id }}">
+                        <div class="d-flex justify-content-between mb-1">
+                            <span class="theme-text-muted">Status:</span>
+                            <span class="badge {% if task.status == 'COMPLETED' or task.status == 'completed' %}bg-success{% else %}bg-primary{% endif %} bg-opacity-25 text-white-50 rounded-pill px-2 py-0">{{ task.status }}</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="theme-text-muted">Initial Capital:</span>
+                            <span class="theme-text-main fw-semibold">₹{{ task.initial_capital }}</span>
+                        </div>
+                        <div class="d-flex justify-content-end pt-1">
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1"
+                                    hx-get="{% url 'users:user-backtest-detail' task.id %}"
+                                    hx-target="#globalHtmxModalDialog">
+                                <span class="material-icons fs-6">visibility</span> View Results
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
             </div>
         {% else %}
             <div class="text-center py-5 theme-text-muted">

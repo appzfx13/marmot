@@ -28,6 +28,9 @@
     <!-- HTMX Library -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
+    <!-- Chart.js Library -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
+
     <style>
         /* Dark Theme Variables (Google Antigravity Dark Canvas) */
         :root[data-theme="dark"] {
@@ -87,6 +90,27 @@
 
         :root {
             --sidebar-width: 250px;
+        }
+
+        /* DRY Load More Button with Animated Spinner & Loading State */
+        .btn-load-more {
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+        }
+        .btn-load-more:hover:not(:disabled) {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(122, 90, 248, 0.25) !important;
+        }
+        .btn-load-more.htmx-request .load-more-idle {
+            display: none !important;
+        }
+        .btn-load-more.htmx-request .load-more-loading {
+            display: inline-flex !important;
+        }
+        .btn-load-more.htmx-request {
+            opacity: 0.85;
+            pointer-events: none;
+            cursor: wait;
         }
 
         @media (max-width: 1440px) {
@@ -153,6 +177,8 @@
         }
         body.sidebar-collapsed .main-with-sidebar {
             margin-left: 0 !important;
+            width: 100% !important;
+            max-width: 100vw !important;
         }
 
         .sticky-top-navbar {
@@ -276,15 +302,19 @@
         .main-with-sidebar {
             padding: 0.75rem 1rem !important;
             margin-left: var(--sidebar-width);
-            transition: margin-left 0.3s ease;
+            width: calc(100% - var(--sidebar-width)) !important;
+            max-width: calc(100vw - var(--sidebar-width)) !important;
+            min-width: 0;
+            box-sizing: border-box;
+            transition: margin-left 0.3s cubic-bezier(0.16, 1, 0.3, 1), width 0.3s cubic-bezier(0.16, 1, 0.3, 1), max-width 0.3s cubic-bezier(0.16, 1, 0.3, 1);
         }
 
         .glass-icon-btn {
             background: var(--nav-hover);
             border: 1px solid var(--border-color);
             color: var(--text-main);
-            width: 32px;
-            height: 32px;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
@@ -305,12 +335,13 @@
             -webkit-backdrop-filter: blur(24px) saturate(180%);
             border: 1px solid var(--border-color);
             border-radius: 50px;
-            padding: 2px 6px;
+            padding: 6px 12px;
             display: inline-flex;
             align-items: center;
-            gap: 4px;
+            gap: 8px;
             box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            height: 34px;
+            height: auto;
+            min-height: 44px;
             box-sizing: border-box;
             margin: 0;
             transition: all 0.2s ease;
@@ -323,10 +354,10 @@
             -webkit-backdrop-filter: blur(24px) saturate(180%) !important;
             border: 1px solid var(--border-color) !important;
             border-radius: 50px !important;
-            padding: 0 10px !important;
-            height: 34px !important;
+            padding: 0 14px !important;
+            height: 44px !important;
             width: auto !important;
-            min-width: 38px !important;
+            min-width: 44px !important;
             display: inline-flex !important;
             align-items: center !important;
             justify-content: center !important;
@@ -362,8 +393,8 @@
         }
 
         .profile-avatar-btn {
-            width: 34px;
-            height: 34px;
+            width: 30px;
+            height: 30px;
             border-radius: 50%;
             border: 1px solid var(--border-color);
             background: var(--nav-hover);
@@ -372,10 +403,11 @@
             align-items: center;
             justify-content: center;
             font-weight: 700;
-            font-size: 0.8rem;
+            font-size: 0.75rem;
             cursor: pointer;
             overflow: hidden;
             transition: all 0.2s ease;
+            padding: 0;
         }
 
         .profile-avatar-btn:hover {
@@ -709,13 +741,70 @@
             border-color: var(--nav-active-border) !important;
         }
 
+        /* Global Button Design System (Standardized to Homepage Pill Standard: 38px Height, 50px Radius) */
+        .btn, 
+        .btn-primary, 
+        .btn-secondary, 
+        .btn-outline-primary, 
+        .btn-outline-secondary, 
+        .btn-outline-success, 
+        .btn-outline-danger, 
+        .btn-outline-warning, 
+        .btn-outline-info, 
+        .btn-success, 
+        .btn-danger, 
+        .btn-warning, 
+        .btn-info,
+        .theme-pill-btn,
+        .auth-nav-btn {
+            height: 38px !important;
+            padding: 0 14px !important;
+            font-size: 0.875rem !important;
+            font-weight: 500 !important;
+            border-radius: 50px !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 6px !important;
+            white-space: nowrap !important;
+            box-sizing: border-box !important;
+            line-height: normal !important;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+
+        .btn .material-icons,
+        .btn-primary .material-icons,
+        .btn-secondary .material-icons,
+        .btn-outline-secondary .material-icons,
+        .btn-outline-primary .material-icons,
+        .btn-outline-success .material-icons,
+        .btn-outline-danger .material-icons,
+        .btn-outline-warning .material-icons,
+        .btn-outline-info .material-icons,
+        .theme-pill-btn .material-icons {
+            font-size: 16px !important;
+            line-height: 1 !important;
+        }
+
+        .glass-icon-btn {
+            width: 38px !important;
+            height: 38px !important;
+            min-width: 38px !important;
+            border-radius: 50% !important;
+            padding: 0 !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-sizing: border-box !important;
+        }
+
         /* Theme Button Utilities */
         .theme-btn-primary {
             background-color: var(--btn-primary-bg) !important;
             color: var(--btn-primary-text) !important;
             border: 1px solid transparent !important;
-            border-radius: 10px !important;
-            font-weight: 600 !important;
+            border-radius: 50px !important;
+            font-weight: 500 !important;
             transition: all 0.2s ease !important;
             box-shadow: 0 4px 12px rgba(13, 110, 253, 0.25) !important;
         }
@@ -730,8 +819,8 @@
             background-color: var(--btn-secondary-bg) !important;
             color: var(--btn-secondary-text) !important;
             border: 1px solid var(--btn-secondary-border) !important;
-            border-radius: 10px !important;
-            font-weight: 600 !important;
+            border-radius: 50px !important;
+            font-weight: 500 !important;
             transition: all 0.2s ease !important;
         }
 
@@ -1123,7 +1212,7 @@
 
     <div class="d-flex flex-column flex-md-row">
         <div class="sidebar p-3 vh-100 position-fixed d-flex flex-column" id="mainSidebar">
-            <div class="mb-4 d-flex align-items-center justify-content-between px-2 pt-2">
+            <div class="mb-4 d-flex align-items-center px-2 pt-2">
                 <div class="d-flex align-items-center gap-2">
                     <img src="{% static 'images/ref/logo/logo-icon.png' %}" alt="Marmot" height="34" style="filter: drop-shadow(0 2px 8px rgba(122, 90, 248, 0.4));">
                     <div>
@@ -1134,9 +1223,6 @@
                         <small class="theme-text-muted" style="font-size: 0.75rem;">Control Panel</small>
                     </div>
                 </div>
-                <button type="button" class="glass-icon-btn d-md-none" id="closeSidebarBtn" aria-label="Close Sidebar">
-                    <span class="material-icons fs-5">close</span>
-                </button>
             </div>
 
             <nav class="nav flex-column flex-grow-1 px-1" id="adminSidebarNav">
@@ -1166,9 +1252,13 @@
                 <div class="sidebar-section-header px-3 pt-3 pb-1">
                     Strategy
                 </div>
-                <a class="nav-link {% if '/backtest/strategies/' in request.path %}active{% endif %}" 
+                <a class="nav-link {% if '/backtest/strategies/' in request.path or request.resolver_match.url_name == 'strategy_list' or request.resolver_match.url_name == 'strategy_detail' %}active{% endif %}" 
                    href="{% url 'backtest:strategy_list' %}">
                     <span class="material-icons">psychology</span>Strategy Hub
+                </a>
+                <a class="nav-link {% if '/backtest/rules/' in request.path or request.resolver_match.url_name == 'rule_list' or request.resolver_match.url_name == 'rule_create' or request.resolver_match.url_name == 'rule_update' %}active{% endif %}" 
+                   href="{% url 'backtest:rule_list' %}">
+                    <span class="material-icons">rule</span>Strategy Rules
                 </a>
 
                 <!-- Section: BACKTEST -->
@@ -1294,7 +1384,7 @@
                 </div>
             </div>
 
-            <div class="container-fluid" id="app-main-container">
+            <div class="container-fluid p-0" id="app-main-container">
                 {% block dashboard_content %}{% endblock %}
             </div>
         </div>
@@ -1582,10 +1672,14 @@
                         this.ws.onmessage = function(event) {
                             try {
                                 const data = JSON.parse(event.data);
-                                if (data.type !== 'progress') return;
-                                console.log('[WS] Progress received for task', data.task_id, ':', data.progress + '%', data.status);
+                                if (data.type !== 'progress' && data.type !== 'backtest_progress') return;
                                 const cbs = window.MarmotWS.callbacks[data.task_id];
-                                if (cbs) cbs.forEach(function(cb) { cb(data); });
+                                if (cbs && cbs.length > 0) {
+                                    console.log('[WS] Progress received for task', data.task_id, ':', data.progress + '%', data.status);
+                                    cbs.forEach(function(cb) {
+                                        try { cb(data); } catch (err) { console.error('[WS Callback Error]', err); }
+                                    });
+                                }
                             } catch (e) {
                                 console.error('[WS] Parse error', e);
                             }
@@ -1607,8 +1701,12 @@
                 
                 subscribe: function(taskId, callback) {
                     this.subscribers[taskId] = true;
-                    if (!this.callbacks[taskId]) this.callbacks[taskId] = [];
-                    this.callbacks[taskId].push(callback);
+                    if (!this.callbacks[taskId]) {
+                        this.callbacks[taskId] = [];
+                    }
+                    if (callback && !this.callbacks[taskId].includes(callback)) {
+                        this.callbacks[taskId].push(callback);
+                    }
                     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                         this.ws.send(JSON.stringify({type: 'subscribe', task_id: taskId}));
                     }

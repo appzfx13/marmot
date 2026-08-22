@@ -5,6 +5,7 @@ from .views import (
     AdminTerminalView,
     AdminLogoutView,
     AdminTraderListView,
+    AdminTraderScrollView,
     AdminTraderCreateView,
     AdminTraderDetailView,
     AdminTraderUpdateView,
@@ -12,12 +13,14 @@ from .views import (
     AdminTraderPasswordResetView,
     # Trade Exec Config Views
     AdminTradeExecConfigListView,
+    AdminTradeExecConfigScrollView,
     AdminTradeExecConfigCreateView,
     AdminTradeExecConfigDetailView,
     AdminTradeExecConfigUpdateView,
     AdminTradeExecConfigDeleteView,
     # Postback Views
     PostbackLogListView,
+    PostbackLogScrollView,
     PostbackLogDetailView,
     # Broker Master Views
     AdminBrokerMasterListView,
@@ -53,6 +56,7 @@ urlpatterns = [
 
     # Traders Management (Aligned with template route names)
     path('traders/', AdminTraderListView.as_view(), name='trader_list'),
+    path('traders/scroll/', AdminTraderScrollView.as_view(), name='trader_scroll'),
     path('traders/bulk-delete/', AdminTraderBulkDeleteView.as_view(), name='trader_bulk_delete'),
     path('traders/create/', AdminTraderCreateView.as_view(), name='trader_create'),
     path('traders/<int:pk>/', AdminTraderDetailView.as_view(), name='trader_detail'),
@@ -62,11 +66,13 @@ urlpatterns = [
 
     # Postback & Webhook Audit Logs
     path('postbacks/', PostbackLogListView.as_view(), name='postback_list'),
+    path('postbacks/scroll/', PostbackLogScrollView.as_view(), name='postback_scroll'),
     path('postbacks/bulk-delete/', PostbackLogBulkDeleteView.as_view(), name='postback_bulk_delete'),
     path('postbacks/<int:pk>/', PostbackLogDetailView.as_view(), name='postback_detail'),
 
     # Trade Execution Configurations
     path('trade-configs/', AdminTradeExecConfigListView.as_view(), name='trade_exec_config_list'),
+    path('trade-configs/scroll/', AdminTradeExecConfigScrollView.as_view(), name='trade_exec_config_scroll'),
     path('trade-configs/bulk-delete/', AdminTradeExecConfigBulkDeleteView.as_view(), name='trade_exec_config_bulk_delete'),
     path('trade-configs/create/', AdminTradeExecConfigCreateView.as_view(), name='trade_exec_config_create'),
     path('trade-configs/<int:pk>/', AdminTradeExecConfigDetailView.as_view(), name='trade_exec_config_detail'),

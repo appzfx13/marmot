@@ -15,7 +15,7 @@ type Config struct {
 }
 
 func LoadConfig() *Config {
-	dbHost := getEnv("DB_HOST", "db")           
+	dbHost := getEnv("POSTGRES_HOST", "db")           
 	dbPort := getEnv("POSTGRES_PORT", "5432")
 	dbUser := getEnv("POSTGRES_USER", "postgres")
 	dbPass := getEnv("POSTGRES_PASSWORD", "postgres")
@@ -45,7 +45,7 @@ func LoadConfig() *Config {
 
 	// DEBUG: Log all loaded config values to verify env vars are loaded correctly
 	fmt.Println("========== [CONFIG DEBUG] ==========")
-	fmt.Printf("[CONFIG] DB_HOST        (DB_HOST)       : %s\n", dbHost)
+	fmt.Printf("[CONFIG] POSTGRES_HOST  (POSTGRES_HOST) : %s\n", dbHost)
 	fmt.Printf("[CONFIG] DB_PORT        (POSTGRES_PORT) : %s\n", dbPort)
 	fmt.Printf("[CONFIG] DB_USER        (POSTGRES_USER) : %s\n", dbUser)
 	fmt.Printf("[CONFIG] DB_NAME        (POSTGRES_DB)   : %s\n", dbName)

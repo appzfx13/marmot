@@ -54,11 +54,28 @@ func (m *TaskManager) StartListener(ctx context.Context, redisService *services.
 	}
 }
 
-// handleMessage parses the JSON payload and routes the command
+// handleMessage parses the JSON payload and routes the command or relays progress
 func (m *TaskManager) handleMessage(parentCtx context.Context, payloadStr string) {
 	var payload models.CommandPayload
 	if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
 		log.Printf("⚠️ Invalid JSON payload received: %v\n", err)
+		return
+	}
+
+	if payload.Command == "" {
+		var progMsg struct {
+			Type   string `json:"type"`
+			TaskID string `json:"task_id"`
+		}
+		if err := json.Unmarshal([]byte(payloadStr), &progMsg); err == nil && progMsg.TaskID != "" {
+			if progMsg.Type == "progress" || progMsg.Type == "backtest_progress" {
+				if m.hub != nil {
+					m.hub.BroadcastToTask(progMsg.TaskID, []byte(payloadStr))
+				}
+				return
+			}
+		}
+		log.Printf("⚠️ Unknown empty command payload: %s\n", payloadStr)
 		return
 	}
 

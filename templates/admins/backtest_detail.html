@@ -5,48 +5,11 @@
 {% block nav_backtest_active %}active{% endblock %}
 
 {% block dashboard_content %}
-<div class="mb-4">
-    <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill btn-sm text-white-50 d-inline-flex align-items-center gap-1 mb-3">
-        <span class="material-icons fs-6">arrow_back</span>
-        <span>Back to Dashboard</span>
-    </a>
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-        <div>
-            <h3 class="fw-bold mb-1 theme-text-main">
-                Backtest Analytics #BT-{{ backtest.id|stringformat:"04d" }}
-                <span class="fs-6 fw-normal text-primary ms-2">({{ backtest.get_strategy_name_display }})</span>
-            </h3>
-            <p class="theme-text-muted mb-0">Index: {{ backtest.index_name }} | Period: {{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</p>
-        </div>
-
-        <div class="d-flex align-items-center gap-2">
-            {% if backtest.status == 'created' or backtest.status == 'paused' %}
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
-                    hx-target="#globalHtmxModalDialog"
-                    hx-swap="innerHTML"
-                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 px-4">
-                <span class="material-icons fs-5">play_arrow</span>
-                <span>Start Execution</span>
-            </button>
-            {% elif backtest.status == 'running' %}
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
-                    hx-target="#globalHtmxModalDialog"
-                    hx-swap="innerHTML"
-                    class="btn btn-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-2 px-4">
-                <span class="material-icons fs-5">pause</span>
-                <span>Pause</span>
-            </button>
-            {% endif %}
-        </div>
-    </div>
-</div>
-
-<div id="backtest-detail-container" class="w-100"
+<div id="backtest-detail-container" class="w-100 col-12 pt-2"
      hx-get="{{ request.get_full_path }}" 
      hx-trigger="reloadBacktestDetail from:body" 
      hx-target="this">
     {% include 'admins/partials/backtest_detail_content.html' %}
 </div>
 {% endblock %}
+

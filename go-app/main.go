@@ -14,6 +14,7 @@ import (
 	"go-app/services"
 	"go-app/workers"
 	"go-app/ws"
+	_ "go-app/strategies"
 )
 
 func main() {

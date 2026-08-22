@@ -1,0 +1,161 @@
+<!-- templates/admins/partials/backtest_edit_modal.html -->
+<div class="modal-content glass-card p-3 border shadow-lg" style="background: var(--nav-hover, rgba(15, 23, 42, 0.96)); backdrop-filter: blur(20px); border-color: var(--border-color) !important; border-radius: 16px;">
+    
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3 pt-1">
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; border: 1px solid rgba(13, 110, 253, 0.3);">
+                <span class="material-icons fs-5">tune</span>
+            </div>
+            <div>
+                <h5 class="modal-title fw-bold theme-text-main mb-0 d-flex align-items-center gap-2">
+                    <span>Edit Parameters & Regenerate</span>
+                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0 fs-7">#BT-{{ backtest.id|stringformat:"04d" }}</span>
+                </h5>
+                <small class="theme-text-muted">Adjust strategy parameters, risk thresholds, and rules to trigger a fresh backtest execution.</small>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <!-- Form -->
+    <form method="POST" 
+          action="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
+          hx-post="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
+          hx-target="#globalHtmxModalDialog"
+          class="glass-form-card">
+        {% csrf_token %}
+
+        <div class="modal-body py-3" style="max-height: 70vh; overflow-y: auto;">
+            
+            <!-- Strategy & Index Context Summary Banner -->
+            <div class="p-3 mb-3 rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important;">
+                <div>
+                    <span class="theme-text-muted small">Strategy Engine:</span>
+                    <span class="text-info fw-bold ms-1">{{ backtest.get_strategy_name_display }}</span>
+                </div>
+                <div>
+                    <span class="theme-text-muted small">Target Index:</span>
+                    <span class="theme-text-main fw-bold ms-1">{{ backtest.index_name }}</span>
+                </div>
+                {% if backtest.backup_task %}
+                <div>
+                    <span class="theme-text-muted small">Linked Backup:</span>
+                    <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-0 ms-1">#{{ backtest.backup_task.id }} ({{ backtest.backup_task.start_date }} to {{ backtest.backup_task.end_date }})</span>
+                </div>
+                {% endif %}
+            </div>
+
+            <!-- Date Range Selection -->
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_start_date">
+                        Start Date<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="date" name="start_date" id="edit_start_date" class="form-control" value="{{ start_date_val }}" required>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_end_date">
+                        End Date<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="date" name="end_date" id="edit_end_date" class="form-control" value="{{ end_date_val }}" required>
+                </div>
+            </div>
+
+            <!-- Capital, Lots & Strike Selection -->
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-4">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_initial_capital">
+                        Initial Capital (₹)<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="number" step="1000" min="1000" name="initial_capital" id="edit_initial_capital" class="form-control font-monospace" value="{{ initial_capital_val }}" required>
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_lots_count">
+                        Lots Count<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="number" min="1" max="100" name="lots_count" id="edit_lots_count" class="form-control font-monospace" value="{{ lots_count_val }}" required>
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_strike_selection">
+                        Strike Selection
+                    </label>
+                    <select name="strike_selection" id="edit_strike_selection" class="form-select">
+                        <option value="ITM2" {% if strike_selection_val == 'ITM2' %}selected{% endif %}>ITM2 (Deep ITM)</option>
+                        <option value="ITM1" {% if strike_selection_val == 'ITM1' %}selected{% endif %}>ITM1 (In The Money)</option>
+                        <option value="ATM" {% if strike_selection_val == 'ATM' %}selected{% endif %}>ATM (At The Money)</option>
+                        <option value="OTM1" {% if strike_selection_val == 'OTM1' %}selected{% endif %}>OTM1 (Out Of The Money)</option>
+                        <option value="OTM2" {% if strike_selection_val == 'OTM2' %}selected{% endif %}>OTM2 (+100 OTM)</option>
+                        <option value="OTM3" {% if strike_selection_val == 'OTM3' %}selected{% endif %}>OTM3 (Deep OTM)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Risk Management Parameters -->
+            <div class="row g-3 mb-3">
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_stop_loss_points">
+                        Stop Loss (Pts)<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="number" step="0.5" min="1" name="stop_loss_points" id="edit_stop_loss_points" class="form-control font-monospace" value="{{ stop_loss_points_val }}" required>
+                    <small class="theme-text-muted">Option strike exit trigger threshold in points.</small>
+                </div>
+                <div class="col-12 col-md-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_rr_ratio">
+                        Risk : Reward Ratio (1:X)<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="number" step="0.1" min="0.5" max="20" name="rr_ratio" id="edit_rr_ratio" class="form-control font-monospace" value="{{ rr_ratio_val }}" required>
+                    <small class="theme-text-muted">Multiplier for profit target (e.g. 5.0 = 5x Stop Loss).</small>
+                </div>
+            </div>
+
+            <!-- Strategy Rules Selection -->
+            <div class="mb-3">
+                <label class="form-label theme-text-muted small fw-bold text-uppercase mb-2 d-flex align-items-center justify-content-between">
+                    <span>Active Strategy Rules & Execution Constraints</span>
+                    <span class="text-info small fw-normal">Select constraints to enforce</span>
+                </label>
+                <div class="row g-2">
+                    {% for rule in available_rules %}
+                    <div class="col-12 col-md-6">
+                        <label class="custom-check-item w-100 d-flex align-items-center gap-2 p-2 rounded-3 border" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important; cursor: pointer;">
+                            <input type="checkbox" name="rules" value="{{ rule.id }}" {% if rule.id in active_rule_ids %}checked{% endif %}>
+                            <div class="flex-grow-1">
+                                <div class="theme-text-main fw-semibold small d-flex align-items-center gap-1">
+                                    <span>{{ rule.name }}</span>
+                                </div>
+                                <div class="theme-text-muted smaller" style="font-size: 0.7rem;">{{ rule.description|default:rule.prompt_directive|truncatechars:65 }}</div>
+                            </div>
+                        </label>
+                    </div>
+                    {% empty %}
+                    <div class="col-12">
+                        <div class="theme-text-muted small fst-italic">No custom rules configured yet.</div>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- Natural Language AI Directives Prompt -->
+            <div class="mb-2">
+                <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_prompt_directives">
+                    AI Strategy Directives Prompt (Optional)
+                </label>
+                <textarea name="prompt_directives" id="edit_prompt_directives" rows="2" class="form-control" placeholder="e.g. Strictly square off all open positions before 15:15 PM. Do not take fresh entries post 14:45 PM.">{{ prompt_directives_val }}</textarea>
+                <small class="theme-text-muted">Custom natural language directives parsed by TensorTrade RL and Go worker engines.</small>
+            </div>
+
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer border-top border-secondary border-opacity-25 px-0 pb-0 pt-3 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1.5 px-4 py-2" data-bs-dismiss="modal" style="font-size: 0.82rem;">
+                <span>Cancel</span>
+            </button>
+            <button type="submit" class="btn btn-sm btn-primary rounded-pill d-inline-flex align-items-center gap-1.5 px-4 py-2 shadow-sm" style="font-size: 0.82rem;">
+                <span class="material-icons" style="font-size: 1.1rem !important;">bolt</span>
+                <span>Save & Regenerate Backtest</span>
+            </button>
+        </div>
+    </form>
+</div>

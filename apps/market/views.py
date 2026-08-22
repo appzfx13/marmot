@@ -373,3 +373,32 @@ class MarketBackupStatusView(LoginRequiredMixin, AdminRequiredMixin, View):
             'file_size_mb': round(task.file_size_mb or 0.0, 2),
             'eta':         '',
         })
+
+
+from apps.common.mixins import BaseHtmxScrollListView
+
+class MarketBackupScrollView(LoginRequiredMixin, AdminRequiredMixin, BaseHtmxScrollListView):
+    """Endpoint for Load More pagination of backup tasks (desktop rows or mobile cards)."""
+    rows_template_name = 'admins/partials/backup_dashboard_rows.html'
+    cards_template_name = 'admins/partials/backup_dashboard_cards.html'
+    context_object_name = 'backups'
+
+    def get_queryset(self):
+        queryset = MarketBackupTask.objects.filter(is_deleted=False)
+        q = self.request.GET.get('q', '').strip()
+        if q:
+            queryset = queryset.filter(index_name__icontains=q) | queryset.filter(id__icontains=q)
+        status = self.request.GET.get('status', '').strip()
+        if status:
+            queryset = queryset.filter(status=status)
+
+        sort = self.request.GET.get('sort', '-created_at').strip()
+        allowed_sort = ['created_at', '-created_at', 'index_name', '-index_name', 'status', '-status']
+        if sort in allowed_sort:
+            return queryset.order_by(sort)
+        return queryset.order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['current_sort'] = self.request.GET.get('sort', '-created_at').strip()
+        return context

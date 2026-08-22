@@ -4,9 +4,7 @@ import "strings"
 
 // strategyRegistry holds all registered plug-and-play strategy instances.
 var strategyRegistry = map[string]Strategy{
-	"ict_smc":     NewICTSMCStrategy(),
-	"gamma_blast": NewGammaBlastStrategy(),
-	"candle_3pm":  NewCandle3PMStrategy(),
+	"tensortrade_rl": NewTensorTradeRLStrategy(),
 }
 
 // GetStrategy resolves a plug-and-play strategy instance by its strategy_name.

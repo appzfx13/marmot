@@ -1,0 +1,224 @@
+{% for backtest in backtests %}
+<!-- Main Compact Row -->
+<tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+    <td class="ps-3 py-2 bg-transparent">
+        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backtest.id }}">
+    </td>
+
+    <td class="py-2 bg-transparent font-monospace fw-bold theme-text-main">
+        #BT-{{ backtest.id|stringformat:"04d" }}
+    </td>
+
+    <td class="py-2 bg-transparent">
+        <div class="fw-bold theme-text-main small">{{ backtest.get_strategy_name_display }}</div>
+        <div class="d-flex align-items-center gap-1 mt-0">
+            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">{{ backtest.index_name }}</span>
+            <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">RL Engine</span>
+        </div>
+    </td>
+
+    <td class="py-2 bg-transparent">
+        <div class="small theme-text-main fw-semibold" style="font-size: 0.78rem;">{{ backtest.start_date|date:"d M Y" }}</div>
+        <div class="small theme-text-muted" style="font-size: 0.72rem;">→ {{ backtest.end_date|date:"d M Y" }}</div>
+    </td>
+
+    <td class="py-2 bg-transparent">
+        <div class="small theme-text-main fw-semibold" style="font-size: 0.78rem;">₹{{ backtest.initial_capital|floatformat:0 }}</div>
+        <div class="small text-info" style="font-size: 0.72rem;">{{ backtest.parameters.lots_count|default:1 }} Lot{% if backtest.parameters.lots_count > 1 %}s{% endif %}</div>
+    </td>
+
+    <td class="py-2 bg-transparent">
+        <div class="small fw-bold {% if backtest.safe_metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} font-monospace" style="font-size: 0.84rem;">
+            {% if backtest.safe_metrics.net_pnl >= 0 %}+{% endif %}₹{{ backtest.safe_metrics.net_pnl|default:0|floatformat:2 }}
+        </div>
+    </td>
+
+    <!-- Real-Time Progress Bar -->
+    <td class="py-2 px-2 bg-transparent">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+            <span class="theme-text-muted backtest-progress-text font-monospace" style="font-size: 0.68rem;" id="backtest-progress-text-{{ backtest.pk }}">{{ backtest.progress|default:0 }}%</span>
+            {% if backtest.status == 'running' %}
+            <span class="status-dot-pulse bg-primary"></span>
+            {% endif %}
+        </div>
+        <div class="progress rounded-pill" style="height: 6px; background-color: rgba(255,255,255,0.08);">
+            <div class="progress-bar bg-primary progress-bar-striped {% if backtest.status == 'running' %}progress-bar-animated{% endif %} backtest-progress-bar rounded-pill" 
+                 id="backtest-progress-{{ backtest.pk }}"
+                 role="progressbar" 
+                 style="width: {{ backtest.progress|default:0 }}%; transition: width 0.3s ease;" 
+                 aria-valuenow="{{ backtest.progress|default:0 }}" aria-valuemin="0" aria-valuemax="100">
+            </div>
+        </div>
+    </td>
+
+    <td class="py-2 px-1 text-center bg-transparent" style="white-space: nowrap;">
+        <span id="backtest-status-{{ backtest.pk }}" class="backtest-status-badge">
+        {% if backtest.status == 'completed' %}
+            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Completed</span>
+        {% elif backtest.status == 'running' %}
+            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Running</span>
+        {% elif backtest.status == 'created' %}
+            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Created</span>
+        {% elif backtest.status == 'paused' %}
+            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Paused</span>
+        {% elif backtest.status == 'cancelled' or backtest.status == 'error' %}
+            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">{{ backtest.get_status_display }}</span>
+        {% else %}
+            <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Pending</span>
+        {% endif %}
+        </span>
+    </td>
+
+    <td class="text-center py-2 pe-4 ps-1 bg-transparent" style="white-space: nowrap;">
+        <div class="d-flex align-items-center justify-content-center gap-1 me-1">
+            {% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-warning" 
+                    style="width: 26px; height: 26px;" 
+                    title="Pause Execution">
+                <span class="material-icons" style="font-size: 0.85rem;">pause</span>
+            </button>
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-danger" 
+                    style="width: 26px; height: 26px;" 
+                    title="Stop Execution">
+                <span class="material-icons" style="font-size: 0.85rem;">stop</span>
+            </button>
+            {% elif backtest.status|lower == 'paused' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=resume" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-success" 
+                    style="width: 26px; height: 26px;" 
+                    title="Resume Execution">
+                <span class="material-icons" style="font-size: 0.85rem;">play_arrow</span>
+            </button>
+            {% else %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center {% if backtest.status|lower == 'created' %}text-success{% else %}text-info{% endif %}" 
+                    style="width: 26px; height: 26px;" 
+                    title="{% if backtest.status|lower == 'created' %}Start Execution{% else %}Re-run Backtest{% endif %}">
+                <span class="material-icons" style="font-size: 0.85rem;">{% if backtest.status|lower == 'created' %}play_arrow{% else %}replay{% endif %}</span>
+            </button>
+            {% endif %}
+
+            <a href="{% url 'backtest:backtest_detail' backtest.pk %}" 
+               class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-primary text-decoration-none" 
+               style="width: 26px; height: 26px;" 
+               title="View Deep Analytics">
+                <span class="material-icons" style="font-size: 0.85rem;">analytics</span>
+            </a>
+
+            <!-- Expand / Collapse Button on the Right -->
+            <button class="btn btn-sm glass-icon-btn text-primary border-0 rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
+                    style="width: 26px; height: 26px; background: rgba(255, 255, 255, 0.06);"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#bt-desk-expand-{{ backtest.id }}"
+                    aria-expanded="false"
+                    aria-controls="bt-desk-expand-{{ backtest.id }}"
+                    title="Expand Quick Metrics">
+                <span class="material-icons" style="font-size: 0.95rem; color: #38bdf8;">keyboard_arrow_down</span>
+            </button>
+            
+            {% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' %}
+            <button type="button" 
+                    class="btn btn-sm glass-icon-btn text-muted border-0 rounded-circle p-0 d-inline-flex align-items-center justify-content-center opacity-25" 
+                    style="width: 26px; height: 26px; cursor: not-allowed;" 
+                    disabled
+                    title="Cannot delete active running task">
+                <span class="material-icons" style="font-size: 0.85rem;">delete</span>
+            </button>
+            {% else %}
+            <button type="button" 
+                    class="btn btn-sm glass-icon-btn text-danger border-0 rounded-circle p-0 d-inline-flex align-items-center justify-content-center" 
+                    style="width: 26px; height: 26px;"
+                    hx-get="{% url 'backtest:backtest_delete' backtest.pk %}" 
+                    hx-target="#globalHtmxModalDialog" 
+                    hx-swap="innerHTML"
+                    title="Delete Backtest Task">
+                <span class="material-icons" style="font-size: 0.85rem;">delete</span>
+            </button>
+            {% endif %}
+        </div>
+    </td>
+</tr>
+
+<!-- Collapsible Detailed Diagnostic Drawer -->
+<tr class="collapse border-0" id="bt-desk-expand-{{ backtest.id }}">
+    <td colspan="9" class="p-0 border-0">
+        <div class="trade-row-drawer p-3 mx-2 my-1 rounded-3">
+            <div class="row g-3 small">
+                <div class="col-md-3">
+                    <div class="theme-text-muted small text-uppercase fw-bold" style="font-size: 0.68rem;">RL Model Configuration</div>
+                    <div class="theme-text-main fw-semibold mt-1">Algorithm: <span class="text-info">{{ backtest.parameters.algorithm|default:"PPO" }}</span></div>
+                    <div class="theme-text-muted">Strike Selection: <span class="theme-text-main">{{ backtest.parameters.strike_selection|default:"ATM" }}</span></div>
+                    <div class="theme-text-muted">Reward Policy: <span class="theme-text-main">{{ backtest.parameters.reward_scheme|default:"risk_adjusted" }}</span></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="theme-text-muted small text-uppercase fw-bold" style="font-size: 0.68rem;">Risk & Execution Rules</div>
+                    <div class="theme-text-main fw-semibold mt-1">Stop Loss: <span class="text-danger">{{ backtest.parameters.stop_loss_pts|default:20 }} pts</span></div>
+                    <div class="theme-text-muted">Risk Reward: <span class="text-success">1:{{ backtest.parameters.risk_reward_ratio|default:2 }}</span></div>
+                    <div class="theme-text-muted">Dynamic Lot Sizing: <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0">Active</span></div>
+                </div>
+                <div class="col-md-3">
+                    <div class="theme-text-muted small text-uppercase fw-bold" style="font-size: 0.68rem;">Financial Metrics</div>
+                    <div class="theme-text-main fw-semibold mt-1">Gross PnL: <span class="{% if backtest.safe_metrics.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} font-monospace">₹{{ backtest.safe_metrics.gross_pnl|default:0|floatformat:2 }}</span></div>
+                    <div class="theme-text-muted">Taxes & Charges: <span class="text-warning font-monospace">₹{{ backtest.safe_metrics.total_charges|default:0|floatformat:2 }}</span></div>
+                    <div class="theme-text-muted">Max Utilized Cap: <span class="text-info font-monospace">₹{{ backtest.safe_metrics.max_utilized_capital|default:0|floatformat:2 }}</span></div>
+                </div>
+                <div class="col-md-3 text-end d-flex flex-column justify-content-between">
+                    <div>
+                        <div class="theme-text-muted small text-uppercase fw-bold" style="font-size: 0.68rem;">Direct Actions</div>
+                        <div class="small theme-text-muted mt-1">{{ backtest.safe_metrics.total_trades|default:0 }} Trades ({{ backtest.safe_metrics.winning_trades|default:0 }}W / {{ backtest.safe_metrics.losing_trades|default:0 }}L)</div>
+                    </div>
+                    <div class="d-flex justify-content-end gap-2 mt-2">
+                        <a href="{% url 'backtest:backtest_detail' backtest.pk %}" class="btn btn-sm btn-primary rounded-pill px-3 d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 0.75rem;">
+                            <span class="material-icons fs-6">insights</span> View Full Report
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </td>
+</tr>
+{% endfor %}
+
+{% if page_obj.has_next %}
+<tr id="dashboard-desk-sentinel-{{ page_obj.number }}">
+    <td colspan="9" class="text-center py-3 bg-transparent border-0">
+        <button type="button"
+                hx-get="{% url 'backtest:backtest_dashboard_scroll' %}?page={{ page_obj.next_page_number }}&scroll_type=rows&q={{ request.GET.q }}&status={{ request.GET.status }}"
+                hx-target="#dashboard-desk-sentinel-{{ page_obj.number }}"
+                hx-swap="outerHTML"
+                class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+                style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+                title="Load More Backtests">
+            <span class="load-more-idle d-inline-flex align-items-center gap-2">
+                <span class="material-icons fs-5">keyboard_arrow_down</span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Load More Backtests (Page {{ page_obj.next_page_number }} of {{ paginator.num_pages }})</span>
+            </span>
+            <span class="load-more-loading d-none align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Loading backtests...</span>
+            </span>
+        </button>
+    </td>
+</tr>
+{% elif paginator.count > 0 %}
+<tr class="border-0">
+    <td colspan="9" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.72rem;">
+        <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ paginator.count }} backtest tasks loaded
+    </td>
+</tr>
+{% endif %}

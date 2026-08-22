@@ -42,167 +42,30 @@
                     <th scope="col" class="text-end pe-4 py-3 theme-text-muted">Actions</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for trader in traders %}
-                <tr style="border-color: var(--border-color) !important;">
-                    <td class="ps-4 py-3" style="width: 40px;">
-                        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ trader.id }}">
-                    </td>
-                    <td class="py-3">
-                        <div class="d-flex align-items-center gap-3">
-                            <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px; border: 1px solid rgba(220, 53, 69, 0.3);">
-                                {{ trader.first_name|default:trader.username|slice:":1"|upper }}
-                            </div>
-                            <div>
-                                <div class="fw-medium theme-text-main">{{ trader.get_full_name|default:trader.username }}</div>
-                                <small class="theme-text-muted">@{{ trader.username }}</small>
-                            </div>
-                        </div>
-                    </td>
-                    <td class="py-3">
-                        <div class="theme-text-main small">{{ trader.email }}</div>
-                        <small class="theme-text-muted">{{ trader.phone_number|default:"N/A" }}</small>
-                    </td>
-                    <td class="py-3">
-                        <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-3 py-1">
-                            {{ trader.get_broker_display|default:trader.broker|default:"Unassigned" }}
-                        </span>
-                    </td>
-                    <td class="py-3">
-                        {% if trader.trade_eligibility %}
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Eligible</span>
-                        {% else %}
-                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Ineligible</span>
-                        {% endif %}
-                    </td>
-                    <td class="text-end pe-4 py-3">
-                        <div class="d-flex align-items-center justify-content-end gap-2">
-                            <a href="{% url 'admins:trader_detail' trader.pk %}" class="glass-icon-btn rounded-circle" style="width: 36px; height: 36px;" title="View Details"><span class="material-icons fs-6">visibility</span></a>
-                            <a href="{% url 'admins:trader_edit' trader.pk %}" class="glass-icon-btn rounded-circle" style="width: 36px; height: 36px;" title="Edit"><span class="material-icons fs-6">edit</span></a>
-                            <button class="glass-icon-btn text-warning border-0 bg-transparent rounded-circle"
-                                    style="width: 36px; height: 36px;"
-                                    title="Reset Password"
-                                    type="button"
-                                    hx-get="{% url 'admins:trader_password_reset' trader.pk %}"
-                                    hx-target="#globalHtmxModalDialog">
-                                <span class="material-icons fs-6">vpn_key</span>
-                            </button>
-                            <button class="glass-icon-btn text-danger border-0 bg-transparent rounded-circle" 
-                                    style="width: 36px; height: 36px;"
-                                    title="Delete"
-                                    type="button"
-                                    hx-get="{% url 'admins:trader_delete' trader.pk %}"
-                                    hx-target="#globalHtmxModalDialog">
-                                <span class="material-icons fs-6">delete</span>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
+            <tbody id="trader-table-body">
+                {% if traders %}
+                    {% include "admins/partials/trader_table_rows.html" %}
+                {% else %}
                 <tr><td colspan="6" class="text-center py-5 theme-text-muted">No traders found.</td></tr>
-                {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>
 
     <!-- MOBILE VIEW: EXPANDABLE TILE CARDS -->
-    <div class="flex-grow-1 overflow-auto p-3 d-block d-lg-none">
-        {% for trader in traders %}
-        <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-            <!-- Mobile Tile Header -->
-            <div class="d-flex justify-content-between align-items-center gap-2">
-                <div class="d-flex align-items-center gap-2">
-                    <input class="form-check-input bulk-item-checkbox me-1" type="checkbox" value="{{ trader.id }}">
-                    <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold flex-shrink-0" style="width: 36px; height: 36px;">{{ trader.first_name|default:trader.username|slice:":1"|upper }}</div>
-                    <div>
-                        <div class="fw-medium theme-text-main fs-6">{{ trader.get_full_name|default:trader.username }}</div>
-                        <small class="theme-text-muted">@{{ trader.username }}</small>
-                    </div>
-                </div>
-
-                <!-- Right Side Dropdown Arrow Icon Button -->
-                <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
-                        style="width: 36px; height: 36px; background: rgba(255, 255, 255, 0.08); color: var(--text-main);"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target="#trader-mobile-expand-{{ trader.id }}"
-                        aria-expanded="false"
-                        aria-controls="trader-mobile-expand-{{ trader.id }}"
-                        title="Expand Details">
-                    <span class="material-icons fs-5 text-primary">keyboard_arrow_down</span>
-                </button>
-            </div>
-            
-            <!-- Collapsible Mobile Details & Actions Container -->
-            <div class="collapse mt-3 pt-3 border-top border-secondary border-opacity-25" id="trader-mobile-expand-{{ trader.id }}">
-                <div class="d-flex flex-column gap-2 mb-3">
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Email:</span>
-                        <span class="theme-text-main fw-semibold">{{ trader.email }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Phone:</span>
-                        <span class="theme-text-main">{{ trader.phone_number|default:"N/A" }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Broker:</span>
-                        <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-2 py-0">
-                            {{ trader.get_broker_display|default:trader.broker|default:"Unassigned" }}
-                        </span>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Eligibility:</span>
-                        {% if trader.trade_eligibility %}
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0">Eligible</span>
-                        {% else %}
-                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0">Ineligible</span>
-                        {% endif %}
-                    </div>
-                </div>
-
-                <div class="d-flex justify-content-end gap-2 border-top pt-2" style="border-color: var(--border-color) !important;">
-                    <a href="{% url 'admins:trader_detail' trader.pk %}" class="btn btn-sm btn-outline-secondary rounded-pill d-flex align-items-center gap-1">
-                        <span class="material-icons fs-6">visibility</span> View
-                    </a>
-                    <button type="button" 
-                            class="btn btn-sm btn-outline-warning rounded-pill d-flex align-items-center gap-1"
-                            hx-get="{% url 'admins:trader_password_reset' trader.pk %}"
-                            hx-target="#globalHtmxModalDialog">
-                        <span class="material-icons fs-6">vpn_key</span> Key
-                    </button>
-                    <button type="button" 
-                            class="btn btn-sm btn-outline-danger rounded-pill d-flex align-items-center gap-1"
-                            hx-get="{% url 'admins:trader_delete' trader.id %}"
-                            hx-target="#globalHtmxModalDialog">
-                        <span class="material-icons fs-6">delete</span> Delete
-                    </button>
-                </div>
-            </div>
-        </div>
-        {% empty %}
+    <div class="flex-grow-1 overflow-auto p-3 d-block d-lg-none" id="trader-mobile-list-container">
+        {% if traders %}
+            {% include "admins/partials/trader_table_cards.html" %}
+        {% else %}
         <div class="text-center py-4 theme-text-muted">No traders found.</div>
-        {% endfor %}
+        {% endif %}
     </div>
 
-    <!-- PAGINATION -->
-    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
-            <div class="small theme-text-muted">
-                {% if is_paginated %}
-                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} traders
-                {% else %}
-                    Showing {{ traders|length }} traders
-                {% endif %}
-            </div>
-            <ul class="pagination mb-0 gap-2 align-items-center">
-                {% if is_paginated and page_obj.has_previous %}
-                <li class="page-item mb-0"><a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 36px; height: 36px;" hx-get="{% url 'admins:trader_list' %}?page={{ page_obj.previous_page_number }}&{{ current_filters }}" hx-target="#traderTableContainer" hx-push-url="true"><span class="material-icons fs-6">chevron_left</span></a></li>
-                {% endif %}
-                <li class="page-item mb-0"><span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold p-0" style="width: 36px; height: 36px;">{{ page_obj.number|default:1 }}</span></li>
-                {% if is_paginated and page_obj.has_next %}
-                <li class="page-item mb-0"><a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center p-0" style="width: 36px; height: 36px;" hx-get="{% url 'admins:trader_list' %}?page={{ page_obj.next_page_number }}&{{ current_filters }}" hx-target="#traderTableContainer" hx-push-url="true"><span class="material-icons fs-6">chevron_right</span></a></li>
-                {% endif %}
-            </ul>
+    <!-- LOAD MORE FOOTER -->
+    <div class="border-top pt-2 pb-2 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+        <div class="d-flex justify-content-between align-items-center small theme-text-muted">
+            <span>Showing {{ paginator.count|default:traders|length }} traders (extendable via Load More)</span>
+            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-1" style="font-size: 0.68rem;">Continuous Table Active</span>
         </div>
     </div>
 </div>

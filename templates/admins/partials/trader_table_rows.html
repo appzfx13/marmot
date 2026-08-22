@@ -1,0 +1,85 @@
+{% for trader in traders %}
+<tr style="border-color: var(--border-color) !important;">
+    <td class="ps-4 py-3 bg-transparent" style="width: 40px;">
+        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ trader.id }}">
+    </td>
+    <td class="py-3 bg-transparent">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold" style="width: 38px; height: 38px; border: 1px solid rgba(220, 53, 69, 0.3);">
+                {{ trader.first_name|default:trader.username|slice:":1"|upper }}
+            </div>
+            <div>
+                <div class="fw-medium theme-text-main">{{ trader.get_full_name|default:trader.username }}</div>
+                <small class="theme-text-muted">@{{ trader.username }}</small>
+            </div>
+        </div>
+    </td>
+    <td class="py-3 bg-transparent">
+        <div class="theme-text-main small">{{ trader.email }}</div>
+        <small class="theme-text-muted">{{ trader.phone_number|default:"N/A" }}</small>
+    </td>
+    <td class="py-3 bg-transparent">
+        <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-3 py-1">
+            {{ trader.get_broker_display|default:trader.broker|default:"Unassigned" }}
+        </span>
+    </td>
+    <td class="py-3 bg-transparent">
+        {% if trader.trade_eligibility %}
+            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Eligible</span>
+        {% else %}
+            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Ineligible</span>
+        {% endif %}
+    </td>
+    <td class="text-end pe-4 py-3 bg-transparent">
+        <div class="d-flex align-items-center justify-content-end gap-2">
+            <a href="{% url 'admins:trader_detail' trader.pk %}" class="glass-icon-btn rounded-circle" style="width: 36px; height: 36px;" title="View Details"><span class="material-icons fs-6">visibility</span></a>
+            <a href="{% url 'admins:trader_edit' trader.pk %}" class="glass-icon-btn rounded-circle" style="width: 36px; height: 36px;" title="Edit"><span class="material-icons fs-6">edit</span></a>
+            <button class="glass-icon-btn text-warning border-0 bg-transparent rounded-circle"
+                    style="width: 36px; height: 36px;"
+                    title="Reset Password"
+                    type="button"
+                    hx-get="{% url 'admins:trader_password_reset' trader.pk %}"
+                    hx-target="#globalHtmxModalDialog">
+                <span class="material-icons fs-6">vpn_key</span>
+            </button>
+            <button class="glass-icon-btn text-danger border-0 bg-transparent rounded-circle" 
+                    style="width: 36px; height: 36px;"
+                    title="Delete"
+                    type="button"
+                    hx-get="{% url 'admins:trader_delete' trader.pk %}"
+                    hx-target="#globalHtmxModalDialog">
+                <span class="material-icons fs-6">delete</span>
+            </button>
+        </div>
+    </td>
+</tr>
+{% endfor %}
+
+{% if page_obj.has_next %}
+<tr id="trader-desk-sentinel-{{ page_obj.number }}">
+    <td colspan="6" class="text-center py-3 bg-transparent border-0">
+        <button type="button"
+                hx-get="{% url 'admins:trader_scroll' %}?page={{ page_obj.next_page_number }}&scroll_type=rows&q={{ request.GET.q }}&broker={{ request.GET.broker }}&sort={{ current_sort }}"
+                hx-target="#trader-desk-sentinel-{{ page_obj.number }}"
+                hx-swap="outerHTML"
+                class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+                style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+                title="Load More Traders">
+            <span class="load-more-idle d-inline-flex align-items-center gap-2">
+                <span class="material-icons fs-5">keyboard_arrow_down</span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Load More Traders (Page {{ page_obj.next_page_number }} of {{ paginator.num_pages }})</span>
+            </span>
+            <span class="load-more-loading d-none align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Loading traders...</span>
+            </span>
+        </button>
+    </td>
+</tr>
+{% elif paginator.count > 0 %}
+<tr class="border-0">
+    <td colspan="6" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.72rem;">
+        <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ paginator.count }} traders loaded
+    </td>
+</tr>
+{% endif %}

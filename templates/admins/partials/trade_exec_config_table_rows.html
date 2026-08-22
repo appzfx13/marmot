@@ -1,0 +1,98 @@
+{% for config in configs %}
+<tr style="border-color: var(--border-color) !important;">
+    <td class="ps-4 py-3 bg-transparent" style="width: 40px;">
+        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ config.id }}">
+    </td>
+    <!-- Config Name -->
+    <td class="py-3 bg-transparent">
+        <div class="fw-medium theme-text-main">{{ config.name|default:"—" }}</div>
+    </td>
+
+    <!-- Target User -->
+    <td class="py-3 bg-transparent">
+        {% if config.admins_user %}
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; border: 1px solid rgba(13, 110, 253, 0.3);">
+                {{ config.admins_user.username|slice:":1"|upper }}
+            </div>
+            <div class="fw-medium theme-text-main">@{{ config.admins_user.username }}</div>
+        </div>
+        {% else %}
+        <span class="theme-text-muted">—</span>
+        {% endif %}
+    </td>
+
+    <!-- Interactive Status Toggle for is_active -->
+    <td class="py-3 bg-transparent">
+    {% if config.is_active %}
+        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill small">Active</span>
+    {% else %}
+        <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill small">Inactive</span>
+    {% endif %}
+    </td>
+
+    <!-- Max Loss -->
+    <td class="py-3 text-end text-danger fw-semibold bg-transparent">${{ config.max_loss_limit }}</td>
+
+    <!-- Max Profit -->
+    <td class="py-3 text-end text-success fw-semibold bg-transparent">${{ config.max_profit_limit }}</td>
+
+    <!-- Lot Size -->
+    <td class="py-3 text-center fw-bold theme-text-main bg-transparent">{{ config.default_lot_size }}</td>
+
+    <!-- Risk Mode -->
+    <td class="py-3 bg-transparent">
+        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill text-uppercase fw-bold px-3 py-1">{{ config.default_risk_type }}</span>
+        <small class="theme-text-muted ms-1">({{ config.default_risk_value }})</small>
+    </td>
+
+    <!-- Actions -->
+    <td class="text-end pe-4 py-3 bg-transparent">
+        <div class="d-flex align-items-center justify-content-end gap-2">
+            <a href="{% url 'admins:trade_exec_config_detail' config.pk %}" class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;" title="View Details">
+                <span class="material-icons fs-6">visibility</span>
+            </a>
+            <a href="{% url 'admins:trade_exec_config_edit' config.pk %}" class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;" title="Edit">
+                <span class="material-icons fs-6">edit</span>
+            </a>
+            <button type="button" 
+                    class="glass-icon-btn text-danger border-0 rounded-circle d-flex align-items-center justify-content-center" 
+                    style="width: 36px; height: 36px;" 
+                    hx-get="{% url 'admins:trade_exec_config_delete' config.pk %}"
+                    hx-target="#globalHtmxModalDialog"
+                    title="Delete Configuration">
+                <span class="material-icons fs-6">delete</span>
+            </button>
+        </div>
+    </td>
+</tr>
+{% endfor %}
+
+{% if page_obj.has_next %}
+<tr id="config-desk-sentinel-{{ page_obj.number }}">
+    <td colspan="9" class="text-center py-3 bg-transparent border-0">
+        <button type="button"
+                hx-get="{% url 'admins:trade_exec_config_scroll' %}?page={{ page_obj.next_page_number }}&scroll_type=rows&sort={{ current_sort }}&{{ current_filters }}"
+                hx-target="#config-desk-sentinel-{{ page_obj.number }}"
+                hx-swap="outerHTML"
+                class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+                style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+                title="Load More Configurations">
+            <span class="load-more-idle d-inline-flex align-items-center gap-2">
+                <span class="material-icons fs-5">keyboard_arrow_down</span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Load More Configs (Page {{ page_obj.next_page_number }} of {{ paginator.num_pages }})</span>
+            </span>
+            <span class="load-more-loading d-none align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Loading configs...</span>
+            </span>
+        </button>
+    </td>
+</tr>
+{% elif paginator.count > 0 %}
+<tr class="border-0">
+    <td colspan="9" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.72rem;">
+        <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ paginator.count }} trade configurations loaded
+    </td>
+</tr>
+{% endif %}

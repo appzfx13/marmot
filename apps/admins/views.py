@@ -196,6 +196,47 @@ class AdminTraderListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
         return context
 
 
+from apps.common.mixins import BaseHtmxScrollListView
+
+class AdminTraderScrollView(LoginRequiredMixin, AdminRequiredMixin, BaseHtmxScrollListView):
+    """Endpoint for Load More pagination of traders table (desktop rows or mobile cards)."""
+    rows_template_name = 'admins/partials/trader_table_rows.html'
+    cards_template_name = 'admins/partials/trader_table_cards.html'
+    context_object_name = 'traders'
+
+    def get_queryset(self):
+        queryset = User.objects.filter(role=MemberRoleChoices.TRADERS, is_deleted=False)
+        q = self.request.GET.get('q', '').strip()
+        if q:
+            queryset = queryset.filter(
+                Q(first_name__icontains=q) |
+                Q(username__icontains=q) |
+                Q(email__icontains=q)
+            )
+
+        broker = self.request.GET.get('broker', '').strip()
+        if broker:
+            queryset = queryset.filter(broker=broker)
+
+        eligibility = self.request.GET.get('eligibility', '').strip()
+        if eligibility:
+            if eligibility == 'true':
+                queryset = queryset.filter(trade_eligibility=True)
+            elif eligibility == 'false':
+                queryset = queryset.filter(trade_eligibility=False)
+
+        sort = self.request.GET.get('sort', 'username').strip()
+        allowed_sort = ['username', '-username', 'first_name', '-first_name', 'email', '-email']
+        if sort in allowed_sort:
+            return queryset.order_by(sort)
+        return queryset.order_by('username')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['current_sort'] = self.request.GET.get('sort', 'username').strip()
+        return context
+
+
 class AdminTraderCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
     model = User
     form_class = UserForm
@@ -323,6 +364,30 @@ class AdminTradeExecConfigListView(HTMXPartialMixin, LoginRequiredMixin, AdminRe
         return context
 
 
+class AdminTradeExecConfigScrollView(LoginRequiredMixin, AdminRequiredMixin, BaseHtmxScrollListView):
+    """Endpoint for Load More pagination of trade configurations (desktop rows or mobile cards)."""
+    rows_template_name = 'admins/partials/trade_exec_config_table_rows.html'
+    cards_template_name = 'admins/partials/trade_exec_config_table_cards.html'
+    context_object_name = 'configs'
+
+    def get_queryset(self):
+        queryset = TradeExecConfig.objects.filter(is_deleted=False).select_related('admins_user')
+        filterset = TradeExecConfigFilter(self.request.GET, queryset=queryset)
+        if filterset.is_valid():
+            queryset = filterset.qs
+
+        sort = self.request.GET.get('sort', 'name').strip()
+        allowed_sort = ['name', '-name', 'max_loss_limit', '-max_loss_limit', 'max_profit_limit', '-max_profit_limit']
+        if sort in allowed_sort:
+            return queryset.order_by(sort)
+        return queryset.order_by('name')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['current_sort'] = self.request.GET.get('sort', 'name').strip()
+        return context
+
+
 class AdminTradeExecConfigDetailView(LoginRequiredMixin, AdminRequiredMixin, DetailView):
     model = TradeExecConfig
     template_name = 'admins/trade_exec_config_detail.html'
@@ -418,6 +483,47 @@ class PostbackLogListView(HTMXPartialMixin, LoginRequiredMixin, DeveloperOrAdmin
         context = super().get_context_data(**kwargs)
         context['page_title'] = "Postback & Webhook Audit Logs"
         context['users_list'] = User.objects.filter(is_active=True).order_by('username')
+        context['current_q'] = self.request.GET.get('q', '')
+        context['current_user_id'] = self.request.GET.get('user_id', '')
+        context['current_start_date'] = self.request.GET.get('start_date', '')
+        context['current_end_date'] = self.request.GET.get('end_date', '')
+        return context
+
+
+class PostbackLogScrollView(LoginRequiredMixin, DeveloperOrAdminRequiredMixin, BaseHtmxScrollListView):
+    """Endpoint for Load More pagination of postback audit logs (desktop rows or mobile cards)."""
+    rows_template_name = 'admins/partials/postback_table_rows.html'
+    cards_template_name = 'admins/partials/postback_table_cards.html'
+    context_object_name = 'postbacks'
+
+    def get_queryset(self):
+        queryset = PostbackLog.objects.filter(is_deleted=False).select_related('user')
+        q = self.request.GET.get('q')
+        if q:
+            queryset = queryset.filter(
+                Q(order_id__icontains=q) |
+                Q(dhan_client_id__icontains=q) |
+                Q(symbol__icontains=q) |
+                Q(order_status__icontains=q) |
+                Q(broker__icontains=q) |
+                Q(user__username__icontains=q)
+            )
+
+        user_id = self.request.GET.get('user_id')
+        if user_id:
+            queryset = queryset.filter(user_id=user_id)
+
+        start_date = self.request.GET.get('start_date')
+        end_date = self.request.GET.get('end_date')
+        if start_date:
+            queryset = queryset.filter(created_at__date__gte=start_date)
+        if end_date:
+            queryset = queryset.filter(created_at__date__lte=end_date)
+
+        return queryset.order_by('-created_at')
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
         context['current_q'] = self.request.GET.get('q', '')
         context['current_user_id'] = self.request.GET.get('user_id', '')
         context['current_start_date'] = self.request.GET.get('start_date', '')

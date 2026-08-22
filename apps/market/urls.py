@@ -3,6 +3,7 @@ from .views import (
     MarketBackupListView,
     MarketBackupCreateView,
     MarketBackupDetailView,
+    MarketBackupScrollView,
     MarketBackupChartView,
     MarketBackupDownloadView,
     MarketBackupControlView,
@@ -17,6 +18,7 @@ urlpatterns = [
     # Backup Dashboard / List
     path('backup/', MarketBackupListView.as_view(), name='market_backup_view'),
     path('backup/list/', MarketBackupListView.as_view(), name='market_backup_list'),
+    path('backup/scroll/', MarketBackupScrollView.as_view(), name='market_backup_scroll'),
     path('backup/bulk-delete/', MarketBackupBulkDeleteView.as_view(), name='market_backup_bulk_delete'),
     path('backup/create/', MarketBackupCreateView.as_view(), name='market_backup_create'),
     path('backup/<int:pk>/', MarketBackupDetailView.as_view(), name='market_backup_detail'),

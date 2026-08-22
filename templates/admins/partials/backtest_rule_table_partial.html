@@ -1,0 +1,423 @@
+{% load static %}
+
+<!-- Header Title Bar -->
+<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div>
+        <h4 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
+            <span class="material-icons text-primary fs-3">rule</span>
+            Strategy Execution Rules & Directives
+        </h4>
+        <p class="theme-text-muted small mb-0">Manage constraint-conditioned RL rules, market regime filters, and natural language AI strategy directives.</p>
+    </div>
+    <div class="d-flex align-items-center gap-2">
+        <a href="{% url 'backtest:backtest_create' %}" class="btn btn-outline-primary rounded-pill px-3 py-2 d-flex align-items-center gap-2">
+            <span class="material-icons fs-5">play_arrow</span>
+            <span>New Backtest</span>
+        </a>
+        <button type="button" 
+                hx-get="{% url 'backtest:rule_create' %}" 
+                hx-target="#globalHtmxModalDialog" 
+                hx-swap="innerHTML"
+                class="btn btn-primary rounded-pill px-3 py-2 d-flex align-items-center gap-2 shadow-sm"
+                style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
+            <span class="material-icons fs-5">add</span>
+            <span>Create Custom Rule</span>
+        </button>
+    </div>
+</div>
+
+<!-- Search & Filter Controls Bar -->
+<div class="glass-card p-3 mb-4">
+    <form method="GET" action="{% url 'backtest:rule_list' %}" class="row g-3 align-items-center" hx-get="{% url 'backtest:rule_list' %}" hx-target="#rule-list-container" hx-push-url="true">
+        <div class="col-12 col-md-5">
+            <div class="input-group">
+                <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
+                    <span class="material-icons fs-6">search</span>
+                </span>
+                <input type="text" name="q" value="{{ current_filters.q|default:'' }}"
+                    class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25"
+                    placeholder="Search rules by name, prompt directive, or keywords..." 
+                    hx-get="{% url 'backtest:rule_list' %}"
+                    hx-target="#rule-list-container" 
+                    hx-trigger="input changed delay:300ms, search"
+                    hx-push-url="true">
+            </div>
+        </div>
+        <div class="col-12 col-sm-6 col-md-4">
+            <select name="rule_type" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25" hx-get="{% url 'backtest:rule_list' %}" hx-target="#rule-list-container" hx-trigger="change" hx-push-url="true">
+                <option value="">All Rule Types</option>
+                {% for code, label in rule_types %}
+                <option value="{{ code }}" {% if current_filters.rule_type == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-sm-6 col-md-3">
+            <select name="is_active" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25" hx-get="{% url 'backtest:rule_list' %}" hx-target="#rule-list-container" hx-trigger="change" hx-push-url="true">
+                <option value="">All Statuses</option>
+                <option value="true" {% if current_filters.is_active == 'true' %}selected{% endif %}>Active Rules</option>
+                <option value="false" {% if current_filters.is_active == 'false' %}selected{% endif %}>Inactive Rules</option>
+            </select>
+        </div>
+    </form>
+</div>
+
+<!-- Rule Table & Cards Glass Container -->
+<div class="glass-card overflow-hidden d-flex flex-column border" style="background: var(--glass-bg); border-color: var(--border-color) !important; min-height: 500px;">
+    
+    <!-- DESKTOP / TABLET VIEW: TABLE -->
+    <div class="d-none d-md-block flex-grow-1" style="width: 100%;">
+        <table class="table table-hover custom-glass-table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main); width: 100%; table-layout: fixed;">
+            <thead>
+                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important; font-size: 0.72rem;">
+                    <th scope="col" class="text-center py-2.5 px-1" style="width: 4%; min-width: 32px;">#</th>
+                    <th scope="col" class="py-2.5 ps-3 pe-2" style="width: 28%;">Rule Name & Regime</th>
+                    <th scope="col" class="py-2.5 px-3" style="width: 34%;">Execution Constraints</th>
+                    <th scope="col" class="py-2.5 px-1 text-center" style="width: 12%;">Scope</th>
+                    <th scope="col" class="py-2.5 px-1 text-center" style="width: 10%;">Status</th>
+                    <th scope="col" class="text-center py-2.5 px-1" style="width: 12%; min-width: 105px;">Actions</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for rule in rules %}
+                <!-- Primary Rule Row -->
+                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important; font-size: 0.76rem;">
+                    <td class="text-center py-2.5 px-1 bg-transparent theme-text-muted font-monospace fw-bold" style="font-size: 0.72rem;">
+                        {{ forloop.counter }}
+                    </td>
+
+                    <td class="py-2.5 ps-3 pe-2 bg-transparent">
+                        <div class="d-flex align-items-center gap-2.5">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center fw-bold flex-shrink-0" 
+                                 style="width: 34px; height: 34px; 
+                                 {% if rule.rule_type == 'intraday' %}background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.3);
+                                 {% elif rule.rule_type == 'risk_management' %}background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);
+                                 {% elif rule.rule_type == 'retest_limit' %}background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);
+                                 {% elif rule.rule_type == 'trendline_retest' %}background: rgba(249, 115, 22, 0.15); color: #fb923c; border: 1px solid rgba(249, 115, 22, 0.3);
+                                 {% elif rule.rule_type == 'gamma_blast' %}background: rgba(168, 85, 247, 0.15); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);
+                                 {% elif rule.rule_type == 'morning_trend' %}background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);
+                                 {% elif rule.rule_type == 'gap_openings' %}background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3);
+                                 {% else %}background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3);{% endif %}">
+                                <span class="material-icons" style="font-size: 1rem;">
+                                    {% if rule.rule_type == 'intraday' %}alarm_off
+                                    {% elif rule.rule_type == 'risk_management' %}security
+                                    {% elif rule.rule_type == 'retest_limit' %}radar
+                                    {% elif rule.rule_type == 'trendline_retest' %}show_chart
+                                    {% elif rule.rule_type == 'gamma_blast' %}bolt
+                                    {% elif rule.rule_type == 'morning_trend' %}trending_up
+                                    {% elif rule.rule_type == 'gap_openings' %}swap_vertical_circle
+                                    {% else %}smart_toy{% endif %}
+                                </span>
+                            </div>
+                            <div class="overflow-hidden" style="min-width: 0;">
+                                <div class="fw-bold theme-text-main text-truncate" title="{{ rule.name }}">{{ rule.name }}</div>
+                                <div class="d-flex align-items-center gap-1.5 mt-0.5">
+                                    <span class="badge rounded-pill px-2 py-0 fw-semibold text-truncate" 
+                                          style="font-size: 0.65rem;
+                                          {% if rule.rule_type == 'intraday' %}background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.4);
+                                          {% elif rule.rule_type == 'risk_management' %}background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4);
+                                          {% elif rule.rule_type == 'retest_limit' %}background: rgba(16, 185, 129, 0.2); color: #a7f3d0; border: 1px solid rgba(16, 185, 129, 0.4);
+                                          {% elif rule.rule_type == 'trendline_retest' %}background: rgba(249, 115, 22, 0.2); color: #fed7aa; border: 1px solid rgba(249, 115, 22, 0.4);
+                                          {% elif rule.rule_type == 'gamma_blast' %}background: rgba(168, 85, 247, 0.2); color: #e9d5ff; border: 1px solid rgba(168, 85, 247, 0.4);
+                                          {% elif rule.rule_type == 'morning_trend' %}background: rgba(59, 130, 246, 0.2); color: #bfdbfe; border: 1px solid rgba(59, 130, 246, 0.4);
+                                          {% elif rule.rule_type == 'gap_openings' %}background: rgba(245, 158, 11, 0.2); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.4);
+                                          {% else %}background: rgba(16, 185, 129, 0.2); color: #a7f3d0; border: 1px solid rgba(16, 185, 129, 0.4);{% endif %}">
+                                        {{ rule.get_rule_type_display }}
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </td>
+
+                    <td class="py-2.5 px-3 bg-transparent">
+                        <div class="d-flex flex-wrap gap-1.5 align-items-center">
+                            {% for k, v in rule.parameters.items|slice:":3" %}
+                            <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.64rem;">
+                                {{ k }}: <strong class="text-info">{{ v }}</strong>
+                            </span>
+                            {% empty %}
+                            <span class="theme-text-muted small" style="font-size: 0.7rem;">Standard Rule</span>
+                            {% endfor %}
+                            {% if rule.parameters|length > 3 %}
+                            <span class="badge bg-dark bg-opacity-50 text-muted rounded-pill px-1.5 py-0.5 font-monospace" style="font-size: 0.6rem;">+{{ rule.parameters|length|add:"-3" }} more</span>
+                            {% endif %}
+                        </div>
+                    </td>
+
+                    <td class="py-2.5 px-1 bg-transparent text-center">
+                        {% if rule.is_system_preset %}
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.66rem;">
+                            <span class="material-icons align-middle me-0.5" style="font-size: 0.72rem !important;">verified</span> System
+                        </span>
+                        {% else %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.66rem;">
+                            Custom User
+                        </span>
+                        {% endif %}
+                    </td>
+
+                    <td class="py-2.5 px-1 bg-transparent text-center">
+                        <button type="button" 
+                                hx-post="{% url 'backtest:rule_toggle' rule.pk %}"
+                                hx-target="#rule-list-container"
+                                hx-swap="innerHTML"
+                                class="btn btn-sm p-0 border-0 bg-transparent"
+                                title="Click to toggle active state">
+                            {% if rule.is_active %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.68rem; cursor: pointer;">
+                                <span class="status-dot-pulse bg-success me-1"></span> Active
+                            </span>
+                            {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.68rem; cursor: pointer;">
+                                Inactive
+                            </span>
+                            {% endif %}
+                        </button>
+                    </td>
+
+                    <td class="text-center py-2.5 px-1 bg-transparent">
+                        <div class="d-inline-flex align-items-center justify-content-center p-1 rounded-pill mx-auto" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08)); gap: 3px;">
+                            <!-- Edit Button -->
+                            <button type="button" 
+                                    hx-get="{% url 'backtest:rule_update' rule.pk %}" 
+                                    hx-target="#globalHtmxModalDialog" 
+                                    hx-swap="innerHTML"
+                                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-primary" 
+                                    style="width: 25px; height: 25px;" 
+                                    title="Edit Rule & Parameters">
+                                <span class="material-icons" style="font-size: 0.82rem;">edit</span>
+                            </button>
+
+                            <!-- Expand Dropdown Button (Kept Together next to Edit) -->
+                            <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center border-0"
+                                    style="width: 25px; height: 25px; background: rgba(56, 189, 248, 0.12); color: #38bdf8;"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#rule-exp-{{ rule.id }}"
+                                    aria-expanded="false"
+                                    aria-controls="rule-exp-{{ rule.id }}"
+                                    title="Expand Rule Directives & Parameters">
+                                <span class="material-icons" style="font-size: 0.95rem; color: #38bdf8;">keyboard_arrow_down</span>
+                            </button>
+
+                            <!-- Delete / Lock Button -->
+                            {% if not rule.is_system_preset %}
+                            <button type="button" 
+                                    hx-get="{% url 'backtest:rule_delete' rule.pk %}" 
+                                    hx-target="#globalHtmxModalDialog" 
+                                    hx-swap="innerHTML"
+                                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-danger" 
+                                    style="width: 25px; height: 25px;" 
+                                    title="Delete Custom Rule">
+                                <span class="material-icons" style="font-size: 0.82rem;">delete</span>
+                            </button>
+                            {% else %}
+                            <button type="button" 
+                                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted opacity-25" 
+                                    style="width: 25px; height: 25px; cursor: not-allowed;" 
+                                    disabled
+                                    title="System Presets cannot be deleted">
+                                <span class="material-icons" style="font-size: 0.82rem;">lock</span>
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+
+                <!-- Collapsible Detailed Rule Drawer -->
+                <tr class="collapse border-0" id="rule-exp-{{ rule.id }}" style="white-space: normal;">
+                    <td colspan="6" class="p-0 border-0" style="white-space: normal;">
+                        <div class="p-3 mx-2 my-2 rounded-3 shadow-lg" style="background: var(--card-bg, rgba(15, 23, 42, 0.95)); backdrop-filter: blur(16px); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)); white-space: normal;">
+                            <div class="row g-3 align-items-stretch">
+                                
+                                <!-- Card 1: AI Prompt Directive (RL Optimization) -->
+                                <div class="col-12 col-lg-4 col-md-6 d-flex flex-column" style="min-width: 0;">
+                                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                                        <div>
+                                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-20">
+                                                <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.75rem;">
+                                                    <span class="material-icons" style="font-size: 0.95rem; color: #38bdf8;">auto_awesome</span>
+                                                    <span class="theme-text-main">AI Prompt Directive</span>
+                                                </span>
+                                                <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.68rem;">RL Optimization</span>
+                                            </div>
+                                            <div class="small font-monospace mb-2">
+                                                <span class="theme-text-muted">Target Regime:</span>
+                                                <span class="text-info fw-semibold ms-1">{{ rule.get_rule_type_display }}</span>
+                                            </div>
+                                            <div class="p-2.5 rounded-2 font-monospace" style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.28); font-size: 0.73rem; line-height: 1.45; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
+                                                "{{ rule.prompt_directive|default:rule.description }}"
+                                            </div>
+                                        </div>
+                                        <div class="theme-text-muted mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between align-items-center" style="font-size: 0.68rem;">
+                                            <span>Directive Scope:</span>
+                                            <span class="theme-text-main fw-semibold">Global Policy Masking</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Card 2: Execution Constraints & Parameters -->
+                                <div class="col-12 col-lg-4 col-md-6 d-flex flex-column" style="min-width: 0;">
+                                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                                        <div>
+                                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-20">
+                                                <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.75rem;">
+                                                    <span class="material-icons" style="font-size: 0.95rem; color: #fbbf24;">tune</span>
+                                                    <span class="theme-text-main">Execution Parameters</span>
+                                                </span>
+                                                <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.68rem;">JSON Constraints</span>
+                                            </div>
+                                            <div class="d-flex flex-column small font-monospace">
+                                                {% for k, v in rule.parameters.items %}
+                                                <div class="d-flex justify-content-between align-items-center py-1.5 {% if not forloop.last %}border-bottom border-secondary border-opacity-10{% endif %}">
+                                                    <span class="theme-text-muted">{{ k }}:</span>
+                                                    <span class="fw-bold text-info font-monospace">{{ v }}</span>
+                                                </div>
+                                                {% empty %}
+                                                <div class="py-2 theme-text-muted fst-italic">Standard rule configuration without overriding JSON constraints.</div>
+                                                {% endfor %}
+                                            </div>
+                                        </div>
+                                        <div class="theme-text-muted mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between align-items-center" style="font-size: 0.68rem;">
+                                            <span>Parameter Enforcement:</span>
+                                            <span class="text-warning fw-semibold">Strict Engine Validation</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Card 3: Rule Mechanics & Description -->
+                                <div class="col-12 col-lg-4 col-md-12 d-flex flex-column" style="min-width: 0;">
+                                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                                        <div>
+                                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-20">
+                                                <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.75rem;">
+                                                    <span class="material-icons" style="font-size: 0.95rem; color: #a855f7;">description</span>
+                                                    <span class="theme-text-main">Trading Mechanics</span>
+                                                </span>
+                                                {% if rule.is_system_preset %}
+                                                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.68rem;">Protected Preset</span>
+                                                {% else %}
+                                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.68rem;">Custom Rule</span>
+                                                {% endif %}
+                                            </div>
+                                            <div class="small font-monospace mb-2" style="font-size: 0.73rem; line-height: 1.45; color: var(--text-main); word-break: break-word;">
+                                                {{ rule.description|default:"Detailed strategy execution rule for reinforcement learning backtesting simulations." }}
+                                            </div>
+                                        </div>
+                                        <div class="theme-text-muted mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between align-items-center" style="font-size: 0.68rem;">
+                                            <span>Created Date:</span>
+                                            <span class="theme-text-main fw-semibold">{{ rule.created_at|date:"Y-m-d H:i" }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center py-5 theme-text-muted">
+                        <div class="d-flex flex-column align-items-center justify-content-center gap-2">
+                            <span class="material-icons text-muted fs-1 opacity-50">rule</span>
+                            <span class="fw-semibold">No Strategy Rules found</span>
+                            <small class="theme-text-muted">Try adjusting your search criteria or create a custom rule.</small>
+                            <button type="button" 
+                                    hx-get="{% url 'backtest:rule_create' %}" 
+                                    hx-target="#globalHtmxModalDialog" 
+                                    hx-swap="innerHTML"
+                                    class="btn btn-sm btn-primary rounded-pill px-3 mt-2">
+                                <span class="material-icons fs-6 align-middle me-1">add</span> Add Rule
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MOBILE VIEW: TILED CARDS -->
+    <div class="d-block d-md-none p-3">
+        {% for rule in rules %}
+        <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="fw-bold theme-text-main fs-6">{{ rule.name }}</div>
+                <button type="button" 
+                        hx-post="{% url 'backtest:rule_toggle' rule.pk %}"
+                        hx-target="#rule-list-container"
+                        hx-swap="innerHTML"
+                        class="btn btn-sm p-0 border-0 bg-transparent">
+                    {% if rule.is_active %}
+                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0" style="font-size: 0.68rem;">Active</span>
+                    {% else %}
+                    <span class="badge bg-secondary bg-opacity-25 text-secondary rounded-pill px-2 py-0" style="font-size: 0.68rem;">Inactive</span>
+                    {% endif %}
+                </button>
+            </div>
+            <div class="mb-2 d-flex align-items-center gap-1">
+                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0" style="font-size: 0.65rem;">{{ rule.get_rule_type_display }}</span>
+                {% if rule.is_system_preset %}
+                <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0" style="font-size: 0.65rem;">Preset</span>
+                {% endif %}
+            </div>
+            <div class="small theme-text-muted mb-2" style="font-size: 0.76rem;">
+                <strong class="text-info">Directive:</strong> {{ rule.prompt_directive|default:rule.description|truncatechars:90 }}
+            </div>
+
+            <!-- Mobile Collapsible Details -->
+            <div class="collapse pt-2 border-top border-secondary border-opacity-15 mb-2" id="rule-mb-exp-{{ rule.id }}">
+                <div class="p-2.5 rounded-2 font-monospace mb-2" style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.28); font-size: 0.73rem; line-height: 1.4; color: var(--text-main); word-break: break-word;">
+                    <div class="fw-bold text-info mb-1">Full AI Prompt Directive:</div>
+                    "{{ rule.prompt_directive|default:rule.description }}"
+                </div>
+                <div class="p-2.5 rounded-2 font-monospace mb-2" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); font-size: 0.72rem;">
+                    <div class="fw-bold text-warning mb-1">Parameters:</div>
+                    {% for k, v in rule.parameters.items %}
+                    <div class="d-flex justify-content-between py-1 border-bottom border-secondary border-opacity-10">
+                        <span class="theme-text-muted">{{ k }}:</span>
+                        <span class="text-info fw-bold">{{ v }}</span>
+                    </div>
+                    {% empty %}
+                    <div class="theme-text-muted fst-italic">Standard defaults</div>
+                    {% endfor %}
+                </div>
+                <div class="small theme-text-muted" style="font-size: 0.72rem;">
+                    {{ rule.description }}
+                </div>
+            </div>
+
+            <div class="d-flex justify-content-between align-items-center border-top border-secondary border-opacity-10 pt-2">
+                <button class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1"
+                        style="font-size: 0.7rem;"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#rule-mb-exp-{{ rule.id }}"
+                        aria-expanded="false">
+                    <span class="material-icons" style="font-size: 0.8rem;">unfold_more</span>
+                    <span>Details</span>
+                </button>
+                <div class="d-flex gap-2">
+                    <button type="button" 
+                            hx-get="{% url 'backtest:rule_update' rule.pk %}" 
+                            hx-target="#globalHtmxModalDialog" 
+                            hx-swap="innerHTML"
+                            class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1">
+                        Edit
+                    </button>
+                    {% if not rule.is_system_preset %}
+                    <button type="button" 
+                            hx-get="{% url 'backtest:rule_delete' rule.pk %}" 
+                            hx-target="#globalHtmxModalDialog" 
+                            hx-swap="innerHTML"
+                            class="btn btn-sm btn-outline-danger rounded-pill px-3 py-1">
+                        Delete
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% empty %}
+        <div class="text-center py-4 theme-text-muted small">No strategy rules found.</div>
+        {% endfor %}
+    </div>
+</div>

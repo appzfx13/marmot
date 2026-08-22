@@ -1,0 +1,316 @@
+{% for trade in trades_page %}
+<!-- Main Compact Trade Row -->
+<tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+    <td class="ps-2 py-1 bg-transparent font-monospace theme-text-muted fw-bold small text-center" style="width: 4%; min-width: 32px; font-size: 0.7rem;">
+        #{{ trade.serial_no }}
+    </td>
+
+    <td class="py-1 px-1 bg-transparent">
+        <div class="mb-0.5">
+            <span class="badge rounded-pill px-1.5 py-0 fw-bold font-monospace" style="font-size: 0.68rem; background: rgba(56, 189, 248, 0.18) !important; color: #38bdf8 !important; border: 1px solid rgba(56, 189, 248, 0.35) !important;">
+                {{ trade.strike|default:trade.symbol }}
+            </span>
+        </div>
+        <div class="d-flex align-items-center gap-0.5 flex-wrap">
+            <span class="badge rounded-pill px-1 py-0 fw-semibold" style="font-size: 0.6rem; background: rgba(59, 130, 246, 0.2) !important; color: #93c5fd !important; border: 1px solid rgba(59, 130, 246, 0.35) !important;">{{ trade.symbol }}</span>
+            {% if trade.is_0dte %}
+            <span class="badge rounded-pill px-1 py-0 fw-bold" style="font-size: 0.6rem; background: rgba(239, 68, 68, 0.2) !important; color: #fca5a5 !important; border: 1px solid rgba(239, 68, 68, 0.4) !important;">⚡ 0DTE</span>
+            {% elif trade.dte is not None %}
+            <span class="badge rounded-pill px-1 py-0 fw-semibold" style="font-size: 0.6rem; background: rgba(14, 165, 233, 0.2) !important; color: #7dd3fc !important; border: 1px solid rgba(14, 165, 233, 0.35) !important;">{{ trade.dte }}D</span>
+            {% endif %}
+            {% if trade.moneyness %}
+            <span class="badge rounded-pill px-1 py-0 fw-semibold" style="font-size: 0.6rem; background: rgba(255, 255, 255, 0.08) !important; color: #e2e8f0 !important; border: 1px solid rgba(255, 255, 255, 0.15) !important;">{{ trade.moneyness }}</span>
+            {% endif %}
+        </div>
+    </td>
+
+    <td class="py-1 px-1 bg-transparent">
+        <div class="d-flex flex-column gap-0.5 font-monospace" style="font-size: 0.66rem;">
+            <div>
+                <span class="badge rounded-pill px-1.5 py-0 font-monospace d-inline-flex align-items-center gap-1 fw-semibold" style="font-size: 0.62rem; background: rgba(255, 255, 255, 0.08) !important; color: #f1f5f9 !important; border: 1px solid rgba(255, 255, 255, 0.15) !important;">
+                    <span class="material-icons" style="font-size: 0.62rem !important;">calendar_today</span>
+                    <span>{{ trade.timestamp|slice:":10" }}</span>
+                </span>
+            </div>
+            <div>
+                <span class="badge px-1 py-0 rounded fw-semibold d-inline-block" style="font-size: 0.62rem; background: rgba(14, 165, 233, 0.2) !important; color: #38bdf8 !important; border: 1px solid rgba(14, 165, 233, 0.35) !important;" title="Entry Time">
+                    In: {{ trade.timestamp|slice:"11:19" }}
+                </span>
+            </div>
+            <div>
+                <span class="badge px-1 py-0 rounded fw-semibold d-inline-block" style="font-size: 0.62rem; background: rgba(245, 158, 11, 0.2) !important; color: #fbbf24 !important; border: 1px solid rgba(245, 158, 11, 0.35) !important;" title="Exit Time">
+                    Out: {{ trade.exit_timestamp|default:trade.timestamp|slice:"11:19" }}
+                </span>
+            </div>
+        </div>
+    </td>
+
+    <td class="py-1 px-1 bg-transparent">
+        <div class="theme-text-main fw-semibold font-monospace" style="font-size: 0.72rem;">{{ trade.index_entry_price|default:trade.entry_price|floatformat:1 }} → {{ trade.index_exit_price|default:trade.exit_price|floatformat:1 }}</div>
+        <div class="{% if trade.index_points >= 0 %}text-success{% else %}text-danger{% endif %} font-monospace fw-semibold" style="font-size: 0.66rem;">
+            {% if trade.index_points >= 0 %}+{% endif %}{{ trade.index_points|floatformat:2 }} pts
+        </div>
+    </td>
+
+    <td class="py-1 px-1 bg-transparent">
+        {% if 'BUY_CE' in trade.trade_type or 'BUY CE' in trade.trade_type %}
+            <span class="badge rounded-pill px-1.5 py-0 fw-bold d-inline-flex align-items-center gap-0.5" style="font-size: 0.66rem; background: rgba(16, 185, 129, 0.22) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.4) !important;">
+                <span class="material-icons" style="font-size: 0.68rem !important;">arrow_upward</span>BUY CE
+            </span>
+        {% elif 'BUY_PE' in trade.trade_type or 'BUY PE' in trade.trade_type %}
+            <span class="badge rounded-pill px-1.5 py-0 fw-bold d-inline-flex align-items-center gap-0.5" style="font-size: 0.66rem; background: rgba(239, 68, 68, 0.22) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.4) !important;">
+                <span class="material-icons" style="font-size: 0.68rem !important;">arrow_downward</span>BUY PE
+            </span>
+        {% elif 'SELL_CE' in trade.trade_type or 'SELL CE' in trade.trade_type %}
+            <span class="badge rounded-pill px-1.5 py-0 fw-bold d-inline-flex align-items-center gap-0.5" style="font-size: 0.66rem; background: rgba(245, 158, 11, 0.22) !important; color: #fbbf24 !important; border: 1px solid rgba(245, 158, 11, 0.4) !important;">
+                <span class="material-icons" style="font-size: 0.68rem !important;">arrow_downward</span>SELL CE
+            </span>
+        {% elif 'SELL_PE' in trade.trade_type or 'SELL PE' in trade.trade_type %}
+            <span class="badge rounded-pill px-1.5 py-0 fw-bold d-inline-flex align-items-center gap-0.5" style="font-size: 0.66rem; background: rgba(14, 165, 233, 0.22) !important; color: #38bdf8 !important; border: 1px solid rgba(14, 165, 233, 0.4) !important;">
+                <span class="material-icons" style="font-size: 0.68rem !important;">arrow_upward</span>SELL PE
+            </span>
+        {% else %}
+            <span class="badge bg-secondary bg-opacity-25 text-light rounded-pill px-1.5 py-0 fw-bold" style="font-size: 0.66rem;">
+                {{ trade.trade_type|cut:"_" }}
+            </span>
+        {% endif %}
+        <div class="theme-text-muted mt-0.5" style="font-size: 0.66rem;">
+            {{ trade.lots_count|default:1 }}L ({{ trade.quantity }} Qty)
+        </div>
+    </td>
+
+    <td class="py-1 px-1 bg-transparent">
+        <div class="theme-text-main fw-semibold font-monospace" style="font-size: 0.72rem;">₹{{ trade.entry_price|floatformat:1 }} → ₹{{ trade.exit_price|floatformat:1 }}</div>
+        <div class="text-info font-monospace" style="font-size: 0.66rem;">Margin: ₹{{ trade.utilized_capital|default:0|floatformat:0 }}</div>
+    </td>
+
+    <td class="py-1 px-1 bg-transparent">
+        <div class="d-flex align-items-center gap-1 flex-wrap">
+            {% if trade.net_pnl >= 0 or trade.pnl >= 0 %}
+                <span class="badge rounded-pill font-monospace fw-bold px-1.5 py-0.5" style="font-size: 0.74rem; background: rgba(16, 185, 129, 0.25) !important; color: #34d399 !important; border: 1px solid #10b981 !important;">
+                    +₹{{ trade.net_pnl|default:trade.pnl|floatformat:2 }}
+                </span>
+                <span class="badge rounded font-monospace fw-bold px-1.5 py-0.5" style="font-size: 0.68rem; background: rgba(16, 185, 129, 0.25) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.5) !important;" title="Trade Return on Capital">
+                    +{{ trade.trade_equity_change_pct }}%
+                </span>
+            {% else %}
+                <span class="badge rounded-pill font-monospace fw-bold px-1.5 py-0.5" style="font-size: 0.74rem; background: rgba(239, 68, 68, 0.25) !important; color: #f87171 !important; border: 1px solid #ef4444 !important;">
+                    ₹{{ trade.net_pnl|default:trade.pnl|floatformat:2 }}
+                </span>
+                <span class="badge rounded font-monospace fw-bold px-1.5 py-0.5" style="font-size: 0.68rem; background: rgba(239, 68, 68, 0.25) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.5) !important;" title="Trade Loss on Capital">
+                    {{ trade.trade_equity_change_pct }}%
+                </span>
+            {% endif %}
+        </div>
+        <div class="font-monospace mt-0.5 d-flex align-items-center gap-1 flex-wrap" style="font-size: 0.66rem;">
+            <span class="theme-text-muted">₹{{ trade.equity_before|floatformat:0 }}➔<strong class="text-info">₹{{ trade.equity_after|default:trade.running_capital|floatformat:0 }}</strong></span>
+            <span class="badge rounded px-1.5 py-0.5 font-monospace fw-bold" style="font-size: 0.66rem; {% if trade.capital_growth_pct >= 0 %}background: rgba(16, 185, 129, 0.25) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.5) !important;{% else %}background: rgba(239, 68, 68, 0.25) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.5) !important;{% endif %}">
+                ({% if trade.capital_growth_pct >= 0 %}+{% endif %}{{ trade.capital_growth_pct }}%)
+            </span>
+        </div>
+    </td>
+
+    <td class="py-1 px-1 bg-transparent text-center">
+        {% if trade.status == 'WIN' or trade.net_pnl > 0 or trade.pnl > 0 %}
+            <span class="badge rounded-pill px-1.5 py-0.5 fw-bold d-inline-flex align-items-center" 
+                  style="font-size: 0.68rem; background: rgba(16, 185, 129, 0.25) !important; color: #34d399 !important; border: 1px solid #10b981 !important; letter-spacing: 0.3px;">
+                <span class="material-icons me-0.5" style="font-size: 0.72rem; vertical-align: middle;">check_circle</span> WIN
+            </span>
+        {% else %}
+            <span class="badge rounded-pill px-1.5 py-0.5 fw-bold d-inline-flex align-items-center" 
+                  style="font-size: 0.68rem; background: rgba(239, 68, 68, 0.25) !important; color: #f87171 !important; border: 1px solid #ef4444 !important; letter-spacing: 0.3px;">
+                <span class="material-icons me-0.5" style="font-size: 0.72rem; vertical-align: middle;">cancel</span> LOSS
+            </span>
+        {% endif %}
+    </td>
+
+    <td class="text-center py-1 px-1 bg-transparent" style="width: 7%; min-width: 48px;">
+        <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center border-0 mx-auto"
+                style="width: 22px; height: 22px; background: rgba(255, 255, 255, 0.06); color: var(--text-main);"
+                type="button"
+                data-bs-toggle="collapse"
+                data-bs-target="#trade-exp-{{ trade.serial_no }}"
+                aria-expanded="false"
+                aria-controls="trade-exp-{{ trade.serial_no }}"
+                title="Expand Trade Details">
+            <span class="material-icons" style="font-size: 0.9rem; color: #38bdf8;">keyboard_arrow_down</span>
+        </button>
+    </td>
+</tr>
+
+<!-- Collapsible Detailed Trade Drawer -->
+<tr class="collapse border-0" id="trade-exp-{{ trade.serial_no }}" style="white-space: normal;">
+    <td colspan="9" class="p-0 border-0" style="white-space: normal;">
+        <div class="trade-row-drawer p-3 mx-2 my-2 rounded-3 shadow-lg" style="background: var(--card-bg, rgba(15, 23, 42, 0.95)); backdrop-filter: blur(16px); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)); white-space: normal;">
+            <div class="row g-3 align-items-stretch">
+                <!-- 1. Contract & Execution Pricing -->
+                <div class="col-12 col-lg-4 col-md-6 d-flex flex-column" style="min-width: 0;">
+                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-20">
+                                <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.75rem;">
+                                    <span class="material-icons" style="font-size: 0.95rem; color: #38bdf8;">receipt_long</span>
+                                    <span class="theme-text-main">Contract & Execution</span>
+                                </span>
+                                <span class="badge rounded-pill px-2 py-0.5 fw-bold font-monospace" style="font-size: 0.7rem; background: rgba(56, 189, 248, 0.18) !important; color: #38bdf8 !important; border: 1px solid rgba(56, 189, 248, 0.35) !important;">{{ trade.strike }}</span>
+                            </div>
+                            <div class="d-flex flex-column small font-monospace">
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Execution Date:</span>
+                                    <span class="theme-text-main fw-semibold">{{ trade.timestamp|slice:":10" }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Time In ➔ Out:</span>
+                                    <span class="theme-text-main fw-semibold">{{ trade.timestamp|slice:"11:19" }} ➔ {{ trade.exit_timestamp|default:trade.timestamp|slice:"11:19" }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Option Price:</span>
+                                    <span class="fw-semibold font-monospace" style="color: #38bdf8 !important;">₹{{ trade.entry_price|floatformat:2 }} ➔ ₹{{ trade.exit_price|floatformat:2 }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Spot Move:</span>
+                                    <span class="{% if trade.index_points >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">
+                                        {{ trade.index_entry_price|floatformat:1 }} ➔ {{ trade.index_exit_price|floatformat:1 }}
+                                        <span class="badge rounded px-1.5 py-0.5 font-monospace fw-bold ms-1" style="font-size: 0.68rem; {% if trade.index_points >= 0 %}background: rgba(16, 185, 129, 0.25) !important; color: #34d399 !important; border: 1px solid #10b981 !important;{% else %}background: rgba(239, 68, 68, 0.25) !important; color: #f87171 !important; border: 1px solid #ef4444 !important;{% endif %}">
+                                            {% if trade.index_points >= 0 %}+{% endif %}{{ trade.index_points|floatformat:2 }} pts
+                                        </span>
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Target / Entry / Stop:</span>
+                                    <span class="fw-semibold font-monospace"><span class="text-success">🎯 ₹{{ trade.target_price|default:0|floatformat:2 }}</span> <span class="theme-text-muted mx-0.5">/</span> <span class="text-info" style="color: #38bdf8 !important;">⚡ ₹{{ trade.entry_price|default:0|floatformat:2 }}</span> <span class="theme-text-muted mx-0.5">/</span> <span class="text-danger">🛑 ₹{{ trade.stop_loss_price|default:0|floatformat:2 }}</span></span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-2">
+                                    <span class="theme-text-muted">Position Size:</span>
+                                    <span class="theme-text-main fw-semibold font-monospace">{{ trade.lots_count|default:1 }} Lot ({{ trade.quantity }} Qty @ {{ trade.lot_size }}/lot)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. Statutory Taxes & Capital Accounting -->
+                <div class="col-12 col-lg-4 col-md-6 d-flex flex-column" style="min-width: 0;">
+                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-20">
+                                <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.75rem;">
+                                    <span class="material-icons" style="font-size: 0.95rem; color: #fbbf24;">account_balance</span>
+                                    <span class="theme-text-main">Taxes & Capital</span>
+                                </span>
+                                <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">Margin & Friction</span>
+                            </div>
+                            <div class="d-flex flex-column small font-monospace">
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Utilized Capital:</span>
+                                    <span class="fw-bold font-monospace" style="color: #38bdf8 !important;">₹{{ trade.utilized_capital|default:0|floatformat:2 }}</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Gross PnL:</span>
+                                    <span class="{% if trade.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">
+                                        {% if trade.gross_pnl >= 0 %}+{% endif %}₹{{ trade.gross_pnl|default:trade.pnl|floatformat:2 }}
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Brokerage & Taxes:</span>
+                                    <span class="text-warning fw-semibold">₹{{ trade.brokerage|default:40.0|floatformat:2 }} + ₹{{ trade.other_charges|default:0|floatformat:2 }} (-₹{{ trade.total_charges|default:40.0|floatformat:2 }})</span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Net Realized PnL:</span>
+                                    <span class="{% if trade.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">
+                                        {% if trade.net_pnl >= 0 %}+{% endif %}₹{{ trade.net_pnl|default:trade.pnl|floatformat:2 }}
+                                        <span class="badge rounded px-1.5 py-0.5 ms-1 font-monospace fw-bold" style="font-size: 0.68rem; {% if trade.trade_equity_change_pct >= 0 %}background: rgba(16, 185, 129, 0.25) !important; color: #34d399 !important; border: 1px solid #10b981 !important;{% else %}background: rgba(239, 68, 68, 0.25) !important; color: #f87171 !important; border: 1px solid #ef4444 !important;{% endif %}">
+                                            {% if trade.trade_equity_change_pct >= 0 %}+{% endif %}{{ trade.trade_equity_change_pct }}%
+                                        </span>
+                                    </span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Equity Progression:</span>
+                                    <span class="theme-text-main fw-semibold">₹{{ trade.equity_before|floatformat:0 }} ➔ <strong style="color: #38bdf8 !important;">₹{{ trade.equity_after|default:trade.running_capital|floatformat:0 }}</strong></span>
+                                </div>
+                                <div class="d-flex justify-content-between align-items-center pt-2">
+                                    <span class="theme-text-muted">Account Growth:</span>
+                                    <span class="{% if trade.capital_growth_pct >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">
+                                        {% if trade.capital_growth_pct >= 0 %}+{% endif %}{{ trade.capital_growth_pct }}% Total
+                                    </span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3. Algorithmic Trigger Reasons -->
+                <div class="col-12 col-lg-4 col-md-12 d-flex flex-column" style="min-width: 0;">
+                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                        <div>
+                            <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-20">
+                                <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.75rem;">
+                                    <span class="material-icons" style="font-size: 0.95rem; color: #a855f7;">psychology</span>
+                                    <span class="theme-text-main">Execution Triggers</span>
+                                </span>
+                                <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.7rem;">{{ trade.expiry_tag|default:"Weekly Expiry" }}</span>
+                            </div>
+                            <div class="d-flex flex-column small font-monospace">
+                                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                                    <span class="theme-text-muted">Signal Engine:</span>
+                                    <span class="theme-text-main fw-semibold">Marmot Go Engine</span>
+                                </div>
+                                <div class="py-2 border-bottom border-secondary border-opacity-10">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="d-flex align-items-center gap-1 fw-bold" style="font-size: 0.73rem; color: #38bdf8 !important;">
+                                            <span class="material-icons" style="font-size: 0.82rem;">bolt</span> Entry Signal:
+                                        </span>
+                                    </div>
+                                    <div class="p-2 rounded-2" style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.28); font-size: 0.73rem; line-height: 1.4; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
+                                        {{ trade.entry_reason|default:trade.reason }}
+                                    </div>
+                                </div>
+                                <div class="pt-2">
+                                    <div class="d-flex justify-content-between align-items-center mb-1">
+                                        <span class="d-flex align-items-center gap-1 fw-bold" style="font-size: 0.73rem; color: #fbbf24 !important;">
+                                            <span class="material-icons" style="font-size: 0.82rem;">flag</span> Exit Trigger:
+                                        </span>
+                                    </div>
+                                    <div class="p-2 rounded-2" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.28); font-size: 0.73rem; line-height: 1.4; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
+                                        {{ trade.exit_reason|default:"Dynamic Trailing / Target Exit" }}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </td>
+</tr>
+{% endfor %}
+
+<!-- Down Arrow "Load More Trades" Button at Table Bottom -->
+{% if trades_page.has_next %}
+<tr id="trades-scroll-sentinel-{{ trades_page.number }}">
+    <td colspan="9" class="text-center py-3 bg-transparent border-0">
+        <button type="button" 
+                hx-get="{% url 'backtest:backtest_trades_scroll' backtest.pk %}?trade_page={{ trades_page.next_page_number }}&trade_status={{ current_filters.trade_status }}&trade_type={{ current_filters.trade_type }}&date_from={{ current_filters.date_from }}&date_to={{ current_filters.date_to }}&q={{ current_filters.q }}&scroll_type=rows"
+                hx-target="#trades-scroll-sentinel-{{ trades_page.number }}"
+                hx-swap="outerHTML"
+                class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+                style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+                title="Load More Trades">
+            <span class="load-more-idle d-inline-flex align-items-center gap-2">
+                <span class="material-icons fs-5">keyboard_arrow_down</span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Load More Trades (Page {{ trades_page.next_page_number }} of {{ trades_page.paginator.num_pages }})</span>
+            </span>
+            <span class="load-more-loading d-none align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Loading trades...</span>
+            </span>
+        </button>
+    </td>
+</tr>
+{% elif trades_page.paginator.count > 0 %}
+<tr class="border-0">
+    <td colspan="9" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.72rem;">
+        <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ trades_page.paginator.count }} trade orders loaded
+    </td>
+</tr>
+{% endif %}

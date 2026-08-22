@@ -1,0 +1,151 @@
+{% for backtest in backtests %}
+<div class="p-3 mb-2 rounded-3 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backtest.id }}">
+            <div>
+                <div class="fw-bold theme-text-main font-monospace">#BT-{{ backtest.id|stringformat:"04d" }}</div>
+                <div class="small text-info fw-semibold">{{ backtest.get_strategy_name_display }}</div>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span id="backtest-status-mb-{{ backtest.pk }}" class="backtest-status-badge">
+                {% if backtest.status == 'completed' %}
+                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0 fw-bold" style="font-size: 0.7rem;">Completed</span>
+                {% elif backtest.status == 'running' %}
+                    <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0 fw-bold" style="font-size: 0.7rem;">Running</span>
+                {% else %}
+                    <span class="badge bg-secondary bg-opacity-25 text-secondary rounded-pill px-2 py-0 fw-bold" style="font-size: 0.7rem;">{{ backtest.get_status_display }}</span>
+                {% endif %}
+            </span>
+
+            <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
+                    style="width: 30px; height: 30px; background: rgba(255, 255, 255, 0.08); color: var(--text-main);"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#bt-mobile-expand-{{ backtest.id }}"
+                    aria-expanded="false"
+                    aria-controls="bt-mobile-expand-{{ backtest.id }}"
+                    title="Expand Details">
+                <span class="material-icons fs-5 text-primary">keyboard_arrow_down</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Mobile Progress Bar -->
+    <div class="progress rounded-pill mb-2" style="height: 5px; background: rgba(255, 255, 255, 0.08);">
+        <div id="backtest-progress-mb-{{ backtest.pk }}" 
+             class="progress-bar progress-bar-striped {% if backtest.status == 'running' %}progress-bar-animated{% endif %} bg-primary rounded-pill backtest-progress-bar" 
+             role="progressbar" 
+             style="width: {{ backtest.progress|default:0 }}%;" 
+             aria-valuenow="{{ backtest.progress|default:0 }}" 
+             aria-valuemin="0" 
+             aria-valuemax="100">
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center small mb-1">
+        <span class="theme-text-muted">{{ backtest.index_name }} | {{ backtest.start_date|date:"d M" }} → {{ backtest.end_date|date:"d M Y" }}</span>
+        <span class="fw-bold font-monospace {% if backtest.safe_metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+            {% if backtest.safe_metrics.net_pnl >= 0 %}+{% endif %}₹{{ backtest.safe_metrics.net_pnl|default:0|floatformat:2 }}
+        </span>
+    </div>
+
+    <!-- Collapsible Mobile Details Container -->
+    <div class="collapse pt-2 mt-2 border-top border-secondary border-opacity-25" id="bt-mobile-expand-{{ backtest.id }}">
+        <div class="d-flex flex-column gap-1 mb-2 small">
+            <div class="d-flex justify-content-between">
+                <span class="theme-text-muted">Capital / Lots:</span>
+                <span class="theme-text-main">₹{{ backtest.initial_capital|floatformat:0 }} ({{ backtest.parameters.lots_count|default:1 }} Lots)</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="theme-text-muted">Win Rate:</span>
+                <span class="theme-text-main">{{ backtest.safe_metrics.win_rate|default:0 }}% ({{ backtest.safe_metrics.winning_trades|default:0 }}W / {{ backtest.safe_metrics.losing_trades|default:0 }}L)</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="theme-text-muted">Max Utilized Cap:</span>
+                <span class="text-info font-monospace">₹{{ backtest.safe_metrics.max_utilized_capital|default:0|floatformat:2 }}</span>
+            </div>
+            <div class="d-flex justify-content-between">
+                <span class="theme-text-muted">Taxes & Charges:</span>
+                <span class="text-warning font-monospace">₹{{ backtest.safe_metrics.total_charges|default:0|floatformat:2 }}</span>
+            </div>
+        </div>
+
+        <div class="d-flex justify-content-end gap-2 pt-2 border-top border-secondary border-opacity-10">
+            {% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
+                    hx-target="#globalHtmxModalDialog"
+                    class="btn btn-sm btn-outline-warning rounded-pill px-3 d-flex align-items-center gap-1"
+                    style="font-size: 0.75rem;">
+                <span class="material-icons fs-6">pause</span> Pause
+            </button>
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
+                    hx-target="#globalHtmxModalDialog"
+                    class="btn btn-sm btn-outline-danger rounded-pill px-3 d-flex align-items-center gap-1"
+                    style="font-size: 0.75rem;">
+                <span class="material-icons fs-6">stop</span> Stop
+            </button>
+            {% elif backtest.status|lower == 'paused' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=resume" 
+                    hx-target="#globalHtmxModalDialog"
+                    class="btn btn-sm btn-outline-success rounded-pill px-3 d-flex align-items-center gap-1"
+                    style="font-size: 0.75rem;">
+                <span class="material-icons fs-6">play_arrow</span> Resume
+            </button>
+            {% else %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
+                    hx-target="#globalHtmxModalDialog"
+                    class="btn btn-sm {% if backtest.status|lower == 'created' %}btn-outline-success{% else %}btn-outline-info{% endif %} rounded-pill px-3 d-flex align-items-center gap-1"
+                    style="font-size: 0.75rem;">
+                <span class="material-icons fs-6">{% if backtest.status|lower == 'created' %}play_arrow{% else %}replay{% endif %}</span> {% if backtest.status|lower == 'created' %}Run{% else %}Re-run{% endif %}
+            </button>
+            {% endif %}
+
+            <a href="{% url 'backtest:backtest_detail' backtest.pk %}" class="btn btn-sm btn-primary rounded-pill px-3 d-flex align-items-center gap-1 shadow-sm" style="font-size: 0.75rem;">
+                <span class="material-icons fs-6">analytics</span> Report
+            </a>
+
+            {% if backtest.status|lower != 'running' and backtest.status|lower != 'pending' %}
+            <button type="button" 
+                    class="btn btn-sm btn-outline-danger rounded-circle p-0 d-flex align-items-center justify-content-center" 
+                    style="width: 28px; height: 28px;" 
+                    hx-get="{% url 'backtest:backtest_delete' backtest.pk %}"
+                    hx-target="#globalHtmxModalDialog">
+                <span class="material-icons fs-6">delete</span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+</div>
+{% endfor %}
+
+{% if page_obj.has_next %}
+<div id="dashboard-mb-sentinel-{{ page_obj.number }}" class="text-center py-3">
+    <button type="button"
+            hx-get="{% url 'backtest:backtest_dashboard_scroll' %}?page={{ page_obj.next_page_number }}&scroll_type=cards&q={{ request.GET.q }}&status={{ request.GET.status }}"
+            hx-target="#dashboard-mb-sentinel-{{ page_obj.number }}"
+            hx-swap="outerHTML"
+            class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+            style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+            title="Load More Backtests">
+        <span class="load-more-idle d-inline-flex align-items-center gap-2">
+            <span class="material-icons fs-5">keyboard_arrow_down</span>
+            <span class="fw-bold" style="font-size: 0.8rem;">Load More Backtests</span>
+        </span>
+        <span class="load-more-loading d-none align-items-center gap-2">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+            <span class="fw-bold" style="font-size: 0.8rem;">Loading...</span>
+        </span>
+    </button>
+</div>
+{% elif paginator.count > 0 %}
+<div class="text-center py-3 theme-text-muted" style="font-size: 0.72rem;">
+    <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ paginator.count }} backtest tasks loaded
+</div>
+{% endif %}

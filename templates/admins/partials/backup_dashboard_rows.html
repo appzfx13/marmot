@@ -1,0 +1,132 @@
+{% for backup in backups %}
+<tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+    <td class="ps-4 py-3 bg-transparent" style="width: 40px;">
+        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backup.id }}">
+    </td>
+    <td class="py-3 bg-transparent">
+        <div class="fw-bold theme-text-main">#{{ backup.id|stringformat:"04d" }}</div>
+        <div class="small text-primary fw-semibold">{{ backup.get_index_name_display }}</div>
+    </td>
+
+    <td class="py-3 bg-transparent">
+        <div class="small theme-text-main">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</div>
+    </td>
+
+    <td class="py-3 bg-transparent">
+        <div class="small theme-text-muted">±{{ backup.strike_count }} ATM</div>
+        <div class="small theme-text-main">{{ backup.file_size_mb }} MB</div>
+    </td>
+
+    <!-- Real-Time Progress Bar -->
+    <td class="py-3 bg-transparent" style="min-width: 160px;">
+        <div class="d-flex align-items-center justify-content-between mb-1">
+            <small class="theme-text-muted backup-progress-text" style="font-size: 0.7rem;" id="backup-progress-text-{{ backup.pk }}">{{ backup.progress }}%</small>
+            <small class="text-primary fw-semibold backup-eta-text" style="font-size: 0.68rem;" id="backup-eta-{{ backup.pk }}"></small>
+        </div>
+        <div class="progress" style="height: 6px; background-color: var(--border-color);">
+            <div class="progress-bar bg-primary progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %} backup-progress-bar" 
+                 id="backup-progress-{{ backup.pk }}"
+                 role="progressbar" 
+                 style="width: {{ backup.progress }}%;" 
+                 aria-valuenow="{{ backup.progress }}" aria-valuemin="0" aria-valuemax="100">
+            </div>
+        </div>
+    </td>
+
+    <td class="py-3 bg-transparent">
+     <span id="backup-status-{{ backup.pk }}" class="backup-status-badge">
+    {% if backup.status == 'completed' %}
+        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(16,185,129,0.18);color:#10b981;border:1.5px solid rgba(16,185,129,0.4);font-size:0.75rem;">Completed</span>
+    {% elif backup.status == 'running' %}
+        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(59,130,246,0.18);color:#3b82f6;border:1.5px solid rgba(59,130,246,0.4);font-size:0.75rem;">Running</span>
+    {% elif backup.status == 'created' %}
+        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(14,165,233,0.18);color:#0ea5e9;border:1.5px solid rgba(14,165,233,0.4);font-size:0.75rem;">Created</span>
+    {% elif backup.status == 'paused' %}
+        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1.5px solid rgba(245,158,11,0.4);font-size:0.75rem;">Paused</span>
+    {% elif backup.status == 'cancelled' or backup.status == 'error' %}
+        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(239,68,68,0.18);color:#ef4444;border:1.5px solid rgba(239,68,68,0.4);font-size:0.75rem;">{{ backup.get_status_display }}</span>
+    {% else %}
+        <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(100,116,139,0.18);color:#94a3b8;border:1.5px solid rgba(100,116,139,0.4);font-size:0.75rem;">Pending</span>
+    {% endif %}
+    </span>
+        {% if backup.error_logs %}
+        <div class="small text-danger mt-1 text-truncate" style="max-width: 170px;" title="{{ backup.error_logs }}">
+            <span class="material-icons fs-6 me-1 align-middle">error_outline</span>{{ backup.get_last_200_logs|truncatechars:40 }}
+        </div>
+        {% endif %}
+    </td>
+
+    <td class="text-center py-2 px-1 bg-transparent">
+        <div class="d-flex align-items-center justify-content-center gap-1">
+            {% if backup.status != 'completed' %}
+                {% if backup.status == 'running' %}
+                <button type="button" 
+                        hx-get="{% url 'market:market_backup_control' backup.pk %}?action=pause" 
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        class="glass-icon-btn text-warning rounded-circle d-flex align-items-center justify-content-center" 
+                        style="width: 36px; height: 36px;" 
+                        title="Pause Task">
+                    <span class="material-icons fs-6">pause</span>
+                </button>
+                {% else %}
+                <button type="button" 
+                        hx-get="{% url 'market:market_backup_control' backup.pk %}?action=resume" 
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        class="glass-icon-btn text-success rounded-circle d-flex align-items-center justify-content-center" 
+                        style="width: 36px; height: 36px;" 
+                        title="Start / Resume Task">
+                    <span class="material-icons fs-6">play_arrow</span>
+                </button>
+                {% endif %}
+            {% endif %}
+
+            <a href="{% url 'market:market_backup_detail' backup.pk %}" 
+               class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" 
+               style="width: 36px; height: 36px;" 
+               title="View Details">
+                <span class="material-icons fs-6">visibility</span>
+            </a>
+            <button type="button" 
+                    class="glass-icon-btn text-danger border-0 rounded-circle d-flex align-items-center justify-content-center" 
+                    style="width: 36px; height: 36px;" 
+                    hx-get="{% url 'market:market_backup_delete' backup.pk %}"
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    title="Delete Backup Task">
+                <span class="material-icons fs-6">delete</span>
+            </button>
+        </div>
+    </td>
+</tr>
+{% endfor %}
+
+{% if page_obj.has_next %}
+<tr id="backup-desk-sentinel-{{ page_obj.number }}">
+    <td colspan="7" class="text-center py-3 bg-transparent border-0">
+        <button type="button"
+                hx-get="{% url 'market:market_backup_scroll' %}?page={{ page_obj.next_page_number }}&scroll_type=rows&q={{ request.GET.q }}&status={{ request.GET.status }}&sort={{ current_sort }}"
+                hx-target="#backup-desk-sentinel-{{ page_obj.number }}"
+                hx-swap="outerHTML"
+                class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+                style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+                title="Load More Backups">
+            <span class="load-more-idle d-inline-flex align-items-center gap-2">
+                <span class="material-icons fs-5">keyboard_arrow_down</span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Load More Backups (Page {{ page_obj.next_page_number }} of {{ paginator.num_pages }})</span>
+            </span>
+            <span class="load-more-loading d-none align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Loading backups...</span>
+            </span>
+        </button>
+    </td>
+</tr>
+{% elif paginator.count > 0 %}
+<tr class="border-0">
+    <td colspan="7" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.72rem;">
+        <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ paginator.count }} backup tasks loaded
+    </td>
+</tr>
+{% endif %}

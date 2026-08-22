@@ -20,11 +20,9 @@ class IndexChoices(models.TextChoices):
     INDIAVIX = 'INDIAVIX', 'India VIX'
 
 
-# Go Strategy Plugin Choices
+# Strategy Choices
 class StrategyChoices(models.TextChoices):
-    ICT_SMC = 'ict_smc', 'ICT / SMC (Order Block & FVG)'
-    GAMMA_BLAST = 'gamma_blast', 'Expiry Gamma Blast (0DTE)'
-    CANDLE_3PM = 'candle_3pm', '3:00 PM Breakout Candle'
+    TENSORTRADE_RL = 'tensortrade_rl', 'TensorTrade RL (Deep Reinforcement Learning)'
 
 
 # Strike Selection Choices

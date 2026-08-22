@@ -1,21 +1,22 @@
 {% extends 'admins/index.html' %}
 {% load static %}
 
-{% block title %}Configure New Backtest - Admin Portal{% endblock %}
+{% block title %}Configure Strategy Backtest - Admin Portal{% endblock %}
 {% block nav_backtest_active %}active{% endblock %}
 
 {% block extra_head %}
 <style>
-    /* Theme Glass Form Input Overrides */
+    /* Theme Glass Form Input Overrides matching Trader Form */
     .glass-form-card input[type="text"],
     .glass-form-card input[type="number"],
     .glass-form-card input[type="date"],
-    .glass-form-card select {
+    .glass-form-card select,
+    .glass-form-card textarea {
         background: rgba(255, 255, 255, 0.04) !important;
         border: 1px solid var(--border-color) !important;
         color: var(--text-main) !important;
         border-radius: 8px !important;
-        padding: 10px 14px;
+        padding: 8px 12px;
         font-size: 0.875rem;
         transition: all 0.2s ease;
         width: 100%;
@@ -27,11 +28,84 @@
     }
 
     .glass-form-card input:focus,
-    .glass-form-card select:focus {
+    .glass-form-card select:focus,
+    .glass-form-card textarea:focus {
         background: rgba(255, 255, 255, 0.07) !important;
         border-color: #0d6efd !important;
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25) !important;
         outline: none;
+    }
+
+    /* Standardized Custom Checkbox UI */
+    .glass-form-card input[type="checkbox"] {
+        appearance: none;
+        -webkit-appearance: none;
+        width: 1.25rem !important;
+        height: 1.25rem !important;
+        min-width: 1.25rem !important;
+        min-height: 1.25rem !important;
+        background-color: rgba(255, 255, 255, 0.05) !important;
+        border: 1px solid var(--border-color) !important;
+        border-radius: 6px !important;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        margin: 0;
+        padding: 0;
+        vertical-align: middle;
+        transition: all 0.2s ease-in-out;
+        position: relative;
+    }
+
+    .glass-form-card input[type="checkbox"]:hover {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.3) !important;
+    }
+
+    .glass-form-card input[type="checkbox"]:checked {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+    }
+
+    .glass-form-card input[type="checkbox"]:checked::after {
+        content: "";
+        width: 6px;
+        height: 10px;
+        border: solid #ffffff;
+        border-width: 0 2px 2px 0;
+        transform: rotate(45deg);
+        margin-bottom: 2px;
+    }
+
+    .glass-form-card input[type="checkbox"]:focus {
+        outline: none;
+        box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.3) !important;
+    }
+
+    /* Checkbox Card Alignment Helper */
+    .custom-check-item {
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+        padding: 0.65rem 0.9rem;
+        border-radius: 8px;
+        background: rgba(255, 255, 255, 0.02);
+        border: 1px solid var(--border-color);
+        transition: all 0.2s ease;
+        cursor: pointer;
+        user-select: none;
+    }
+
+    .custom-check-item:hover {
+        background: rgba(13, 110, 253, 0.08);
+        border-color: rgba(13, 110, 253, 0.35);
+    }
+
+    .custom-check-item:has(input:checked) {
+        background: rgba(13, 110, 253, 0.16);
+        border-color: #0d6efd;
+        box-shadow: 0 0 0 1px #0d6efd, 0 4px 12px rgba(13, 110, 253, 0.2);
     }
 </style>
 {% endblock %}
@@ -49,20 +123,20 @@
                     Configure Strategy Backtest
                 </h2>
                 <div class="theme-text-muted small">
-                    Select your prebuilt Go strategy plugin, optional existing backup dataset, date range, and capital.
+                    Configure TensorTrade RL Strategy parameters, dataset selection, execution rules, and capital.
                 </div>
             </div>
         </div>
         <div class="d-flex align-items-center gap-2">
-            <a href="{% url 'backtest:backtest_dashboard' %}" class="glass-icon-btn text-decoration-none" title="Back to Dashboard">
+            <a href="{% url 'backtest:backtest_dashboard' %}" class="glass-icon-btn text-decoration-none" title="Back to List">
                 <span class="material-icons fs-5">arrow_back</span>
             </a>
         </div>
     </div>
 </div>
 
-<div class="glass-card glass-form-card p-3 p-sm-4 p-md-5 mx-auto" style="max-width: 860px;">
-    <form method="POST" action="{% url 'backtest:backtest_create' %}">
+<div class="glass-card glass-form-card p-3 p-sm-4">
+    <form id="backtestForm" method="POST" action="{% url 'backtest:backtest_create' %}">
         {% csrf_token %}
 
         {% if form.non_field_errors %}
@@ -82,31 +156,35 @@
             <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Pre-downloaded Market Dataset (Optional)</h6>
         </div>
 
-        <div class="mb-4 p-3 rounded-3" style="background: rgba(13, 110, 253, 0.06); border: 1px solid rgba(13, 110, 253, 0.2);">
-            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-                <label class="form-label theme-text-main small fw-bold text-uppercase mb-md-0" for="{{ form.backup_task.id_for_label }}" style="min-width: 180px;">
-                    Backup File
-                </label>
-                <div class="flex-grow-1 w-100">
-                    {{ form.backup_task }}
-                    <small class="form-text theme-text-muted mt-1 d-block">Selecting a completed market backup dataset will link contract option candles.</small>
-                </div>
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.backup_task.id_for_label }}" style="min-width: 180px;">
+                Backup Dataset
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.backup_task }}
+                <small class="form-text theme-text-muted mt-1 d-block">Selecting a completed market backup dataset will link contract option candles.</small>
+                {% for error in form.backup_task.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
             </div>
         </div>
 
-        {# Section 2: Strategy Plugin & Target Asset #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-            <span class="material-icons text-primary fs-5">extension</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Strategy Plugin & Asset Selection</h6>
+        {# Section 2: Strategy Engine & Asset Selection #}
+        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+            <span class="material-icons text-primary fs-5">psychology</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Strategy Engine & Asset Selection</h6>
         </div>
 
         <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
             <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.strategy_name.id_for_label }}" style="min-width: 180px;">
-                Go Strategy Plugin<span class="text-danger ms-1">*</span>
+                RL Strategy Engine<span class="text-danger ms-1">*</span>
             </label>
             <div class="flex-grow-1 w-100">
                 {{ form.strategy_name }}
-                <small class="form-text theme-text-muted d-block mt-1">Choose between ICT/SMC (Order Block/FVG), Expiry Gamma Blast (0DTE), or 3:00 PM Breakout.</small>
+                <small class="form-text theme-text-muted d-block mt-1">TensorTrade RL (Deep Reinforcement Learning) engine with PPO policy optimization.</small>
+                {% for error in form.strategy_name.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
             </div>
         </div>
 
@@ -116,10 +194,61 @@
             </label>
             <div class="flex-grow-1 w-100">
                 {{ form.index_name }}
+                {% for error in form.index_name.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
             </div>
         </div>
 
-        {# Section 3: Time Period & Capital #}
+        {# Section 3: Predefined Strategy Rules & AI Directives #}
+        <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons text-primary fs-5">rule</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Constraint Rules & AI Directives</h6>
+            </div>
+            <a href="{% url 'backtest:rule_list' %}" class="small text-info text-decoration-none d-flex align-items-center gap-1" target="_blank">
+                <span class="material-icons fs-6">settings</span>
+                <span>Manage Rules</span>
+            </a>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase pt-2 mb-md-0" style="min-width: 180px;">
+                Execution Rules
+            </label>
+            <div class="flex-grow-1 w-100">
+                <div class="row g-2">
+                    {% for choice in form.rules %}
+                    <div class="col-12 col-md-6">
+                        <label for="{{ choice.id_for_label }}" class="custom-check-item w-100 h-100">
+                            {{ choice.tag }}
+                            <span class="theme-text-main small fw-semibold">{{ choice.choice_label }}</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+                <small class="form-text theme-text-muted mt-2 d-block">
+                    Select one or more constraints to mask invalid trading regimes in TensorTrade RL (e.g. 0DTE Expiry afternoons, 09:20-10:30 ORB, or 15:15 Auto Square-off).
+                </small>
+            </div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase pt-2 mb-md-0" for="{{ form.prompt_directives.id_for_label }}" style="min-width: 180px;">
+                AI Directives Prompt
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.prompt_directives }}
+                <small class="form-text theme-text-muted mt-1 d-block">
+                    Optional natural language prompt instructions for TensorTrade RL (e.g. <em>"Max 3 trades per day, strictly exit on 1:2 risk-reward"</em>).
+                </small>
+                {% for error in form.prompt_directives.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Section 4: Time Horizon & Capital #}
         <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
             <span class="material-icons text-primary fs-5">date_range</span>
             <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Backtest Horizon & Capital</h6>
@@ -131,80 +260,77 @@
             </label>
             <div class="flex-grow-1 w-100">
                 {{ form.initial_capital }}
+                {% for error in form.initial_capital.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
             </div>
         </div>
 
-        <div class="row g-3 mb-3">
-            <div class="col-12 col-md-6">
-                <div class="d-flex flex-column align-items-start gap-1">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0" for="{{ form.start_date.id_for_label }}">
-                        Start Date<span class="text-danger ms-1">*</span>
-                    </label>
-                    <div class="w-100">
-                        {{ form.start_date }}
-                    </div>
-                </div>
-            </div>
-            <div class="col-12 col-md-6">
-                <div class="d-flex flex-column align-items-start gap-1">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0" for="{{ form.end_date.id_for_label }}">
-                        End Date<span class="text-danger ms-1">*</span>
-                    </label>
-                    <div class="w-100">
-                        {{ form.end_date }}
-                    </div>
-                </div>
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.start_date.id_for_label }}" style="min-width: 180px;">
+                Start Date<span class="text-danger ms-1">*</span>
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.start_date }}
+                {% for error in form.start_date.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
             </div>
         </div>
 
-        {# Section 4: Strike & Position Sizing Parameters #}
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.end_date.id_for_label }}" style="min-width: 180px;">
+                End Date<span class="text-danger ms-1">*</span>
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.end_date }}
+                {% for error in form.end_date.errors %}
+                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+                {% endfor %}
+            </div>
+        </div>
+
+        {# Section 5: Strike & Position Sizing Parameters #}
         <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
             <span class="material-icons text-primary fs-5">tune</span>
             <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Strike & Position Sizing Parameters</h6>
         </div>
 
-        <div class="row g-3 mb-4">
-            <div class="col-12 col-md-6">
-                <div class="d-flex flex-column align-items-start gap-1">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0" for="{{ form.strike_selection.id_for_label }}">
-                        Strike Type / Selection
-                    </label>
-                    <div class="w-100">
-                        {{ form.strike_selection }}
-                        <small class="form-text theme-text-muted d-block mt-1">Target Strike offset: ATM, ITM (+/- 1, 2) or OTM (+/- 1, 2).</small>
-                    </div>
-                </div>
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.strike_selection.id_for_label }}" style="min-width: 180px;">
+                Strike Selection
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.strike_selection }}
+                <small class="form-text theme-text-muted d-block mt-1">Target Strike offset: ATM, ITM (+/- 1, 2) or OTM (+/- 1, 2).</small>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="d-flex flex-column align-items-start gap-1">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0" for="{{ form.lots_count.id_for_label }}">
-                        Lots Count (Qty)
-                    </label>
-                    <div class="w-100">
-                        {{ form.lots_count }}
-                        <small class="form-text theme-text-muted d-block mt-1">Number of lots to trade per signal (e.g. 1, 2, 5).</small>
-                    </div>
-                </div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.lots_count.id_for_label }}" style="min-width: 180px;">
+                Lots Count (Qty)
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.lots_count }}
+                <small class="form-text theme-text-muted d-block mt-1">Number of lots to trade per signal (e.g. 1, 2, 5).</small>
             </div>
-            <div class="col-12 col-md-6">
-                <div class="d-flex flex-column align-items-start gap-1">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0" for="{{ form.risk_reward_ratio.id_for_label }}">
-                        Risk:Reward Ratio
-                    </label>
-                    <div class="w-100">
-                        {{ form.risk_reward_ratio }}
-                    </div>
-                </div>
+        </div>
+
+        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.risk_reward_ratio.id_for_label }}" style="min-width: 180px;">
+                Risk:Reward Ratio
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.risk_reward_ratio }}
             </div>
-            <div class="col-12 col-md-6">
-                <div class="d-flex flex-column align-items-start gap-1">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0" for="{{ form.stop_loss_pct.id_for_label }}">
-                        Stop Loss (%)
-                    </label>
-                    <div class="w-100">
-                        {{ form.stop_loss_pct }}
-                    </div>
-                </div>
+        </div>
+
+        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.stop_loss_points.id_for_label }}" style="min-width: 180px;">
+                Stop Loss (Points)
+            </label>
+            <div class="flex-grow-1 w-100">
+                {{ form.stop_loss_points }}
             </div>
         </div>
 

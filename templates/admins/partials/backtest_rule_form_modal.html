@@ -1,0 +1,130 @@
+<!-- templates/admins/partials/backtest_rule_form_modal.html -->
+<div class="modal-content glass-card p-3 border shadow-lg" style="background: var(--nav-hover, rgba(15, 23, 42, 0.96)); backdrop-filter: blur(20px); border-color: var(--border-color) !important; border-radius: 16px;">
+    
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3 pt-1">
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border: 1px solid rgba(13, 110, 253, 0.3);">
+                <span class="material-icons fs-5">rule</span>
+            </div>
+            <div>
+                <h5 class="modal-title fw-bold theme-text-main mb-0">
+                    {% if form.instance.pk %}Edit Strategy Rule: {{ form.instance.name }}{% else %}Create Custom Strategy Rule{% endif %}
+                </h5>
+                <small class="theme-text-muted">Configure constraint parameters and natural language prompt directives.</small>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <!-- Form -->
+    <form method="POST" 
+          action="{% if form.instance.pk %}{% url 'backtest:rule_update' form.instance.pk %}{% else %}{% url 'backtest:rule_create' %}{% endif %}" 
+          hx-post="{% if form.instance.pk %}{% url 'backtest:rule_update' form.instance.pk %}{% else %}{% url 'backtest:rule_create' %}{% endif %}" 
+          hx-target="#globalHtmxModalDialog">
+        {% csrf_token %}
+
+        <div class="modal-body py-3">
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger rounded-3 py-2 px-3 mb-3 small bg-danger bg-opacity-25 text-danger border-0">
+                {% for error in form.non_field_errors %}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons fs-6">error_outline</span>
+                    <span>{{ error }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- Rule Name & Active Switch Row -->
+            <div class="row g-3 mb-3 align-items-center">
+                <div class="col-12 col-md-8">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="{{ form.name.id_for_label }}">
+                        Rule Name<span class="text-danger ms-1">*</span>
+                    </label>
+                    {{ form.name }}
+                    {% if form.name.errors %}
+                    <div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>
+                    {% endif %}
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1 d-block">
+                        Status
+                    </label>
+                    <div class="form-check form-switch p-2 rounded-3 border d-flex align-items-center justify-content-between px-3" style="background: rgba(255,255,255,0.03); border-color: var(--border-color) !important; min-height: 38px;">
+                        <label class="form-check-label theme-text-main small fw-semibold mb-0" for="{{ form.is_active.id_for_label }}">
+                            Active
+                        </label>
+                        {{ form.is_active }}
+                    </div>
+                </div>
+            </div>
+
+            <!-- Rule Regime / Type Row -->
+            <div class="mb-3">
+                <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="{{ form.rule_type.id_for_label }}">
+                    Rule Regime / Category<span class="text-danger ms-1">*</span>
+                </label>
+                {{ form.rule_type }}
+                {% if form.rule_type.errors %}
+                <div class="text-danger small mt-1">{{ form.rule_type.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <!-- AI Prompt Directive Row -->
+            <div class="mb-3 p-3 rounded-3" style="background: rgba(14, 165, 233, 0.06); border: 1px solid rgba(14, 165, 233, 0.2);">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label text-info small fw-bold text-uppercase mb-0 d-flex align-items-center gap-1" for="{{ form.prompt_directive.id_for_label }}">
+                        <span class="material-icons fs-6">auto_awesome</span>
+                        <span>AI Prompt Directive (TensorTrade RL Instruction)</span>
+                    </label>
+                    <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0" style="font-size: 0.65rem;">Natural Language</span>
+                </div>
+                {{ form.prompt_directive }}
+                <small class="form-text theme-text-muted mt-1 d-block" style="font-size: 0.72rem;">
+                    Natural language prompt instruction passed directly into the Deep RL optimization loop.
+                </small>
+                {% if form.prompt_directive.errors %}
+                <div class="text-danger small mt-1">{{ form.prompt_directive.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <!-- Strategy Description -->
+            <div class="mb-3">
+                <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="{{ form.description.id_for_label }}">
+                    Rule Description & Mechanics
+                </label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                <div class="text-danger small mt-1">{{ form.description.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <!-- JSON Filter Parameters -->
+            <div class="mb-2">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0" for="{{ form.parameters_json.id_for_label }}">
+                        JSON Execution Filters (Optional)
+                    </label>
+                    <span class="theme-text-muted small font-monospace" style="font-size: 0.68rem;">JSON Format</span>
+                </div>
+                {{ form.parameters_json }}
+                <small class="form-text theme-text-muted mt-1 d-block" style="font-size: 0.72rem;">
+                    Supported keys: <code>start_time</code>, <code>end_time</code>, <code>is_0dte_only</code>, <code>min_gap_pct</code>, <code>cutoff_time</code>, <code>max_trades</code>.
+                </small>
+                {% if form.parameters_json.errors %}
+                <div class="text-danger small mt-1">{{ form.parameters_json.errors.0 }}</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer border-top border-secondary border-opacity-25 pt-3 pb-1 d-flex justify-content-end gap-2">
+            <button type="button" class="btn btn-outline-secondary rounded-pill px-4 py-2" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-primary rounded-pill px-4 py-2 fw-semibold text-white d-inline-flex align-items-center gap-2 shadow-sm" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
+                <span class="material-icons fs-5">save</span>
+                <span>{% if form.instance.pk %}Update Rule{% else %}Save Rule{% endif %}</span>
+            </button>
+        </div>
+    </form>
+</div>

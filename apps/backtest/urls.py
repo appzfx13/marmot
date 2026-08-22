@@ -3,23 +3,36 @@ from .views import (
     BacktestDashboardView,
     BacktestCreateView,
     BacktestDetailView,
+    BacktestTradesScrollView,
+    BacktestDashboardScrollView,
     BacktestControlView,
+    BacktestEditModalView,
+    BacktestStatusView,
     BacktestDeleteView,
     BacktestBulkDeleteView,
     StrategyListView,
     StrategyDetailView,
     StrategySaveCodeView,
     StrategyDeleteView,
+    BacktestRuleListView,
+    BacktestRuleCreateView,
+    BacktestRuleUpdateView,
+    BacktestRuleDeleteView,
+    BacktestRuleToggleView,
 )
 
 app_name = 'backtest'
 
 urlpatterns = [
     path('list/', BacktestDashboardView.as_view(), name='backtest_dashboard'),
+    path('scroll/', BacktestDashboardScrollView.as_view(), name='backtest_dashboard_scroll'),
     path('bulk-delete/', BacktestBulkDeleteView.as_view(), name='backtest_bulk_delete'),
     path('create/', BacktestCreateView.as_view(), name='backtest_create'),
     path('<int:pk>/', BacktestDetailView.as_view(), name='backtest_detail'),
+    path('<int:pk>/trades-scroll/', BacktestTradesScrollView.as_view(), name='backtest_trades_scroll'),
+    path('<int:pk>/status/', BacktestStatusView.as_view(), name='backtest_status'),
     path('<int:pk>/control/', BacktestControlView.as_view(), name='backtest_control'),
+    path('<int:pk>/edit-modal/', BacktestEditModalView.as_view(), name='backtest_edit_modal'),
     path('<int:pk>/delete/', BacktestDeleteView.as_view(), name='backtest_delete'),
     
     # Strategy Hub & Web UI Code Editor Endpoints
@@ -27,4 +40,11 @@ urlpatterns = [
     path('strategies/<int:pk>/', StrategyDetailView.as_view(), name='strategy_detail'),
     path('strategies/<int:pk>/save-code/', StrategySaveCodeView.as_view(), name='strategy_save_code'),
     path('strategies/<int:pk>/delete/', StrategyDeleteView.as_view(), name='strategy_delete'),
+
+    # Rule Management & CRUD Endpoints
+    path('rules/', BacktestRuleListView.as_view(), name='rule_list'),
+    path('rules/create/', BacktestRuleCreateView.as_view(), name='rule_create'),
+    path('rules/<int:pk>/edit/', BacktestRuleUpdateView.as_view(), name='rule_update'),
+    path('rules/<int:pk>/delete/', BacktestRuleDeleteView.as_view(), name='rule_delete'),
+    path('rules/<int:pk>/toggle/', BacktestRuleToggleView.as_view(), name='rule_toggle'),
 ]

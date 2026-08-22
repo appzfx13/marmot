@@ -8,6 +8,22 @@
     .custom-glass-table.table-hover tbody tr:hover > * {
         background-color: var(--nav-hover) !important;
     }
+    .trade-row-drawer {
+        background: rgba(15, 23, 42, 0.45) !important;
+        border-left: 3px solid #0ea5e9 !important;
+    }
+    .status-dot-pulse {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        display: inline-block;
+        animation: pulse-ring 1.5s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+    }
+    @keyframes pulse-ring {
+        0% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(14, 165, 233, 0.7); }
+        70% { transform: scale(1); box-shadow: 0 0 0 6px rgba(14, 165, 233, 0); }
+        100% { transform: scale(0.95); box-shadow: 0 0 0 0 rgba(14, 165, 233, 0); }
+    }
 </style>
 
 <div class="glass-card p-0 overflow-hidden mb-4 border-0">
@@ -25,267 +41,54 @@
         </button>
     </div>
 
-    <!-- DESKTOP / TABLET VIEW: TABLE -->
-    <div class="table-responsive flex-grow-1 overflow-auto d-none d-md-block">
-        <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
+    <!-- DESKTOP VIEW: INSTITUTIONAL COMPACT TABLE WITH EXPAND ACCORDIONS -->
+    <div class="d-none d-md-block flex-grow-1" style="width: 100%;">
+        <table class="table table-hover custom-glass-table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main); width: 100%; table-layout: fixed;">
             <thead>
-                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
-                    <th scope="col" class="ps-4 py-3" style="width: 40px;">
-                        <input class="form-check-input bulk-select-all" type="checkbox" title="Select All">
+                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important; font-size: 0.72rem;">
+                    <th scope="col" class="ps-3 py-2 text-center" style="width: 3%; min-width: 28px;">
+                        <input class="form-check-input select-all-checkbox" type="checkbox" id="selectAllDesktop">
                     </th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Task #</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Strategy & Symbol</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Date Horizon</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Capital & Position</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Net PnL</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Progress</th>
-                    <th scope="col" class="py-3 theme-text-muted text-uppercase small fw-semibold">Status</th>
-                    <th scope="col" class="text-end pe-4 py-3 theme-text-muted text-uppercase small fw-semibold">Actions</th>
+                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 7%;">Task ID</th>
+                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 17%;">Strategy & Asset</th>
+                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 12%;">Date Horizon</th>
+                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 11%;">Capital / Lots</th>
+                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 12%;">Realized Net PnL</th>
+                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 12%;">Execution Progress</th>
+                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 11%;">Status</th>
+                    <th scope="col" class="text-center py-2 pe-4 ps-1 theme-text-muted text-uppercase small fw-semibold" style="width: 15%; min-width: 120px;">Quick Actions</th>
                 </tr>
             </thead>
-            <tbody>
-                {% for backtest in backtests %}
-                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
-                    <td class="ps-4 py-3 bg-transparent">
-                        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backtest.id }}">
-                    </td>
-
-                    <td class="py-3 bg-transparent font-monospace fw-bold theme-text-main">
-                        #BT-{{ backtest.id|stringformat:"04d" }}
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="fw-bold theme-text-main">{{ backtest.get_strategy_name_display }}</div>
-                        <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.68rem;">{{ backtest.index_name }}</span>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="small theme-text-main fw-semibold">{{ backtest.start_date|date:"d M Y" }}</div>
-                        <div class="small theme-text-muted">to {{ backtest.end_date|date:"d M Y" }}</div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="small theme-text-main fw-semibold">Capital: ₹{{ backtest.initial_capital|floatformat:0 }}</div>
-                        <div class="small theme-text-muted">Lots: {{ backtest.parameters.lots_count|default:1 }}</div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="small fw-bold {% if backtest.metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            {% if backtest.metrics.net_pnl >= 0 %}+{% endif %}₹{{ backtest.metrics.net_pnl|default:0|floatformat:2 }}
-                        </div>
-                    </td>
-
-                    <!-- Real-Time Progress Bar -->
-                    <td class="py-3 bg-transparent" style="min-width: 140px;">
-                        <div class="d-flex align-items-center justify-content-between mb-1">
-                            <small class="theme-text-muted backtest-progress-text" style="font-size: 0.7rem;" id="backtest-progress-text-{{ backtest.pk }}">{{ backtest.progress }}%</small>
-                        </div>
-                        <div class="progress" style="height: 6px; background-color: var(--border-color);">
-                            <div class="progress-bar bg-primary progress-bar-striped {% if backtest.status == 'running' %}progress-bar-animated{% endif %} backtest-progress-bar" 
-                                 id="backtest-progress-{{ backtest.pk }}"
-                                 role="progressbar" 
-                                 style="width: {{ backtest.progress }}%;" 
-                                 aria-valuenow="{{ backtest.progress }}" aria-valuemin="0" aria-valuemax="100">
-                            </div>
-                        </div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <span id="backtest-status-{{ backtest.pk }}" class="backtest-status-badge">
-                        {% if backtest.status == 'completed' %}
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
-                        {% elif backtest.status == 'running' %}
-                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>
-                        {% elif backtest.status == 'created' %}
-                            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1">Created</span>
-                        {% elif backtest.status == 'paused' %}
-                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>
-                        {% elif backtest.status == 'cancelled' or backtest.status == 'error' %}
-                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">{{ backtest.get_status_display }}</span>
-                        {% else %}
-                            <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">Pending</span>
-                        {% endif %}
-                        </span>
-                    </td>
-
-                    <td class="text-end pe-4 py-3 bg-transparent">
-                        <div class="d-flex align-items-center justify-content-end gap-2">
-                            {% if backtest.status == 'running' %}
-                            <button type="button" 
-                                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
-                                    hx-target="#globalHtmxModalDialog"
-                                    hx-swap="innerHTML"
-                                    class="glass-icon-btn text-warning rounded-circle d-flex align-items-center justify-content-center" 
-                                    style="width: 36px; height: 36px;" 
-                                    title="Pause Backtest">
-                                <span class="material-icons fs-6">pause</span>
-                            </button>
-                            {% else %}
-                            <button type="button" 
-                                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
-                                    hx-target="#globalHtmxModalDialog"
-                                    hx-swap="innerHTML"
-                                    class="glass-icon-btn text-success rounded-circle d-flex align-items-center justify-content-center" 
-                                    style="width: 36px; height: 36px;" 
-                                    title="Start Backtest">
-                                <span class="material-icons fs-6">play_arrow</span>
-                            </button>
-                            {% endif %}
-
-                            <a href="{% url 'backtest:backtest_detail' backtest.pk %}" 
-                               class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" 
-                               style="width: 36px; height: 36px;" 
-                               title="View Analytics">
-                                <span class="material-icons fs-6">analytics</span>
-                            </a>
-                            
-                            <button type="button" 
-                                    class="glass-icon-btn text-danger border-0 rounded-circle d-flex align-items-center justify-content-center" 
-                                    style="width: 36px; height: 36px;" 
-                                    hx-get="{% url 'backtest:backtest_delete' backtest.pk %}"
-                                    hx-target="#globalHtmxModalDialog"
-                                    hx-swap="innerHTML"
-                                    title="Delete Backtest Task">
-                                <span class="material-icons fs-6">delete</span>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-                {% empty %}
+            <tbody id="backtest-table-body">
+                {% if backtests %}
+                    {% include "admins/partials/backtest_dashboard_rows.html" %}
+                {% else %}
                 <tr class="border-0">
-                    <td colspan="8" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                    <td colspan="10" class="text-center py-5 theme-text-muted border-0 bg-transparent">
                         <span class="material-icons fs-1 mb-2 opacity-50">analytics</span>
                         <p class="mb-0 fw-medium">No strategy backtests found.</p>
                         <small class="opacity-75">Click "Run New Backtest" above to initialize a plug-and-play strategy execution.</small>
                     </td>
                 </tr>
-                {% endfor %}
+                {% endif %}
             </tbody>
         </table>
     </div>
 
-    <!-- MOBILE VIEW: EXPANDABLE TILE CARDS WITH DROPDOWN ARROW -->
-    <div class="flex-grow-1 overflow-auto p-3 d-block d-md-none">
-        {% for backtest in backtests %}
-        <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-            <div class="d-flex justify-content-between align-items-center gap-2">
-                <div class="d-flex align-items-center gap-2">
-                    <input class="form-check-input bulk-item-checkbox me-1" type="checkbox" value="{{ backtest.id }}">
-                    <div>
-                        <div class="fw-bold theme-text-main">#BT-{{ backtest.id|stringformat:"04d" }}</div>
-                        <small class="theme-text-muted">{{ backtest.get_strategy_name_display }}</small>
-                    </div>
-                </div>
-
-                <div class="d-flex align-items-center gap-2">
-                    <span id="backtest-status-mb-{{ backtest.pk }}" class="backtest-status-badge">
-                        {% if backtest.status == 'completed' %}
-                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-1 smaller">Completed</span>
-                        {% elif backtest.status == 'running' %}
-                            <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-1 smaller">Running</span>
-                        {% else %}
-                            <span class="badge bg-secondary bg-opacity-25 text-secondary rounded-pill px-2 py-1 smaller">{{ backtest.get_status_display }}</span>
-                        {% endif %}
-                    </span>
-
-                    <!-- Right Side Dropdown Arrow Icon Button -->
-                    <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
-                            style="width: 34px; height: 34px; background: rgba(255, 255, 255, 0.08); color: var(--text-main);"
-                            type="button"
-                            data-bs-toggle="collapse"
-                            data-bs-target="#bt-mobile-expand-{{ backtest.id }}"
-                            aria-expanded="false"
-                            aria-controls="bt-mobile-expand-{{ backtest.id }}"
-                            title="Expand Details">
-                        <span class="material-icons fs-5 text-primary">keyboard_arrow_down</span>
-                    </button>
-                </div>
-            </div>
-
-            <!-- Collapsible Mobile Details Container -->
-            <div class="collapse mt-3 pt-3 border-top border-secondary border-opacity-25" id="bt-mobile-expand-{{ backtest.id }}">
-                <div class="d-flex flex-column gap-2 mb-3">
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Index Symbol:</span>
-                        <span class="badge bg-secondary bg-opacity-25 theme-text-main rounded-pill px-2 py-0">{{ backtest.index_name }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Backtest Horizon:</span>
-                        <span class="theme-text-main">{{ backtest.start_date|date:"d M Y" }} → {{ backtest.end_date|date:"d M Y" }}</span>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Capital / Lots:</span>
-                        <span class="theme-text-main">₹{{ backtest.initial_capital|floatformat:0 }} ({{ backtest.parameters.lots_count|default:1 }} Lots)</span>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Net PnL:</span>
-                        <strong class="{% if backtest.metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
-                            {% if backtest.metrics.net_pnl >= 0 %}+{% endif %}₹{{ backtest.metrics.net_pnl|default:0|floatformat:2 }}
-                        </strong>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Win Rate:</span>
-                        <span class="theme-text-main">{{ backtest.metrics.win_rate|default:0 }}% ({{ backtest.metrics.winning_trades|default:0 }}W / {{ backtest.metrics.losing_trades|default:0 }}L)</span>
-                    </div>
-                </div>
-
-                <div class="d-flex justify-content-end gap-2 border-top pt-2" style="border-color: var(--border-color) !important;">
-                    <a href="{% url 'backtest:backtest_detail' backtest.pk %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1">
-                        <span class="material-icons fs-6">analytics</span> Analytics
-                    </a>
-                    <button type="button" 
-                            class="btn btn-sm btn-outline-danger rounded-circle p-0 d-flex align-items-center justify-content-center" 
-                            style="width: 32px; height: 32px;" 
-                            hx-get="{% url 'backtest:backtest_delete' backtest.pk %}"
-                            hx-target="#globalHtmxModalDialog">
-                        <span class="material-icons fs-6">delete</span>
-                    </button>
-                </div>
-            </div>
-        </div>
-        {% empty %}
+    <!-- MOBILE VIEW: COMPACT CARDS WITH EXPAND ACCORDION & REAL-TIME PROGRESS -->
+    <div class="flex-grow-1 overflow-auto p-2 d-block d-md-none" id="backtest-mobile-list-container">
+        {% if backtests %}
+            {% include "admins/partials/backtest_dashboard_cards.html" %}
+        {% else %}
         <div class="text-center py-4 theme-text-muted">No strategy backtests found.</div>
-        {% endfor %}
+        {% endif %}
     </div>
 
-    <!-- Pinned Pagination Footer -->
-    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
-            <div class="small theme-text-muted text-center text-sm-start">
-                {% if is_paginated %}
-                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} backtests
-                {% else %}
-                    Showing {{ backtests|length }} of {{ backtests|length }} backtests
-                {% endif %}
-            </div>
-            
-            <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
-                {% if is_paginated and page_obj.has_previous %}
-                <li class="page-item mb-0">
-                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
-                       style="width: 36px; height: 36px;"
-                       hx-get="{% url 'backtest:backtest_dashboard' %}?page={{ page_obj.previous_page_number }}" 
-                       hx-target="#backtest-dashboard-container" hx-push-url="true">
-                       <span class="material-icons fs-6">chevron_left</span>
-                    </a>
-                </li>
-                {% endif %}
-                <li class="page-item mb-0">
-                    <span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold text-decoration-none p-0" style="width: 36px; height: 36px;">
-                        {% if is_paginated %}{{ page_obj.number }}{% else %}1{% endif %}
-                    </span>
-                </li>
-                {% if is_paginated and page_obj.has_next %}
-                <li class="page-item mb-0">
-                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
-                       style="width: 36px; height: 36px;"
-                       hx-get="{% url 'backtest:backtest_dashboard' %}?page={{ page_obj.next_page_number }}" 
-                       hx-target="#backtest-dashboard-container" hx-push-url="true">
-                       <span class="material-icons fs-6">chevron_right</span>
-                    </a>
-                </li>
-                {% endif %}
-            </ul>
+    <!-- Infinite Scroll Status Footer -->
+    <div class="border-top pt-2 pb-2 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+        <div class="d-flex justify-content-between align-items-center small theme-text-muted">
+            <span>Showing {{ paginator.count|default:backtests|length }} backtests (auto-extends on scroll)</span>
+            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-1" style="font-size: 0.68rem;">Continuous Scroll Active</span>
         </div>
     </div>
 </div>
@@ -293,41 +96,50 @@
 <script>
 (function() {
     function applyBacktestListUpdate(data) {
-        if (!data || data.type !== 'backtest_progress') return;
-        const progressBar = document.querySelector('.backtest-progress-bar[id="backtest-progress-' + data.task_id + '"]');
-        const progressText = document.querySelector('.backtest-progress-text[id="backtest-progress-text-' + data.task_id + '"]');
-        const statusBadge = document.querySelector('.backtest-status-badge[id="backtest-status-' + data.task_id + '"]');
+        if (!data || (data.type !== 'backtest_progress' && data.type !== 'progress')) return;
+        const progress = data.progress !== undefined ? data.progress : 0;
+        const status = data.status || '';
 
-        if (progressBar) {
-            progressBar.style.width = data.progress + '%';
-            progressBar.setAttribute('aria-valuenow', data.progress);
-            if (data.status === 'running') {
-                progressBar.classList.add('progress-bar-animated');
+        const progressBars = document.querySelectorAll('.backtest-progress-bar[id*="backtest-progress-"][id*="' + data.task_id + '"]');
+        const progressTexts = document.querySelectorAll('.backtest-progress-text[id*="backtest-progress-text-"][id*="' + data.task_id + '"]');
+        const statusBadges = document.querySelectorAll('.backtest-status-badge[id*="backtest-status-"][id*="' + data.task_id + '"]');
+
+        progressBars.forEach(function(pb) {
+            pb.style.width = Math.max(5, progress) + '%';
+            pb.setAttribute('aria-valuenow', progress);
+            if (status === 'running') {
+                pb.classList.add('progress-bar-animated');
             } else {
-                progressBar.classList.remove('progress-bar-animated');
+                pb.classList.remove('progress-bar-animated');
             }
-        }
-        if (progressText) progressText.textContent = data.progress + '%';
+        });
 
-        if (statusBadge) {
+        progressTexts.forEach(function(pt) {
+            pt.textContent = progress + '%';
+        });
+
+        statusBadges.forEach(function(sb) {
             const statusMap = {
-                'completed': '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>',
-                'running': '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Running</span>',
-                'created': '<span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1">Created</span>',
-                'paused': '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Paused</span>',
-                'cancelled': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Cancelled</span>',
-                'error': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Error</span>'
+                'completed': '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Completed</span>',
+                'running': '<span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Running</span>',
+                'created': '<span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Created</span>',
+                'paused': '<span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Paused</span>',
+                'cancelled': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Cancelled</span>',
+                'error': '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.68rem;">Error</span>'
             };
-            statusBadge.innerHTML = statusMap[data.status] || statusMap['created'];
-        }
+            sb.innerHTML = statusMap[status] || statusMap['created'];
+        });
     }
 
     function initSubscriptions() {
         document.querySelectorAll('.backtest-progress-bar').forEach(function(el) {
-            const taskId = el.id.replace('backtest-progress-', '');
-            if (window.MarmotWS && window.MarmotWS.url) {
-                window.MarmotWS.unsubscribe(taskId);
-                window.MarmotWS.subscribe(taskId, applyBacktestListUpdate);
+            const match = el.id.match(/\d+/);
+            if (match) {
+                const taskId = match[0];
+                if (window.MarmotWS && window.MarmotWS.url) {
+                    window.MarmotWS.unsubscribe(taskId);
+                    window.MarmotWS.subscribe(taskId, applyBacktestListUpdate);
+                }
             }
         });
     }

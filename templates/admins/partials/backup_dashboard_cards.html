@@ -1,0 +1,97 @@
+{% for backup in backups %}
+<div class="p-3 mb-2 rounded-3 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+        <div class="d-flex align-items-center gap-2">
+            <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backup.id }}">
+            <div>
+                <div class="fw-bold theme-text-main font-monospace">#{{ backup.id|stringformat:"04d" }}</div>
+                <div class="small text-primary fw-semibold">{{ backup.get_index_name_display }}</div>
+            </div>
+        </div>
+
+        <span id="backup-status-mb-{{ backup.pk }}" class="backup-status-badge">
+            {% if backup.status == 'completed' %}
+                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0 fw-bold" style="font-size: 0.7rem;">Completed</span>
+            {% elif backup.status == 'running' %}
+                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0 fw-bold" style="font-size: 0.7rem;">Running</span>
+            {% else %}
+                <span class="badge bg-secondary bg-opacity-25 text-secondary rounded-pill px-2 py-0 fw-bold" style="font-size: 0.7rem;">{{ backup.get_status_display }}</span>
+            {% endif %}
+        </span>
+    </div>
+
+    <!-- Mobile Progress Bar -->
+    <div class="progress rounded-pill mb-2" style="height: 5px; background: rgba(255, 255, 255, 0.08);">
+        <div id="backup-progress-mb-{{ backup.pk }}" 
+             class="progress-bar progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %} bg-primary rounded-pill backup-progress-bar" 
+             role="progressbar" 
+             style="width: {{ backup.progress }}%;" 
+             aria-valuenow="{{ backup.progress }}" 
+             aria-valuemin="0" 
+             aria-valuemax="100">
+        </div>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center small mb-2 theme-text-muted">
+        <span>{{ backup.start_date|date:"d M" }} → {{ backup.end_date|date:"d M Y" }}</span>
+        <span>±{{ backup.strike_count }} ATM | {{ backup.file_size_mb }} MB</span>
+    </div>
+
+    <div class="d-flex justify-content-end gap-2 pt-2 border-top border-secondary border-opacity-10">
+        {% if backup.status != 'completed' %}
+            {% if backup.status == 'running' %}
+            <button type="button" 
+                    hx-get="{% url 'market:market_backup_control' backup.pk %}?action=pause" 
+                    hx-target="#globalHtmxModalDialog"
+                    class="btn btn-sm btn-outline-warning rounded-pill px-3 d-flex align-items-center gap-1"
+                    style="font-size: 0.75rem;">
+                <span class="material-icons fs-6">pause</span> Pause
+            </button>
+            {% else %}
+            <button type="button" 
+                    hx-get="{% url 'market:market_backup_control' backup.pk %}?action=resume" 
+                    hx-target="#globalHtmxModalDialog"
+                    class="btn btn-sm btn-outline-success rounded-pill px-3 d-flex align-items-center gap-1"
+                    style="font-size: 0.75rem;">
+                <span class="material-icons fs-6">play_arrow</span> Resume
+            </button>
+            {% endif %}
+        {% endif %}
+        <a href="{% url 'market:market_backup_detail' backup.pk %}" class="btn btn-sm btn-primary rounded-pill px-3 d-flex align-items-center gap-1 shadow-sm" style="font-size: 0.75rem;">
+            <span class="material-icons fs-6">visibility</span> Details
+        </a>
+        <button type="button" 
+                class="btn btn-sm btn-outline-danger rounded-circle p-0 d-flex align-items-center justify-content-center" 
+                style="width: 28px; height: 28px;" 
+                hx-get="{% url 'market:market_backup_delete' backup.pk %}"
+                hx-target="#globalHtmxModalDialog">
+            <span class="material-icons fs-6">delete</span>
+        </button>
+    </div>
+</div>
+{% endfor %}
+
+{% if page_obj.has_next %}
+<div id="backup-mb-sentinel-{{ page_obj.number }}" class="text-center py-3">
+    <button type="button"
+            hx-get="{% url 'market:market_backup_scroll' %}?page={{ page_obj.next_page_number }}&scroll_type=cards&q={{ request.GET.q }}&status={{ request.GET.status }}&sort={{ current_sort }}"
+            hx-target="#backup-mb-sentinel-{{ page_obj.number }}"
+            hx-swap="outerHTML"
+            class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+            style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+            title="Load More Backups">
+        <span class="load-more-idle d-inline-flex align-items-center gap-2">
+            <span class="material-icons fs-5">keyboard_arrow_down</span>
+            <span class="fw-bold" style="font-size: 0.8rem;">Load More Backups</span>
+        </span>
+        <span class="load-more-loading d-none align-items-center gap-2">
+            <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+            <span class="fw-bold" style="font-size: 0.8rem;">Loading...</span>
+        </span>
+    </button>
+</div>
+{% elif paginator.count > 0 %}
+<div class="text-center py-3 theme-text-muted" style="font-size: 0.72rem;">
+    <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ paginator.count }} backup tasks loaded
+</div>
+{% endif %}

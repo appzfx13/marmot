@@ -92,3 +92,11 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
 - **High-Throughput Streaming & Parquet:**
   - Parquet dataset reader/writers (`go-app/parquet/`) must follow date-partitioned storage paths (`/app/backup/{user_id}/{task_id}/`).
   - WebSockets hub (`go-app/ws/hub.go`) must handle broadcast channels safely without blocking worker threads.
+
+---
+
+## 10. Backtesting, Dynamic Lot Sizes & Brokerage Accounting
+- **Dynamic Lot Sizing:** Historical index option trade quantities must always be resolved dynamically via date-aware lookups (`get_historical_lot_size(index_name, date)`) to accurately reflect historical exchange revisions (e.g. NIFTY 75 → 50 → 25; BANKNIFTY 25 → 15 → 30).
+- **Expiry Schedule Accuracy:** Backtest and strategy evaluators must account for exchange expiry schedules (`get_index_expiry_info(index_name, date)`) including weekly vs monthly expiry days and regulatory single-weekly index shifts.
+- **Full Charges & Brokerage Accounting:** Every backtest execution and trade log must calculate gross PnL, brokerage, STT/CTT, exchange charges, SEBI fees, stamp duty, and GST using `calculate_trade_charges()`.
+- **Utilized Capital Metrics:** Backtest reports and UI dashboards must report max utilized capital, average utilized capital, capital utilization %, and ROI on utilized capital alongside total capital ROI.

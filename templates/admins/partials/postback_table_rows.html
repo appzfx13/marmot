@@ -1,0 +1,99 @@
+{% for log in postbacks %}
+<tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+    <td class="ps-4 py-3 bg-transparent" style="width: 40px;">
+        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ log.id }}">
+    </td>
+    <td class="py-3 bg-transparent">
+        <div class="fw-bold theme-text-main">{{ log.created_at|date:"M d, Y H:i:s" }}</div>
+        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.68rem;">{{ log.broker }}</span>
+    </td>
+
+    <td class="py-3 bg-transparent">
+        {% if log.user %}
+        <div class="fw-semibold text-info">{{ log.user.username }}</div>
+        {% if log.broker_client_id %}
+        <div class="small text-warning" style="font-size: 0.75rem;">Client: {{ log.broker_client_id }}</div>
+        {% else %}
+        <div class="small theme-text-muted" style="font-size: 0.75rem;">ID: #{{ log.user.id }}</div>
+        {% endif %}
+        <div class="fw-bold theme-text-main">{{ log.user.get_full_name|default:log.user.username }}</div>
+        <small class="theme-text-muted">@{{ log.user.username }}</small>
+        {% else %}
+        <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-2 py-0">Unassigned</span>
+        {% endif %}
+    </td>
+
+    <td class="py-3 bg-transparent">
+        <div class="fw-semibold font-monospace theme-text-main" style="font-size: 0.85rem;">{{ log.order_id|default:"--" }}</div>
+        <div class="small text-muted">{{ log.symbol|default:"--" }}</div>
+    </td>
+
+    <td class="py-3 bg-transparent">
+        {% if log.transaction_type %}
+        <span class="badge {% if log.transaction_type == 'BUY' %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25{% endif %} rounded-pill px-3 py-1 fw-bold">
+            {{ log.transaction_type }}
+        </span>
+        {% else %}
+        <span class="text-muted">--</span>
+        {% endif %}
+        <div class="small theme-text-muted mt-1">Qty: {{ log.quantity }}</div>
+    </td>
+
+    <td class="py-3 bg-transparent">
+        <div class="small theme-text-main fw-semibold">₹{{ log.price|floatformat:2 }}</div>
+        <div class="small theme-text-muted" style="font-size: 0.75rem;">IP: {{ log.ip_address|default:"127.0.0.1" }}</div>
+    </td>
+
+    <td class="py-3 bg-transparent">
+        {% if log.order_status == 'TRADED' or log.order_status == 'SUCCESS' %}
+            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">TRADED</span>
+        {% elif log.order_status == 'PENDING' %}
+            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">PENDING</span>
+        {% elif log.order_status == 'CANCELLED' or log.order_status == 'REJECTED' or log.order_status == 'FAILED' %}
+            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">{{ log.order_status }}</span>
+        {% else %}
+            <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1">{{ log.order_status|default:"RECORDED" }}</span>
+        {% endif %}
+    </td>
+
+    <td class="text-end pe-4 py-3 bg-transparent">
+        <button type="button" 
+                class="btn btn-sm btn-outline-info rounded-pill px-3 d-inline-flex align-items-center gap-1"
+                hx-get="{% url 'admins:postback_detail' log.pk %}"
+                hx-target="#globalHtmxModalDialog"
+                hx-swap="innerHTML">
+            <span class="material-icons fs-6">code</span>
+            <span>Inspect JSON</span>
+        </button>
+    </td>
+</tr>
+{% endfor %}
+
+{% if page_obj.has_next %}
+<tr id="postback-desk-sentinel-{{ page_obj.number }}">
+    <td colspan="8" class="text-center py-3 bg-transparent border-0">
+        <button type="button"
+                hx-get="{% url 'admins:postback_scroll' %}?page={{ page_obj.next_page_number }}&scroll_type=rows&q={{ current_q }}&user_id={{ current_user_id }}&start_date={{ current_start_date }}&end_date={{ current_end_date }}"
+                hx-target="#postback-desk-sentinel-{{ page_obj.number }}"
+                hx-swap="outerHTML"
+                class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+                style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+                title="Load More Postback Logs">
+            <span class="load-more-idle d-inline-flex align-items-center gap-2">
+                <span class="material-icons fs-5">keyboard_arrow_down</span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Load More Logs (Page {{ page_obj.next_page_number }} of {{ paginator.num_pages }})</span>
+            </span>
+            <span class="load-more-loading d-none align-items-center gap-2">
+                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+                <span class="fw-bold" style="font-size: 0.8rem;">Loading logs...</span>
+            </span>
+        </button>
+    </td>
+</tr>
+{% elif paginator.count > 0 %}
+<tr class="border-0">
+    <td colspan="8" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.72rem;">
+        <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ paginator.count }} postback logs loaded
+    </td>
+</tr>
+{% endif %}

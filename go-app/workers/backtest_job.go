@@ -50,7 +50,7 @@ func (j *BacktestJob) Run(ctx context.Context) {
 		userID = "1"
 	}
 	if strategyName == "" || strategyName == "<nil>" {
-		strategyName = "ict_smc"
+		strategyName = "tensortrade_rl"
 	}
 
 	strat, ok := strategies.GetStrategy(strategyName)
