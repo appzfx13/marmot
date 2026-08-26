@@ -32,6 +32,52 @@
         color: #38bdf8 !important;
         box-shadow: 0 0 8px rgba(13, 110, 253, 0.35) !important;
     }
+
+    /* Stop-Loss RCA Card Theme Styling */
+    .rca-container-card {
+        border-left: 4px solid #ef4444 !important;
+        transition: all 0.2s ease;
+    }
+    :root[data-theme="dark"] .rca-container-card {
+        background: #030610 !important;
+        border-color: rgba(255, 255, 255, 0.10) !important;
+        border-left-color: #ef4444 !important;
+        box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.8) !important;
+    }
+    :root[data-theme="light"] .rca-container-card {
+        background: #ffffff !important;
+        border-color: rgba(15, 23, 42, 0.12) !important;
+        border-left-color: #ef4444 !important;
+        box-shadow: 0 10px 30px -5px rgba(15, 23, 42, 0.08) !important;
+    }
+
+    /* RCA Sub-Panels */
+    :root[data-theme="dark"] .rca-subpanel {
+        background: #070b16 !important;
+        border: 1px solid rgba(255, 255, 255, 0.09) !important;
+    }
+    :root[data-theme="light"] .rca-subpanel {
+        background: #f8fafc !important;
+        border: 1px solid rgba(15, 23, 42, 0.09) !important;
+    }
+
+    /* RCA Rule Items */
+    :root[data-theme="dark"] .rca-rule-item {
+        background: #02040c !important;
+        border: 1px solid rgba(168, 85, 247, 0.35) !important;
+    }
+    :root[data-theme="dark"] .rca-rule-item:hover {
+        background: #0b1124 !important;
+        border-color: rgba(168, 85, 247, 0.6) !important;
+    }
+    :root[data-theme="light"] .rca-rule-item {
+        background: #ffffff !important;
+        border: 1px solid rgba(168, 85, 247, 0.3) !important;
+    }
+    :root[data-theme="light"] .rca-rule-item:hover {
+        background: #fdf4ff !important;
+        border-color: rgba(168, 85, 247, 0.55) !important;
+    }
 </style>
 
 <!-- Top Header Navigation & Live Controls -->
@@ -130,8 +176,8 @@
 </div>
 
 <!-- Live Strategy Execution Progress Bar Card -->
-{% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
-<div class="glass-card p-3 mb-4 border border-primary border-opacity-30 position-relative overflow-hidden" 
+<div id="backtest-live-progress-card" 
+     class="glass-card p-3 mb-4 border border-primary border-opacity-30 position-relative overflow-hidden {% if backtest.status|lower != 'running' and backtest.status|lower != 'pending' and backtest.status|lower != 'in_progress' %}d-none{% endif %}" 
      style="background: linear-gradient(135deg, rgba(13, 110, 253, 0.12) 0%, rgba(13, 110, 253, 0.03) 100%);">
     <div class="d-flex align-items-center justify-content-between mb-2">
         <div class="d-flex align-items-center gap-2">
@@ -153,6 +199,10 @@
         </div>
     </div>
 
+    <div id="backtest-step-status" class="mt-2 text-info small font-monospace fst-italic">
+        {{ backtest.step_info|default:"Evaluating market ticks & policy execution..." }}
+    </div>
+
     <div class="row g-2 mt-2 pt-2 border-top border-secondary border-opacity-25 small">
         <div class="col-6 col-md-3">
             <span class="theme-text-muted">Task ID:</span> <span class="theme-text-main fw-semibold font-monospace">#BT-{{ backtest.id|stringformat:"04d" }}</span>
@@ -168,11 +218,10 @@
         </div>
     </div>
 </div>
-{% endif %}
 
 <!-- Comprehensive Strategy Configuration & Execution Parameters Card -->
-<div class="glass-card p-3 mb-4 position-relative overflow-hidden" style="background: rgba(15, 23, 42, 0.65); border: 1px solid var(--border-color);">
-    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-3 pb-2 border-bottom border-secondary border-opacity-15">
+<div class="glass-card p-3 p-md-4 mb-4 position-relative overflow-hidden">
+    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-3.5 pb-2.5 border-bottom border-secondary border-opacity-15">
         <div class="d-flex align-items-center gap-2">
             <div class="rounded-circle bg-info bg-opacity-20 text-info d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; border: 1px solid rgba(14, 165, 233, 0.3);">
                 <span class="material-icons fs-5">tune</span>
@@ -194,7 +243,7 @@
     </div>
 
     <!-- Key Parameters Grid -->
-    <div class="row g-3 small">
+    <div class="row g-3 g-md-3.5 small">
         <div class="col-6 col-md-4 col-xl-2">
             <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Strategy Engine</span>
             <span class="text-info fw-bold">{{ backtest.get_strategy_name_display }}</span>
@@ -231,6 +280,14 @@
               {% elif rule.rule_type == 'risk_management' %}background: rgba(56, 189, 248, 0.2); color: #7dd3fc; border: 1px solid rgba(56, 189, 248, 0.4);
               {% elif rule.rule_type == 'retest_limit' %}background: rgba(16, 185, 129, 0.2); color: #a7f3d0; border: 1px solid rgba(16, 185, 129, 0.4);
               {% elif rule.rule_type == 'trendline_retest' %}background: rgba(249, 115, 22, 0.2); color: #fed7aa; border: 1px solid rgba(249, 115, 22, 0.4);
+              {% elif rule.rule_type == 'india_vix' %}background: rgba(236, 72, 153, 0.2); color: #fbcfe8; border: 1px solid rgba(236, 72, 153, 0.4);
+              {% elif rule.rule_type == 'loss_rca' %}background: rgba(239, 68, 68, 0.2); color: #fca5a5; border: 1px solid rgba(239, 68, 68, 0.45);
+              {% elif rule.rule_type == 'atr_noise_filter' %}background: rgba(20, 184, 166, 0.2); color: #99f6e4; border: 1px solid rgba(20, 184, 166, 0.4);
+              {% elif rule.rule_type == 'candle_close_sl' %}background: rgba(99, 102, 241, 0.2); color: #c7d2fe; border: 1px solid rgba(99, 102, 241, 0.4);
+              {% elif rule.rule_type == 'liquidity_sweep' %}background: rgba(6, 182, 212, 0.2); color: #a5f3fc; border: 1px solid rgba(6, 182, 212, 0.4);
+              {% elif rule.rule_type == 'pdh_pdl' %}background: rgba(14, 165, 233, 0.2); color: #bae6fd; border: 1px solid rgba(14, 165, 233, 0.4);
+              {% elif rule.rule_type == 'ict_smc_matrix' %}background: rgba(99, 102, 241, 0.2); color: #c7d2fe; border: 1px solid rgba(99, 102, 241, 0.4);
+              {% elif rule.rule_type == 'morning_macd_retest' %}background: rgba(245, 158, 11, 0.2); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.4);
               {% elif rule.rule_type == 'gamma_blast' %}background: rgba(168, 85, 247, 0.2); color: #e9d5ff; border: 1px solid rgba(168, 85, 247, 0.4);
               {% elif rule.rule_type == 'morning_trend' %}background: rgba(59, 130, 246, 0.2); color: #bfdbfe; border: 1px solid rgba(59, 130, 246, 0.4);
               {% elif rule.rule_type == 'gap_openings' %}background: rgba(245, 158, 11, 0.2); color: #fde68a; border: 1px solid rgba(245, 158, 11, 0.4);
@@ -251,7 +308,7 @@
         {% if backtest.backup_task %}
         <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-1 ms-auto" style="font-size: 0.7rem;">
             <span class="material-icons align-middle me-1" style="font-size: 0.75rem !important;">storage</span>
-            Linked Dataset #{{ backtest.backup_task.id }} ({{ backtest.backup_task.start_date }} to {{ backtest.backup_task.end_date }})
+            Linked Dataset #{{ backtest.backup_task.id }} · {{ backtest.backup_task.display_symbol }} ({{ backtest.backup_task.start_date }} to {{ backtest.backup_task.end_date }})
         </span>
         {% endif %}
     </div>
@@ -259,7 +316,7 @@
     {% if backtest.parameters.prompt_directives %}
     <div class="mt-2 pt-2 border-top border-secondary border-opacity-10 small d-flex align-items-start gap-2">
         <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0 fw-bold" style="font-size: 0.68rem;">AI DIRECTIVES</span>
-        <span class="theme-text-main fst-italic" style="color: #e2e8f0 !important;">"{{ backtest.parameters.prompt_directives }}"</span>
+        <span class="theme-text-main fst-italic">"{{ backtest.parameters.prompt_directives }}"</span>
     </div>
     {% endif %}
 </div>
@@ -627,6 +684,226 @@
     </div>
 </div>
 
+<!-- AI Stop-Loss Root Cause Analysis (Loss RCA) & Future Rule Synthesis Card -->
+{% if backtest.results.loss_rca_breakdown or backtest.results.ai_suggested_future_rules %}
+<div class="glass-card p-0 overflow-hidden mb-4 border-0">
+    <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35);">
+                <span class="material-icons" style="font-size: 1.25rem;">troubleshoot</span>
+            </div>
+            <div>
+                <h5 class="fw-bold theme-text-main mb-0">Stop-Loss Root Cause Analysis (Loss RCA) & Learning Engine</h5>
+                <small class="theme-text-muted">TensorTrade AI failure mode decomposition & automated future rule guardrail synthesis.</small>
+            </div>
+        </div>
+        <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-3 py-1 font-monospace fw-bold" style="font-size: 0.72rem;">
+            {{ analytics.sl_hit_count }} Stop Losses Diagnosed
+        </span>
+    </div>
+
+    <div class="p-3 p-md-4">
+        <div class="row g-3 g-lg-4">
+            <!-- 1. Primary Failure Mechanisms (Left Column) -->
+            <div class="col-12 col-lg-5">
+                <div class="p-3.5 p-md-4 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                    <div class="d-flex align-items-center justify-content-between mb-3.5 pb-2.5 border-bottom border-secondary border-opacity-15">
+                        <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.74rem; letter-spacing: 0.5px;">
+                            <span class="material-icons text-danger" style="font-size: 1rem;">pie_chart</span>
+                            Primary Failure Mechanisms
+                        </span>
+                        <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.65rem;">
+                            {{ backtest.results.loss_rca_breakdown|length }} Patterns
+                        </span>
+                    </div>
+                    {% for rca_item in backtest.results.loss_rca_breakdown %}
+                    <div class="mb-3.5 pb-2.5 {% if not forloop.last %}border-bottom border-secondary border-opacity-15{% endif %}">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="theme-text-main fw-bold text-truncate" style="font-size: 0.85rem;" title="{{ rca_item.category }}">
+                                {{ rca_item.category }}
+                            </span>
+                            <span class="text-danger font-monospace fw-bold ms-2 flex-shrink-0" style="font-size: 0.82rem;">
+                                {{ rca_item.count }} ({{ rca_item.percentage }}%)
+                            </span>
+                        </div>
+                        <div class="progress rounded-pill" style="height: 6px; background: rgba(255, 255, 255, 0.08);">
+                            <div class="progress-bar bg-danger rounded-pill" style="width: {{ rca_item.percentage }}%;"></div>
+                        </div>
+                    </div>
+                    {% empty %}
+                    <div class="theme-text-muted small fst-italic p-4 text-center">No recurring stop loss patterns detected.</div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <!-- 2. AI-Synthesized Preventive Rules (Right Column - Matching UI Structure) -->
+            <div class="col-12 col-lg-7">
+                <div class="p-3.5 p-md-4 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                    <div class="d-flex justify-content-between align-items-center mb-3.5 pb-2.5 border-bottom border-secondary border-opacity-15">
+                        <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.74rem; letter-spacing: 0.5px;">
+                            <span class="material-icons text-info" style="font-size: 1rem;">auto_awesome</span> 
+                            AI-Synthesized Preventive Rules
+                        </span>
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
+                            Adaptive Guardrails
+                        </span>
+                    </div>
+                    <div class="d-flex flex-column">
+                        {% for future_rule in backtest.results.ai_suggested_future_rules %}
+                        <div class="mb-3.5 pb-3 {% if not forloop.last %}border-bottom border-secondary border-opacity-15{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center mb-1.5 flex-wrap gap-2">
+                                <div class="d-flex align-items-center gap-2 text-truncate">
+                                    <span class="material-icons text-info flex-shrink-0" style="font-size: 1.05rem;">shield</span>
+                                    <span class="theme-text-main fw-bold text-truncate" style="font-size: 0.86rem;" title="{{ future_rule.name }}">
+                                        {{ future_rule.name }}
+                                    </span>
+                                </div>
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-1 font-monospace fw-bold flex-shrink-0" style="font-size: 0.74rem;">
+                                    🛡️ Prevents ~{{ future_rule.impact_loss_count }} Losses
+                                </span>
+                            </div>
+                            <div class="theme-text-muted mt-1.5 ps-4" style="font-size: 0.82rem; line-height: 1.5;">
+                                {{ future_rule.preventative_prompt }}
+                            </div>
+                        </div>
+                        {% empty %}
+                        <div class="theme-text-muted small fst-italic p-4 text-center">All trades satisfied active rule criteria cleanly.</div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- Active Strategy Rules Efficacy & Precision Attribution Summary Card Widget -->
+{% if rules_performance %}
+<div class="glass-card p-0 overflow-hidden mb-4 border-0">
+    <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: rgba(56, 189, 248, 0.18); color: #38bdf8;">
+                <span class="material-icons" style="font-size: 1.25rem;">fact_check</span>
+            </div>
+            <div>
+                <h5 class="fw-bold theme-text-main mb-0">Active Strategy Rules Efficacy & Precision Attribution</h5>
+                <small class="theme-text-muted">Factor decomposition: execution hit rate, win precision %, net alpha PnL, and false-signal mitigation per rule.</small>
+            </div>
+        </div>
+        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-3 py-1 font-monospace fw-bold" style="font-size: 0.72rem;">
+            {{ rules_performance|length }} Active Rules Monitored
+        </span>
+    </div>
+
+    <!-- DESKTOP / LAPTOP: DENSE RULES EFFICACY TABLE -->
+    <div class="w-100 d-none d-lg-block">
+        <table class="table table-hover custom-glass-table align-middle mb-0 border-0 w-100" style="width: 100%; table-layout: fixed; --bs-table-bg: transparent; color: var(--text-main);">
+            <thead>
+                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                    <th scope="col" class="ps-3 py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 32%; font-size: 0.7rem;">Rule Name & Guardrail Role</th>
+                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 12%; font-size: 0.7rem;">Invocations</th>
+                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 18%; font-size: 0.7rem;">Accuracy / Win Rate</th>
+                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 12%; font-size: 0.7rem;">Win / Loss Split</th>
+                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 14%; font-size: 0.7rem;">Net Alpha PnL</th>
+                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 12%; font-size: 0.7rem;">Precision Status</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for r in rules_performance %}
+                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+                    <td class="ps-3 py-2 bg-transparent">
+                        <div class="d-flex align-items-center gap-2 mb-0.5">
+                            <span class="material-icons fs-6" style="color: {{ r.color }};">{{ r.icon }}</span>
+                            <span class="fw-bold theme-text-main small">{{ r.name }}</span>
+                        </div>
+                        <small class="theme-text-muted d-block ps-4" style="font-size: 0.68rem; margin-top: -2px;">{{ r.role }}</small>
+                    </td>
+
+                    <td class="py-2 px-1 bg-transparent text-center font-monospace">
+                        <span class="badge rounded-pill px-2 py-0.5 fw-semibold" style="font-size: 0.7rem; background: rgba(255, 255, 255, 0.08) !important; color: #f1f5f9 !important; border: 1px solid rgba(255, 255, 255, 0.15) !important;">
+                            {{ r.triggered_count }} Trades
+                        </span>
+                    </td>
+
+                    <td class="py-2 px-1 bg-transparent font-monospace">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <span class="fw-bold {% if r.accuracy_pct >= 60 %}text-success{% elif r.accuracy_pct >= 45 %}text-info{% else %}text-warning{% endif %}" style="font-size: 0.75rem;">
+                                {{ r.accuracy_pct }}%
+                            </span>
+                            {% if r.prevented_count > 0 %}
+                            <span class="text-info" style="font-size: 0.65rem;" title="False traps / noise stopouts prevented">
+                                🛡️ {{ r.prevented_count }} Saved
+                            </span>
+                            {% endif %}
+                        </div>
+                        <div class="progress rounded-pill" style="height: 5px; background: rgba(255, 255, 255, 0.08);">
+                            <div class="progress-bar {% if r.accuracy_pct >= 60 %}bg-success{% elif r.accuracy_pct >= 45 %}bg-info{% else %}bg-warning{% endif %} rounded-pill" style="width: {{ r.accuracy_pct }}%;"></div>
+                        </div>
+                    </td>
+
+                    <td class="py-2 px-1 bg-transparent text-center font-monospace" style="font-size: 0.72rem;">
+                        <span class="text-success fw-bold">{{ r.winning_count }}W</span>
+                        <span class="theme-text-muted mx-0.5">/</span>
+                        <span class="text-danger fw-bold">{{ r.losing_count }}L</span>
+                    </td>
+
+                    <td class="py-2 px-1 bg-transparent font-monospace">
+                        <span class="badge rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.74rem; {% if r.net_pnl >= 0 %}background: rgba(16, 185, 129, 0.22) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.4) !important;{% else %}background: rgba(239, 68, 68, 0.22) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.4) !important;{% endif %}">
+                            {% if r.net_pnl >= 0 %}+{% endif %}₹{{ r.net_pnl|floatformat:2 }}
+                        </span>
+                    </td>
+
+                    <td class="py-2 px-1 bg-transparent text-center">
+                        {% if r.accuracy_pct >= 65 %}
+                            <span class="badge rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.2) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.4) !important;">
+                                🟢 High Precision
+                            </span>
+                        {% elif r.accuracy_pct >= 50 %}
+                            <span class="badge rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.65rem; background: rgba(56, 189, 248, 0.2) !important; color: #38bdf8 !important; border: 1px solid rgba(56, 189, 248, 0.4) !important;">
+                                🔵 Solid Filter
+                            </span>
+                        {% else %}
+                            <span class="badge rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.65rem; background: rgba(245, 158, 11, 0.2) !important; color: #fbbf24 !important; border: 1px solid rgba(245, 158, 11, 0.4) !important;">
+                                ⚡ Active Shield
+                            </span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MOBILE & TABLET VIEW: COMPACT RULE PERFORMANCE CARDS -->
+    <div class="p-3 d-block d-lg-none">
+        <div class="row g-2">
+            {% for r in rules_performance %}
+            <div class="col-12 col-md-6">
+                <div class="p-2.5 rounded-3 border" style="background: rgba(15, 23, 42, 0.55); border-color: var(--border-color) !important;">
+                    <div class="d-flex justify-content-between align-items-start mb-1.5">
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="material-icons fs-6" style="color: {{ r.color }};">{{ r.icon }}</span>
+                            <span class="fw-bold theme-text-main small">{{ r.name }}</span>
+                        </div>
+                        <span class="badge rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem; {% if r.net_pnl >= 0 %}background: rgba(16, 185, 129, 0.2) !important; color: #34d399 !important;{% else %}background: rgba(239, 68, 68, 0.2) !important; color: #f87171 !important;{% endif %}">
+                            {% if r.net_pnl >= 0 %}+{% endif %}₹{{ r.net_pnl|floatformat:0 }}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center small font-monospace mb-1">
+                        <span class="theme-text-muted" style="font-size: 0.7rem;">Invocations: <strong>{{ r.triggered_count }}</strong> ({{ r.winning_count }}W/{{ r.losing_count }}L)</span>
+                        <span class="fw-bold {% if r.accuracy_pct >= 60 %}text-success{% else %}text-info{% endif %}" style="font-size: 0.72rem;">{{ r.accuracy_pct }}% Win</span>
+                    </div>
+                    <div class="progress rounded-pill" style="height: 4px; background: rgba(255, 255, 255, 0.08);">
+                        <div class="progress-bar {% if r.accuracy_pct >= 60 %}bg-success{% else %}bg-info{% endif %} rounded-pill" style="width: {{ r.accuracy_pct }}%;"></div>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
 <!-- Advanced Trade Log Search & Filter Controls Bar -->
 <div class="glass-card p-3 mb-4">
     <form method="GET" 
@@ -683,6 +960,22 @@
             <small class="theme-text-muted">Total {{ total_trades_count }} Signals recorded | Infinite scroll auto-appends on scroll</small>
         </div>
         <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1">Trade Log</span>
+    </div>
+
+    <!-- Interactive Chart Filter Banner (Visible when a trade is selected from chart) -->
+    <div id="chart-trade-filter-banner" class="px-3 py-2 border-bottom d-none align-items-center justify-content-between" style="background: rgba(14, 165, 233, 0.15); border-color: rgba(14, 165, 233, 0.3) !important;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-info fs-5">show_chart</span>
+            <span class="small fw-semibold theme-text-main">
+                Chart Filter Active: <span id="chart-filtered-trade-title" class="text-info">Trade #1</span>
+            </span>
+        </div>
+        <button type="button" 
+                class="btn btn-sm btn-outline-info rounded-pill px-3 py-0.5 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                onclick="window.clearTradeChartFilter && window.clearTradeChartFilter()">
+            <span class="material-icons" style="font-size: 0.9rem;">close</span>
+            <span>Show All Trades</span>
+        </button>
     </div>
 
     <!-- DESKTOP / LAPTOP: COMPACT INSTITUTIONAL TRADES TABLE -->
@@ -833,6 +1126,8 @@
         const hudTradeEquity = document.getElementById('hudTradeEquity');
         const hudTradeDrawdown = document.getElementById('hudTradeDrawdown');
 
+        let selectedTradeIndex = null;
+
         function updateHUD(idx) {
             const pt = rawTradeData[idx];
             if (!pt) return;
@@ -856,6 +1151,197 @@
             }
         }
 
+        let isServerFiltered = false;
+
+        function filterTableForTrade(tradeNum, pt) {
+            console.log('🎯 [Chart Trade Clicked] Isolating Trade #' + tradeNum, pt);
+            const banner = document.getElementById('chart-trade-filter-banner');
+            const bannerTitle = document.getElementById('chart-filtered-trade-title');
+            if (banner && bannerTitle) {
+                const formattedPnl = (pt.pnl !== undefined) ? ((pt.pnl >= 0 ? '+₹' : '₹') + Number(pt.pnl).toLocaleString('en-IN', {minimumFractionDigits: 2})) : '';
+                bannerTitle.innerHTML = `<strong>Trade #${tradeNum}</strong> &mdash; <span class="font-monospace">${pt.strike || ''}</span> (${pt.label || ''}) &bull; Realized PnL: <span class="${pt.pnl >= 0 ? 'text-success' : 'text-danger'} fw-bold">${formattedPnl}</span>`;
+                banner.classList.remove('d-none');
+                banner.classList.add('d-flex');
+            }
+
+            // Check if row/card exists in current DOM
+            const existingRow = document.getElementById('trade-row-' + tradeNum);
+            const existingCard = document.getElementById('trade-card-' + tradeNum);
+
+            if (existingRow || existingCard) {
+                // In DOM: Instant client-side filter
+                const rows = document.querySelectorAll('.trade-table-row');
+                let targetRow = null;
+                rows.forEach(function(row) {
+                    const serial = row.getAttribute('data-trade-serial');
+                    const drawer = document.getElementById('trade-exp-' + serial);
+                    if (String(serial) === String(tradeNum)) {
+                        row.style.display = '';
+                        row.classList.add('table-primary');
+                        row.style.boxShadow = '0 0 16px rgba(56, 189, 248, 0.4)';
+                        targetRow = row;
+                        if (drawer) {
+                            drawer.style.display = '';
+                            if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                                bootstrap.Collapse.getOrCreateInstance(drawer, { toggle: false }).show();
+                            } else {
+                                drawer.classList.add('show');
+                            }
+                        }
+                    } else {
+                        row.style.display = 'none';
+                        row.classList.remove('table-primary');
+                        row.style.boxShadow = 'none';
+                        if (drawer) {
+                            drawer.style.display = 'none';
+                            drawer.classList.remove('show');
+                        }
+                    }
+                });
+
+                const cards = document.querySelectorAll('.trade-card-item');
+                let targetCard = null;
+                cards.forEach(function(card) {
+                    const serial = card.getAttribute('data-trade-serial');
+                    const drawer = document.getElementById('trade-mb-exp-' + serial);
+                    if (String(serial) === String(tradeNum)) {
+                        card.style.display = '';
+                        card.style.borderColor = '#38bdf8';
+                        card.style.boxShadow = '0 0 16px rgba(56, 189, 248, 0.4)';
+                        targetCard = card;
+                        if (drawer) {
+                            if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                                bootstrap.Collapse.getOrCreateInstance(drawer, { toggle: false }).show();
+                            } else {
+                                drawer.classList.add('show');
+                            }
+                        }
+                    } else {
+                        card.style.display = 'none';
+                        card.style.borderColor = '';
+                        card.style.boxShadow = 'none';
+                        if (drawer) {
+                            drawer.classList.remove('show');
+                        }
+                    }
+                });
+
+                const targetEl = targetRow || targetCard || document.getElementById('backtest-orders-container');
+                if (targetEl) {
+                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            } else {
+                // Not in DOM (trade #31+ or unpaginated): Fetch specific trade via server endpoint
+                isServerFiltered = true;
+                const urlRows = `{% url 'backtest:backtest_trades_scroll' backtest.pk %}?trade_num=${tradeNum}&scroll_type=rows`;
+                const urlCards = `{% url 'backtest:backtest_trades_scroll' backtest.pk %}?trade_num=${tradeNum}&scroll_type=cards`;
+
+                const tableBody = document.getElementById('trades-table-body');
+                const cardsContainer = document.getElementById('trades-mobile-container');
+
+                if (tableBody) {
+                    fetch(urlRows)
+                        .then(res => res.text())
+                        .then(html => {
+                            tableBody.innerHTML = html;
+                            const newRow = document.getElementById('trade-row-' + tradeNum);
+                            const newDrawer = document.getElementById('trade-exp-' + tradeNum);
+                            if (newRow) {
+                                newRow.classList.add('table-primary');
+                                newRow.style.boxShadow = '0 0 16px rgba(56, 189, 248, 0.4)';
+                            }
+                            if (newDrawer && typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                                bootstrap.Collapse.getOrCreateInstance(newDrawer, { toggle: false }).show();
+                            }
+                            if (window.htmx) window.htmx.process(tableBody);
+                        });
+                }
+
+                if (cardsContainer) {
+                    fetch(urlCards)
+                        .then(res => res.text())
+                        .then(html => {
+                            cardsContainer.innerHTML = html;
+                            const newCard = document.getElementById('trade-card-' + tradeNum);
+                            const newDrawer = document.getElementById('trade-mb-exp-' + tradeNum);
+                            if (newCard) {
+                                newCard.style.borderColor = '#38bdf8';
+                                newCard.style.boxShadow = '0 0 16px rgba(56, 189, 248, 0.4)';
+                            }
+                            if (newDrawer && typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
+                                bootstrap.Collapse.getOrCreateInstance(newDrawer, { toggle: false }).show();
+                            }
+                            if (window.htmx) window.htmx.process(cardsContainer);
+                        });
+                }
+
+                const containerEl = document.getElementById('backtest-orders-container');
+                if (containerEl) {
+                    containerEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+                }
+            }
+        }
+
+        window.clearTradeChartFilter = function() {
+            console.log('🔄 [Clear Chart Trade Filter] Showing all trades...');
+            selectedTradeIndex = null;
+            const banner = document.getElementById('chart-trade-filter-banner');
+            if (banner) {
+                banner.classList.add('d-none');
+                banner.classList.remove('d-flex');
+            }
+
+            if (isServerFiltered) {
+                isServerFiltered = false;
+                const urlResetRows = `{% url 'backtest:backtest_trades_scroll' backtest.pk %}?trade_status={{ current_filters.trade_status }}&trade_type={{ current_filters.trade_type }}&date_from={{ current_filters.date_from }}&date_to={{ current_filters.date_to }}&q={{ current_filters.q }}&scroll_type=rows`;
+                const urlResetCards = `{% url 'backtest:backtest_trades_scroll' backtest.pk %}?trade_status={{ current_filters.trade_status }}&trade_type={{ current_filters.trade_type }}&date_from={{ current_filters.date_from }}&date_to={{ current_filters.date_to }}&q={{ current_filters.q }}&scroll_type=cards`;
+
+                const tableBody = document.getElementById('trades-table-body');
+                const cardsContainer = document.getElementById('trades-mobile-container');
+
+                if (tableBody) {
+                    fetch(urlResetRows)
+                        .then(res => res.text())
+                        .then(html => {
+                            tableBody.innerHTML = html;
+                            if (window.htmx) window.htmx.process(tableBody);
+                        });
+                }
+
+                if (cardsContainer) {
+                    fetch(urlResetCards)
+                        .then(res => res.text())
+                        .then(html => {
+                            cardsContainer.innerHTML = html;
+                            if (window.htmx) window.htmx.process(cardsContainer);
+                        });
+                }
+            } else {
+                const rows = document.querySelectorAll('.trade-table-row');
+                rows.forEach(function(row) {
+                    row.style.display = '';
+                    row.classList.remove('table-primary');
+                    row.style.boxShadow = 'none';
+                });
+
+                const drawers = document.querySelectorAll('.trade-drawer-row');
+                drawers.forEach(function(d) {
+                    d.style.display = '';
+                });
+
+                const cards = document.querySelectorAll('.trade-card-item');
+                cards.forEach(function(card) {
+                    card.style.display = '';
+                    card.style.borderColor = '';
+                    card.style.boxShadow = 'none';
+                });
+            }
+
+            if (window.marmotEquityChart) {
+                window.marmotEquityChart.update();
+            }
+        };
+
         window.marmotEquityChart = new Chart(ctx, {
             type: 'line',
             data: {
@@ -868,12 +1354,32 @@
                     fill: true,
                     tension: 0.25,
                     borderWidth: 2.2,
-                    pointRadius: currentZoom > 1 ? (currentZoom >= 4 ? 4.5 : 3) : (dataPoints.length < 60 ? 3 : 0),
-                    pointHoverRadius: 6,
-                    pointBackgroundColor: lineColor,
+                    pointRadius: function(context) {
+                        if (selectedTradeIndex !== null && context.dataIndex === selectedTradeIndex) {
+                            return 7.5;
+                        }
+                        return currentZoom > 1 ? (currentZoom >= 4 ? 4.5 : 3) : (dataPoints.length < 60 ? 3 : 0);
+                    },
+                    pointHoverRadius: 7,
+                    pointBackgroundColor: function(context) {
+                        if (selectedTradeIndex !== null && context.dataIndex === selectedTradeIndex) {
+                            return '#38bdf8';
+                        }
+                        return lineColor;
+                    },
                     pointHoverBackgroundColor: '#ffffff',
-                    pointBorderColor: '#0f172a',
-                    pointBorderWidth: 1.5
+                    pointBorderColor: function(context) {
+                        if (selectedTradeIndex !== null && context.dataIndex === selectedTradeIndex) {
+                            return '#ffffff';
+                        }
+                        return '#0f172a';
+                    },
+                    pointBorderWidth: function(context) {
+                        if (selectedTradeIndex !== null && context.dataIndex === selectedTradeIndex) {
+                            return 2.5;
+                        }
+                        return 1.5;
+                    }
                 }]
             },
             options: {
@@ -882,6 +1388,22 @@
                 interaction: {
                     mode: 'index',
                     intersect: false
+                },
+                onClick: function(event, activeElements) {
+                    if (activeElements && activeElements.length > 0) {
+                        const idx = activeElements[0].index;
+                        const pt = rawTradeData[idx];
+                        if (pt && pt.trade_num) {
+                            selectedTradeIndex = idx;
+                            updateHUD(idx);
+                            filterTableForTrade(pt.trade_num, pt);
+                            if (window.marmotEquityChart) window.marmotEquityChart.update();
+                        } else {
+                            window.clearTradeChartFilter();
+                        }
+                    } else {
+                        window.clearTradeChartFilter();
+                    }
                 },
                 onHover: function(event, activeElements) {
                     if (activeElements && activeElements.length > 0) {
@@ -1078,6 +1600,8 @@
     const taskStatus = "{{ backtest.status }}";
     let isFinished = (taskStatus === 'completed' || taskStatus === 'error' || taskStatus === 'cancelled');
 
+    console.log('🚀 [Backtest Detail Initialized] Task #' + taskId + ' (Status: ' + taskStatus + ', isFinished: ' + isFinished + ')');
+
     function applyBacktestProgressUpdate(data) {
         if (!data) return;
         const progress = data.progress !== undefined ? data.progress : 0;
@@ -1086,15 +1610,31 @@
         const tradesCount = data.total_trades !== undefined ? data.total_trades : null;
         const netPnL = data.net_pnl !== undefined ? data.net_pnl : null;
 
-        const progressBar = document.getElementById('backtest-progress-bar');
-        const progressPercent = document.getElementById('backtest-progress-percent');
+        console.log('📊 [Detail UI Update] Task #' + taskId + ' -> Progress: ' + progress + '%, Status: ' + status + ', Trades: ' + tradesCount + ', NetPnL: ' + netPnL);
+
+        if (status === 'running' || status === 'pending' || (progress > 0 && progress < 100)) {
+            isFinished = false;
+        }
+
+        const liveCard = document.getElementById('backtest-live-progress-card');
+        const progressBar = document.getElementById('backtest-live-progress-bar') || document.getElementById('backtest-progress-bar');
+        const progressPercent = document.getElementById('backtest-live-progress-pct') || document.getElementById('backtest-progress-percent');
         const stepStatus = document.getElementById('backtest-step-status');
         const liveTrades = document.getElementById('backtest-live-trades');
         const livePnL = document.getElementById('backtest-live-pnl');
 
+        if (liveCard && (status === 'running' || status === 'pending' || (progress > 0 && progress < 100))) {
+            liveCard.classList.remove('d-none');
+        }
+
         if (progressBar) {
             progressBar.style.width = Math.max(5, progress) + '%';
             progressBar.setAttribute('aria-valuenow', progress);
+            if (status === 'running') {
+                progressBar.classList.add('progress-bar-animated');
+            } else {
+                progressBar.classList.remove('progress-bar-animated');
+            }
         }
         if (progressPercent) {
             progressPercent.textContent = progress + '%';
@@ -1142,7 +1682,7 @@
             // 3. Immediately update step status
             if (stepStatus) {
                 stepStatus.textContent = '✨ Backtest Execution Completed! Rendering full trade analytics...';
-                stepStatus.className = 'text-success font-monospace fw-semibold';
+                stepStatus.className = 'mt-2 text-success font-monospace fw-semibold';
             }
 
             // 4. Reload full container via HTMX to swap in trade tables, KPI summary, and equity chart
@@ -1161,13 +1701,13 @@
     }
 
     // 1. WebSocket Hub Subscription
-    if (window.MarmotWS && window.MarmotWS.url) {
+    if (window.MarmotWS) {
         window.MarmotWS.unsubscribe(taskId);
         window.MarmotWS.subscribe(taskId, applyBacktestProgressUpdate);
     }
 
-    // 2. Active Polling while task is running or pending
-    if (taskStatus === 'running' || taskStatus === 'pending') {
+    // 2. Active Polling while task is running, pending, or until finished
+    if (!isFinished || taskStatus === 'running' || taskStatus === 'pending') {
         const pollTimer = setInterval(function() {
             if (isFinished) {
                 clearInterval(pollTimer);
@@ -1179,6 +1719,7 @@
             .then(function(res) { return res.ok ? res.json() : null; })
             .then(function(data) {
                 if (data) {
+                    console.log('🔄 [Detail HTTP Poll Response]:', data);
                     applyBacktestProgressUpdate(data);
                     if (data.status === 'completed' || data.status === 'error' || data.status === 'cancelled') {
                         clearInterval(pollTimer);
@@ -1191,12 +1732,16 @@
 
     // 3. Listen for reloadBacktestDetail event from modal confirmations
     document.body.addEventListener('reloadBacktestDetail', function() {
+        console.log('⚡ [reloadBacktestDetail Event Triggered] Reloading detail container...');
+        isFinished = false;
         const container = document.getElementById('backtest-detail-container') || document.getElementById('mainContentBody');
         if (container && window.htmx) {
             window.htmx.ajax('GET', window.location.pathname + window.location.search, {
                 target: container.id === 'backtest-detail-container' ? '#backtest-detail-container' : '#mainContentBody',
                 swap: 'innerHTML'
             });
+        } else {
+            window.location.reload();
         }
     });
 })();

@@ -87,6 +87,7 @@
     .custom-check-item {
         display: flex;
         align-items: center;
+        justify-content: space-between;
         gap: 0.75rem;
         padding: 0.65rem 0.9rem;
         border-radius: 8px;
@@ -97,15 +98,53 @@
         user-select: none;
     }
 
+    .custom-check-item input[type="checkbox"] {
+        order: 2;
+        width: 2.3rem !important;
+        height: 1.25rem !important;
+        cursor: pointer !important;
+        appearance: none;
+        -webkit-appearance: none;
+        background-color: rgba(255, 255, 255, 0.18);
+        border: 1px solid rgba(255, 255, 255, 0.25);
+        border-radius: 2rem;
+        position: relative;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        flex-shrink: 0;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%2394a3b8'/%3e%3c/svg%3e");
+        background-position: left center;
+        background-repeat: no-repeat;
+        background-size: contain;
+    }
+
+    .custom-check-item input[type="checkbox"]:checked {
+        background-color: #10b981 !important;
+        border-color: #059669 !important;
+        background-position: right center;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.45) !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e") !important;
+    }
+
+    .custom-check-item span {
+        order: 1;
+    }
+
     .custom-check-item:hover {
-        background: rgba(13, 110, 253, 0.08);
-        border-color: rgba(13, 110, 253, 0.35);
+        background: rgba(16, 185, 129, 0.08);
+        border-color: rgba(16, 185, 129, 0.35);
     }
 
     .custom-check-item:has(input:checked) {
-        background: rgba(13, 110, 253, 0.16);
-        border-color: #0d6efd;
-        box-shadow: 0 0 0 1px #0d6efd, 0 4px 12px rgba(13, 110, 253, 0.2);
+        background: rgba(5, 46, 28, 0.70) !important;
+        border-color: rgba(16, 185, 129, 0.55) !important;
+        box-shadow: 0 4px 18px -2px rgba(16, 185, 129, 0.35), inset 0 0 14px rgba(16, 185, 129, 0.15) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+    }
+
+    .custom-check-item:has(input:checked) span {
+        color: #34d399 !important;
+        font-weight: 700 !important;
     }
 </style>
 {% endblock %}
@@ -217,15 +256,28 @@
                 Execution Rules
             </label>
             <div class="flex-grow-1 w-100">
-                <div class="row g-2">
-                    {% for choice in form.rules %}
-                    <div class="col-12 col-md-6">
-                        <label for="{{ choice.id_for_label }}" class="custom-check-item w-100 h-100">
-                            {{ choice.tag }}
-                            <span class="theme-text-main small fw-semibold">{{ choice.choice_label }}</span>
-                        </label>
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="theme-text-muted small">Select active rules & guardrails:</span>
+                    <div class="d-flex align-items-center gap-1.5">
+                        <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-0.5 fw-semibold" style="font-size: 0.68rem;" onclick="selectAllFormRules(true)">
+                            Select All
+                        </button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-0.5 fw-semibold" style="font-size: 0.68rem;" onclick="selectAllFormRules(false)">
+                            Clear
+                        </button>
                     </div>
-                    {% endfor %}
+                </div>
+                <div class="custom-scrollable-rules p-2 rounded-2" style="max-height: 250px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(0, 0, 0, 0.2);">
+                    <div class="row g-2">
+                        {% for choice in form.rules %}
+                        <div class="col-12 col-md-6">
+                            <label for="{{ choice.id_for_label }}" class="custom-check-item w-100 h-100 p-2 d-flex align-items-center gap-2 rounded-2 border" style="background: rgba(255, 255, 255, 0.02); border-color: rgba(255, 255, 255, 0.06) !important; cursor: pointer;">
+                                {{ choice.tag }}
+                                <span class="theme-text-main small fw-semibold">{{ choice.choice_label }}</span>
+                            </label>
+                        </div>
+                        {% endfor %}
+                    </div>
                 </div>
                 <small class="form-text theme-text-muted mt-2 d-block">
                     Select one or more constraints to mask invalid trading regimes in TensorTrade RL (e.g. 0DTE Expiry afternoons, 09:20-10:30 ORB, or 15:15 Auto Square-off).
@@ -343,4 +395,11 @@
         </div>
     </form>
 </div>
+
+<script>
+function selectAllFormRules(shouldCheck) {
+    const checkboxes = document.querySelectorAll('input[name="rules"]');
+    checkboxes.forEach(cb => cb.checked = shouldCheck);
+}
+</script>
 {% endblock %}

@@ -3,11 +3,12 @@ import shutil
 from django.conf import settings
 from django.db import models
 from apps.common.models import BaseModel
-from apps.common.choices import TaskStatusChoices, IndexChoices, MarketTypeChoices, ForexInstrumentChoices
+from apps.common.choices import TaskStatusChoices, IndexChoices, MarketTypeChoices, ForexInstrumentChoices, DatabentoSchemaChoices
 
 class MarketBackupTask(BaseModel):
     StatusChoices = TaskStatusChoices
     IndexChoices = IndexChoices
+    DatabentoSchemaChoices = DatabentoSchemaChoices
 
     # 1. User Input Parameters
     start_date = models.DateField(help_text="Start date for options data range")
@@ -26,12 +27,8 @@ class MarketBackupTask(BaseModel):
     strike_count = models.PositiveIntegerField(default=5, null=True, blank=True, help_text="Number of strikes above/below ATM (INDEX/F&O only)")
 
     # FOREX / CME Micro Futures fields (NEW — nullable)
-    forex_instrument = models.CharField(
-        max_length=10,
-        choices=ForexInstrumentChoices.choices,
-        null=True, blank=True,
-        help_text="CME Micro Futures instrument to back up (FOREX/FUTURES only)"
-    )
+    forex_instrument = models.CharField(max_length=10, choices=ForexInstrumentChoices.choices, null=True, blank=True, help_text="CME Micro Futures instrument to back up (FOREX/FUTURES only)")
+    databento_schema = models.CharField(max_length=20, choices=DatabentoSchemaChoices.choices, default=DatabentoSchemaChoices.OHLCV_1M, null=True, blank=True, help_text="Databento Order Flow schema (FOREX/FUTURES only)")
 
     # 2. Control & Progress State (Tracked by Go Engine & Django UI)
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.CREATED)
@@ -46,6 +43,27 @@ class MarketBackupTask(BaseModel):
         ordering = ['-created_at']
         verbose_name = "Market Backup Task"
         verbose_name_plural = "Market Backup Tasks"
+
+    @property
+    def display_symbol(self):
+        """Returns readable asset symbol (e.g. Nifty 50 or XAUUSD / Gold -> MGC)."""
+        if self.market_type == MarketTypeChoices.FOREX_FUTURES and self.forex_instrument:
+            return self.get_forex_instrument_display()
+        return self.get_index_name_display() if self.index_name else "INDEX/F&O"
+
+    @property
+    def asset_code(self):
+        """Returns short asset code (e.g. NIFTY or MGC)."""
+        if self.market_type == MarketTypeChoices.FOREX_FUTURES and self.forex_instrument:
+            return self.forex_instrument
+        return self.index_name or "INDEX"
+
+    @property
+    def provider_name(self):
+        """Returns the market data provider (DhanHQ vs Databento)."""
+        if self.market_type == MarketTypeChoices.FOREX_FUTURES:
+            return "Databento"
+        return "DhanHQ"
 
     def delete_dataset_files(self):
         """Removes task backup dataset folder from disk."""
@@ -86,4 +104,5 @@ class MarketBackupTask(BaseModel):
         return "\n".join(lines)
 
     def __str__(self):
-        return f"Backup #{self.id} | {self.index_name} ({self.start_date} to {self.end_date}) - [{self.status.upper()}]"
+        asset = self.display_symbol if hasattr(self, 'display_symbol') else (self.index_name or self.forex_instrument or "DATASET")
+        return f"Backup #{self.id:04d} · {asset} ({self.start_date} → {self.end_date}) — [{self.status.upper()}]"

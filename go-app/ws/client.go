@@ -53,8 +53,10 @@ func (c *Client) readPump() {
 		if err := json.Unmarshal(message, &subMsg); err == nil {
 			switch subMsg.Type {
 			case "subscribe":
+				log.Printf("📥 [WS] Client registered subscription for task: %s\n", subMsg.TaskID)
 				c.hub.Subscribe <- &TaskSubscription{TaskID: subMsg.TaskID, Client: c}
 			case "unsubscribe":
+				log.Printf("📤 [WS] Client removed subscription for task: %s\n", subMsg.TaskID)
 				c.hub.Unsubscribe <- &TaskSubscription{TaskID: subMsg.TaskID, Client: c}
 			default:
 				c.hub.Broadcast <- message

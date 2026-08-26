@@ -110,6 +110,14 @@ class ForexInstrumentChoices(models.TextChoices):
     USOIL_MCL   = "MCL",  "USOIL / Crude   →  MCL  (Micro Crude Oil)"
 
 
+# Databento Order Flow Data Schema Choices
+class DatabentoSchemaChoices(models.TextChoices):
+    OHLCV_1M = 'ohlcv-1m', '1-Min Candles (OHLCV)'
+    TRADES   = 'trades',   'Tick-by-Tick Executions'
+    MBP_10   = 'mbp-10',   'Level-10 Order Book Depth (DOM)'
+    MBO      = 'mbo',      'Full Market-By-Order Flow'
+
+
 # Logger Category Choices (Marmot Trading Platform Apps & Subsystems)
 class LoggerCategoryChoices(models.TextChoices):
     TRADING = "TRADING", "Trading Core Engine"

@@ -21,17 +21,29 @@ type DBService struct {
 }
 
 func NewDBService(ctx context.Context, dbURL, tableName string) (*DBService, error) {
-	pool, err := pgxpool.New(ctx, dbURL)
-	if err != nil {
-		return nil, fmt.Errorf("unable to connect to postgres: %w", err)
+	var pool *pgxpool.Pool
+	var err error
+	maxRetries := 10
+
+	for attempt := 1; attempt <= maxRetries; attempt++ {
+		pool, err = pgxpool.New(ctx, dbURL)
+		if err == nil {
+			if pingErr := pool.Ping(ctx); pingErr == nil {
+				log.Println("✅ Connected to PostgreSQL (Shared State Layer)")
+				return &DBService{Pool: pool, TableName: tableName}, nil
+			} else {
+				err = pingErr
+			}
+			pool.Close()
+		}
+
+		if attempt < maxRetries {
+			log.Printf("⏳ [DB] PostgreSQL not ready yet (%v). Retrying in 2s (Attempt %d/%d)...", err, attempt, maxRetries)
+			time.Sleep(2 * time.Second)
+		}
 	}
 
-	if err := pool.Ping(ctx); err != nil {
-		return nil, fmt.Errorf("postgres ping failed: %w", err)
-	}
-
-	log.Println("✅ Connected to PostgreSQL (Shared State Layer)")
-	return &DBService{Pool: pool, TableName: tableName}, nil
+	return nil, fmt.Errorf("unable to connect to postgres after %d attempts: %w", maxRetries, err)
 }
 
 // UpdateTaskProgress updates status and progress percentage (0 to 100)

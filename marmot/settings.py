@@ -279,3 +279,6 @@ SOCIALACCOUNT_PROVIDERS = {
 # UI Theme Configuration (e.g. 'default', 'shadcn-zinc', 'shadcn-slate', 'shadcn-violet')
 UI_THEME = os.getenv('UI_THEME', 'default')
 
+# Databento Order Flow & CME Futures API Configuration
+DATABENTO_API_KEY = os.getenv('DATABENTO_API_KEY', '')
+

@@ -33,7 +33,7 @@ class MarketBackupForm(forms.ModelForm):
             # INDEX / F&O
             'index_name', 'strike_count',
             # FOREX / CME
-            'forex_instrument',
+            'forex_instrument', 'databento_schema',
         ]
         widgets = {
             'market_type':      forms.Select(attrs={'class': _SELECT_CSS, 'id': 'id_market_type'}),
@@ -41,6 +41,7 @@ class MarketBackupForm(forms.ModelForm):
             'end_date':         forms.DateInput(attrs={'type': 'date', 'class': _FIELD_CSS}),
             'index_name':       forms.Select(attrs={'class': _SELECT_CSS}),
             'forex_instrument': forms.Select(attrs={'class': _SELECT_CSS}),
+            'databento_schema': forms.Select(attrs={'class': _SELECT_CSS}),
         }
 
     def clean(self):

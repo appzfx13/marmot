@@ -97,9 +97,9 @@
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2 mb-1">
-                        <h4 class="fw-bold mb-0 theme-text-main">{{ backup.get_index_name_display }}</h4>
-                        <span class="badge bg-secondary bg-opacity-15 theme-text-muted border border-secondary border-opacity-20 rounded-pill px-2.5 py-1 small">
-                            1-Min OHLCV + Options
+                        <h4 class="fw-bold mb-0 theme-text-main">{{ backup.display_symbol }}</h4>
+                        <span class="badge {% if backup.market_type == 'FOREX_FUTURES' %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25{% endif %} rounded-pill px-2.5 py-1 small">
+                            {% if backup.market_type == 'FOREX_FUTURES' %}FOREX / CME Futures · Provider: {{ backup.provider_name }}{% else %}INDEX / F&amp;O · Provider: {{ backup.provider_name }}{% endif %}
                         </span>
                     </div>
                     <p class="theme-text-muted small mb-0 d-flex align-items-center gap-2">
@@ -159,8 +159,20 @@
                     </h5>
 
                     <div class="stat-item">
-                        <span class="stat-label">Target Index</span>
-                        <span class="stat-value">{{ backup.get_index_name_display }}</span>
+                        <span class="stat-label">Market Segment</span>
+                        <span class="stat-value fw-bold {% if backup.market_type == 'FOREX_FUTURES' %}text-success{% else %}text-primary{% endif %}">
+                            {% if backup.market_type == 'FOREX_FUTURES' %}FOREX / CME Futures{% else %}INDEX / F&amp;O{% endif %}
+                        </span>
+                    </div>
+
+                    <div class="stat-item">
+                        <span class="stat-label">Target Asset</span>
+                        <span class="stat-value">{{ backup.display_symbol }}</span>
+                    </div>
+
+                    <div class="stat-item">
+                        <span class="stat-label">Data Provider</span>
+                        <span class="stat-value"><strong class="theme-text-main">{{ backup.provider_name }}</strong></span>
                     </div>
 
                     <div class="stat-item">
@@ -168,10 +180,12 @@
                         <span class="stat-value">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</span>
                     </div>
 
+                    {% if backup.market_type != 'FOREX_FUTURES' %}
                     <div class="stat-item">
                         <span class="stat-label">Strike Spread</span>
                         <span class="stat-value">±{{ backup.strike_count }} ATM (CE &amp; PE)</span>
                     </div>
+                    {% endif %}
 
                     <div class="stat-item">
                         <span class="stat-label">Storage Format</span>
@@ -291,7 +305,86 @@
         </div>
     </div>
 
-    <!-- ── 3. DIAGNOSTIC LOGS (ONLY WHEN PRESENT) ────────────────────────── -->
+    <!-- ── 3. PARQUET DATASET INSPECTOR & VERIFICATION ────────────────── -->
+    {% if parquet_inspection.exists %}
+    <div class="detail-card mb-4">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-3 pb-3 border-bottom border-secondary border-opacity-15">
+            <div class="d-flex align-items-center gap-2.5">
+                <div class="p-2 rounded-3" style="background: rgba(16, 185, 129, 0.12); border: 1px solid rgba(16, 185, 129, 0.25);">
+                    <span class="material-icons text-emerald fs-5 d-block">verified</span>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="fw-bold theme-text-main mb-0">Parquet Dataset Inspector</h5>
+                        {% if parquet_inspection.is_valid %}
+                            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 text-xxs fw-semibold">
+                                Valid Apache Parquet (PAR1)
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2.5 py-1 text-xxs fw-semibold">
+                                Format Warning
+                            </span>
+                        {% endif %}
+                    </div>
+                    <span class="text-xs text-muted">Direct Binary Ingestion Inspection & Raw Data Verification</span>
+                </div>
+            </div>
+
+            <!-- Metadata Metrics Pills -->
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <div class="px-3 py-1.5 rounded-3 text-center" style="background: var(--input-bg); border: 1px solid var(--border-color);">
+                    <span class="text-xxs text-muted d-block text-uppercase fw-semibold">Total Rows</span>
+                    <span class="fw-bold text-emerald font-monospace text-xs">{{ parquet_inspection.num_rows|default:0 }}</span>
+                </div>
+                <div class="px-3 py-1.5 rounded-3 text-center" style="background: var(--input-bg); border: 1px solid var(--border-color);">
+                    <span class="text-xxs text-muted d-block text-uppercase fw-semibold">File Size</span>
+                    <span class="fw-bold theme-text-main font-monospace text-xs">{{ parquet_inspection.file_size_mb }} MB</span>
+                </div>
+                <div class="px-3 py-1.5 rounded-3 text-center" style="background: var(--input-bg); border: 1px solid var(--border-color);">
+                    <span class="text-xxs text-muted d-block text-uppercase fw-semibold">Row Groups</span>
+                    <span class="fw-bold text-info font-monospace text-xs">{{ parquet_inspection.num_row_groups }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Schema Columns -->
+        {% if parquet_inspection.schema %}
+        <div class="mb-3">
+            <span class="stat-label text-xxs text-uppercase fw-semibold mb-1.5 d-block">Binary Schema &amp; Data Types:</span>
+            <div class="d-flex flex-wrap gap-1.5">
+                {% for col in parquet_inspection.schema %}
+                <span class="badge bg-dark border border-secondary border-opacity-25 text-light font-monospace text-xxs px-2 py-1">
+                    <span class="text-info">{{ col.name }}</span>: <span class="text-muted">{{ col.type }}</span>
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Live Search Box -->
+        {% if parquet_inspection.is_valid %}
+        <div class="mb-3">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-dark border-secondary border-opacity-25 text-muted px-2.5">
+                    <span class="material-icons text-xs">search</span>
+                </span>
+                <input type="text"
+                       name="q"
+                       class="form-bg-input form-control text-xs"
+                       placeholder="Filter Parquet rows (e.g. 2026-08-14, MGC, FUT, CE)..."
+                       hx-get="{% url 'market:market_backup_preview' backup.pk %}"
+                       hx-target="#parquet-preview-table-container"
+                       hx-trigger="keyup changed delay:300ms, search">
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- Raw Data Sample Table Partial -->
+        {% include 'admins/partials/parquet_preview_content.html' %}
+    </div>
+    {% endif %}
+
+    <!-- ── 4. DIAGNOSTIC LOGS (ONLY WHEN PRESENT) ────────────────────────── -->
     {% if backup.error_logs %}
     <div class="detail-card mb-4" id="backup-error-logs">
         <div class="d-flex align-items-center justify-content-between mb-2">

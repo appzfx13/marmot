@@ -19,6 +19,12 @@ type TaskParams struct {
 	// Dhan authentication: access token generated from API Key + Secret (24h TTL, injected by Django)
 	DhanClientID    string                 `json:"dhan_client_id"`
 	DhanAccessToken string                 `json:"dhan_access_token"`
+	// FOREX / Databento parameters
+	MarketType      string                 `json:"market_type"`
+	ForexInstrument string                 `json:"forex_instrument"`
+	ProviderName    string                 `json:"provider_name"`
+	DatabentoAPIKey string                 `json:"databento_api_key"`
+	DatabentoSchema string                 `json:"databento_schema"`
 	Params          map[string]interface{} `json:"params"`
 }
 

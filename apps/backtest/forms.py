@@ -46,9 +46,15 @@ class BacktestRuleForm(forms.ModelForm):
         return instance
 
 
+class MarketBackupTaskChoiceField(forms.ModelChoiceField):
+    def label_from_instance(self, obj):
+        size_info = f" ({obj.file_size_mb:.1f} MB)" if obj.file_size_mb > 0 else ""
+        return f"#{obj.id:04d} · {obj.display_symbol} ({obj.start_date} → {obj.end_date}) — [{obj.status.upper()}]{size_info}"
+
+
 class BacktestTaskForm(forms.ModelForm):
-    backup_task = forms.ModelChoiceField(
-        queryset=MarketBackupTask.objects.filter(is_deleted=False),
+    backup_task = MarketBackupTaskChoiceField(
+        queryset=MarketBackupTask.objects.filter(is_deleted=False).order_by('-id'),
         required=False,
         empty_label="-- Select Existing Backup File (Optional) --",
         widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_backup_task'})

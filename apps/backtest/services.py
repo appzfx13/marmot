@@ -27,8 +27,10 @@ def broadcast_backtest_progress(task_id, progress: int, status: str, net_pnl: fl
             "step_info": str(step_info),
         }
         BacktestTask.objects.filter(id=task_id).update(progress=progress, status=status)
-        redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
+        pub_count = redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
+        print(f"📡 [BROADCAST-PROGRESS] Task #{task_id} -> {progress}% ({status}) | Step: {step_info} | PnL: ₹{net_pnl:,.2f} | Trades: {total_trades} | Redis Pub Subscribed Clients: {pub_count}", flush=True)
     except Exception as e:
+        print(f"❌ [BROADCAST-PROGRESS ERROR] Task #{task_id}: {e}", flush=True)
         logger.error("Failed to broadcast backtest progress", exc=e, extra={"task_id": task_id})
 
 

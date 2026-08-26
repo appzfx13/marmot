@@ -1,87 +1,263 @@
 <!-- templates/admins/partials/backtest_edit_modal.html -->
-<div class="modal-content glass-card p-3 border shadow-lg" style="background: var(--nav-hover, rgba(15, 23, 42, 0.96)); backdrop-filter: blur(20px); border-color: var(--border-color) !important; border-radius: 16px;">
+<style>
+    /* Modal Theme System (Ultra Deep Dark & Clean Light) */
+    :root[data-theme="dark"] .edit-backtest-modal-card {
+        background: #030610 !important;
+        border-color: rgba(255, 255, 255, 0.11) !important;
+        color: #f8fafc !important;
+        box-shadow: 0 30px 70px -15px rgba(0, 0, 0, 0.98), 0 0 0 1px rgba(255, 255, 255, 0.08) !important;
+    }
+    :root[data-theme="light"] .edit-backtest-modal-card {
+        background: #ffffff !important;
+        border-color: rgba(15, 23, 42, 0.14) !important;
+        color: #0f172a !important;
+        box-shadow: 0 25px 55px -10px rgba(15, 23, 42, 0.16), 0 0 0 1px rgba(15, 23, 42, 0.06) !important;
+    }
+
+    /* Subpanels */
+    :root[data-theme="dark"] .edit-modal-subpanel {
+        background: #070b16 !important;
+        border-color: rgba(255, 255, 255, 0.09) !important;
+    }
+    :root[data-theme="light"] .edit-modal-subpanel {
+        background: #f8fafc !important;
+        border-color: rgba(15, 23, 42, 0.09) !important;
+    }
+
+    /* Form Inputs */
+    :root[data-theme="dark"] .edit-modal-input {
+        background: #010308 !important;
+        color: #f8fafc !important;
+        border-color: rgba(255, 255, 255, 0.16) !important;
+        padding: 9px 14px !important;
+        border-radius: 9px !important;
+    }
+    :root[data-theme="dark"] .edit-modal-input:focus {
+        border-color: #6366f1 !important;
+        box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.35) !important;
+        background: #02050e !important;
+    }
+    :root[data-theme="light"] .edit-modal-input {
+        background: #ffffff !important;
+        color: #0f172a !important;
+        border-color: rgba(15, 23, 42, 0.22) !important;
+        padding: 9px 14px !important;
+        border-radius: 9px !important;
+    }
+    :root[data-theme="light"] .edit-modal-input:focus {
+        border-color: #7a5af8 !important;
+        box-shadow: 0 0 0 3px rgba(122, 90, 248, 0.22) !important;
+    }
+
+    /* Text & Labels */
+    :root[data-theme="dark"] .edit-modal-label {
+        color: #cbd5e1 !important;
+    }
+    :root[data-theme="light"] .edit-modal-label {
+        color: #334155 !important;
+    }
+    :root[data-theme="dark"] .edit-modal-muted {
+        color: #94a3b8 !important;
+    }
+    :root[data-theme="light"] .edit-modal-muted {
+        color: #64748b !important;
+    }
+
+    /* Rule Items */
+    :root[data-theme="dark"] .edit-modal-rule-item {
+        background: #02040c !important;
+        border-color: rgba(255, 255, 255, 0.08) !important;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    :root[data-theme="dark"] .edit-modal-rule-item:hover {
+        background: #0b1122 !important;
+        border-color: rgba(99, 102, 241, 0.5) !important;
+    }
+    :root[data-theme="light"] .edit-modal-rule-item {
+        background: #ffffff !important;
+        border-color: rgba(15, 23, 42, 0.11) !important;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+    }
+    :root[data-theme="light"] .edit-modal-rule-item:hover {
+        background: #f1f5f9 !important;
+        border-color: rgba(122, 90, 248, 0.4) !important;
+    }
+
+    /* Active Rule Tile (Green Glass Effect with ~70% Opacity Layer) */
+    :root[data-theme="dark"] .edit-modal-rule-item:has(input:checked) {
+        background: rgba(5, 46, 28, 0.70) !important;
+        border-color: rgba(16, 185, 129, 0.55) !important;
+        box-shadow: 0 4px 18px -2px rgba(16, 185, 129, 0.35), inset 0 0 14px rgba(16, 185, 129, 0.15) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+    }
+    :root[data-theme="dark"] .edit-modal-rule-item:has(input:checked) .fw-bold {
+        color: #34d399 !important;
+    }
+    :root[data-theme="dark"] .edit-modal-rule-item:has(input:checked) .edit-modal-muted {
+        color: #a7f3d0 !important;
+    }
+
+    :root[data-theme="light"] .edit-modal-rule-item:has(input:checked) {
+        background: rgba(209, 250, 229, 0.70) !important;
+        border-color: rgba(16, 185, 129, 0.60) !important;
+        box-shadow: 0 4px 16px rgba(16, 185, 129, 0.22), inset 0 0 10px rgba(16, 185, 129, 0.12) !important;
+        backdrop-filter: blur(10px) !important;
+        -webkit-backdrop-filter: blur(10px) !important;
+    }
+    :root[data-theme="light"] .edit-modal-rule-item:has(input:checked) .fw-bold {
+        color: #065f46 !important;
+    }
+    :root[data-theme="light"] .edit-modal-rule-item:has(input:checked) .edit-modal-muted {
+        color: #047857 !important;
+    }
+
+    /* Green / Grey Toggle Switch */
+    .edit-rule-toggle {
+        width: 2.5rem !important;
+        height: 1.35rem !important;
+        cursor: pointer !important;
+        transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        border-radius: 2rem !important;
+    }
+
+    /* Unchecked State (Grey) */
+    :root[data-theme="dark"] .edit-rule-toggle {
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        border-color: rgba(255, 255, 255, 0.25) !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%2394a3b8'/%3e%3c/svg%3e") !important;
+    }
+    :root[data-theme="light"] .edit-rule-toggle {
+        background-color: #e2e8f0 !important;
+        border-color: #cbd5e1 !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%2364748b'/%3e%3c/svg%3e") !important;
+    }
+
+    /* Checked State (Vibrant Green with Glow) */
+    .edit-rule-toggle:checked {
+        background-color: #10b981 !important;
+        border-color: #059669 !important;
+        box-shadow: 0 0 12px rgba(16, 185, 129, 0.6) !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e") !important;
+    }
+
+    /* Custom Scrollbar for Rules */
+    .edit-rules-scroller::-webkit-scrollbar {
+        width: 7px;
+    }
+    :root[data-theme="dark"] .edit-rules-scroller::-webkit-scrollbar-track {
+        background: #010307;
+        border-radius: 5px;
+    }
+    :root[data-theme="dark"] .edit-rules-scroller::-webkit-scrollbar-thumb {
+        background: rgba(99, 102, 241, 0.5);
+        border-radius: 5px;
+    }
+    :root[data-theme="dark"] .edit-rules-scroller::-webkit-scrollbar-thumb:hover {
+        background: rgba(99, 102, 241, 0.85);
+    }
+    :root[data-theme="light"] .edit-rules-scroller::-webkit-scrollbar-track {
+        background: #e2e8f0;
+        border-radius: 5px;
+    }
+    :root[data-theme="light"] .edit-rules-scroller::-webkit-scrollbar-thumb {
+        background: rgba(122, 90, 248, 0.45);
+        border-radius: 5px;
+    }
+    :root[data-theme="light"] .edit-rules-scroller::-webkit-scrollbar-thumb:hover {
+        background: rgba(122, 90, 248, 0.75);
+    }
+</style>
+
+<div class="modal-content edit-backtest-modal-card p-0 border rounded-4 overflow-hidden" style="width: 100%; min-width: 100%; max-width: 1260px;">
     
     <!-- Modal Header -->
-    <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3 pt-1">
-        <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center" style="width: 42px; height: 42px; border: 1px solid rgba(13, 110, 253, 0.3);">
-                <span class="material-icons fs-5">tune</span>
+    <div class="modal-header border-bottom px-4 px-md-4.5 py-3 d-flex align-items-center justify-content-between" style="border-color: var(--border-color) !important;">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
+                 style="width: 44px; height: 44px; background: rgba(99, 102, 241, 0.18); color: #818cf8; border: 1px solid rgba(99, 102, 241, 0.4);">
+                <span class="material-icons" style="font-size: 1.3rem;">tune</span>
             </div>
             <div>
-                <h5 class="modal-title fw-bold theme-text-main mb-0 d-flex align-items-center gap-2">
+                <h5 class="modal-title fw-bold mb-0.5 d-flex align-items-center gap-2" style="font-size: 1.15rem;">
                     <span>Edit Parameters & Regenerate</span>
-                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0 fs-7">#BT-{{ backtest.id|stringformat:"04d" }}</span>
+                    <span class="badge rounded-pill px-3 py-0.5 font-monospace fw-bold" 
+                          style="font-size: 0.75rem; background: rgba(56, 189, 248, 0.18); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35);">
+                        #BT-{{ backtest.id|stringformat:"04d" }}
+                    </span>
                 </h5>
-                <small class="theme-text-muted">Adjust strategy parameters, risk thresholds, and rules to trigger a fresh backtest execution.</small>
+                <small class="edit-modal-muted" style="font-size: 0.80rem;">Adjust strategy parameters, risk thresholds, and active rules to trigger a fresh backtest execution.</small>
             </div>
         </div>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
 
     <!-- Form -->
     <form method="POST" 
           action="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
           hx-post="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
-          hx-target="#globalHtmxModalDialog"
-          class="glass-form-card">
+          hx-target="#globalHtmxModalDialog">
         {% csrf_token %}
 
-        <div class="modal-body py-3" style="max-height: 70vh; overflow-y: auto;">
+        <div class="modal-body px-4 px-md-4.5 py-4" style="max-height: 84vh; overflow-y: auto; overscroll-behavior: contain;">
             
             <!-- Strategy & Index Context Summary Banner -->
-            <div class="p-3 mb-3 rounded-3 border d-flex flex-wrap align-items-center justify-content-between gap-2" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important;">
-                <div>
-                    <span class="theme-text-muted small">Strategy Engine:</span>
-                    <span class="text-info fw-bold ms-1">{{ backtest.get_strategy_name_display }}</span>
-                </div>
-                <div>
-                    <span class="theme-text-muted small">Target Index:</span>
-                    <span class="theme-text-main fw-bold ms-1">{{ backtest.index_name }}</span>
+            <div class="p-3.5 mb-4 rounded-3 border edit-modal-subpanel d-flex flex-wrap align-items-center justify-content-between gap-3">
+                <div class="d-flex align-items-center gap-2.5 flex-wrap">
+                    <span class="badge rounded-pill px-3 py-1.5 fw-bold font-monospace shadow-sm" 
+                          style="font-size: 0.80rem; background: rgba(99, 102, 241, 0.25); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.5);">
+                        <span class="material-icons align-middle me-1" style="font-size: 0.90rem;">psychology</span>
+                        {{ backtest.get_strategy_name_display }}
+                    </span>
+                    <span class="edit-modal-muted small">Target Instrument:</span>
+                    <span class="fw-bold font-monospace text-info fs-6">{{ backtest.index_name }}</span>
                 </div>
                 {% if backtest.backup_task %}
                 <div>
-                    <span class="theme-text-muted small">Linked Backup:</span>
-                    <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-0 ms-1">#{{ backtest.backup_task.id }} ({{ backtest.backup_task.start_date }} to {{ backtest.backup_task.end_date }})</span>
+                    <span class="edit-modal-muted small">Linked Backup:</span>
+                    <span class="badge bg-secondary bg-opacity-30 border border-secondary border-opacity-40 rounded-pill px-3 py-1 ms-1 font-monospace" style="font-size: 0.76rem;">
+                        #{{ backtest.backup_task.id }} · {{ backtest.backup_task.display_symbol }} ({{ backtest.backup_task.start_date }} → {{ backtest.backup_task.end_date }})
+                    </span>
                 </div>
                 {% endif %}
             </div>
 
-            <!-- Date Range Selection -->
-            <div class="row g-3 mb-3">
-                <div class="col-12 col-md-6">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_start_date">
+            <!-- 1. Row: Date Range & Capital (3 Columns Spacious) -->
+            <div class="row g-3.5 mb-4">
+                <div class="col-12 col-md-4">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_start_date" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                         Start Date<span class="text-danger ms-1">*</span>
                     </label>
-                    <input type="date" name="start_date" id="edit_start_date" class="form-control" value="{{ start_date_val }}" required>
+                    <input type="date" name="start_date" id="edit_start_date" class="form-control edit-modal-input font-monospace" value="{{ start_date_val }}" required style="font-size: 0.88rem;">
                 </div>
-                <div class="col-12 col-md-6">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_end_date">
+                <div class="col-12 col-md-4">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_end_date" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                         End Date<span class="text-danger ms-1">*</span>
                     </label>
-                    <input type="date" name="end_date" id="edit_end_date" class="form-control" value="{{ end_date_val }}" required>
+                    <input type="date" name="end_date" id="edit_end_date" class="form-control edit-modal-input font-monospace" value="{{ end_date_val }}" required style="font-size: 0.88rem;">
+                </div>
+                <div class="col-12 col-md-4">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_initial_capital" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                        Initial Capital (₹)<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="number" step="1000" min="1000" name="initial_capital" id="edit_initial_capital" class="form-control edit-modal-input font-monospace fw-bold text-success" value="{{ initial_capital_val }}" required style="font-size: 0.88rem;">
                 </div>
             </div>
 
-            <!-- Capital, Lots & Strike Selection -->
-            <div class="row g-3 mb-3">
-                <div class="col-12 col-md-4">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_initial_capital">
-                        Initial Capital (₹)<span class="text-danger ms-1">*</span>
-                    </label>
-                    <input type="number" step="1000" min="1000" name="initial_capital" id="edit_initial_capital" class="form-control font-monospace" value="{{ initial_capital_val }}" required>
-                </div>
-                <div class="col-6 col-md-4">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_lots_count">
+            <!-- 2. Row: Lots, Strike, Stop Loss, Risk-Reward (4 Columns Spacious) -->
+            <div class="row g-3.5 mb-4">
+                <div class="col-6 col-md-3">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_lots_count" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                         Lots Count<span class="text-danger ms-1">*</span>
                     </label>
-                    <input type="number" min="1" max="100" name="lots_count" id="edit_lots_count" class="form-control font-monospace" value="{{ lots_count_val }}" required>
+                    <input type="number" min="1" max="100" name="lots_count" id="edit_lots_count" class="form-control edit-modal-input font-monospace fw-bold" value="{{ lots_count_val }}" required style="font-size: 0.88rem;">
                 </div>
-                <div class="col-6 col-md-4">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_strike_selection">
+                <div class="col-6 col-md-3">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_strike_selection" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                         Strike Selection
                     </label>
-                    <select name="strike_selection" id="edit_strike_selection" class="form-select">
-                        <option value="ITM2" {% if strike_selection_val == 'ITM2' %}selected{% endif %}>ITM2 (Deep ITM)</option>
+                    <select name="strike_selection" id="edit_strike_selection" class="form-select edit-modal-input fw-semibold" style="font-size: 0.88rem;">
+                        <option value="ITM2" {% if strike_selection_val == 'ITM2' %}selected{% endif %}>ITM2 (Deep ITM · High Delta)</option>
                         <option value="ITM1" {% if strike_selection_val == 'ITM1' %}selected{% endif %}>ITM1 (In The Money)</option>
                         <option value="ATM" {% if strike_selection_val == 'ATM' %}selected{% endif %}>ATM (At The Money)</option>
                         <option value="OTM1" {% if strike_selection_val == 'OTM1' %}selected{% endif %}>OTM1 (Out Of The Money)</option>
@@ -89,73 +265,132 @@
                         <option value="OTM3" {% if strike_selection_val == 'OTM3' %}selected{% endif %}>OTM3 (Deep OTM)</option>
                     </select>
                 </div>
-            </div>
-
-            <!-- Risk Management Parameters -->
-            <div class="row g-3 mb-3">
-                <div class="col-12 col-md-6">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_stop_loss_points">
+                <div class="col-6 col-md-3">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_stop_loss_points" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                         Stop Loss (Pts)<span class="text-danger ms-1">*</span>
                     </label>
-                    <input type="number" step="0.5" min="1" name="stop_loss_points" id="edit_stop_loss_points" class="form-control font-monospace" value="{{ stop_loss_points_val }}" required>
-                    <small class="theme-text-muted">Option strike exit trigger threshold in points.</small>
+                    <input type="number" step="0.5" min="1" name="stop_loss_points" id="edit_stop_loss_points" class="form-control edit-modal-input font-monospace fw-bold text-danger" value="{{ stop_loss_points_val }}" required style="font-size: 0.88rem;">
                 </div>
-                <div class="col-12 col-md-6">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_rr_ratio">
-                        Risk : Reward Ratio (1:X)<span class="text-danger ms-1">*</span>
+                <div class="col-6 col-md-3">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_rr_ratio" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                        Risk : Reward (1:X)<span class="text-danger ms-1">*</span>
                     </label>
-                    <input type="number" step="0.1" min="0.5" max="20" name="rr_ratio" id="edit_rr_ratio" class="form-control font-monospace" value="{{ rr_ratio_val }}" required>
-                    <small class="theme-text-muted">Multiplier for profit target (e.g. 5.0 = 5x Stop Loss).</small>
+                    <input type="number" step="0.1" min="0.5" max="20" name="rr_ratio" id="edit_rr_ratio" class="form-control edit-modal-input font-monospace fw-bold text-primary" value="{{ rr_ratio_val }}" required style="font-size: 0.88rem;">
                 </div>
             </div>
 
-            <!-- Strategy Rules Selection -->
-            <div class="mb-3">
-                <label class="form-label theme-text-muted small fw-bold text-uppercase mb-2 d-flex align-items-center justify-content-between">
-                    <span>Active Strategy Rules & Execution Constraints</span>
-                    <span class="text-info small fw-normal">Select constraints to enforce</span>
-                </label>
-                <div class="row g-2">
-                    {% for rule in available_rules %}
-                    <div class="col-12 col-md-6">
-                        <label class="custom-check-item w-100 d-flex align-items-center gap-2 p-2 rounded-3 border" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important; cursor: pointer;">
-                            <input type="checkbox" name="rules" value="{{ rule.id }}" {% if rule.id in active_rule_ids %}checked{% endif %}>
-                            <div class="flex-grow-1">
-                                <div class="theme-text-main fw-semibold small d-flex align-items-center gap-1">
-                                    <span>{{ rule.name }}</span>
+            <!-- 3. Strategy Rules Selection (Generous Height Scrollable Container with Green/Grey Toggles at Right End) -->
+            <div class="mb-4 p-3.5 rounded-3 border edit-modal-subpanel">
+                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-primary" style="font-size: 1.15rem;">checklist</span>
+                        <span class="edit-modal-label small fw-bold text-uppercase" style="font-size: 0.78rem; letter-spacing: 0.5px;">
+                            Active Strategy Rules & Execution Guardrails
+                        </span>
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-0.5 ms-1" style="font-size: 0.70rem;">
+                            {{ available_rules|length }} Active Available
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <button type="button" class="btn btn-sm btn-outline-info rounded-pill px-3 py-1 fw-bold" style="font-size: 0.74rem;" onclick="selectAllEditRules(true)">
+                            Select All
+                        </button>
+                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fw-bold" style="font-size: 0.74rem;" onclick="selectAllEditRules(false)">
+                            Clear
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Isolated Scrollable Rules List Container with Right-Aligned Toggle Buttons -->
+                <div class="edit-rules-scroller p-2 rounded-2" 
+                     id="editModalRulesContainer"
+                     style="max-height: 285px; height: 285px; overflow-y: scroll !important; overscroll-behavior: contain !important; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color) !important;">
+                    <div class="row g-2.5">
+                        {% for rule in available_rules %}
+                        <div class="col-12 col-md-6">
+                            <label class="edit-modal-rule-item w-100 d-flex align-items-center justify-content-between gap-3 p-3 rounded-3 border h-100 transition-all" 
+                                   style="cursor: pointer; min-height: 62px;">
+                                <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
+                                    <div class="fw-bold small text-truncate" title="{{ rule.name }}" style="font-size: 0.80rem;">
+                                        {{ rule.name }}
+                                    </div>
+                                    <div class="edit-modal-muted text-truncate mt-0.5" style="font-size: 0.72rem; line-height: 1.35;">
+                                        {{ rule.description|default:rule.prompt_directive|truncatechars:85 }}
+                                    </div>
                                 </div>
-                                <div class="theme-text-muted smaller" style="font-size: 0.7rem;">{{ rule.description|default:rule.prompt_directive|truncatechars:65 }}</div>
-                            </div>
-                        </label>
+                                <div class="form-check form-switch p-0 m-0 flex-shrink-0 d-flex align-items-center">
+                                    <input type="checkbox" name="rules" value="{{ rule.id }}" 
+                                           class="form-check-input edit-rule-checkbox edit-rule-toggle m-0" 
+                                           role="switch" 
+                                           {% if rule.id in active_rule_ids %}checked{% endif %}>
+                                </div>
+                            </label>
+                        </div>
+                        {% empty %}
+                        <div class="col-12 p-4 text-center">
+                            <span class="edit-modal-muted small fst-italic">No strategy rules configured yet.</span>
+                        </div>
+                        {% endfor %}
                     </div>
-                    {% empty %}
-                    <div class="col-12">
-                        <div class="theme-text-muted small fst-italic">No custom rules configured yet.</div>
-                    </div>
-                    {% endfor %}
                 </div>
             </div>
 
-            <!-- Natural Language AI Directives Prompt -->
+            <!-- 4. Natural Language AI Directives Prompt -->
             <div class="mb-2">
-                <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="edit_prompt_directives">
-                    AI Strategy Directives Prompt (Optional)
+                <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5 d-flex align-items-center justify-content-between" for="edit_prompt_directives" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                    <span>AI Strategy Directives Prompt (Optional)</span>
+                    <span class="badge bg-secondary bg-opacity-30 border border-secondary border-opacity-40 px-2.5 py-0.5 fw-normal" style="font-size: 0.68rem;">Natural Language Directives</span>
                 </label>
-                <textarea name="prompt_directives" id="edit_prompt_directives" rows="2" class="form-control" placeholder="e.g. Strictly square off all open positions before 15:15 PM. Do not take fresh entries post 14:45 PM.">{{ prompt_directives_val }}</textarea>
-                <small class="theme-text-muted">Custom natural language directives parsed by TensorTrade RL and Go worker engines.</small>
+                <textarea name="prompt_directives" id="edit_prompt_directives" rows="3" class="form-control edit-modal-input" 
+                          placeholder="e.g. Strictly square off all open positions before 15:15 PM. Prohibit taking fresh entries post 14:45 PM. Prioritize retest limit entries on 3-min HTF momentum."
+                          style="font-size: 0.82rem; min-height: 80px;">{{ prompt_directives_val }}</textarea>
+                <small class="edit-modal-muted mt-1 d-block" style="font-size: 0.72rem;">Custom natural language directives parsed by TensorTrade RL and Go worker engines.</small>
             </div>
 
         </div>
 
         <!-- Modal Footer -->
-        <div class="modal-footer border-top border-secondary border-opacity-25 px-0 pb-0 pt-3 d-flex justify-content-end gap-2">
-            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1.5 px-4 py-2" data-bs-dismiss="modal" style="font-size: 0.82rem;">
+        <div class="modal-footer border-top px-4 px-md-4.5 py-3 d-flex justify-content-end gap-2.5" style="border-color: var(--border-color) !important; background: rgba(0, 0, 0, 0.06);">
+            <button type="button" class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1.5 px-4 py-2" data-bs-dismiss="modal" style="font-size: 0.85rem;">
                 <span>Cancel</span>
             </button>
-            <button type="submit" class="btn btn-sm btn-primary rounded-pill d-inline-flex align-items-center gap-1.5 px-4 py-2 shadow-sm" style="font-size: 0.82rem;">
+            <button type="submit" class="btn btn-primary rounded-pill d-inline-flex align-items-center gap-1.5 px-4.5 py-2 shadow-sm fw-bold" style="font-size: 0.85rem;">
                 <span class="material-icons" style="font-size: 1.1rem !important;">bolt</span>
                 <span>Save & Regenerate Backtest</span>
             </button>
         </div>
     </form>
 </div>
+
+<script>
+function selectAllEditRules(shouldCheck) {
+    const checkboxes = document.querySelectorAll('.edit-rule-checkbox');
+    checkboxes.forEach(cb => cb.checked = shouldCheck);
+}
+
+// Stop outer scrolling when wheeling inside the rules container
+(function() {
+    const container = document.getElementById('editModalRulesContainer');
+    if (container) {
+        container.addEventListener('wheel', function(e) {
+            const scrollTop = this.scrollTop;
+            const scrollHeight = this.scrollHeight;
+            const height = this.clientHeight;
+            const delta = e.deltaY;
+            const up = delta < 0;
+            if (!up && delta > scrollHeight - height - scrollTop) {
+                this.scrollTop = scrollHeight;
+                e.preventDefault();
+                e.stopPropagation();
+            } else if (up && -delta > scrollTop) {
+                this.scrollTop = 0;
+                e.preventDefault();
+                e.stopPropagation();
+            } else {
+                e.stopPropagation();
+            }
+        }, { passive: false });
+    }
+})();
+</script>
+

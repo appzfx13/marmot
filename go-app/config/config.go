@@ -12,6 +12,7 @@ type Config struct {
 	WSPort          string
 	DhanClientID    string
 	DhanAccessToken string
+	DatabentoAPIKey string
 }
 
 func LoadConfig() *Config {
@@ -33,6 +34,7 @@ func LoadConfig() *Config {
 	if dhanToken == "" {
 		dhanToken = getEnv("DHAN_API_KEY", "")
 	}
+	databentoKey := getEnv("DATABENTO_API_KEY", "")
 
 	cfg := &Config{
 		DatabaseURL:     dbURL,
@@ -41,6 +43,7 @@ func LoadConfig() *Config {
 		WSPort:          wsPort,
 		DhanClientID:    dhanClient,
 		DhanAccessToken: dhanToken,
+		DatabentoAPIKey: databentoKey,
 	}
 
 	// DEBUG: Log all loaded config values to verify env vars are loaded correctly

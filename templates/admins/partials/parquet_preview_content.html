@@ -1,0 +1,185 @@
+<div id="parquet-preview-table-container">
+    {% if parquet_inspection.exists and parquet_inspection.is_valid %}
+    <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2.5">
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-1 text-xxs font-monospace">
+                {{ parquet_inspection.num_rows|default:0 }} TOTAL K-LINES
+            </span>
+            <span class="text-xs text-muted">
+                {% if query %}
+                    Showing matching records for query "<strong>{{ query }}</strong>"
+                {% elif parquet_inspection.is_split_view %}
+                    Showing <strong>Starting 10 K-Lines</strong> and <strong>Ending 10 K-Lines</strong>
+                {% else %}
+                    Showing top <strong>{{ parquet_inspection.sample_count }}</strong> sample records
+                {% endif %}
+            </span>
+        </div>
+        {% if query %}
+        <button type="button" 
+                hx-get="{% url 'market:market_backup_preview' backup.pk %}"
+                hx-target="#parquet-preview-table-container"
+                class="btn btn-link btn-sm text-xs text-primary p-0 text-decoration-none">
+            Clear filter
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="table-responsive rounded-3 border border-secondary border-opacity-15" style="max-height: 480px; overflow-y: auto;">
+        <table class="table table-dark table-hover table-borderless align-middle mb-0 text-xs">
+            <thead class="sticky-top" style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border-color); z-index: 10;">
+                <tr>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">DATETIME</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">SYMBOL</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">TYPE</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">STRIKE</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">OPT</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">OPEN</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">HIGH</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">LOW</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">CLOSE</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">VOL</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">OI</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">SPOT</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% if parquet_inspection.is_split_view %}
+                    <!-- SECTION 1: STARTING 10 K-LINES (HEAD) -->
+                    <tr class="table-active" style="background: rgba(13, 110, 253, 0.12); border-bottom: 1px solid rgba(13, 110, 253, 0.25);">
+                        <td colspan="12" class="py-1.5 px-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-success bg-opacity-30 text-success border border-success border-opacity-40 rounded-pill px-2 py-0.5 text-xxs font-monospace fw-bold">
+                                    🟢 STARTING 10 K-LINES (HEAD)
+                                </span>
+                                <span class="text-xxs theme-text-muted font-monospace">Beginning of dataset verification</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% for row in parquet_inspection.head_records %}
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime }}</td>
+                        <td class="py-2 px-3 fw-bold">{{ row.index_name }}</td>
+                        <td class="py-2 px-3">
+                            <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 px-1.5 py-0.5 text-xxs">
+                                {{ row.instrument_type }}
+                            </span>
+                        </td>
+                        <td class="py-2 px-3 font-monospace">{{ row.strike }}</td>
+                        <td class="py-2 px-3">
+                            {% if row.option_type == 'CE' %}
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">CE</span>
+                            {% elif row.option_type == 'PE' %}
+                                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">PE</span>
+                            {% else %}
+                                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-1.5 py-0.5 text-xxs">{{ row.option_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2 px-3 font-monospace text-end">{{ row.open|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-success">{{ row.high|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-danger">{{ row.low|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end fw-bold">{{ row.close|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-warning">{{ row.volume }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.oi }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.spot_price|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+
+                    <!-- SEPARATOR / MIDDLE OMITTED NOTICE -->
+                    <tr style="background: rgba(255, 255, 255, 0.02); border-top: 1px dashed var(--border-color); border-bottom: 1px dashed var(--border-color);">
+                        <td colspan="12" class="text-center py-2.5 theme-text-muted font-monospace text-xxs">
+                            <span class="material-icons align-middle me-1 text-primary" style="font-size: 0.9rem;">unfold_more</span>
+                            <strong>... {{ parquet_inspection.num_rows }} Total K-Lines in Parquet ...</strong>
+                            <span class="opacity-75 ms-1">(Intermediate candles omitted for fast verification)</span>
+                        </td>
+                    </tr>
+
+                    <!-- SECTION 2: ENDING 10 K-LINES (TAIL) -->
+                    <tr class="table-active" style="background: rgba(220, 53, 69, 0.12); border-bottom: 1px solid rgba(220, 53, 69, 0.25);">
+                        <td colspan="12" class="py-1.5 px-3">
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="badge bg-danger bg-opacity-30 text-danger border border-danger border-opacity-40 rounded-pill px-2 py-0.5 text-xxs font-monospace fw-bold">
+                                    🔴 ENDING 10 K-LINES (TAIL)
+                                </span>
+                                <span class="text-xxs theme-text-muted font-monospace">End of dataset verification</span>
+                            </div>
+                        </td>
+                    </tr>
+                    {% for row in parquet_inspection.tail_records %}
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime }}</td>
+                        <td class="py-2 px-3 fw-bold">{{ row.index_name }}</td>
+                        <td class="py-2 px-3">
+                            <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 px-1.5 py-0.5 text-xxs">
+                                {{ row.instrument_type }}
+                            </span>
+                        </td>
+                        <td class="py-2 px-3 font-monospace">{{ row.strike }}</td>
+                        <td class="py-2 px-3">
+                            {% if row.option_type == 'CE' %}
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">CE</span>
+                            {% elif row.option_type == 'PE' %}
+                                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">PE</span>
+                            {% else %}
+                                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-1.5 py-0.5 text-xxs">{{ row.option_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2 px-3 font-monospace text-end">{{ row.open|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-success">{{ row.high|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-danger">{{ row.low|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end fw-bold">{{ row.close|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-warning">{{ row.volume }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.oi }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.spot_price|floatformat:2 }}</td>
+                    </tr>
+                    {% endfor %}
+
+                {% else %}
+                    <!-- STANDARD / FILTER SEARCH RECORDS -->
+                    {% for row in parquet_inspection.records %}
+                    <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
+                        <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime }}</td>
+                        <td class="py-2 px-3 fw-bold">{{ row.index_name }}</td>
+                        <td class="py-2 px-3">
+                            <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 px-1.5 py-0.5 text-xxs">
+                                {{ row.instrument_type }}
+                            </span>
+                        </td>
+                        <td class="py-2 px-3 font-monospace">{{ row.strike }}</td>
+                        <td class="py-2 px-3">
+                            {% if row.option_type == 'CE' %}
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">CE</span>
+                            {% elif row.option_type == 'PE' %}
+                                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">PE</span>
+                            {% else %}
+                                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-1.5 py-0.5 text-xxs">{{ row.option_type }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2 px-3 font-monospace text-end">{{ row.open|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-success">{{ row.high|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-danger">{{ row.low|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end fw-bold">{{ row.close|floatformat:2 }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-warning">{{ row.volume }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.oi }}</td>
+                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.spot_price|floatformat:2 }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="12" class="text-center py-4 text-muted">
+                            <span class="material-icons fs-4 d-block mb-1 opacity-50">search_off</span>
+                            No matching candle records found in Parquet dataset.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="p-3 text-center rounded-3" style="background: rgba(239, 68, 68, 0.08); border: 1px dashed rgba(239, 68, 68, 0.3);">
+        <span class="material-icons text-danger fs-3 d-block mb-1">warning</span>
+        <span class="text-xs text-danger fw-semibold d-block">Parquet Verification Notice</span>
+        <span class="text-xs text-muted">{{ parquet_inspection.error|default:"Parquet file not generated yet or missing on storage server." }}</span>
+    </div>
+    {% endif %}
+</div>

@@ -122,10 +122,11 @@
         };
 
         function applyListUpdate(data) {
-            const progressBar  = document.getElementById('backup-progress-'      + data.task_id);
-            const progressText = document.getElementById('backup-progress-text-' + data.task_id);
-            const etaText      = document.getElementById('backup-eta-'           + data.task_id);
-            const statusBadge  = document.getElementById('backup-status-'        + data.task_id);
+            const rawId = String(data.task_id).replace(/^mb-/, '');
+            const progressBar  = document.getElementById('backup-progress-' + rawId) || document.getElementById('backup-progress-mb-' + rawId);
+            const progressText = document.getElementById('backup-progress-text-' + rawId);
+            const etaText      = document.getElementById('backup-eta-' + rawId);
+            const statusBadge  = document.getElementById('backup-status-' + rawId);
 
             if (progressBar) {
                 progressBar.style.width = data.progress + '%';
@@ -141,7 +142,8 @@
         // So status + progress are correct the instant the list renders,
         // without waiting for the next WS push.
         function fetchInitialStatus(taskId) {
-            fetch('/market/backup/' + taskId + '/status/', {
+            const cleanId = String(taskId).replace(/^mb-/, '');
+            fetch('/market/backup/' + cleanId + '/status/', {
                 headers: { 'X-Requested-With': 'XMLHttpRequest' }
             })
             .then(function(r) { return r.ok ? r.json() : null; })
@@ -150,8 +152,11 @@
         }
 
         function initListSubscriptions() {
+            const processed = new Set();
             document.querySelectorAll('.backup-progress-bar').forEach(function(el) {
-                const taskId = el.id.replace('backup-progress-', '');
+                const taskId = el.id.replace('backup-progress-', '').replace(/^mb-/, '');
+                if (!taskId || processed.has(taskId)) return;
+                processed.add(taskId);
 
                 // 1. Immediate REST poll so the UI is fresh on page-load
                 fetchInitialStatus(taskId);

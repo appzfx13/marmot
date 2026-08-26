@@ -58,6 +58,7 @@
             --input-bg: rgba(255, 255, 255, 0.05);
             --input-placeholder: rgba(255, 255, 255, 0.45);
             --calendar-icon-filter: invert(0.9);
+            --table-hover-bg: rgba(56, 189, 248, 0.05);
         }
 
         /* Light Theme Variables (Nordic Ice & Sapphire) */
@@ -69,6 +70,7 @@
             --text-main: #0f172a;
             --text-muted: #475569;
             --nav-hover: rgba(122, 90, 248, 0.08);
+            --table-hover-bg: rgba(122, 90, 248, 0.04);
             --nav-active: rgba(122, 90, 248, 0.15);
             --nav-active-border: #7a5af8;
             --btn-primary-bg: #7a5af8;
@@ -1136,18 +1138,32 @@
             cursor: pointer;
         }
 
-        /* Custom Glass Table Styling (Dense & High Readability) */
+        /* Custom Glass Table Styling (Dense, Smooth & Dark-Mode Optimized) */
+        .custom-glass-table {
+            --bs-table-hover-bg: var(--table-hover-bg, rgba(56, 189, 248, 0.05)) !important;
+            --bs-table-bg: transparent !important;
+            --bs-table-accent-bg: transparent !important;
+        }
+
         .custom-glass-table > :not(caption) > * > * {
             background-color: transparent !important;
             color: var(--text-main) !important;
             border-bottom-color: var(--border-color) !important;
             padding: 0.55rem 0.75rem !important;
             font-size: 0.8125rem;
+            transition: background-color 0.15s ease-in-out;
         }
 
-        .custom-glass-table.table-hover tbody tr:hover > * {
-            background-color: var(--nav-hover) !important;
+        .custom-glass-table.table-hover tbody tr:not(.collapse):not(.trade-drawer-row):hover > * {
+            background-color: var(--table-hover-bg, rgba(56, 189, 248, 0.05)) !important;
             color: var(--text-main) !important;
+            box-shadow: none !important;
+        }
+
+        .custom-glass-table.table-hover tbody tr.collapse:hover > *,
+        .custom-glass-table.table-hover tbody tr.trade-drawer-row:hover > * {
+            background-color: transparent !important;
+            box-shadow: none !important;
         }
 
         .table {
@@ -1155,7 +1171,7 @@
             --bs-table-accent-bg: transparent !important;
             --bs-table-striped-bg: transparent !important;
             --bs-table-color: var(--text-main) !important;
-            --bs-table-hover-bg: var(--nav-hover) !important;
+            --bs-table-hover-bg: var(--table-hover-bg, rgba(56, 189, 248, 0.05)) !important;
             --bs-table-border-color: var(--border-color) !important;
             color: var(--text-main) !important;
             background-color: transparent !important;
@@ -1193,6 +1209,25 @@
             backdrop-filter: blur(20px) !important;
             -webkit-backdrop-filter: blur(20px) !important;
             border: 1px solid var(--border-color) !important;
+        }
+
+        body.modal-open, html.modal-open {
+            overflow: hidden !important;
+        }
+
+        .custom-scrollable-rules::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollable-rules::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 4px;
+        }
+        .custom-scrollable-rules::-webkit-scrollbar-thumb {
+            background: rgba(56, 189, 248, 0.35);
+            border-radius: 4px;
+        }
+        .custom-scrollable-rules::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.65);
         }
 
         :root[data-theme="dark"] .btn-close {
@@ -1505,12 +1540,81 @@
             }
         });
 
-        document.body.addEventListener('closeGlobalModal', function() {
-            const modalEl = document.getElementById('globalHtmxModal');
-            if (modalEl) {
-                const modal = bootstrap.Modal.getInstance(modalEl);
-                if (modal) modal.hide();
+        // ── Robust Global HTMX Modal Controller ─────────────────────────────
+        function getGlobalModalEl() {
+            const el = document.getElementById('globalHtmxModal');
+            return (el && el instanceof HTMLElement) ? el : null;
+        }
+
+        function showGlobalModal() {
+            const modalEl = getGlobalModalEl();
+            if (!modalEl) return;
+            try {
+                const existing = bootstrap.Modal.getInstance(modalEl);
+                if (existing) existing.dispose();
+            } catch (e) {}
+
+            try {
+                document.body.style.overflow = 'hidden';
+                document.documentElement.style.overflow = 'hidden';
+                const modal = new bootstrap.Modal(modalEl);
+                modal.show();
+            } catch (err) {
+                console.warn('Error showing global modal:', err);
             }
+        }
+
+        function hideGlobalModal() {
+            const modalEl = getGlobalModalEl();
+            if (!modalEl) return;
+            try {
+                const instance = bootstrap.Modal.getInstance(modalEl);
+                if (instance) instance.hide();
+            } catch (err) {
+                console.warn('Error hiding global modal:', err);
+            }
+        }
+
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt && evt.detail && evt.detail.target && evt.detail.target.id === 'globalHtmxModalDialog') {
+                requestAnimationFrame(function() {
+                    showGlobalModal();
+                });
+            }
+            const container = evt.detail.target;
+            if (container) {
+                const selectAll = container.querySelector('.bulk-select-all');
+                if (selectAll) selectAll.checked = false;
+                updateBulkActionBar(container);
+            }
+        });
+
+        const globalModalElement = getGlobalModalEl();
+        if (globalModalElement) {
+            globalModalElement.addEventListener('hidden.bs.modal', function () {
+                const dialog = document.getElementById('globalHtmxModalDialog');
+                if (dialog) dialog.innerHTML = '';
+                try {
+                    const instance = bootstrap.Modal.getInstance(globalModalElement);
+                    if (instance) instance.dispose();
+                } catch (e) {}
+                document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+                document.documentElement.style.removeProperty('overflow');
+            });
+        }
+
+        document.body.addEventListener('closeGlobalModal', function() {
+            hideGlobalModal();
+            setTimeout(function() {
+                document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('padding-right');
+                document.body.style.removeProperty('overflow');
+                document.documentElement.style.removeProperty('overflow');
+            }, 250);
         });
 
         document.body.addEventListener('reloadPage', function() {
@@ -1581,23 +1685,6 @@
                 }
             }
         });
-
-        document.body.addEventListener('htmx:afterSwap', function(evt) {
-            const container = evt.detail.target;
-            if (container) {
-                const selectAll = container.querySelector('.bulk-select-all');
-                if (selectAll) selectAll.checked = false;
-                updateBulkActionBar(container);
-            }
-        });
-
-        const globalModalEl = document.getElementById('globalHtmxModal');
-        if (globalModalEl) {
-            globalModalEl.addEventListener('hidden.bs.modal', function () {
-                const dialog = document.getElementById('globalHtmxModalDialog');
-                if (dialog) dialog.innerHTML = '';
-            });
-        }
         (function() {
             const htmlElement = document.documentElement;
             const toggleBtn = document.getElementById('themeToggleBtn');
@@ -1644,79 +1731,99 @@
         })();
         
         (function() {
-            const wsUrl = "{{ ws_url|default:'' }}";
-            if (!wsUrl) return;
+            let wsUrl = "{{ ws_url|default:'' }}";
+            if (!wsUrl && window.location.host) {
+                const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                wsUrl = proto + '//' + window.location.hostname + ':8082/ws';
+            }
             
             window.MarmotWS = {
                 ws: null,
                 url: wsUrl,
                 subscribers: {},
                 callbacks: {},
-                reconnectDelay: 3000,
+                reconnectDelay: 2500,
                 useFallback: false,
                 fallbackIntervals: {},
                 
                 connect: function() {
+                    if (!this.url) return;
                     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
                         return;
                     }
                     try {
                         this.ws = new WebSocket(this.url);
                         this.ws.onopen = function() {
-                            console.log('[WS] Connected to', window.MarmotWS.url);
+                            console.log('✅ [WS] Connected to WebSocket Hub:', window.MarmotWS.url);
                             window.MarmotWS.useFallback = false;
-                            Object.keys(window.MarmotWS.subscribers).forEach(function(taskId) {
-                                window.MarmotWS.ws.send(JSON.stringify({type: 'subscribe', task_id: taskId}));
+                            const activeSubTasks = Object.keys(window.MarmotWS.subscribers);
+                            console.log('📡 [WS] Registering active subscriptions for tasks:', activeSubTasks);
+                            activeSubTasks.forEach(function(taskId) {
+                                if (window.MarmotWS.ws && window.MarmotWS.ws.readyState === WebSocket.OPEN) {
+                                    window.MarmotWS.ws.send(JSON.stringify({type: 'subscribe', task_id: String(taskId)}));
+                                    console.log('📤 [WS Sent subscribe]: task_id =', String(taskId));
+                                }
                             });
                         };
                         this.ws.onmessage = function(event) {
                             try {
                                 const data = JSON.parse(event.data);
+                                console.log('📥 [WS Message Received]:', data);
                                 if (data.type !== 'progress' && data.type !== 'backtest_progress') return;
-                                const cbs = window.MarmotWS.callbacks[data.task_id];
+                                const taskIdStr = String(data.task_id);
+                                const cbs = window.MarmotWS.callbacks[taskIdStr];
                                 if (cbs && cbs.length > 0) {
-                                    console.log('[WS] Progress received for task', data.task_id, ':', data.progress + '%', data.status);
+                                    console.log('⚡ [WS Triggering ' + cbs.length + ' callback(s) for task #' + taskIdStr + ']: ' + data.progress + '% (' + data.status + ') | ' + (data.step_info || ''));
                                     cbs.forEach(function(cb) {
                                         try { cb(data); } catch (err) { console.error('[WS Callback Error]', err); }
                                     });
+                                } else {
+                                    console.warn('⚠️ [WS] Received progress for task #' + taskIdStr + ' but no callbacks registered in MarmotWS.callbacks!');
                                 }
                             } catch (e) {
-                                console.error('[WS] Parse error', e);
+                                console.error('❌ [WS Parse Error]:', e, event.data);
                             }
                         };
                         this.ws.onclose = function() {
-                            console.log('[WS] Disconnected. Reconnecting in', window.MarmotWS.reconnectDelay, 'ms');
+                            console.log('🔌 [WS] Disconnected. Reconnecting in', window.MarmotWS.reconnectDelay, 'ms');
                             window.MarmotWS.ws = null;
                             setTimeout(function() { window.MarmotWS.connect(); }, window.MarmotWS.reconnectDelay);
                         };
                         this.ws.onerror = function(err) {
-                            console.error('[WS] Error', err);
+                            console.error('❌ [WS Error]:', err);
                             window.MarmotWS.enableFallback();
                         };
                     } catch (e) {
-                        console.error('[WS] Connect failed', e);
+                        console.error('❌ [WS Connect Exception]:', e);
                         window.MarmotWS.enableFallback();
                     }
                 },
                 
                 subscribe: function(taskId, callback) {
-                    this.subscribers[taskId] = true;
-                    if (!this.callbacks[taskId]) {
-                        this.callbacks[taskId] = [];
+                    const taskIdStr = String(taskId);
+                    this.subscribers[taskIdStr] = true;
+                    if (!this.callbacks[taskIdStr]) {
+                        this.callbacks[taskIdStr] = [];
                     }
-                    if (callback && !this.callbacks[taskId].includes(callback)) {
-                        this.callbacks[taskId].push(callback);
+                    if (callback && !this.callbacks[taskIdStr].includes(callback)) {
+                        this.callbacks[taskIdStr].push(callback);
                     }
+                    console.log('📌 [MarmotWS.subscribe] Registered listener for Task #' + taskIdStr + ' (total listeners: ' + this.callbacks[taskIdStr].length + ')');
                     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                        this.ws.send(JSON.stringify({type: 'subscribe', task_id: taskId}));
+                        this.ws.send(JSON.stringify({type: 'subscribe', task_id: taskIdStr}));
+                        console.log('📤 [WS Sent subscribe immediately]: task_id =', taskIdStr);
+                    } else {
+                        console.log('⏳ [WS Not Open Yet]: State is', this.ws ? this.ws.readyState : 'null', '- subscription queued for onopen.');
                     }
                 },
                 
                 unsubscribe: function(taskId) {
-                    delete this.subscribers[taskId];
-                    delete this.callbacks[taskId];
+                    const taskIdStr = String(taskId);
+                    delete this.subscribers[taskIdStr];
+                    delete this.callbacks[taskIdStr];
+                    console.log('🗑️ [MarmotWS.unsubscribe] Removed listeners for Task #' + taskIdStr);
                     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
-                        this.ws.send(JSON.stringify({type: 'unsubscribe', task_id: taskId}));
+                        this.ws.send(JSON.stringify({type: 'unsubscribe', task_id: taskIdStr}));
                     }
                 },
                 
@@ -1729,7 +1836,7 @@
                         if (!window.MarmotWS.fallbackIntervals[taskId]) {
                             window.MarmotWS.fallbackIntervals[taskId] = setInterval(function() {
                                 el.dispatchEvent(new CustomEvent('wsFallbackTick'));
-                            }, 3000);
+                            }, 2500);
                         }
                     });
                 },

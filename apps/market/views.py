@@ -6,6 +6,7 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse, JsonResponse, HttpResponseRedirect, FileResponse, Http404
+from django.utils.text import slugify
 from django.shortcuts import render
 from django.urls import reverse_lazy
 from django.views.generic import ListView, CreateView, DetailView, DeleteView, View
@@ -16,7 +17,7 @@ from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 
 from .models import MarketBackupTask
 from .forms import MarketBackupForm
-from .services import create_and_start_backup_task, send_control_command
+from .services import create_and_start_backup_task, send_control_command, inspect_parquet_dataset
 
 
 class MarketBackupListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
@@ -92,6 +93,7 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
             dhan_access_token=token if token else None,
             market_type=form.cleaned_data.get('market_type'),
             forex_instrument=form.cleaned_data.get('forex_instrument'),
+            databento_schema=form.cleaned_data.get('databento_schema'),
         )
         
         # Add success message and redirect back to the dashboard
@@ -112,7 +114,25 @@ class MarketBackupDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['ws_url'] = settings.MARMOT_WS_URL
+        context['parquet_inspection'] = inspect_parquet_dataset(self.object)
         return context
+
+
+class MarketBackupPreviewView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Returns HTMX partial for Parquet dataset table preview and live search filtering."""
+    def get(self, request, pk, *args, **kwargs):
+        task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
+        if not task:
+            return HttpResponse('Task not found', status=404)
+
+        query = request.GET.get('q', '').strip()
+        inspection = inspect_parquet_dataset(task, query=query, limit=50)
+
+        return render(request, 'admins/partials/parquet_preview_content.html', {
+            'backup': task,
+            'parquet_inspection': inspection,
+            'query': query,
+        })
 
 
 class MarketBackupChartView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -135,21 +155,30 @@ class MarketBackupChartView(LoginRequiredMixin, AdminRequiredMixin, View):
 
 
 class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """Packs date-partitioned Parquet datasets into a ZIP archive and streams it to the user."""
+    """
+    Serves market backup datasets for download using the Hybrid Industrial Standard:
+    - Internal server storage stays on immutable paths (/app/backup/{user_id}/{task_id}/).
+    - Downloads serve clean, human-readable filenames (username_asset_task_dates.zip / .parquet).
+    """
     def get(self, request, pk, *args, **kwargs):
         task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
         if not task:
             raise Http404("Market backup task not found.")
 
         user_id = str(task.created_by.id if getattr(task, 'created_by', None) else 1)
-        backup_id = str(task.id)
-        index_name = task.index_name.lower()
+        user_slug = slugify(task.created_by.username) if getattr(task, 'created_by', None) else 'admin'
+        
+        market_tag = 'forex' if task.market_type == MarketBackupTask.MarketTypeChoices.FOREX_FUTURES else 'index'
+        provider_tag = task.provider_name.lower()
+        asset_tag = task.asset_code.lower()
 
+        backup_id = str(task.id)
         candidate_paths = [
             task.parquet_file_path,
+            os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id, 'dataset.parquet'),
+            os.path.join('/app', 'backup', user_id, backup_id, 'dataset.parquet'),
             os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id),
             os.path.join('/app', 'backup', user_id, backup_id),
-            os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', user_id, f"{index_name}_options"),
         ]
 
         target_path = None
@@ -159,23 +188,30 @@ class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
                 break
 
         if not target_path:
-            raise Http404("Backup data directory or file not found on disk.")
+            messages.error(request, "Backup dataset is not available on disk or still processing.")
+            return HttpResponseRedirect(reverse_lazy('market:market_backup_list'))
 
-        zip_buffer = io.BytesIO()
-        zip_filename = f"{index_name}_backup_task_{task.id}.zip"
+        # 1. If directory of chunk parquet files exists, stream a ZIP archive
+        if os.path.isdir(target_path):
+            zip_buffer = io.BytesIO()
+            zip_filename = f"marmot_{user_slug}_{market_tag}_{asset_tag}_{provider_tag}_task_{task.id}_from_{task.start_date}_to_{task.end_date}.zip"
 
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            if os.path.isdir(target_path):
+            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
                 for root, _, files in os.walk(target_path):
                     for file in files:
                         full_path = os.path.join(root, file)
                         rel_path = os.path.relpath(full_path, target_path)
                         zip_file.write(full_path, arcname=rel_path)
-            else:
-                zip_file.write(target_path, arcname=os.path.basename(target_path))
 
-        zip_buffer.seek(0)
-        return FileResponse(zip_buffer, as_attachment=True, filename=zip_filename)
+            zip_buffer.seek(0)
+            return FileResponse(zip_buffer, as_attachment=True, filename=zip_filename)
+
+        # 2. Single consolidated parquet file
+        filename = f"marmot_{user_slug}_{market_tag}_{asset_tag}_{provider_tag}_task_{task.id}_from_{task.start_date}_to_{task.end_date}.parquet"
+        response = FileResponse(open(target_path, 'rb'), content_type='application/vnd.apache.parquet')
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
+        response['Content-Length'] = os.path.getsize(target_path)
+        return response
 
 
 class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -243,45 +279,7 @@ class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         return response
 
 
-class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """
-    Serves the single consolidated .parquet dataset file directly for download.
-    """
-    def get(self, request, pk, *args, **kwargs):
-        task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
-        if not task:
-            raise Http404("Market backup task not found.")
 
-        user_id = str(task.created_by.id if task.created_by else 1)
-        candidates = [
-            task.parquet_file_path,
-            os.path.join(settings.BASE_DIR, 'backup', user_id, str(task.id), 'dataset.parquet'),
-            os.path.join('/app', 'backup', user_id, str(task.id), 'dataset.parquet'),
-            os.path.join(settings.BASE_DIR, 'backup', user_id, str(task.id)),
-            os.path.join('/app', 'backup', user_id, str(task.id)),
-        ]
-
-        target_file = None
-        for p in candidates:
-            if p and os.path.exists(p):
-                if os.path.isfile(p):
-                    target_file = p
-                    break
-                elif os.path.isdir(p):
-                    ds_p = os.path.join(p, 'dataset.parquet')
-                    if os.path.exists(ds_p):
-                        target_file = ds_p
-                        break
-
-        if not target_file:
-            messages.error(request, "Backup dataset file is not available or still in progress.")
-            return HttpResponseRedirect(reverse_lazy('market:market_backup_list'))
-
-        filename = f"{task.index_name.lower()}_{task.start_date}_{task.end_date}.parquet"
-        response = FileResponse(open(target_file, 'rb'), content_type='application/vnd.apache.parquet')
-        response['Content-Disposition'] = f'attachment; filename="{filename}"'
-        response['Content-Length'] = os.path.getsize(target_file)
-        return response
 
 
 

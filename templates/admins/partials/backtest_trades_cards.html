@@ -1,5 +1,5 @@
 {% for trade in trades_page %}
-<div class="p-3 mb-2 rounded-3 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+<div id="trade-card-{{ trade.serial_no }}" class="trade-card-item p-3 mb-2 rounded-3 border shadow-sm" data-trade-serial="{{ trade.serial_no }}" data-trade-id="{{ trade.id|default:trade.serial_no }}" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
     <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
         <div>
             <div class="d-flex align-items-center gap-1 mb-1">
@@ -87,91 +87,125 @@
     </div>
 
     <!-- Mobile Collapsible Trade Drawer -->
-    <div class="collapse pt-2 mt-2 border-top border-secondary border-opacity-25 small" id="trade-mb-exp-{{ trade.serial_no }}">
-        <div class="glass-card p-3 rounded-3 shadow-sm overflow-hidden" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 mb-2 pb-1 border-bottom border-secondary border-opacity-20">
-                <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1">
-                    <span class="material-icons" style="font-size: 0.85rem; color: #38bdf8;">receipt_long</span>
+    <!-- Collapsible Detailed Trade Drawer -->
+    <div class="collapse pt-2 mt-2.5 border-top border-secondary border-opacity-25 small" id="trade-mb-exp-{{ trade.serial_no }}">
+        <div class="glass-card p-3 p-md-3.5 rounded-3 shadow-sm overflow-hidden" style="min-width: 0; background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 mb-3 pb-2 border-bottom border-secondary border-opacity-20">
+                <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.74rem; letter-spacing: 0.5px;">
+                    <span class="material-icons text-info" style="font-size: 0.95rem;">receipt_long</span>
                     <span class="theme-text-main">Trade Execution</span>
                 </span>
-                <span class="badge rounded-pill px-2 py-0.5 fw-bold font-monospace" style="font-size: 0.7rem; background: rgba(56, 189, 248, 0.18) !important; color: #38bdf8 !important; border: 1px solid rgba(56, 189, 248, 0.35) !important;">{{ trade.strike }}</span>
+                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-35 rounded-pill px-2.5 py-0.5 fw-bold font-monospace" style="font-size: 0.70rem;">{{ trade.strike }}</span>
             </div>
             
-            <div class="d-flex flex-column small font-monospace">
+            <div class="d-flex flex-column small">
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Execution Date:</span>
-                    <span class="theme-text-main fw-semibold">{{ trade.timestamp|slice:":10" }}</span>
+                    <span class="theme-text-main fw-semibold font-monospace">{{ trade.timestamp|slice:":10" }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Time In ➔ Out:</span>
-                    <span class="theme-text-main fw-semibold">{{ trade.timestamp|slice:"11:19" }} ➔ {{ trade.exit_timestamp|default:trade.timestamp|slice:"11:19" }}</span>
+                    <span class="theme-text-main fw-semibold font-monospace">{{ trade.timestamp|slice:"11:19" }} ➔ {{ trade.exit_timestamp|default:trade.timestamp|slice:"11:19" }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Option Price:</span>
-                    <span class="fw-semibold font-monospace" style="color: #38bdf8 !important;">₹{{ trade.entry_price|floatformat:2 }} ➔ ₹{{ trade.exit_price|floatformat:2 }}</span>
+                    <span class="fw-bold font-monospace text-info">₹{{ trade.entry_price|floatformat:2 }} ➔ ₹{{ trade.exit_price|floatformat:2 }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Spot Move:</span>
-                    <span class="{% if trade.index_points >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">
+                    <span class="{% if trade.index_points >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold font-monospace">
                         {{ trade.index_entry_price|floatformat:1 }} ➔ {{ trade.index_exit_price|floatformat:1 }}
-                        <span class="badge rounded px-1.5 py-0.5 font-monospace fw-bold ms-1" style="font-size: 0.68rem; {% if trade.index_points >= 0 %}background: rgba(16, 185, 129, 0.25) !important; color: #34d399 !important; border: 1px solid #10b981 !important;{% else %}background: rgba(239, 68, 68, 0.25) !important; color: #f87171 !important; border: 1px solid #ef4444 !important;{% endif %}">
+                        <span class="badge rounded px-1.5 py-0.5 font-monospace fw-bold ms-1" style="font-size: 0.68rem; {% if trade.index_points >= 0 %}background: rgba(16, 185, 129, 0.22) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.4) !important;{% else %}background: rgba(239, 68, 68, 0.22) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.4) !important;{% endif %}">
                             {% if trade.index_points >= 0 %}+{% endif %}{{ trade.index_points|floatformat:2 }} pts
                         </span>
                     </span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Target / Entry / Stop:</span>
-                    <span class="fw-semibold font-monospace"><span class="text-success">🎯 ₹{{ trade.target_price|default:0|floatformat:2 }}</span> <span class="theme-text-muted mx-0.5">/</span> <span class="text-info" style="color: #38bdf8 !important;">⚡ ₹{{ trade.entry_price|default:0|floatformat:2 }}</span> <span class="theme-text-muted mx-0.5">/</span> <span class="text-danger">🛑 ₹{{ trade.stop_loss_price|default:0|floatformat:2 }}</span></span>
+                    <span class="fw-semibold font-monospace">
+                        <span class="text-success fw-bold">🎯 ₹{{ trade.target_price|default:0|floatformat:2 }}</span>
+                        <span class="theme-text-muted mx-0.5">/</span>
+                        <span class="text-info fw-bold">⚡ ₹{{ trade.entry_price|default:0|floatformat:2 }}</span>
+                        <span class="theme-text-muted mx-0.5">/</span>
+                        <span class="text-danger fw-bold">🛑 ₹{{ trade.stop_loss_price|default:0|floatformat:2 }}</span>
+                    </span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Position Size:</span>
-                    <span class="theme-text-main fw-semibold font-monospace">{{ trade.lots_count|default:1 }} Lot ({{ trade.quantity }} Qty @ {{ trade.lot_size }}/lot)</span>
+                    <span class="theme-text-main fw-bold font-monospace">{{ trade.lots_count|default:1 }} Lot ({{ trade.quantity }} Qty @ {{ trade.lot_size }}/lot)</span>
                 </div>
+                {% if trade.vix_level %}
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                    <span class="theme-text-muted">India VIX:</span>
+                    <span class="fw-bold font-monospace" style="color: #ec4899 !important;">📊 {{ trade.vix_level|floatformat:1 }} <span class="badge rounded px-1.5 py-0.5 ms-1" style="font-size: 0.65rem; background: rgba(236, 72, 153, 0.2); color: #fbcfe8; border: 1px solid rgba(236, 72, 153, 0.4);">{{ trade.vix_regime|default:"Normal"|slice:":17" }}</span></span>
+                </div>
+                {% endif %}
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Utilized Capital:</span>
-                    <span class="fw-bold font-monospace" style="color: #38bdf8 !important;">₹{{ trade.utilized_capital|default:0|floatformat:2 }}</span>
+                    <span class="fw-bold font-monospace text-info">₹{{ trade.utilized_capital|default:0|floatformat:2 }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Gross PnL:</span>
-                    <span class="{% if trade.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">
+                    <span class="{% if trade.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold font-monospace">
                         {% if trade.gross_pnl >= 0 %}+{% endif %}₹{{ trade.gross_pnl|default:trade.pnl|floatformat:2 }}
                     </span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Brokerage & Taxes:</span>
-                    <span class="text-warning fw-semibold">₹{{ trade.brokerage|default:40.0|floatformat:2 }} + ₹{{ trade.other_charges|default:0|floatformat:2 }} (-₹{{ trade.total_charges|default:40.0|floatformat:2 }})</span>
+                    <span class="text-warning fw-semibold font-monospace">₹{{ trade.brokerage|default:40.0|floatformat:2 }} + ₹{{ trade.other_charges|default:0|floatformat:2 }} (-₹{{ trade.total_charges|default:40.0|floatformat:2 }})</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
                     <span class="theme-text-muted">Net Realized PnL:</span>
-                    <span class="{% if trade.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">
+                    <span class="{% if trade.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold font-monospace">
                         {% if trade.net_pnl >= 0 %}+{% endif %}₹{{ trade.net_pnl|default:trade.pnl|floatformat:2 }}
-                        <span class="badge rounded px-1.5 py-0.5 ms-1 font-monospace fw-bold" style="font-size: 0.68rem; {% if trade.trade_equity_change_pct >= 0 %}background: rgba(16, 185, 129, 0.25) !important; color: #34d399 !important; border: 1px solid #10b981 !important;{% else %}background: rgba(239, 68, 68, 0.25) !important; color: #f87171 !important; border: 1px solid #ef4444 !important;{% endif %}">
+                        <span class="badge rounded px-1.5 py-0.5 ms-1 font-monospace fw-bold" style="font-size: 0.68rem; {% if trade.trade_equity_change_pct >= 0 %}background: rgba(16, 185, 129, 0.22) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.4) !important;{% else %}background: rgba(239, 68, 68, 0.22) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.4) !important;{% endif %}">
                             {% if trade.trade_equity_change_pct >= 0 %}+{% endif %}{{ trade.trade_equity_change_pct }}%
                         </span>
                     </span>
                 </div>
-                <div class="d-flex justify-content-between align-items-center pt-2">
+                <div class="d-flex justify-content-between align-items-center pt-2.5">
                     <span class="theme-text-muted">Equity Progression:</span>
-                    <span class="theme-text-main fw-semibold">₹{{ trade.equity_before|floatformat:0 }} ➔ <strong style="color: #38bdf8 !important;">₹{{ trade.equity_after|default:trade.running_capital|floatformat:0 }}</strong></span>
+                    <span class="theme-text-main fw-semibold font-monospace">₹{{ trade.equity_before|floatformat:0 }} ➔ <strong class="text-info">₹{{ trade.equity_after|default:trade.running_capital|floatformat:0 }}</strong></span>
                 </div>
             </div>
 
             <!-- Trigger Cards -->
-            <div class="p-2.5 rounded-2 font-monospace mt-2 mb-1.5" style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.28); font-size: 0.74rem; line-height: 1.45; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
-                <div class="fw-bold d-flex align-items-center gap-1 mb-1" style="color: #38bdf8 !important;">
-                    <span class="material-icons" style="font-size: 0.85rem !important;">bolt</span>
+            <div class="p-2.5 rounded-2 mt-3 mb-2.5" style="background: rgba(14, 165, 233, 0.08); border: 1px solid rgba(14, 165, 233, 0.25); font-size: 0.75rem; line-height: 1.45; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
+                <div class="fw-bold d-flex align-items-center gap-1 mb-1.5 text-info" style="font-size: 0.74rem;">
+                    <span class="material-icons" style="font-size: 0.88rem !important;">bolt</span>
                     <span>Entry Signal:</span>
                 </div>
                 <div>{{ trade.entry_reason|default:trade.reason }}</div>
             </div>
 
             {% if trade.exit_reason %}
-            <div class="p-2.5 rounded-2 font-monospace" style="background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.28); font-size: 0.74rem; line-height: 1.45; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
-                <div class="fw-bold d-flex align-items-center gap-1 mb-1" style="color: #fbbf24 !important;">
-                    <span class="material-icons" style="font-size: 0.85rem !important;">flag</span>
+            <div class="p-2.5 rounded-2 mb-2.5" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.25); font-size: 0.75rem; line-height: 1.45; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
+                <div class="fw-bold d-flex align-items-center gap-1 mb-1.5 text-warning" style="font-size: 0.74rem;">
+                    <span class="material-icons" style="font-size: 0.88rem !important;">flag</span>
                     <span>Exit Trigger:</span>
                 </div>
                 <div>{{ trade.exit_reason }}</div>
+            </div>
+            {% endif %}
+
+            {% if trade.loss_rca_summary %}
+            <div class="p-2.5 rounded-2 mt-3" style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); font-size: 0.75rem; line-height: 1.45; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
+                <div class="d-flex justify-content-between align-items-center mb-1.5 flex-wrap gap-1">
+                    <span class="fw-bold d-flex align-items-center gap-1 text-danger" style="font-size: 0.74rem;">
+                        <span class="material-icons" style="font-size: 0.88rem !important;">find_replace</span>
+                        <span>Loss Root Cause (RCA):</span>
+                    </span>
+                    <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2 py-0.5" style="font-size: 0.65rem;">{{ trade.loss_rca_primary|default:"RCA Diagnosis" }}</span>
+                </div>
+                <div>{{ trade.loss_rca_summary }}</div>
+                {% if trade.ai_prevention_rule %}
+                <div class="p-2.5 rounded-2 mt-2.5" style="background: rgba(99, 102, 241, 0.08); border: 1px solid rgba(99, 102, 241, 0.25); font-size: 0.75rem; line-height: 1.45;">
+                    <div class="fw-bold d-flex align-items-center gap-1 mb-1 text-info" style="font-size: 0.72rem;">
+                        <span class="material-icons" style="font-size: 0.85rem;">auto_awesome</span> AI Prevention Rule:
+                    </div>
+                    <div class="theme-text-main">{{ trade.ai_prevention_rule }}</div>
+                </div>
+                {% endif %}
             </div>
             {% endif %}
         </div>

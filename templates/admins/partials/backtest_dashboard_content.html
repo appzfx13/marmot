@@ -4,9 +4,11 @@
     .custom-glass-table > :not(caption) > * > * {
         background-color: transparent !important;
         box-shadow: none !important;
+        transition: background-color 0.15s ease-in-out;
     }
-    .custom-glass-table.table-hover tbody tr:hover > * {
-        background-color: var(--nav-hover) !important;
+    .custom-glass-table.table-hover tbody tr:not(.collapse):hover > * {
+        background-color: var(--table-hover-bg, rgba(56, 189, 248, 0.05)) !important;
+        box-shadow: none !important;
     }
     .trade-row-drawer {
         background: rgba(15, 23, 42, 0.45) !important;
@@ -99,10 +101,11 @@
         if (!data || (data.type !== 'backtest_progress' && data.type !== 'progress')) return;
         const progress = data.progress !== undefined ? data.progress : 0;
         const status = data.status || '';
+        const taskId = String(data.task_id);
 
-        const progressBars = document.querySelectorAll('.backtest-progress-bar[id*="backtest-progress-"][id*="' + data.task_id + '"]');
-        const progressTexts = document.querySelectorAll('.backtest-progress-text[id*="backtest-progress-text-"][id*="' + data.task_id + '"]');
-        const statusBadges = document.querySelectorAll('.backtest-status-badge[id*="backtest-status-"][id*="' + data.task_id + '"]');
+        const progressBars = document.querySelectorAll('.backtest-progress-bar[id*="' + taskId + '"]');
+        const progressTexts = document.querySelectorAll('.backtest-progress-text[id*="' + taskId + '"]');
+        const statusBadges = document.querySelectorAll('.backtest-status-badge[id*="' + taskId + '"]');
 
         progressBars.forEach(function(pb) {
             pb.style.width = Math.max(5, progress) + '%';
@@ -129,14 +132,26 @@
             };
             sb.innerHTML = statusMap[status] || statusMap['created'];
         });
+
+        if (status === 'completed' || status === 'error' || progress >= 100) {
+            setTimeout(function() {
+                const tableBody = document.getElementById('backtest-table-body');
+                if (tableBody && window.htmx) {
+                    window.htmx.ajax('GET', window.location.pathname + window.location.search, {
+                        target: '#mainContentBody',
+                        swap: 'innerHTML'
+                    });
+                }
+            }, 1200);
+        }
     }
 
     function initSubscriptions() {
         document.querySelectorAll('.backtest-progress-bar').forEach(function(el) {
             const match = el.id.match(/\d+/);
             if (match) {
-                const taskId = match[0];
-                if (window.MarmotWS && window.MarmotWS.url) {
+                const taskId = String(match[0]);
+                if (window.MarmotWS) {
                     window.MarmotWS.unsubscribe(taskId);
                     window.MarmotWS.subscribe(taskId, applyBacktestListUpdate);
                 }
@@ -149,5 +164,7 @@
     } else {
         initSubscriptions();
     }
+    document.body.addEventListener('htmx:afterSwap', initSubscriptions);
+    document.body.addEventListener('htmx:afterSettle', initSubscriptions);
 })();
 </script>

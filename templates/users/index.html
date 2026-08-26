@@ -55,6 +55,7 @@
             --input-bg: rgba(255, 255, 255, 0.05);
             --input-placeholder: rgba(255, 255, 255, 0.45);
             --calendar-icon-filter: invert(0.9);
+            --table-hover-bg: rgba(56, 189, 248, 0.05);
         }
 
         /* Light Theme Variables (Nordic Ice & Sapphire) */
@@ -66,6 +67,7 @@
             --text-main: #0f172a;
             --text-muted: #475569;
             --nav-hover: rgba(122, 90, 248, 0.08);
+            --table-hover-bg: rgba(122, 90, 248, 0.04);
             --nav-active: rgba(122, 90, 248, 0.15);
             --nav-active-border: #7a5af8;
             --btn-primary-bg: #7a5af8;
@@ -733,7 +735,13 @@
             letter-spacing: 0.02em;
         }
 
-        /* Custom Glass Table Styling (Dense & High Readability) */
+        /* Custom Glass Table Styling (Dense, Smooth & Dark-Mode Optimized) */
+        .custom-glass-table {
+            --bs-table-hover-bg: var(--table-hover-bg, rgba(56, 189, 248, 0.05)) !important;
+            --bs-table-bg: transparent !important;
+            --bs-table-accent-bg: transparent !important;
+        }
+
         .custom-glass-table > :not(caption) > * > * {
             background-color: transparent !important;
             color: var(--text-main) !important;
@@ -741,11 +749,19 @@
             padding: 0.42rem 0.65rem !important;
             font-size: 0.78rem !important;
             vertical-align: middle;
+            transition: background-color 0.15s ease-in-out;
         }
 
-        .custom-glass-table.table-hover tbody tr:hover > * {
-            background-color: var(--nav-hover) !important;
+        .custom-glass-table.table-hover tbody tr:not(.collapse):not(.trade-drawer-row):hover > * {
+            background-color: var(--table-hover-bg, rgba(56, 189, 248, 0.05)) !important;
             color: var(--text-main) !important;
+            box-shadow: none !important;
+        }
+
+        .custom-glass-table.table-hover tbody tr.collapse:hover > *,
+        .custom-glass-table.table-hover tbody tr.trade-drawer-row:hover > * {
+            background-color: transparent !important;
+            box-shadow: none !important;
         }
 
         .table {
@@ -753,7 +769,7 @@
             --bs-table-accent-bg: transparent !important;
             --bs-table-striped-bg: transparent !important;
             --bs-table-color: var(--text-main) !important;
-            --bs-table-hover-bg: var(--nav-hover) !important;
+            --bs-table-hover-bg: var(--table-hover-bg, rgba(56, 189, 248, 0.05)) !important;
             --bs-table-border-color: var(--border-color) !important;
             color: var(--text-main) !important;
             background-color: transparent !important;

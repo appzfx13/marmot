@@ -4,8 +4,20 @@
         <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backup.id }}">
     </td>
     <td class="py-3 bg-transparent">
-        <div class="fw-bold theme-text-main">#{{ backup.id|stringformat:"04d" }}</div>
-        <div class="small text-primary fw-semibold">{{ backup.get_index_name_display }}</div>
+        <div class="fw-bold theme-text-main d-flex align-items-center gap-2">
+            <span>#{{ backup.id|stringformat:"04d" }}</span>
+            {% if backup.market_type == 'FOREX_FUTURES' %}
+                <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.68rem;padding:2px 6px;">FOREX</span>
+            {% else %}
+                <span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-size:0.68rem;padding:2px 6px;">INDEX</span>
+            {% endif %}
+        </div>
+        <div class="small fw-semibold {% if backup.market_type == 'FOREX_FUTURES' %}text-success{% else %}text-primary{% endif %}">
+            {{ backup.display_symbol }}
+        </div>
+        <div class="small theme-text-muted" style="font-size: 0.7rem;">
+            Provider: <strong class="theme-text-main">{{ backup.provider_name }}</strong>
+        </div>
     </td>
 
     <td class="py-3 bg-transparent">

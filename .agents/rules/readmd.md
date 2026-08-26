@@ -9,6 +9,7 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
 ---
 
 ## 1. Scope, Minimality & Code Simplicity
+- **User Approval Required Before Any Code Changes (HIGH PRIORITY):** NEVER modify any file, write code, apply patches, or execute modifying commands without explicitly presenting the proposed plan or change to the user and receiving explicit user confirmation/approval first.
 - **Required Changes Only:** Make **only strictly required changes** to fulfill the specific prompt or task. Never perform unsolicited refactoring, code reorganization, or stylistic rewrites on untouched files or methods.
 - **Preserve Unrelated Code:** Preserve all existing comments, type annotations, and logic in untouched code sections.
 - **Straightforward & Readable Code:** Avoid over-engineering, unnecessary abstractions, or overly complex implementations. Write clear, easily understandable, maintainable code in Python and Go.
@@ -100,3 +101,16 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
 - **Expiry Schedule Accuracy:** Backtest and strategy evaluators must account for exchange expiry schedules (`get_index_expiry_info(index_name, date)`) including weekly vs monthly expiry days and regulatory single-weekly index shifts.
 - **Full Charges & Brokerage Accounting:** Every backtest execution and trade log must calculate gross PnL, brokerage, STT/CTT, exchange charges, SEBI fees, stamp duty, and GST using `calculate_trade_charges()`.
 - **Utilized Capital Metrics:** Backtest reports and UI dashboards must report max utilized capital, average utilized capital, capital utilization %, and ROI on utilized capital alongside total capital ROI.
+
+---
+
+## 11. Structured RCA, Feature Planning & Approval Protocol
+- **Step-by-Step Bug Fix Workflow (Mandatory):**
+  1. **Find RCA:** Perform root cause analysis and explain the bug using simple, easily understandable concepts.
+  2. **Pros / Cons Fix Options Table:** Present proposed fix options in a comparison table detailing Pros, Cons, and Recommended Better Approach.
+  3. **Stop & Request Start Approval:** STOP and ask the user to select the preferred fix and explicitly grant approval ("proceed to start") before executing any code changes.
+- **Step-by-Step Feature Enhancement Workflow (Mandatory):**
+  1. **Dependency Audit:** Thoroughly check all dependent models, service layers, Go microservice handlers, APIs, and UI templates.
+  2. **Prepare Implementation Plan:** Draft a structured `implementation_plan.md` artifact detailing proposed architectural changes and verification steps.
+  3. **Stop & Request Start Approval:** Present the plan, discuss design choices, and wait for explicit user confirmation ("proceed to start") before modifying code.
+- **RCA - Fix - Approach Summary Table Required:** After completing approved work, AI agents MUST provide a structured summary table containing Root Cause Analysis (RCA), Fix Applied, and Architectural Approach in the final response.
