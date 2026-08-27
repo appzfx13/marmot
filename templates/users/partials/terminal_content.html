@@ -1,94 +1,55 @@
 {% load static %}
-<div class="row g-3">
-    <!-- Top Terminal Control Header -->
-    <div class="col-12">
-        <div class="glass-card p-3 rounded-4 border d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3"
-             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
-            
-            <div class="d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0"
-                     style="width: 48px; height: 48px; border: 1px solid rgba(122, 90, 248, 0.3);">
-                    <span class="material-icons fs-3">terminal</span>
-                </div>
-                <div>
-                    <div class="d-flex align-items-center gap-2">
-                        <h4 class="theme-text-main fw-bold mb-0">Trading Terminal</h4>
-                        {% if has_configured_account %}
-                            {% if broker_code == 'dhan' %}
-                                <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
-                                    <span class="material-icons fs-6 align-middle me-1">bolt</span>DHAN HQ
-                                </span>
-                            {% elif broker_code == 'fyers' %}
-                                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
-                                    <span class="material-icons fs-6 align-middle me-1">swap_horiz</span>FYERS API
-                                </span>
-                            {% else %}
-                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
-                                    <span class="material-icons fs-6 align-middle me-1">science</span>SANDBOX
-                                </span>
-                            {% endif %}
-                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 py-1 px-2 small font-monospace">
-                                ID: {{ account_id_display }}
-                            </span>
-                        {% else %}
-                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
-                                <span class="material-icons fs-6 align-middle me-1">warning</span>SETUP REQUIRED
-                            </span>
-                        {% endif %}
-                    </div>
-                    <div class="theme-text-muted small">High-frequency absolute order execution suite for Dhan &amp; Fyers.</div>
-                </div>
-            </div>
+<div class="d-flex flex-column gap-4">
 
-            <!-- Health Status & Account Switcher & Auth Trigger -->
-            <div class="d-flex align-items-center gap-2 ms-md-auto flex-wrap">
-                <!-- Active Trading Account Switcher -->
-                {% include "users/partials/account_selector_dropdown.html" %}
+    <!-- START: Spark Terminal Header Banner -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h1 class="page-title">Trading Terminal</h1>
+            <p class="page-subtitle">High-frequency absolute order execution suite with multi-broker routing and real-time market data.</p>
+        </div>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            <!-- Active Trading Account Switcher -->
+            {% include "users/partials/account_selector_dropdown.html" %}
 
-                {% if has_configured_account %}
-                    <div class="glass-card px-3 py-1.5 rounded-pill d-inline-flex align-items-center gap-2 border"
-                         style="background: rgba(255,255,255,0.03); border-color: var(--border-color) !important;">
-                        {% if is_token_active %}
-                            <span class="position-relative d-flex h-2 w-2">
-                                <span class="animate-ping position-absolute inline-flex h-full w-full rounded-circle bg-success opacity-75" style="width:8px;height:8px;"></span>
-                                <span class="relative inline-flex rounded-circle bg-success" style="width:8px;height:8px;"></span>
-                            </span>
-                            <span class="text-success fw-bold small" style="font-size:0.78rem;">LIVE CONNECTED</span>
-                        {% else %}
-                            <span class="rounded-circle bg-warning" style="width:8px;height:8px;"></span>
-                            <span class="text-warning fw-bold small" style="font-size:0.78rem;">AUTH REQUIRED</span>
-                        {% endif %}
-                    </div>
-
-                    {% if not is_token_active %}
-                        {% if broker_code == 'dhan' %}
-                            <a href="{% url 'trade_core:dhan-user-login' %}" 
-                               hx-get="{% url 'trade_core:dhan-user-login' %}"
-                               hx-target="#globalHtmxModalDialog"
-                               class="btn btn-sm btn-warning rounded-pill px-3 py-1.5 fw-bold text-dark d-flex align-items-center gap-1 shadow-sm">
-                                <span class="material-icons fs-6">vpn_key</span>
-                                <span>Dhan Consent Login</span>
-                            </a>
-                        {% else %}
-                            <a href="{% url 'users:user-accounts' %}" 
-                               class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
-                                <span class="material-icons fs-6">settings</span>
-                                <span>Connect {{ broker_name }}</span>
-                            </a>
-                        {% endif %}
-                    {% endif %}
+            {% if has_configured_account %}
+                {% if is_token_active %}
+                    <span class="trend-badge trend-up py-1.5 px-3">
+                        <i class="bi bi-broadcast"></i>
+                        <span>LIVE CONNECTED</span>
+                    </span>
                 {% else %}
-                    <button type="button" 
-                            hx-get="{% url 'users:user-account-create-modal' %}"
-                            hx-target="#globalHtmxModalDialog"
-                            class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
-                        <span class="material-icons fs-6">add_card</span>
-                        <span>Add Trading Account</span>
-                    </button>
+                    <span class="trend-badge trend-down py-1.5 px-3 bg-warning text-dark">
+                        <i class="bi bi-exclamation-triangle-fill"></i>
+                        <span>AUTH REQUIRED</span>
+                    </span>
                 {% endif %}
-            </div>
+
+                {% if not is_token_active %}
+                    {% if broker_code == 'dhan' %}
+                        <a href="{% url 'trade_core:dhan-user-login' %}" 
+                           hx-get="{% url 'trade_core:dhan-user-login' %}"
+                           hx-target="#globalHtmxModalDialog"
+                           class="btn btn-sm btn-warning rounded-pill px-3 py-1.5 fw-bold text-dark d-flex align-items-center gap-1 shadow-sm">
+                            <i class="bi bi-key-fill"></i>
+                            <span>Dhan Consent Login</span>
+                        </a>
+                    {% else %}
+                        <a href="{% url 'users:user-accounts' %}" 
+                           class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
+                            <i class="bi bi-gear-fill"></i>
+                            <span>Configure</span>
+                        </a>
+                    {% endif %}
+                {% endif %}
+            {% else %}
+                <span class="trend-badge trend-down py-1.5 px-3">
+                    <i class="bi bi-exclamation-circle-fill"></i>
+                    <span>SETUP REQUIRED</span>
+                </span>
+            {% endif %}
         </div>
     </div>
+    <!-- END: Terminal Header Banner -->
 
     <!-- ═══════════════════════════════════════════════════════════════════
          TOP HERO CHART SECTION: TRADINGVIEW LIGHTWEIGHT CANVAS ENGINE
@@ -329,15 +290,17 @@
              style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
             
             <div class="d-flex align-items-center justify-content-between mb-3">
-                <ul class="nav nav-pills gap-1" id="terminalTabs" role="tablist">
+                <ul class="nav nav-pills gap-1 p-1 rounded-3" id="terminalTabs" role="tablist">
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link active rounded-pill px-3 py-1 small fw-bold" id="positions-tab" data-bs-toggle="tab" data-bs-target="#positions-panel" type="button" role="tab">
-                            Open Positions ({% if has_configured_account %}2{% else %}0{% endif %})
+                        <button class="nav-link active px-3 py-1.5 small fw-bold" id="positions-tab" data-bs-toggle="tab" data-bs-target="#positions-panel" type="button" role="tab">
+                            <span class="material-icons fs-6">show_chart</span>
+                            <span>Open Positions ({% if has_configured_account %}2{% else %}0{% endif %})</span>
                         </button>
                     </li>
                     <li class="nav-item" role="presentation">
-                        <button class="nav-link rounded-pill px-3 py-1 small fw-bold" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-panel" type="button" role="tab">
-                            Order Book ({% if has_configured_account %}1{% else %}0{% endif %})
+                        <button class="nav-link px-3 py-1.5 small fw-bold" id="orders-tab" data-bs-toggle="tab" data-bs-target="#orders-panel" type="button" role="tab">
+                            <span class="material-icons fs-6">receipt_long</span>
+                            <span>Order Book ({% if has_configured_account %}1{% else %}0{% endif %})</span>
                         </button>
                     </li>
                 </ul>

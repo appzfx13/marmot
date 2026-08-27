@@ -1,148 +1,205 @@
 <!-- templates/users/partials/dashboard_content.html -->
-<div class="user-dashboard-viewport">
+<div class="d-flex flex-column gap-4">
 
-    <!-- Header & Account Quick Banner -->
-    <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3 mb-4">
+    <!-- START: Spark Dashboard Header Banner -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
         <div>
-            <h2 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
-                <span>Welcome back, {{ request.user.first_name|default:request.user.username }}!</span>
-            </h2>
-            <p class="theme-text-muted small mb-0">Overview of trader performance, broker health, and execution controls.</p>
+            <h1 class="page-title">Trader Overview</h1>
+            <p class="page-subtitle">Overview of trader performance, broker health, security flags, and execution controls.</p>
         </div>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
             {% if request.user.trade_eligibility and not request.user.is_blocked %}
-                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-1">
-                    <span class="material-icons fs-6">check_circle</span> Trade Eligible
+                <span class="trend-badge trend-up py-1.5 px-3">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Trade Eligible</span>
                 </span>
             {% else %}
-                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-1">
-                    <span class="material-icons fs-6">block</span> Trade Blocked
+                <span class="trend-badge trend-down py-1.5 px-3">
+                    <i class="bi bi-slash-circle"></i>
+                    <span>Trade Blocked</span>
                 </span>
             {% endif %}
 
             {% if request.user.primary_freeze or request.user.final_freeze %}
-                <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2 fw-bold d-inline-flex align-items-center gap-1">
-                    <span class="material-icons fs-6">ac_unit</span> Account Frozen
+                <span class="trend-badge trend-down py-1.5 px-3 bg-warning text-dark">
+                    <i class="bi bi-snow"></i>
+                    <span>Account Frozen</span>
                 </span>
             {% endif %}
+
+            <a href="{% url 'users:user-live-dashboard' %}" 
+               class="btn-date-picker text-decoration-none"
+               hx-get="{% url 'users:user-live-dashboard' %}"
+               hx-target="#user-portal-container"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-activity"></i>
+                <span>Live Dashboard</span>
+                <i class="bi bi-chevron-right ms-1"></i>
+            </a>
         </div>
     </div>
+    <!-- END: Dashboard Header Banner -->
 
-    <!-- 4 Meaningful Trader Metrics Cards (Replacing Generic Graphs) -->
-    <div class="row g-3 mb-4">
-        <!-- Card 1: P&L Performance -->
-        <div class="col-12 col-sm-6 col-lg-3">
-            <div class="metric-card glass-card p-3 h-100 theme-text-main rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="small theme-text-muted text-uppercase fw-bold" style="letter-spacing: 0.5px;">Net P&L</span>
-                    <span class="material-icons text-primary">account_balance_wallet</span>
+    <!-- START: Top Area Metric Cards -->
+    <div class="row g-4">
+        <!-- Stat Card 1: Green Alert Banner -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card alert-green-card h-100 d-flex flex-column justify-content-between">
+                <div class="position-relative z-index-2">
+                    <span class="alert-green-badge">Session</span>
+                    <div class="alert-green-date">{{ request.user.first_name|default:request.user.username }}</div>
+                    <div class="alert-green-text">Active trader terminal with multi-broker routing</div>
                 </div>
-                <h3 class="fw-bold mb-1 {% if request.user.pl_integer > 0 %}text-success{% elif request.user.pl_integer < 0 %}text-danger{% else %}theme-text-main{% endif %}">
-                    ₹{{ request.user.pl_integer|default:"0.00" }}
-                </h3>
-                <div class="d-flex align-items-center gap-1 smaller">
-                    <span class="badge {% if request.user.stats == 'PROFIT' %}bg-success bg-opacity-25 text-success{% elif request.user.stats == 'LOSS' %}bg-danger bg-opacity-25 text-danger{% else %}bg-secondary bg-opacity-25 theme-text-muted{% endif %} rounded-pill px-2 py-0.5">
-                        {{ request.user.get_stats_display|default:"No Trade" }}
-                    </span>
+                <a href="{% url 'users:user-terminal' %}" 
+                   class="alert-green-link z-index-2"
+                   hx-get="{% url 'users:user-terminal' %}"
+                   hx-target="#user-portal-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
+                    <span>Open Terminal</span>
+                    <i class="bi bi-arrow-right"></i>
+                </a>
+
+                <!-- Inline SVG geometric decoration -->
+                <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(50,50)">
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" />
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(60)" />
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(120)" />
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Stat Card 2: Net P&L -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
+                        <span class="stat-label">Net P&amp;L</span>
+                        <span class="badge {% if request.user.stats == 'PROFIT' %}bg-success bg-opacity-25 text-success{% elif request.user.stats == 'LOSS' %}bg-danger bg-opacity-25 text-danger{% else %}bg-secondary bg-opacity-25 theme-text-muted{% endif %} rounded-pill px-2 py-1 small fw-bold">
+                            {{ request.user.get_stats_display|default:"No Trade" }}
+                        </span>
+                    </div>
+                    <div class="stat-value {% if request.user.pl_integer > 0 %}text-success{% elif request.user.pl_integer < 0 %}text-danger{% endif %}">
+                        ₹{{ request.user.pl_integer|default:"0.00" }}
+                    </div>
+                    <div class="trend-badge {% if request.user.pl_integer >= 0 %}trend-up{% else %}trend-down{% endif %}">
+                        <i class="bi {% if request.user.pl_integer >= 0 %}bi-arrow-up-right{% else %}bi-arrow-down-left{% endif %}"></i>
+                        <span>Today's Total Performance</span>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
+                    <span>Performance</span>
+                    <span class="fw-semibold text-main">Session PnL</span>
                 </div>
             </div>
         </div>
 
-        <!-- Card 2: Execution Freeze Controls -->
-        <div class="col-12 col-sm-6 col-lg-3">
-            <div class="metric-card glass-card p-3 h-100 theme-text-main rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="small theme-text-muted text-uppercase fw-bold" style="letter-spacing: 0.5px;">Freeze Status</span>
-                    <span class="material-icons text-warning">security</span>
+        <!-- Stat Card 3: Freeze Status -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
+                        <span class="stat-label">Safety Status</span>
+                        <i class="bi bi-shield-lock text-warning"></i>
+                    </div>
+                    <div class="stat-value">
+                        {% if request.user.final_freeze %}
+                            <span class="text-danger fs-5">Final Freeze</span>
+                        {% elif request.user.primary_freeze %}
+                            <span class="text-warning fs-5">Primary Freeze</span>
+                        {% else %}
+                            <span class="text-success fs-5">Active / Unfrozen</span>
+                        {% endif %}
+                    </div>
+                    <div class="trend-badge trend-up">
+                        <i class="bi bi-check2-shield"></i>
+                        <span>Risk &amp; drawdown safety</span>
+                    </div>
                 </div>
-                <h4 class="fw-bold mb-1 theme-text-main">
-                    {% if request.user.final_freeze %}
-                        <span class="text-danger">Final Freeze</span>
-                    {% elif request.user.primary_freeze %}
-                        <span class="text-warning">Primary Freeze</span>
-                    {% else %}
-                        <span class="text-success">Active / Unfrozen</span>
-                    {% endif %}
-                </h4>
-                <p class="smaller theme-text-muted mb-0">Safety limits and risk controls</p>
-            </div>
-        </div>
-
-        <!-- Card 3: Broker Health & API Status -->
-        <div class="col-12 col-sm-6 col-lg-3">
-            <div class="metric-card glass-card p-3 h-100 theme-text-main rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="small theme-text-muted text-uppercase fw-bold" style="letter-spacing: 0.5px;">Broker Health</span>
-                    <span class="material-icons text-info">lan</span>
-                </div>
-                <h4 class="fw-bold mb-1 theme-text-main">
-                    {{ request.user.get_broker_display|default:"Dhan Broker" }}
-                </h4>
-                <div class="d-flex align-items-center gap-1 smaller theme-text-muted">
-                    <span class="badge bg-success rounded-circle p-1 me-1"></span>
-                    <span>Client ID: {{ request.user.broker_client_id|default:"Configured" }}</span>
+                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
+                    <span>Risk Level</span>
+                    <span class="fw-semibold text-main">Normal</span>
                 </div>
             </div>
         </div>
 
-        <!-- Card 4: Platform Traders Overview -->
-        <div class="col-12 col-sm-6 col-lg-3">
-            <div class="metric-card glass-card p-3 h-100 theme-text-main rounded-4 border" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <div class="d-flex justify-content-between align-items-start mb-2">
-                    <span class="small theme-text-muted text-uppercase fw-bold" style="letter-spacing: 0.5px;">System Traders</span>
-                    <span class="material-icons text-primary">groups</span>
+        <!-- Stat Card 4: Broker Health -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
+                        <span class="stat-label">Broker Link</span>
+                        <i class="bi bi-broadcast text-info"></i>
+                    </div>
+                    <div class="stat-value fs-5">
+                        {{ request.user.get_broker_display|default:"Dhan Broker" }}
+                    </div>
+                    <div class="trend-badge trend-up">
+                        <i class="bi bi-key-fill"></i>
+                        <span>Client ID: {{ request.user.broker_client_id|default:"Configured" }}</span>
+                    </div>
                 </div>
-                <h3 class="fw-bold mb-1 theme-text-main">{{ active_traders|default:0 }} / {{ total_traders|default:0 }}</h3>
-                <p class="smaller theme-text-muted mb-0">Eligible execution accounts</p>
+                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
+                    <span>API Token</span>
+                    <span class="fw-semibold text-main">{% if request.user.api_key %}Connected{% else %}Ready{% endif %}</span>
+                </div>
             </div>
         </div>
     </div>
+    <!-- END: Top Area Metric Cards -->
 
-    <!-- Meaningful Trader Control Widgets -->
-    <div class="row g-4 mb-4">
+    <!-- START: Meaningful Trader Control Widgets -->
+    <div class="row g-4">
         <!-- Account Status & Integration Health -->
         <div class="col-12 col-lg-6">
-            <div class="glass-card p-4 rounded-4 border h-100" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-                    <span class="material-icons text-primary fs-5">tune</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Account Integration & Security</h6>
+            <div class="card h-100 mb-0">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h2 class="card-title mb-0">Account Integration &amp; Security</h2>
+                        <span class="card-subtitle theme-text-muted small">Account verification and risk flags</span>
+                    </div>
                 </div>
 
-                <div class="d-flex flex-column gap-3">
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="small theme-text-muted fw-bold">Primary Freeze Flag</span>
-                        {% if request.user.primary_freeze %}
-                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Enabled</span>
-                        {% else %}
-                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-3 py-1 fw-bold">Disabled</span>
-                        {% endif %}
-                    </div>
+                <div class="card-body">
+                    <div class="d-flex flex-column gap-3">
+                        <div class="d-flex justify-content-between align-items-center p-2 rounded-3" style="background: rgba(255,255,255,0.02);">
+                            <span class="small theme-text-muted fw-bold">Primary Freeze Flag</span>
+                            {% if request.user.primary_freeze %}
+                                <span class="trend-badge trend-down py-1 px-3">Enabled</span>
+                            {% else %}
+                                <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-3 py-1">Disabled</span>
+                            {% endif %}
+                        </div>
 
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="small theme-text-muted fw-bold">Final Freeze Flag</span>
-                        {% if request.user.final_freeze %}
-                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 fw-bold">Enabled</span>
-                        {% else %}
-                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-3 py-1 fw-bold">Disabled</span>
-                        {% endif %}
-                    </div>
+                        <div class="d-flex justify-content-between align-items-center p-2 rounded-3" style="background: rgba(255,255,255,0.02);">
+                            <span class="small theme-text-muted fw-bold">Final Freeze Flag</span>
+                            {% if request.user.final_freeze %}
+                                <span class="trend-badge trend-down py-1 px-3">Enabled</span>
+                            {% else %}
+                                <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-3 py-1">Disabled</span>
+                            {% endif %}
+                        </div>
 
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="small theme-text-muted fw-bold">Broker API Connection</span>
-                        {% if request.user.api_key %}
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Connected</span>
-                        {% else %}
-                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Pending API Key</span>
-                        {% endif %}
-                    </div>
+                        <div class="d-flex justify-content-between align-items-center p-2 rounded-3" style="background: rgba(255,255,255,0.02);">
+                            <span class="small theme-text-muted fw-bold">Broker API Connection</span>
+                            {% if request.user.api_key %}
+                                <span class="trend-badge trend-up py-1 px-3">Connected</span>
+                            {% else %}
+                                <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-3 py-1">Pending API Key</span>
+                            {% endif %}
+                        </div>
 
-                    <div class="d-flex justify-content-between align-items-center">
-                        <span class="small theme-text-muted fw-bold">Email Verification</span>
-                        {% if request.user.is_email_verified %}
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold">Verified</span>
-                        {% else %}
-                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold">Unverified</span>
-                        {% endif %}
+                        <div class="d-flex justify-content-between align-items-center p-2 rounded-3" style="background: rgba(255,255,255,0.02);">
+                            <span class="small theme-text-muted fw-bold">Email Verification</span>
+                            {% if request.user.is_email_verified %}
+                                <span class="trend-badge trend-up py-1 px-3">Verified</span>
+                            {% else %}
+                                <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-3 py-1">Unverified</span>
+                            {% endif %}
+                        </div>
                     </div>
                 </div>
             </div>
@@ -150,47 +207,57 @@
 
         <!-- Quick Execution Actions -->
         <div class="col-12 col-lg-6">
-            <div class="glass-card p-4 rounded-4 border h-100" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-                    <span class="material-icons text-primary fs-5">bolt</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Quick Controls & Shortcuts</h6>
+            <div class="card h-100 mb-0">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h2 class="card-title mb-0">Quick Controls &amp; Shortcuts</h2>
+                        <span class="card-subtitle theme-text-muted small">Instant management shortcuts</span>
+                    </div>
                 </div>
 
-                <div class="d-flex flex-column gap-3">
-                    <a href="{% url 'users:marmot-profile' %}" 
-                       class="btn btn-outline-secondary d-flex align-items-center justify-content-between p-3 rounded-3 text-decoration-none"
-                       hx-get="{% url 'users:marmot-profile' %}"
-                       hx-target="#user-portal-container"
-                       hx-swap="innerHTML"
-                       hx-push-url="true">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="material-icons text-primary">account_circle</span>
-                            <span class="fw-semibold">Update Profile & Credentials</span>
-                        </div>
-                        <span class="material-icons fs-6">chevron_right</span>
-                    </a>
+                <div class="card-body">
+                    <div class="d-flex flex-column gap-3">
+                        <a href="{% url 'users:marmot-profile' %}" 
+                           class="btn btn-outline-secondary d-flex align-items-center justify-content-between p-3 rounded-3 text-decoration-none"
+                           hx-get="{% url 'users:marmot-profile' %}"
+                           hx-target="#user-portal-container"
+                           hx-swap="innerHTML"
+                           hx-push-url="true">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-person-circle fs-5 text-primary"></i>
+                                <span class="fw-semibold">Update Profile &amp; Credentials</span>
+                            </div>
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
 
-                    <a href="{% url 'users:user-accounts' %}" class="btn btn-outline-secondary d-flex align-items-center justify-content-between p-3 rounded-3 text-decoration-none">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="material-icons text-success">account_balance_wallet</span>
-                            <span class="fw-semibold">Manage Trading Accounts & Sandbox</span>
-                        </div>
-                        <span class="material-icons fs-6">chevron_right</span>
-                    </a>
+                        <a href="{% url 'users:user-accounts' %}" 
+                           class="btn btn-outline-secondary d-flex align-items-center justify-content-between p-3 rounded-3 text-decoration-none"
+                           hx-get="{% url 'users:user-accounts' %}"
+                           hx-target="#user-portal-container"
+                           hx-swap="innerHTML"
+                           hx-push-url="true">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-wallet2 fs-5 text-success"></i>
+                                <span class="fw-semibold">Manage Trading Accounts &amp; Sandbox</span>
+                            </div>
+                            <i class="bi bi-chevron-right"></i>
+                        </a>
 
-                    <button type="button" 
-                            class="btn btn-outline-danger d-flex align-items-center justify-content-between p-3 rounded-3 text-start w-100"
-                            hx-get="{% url 'users:user-kill-switch' %}"
-                            hx-target="#globalHtmxModalDialog">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="material-icons text-danger">bolt</span>
-                            <span class="fw-bold text-danger">Emergency Freeze Account</span>
-                        </div>
-                        <span class="material-icons fs-6 text-danger">chevron_right</span>
-                    </button>
+                        <button type="button" 
+                                class="btn btn-outline-danger d-flex align-items-center justify-content-between p-3 rounded-3 text-start w-100"
+                                hx-get="{% url 'users:user-kill-switch' %}"
+                                hx-target="#globalHtmxModalDialog">
+                            <div class="d-flex align-items-center gap-2">
+                                <i class="bi bi-shield-x fs-5 text-danger"></i>
+                                <span class="fw-bold text-danger">Emergency Freeze Account</span>
+                            </div>
+                            <i class="bi bi-chevron-right text-danger"></i>
+                        </button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+    <!-- END: Meaningful Trader Control Widgets -->
 
 </div>

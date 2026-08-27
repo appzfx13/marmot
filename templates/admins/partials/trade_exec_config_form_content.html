@@ -67,17 +67,12 @@
         outline: none;
     }
 
-    .glass-form-card input:disabled {
+    .glass-form-card input:disabled,
+    .glass-form-card select:disabled {
         opacity: 0.45 !important;
         cursor: not-allowed !important;
         background-color: rgba(255, 255, 255, 0.02) !important;
         border-color: rgba(255, 255, 255, 0.08) !important;
-    }
-
-    :root[data-theme="light"] .form-check.form-switch .form-check-input,
-    :root[data-theme="light"] input[type="checkbox"][role="switch"] {
-        background-color: rgba(0, 0, 0, 0.12) !important;
-        border: 1.5px solid rgba(0, 0, 0, 0.2) !important;
     }
 
     /* ─── Premium Glassmorphic Switch Toggle UI (SVG Knob Track) ─────────── */
@@ -87,8 +82,7 @@
     }
 
     .form-check.form-switch .form-check-input,
-    input[type="checkbox"][role="switch"],
-    input[type="checkbox"].form-check-input {
+    input[type="checkbox"][role="switch"] {
         appearance: none !important;
         -webkit-appearance: none !important;
         -moz-appearance: none !important;
@@ -110,15 +104,19 @@
         float: none !important;
         margin: 0 !important;
         box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+        --bs-form-check-bg-image: none !important;
     }
 
     .form-check.form-switch .form-check-input:checked,
-    input[type="checkbox"][role="switch"]:checked,
-    input[type="checkbox"].form-check-input:checked {
+    input[type="checkbox"][role="switch"]:checked {
         background-color: #0d6efd !important;
         border-color: #0d6efd !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e") !important;
         background-position: right 2px center !important;
+        background-repeat: no-repeat !important;
+        background-size: 1.35rem 1.35rem !important;
         box-shadow: 0 0 14px rgba(13, 110, 253, 0.5), inset 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+        --bs-form-check-bg-image: none !important;
     }
 
     .form-check.form-switch .form-check-input:focus,
@@ -127,24 +125,49 @@
         box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.3) !important;
     }
 
-    /* Checkbox Label Wrapper Component */
-    .custom-check-item {
-        display: flex;
-        align-items: center;
-        gap: 0.6rem;
-        padding: 0.55rem 0.85rem;
-        border-radius: 8px;
-        background: var(--input-bg, rgba(255, 255, 255, 0.03));
-        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-        transition: all 0.2s ease;
-        cursor: pointer;
-        user-select: none;
-        margin-bottom: 0;
+    :root[data-theme="light"] .form-check.form-switch .form-check-input,
+    :root[data-theme="light"] input[type="checkbox"][role="switch"] {
+        background-color: rgba(0, 0, 0, 0.12) !important;
+        border: 1.5px solid rgba(0, 0, 0, 0.2) !important;
     }
 
-    .custom-check-item:hover {
-        background: var(--nav-hover, rgba(255, 255, 255, 0.08));
-        border-color: rgba(122, 90, 248, 0.3);
+    /* ─── Standardized Toggle Box & Card Units ───────────────────────────── */
+    .config-card-unit {
+        padding: 1.25rem;
+        border-radius: 12px;
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+        background: rgba(255, 255, 255, 0.02);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .config-card-unit:hover {
+        border-color: rgba(122, 90, 248, 0.25);
+    }
+
+    .toggle-header-strip {
+        padding: 0.6rem 0.9rem;
+        border-radius: 9px;
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+        background: rgba(255, 255, 255, 0.03);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 48px;
+        margin-bottom: 0.9rem;
+        user-select: none;
+    }
+
+    .toggle-dep-container {
+        transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), filter 0.25s ease;
+    }
+
+    .toggle-dep-container.is-dimmed {
+        opacity: 0.42;
+        pointer-events: none;
     }
 
     /* Market Type Tabs */
@@ -206,8 +229,8 @@
 </style>
 
 <div class="row">
-    <!-- Header -->
-    <div class="col-12 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
+    <!-- Header with proper top spacing -->
+    <div class="col-12 pt-2 pt-md-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
         <div class="d-flex align-items-center gap-3">
             <a href="{% url 'admins:trade_exec_config_list' %}" 
                class="glass-icon-btn text-decoration-none" 
@@ -291,24 +314,27 @@
                     {% endif %}
                 </div>
 
-                <!-- SECTION 1: GENERAL SETTINGS -->
+                <!-- SECTION 1: GENERAL SETTINGS (Optimized Balanced Grid) -->
                 <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
                     <span class="material-icons text-primary fs-5">settings</span>
                     <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">General Settings</h6>
                 </div>
 
                 <div class="row g-3 mb-4">
-                    <div class="col-12 col-md-4">
+                    <!-- Row 1: Name and Target User -->
+                    <div class="col-12 col-lg-6">
                         <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="{{ form.name.id_for_label }}">Configuration Name *</label>
                         {{ form.name }}
                         {% if form.name.errors %}<div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>{% endif %}
                     </div>
-                    <div class="col-12 col-sm-6 col-md-3">
+                    <div class="col-12 col-lg-6">
                         <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="{{ form.admins_user.id_for_label }}">Target User *</label>
                         {{ form.admins_user }}
                         {% if form.admins_user.errors %}<div class="text-danger small mt-1">{{ form.admins_user.errors.0 }}</div>{% endif %}
                     </div>
-                    <div class="col-12 col-sm-6 col-md-3" 
+
+                    <!-- Row 2: Execution Mode and Master Active Switch -->
+                    <div class="col-12 col-lg-8" 
                          id="execution-mode-container"
                          hx-get="{% url 'admins:trade_exec_user_account_info' %}"
                          hx-trigger="change from:#id_admins_user"
@@ -318,13 +344,19 @@
                         {% include "admins/partials/trade_exec_user_account_badge.html" %}
                         {% if form.account_type.errors %}<div class="text-danger small mt-1">{{ form.account_type.errors.0 }}</div>{% endif %}
                     </div>
-                    <div class="col-12 col-md-2 d-flex flex-column justify-content-end">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1 d-none d-md-block">&nbsp;</label>
-                        <div class="form-check form-switch p-2 rounded-3 border d-flex align-items-center justify-content-between px-3" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important; min-height: 40px;">
-                            <label class="form-check-label theme-text-main small fw-bold mb-0" for="id_is_active">
-                                Active Config
+                    <div class="col-12 col-lg-4">
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">Master Status *</label>
+                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0-5 small" style="font-size: 0.7rem;">Live Switch</span>
+                        </div>
+                        <div class="form-check form-switch p-2 px-3 rounded-3 border d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; min-height: 40px;">
+                            <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer" for="id_is_active">
+                                Active Execution
                             </label>
                             {{ form.is_active }}
+                        </div>
+                        <div class="theme-text-muted small mt-1" style="font-size:0.75rem;">
+                            Master switch to enable/disable automated strategy order triggers.
                         </div>
                     </div>
                 </div>
@@ -336,44 +368,52 @@
                 </div>
 
                 <div class="row g-3 mb-4">
-                    <!-- Max Loss Limit Card -->
-                    <div class="col-12 col-md-6">
-                        <div class="p-3 rounded-3 border h-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
-                            <div class="form-check form-switch p-2 rounded-3 border d-flex align-items-center justify-content-between px-3 mb-3" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important; min-height: 44px;">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0" for="id_max_loss_status">
-                                    Enable Max Loss Limit
-                                </label>
-                                {{ form.max_loss_status }}
-                            </div>
-                            <div>
-                                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="id_max_loss_limit">Max Loss Limit ($)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-transparent theme-text-muted border-secondary border-opacity-25">$</span>
-                                    {{ form.max_loss_limit }}
+                    <!-- Max Loss Limit Card (Single-Line Inline) -->
+                    <div class="col-12 col-lg-6">
+                        <div class="config-card-unit p-3">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                <!-- Left: Switch and Title -->
+                                <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                                    {{ form.max_loss_status }}
+                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_max_loss_status">
+                                        <span class="material-icons text-danger fs-5">gpp_maybe</span>
+                                        <span>Enable Max Loss Limit</span>
+                                    </label>
                                 </div>
-                                <div class="theme-text-muted small mt-1">Maximum allowed session loss limit before auto-freeze triggers.</div>
-                                {% if form.max_loss_limit.errors %}<div class="text-danger small mt-1">{{ form.max_loss_limit.errors.0 }}</div>{% endif %}
+
+                                <!-- Right: Amount Input Field -->
+                                <div id="max_loss_dep_body" class="toggle-dep-container" style="min-width: 150px; max-width: 200px; flex: 1;">
+                                    {{ form.max_loss_limit }}
+                                    {% if form.max_loss_limit.errors %}<div class="text-danger small mt-1">{{ form.max_loss_limit.errors.0 }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
+                                Maximum allowed session loss limit before auto-freeze triggers.
                             </div>
                         </div>
                     </div>
 
-                    <!-- Max Profit Limit Card -->
-                    <div class="col-12 col-md-6">
-                        <div class="p-3 rounded-3 border h-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
-                            <div class="form-check form-switch p-2 rounded-3 border d-flex align-items-center justify-content-between px-3 mb-3" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important; min-height: 44px;">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0" for="id_max_profit_status">
-                                    Enable Max Profit Limit
-                                </label>
-                                {{ form.max_profit_status }}
-                            </div>
-                            <div>
-                                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="id_max_profit_limit">Max Profit Limit ($)</label>
-                                <div class="input-group">
-                                    <span class="input-group-text bg-transparent theme-text-muted border-secondary border-opacity-25">$</span>
-                                    {{ form.max_profit_limit }}
+                    <!-- Max Profit Limit Card (Single-Line Inline) -->
+                    <div class="col-12 col-lg-6">
+                        <div class="config-card-unit p-3">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                <!-- Left: Switch and Title -->
+                                <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                                    {{ form.max_profit_status }}
+                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_max_profit_status">
+                                        <span class="material-icons text-success fs-5">verified</span>
+                                        <span>Enable Max Profit Limit</span>
+                                    </label>
                                 </div>
-                                <div class="theme-text-muted small mt-1">Target session profit limit for automatic trade locking.</div>
-                                {% if form.max_profit_limit.errors %}<div class="text-danger small mt-1">{{ form.max_profit_limit.errors.0 }}</div>{% endif %}
+
+                                <!-- Right: Amount Input Field -->
+                                <div id="max_profit_dep_body" class="toggle-dep-container" style="min-width: 150px; max-width: 200px; flex: 1;">
+                                    {{ form.max_profit_limit }}
+                                    {% if form.max_profit_limit.errors %}<div class="text-danger small mt-1">{{ form.max_profit_limit.errors.0 }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
+                                Target session profit limit for automatic trade locking.
                             </div>
                         </div>
                     </div>
@@ -388,40 +428,49 @@
                     </div>
 
                     <div class="row g-3 mb-4">
-                        <div class="col-12 col-md-6">
-                            <div class="p-3 rounded-3 border h-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
-                                <div class="form-check form-switch p-2 rounded-3 border d-flex align-items-center justify-content-between px-3 mb-3" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important; min-height: 44px;">
-                                    <label class="form-check-label theme-text-main small fw-bold mb-0" for="id_auto_lot_status">
-                                        Auto Lot Size Calculation
+                        <!-- Auto Lot Card -->
+                        <div class="col-12 col-lg-6">
+                            <div class="config-card-unit">
+                                <div class="form-check form-switch toggle-header-strip">
+                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_auto_lot_status">
+                                        <span class="material-icons text-primary fs-5">widgets</span>
+                                        <span>Auto Lot Size Calculation</span>
                                     </label>
                                     {{ form.auto_lot_status }}
                                 </div>
-                                <div>
-                                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_lot_size.id_for_label }}">Default Lot Size</label>
+                                <div id="auto_lot_dep_body" class="toggle-dep-container">
+                                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_lot_size.id_for_label }}">Default Lot Size (Lots)</label>
                                     {{ form.default_lot_size }}
+                                    <div class="theme-text-muted small mt-1">Base quantity lot count used for initial order execution.</div>
                                     {% if form.default_lot_size.errors %}<div class="text-danger small mt-1">{{ form.default_lot_size.errors.0 }}</div>{% endif %}
                                 </div>
                             </div>
                         </div>
-                        <div class="col-12 col-md-6">
-                            <div class="p-3 rounded-3 border h-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
-                                <div class="form-check form-switch p-2 rounded-3 border d-flex align-items-center justify-content-between px-3 mb-3" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important; min-height: 44px;">
-                                    <label class="form-check-label theme-text-main small fw-bold mb-0" for="id_auto_sl_status">
-                                        Auto Attach Stop Loss
+
+                        <!-- Auto Stop Loss Card -->
+                        <div class="col-12 col-lg-6">
+                            <div class="config-card-unit">
+                                <div class="form-check form-switch toggle-header-strip">
+                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_auto_sl_status">
+                                        <span class="material-icons text-danger fs-5">security</span>
+                                        <span>Auto Attach Stop Loss</span>
                                     </label>
                                     {{ form.auto_sl_status }}
                                 </div>
-                                <div class="row g-2">
-                                    <div class="col-6">
-                                        <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_value.id_for_label }}">Risk Value</label>
-                                        {{ form.default_risk_value }}
-                                        {% if form.default_risk_value.errors %}<div class="text-danger small mt-1">{{ form.default_risk_value.errors.0 }}</div>{% endif %}
+                                <div id="auto_sl_dep_body" class="toggle-dep-container">
+                                    <div class="row g-2">
+                                        <div class="col-12 col-sm-6">
+                                            <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_value.id_for_label }}">Default Risk Value</label>
+                                            {{ form.default_risk_value }}
+                                            {% if form.default_risk_value.errors %}<div class="text-danger small mt-1">{{ form.default_risk_value.errors.0 }}</div>{% endif %}
+                                        </div>
+                                        <div class="col-12 col-sm-6">
+                                            <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_type.id_for_label }}">Risk Calculation Mode</label>
+                                            {{ form.default_risk_type }}
+                                            {% if form.default_risk_type.errors %}<div class="text-danger small mt-1">{{ form.default_risk_type.errors.0 }}</div>{% endif %}
+                                        </div>
                                     </div>
-                                    <div class="col-6">
-                                        <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_type.id_for_label }}">Risk Mode</label>
-                                        {{ form.default_risk_type }}
-                                        {% if form.default_risk_type.errors %}<div class="text-danger small mt-1">{{ form.default_risk_type.errors.0 }}</div>{% endif %}
-                                    </div>
+                                    <div class="theme-text-muted small mt-1">Automatically attach defensive SL bracket upon trade entry fill.</div>
                                 </div>
                             </div>
                         </div>
@@ -506,49 +555,72 @@
                     </div>
                 </div>
 
-                <!-- SECTION 5: LAYERING & ADVANCED FEATURES -->
+                <!-- SECTION 5: LAYERING & ADVANCED FEATURES (Equalized 3-Column Grid) -->
                 <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
                     <span class="material-icons text-primary fs-5">layers</span>
                     <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Layering &amp; Advanced Features</h6>
                 </div>
 
                 <div class="row g-3 mb-4">
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 border h-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
-                            <div class="form-check form-switch p-2 rounded-3 border d-flex align-items-center justify-content-between px-3 mb-3" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important; min-height: 44px;">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0" for="id_layer_status">
-                                    Enable Order Layering
+                    <!-- Layering Card -->
+                    <div class="col-12 col-lg-4">
+                        <div class="config-card-unit">
+                            <div class="form-check form-switch toggle-header-strip">
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_layer_status">
+                                    <span class="material-icons text-primary fs-5">stacked_line_chart</span>
+                                    <span>Enable Order Layering</span>
                                 </label>
                                 {{ form.layer_status }}
                             </div>
-                            <div>
-                                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.layer_add_in_lot_count.id_for_label }}">Lots Per Layer</label>
+                            <div id="layer_lots_dep_body" class="toggle-dep-container">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.layer_add_in_lot_count.id_for_label }}">Lots Per Layer Entry</label>
                                 {{ form.layer_add_in_lot_count }}
+                                <div class="theme-text-muted small mt-1">Additional lots added on each pyramiding trigger.</div>
                                 {% if form.layer_add_in_lot_count.errors %}<div class="text-danger small mt-1">{{ form.layer_add_in_lot_count.errors.0 }}</div>{% endif %}
                             </div>
                         </div>
                     </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 border h-100 d-flex flex-column justify-content-end" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
-                            <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.layer_percentage.id_for_label }}">Layer Step Distance (%)</label>
-                            {{ form.layer_percentage }}
-                            <div class="theme-text-muted small mt-1">Price movement percentage required to trigger next layer entry.</div>
-                            {% if form.layer_percentage.errors %}<div class="text-danger small mt-1">{{ form.layer_percentage.errors.0 }}</div>{% endif %}
+
+                    <!-- Layer Step Distance Card -->
+                    <div class="col-12 col-lg-4">
+                        <div class="config-card-unit">
+                            <div class="toggle-header-strip">
+                                <span class="theme-text-main small fw-bold d-flex align-items-center gap-2">
+                                    <span class="material-icons text-info fs-5">straighten</span>
+                                    <span>Layer Step Parameters</span>
+                                </span>
+                                <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 small">Pyramiding</span>
+                            </div>
+                            <div id="layer_step_dep_body" class="toggle-dep-container">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.layer_percentage.id_for_label }}">Layer Step Distance (%)</label>
+                                {{ form.layer_percentage }}
+                                <div class="theme-text-muted small mt-1">Price movement percentage required to trigger next layer entry.</div>
+                                {% if form.layer_percentage.errors %}<div class="text-danger small mt-1">{{ form.layer_percentage.errors.0 }}</div>{% endif %}
+                            </div>
                         </div>
                     </div>
-                    <div class="col-12 col-md-4">
-                        <div class="p-3 rounded-3 border h-100 d-flex flex-column justify-content-center gap-2" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;">
-                            <div class="form-check form-switch p-2 rounded-3 border d-flex align-items-center justify-content-between px-3" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important; min-height: 44px;">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0" for="id_forecast_status">
-                                    Predictive Forecasting
-                                </label>
-                                {{ form.forecast_status }}
+
+                    <!-- AI & Backtest Modes Card -->
+                    <div class="col-12 col-lg-4">
+                        <div class="config-card-unit d-flex flex-column justify-content-between">
+                            <div>
+                                <div class="form-check form-switch toggle-header-strip mb-2">
+                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_forecast_status">
+                                        <span class="material-icons text-warning fs-5">psychology</span>
+                                        <span>Predictive Forecasting</span>
+                                    </label>
+                                    {{ form.forecast_status }}
+                                </div>
+                                <div class="form-check form-switch toggle-header-strip mb-0">
+                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_backtest_status">
+                                        <span class="material-icons text-success fs-5">science</span>
+                                        <span>Backtest Simulation Mode</span>
+                                    </label>
+                                    {{ form.backtest_status }}
+                                </div>
                             </div>
-                            <div class="form-check form-switch p-2 rounded-3 border d-flex align-items-center justify-content-between px-3" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important; min-height: 44px;">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0" for="id_backtest_status">
-                                    Backtest Mode
-                                </label>
-                                {{ form.backtest_status }}
+                            <div class="theme-text-muted small mt-2" style="font-size:0.75rem;">
+                                Independent simulation &amp; AI prediction execution toggles.
                             </div>
                         </div>
                     </div>
@@ -557,7 +629,7 @@
                 <!-- Action Buttons -->
                 <div class="d-flex align-items-center justify-content-end gap-3 pt-3 border-top" style="border-color: var(--border-color) !important;">
                     <a href="{% url 'admins:trade_exec_config_list' %}" 
-                       class="btn btn-outline-secondary rounded-pill px-4 py-2 small fw-bold border-secondary border-opacity-25 text-white-50"
+                       class="btn btn-outline-secondary rounded-pill px-4 py-2 small fw-bold border-secondary border-opacity-25 theme-text-muted"
                        hx-get="{% url 'admins:trade_exec_config_list' %}"
                        hx-target="#app-main-container"
                        hx-push-url="true">
@@ -577,13 +649,19 @@
 <!-- Glassmorphic Confirmation Modal -->
 <div class="modal fade" id="confirmSaveModal" tabindex="-1" aria-labelledby="confirmSaveModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content glass-modal-content rounded-4 border-0 p-2">
+        <div class="modal-content glass-card p-3 border shadow-lg" style="max-width: 520px; width: 100%; margin: 0 auto; border-radius: 16px; background: var(--glass-bg); border: 1px solid var(--border-color) !important;">
             <div class="modal-header border-0 pb-0">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="material-icons text-primary fs-4">published_with_changes</span>
-                    <h5 class="modal-title theme-text-main fw-bold" id="confirmSaveModalLabel">Confirm Save</h5>
+                <div class="d-flex align-items-center gap-2.5">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
+                         style="width: 40px; height: 40px; background: rgba(180, 241, 5, 0.15); color: var(--brand-lime); border: 1px solid rgba(180, 241, 5, 0.3);">
+                        <span class="material-icons fs-5">published_with_changes</span>
+                    </div>
+                    <div>
+                        <h5 class="modal-title theme-text-main fw-bold mb-0" id="confirmSaveModalLabel">Confirm Save</h5>
+                        <small class="theme-text-muted" style="font-size: 0.78rem;">Trade execution settings will apply immediately.</small>
+                    </div>
                 </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body py-3">
                 <p class="theme-text-muted mb-0 small">
@@ -594,8 +672,9 @@
                 <button type="button" class="btn btn-outline-secondary rounded-pill px-4 py-2 small fw-bold" data-bs-dismiss="modal">
                     Cancel
                 </button>
-                <button type="button" class="btn btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" id="confirmSubmitBtn">
-                    Confirm &amp; Save
+                <button type="button" class="btn btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm d-inline-flex align-items-center gap-1.5" id="confirmSubmitBtn">
+                    <i class="bi bi-check2-circle"></i>
+                    <span>Confirm &amp; Save</span>
                 </button>
             </div>
         </div>
@@ -624,6 +703,59 @@ window.setMarketType = function(val) {
     window.applyMarketType(val);
 };
 
+window.syncAllFormToggleStates = function() {
+    // 1. Max Loss Limit
+    const lossCheck = document.getElementById('id_max_loss_status');
+    const lossInput = document.getElementById('id_max_loss_limit');
+    const lossDep   = document.getElementById('max_loss_dep_body');
+    if (lossCheck && lossInput) {
+        lossInput.disabled = !lossCheck.checked;
+        if (lossDep) lossDep.classList.toggle('is-dimmed', !lossCheck.checked);
+    }
+
+    // 2. Max Profit Limit
+    const profitCheck = document.getElementById('id_max_profit_status');
+    const profitInput = document.getElementById('id_max_profit_limit');
+    const profitDep   = document.getElementById('max_profit_dep_body');
+    if (profitCheck && profitInput) {
+        profitInput.disabled = !profitCheck.checked;
+        if (profitDep) profitDep.classList.toggle('is-dimmed', !profitCheck.checked);
+    }
+
+    // 3. Auto Lot Size Calculation
+    const autoLotCheck = document.getElementById('id_auto_lot_status');
+    const lotInput     = document.getElementById('id_default_lot_size');
+    const autoLotDep   = document.getElementById('auto_lot_dep_body');
+    if (autoLotCheck && lotInput) {
+        lotInput.disabled = !autoLotCheck.checked;
+        if (autoLotDep) autoLotDep.classList.toggle('is-dimmed', !autoLotCheck.checked);
+    }
+
+    // 4. Auto Attach Stop Loss
+    const autoSLCheck = document.getElementById('id_auto_sl_status');
+    const riskVal     = document.getElementById('id_default_risk_value');
+    const riskType    = document.getElementById('id_default_risk_type');
+    const autoSLDep   = document.getElementById('auto_sl_dep_body');
+    if (autoSLCheck) {
+        if (riskVal) riskVal.disabled = !autoSLCheck.checked;
+        if (riskType) riskType.disabled = !autoSLCheck.checked;
+        if (autoSLDep) autoSLDep.classList.toggle('is-dimmed', !autoSLCheck.checked);
+    }
+
+    // 5. Order Layering (Pyramiding)
+    const layerCheck   = document.getElementById('id_layer_status');
+    const layerLots    = document.getElementById('id_layer_add_in_lot_count');
+    const layerPct     = document.getElementById('id_layer_percentage');
+    const layerLotsDep = document.getElementById('layer_lots_dep_body');
+    const layerStepDep = document.getElementById('layer_step_dep_body');
+    if (layerCheck) {
+        if (layerLots) layerLots.disabled = !layerCheck.checked;
+        if (layerPct) layerPct.disabled = !layerCheck.checked;
+        if (layerLotsDep) layerLotsDep.classList.toggle('is-dimmed', !layerCheck.checked);
+        if (layerStepDep) layerStepDep.classList.toggle('is-dimmed', !layerCheck.checked);
+    }
+};
+
 document.addEventListener('click', function(e) {
     const btn = e.target.closest('.market-tab-btn');
     if (btn) {
@@ -641,27 +773,15 @@ document.addEventListener('click', function(e) {
     }
 });
 
-window.updateRiskControlState = function() {
-    const lossCheck  = document.getElementById('id_max_loss_status');
-    const lossInput  = document.getElementById('id_max_loss_limit');
-    if (lossCheck && lossInput) {
-        lossInput.disabled = !lossCheck.checked;
-        if (!lossCheck.checked) lossInput.removeAttribute('required');
-        else lossInput.setAttribute('required', 'required');
-    }
-
-    const profitCheck = document.getElementById('id_max_profit_status');
-    const profitInput = document.getElementById('id_max_profit_limit');
-    if (profitCheck && profitInput) {
-        profitInput.disabled = !profitCheck.checked;
-        if (!profitCheck.checked) profitInput.removeAttribute('required');
-        else profitInput.setAttribute('required', 'required');
-    }
-};
-
 document.addEventListener('change', function(e) {
-    if (e.target && (e.target.id === 'id_max_loss_status' || e.target.id === 'id_max_profit_status')) {
-        window.updateRiskControlState();
+    if (e.target && (
+        e.target.id === 'id_max_loss_status' ||
+        e.target.id === 'id_max_profit_status' ||
+        e.target.id === 'id_auto_lot_status' ||
+        e.target.id === 'id_auto_sl_status' ||
+        e.target.id === 'id_layer_status'
+    )) {
+        window.syncAllFormToggleStates();
     }
 });
 
@@ -669,6 +789,6 @@ document.addEventListener('change', function(e) {
     const marketSelect = document.getElementById('id_market_type');
     const initial = marketSelect ? marketSelect.value : 'INDEX_FO';
     window.applyMarketType(initial || 'INDEX_FO');
-    window.updateRiskControlState();
+    window.syncAllFormToggleStates();
 })();
 </script>

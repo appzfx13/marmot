@@ -20,16 +20,24 @@ from .forms import MarketBackupForm
 from .services import create_and_start_backup_task, send_control_command, inspect_parquet_dataset
 
 
-class MarketBackupListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
+class MarketBackupListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
     """
     Unified Market Backup Dashboard & List View.
     Handles full-page loads, HTMX partial requests, filtering, sorting, and pagination.
     """
     model = MarketBackupTask
     template_name = 'admins/backup_dashboard.html'
-    partial_template_name = 'admins/partials/backup_dashboard_content.html'
+    partial_template_name = 'admins/partials/backup_dashboard_list_content.html'
+    table_template_name = 'admins/partials/backup_dashboard_content.html'
     context_object_name = 'backups'
     paginate_by = settings.PAGINATION_COUNT
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Target') == 'backup-dashboard-container':
+            return [self.table_template_name]
+        if self.request.headers.get('HX-Request'):
+            return [self.partial_template_name]
+        return [self.template_name]
 
     def get_queryset(self):
         queryset = super().get_queryset().filter(is_deleted=False)

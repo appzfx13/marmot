@@ -1,33 +1,165 @@
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-        <h1 class="fw-bold mb-1 theme-text-main">Admin Dashboard</h1>
-        <p class="mb-0 theme-text-muted">Overview of active traders and platform metrics</p>
-    </div>
-</div>
+<!-- templates/admins/partials/dashboard_content.html -->
+<div class="d-flex flex-column gap-4">
 
-<!-- Admin Metrics Row -->
-<div class="row g-3 mb-4">
-    <div class="col-12 col-md-6">
-        <div class="metric-card">
-            <p class="theme-text-muted mb-1 fw-medium">Total Traders</p>
-            <h2 class="theme-text-main fw-bold mb-0">{{ total_traders|default:0 }}</h2>
+    <!-- START: Spark Dashboard Header Banner -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h1 class="page-title">Admin Dashboard</h1>
+            <p class="page-subtitle">System overview, active trader metrics, platform execution health, and configuration management.</p>
+        </div>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            <span class="trend-badge trend-up py-1.5 px-3">
+                <i class="bi bi-shield-lock-fill"></i>
+                <span>Platform Control</span>
+            </span>
+
+            <a href="{% url 'admins:trader_list' %}" 
+               class="btn-date-picker text-decoration-none"
+               hx-get="{% url 'admins:trader_list' %}"
+               hx-target="#app-main-container"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-people-fill"></i>
+                <span>Manage Traders</span>
+                <i class="bi bi-chevron-right ms-1"></i>
+            </a>
         </div>
     </div>
-    <div class="col-12 col-md-6">
-        <div class="metric-card">
-            <p class="theme-text-muted mb-1 fw-medium">Eligible Traders</p>
-            <h2 class="text-success fw-bold mb-0">{{ active_traders|default:0 }}</h2>
+    <!-- END: Dashboard Header Banner -->
+
+    <!-- START: Top Area Metric Cards -->
+    <div class="row g-4">
+        <!-- Stat Card 1: Green Alert Banner -->
+        <div class="col-xl-4 col-md-6">
+            <div class="card alert-green-card h-100 d-flex flex-column justify-content-between">
+                <div class="position-relative z-index-2">
+                    <span class="alert-green-badge">Engine Status</span>
+                    <div class="alert-green-date">Platform Core &bull; High-Throughput</div>
+                    <div class="alert-green-text">Trading engine, worker pools, and broker telemetry online</div>
+                </div>
+                <a href="{% url 'admins:admin-live-dashboard' %}" 
+                   class="alert-green-link z-index-2"
+                   hx-get="{% url 'admins:admin-live-dashboard' %}"
+                   hx-target="#app-main-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
+                    <span>Live Console</span>
+                    <i class="bi bi-arrow-right"></i>
+                </a>
+
+                <!-- Inline SVG geometric decoration -->
+                <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(50,50)">
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" />
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(60)" />
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(120)" />
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Stat Card 2: Total Registered Traders -->
+        <div class="col-xl-4 col-md-6">
+            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
+                        <span class="stat-label">Total Registered Traders</span>
+                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-1 small fw-bold">Traders</span>
+                    </div>
+                    <div class="stat-value text-primary">
+                        {{ total_traders|default:0 }}
+                    </div>
+                    <div class="trend-badge trend-up">
+                        <i class="bi bi-person-check-fill"></i>
+                        <span>Accounts created across all roles</span>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
+                    <span>Account Base</span>
+                    <span class="fw-semibold text-main">System Users</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stat Card 3: Active Traders -->
+        <div class="col-xl-4 col-md-12">
+            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
+                        <span class="stat-label">Active / Eligible Traders</span>
+                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-1 small fw-bold">Live Ready</span>
+                    </div>
+                    <div class="stat-value text-success">
+                        {{ active_traders|default:0 }}
+                    </div>
+                    <div class="trend-badge trend-up">
+                        <i class="bi bi-shield-check"></i>
+                        <span>Eligible for real-time strategy execution</span>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
+                    <span>Execution Ready</span>
+                    <span class="fw-semibold text-main">Trade Enabled</span>
+                </div>
+            </div>
         </div>
     </div>
-</div>
+    <!-- END: Top Area Metric Cards -->
 
-<div class="glass-card p-4">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-        <h5 class="theme-text-main fw-bold mb-0">Quick Actions</h5>
+    <!-- START: Quick Management Actions Card -->
+    <div class="row g-4">
+        <div class="col-12">
+            <div class="card mb-0">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h2 class="card-title mb-0">Quick Administration Actions</h2>
+                        <span class="card-subtitle theme-text-muted small">Direct control shortcuts for platform management</span>
+                    </div>
+                </div>
+
+                <div class="card-body">
+                    <div class="d-flex gap-3 flex-wrap">
+                        <a href="{% url 'admins:trader_list' %}" 
+                           class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-medium d-inline-flex align-items-center gap-2"
+                           hx-get="{% url 'admins:trader_list' %}"
+                           hx-target="#app-main-container"
+                           hx-swap="innerHTML"
+                           hx-push-url="true">
+                            <i class="bi bi-people-fill text-primary"></i>
+                            <span>Manage Traders</span>
+                        </a>
+                        <a href="{% url 'admins:trade_exec_config_list' %}" 
+                           class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-medium d-inline-flex align-items-center gap-2"
+                           hx-get="{% url 'admins:trade_exec_config_list' %}"
+                           hx-target="#app-main-container"
+                           hx-swap="innerHTML"
+                           hx-push-url="true">
+                            <i class="bi bi-sliders text-success"></i>
+                            <span>Execution Controls</span>
+                        </a>
+                        <a href="{% url 'admins:broker-master-list' %}" 
+                           class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-medium d-inline-flex align-items-center gap-2"
+                           hx-get="{% url 'admins:broker-master-list' %}"
+                           hx-target="#app-main-container"
+                           hx-swap="innerHTML"
+                           hx-push-url="true">
+                            <i class="bi bi-building text-info"></i>
+                            <span>Broker Masters</span>
+                        </a>
+                        <a href="{% url 'admins:postback_list' %}" 
+                           class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-medium d-inline-flex align-items-center gap-2"
+                           hx-get="{% url 'admins:postback_list' %}"
+                           hx-target="#app-main-container"
+                           hx-swap="innerHTML"
+                           hx-push-url="true">
+                            <i class="bi bi-receipt text-warning"></i>
+                            <span>Postback Logs</span>
+                        </a>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
-    <div class="d-flex gap-2 flex-wrap">
-        <a href="{% url 'admins:trader_list' %}" class="btn theme-btn-secondary d-flex align-items-center gap-2 fw-medium">
-            <span class="material-icons fs-5">people</span> Manage Traders
-        </a>
-    </div>
-</div>   
+    <!-- END: Quick Management Actions Card -->
+
+</div>

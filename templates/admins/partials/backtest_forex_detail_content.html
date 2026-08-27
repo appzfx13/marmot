@@ -4,10 +4,10 @@
 <!-- Glassmorphism Styles & Responsive Layout Tokens for Forex Detail UI -->
 <style>
     .forex-glass-card {
-        background: var(--bg-card);
+        background: var(--bg-surface);
         backdrop-filter: blur(16px);
         -webkit-backdrop-filter: blur(16px);
-        border: 1px solid var(--border-color);
+        border: 1px solid var(--border-default);
         border-radius: 12px;
         transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
     }
@@ -22,17 +22,18 @@
     }
     .forex-orderflow-badge {
         background: rgba(14, 165, 233, 0.18) !important;
-        color: #38bdf8 !important;
+        color: #0284c7 !important;
         border: 1px solid rgba(14, 165, 233, 0.35) !important;
     }
 </style>
 
 <!-- 1. Header Banner: Forex Futures Strategy & Instrument Summary -->
-<div class="glass-card p-3 p-md-4 mb-4 position-relative overflow-hidden border-0 shadow-sm" style="background: linear-gradient(135deg, rgba(147, 51, 234, 0.08) 0%, rgba(15, 23, 42, 0.4) 100%);">
+<div class="pt-2 pt-md-3 mb-4">
+    <div class="glass-card p-3 p-md-4 position-relative overflow-hidden border-0 shadow-sm" style="background: var(--glass-bg); border: 1px solid var(--border-color) !important;">
     <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
         <div class="d-flex align-items-center gap-3">
             <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
-                 style="width: 48px; height: 48px; background: rgba(147, 51, 234, 0.2); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.4);">
+                 style="width: 48px; height: 48px; background: rgba(180, 241, 5, 0.15); color: var(--brand-lime); border: 1px solid rgba(180, 241, 5, 0.3);">
                 <span class="material-icons" style="font-size: 1.5rem;">public</span>
             </div>
             <div>
@@ -44,11 +45,11 @@
                         ⚡ DATABENTO ORDER FLOW (MBP-10)
                     </span>
                     <span class="badge rounded-pill px-2.5 py-1 font-monospace fw-bold" 
-                          style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.75rem;">
+                          style="background: rgba(16, 185, 129, 0.18); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.75rem;">
                         #BT-{{ backtest.id|stringformat:"04d" }}
                     </span>
                 </div>
-                <h3 class="fw-bolder theme-text-main mb-0.5 d-flex align-items-center gap-2" style="font-size: 1.35rem;">
+                <h3 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2" style="font-size: 1.35rem;">
                     <span>{{ backtest.index_name }} Futures Backtest Analytics</span>
                 </h3>
                 <p class="theme-text-muted small mb-0 font-monospace" style="font-size: 0.80rem;">
@@ -61,12 +62,12 @@
 
         <!-- Action Controls: Edit & Regenerate Modal / Download Excel Report -->
         <div class="d-flex align-items-center gap-2 flex-wrap flex-shrink-0">
-            <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" class="btn btn-success text-white rounded-pill px-3.5 py-2 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm" style="background: linear-gradient(135deg, #198754 0%, #157347 100%); font-size: 0.85rem;" title="Download Executive Multi-Sheet Excel Report">
-                <i class="bi bi-file-earmark-excel-fill fs-6"></i>
+            <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" class="btn btn-success text-white rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); font-size: 0.85rem;" title="Download Executive Multi-Sheet Excel Report">
+                <span class="material-icons" style="font-size: 1.15rem;">file_download</span>
                 <span>Download Excel Report</span>
             </a>
             <button type="button" 
-                    class="btn btn-primary rounded-pill px-3.5 py-2 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    class="btn btn-primary rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
                     hx-get="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
                     hx-target="#globalHtmxModalDialog"
                     style="font-size: 0.85rem;">
@@ -80,34 +81,34 @@
         </div>
     </div>
 </div>
+</div>
 
 <!-- 2. Top 4 Forex Performance Cards ($ USD Currency & CME Micro Sizing) -->
 <div class="row g-3 g-lg-4 mb-4">
-    
     <!-- Card 1: Net PnL & Equity Growth ($ USD) -->
     <div class="col-12 col-md-6 col-xl-3">
-        <div class="forex-glass-card p-3.5 h-100 position-relative overflow-hidden">
+        <div class="forex-glass-card p-3 p-md-4 h-100 position-relative overflow-hidden">
             <div class="d-flex align-items-center justify-content-between mb-2">
                 <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Net Alpha PnL ($ USD)</span>
                 <span class="badge rounded-pill px-2 py-0.5 fs-7 fw-semibold {% if analytics.net_pnl >= 0 %}bg-success bg-opacity-20 text-success border border-success border-opacity-35{% else %}bg-danger bg-opacity-20 text-danger border border-danger border-opacity-35{% endif %}">
                     {% if analytics.roi_on_capital >= 0 %}+{% endif %}{{ analytics.roi_on_capital|floatformat:2 }}% ROI
                 </span>
             </div>
-            <h3 class="fw-bolder mb-2 font-monospace {% if analytics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 1.45rem;">
+            <h3 class="fw-bold mb-2 font-monospace {% if analytics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 1.45rem;">
                 {% if analytics.net_pnl >= 0 %}+{% endif %}${{ analytics.net_pnl|floatformat:2 }}
             </h3>
-            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-15 small font-monospace" style="font-size: 0.78rem;">
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-15 small" style="font-size: 0.78rem;">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Gross Profit:</span>
-                    <span class="fw-semibold text-success">+${{ analytics.gross_profit|floatformat:2 }}</span>
+                    <span class="fw-semibold text-success font-monospace">+${{ analytics.gross_profit|floatformat:2 }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Gross Loss:</span>
-                    <span class="fw-semibold text-danger">-${{ analytics.gross_loss|floatformat:2 }}</span>
+                    <span class="fw-semibold text-danger font-monospace">-${{ analytics.gross_loss|stringformat:".2f"|cut:"-" }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Ending Account Equity:</span>
-                    <span class="theme-text-main fw-bold">${{ analytics.ending_equity|floatformat:2 }} USD</span>
+                    <span class="theme-text-main fw-bold font-monospace">${{ analytics.ending_equity|floatformat:2 }} USD</span>
                 </div>
             </div>
         </div>
@@ -115,28 +116,29 @@
 
     <!-- Card 2: Profit Factor & Payoff Ratio -->
     <div class="col-12 col-md-6 col-xl-3">
-        <div class="forex-glass-card p-3.5 h-100 position-relative overflow-hidden">
+        <div class="forex-glass-card p-3 p-md-4 h-100 position-relative overflow-hidden">
             <div class="d-flex align-items-center justify-content-between mb-2">
                 <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Profit Factor & Expectancy</span>
-                <span class="badge rounded-pill px-2 py-0.5 fs-7 fw-semibold" style="background: rgba(59, 130, 246, 0.2); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.35);">
+                <span class="badge rounded-pill px-2 py-0.5 fs-7 fw-semibold font-monospace" style="background: rgba(59, 130, 246, 0.18); color: #2563eb; border: 1px solid rgba(59, 130, 246, 0.35);">
                     Sharpe {{ analytics.sharpe_ratio|default:1.85 }}
                 </span>
             </div>
-            <h3 class="fw-bolder mb-2 font-monospace theme-text-main" style="font-size: 1.45rem;">
-                {{ analytics.profit_factor|default:1.00 }} <small class="theme-text-muted fs-6 fw-normal">Profit Factor</small>
+            <h3 class="fw-bold mb-2 theme-text-main d-flex align-items-baseline gap-1" style="font-size: 1.45rem;">
+                <span class="font-monospace">{{ analytics.profit_factor|default:1.00 }}</span>
+                <small class="theme-text-muted fs-6 fw-normal">Profit Factor</small>
             </h3>
-            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-15 small font-monospace" style="font-size: 0.78rem;">
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-15 small" style="font-size: 0.78rem;">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Avg Win Trade:</span>
-                    <span class="fw-semibold text-success">+${{ analytics.avg_win_pnl|floatformat:2 }}</span>
+                    <span class="fw-semibold text-success font-monospace">+${{ analytics.avg_win_pnl|floatformat:2 }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Avg Loss Trade:</span>
-                    <span class="fw-semibold text-danger">-${{ analytics.avg_loss_pnl|floatformat:2 }}</span>
+                    <span class="fw-semibold text-danger font-monospace">-${{ analytics.avg_loss_pnl|stringformat:".2f"|cut:"-" }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Win / Loss Payoff:</span>
-                    <span class="fw-semibold text-info">{{ analytics.win_loss_ratio|floatformat:2 }}x</span>
+                    <span class="fw-semibold text-info font-monospace">{{ analytics.win_loss_ratio|floatformat:2 }}x</span>
                 </div>
             </div>
         </div>
@@ -144,29 +146,29 @@
 
     <!-- Card 3: Win Rate & Trade Executions -->
     <div class="col-12 col-md-6 col-xl-3">
-        <div class="forex-glass-card p-3.5 h-100 position-relative overflow-hidden">
+        <div class="forex-glass-card p-3 p-md-4 h-100 position-relative overflow-hidden">
             <div class="d-flex align-items-center justify-content-between mb-2">
                 <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Win Rate & Executions</span>
-                <span class="badge rounded-pill px-2 py-0.5 fs-7 fw-semibold" style="background: rgba(14, 165, 233, 0.2); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.35);">
+                <span class="badge rounded-pill px-2 py-0.5 fs-7 fw-semibold font-monospace" style="background: rgba(14, 165, 233, 0.18); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.35);">
                     {{ analytics.total_trades }} Trades
                 </span>
             </div>
-            <h3 class="fw-bolder mb-2 font-monospace d-flex align-items-baseline gap-1" style="font-size: 1.45rem;">
-                <span class="fw-bold text-info">{{ analytics.win_rate|default:0 }}%</span>
+            <h3 class="fw-bold mb-2 d-flex align-items-baseline gap-1 theme-text-main" style="font-size: 1.45rem;">
+                <span class="fw-bold text-info font-monospace">{{ analytics.win_rate|default:0 }}%</span>
                 <span class="theme-text-muted fs-6 fw-normal ms-1">Win Rate</span>
             </h3>
-            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-15 small font-monospace" style="font-size: 0.78rem;">
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-15 small" style="font-size: 0.78rem;">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Winning Trades:</span>
-                    <span class="fw-semibold text-success">{{ analytics.winning_trades_count }} ({{ analytics.win_rate }}%)</span>
+                    <span class="fw-semibold text-success font-monospace">{{ analytics.winning_trades_count }} ({{ analytics.win_rate }}%)</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Losing Trades:</span>
-                    <span class="fw-semibold text-danger">{{ analytics.losing_trades_count }}</span>
+                    <span class="fw-semibold text-danger font-monospace">{{ analytics.losing_trades_count }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Max Drawdown:</span>
-                    <span class="fw-bold text-danger">{{ analytics.max_drawdown }}% (${{ analytics.max_drawdown_amount|floatformat:2 }})</span>
+                    <span class="fw-bold text-danger font-monospace">{{ analytics.max_drawdown }}% (${{ analytics.max_drawdown_amount|floatformat:2 }})</span>
                 </div>
             </div>
         </div>
@@ -174,28 +176,28 @@
 
     <!-- Card 4: CME Micro Lot Capital & Fee Accounting -->
     <div class="col-12 col-md-6 col-xl-3">
-        <div class="forex-glass-card p-3.5 h-100 position-relative overflow-hidden">
+        <div class="forex-glass-card p-3 p-md-4 h-100 position-relative overflow-hidden">
             <div class="d-flex align-items-center justify-content-between mb-2">
                 <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">CME Micro Margin & Fees</span>
-                <span class="badge rounded-pill px-2 py-0.5 fs-7 fw-semibold" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.35);">
+                <span class="badge rounded-pill px-2 py-0.5 fs-7 fw-semibold font-monospace" style="background: rgba(245, 158, 11, 0.18); color: #d97706; border: 1px solid rgba(245, 158, 11, 0.35);">
                     ${{ analytics.total_charges|floatformat:2 }} Fees
                 </span>
             </div>
-            <h3 class="fw-bolder mb-2 font-monospace text-warning" style="font-size: 1.45rem;">
-                ${{ analytics.max_utilized_capital|floatformat:2 }} <small class="theme-text-muted fs-6 fw-normal">Peak Margin</small>
+            <h3 class="fw-bold mb-2 font-monospace text-warning" style="font-size: 1.45rem;">
+                ${{ analytics.max_utilized_capital|floatformat:2 }} <small class="theme-text-muted fs-6 fw-normal" style="font-family: var(--font-sans);">Peak Margin</small>
             </h3>
-            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-15 small font-monospace" style="font-size: 0.78rem;">
+            <div class="d-flex flex-column gap-1 pt-2 border-top border-secondary border-opacity-15 small" style="font-size: 0.78rem;">
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">ROI on Margin Used:</span>
-                    <span class="fw-bold text-success">{% if analytics.roi_on_utilized >= 0 %}+{% endif %}{{ analytics.roi_on_utilized|floatformat:2 }}%</span>
+                    <span class="fw-bold text-success font-monospace">{% if analytics.roi_on_utilized >= 0 %}+{% endif %}{{ analytics.roi_on_utilized|floatformat:2 }}%</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">Avg Utilized Margin:</span>
-                    <span class="theme-text-main fw-semibold">${{ analytics.avg_utilized_capital|floatformat:2 }}</span>
+                    <span class="theme-text-main fw-semibold font-monospace">${{ analytics.avg_utilized_capital|floatformat:2 }}</span>
                 </div>
                 <div class="d-flex justify-content-between align-items-center">
                     <span class="theme-text-muted">CME Flat Commissions:</span>
-                    <span class="theme-text-main">${{ analytics.total_brokerage|floatformat:2 }} ($1.50/rt)</span>
+                    <span class="theme-text-main font-monospace">${{ analytics.total_brokerage|floatformat:2 }} ($1.50/rt)</span>
                 </div>
             </div>
         </div>
@@ -204,10 +206,9 @@
 
 <!-- 3. Order Flow Metrics & Strategy Rules Efficacy Section -->
 <div class="row g-3 g-lg-4 mb-4">
-    
     <!-- Databento Order Flow Analytics Box -->
     <div class="col-12 col-lg-5">
-        <div class="forex-glass-card p-3.5 h-100">
+        <div class="forex-glass-card p-3 p-md-4 h-100">
             <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-15">
                 <span class="theme-text-main fw-bold text-uppercase d-flex align-items-center gap-2" style="font-size: 0.82rem; letter-spacing: 0.5px;">
                     <span class="material-icons text-info" style="font-size: 1.1rem;">analytics</span>
@@ -219,7 +220,7 @@
             </div>
 
             <div class="d-flex flex-column gap-3 font-monospace small" style="font-size: 0.82rem;">
-                <div class="p-2.5 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                <div class="p-3 rounded-3" style="background: var(--bg-elevated); border: 1px solid var(--border-default);">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="theme-text-muted">CVD Delta Exhaustion Signals:</span>
                         <span class="text-info fw-bold">Active Monitored</span>
@@ -229,7 +230,7 @@
                     </small>
                 </div>
 
-                <div class="p-2.5 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                <div class="p-3 rounded-3" style="background: var(--bg-elevated); border: 1px solid var(--border-default);">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="theme-text-muted">Level-10 DOM Depth Iceberg Absorption:</span>
                         <span class="text-success fw-bold">Enabled</span>
@@ -239,7 +240,7 @@
                     </small>
                 </div>
 
-                <div class="p-2.5 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                <div class="p-3 rounded-3" style="background: var(--bg-elevated); border: 1px solid var(--border-default);">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <span class="theme-text-muted">London & NY Killzone Delta Expansion:</span>
                         <span class="text-warning fw-bold">Active</span>
@@ -254,7 +255,7 @@
 
     <!-- Active Forex Strategy Rules Efficacy Table -->
     <div class="col-12 col-lg-7">
-        <div class="forex-glass-card p-3.5 h-100">
+        <div class="forex-glass-card p-3 p-md-4 h-100">
             <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-15">
                 <span class="theme-text-main fw-bold text-uppercase d-flex align-items-center gap-2" style="font-size: 0.82rem; letter-spacing: 0.5px;">
                     <span class="material-icons text-primary" style="font-size: 1.1rem;">fact_check</span>
@@ -268,7 +269,7 @@
             <div class="table-responsive">
                 <table class="table table-hover align-middle mb-0 border-0 w-100" style="font-size: 0.78rem;">
                     <thead>
-                        <tr class="theme-text-muted border-bottom" style="background: rgba(255, 255, 255, 0.03);">
+                        <tr class="theme-text-muted border-bottom" style="background: var(--nav-hover);">
                             <th class="py-2 text-uppercase fw-semibold">Rule Name</th>
                             <th class="py-2 text-uppercase fw-semibold text-center">Invocations</th>
                             <th class="py-2 text-uppercase fw-semibold text-center">Win Rate</th>
@@ -278,7 +279,7 @@
                     <tbody>
                         {% for ritem in rules_performance %}
                         <tr class="border-bottom border-secondary border-opacity-10">
-                            <td class="py-2.5 ps-2">
+                            <td class="py-2 ps-2">
                                 <div class="d-flex align-items-center gap-2">
                                     <span class="material-icons" style="font-size: 0.95rem; color: {{ ritem.color }};">{{ ritem.icon }}</span>
                                     <span class="theme-text-main fw-bold text-truncate" style="max-width: 220px;" title="{{ ritem.rule_name }}">
@@ -286,9 +287,9 @@
                                     </span>
                                 </div>
                             </td>
-                            <td class="py-2.5 text-center font-monospace">{{ ritem.triggered_count }}</td>
-                            <td class="py-2.5 text-center font-monospace text-info fw-bold">{{ ritem.accuracy_pct }}%</td>
-                            <td class="py-2.5 text-end font-monospace fw-bold {% if ritem.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            <td class="py-2 text-center font-monospace">{{ ritem.triggered_count }}</td>
+                            <td class="py-2 text-center font-monospace text-info fw-bold">{{ ritem.accuracy_pct }}%</td>
+                            <td class="py-2 text-end font-monospace fw-bold {% if ritem.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
                                 {% if ritem.net_pnl >= 0 %}+{% endif %}${{ ritem.net_pnl|floatformat:2 }}
                             </td>
                         </tr>
@@ -308,8 +309,8 @@
 {% if backtest.results.loss_rca_breakdown or backtest.results.ai_suggested_future_rules %}
 <div class="forex-glass-card p-0 overflow-hidden mb-4 border-0">
     <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div class="d-flex align-items-center gap-2.5">
-            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: rgba(239, 68, 68, 0.18); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.35);">
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: rgba(239, 68, 68, 0.18); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.35);">
                 <span class="material-icons" style="font-size: 1.25rem;">troubleshoot</span>
             </div>
             <div>
@@ -326,9 +327,9 @@
         <div class="row g-3 g-lg-4">
             <!-- 1. Primary Failure Mechanisms (Left Column) -->
             <div class="col-12 col-lg-5">
-                <div class="p-3.5 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                <div class="p-3 rounded-3 h-100" style="background: var(--bg-elevated); border: 1px solid var(--border-default);">
                     <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-15">
-                        <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.74rem; letter-spacing: 0.5px;">
+                        <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-2" style="font-size: 0.74rem; letter-spacing: 0.5px;">
                             <span class="material-icons text-danger" style="font-size: 1rem;">pie_chart</span>
                             Primary Failure Mechanisms
                         </span>
@@ -338,7 +339,7 @@
                     </div>
                     {% for rca_item in backtest.results.loss_rca_breakdown %}
                     <div class="mb-3 pb-2 {% if not forloop.last %}border-bottom border-secondary border-opacity-15{% endif %}">
-                        <div class="d-flex justify-content-between align-items-center mb-1.5">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
                             <span class="theme-text-main fw-bold text-truncate" style="font-size: 0.82rem;" title="{{ rca_item.category }}">
                                 {{ rca_item.category }}
                             </span>
@@ -356,11 +357,11 @@
                 </div>
             </div>
 
-            <!-- 2. AI-Synthesized Preventive Rules (Right Column - With Interactive + Add This Rule Button) -->
+            <!-- 2. AI-Synthesized Preventive Rules -->
             <div class="col-12 col-lg-7">
-                <div class="p-3.5 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                <div class="p-3 rounded-3 h-100" style="background: var(--bg-elevated); border: 1px solid var(--border-default);">
                     <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary border-opacity-15">
-                        <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.74rem; letter-spacing: 0.5px;">
+                        <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-2" style="font-size: 0.74rem; letter-spacing: 0.5px;">
                             <span class="material-icons text-info" style="font-size: 1rem;">auto_awesome</span> 
                             AI-Synthesized Preventive Rules
                         </span>
@@ -370,8 +371,8 @@
                     </div>
                     <div class="d-flex flex-column">
                         {% for future_rule in backtest.results.ai_suggested_future_rules %}
-                        <div class="mb-3.5 pb-3 {% if not forloop.last %}border-bottom border-secondary border-opacity-15{% endif %}">
-                            <div class="d-flex justify-content-between align-items-center mb-1.5 flex-wrap gap-2">
+                        <div class="mb-3 pb-3 {% if not forloop.last %}border-bottom border-secondary border-opacity-15{% endif %}">
+                            <div class="d-flex justify-content-between align-items-center mb-1 flex-wrap gap-2">
                                 <div class="d-flex align-items-center gap-2 text-truncate">
                                     <span class="material-icons text-info flex-shrink-0" style="font-size: 1.05rem;">shield</span>
                                     <span class="theme-text-main fw-bold text-truncate" style="font-size: 0.86rem;" title="{{ future_rule.name }}">
@@ -392,7 +393,7 @@
                                     </button>
                                 </div>
                             </div>
-                            <div class="theme-text-muted mt-1.5 ps-4 font-monospace" style="font-size: 0.82rem; line-height: 1.5; color: #a7f3d0 !important;">
+                            <div class="theme-text-muted mt-1 ps-4 font-monospace" style="font-size: 0.82rem; line-height: 1.5; color: var(--success) !important;">
                                 {{ future_rule.preventive_prompt }}
                             </div>
                         </div>
@@ -410,8 +411,8 @@
 <!-- 5. Dense Forex Trade Audit Log Table ($ USD PnL & Order Flow Reasons) -->
 <div class="forex-glass-card p-3 p-md-4 mb-4">
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3 pb-2 border-bottom border-secondary border-opacity-15">
-        <div class="d-flex align-items-center gap-2.5">
-            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: rgba(56, 189, 248, 0.18); color: #38bdf8;">
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: rgba(56, 189, 248, 0.18); color: var(--info);">
                 <span class="material-icons" style="font-size: 1.25rem;">list_alt</span>
             </div>
             <div>
@@ -428,43 +429,43 @@
     <div class="table-responsive">
         <table class="table table-hover align-middle mb-0 w-100" style="font-size: 0.80rem;">
             <thead>
-                <tr class="theme-text-muted border-bottom" style="background: rgba(255, 255, 255, 0.02);">
-                    <th class="ps-3 py-2.5 text-uppercase fw-semibold" style="width: 5%;">#</th>
-                    <th class="py-2.5 text-uppercase fw-semibold" style="width: 14%;">Date & Time</th>
-                    <th class="py-2.5 text-uppercase fw-semibold" style="width: 12%;">Symbol / Side</th>
-                    <th class="py-2.5 text-uppercase fw-semibold text-center" style="width: 10%;">Lots</th>
-                    <th class="py-2.5 text-uppercase fw-semibold text-end" style="width: 12%;">Entry / Exit</th>
-                    <th class="py-2.5 text-uppercase fw-semibold text-end" style="width: 12%;">Pips PnL</th>
-                    <th class="py-2.5 text-uppercase fw-semibold text-end" style="width: 13%;">Net PnL ($ USD)</th>
-                    <th class="py-2.5 text-uppercase fw-semibold text-center" style="width: 22%;">Order Flow Reason</th>
+                <tr class="theme-text-muted border-bottom" style="background: var(--nav-hover);">
+                    <th class="ps-3 py-2 text-uppercase fw-semibold" style="width: 5%;">#</th>
+                    <th class="py-2 text-uppercase fw-semibold" style="width: 14%;">Date & Time</th>
+                    <th class="py-2 text-uppercase fw-semibold" style="width: 12%;">Symbol / Side</th>
+                    <th class="py-2 text-uppercase fw-semibold text-center" style="width: 10%;">Lots</th>
+                    <th class="py-2 text-uppercase fw-semibold text-end" style="width: 12%;">Entry / Exit</th>
+                    <th class="py-2 text-uppercase fw-semibold text-end" style="width: 12%;">Pips PnL</th>
+                    <th class="py-2 text-uppercase fw-semibold text-end" style="width: 13%;">Net PnL ($ USD)</th>
+                    <th class="py-2 text-uppercase fw-semibold text-center" style="width: 22%;">Order Flow Reason</th>
                 </tr>
             </thead>
             <tbody>
                 {% for trade in trades_page %}
                 <tr class="border-bottom border-secondary border-opacity-10">
-                    <td class="ps-3 py-2.5 font-monospace theme-text-muted">{{ trade.serial_no|default:forloop.counter }}</td>
-                    <td class="py-2.5 font-monospace theme-text-main" style="font-size: 0.78rem;">
+                    <td class="ps-3 py-2 font-monospace theme-text-muted">{{ trade.serial_no|default:forloop.counter }}</td>
+                    <td class="py-2 font-monospace theme-text-main" style="font-size: 0.78rem;">
                         {{ trade.datetime|default:trade.entry_time|default:'-' }}
                     </td>
-                    <td class="py-2.5">
+                    <td class="py-2">
                         <span class="badge rounded-pill px-2.5 py-1 font-monospace fw-bold {% if 'BUY' in trade.trade_type or 'LONG' in trade.trade_type or 'CE' in trade.trade_type %}bg-success bg-opacity-20 text-success border border-success border-opacity-35{% else %}bg-danger bg-opacity-20 text-danger border border-danger border-opacity-35{% endif %}">
                             {{ trade.symbol|default:backtest.index_name }} {{ trade.trade_type|default:'LONG' }}
                         </span>
                     </td>
-                    <td class="py-2.5 text-center font-monospace fw-bold theme-text-main">
+                    <td class="py-2 text-center font-monospace fw-bold theme-text-main">
                         {{ trade.lots_count|default:trade.quantity|default:1 }} Lot{% if trade.lots_count > 1 %}s{% endif %}
                     </td>
-                    <td class="py-2.5 text-end font-monospace" style="font-size: 0.78rem;">
+                    <td class="py-2 text-end font-monospace" style="font-size: 0.78rem;">
                         <div class="theme-text-main fw-bold">{{ trade.entry_price|default:trade.entry_spot|floatformat:2 }}</div>
                         <div class="theme-text-muted" style="font-size: 0.72rem;">➔ {{ trade.exit_price|default:trade.exit_spot|floatformat:2 }}</div>
                     </td>
-                    <td class="py-2.5 text-end font-monospace fw-bold {% if trade.net_pnl > 0 %}text-success{% elif trade.net_pnl < 0 %}text-danger{% else %}theme-text-muted{% endif %}">
+                    <td class="py-2 text-end font-monospace fw-bold {% if trade.net_pnl > 0 %}text-success{% elif trade.net_pnl < 0 %}text-danger{% else %}theme-text-muted{% endif %}">
                         {% if trade.index_points >= 0 %}+{% endif %}{{ trade.index_points|floatformat:1 }} pts
                     </td>
-                    <td class="py-2.5 text-end font-monospace fw-bold {% if trade.net_pnl > 0 %}text-success{% elif trade.net_pnl < 0 %}text-danger{% else %}theme-text-muted{% endif %}" style="font-size: 0.85rem;">
+                    <td class="py-2 text-end font-monospace fw-bold {% if trade.net_pnl > 0 %}text-success{% elif trade.net_pnl < 0 %}text-danger{% else %}theme-text-muted{% endif %}" style="font-size: 0.85rem;">
                         {% if trade.net_pnl >= 0 %}+{% endif %}${{ trade.net_pnl|floatformat:2 }}
                     </td>
-                    <td class="py-2.5 text-center">
+                    <td class="py-2 text-center">
                         <small class="theme-text-muted font-monospace d-block text-truncate" style="max-width: 240px; font-size: 0.72rem;" title="{{ trade.reason|default:trade.entry_reason }}">
                             {{ trade.reason|default:trade.entry_reason|default:'Order Flow CVD Signal' }}
                         </small>

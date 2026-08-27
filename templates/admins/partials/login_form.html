@@ -1,175 +1,60 @@
 <form id="login-form" hx-post="{% url 'admins:admin-login' %}" hx-target="#login-form" hx-swap="outerHTML" novalidate>
     {% csrf_token %}
 
-    <style>
-        .admin-form-label {
-            color: var(--text-subtitle);
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-bottom: 3px;
-            display: block;
-            text-align: left;
-        }
-
-        .admin-form-control {
-            background-color: var(--input-bg) !important;
-            border: 1px solid var(--input-border) !important;
-            color: var(--input-text) !important;
-            border-radius: 8px;
-            padding: 6px 12px;
-            font-size: 0.8125rem;
-            height: 36px;
-            width: 100%;
-            transition: all 0.2s ease;
-        }
-
-        .admin-form-control::placeholder {
-            color: var(--input-placeholder) !important;
-        }
-
-        .admin-form-control:focus {
-            box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.2) !important;
-            border-color: #ef4444 !important;
-            outline: none;
-        }
-
-        .admin-password-wrapper {
-            position: relative;
-        }
-
-        .admin-password-toggle-btn {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 2px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s ease;
-        }
-
-        .admin-password-toggle-btn:hover {
-            color: var(--text-title);
-        }
-
-        .btn-admin-submit {
-            background: var(--btn-admin);
-            color: var(--btn-text);
-            border: none;
-            border-radius: 50px;
-            padding: 0 20px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            width: 100%;
-            height: 38px;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 14px rgba(239, 68, 68, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            margin-top: 4px;
-            box-sizing: border-box;
-        }
-
-        .btn-admin-submit:hover:not(:disabled) {
-            background: var(--btn-admin-hover);
-            color: var(--btn-text);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(239, 68, 68, 0.4);
-        }
-
-        .btn-admin-submit:disabled, .btn-admin-submit.btn-loading {
-            opacity: 0.85;
-            cursor: not-allowed;
-            pointer-events: none;
-            transform: none !important;
-        }
-
-        /* Global Dot Pulse Animation */
-        .dot-pulse-loader {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            margin-left: 6px;
-            vertical-align: middle;
-        }
-
-        .dot-pulse-loader span {
-            width: 5px;
-            height: 5px;
-            background-color: currentColor;
-            border-radius: 50%;
-            display: inline-block;
-            animation: dotPulse 1.2s infinite ease-in-out both;
-        }
-
-        .dot-pulse-loader span:nth-child(1) { animation-delay: -0.32s; }
-        .dot-pulse-loader span:nth-child(2) { animation-delay: -0.16s; }
-        .dot-pulse-loader span:nth-child(3) { animation-delay: 0s; }
-
-        @keyframes dotPulse {
-            0%, 80%, 100% {
-                transform: scale(0.4);
-                opacity: 0.4;
-            }
-            40% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-    </style>
-
     {% if form.non_field_errors %}
-    <div class="alert alert-danger py-2 px-3 small rounded-3 mb-2 text-start">
+    <div class="alert alert-danger py-2 px-3 rounded-3 small mb-3 border-0 d-flex align-items-center gap-2" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">
+        <i class="bi bi-exclamation-triangle-fill"></i>
         {% for error in form.non_field_errors %}
-        <div>{{ error }}</div>
+        <span>{{ error }}</span>
         {% endfor %}
     </div>
     {% endif %}
 
-    <div class="mb-2 text-start">
-        <label for="id_admin_username" class="admin-form-label">Admin Username</label>
-        <input type="text"
-               name="username"
-               id="id_admin_username"
-               class="admin-form-control"
-               placeholder="Enter admin username"
-               value="{{ form.username.value|default:'' }}"
-               required
-               autocomplete="username">
+    <!-- Admin Username Input Group -->
+    <div class="login-form-group text-start">
+        <label for="id_admin_username" class="login-form-label">Admin Username</label>
+        <div class="login-input-group">
+            <i class="bi bi-person-badge input-icon"></i>
+            <input type="text"
+                   name="username"
+                   id="id_admin_username"
+                   class="login-input"
+                   placeholder="Enter admin username"
+                   value="{{ form.username.value|default:'' }}"
+                   required
+                   autofocus
+                   autocomplete="username">
+        </div>
         {% if form.username.errors %}
-        <div class="text-danger small mt-1">{{ form.username.errors.0 }}</div>
+        <div class="text-danger small mt-1 ps-1">{{ form.username.errors.0 }}</div>
         {% endif %}
     </div>
 
-    <div class="mb-3 text-start">
-        <label for="id_admin_password" class="admin-form-label">Master Password</label>
-        <div class="admin-password-wrapper">
+    <!-- Admin Password Input Group -->
+    <div class="login-form-group text-start">
+        <label for="id_admin_password" class="login-form-label">Master Password</label>
+        <div class="login-input-group">
+            <i class="bi bi-shield-lock input-icon"></i>
             <input type="password"
                    name="password"
                    id="id_admin_password"
-                   class="admin-form-control"
+                   class="login-input login-input-password"
                    placeholder="••••••••"
                    required
                    autocomplete="current-password">
-            <button type="button" class="admin-password-toggle-btn" id="toggleAdminPasswordBtn" aria-label="Toggle password visibility">
-                <span class="material-icons" id="toggleAdminPasswordIcon" style="font-size: 18px;">visibility_off</span>
+            <button type="button" class="password-toggle-btn" id="toggleAdminPasswordBtn" aria-label="Toggle password visibility">
+                <i class="bi bi-eye" id="toggleAdminPasswordIcon"></i>
             </button>
         </div>
         {% if form.password.errors %}
-        <div class="text-danger small mt-1">{{ form.password.errors.0 }}</div>
+        <div class="text-danger small mt-1 ps-1">{{ form.password.errors.0 }}</div>
         {% endif %}
     </div>
 
-    <button type="submit" class="btn btn-admin-submit" id="adminSubmitBtn">
+    <!-- Submit Button -->
+    <button type="submit" class="btn-login mt-4" id="adminSubmitBtn">
         <span>Authenticate Admin</span>
-        <span class="material-icons" style="font-size: 16px;">arrow_forward</span>
+        <i class="bi bi-arrow-right"></i>
     </button>
 </form>
 
@@ -183,7 +68,7 @@
             toggleBtn.addEventListener('click', function() {
                 const isPassword = passwordInput.type === 'password';
                 passwordInput.type = isPassword ? 'text' : 'password';
-                toggleIcon.textContent = isPassword ? 'visibility' : 'visibility_off';
+                toggleIcon.className = isPassword ? 'bi bi-eye-slash' : 'bi bi-eye';
             });
         }
 
@@ -191,9 +76,9 @@
         const submitBtn = document.getElementById('adminSubmitBtn');
         if (loginForm && submitBtn) {
             loginForm.addEventListener('submit', function() {
-                if (submitBtn.classList.contains('btn-loading')) return;
-                submitBtn.classList.add('btn-loading');
-                submitBtn.innerHTML = '<span>Authenticating</span><div class="dot-pulse-loader"><span></span><span></span><span></span></div>';
+                if (submitBtn.classList.contains('disabled')) return;
+                submitBtn.classList.add('disabled');
+                submitBtn.innerHTML = '<span>Authenticating...</span><div class="spinner-border spinner-border-sm text-light ms-2" role="status"></div>';
             });
         }
     })();

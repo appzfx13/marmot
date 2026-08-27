@@ -50,43 +50,7 @@ class UserForm(forms.ModelForm):
 
 
 
-class TradeExecConfigForm(forms.ModelForm):
-    class Meta:
-        model = TradeExecConfig
-        fields = [
-            'name',
-            'admins_user',
-            'is_active',
-            'max_loss_limit',
-            'max_profit_limit',
-            'auto_lot_status',
-            'default_lot_size',
-            'auto_sl_status',
-            'default_risk_value',
-            'default_risk_type',
-            'layer_status',
-            'layer_add_in_lot_count',
-            'layer_percentage',
-            'forecast_status',
-            'backtest_status',
-        ]
-        widgets = {
-            'name': forms.TextInput(attrs={'placeholder': 'Enter configuration name', 'class': 'form-control'}),
-            'admins_user': forms.Select(attrs={'class': 'form-select'}),
-            'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'max_loss_limit': forms.NumberInput(attrs={'placeholder': '0.00', 'step': '0.01'}),
-            'max_profit_limit': forms.NumberInput(attrs={'placeholder': '0.00', 'step': '0.01'}),
-            'auto_lot_status': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'default_lot_size': forms.NumberInput(attrs={'placeholder': '1', 'min': '1'}),
-            'auto_sl_status': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'default_risk_value': forms.NumberInput(attrs={'placeholder': '0.00', 'step': '0.01'}),
-            'default_risk_type': forms.Select(attrs={'class': 'form-select'}),
-            'layer_status': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'layer_add_in_lot_count': forms.NumberInput(attrs={'placeholder': '0'}),
-            'layer_percentage': forms.NumberInput(attrs={'placeholder': '0.00', 'step': '0.01'}),
-            'forecast_status': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'backtest_status': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-        }
+from apps.trade_config.forms import TradeExecConfigForm
 
 
 class AdminTraderPasswordResetForm(forms.Form):

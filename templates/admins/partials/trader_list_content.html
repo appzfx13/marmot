@@ -1,0 +1,105 @@
+{% load static %}
+<div class="d-flex flex-column gap-4">
+
+    <!-- START: Spark Page Header -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h1 class="page-title">Traders Management</h1>
+            <p class="page-subtitle">Search, filter, manage permissions, and configure registered traders.</p>
+        </div>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            <div class="dropdown bulk-dropdown d-none">
+                <button class="btn btn-outline-danger rounded-pill px-3 py-1.5 fw-semibold dropdown-toggle d-inline-flex align-items-center gap-2 shadow-sm" 
+                        type="button" 
+                        data-bs-toggle="dropdown" 
+                        aria-expanded="false"
+                        title="Bulk Operations">
+                    <i class="bi bi-three-dots-vertical"></i>
+                    <span>Bulk Actions</span>
+                    <span class="badge bg-danger rounded-pill bulk-selected-count">0</span>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-end dropdown-menu-custom">
+                    <li>
+                        <a class="dropdown-item text-danger d-flex align-items-center gap-2" 
+                           href="javascript:void(0);" 
+                           onclick="triggerBulkDelete(this, '{% url 'admins:trader_bulk_delete' %}')">
+                            <i class="bi bi-trash"></i>
+                            <span>Delete Selected (<span class="bulk-selected-count">0</span>)</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <a href="{% url 'admins:trader_create' %}"
+                class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 shadow-sm"
+                hx-get="{% url 'admins:trader_create' %}"
+                hx-target="#app-main-container"
+                hx-push-url="true">
+                <i class="bi bi-person-plus-fill"></i>
+                <span>Add Trader</span>
+            </a>
+        </div>
+    </div>
+    <!-- END: Spark Page Header -->
+
+    <!-- Search & Filter Controls -->
+    <div class="card mb-0">
+        <div class="card-body p-3 p-md-4">
+            <form method="GET" action="{% url 'admins:trader_list' %}" class="row g-3 align-items-center">
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" name="q" value="{{ request.GET.q }}"
+                            class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25"
+                            placeholder="Search name, email..." hx-get="{% url 'admins:trader_list' %}"
+                            hx-target="#traderTableContainer" hx-trigger="input changed delay:400ms, search"
+                            hx-include="[name='phone_number'], [name='broker'], [name='trade_eligibility']" hx-push-url="true">
+                    </div>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-2">
+                    <input type="text" name="phone_number" value="{{ request.GET.phone_number }}"
+                        class="form-control bg-transparent theme-text-main border-secondary border-opacity-25"
+                        placeholder="Filter phone..." hx-get="{% url 'admins:trader_list' %}"
+                        hx-target="#traderTableContainer" hx-trigger="input changed delay:400ms"
+                        hx-include="[name='q'], [name='broker'], [name='trade_eligibility']" hx-push-url="true">
+                </div>
+                <div class="col-12 col-sm-6 col-lg-3">
+                    <select name="broker" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
+                        hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-trigger="change"
+                        hx-include="[name='q'], [name='phone_number'], [name='trade_eligibility']" hx-push-url="true">
+                        <option value="" class="text-dark">All Brokers</option>
+                        {% for value, label in BrokerChoices.choices %}
+                        <option value="{{ value }}" class="text-dark" {% if request.GET.broker == value %}selected{% endif %}>{{ label }}</option>
+                        {% endfor %}
+                    </select>
+                </div>
+                <div class="col-12 col-sm-6 col-lg-2">
+                    <select name="trade_eligibility"
+                        class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
+                        hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-trigger="change"
+                        hx-include="[name='q'], [name='phone_number'], [name='broker']" hx-push-url="true">
+                        <option value="" class="text-dark">Eligibility (All)</option>
+                        <option value="true" class="text-dark" {% if request.GET.trade_eligibility == 'true' %}selected{% endif %}>Eligible</option>
+                        <option value="false" class="text-dark" {% if request.GET.trade_eligibility == 'false' %}selected{% endif %}>Not Eligible</option>
+                    </select>
+                </div>
+                <div class="col-12 col-sm-12 col-lg-2">
+                    <a href="{% url 'admins:trader_list' %}"
+                        class="btn btn-outline-secondary rounded-pill theme-text-muted border-secondary border-opacity-25 w-100 d-inline-flex align-items-center justify-content-center gap-1.5"
+                        hx-get="{% url 'admins:trader_list' %}" hx-target="#traderTableContainer" hx-push-url="true">
+                        <i class="bi bi-arrow-counterclockwise"></i><span>Reset</span>
+                    </a>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Container for dynamic table swap -->
+    <div id="traderTableContainer" class="w-100" hx-get="{{ request.get_full_path }}"
+        hx-trigger="reloadTraderTable from:body" hx-target="#traderTableContainer" hx-swap="innerHTML">
+        {% include 'admins/partials/trader_table.html' %}
+    </div>
+
+</div>

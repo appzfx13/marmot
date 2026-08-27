@@ -1,698 +1,233 @@
 {% load static %}
 {% load socialaccount %}
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" data-ui-theme="{{ UI_THEME }}">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Sign Up — Marmot Algorithmic Trading</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Account — Marmot Algorithmic Trading</title>
 
-    <!-- Bootstrap 5 CSS & Google Fonts/Icons -->
+    <!-- SEO Optimization -->
+    <meta name="description" content="Create an account on Marmot Algorithmic Trading & Analytics Platform">
+    <meta name="author" content="Marmot Core">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
+
+    <!-- Third-Party Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,400..700;1,400..700&family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..700,0..100&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link href="https://fonts.googleapis.com/css2?family=Google+Symbols:opsz,wght,FILL,GRAD,ROND@20..48,100..700,0..1,-50..200,0..100&display=block" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
-    <!-- Lenis Smooth Scroll CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.26/dist/lenis.css">
-    <!-- Dynamic Shadcn Theme Stylesheet -->
-    <link rel="stylesheet" href="{% static 'css/theme-shadcn.css' %}">
 
+    <!-- Main Design System & Custom Stylesheet -->
+    <link rel="stylesheet" href="{% static 'css/spark-theme.css' %}">
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
-
-    <style>
-        :root[data-theme="dark"] {
-            --bg-page: #000000;
-            --bg-card: rgba(13, 18, 30, 0.75);
-            --card-border: rgba(255, 255, 255, 0.08);
-            --text-title: #ffffff;
-            --text-subtitle: rgba(255, 255, 255, 0.72);
-            --text-muted: rgba(255, 255, 255, 0.45);
-            --input-bg: rgba(255, 255, 255, 0.05);
-            --input-border: rgba(255, 255, 255, 0.1);
-            --input-text: #ffffff;
-            --input-placeholder: rgba(255, 255, 255, 0.45);
-            --social-btn-bg: rgba(255, 255, 255, 0.06);
-            --social-btn-hover: rgba(255, 255, 255, 0.12);
-            --social-btn-text: #e2e8f0;
-            --divider-line: rgba(255, 255, 255, 0.08);
-            --btn-primary: #7a5af8;
-            --btn-primary-hover: #6342e8;
-            --btn-text: #ffffff;
-            --toggle-bg: rgba(255, 255, 255, 0.08);
-            --toggle-border: rgba(255, 255, 255, 0.12);
-            --aurora-1: rgba(122, 90, 248, 0.20);
-            --aurora-2: rgba(26, 115, 232, 0.15);
-        }
-
-        :root[data-theme="light"] {
-            --bg-page: #f8fafc;
-            --bg-card: rgba(255, 255, 255, 0.92);
-            --card-border: rgba(15, 23, 42, 0.08);
-            --text-title: #0f172a;
-            --text-subtitle: #475569;
-            --text-muted: #64748b;
-            --input-bg: #f8fafc;
-            --input-border: #cbd5e1;
-            --input-text: #0f172a;
-            --input-placeholder: #94a3b8;
-            --social-btn-bg: #f1f5f9;
-            --social-btn-hover: #e2e8f0;
-            --social-btn-text: #334155;
-            --divider-line: #e2e8f0;
-            --btn-primary: #7a5af8;
-            --btn-primary-hover: #6342e8;
-            --btn-text: #ffffff;
-            --toggle-bg: rgba(0, 0, 0, 0.05);
-            --toggle-border: rgba(0, 0, 0, 0.1);
-            --aurora-1: rgba(122, 90, 248, 0.08);
-            --aurora-2: rgba(26, 115, 232, 0.06);
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        html, body {
-            width: 100%;
-            max-width: 100%;
-            overflow-x: hidden;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Google Sans Flex', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', sans-serif;
-            background-color: var(--bg-page);
-            background-image: 
-                radial-gradient(circle at 50% 15%, var(--aurora-1) 0%, transparent 55%),
-                radial-gradient(circle at 80% 40%, var(--aurora-2) 0%, transparent 45%);
-            background-attachment: fixed;
-            min-height: 100vh;
-            min-height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            padding: 36px 14px 16px 14px;
-            position: relative;
-            letter-spacing: -0.01em;
-            overflow-x: hidden;
-            transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        /* Ambient Dual-Color Glow Blobs (Fixed to prevent page scrollbars) */
-        .ambient-blob-container {
-            position: fixed;
-            bottom: 0;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 0;
-            pointer-events: none;
-            opacity: 0.45;
-            max-width: 100vw;
-            width: 100%;
-            overflow: hidden;
-            display: flex;
-            justify-content: center;
-        }
-
-        .ambient-blob-container svg {
-            max-width: 100vw;
-            width: min(650px, 90vw);
-            height: auto;
-        }
-
-        .auth-nav-top {
-            position: fixed;
-            top: 16px;
-            left: 20px;
-            right: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 1000;
-            max-width: 100%;
-            pointer-events: none;
-        }
-
-        .auth-nav-btn {
-            background: var(--toggle-bg);
-            border: 1px solid var(--toggle-border);
-            color: var(--text-title);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-radius: 50px;
-            padding: 0 14px;
-            height: 38px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            pointer-events: auto;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            box-sizing: border-box;
-            white-space: nowrap;
-        }
-
-        .auth-nav-btn:hover {
-            background: var(--tab-active-bg);
-            color: var(--text-title);
-            transform: translateY(-1px);
-            text-decoration: none;
-        }
-
-        /* Main Auth Card — Fully Responsive */
-        .auth-card {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            max-width: 410px;
-            margin: 0 auto;
-            background: var(--bg-card);
-            backdrop-filter: blur(28px) saturate(180%);
-            -webkit-backdrop-filter: blur(28px) saturate(180%);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 22px 22px;
-            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.25);
-            animation: cardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        @media (max-width: 576px) {
-            body {
-                padding: 48px 10px 16px 10px;
-            }
-            .auth-nav-top {
-                top: 12px;
-                left: 14px;
-                right: 14px;
-            }
-            .auth-nav-btn {
-                height: 36px;
-                padding: 0 12px;
-                font-size: 0.8125rem;
-            }
-            .auth-card {
-                padding: 18px 14px;
-                border-radius: 14px;
-                max-width: 100%;
-            }
-            .auth-title {
-                font-size: 1.15rem !important;
-            }
-            .auth-subtitle {
-                font-size: 0.75rem !important;
-                margin-bottom: 12px !important;
-            }
-        }
-
-        @keyframes cardFadeIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .auth-title {
-            color: var(--text-title);
-            font-size: 1.25rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 2px;
-        }
-
-        .auth-subtitle {
-            color: var(--text-subtitle);
-            font-size: 0.78rem;
-            margin-bottom: 14px;
-            line-height: 1.45;
-        }
-
-        /* Social Buttons */
-        .social-btn {
-            background: var(--social-btn-bg);
-            color: var(--social-btn-text);
-            border: 1px solid var(--card-border);
-            border-radius: 50px;
-            padding: 0 16px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            text-decoration: none;
-            transition: all 0.2s ease;
-            height: 38px;
-            box-sizing: border-box;
-        }
-
-        .social-btn:hover {
-            background: var(--social-btn-hover);
-            color: var(--social-btn-text);
-            transform: translateY(-1px);
-        }
-
-        /* Divider */
-        .auth-divider {
-            position: relative;
-            margin: 12px 0;
-            text-align: center;
-        }
-
-        .auth-divider::before {
-            content: '';
-            position: absolute;
-            top: 50%;
-            left: 0;
-            right: 0;
-            height: 1px;
-            background: var(--divider-line);
-        }
-
-        .auth-divider span {
-            position: relative;
-            background: var(--bg-card);
-            padding: 0 10px;
-            color: var(--text-muted);
-            font-size: 0.75rem;
-            font-weight: 500;
-        }
-
-        /* Form Inputs */
-        .form-label {
-            color: var(--text-subtitle);
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-bottom: 3px;
-        }
-
-        .form-control {
-            background-color: var(--input-bg) !important;
-            border: 1px solid var(--input-border) !important;
-            color: var(--input-text) !important;
-            border-radius: 8px;
-            padding: 6px 12px;
-            font-size: 0.8125rem;
-            height: 36px;
-            transition: all 0.2s ease;
-        }
-
-        .form-control::placeholder {
-            color: var(--input-placeholder) !important;
-        }
-
-        .form-control:focus {
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
-            border-color: #3b82f6 !important;
-        }
-
-        .password-wrapper {
-            position: relative;
-        }
-
-        .password-toggle-btn {
-            position: absolute;
-            right: 12px;
-            top: 50%;
-            transform: translateY(-50%);
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            cursor: pointer;
-            padding: 2px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            transition: color 0.2s ease;
-        }
-
-        .password-toggle-btn:hover {
-            color: var(--text-title);
-        }
-
-        /* Submit Button */
-        .btn-submit {
-            background-color: var(--btn-primary);
-            color: var(--btn-text);
-            border: none;
-            border-radius: 50px;
-            padding: 0 20px;
-            font-size: 0.875rem;
-            font-weight: 600;
-            width: 100%;
-            height: 38px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25);
-            box-sizing: border-box;
-        }
-
-        .btn-submit:hover:not(:disabled) {
-            background-color: var(--btn-primary-hover);
-            color: var(--btn-text);
-            transform: translateY(-1px);
-            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
-        }
-
-        .btn-submit:disabled, .btn-submit.btn-loading {
-            opacity: 0.85;
-            cursor: not-allowed;
-            pointer-events: none;
-            transform: none !important;
-        }
-
-        /* Global Dot Pulse Animation */
-        .dot-pulse-loader {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            margin-left: 6px;
-            vertical-align: middle;
-        }
-
-        .dot-pulse-loader span {
-            width: 5px;
-            height: 5px;
-            background-color: currentColor;
-            border-radius: 50%;
-            display: inline-block;
-            animation: dotPulse 1.2s infinite ease-in-out both;
-        }
-
-        .dot-pulse-loader span:nth-child(1) { animation-delay: -0.32s; }
-        .dot-pulse-loader span:nth-child(2) { animation-delay: -0.16s; }
-        .dot-pulse-loader span:nth-child(3) { animation-delay: 0s; }
-
-        @keyframes dotPulse {
-            0%, 80%, 100% {
-                transform: scale(0.4);
-                opacity: 0.4;
-            }
-            40% {
-                transform: scale(1);
-                opacity: 1;
-            }
-        }
-
-        .form-check-input {
-            background-color: var(--input-bg);
-            border-color: var(--input-border);
-            border-radius: 6px;
-        }
-
-        .form-check-input:checked {
-            background-color: var(--btn-primary);
-            border-color: var(--btn-primary);
-        }
-
-        .form-check-label {
-            color: var(--text-subtitle);
-            font-size: 0.75rem;
-            user-select: none;
-        }
-
-        .auth-footer-link {
-            color: var(--text-subtitle);
-            font-size: 0.75rem;
-            text-align: center;
-            margin-top: 14px;
-        }
-
-        .auth-footer-link a {
-            color: var(--btn-primary);
-            text-decoration: none;
-            font-weight: 600;
-        }
-
-        .auth-footer-link a:hover {
-            text-decoration: underline;
-        }
-    </style>
+    <style>html { font-size: 90%; }</style>
 </head>
 <body>
 
-    <!-- Top Navigation Controls -->
-    <div class="auth-nav-top">
-        <a href="{% url 'home' %}" class="auth-nav-btn">
-            <span class="material-icons" style="font-size: 18px;">arrow_back</span>
-            <span>Home</span>
-        </a>
-
-        <button class="auth-nav-btn" id="themeToggleBtn" type="button" aria-label="Toggle Theme">
-            <span class="material-icons" id="themeToggleIcon" style="font-size: 18px;">dark_mode</span>
-            <span id="themeToggleText">Dark</span>
+    <!-- ==========================================
+         Theme Toggle Button (Top Right Corner)
+         ========================================== -->
+    <div class="theme-toggle-corner">
+        <button type="button" 
+                class="btn btn-sm rounded-pill d-inline-flex align-items-center gap-2 px-3 py-1.5 shadow-sm" 
+                id="themeToggleBtn" 
+                title="Toggle Theme" 
+                style="background: var(--card-background); border: 1px solid var(--border-color); color: var(--text-main);">
+            <i class="bi bi-moon-stars-fill" id="themeIcon" style="color: var(--brand-lime);"></i>
+            <span class="small fw-semibold" id="themeText">Dark</span>
         </button>
     </div>
 
-    <!-- Main Sign Up Card -->
-    <div class="auth-card">
-        <div class="text-center">
-            <div class="d-inline-flex align-items-center justify-content-center mb-3 p-2 rounded-3" style="background: rgba(59, 130, 246, 0.1);">
-                <img src="{% static 'images/ref/logo-white.svg' %}" alt="Marmot Logo" height="28" class="d-none dark-logo">
-                <img src="{% static 'images/ref/logo-black.svg' %}" alt="Marmot Logo" height="28" class="d-block light-logo">
-            </div>
-            <h1 class="auth-title">Sign Up</h1>
-            <p class="auth-subtitle">Enter your details to create a trading account</p>
-        </div>
-
-        <!-- Social Auth Options -->
-        <div class="row g-2 mb-3">
-            <div class="col-sm-6">
-                <a href="{% provider_login_url 'google' %}" class="social-btn w-100">
-                    <svg width="20" height="20" viewBox="0 0 21 20" fill="none" xmlns="http://www.w3.org/2000/svg">
-                        <path d="M19.2511 10.1943C19.2511 9.47489 19.1915 8.94989 19.0626 8.40546H10.6797V11.6526H15.6003C15.5011 12.4596 14.9654 13.6749 13.7749 14.4915L13.7582 14.6002L16.4087 16.6125L16.5924 16.6305C18.2788 15.104 19.2511 12.8582 19.2511 10.1943Z" fill="#4285F4"/>
-                        <path d="M10.6788 18.75C13.0895 18.75 15.1133 17.9722 16.5915 16.6305L13.774 14.4916C13.0201 15.0069 12.0081 15.3666 10.6788 15.3666C8.31773 15.3666 6.31379 13.8402 5.59944 11.7305L5.49473 11.7392L2.73868 13.8295L2.70264 13.9277C4.17087 16.786 7.18674 18.75 10.6788 18.75Z" fill="#34A853"/>
-                        <path d="M5.60014 11.7305C5.41165 11.1861 5.30257 10.6027 5.30257 9.99998C5.30257 9.39716 5.41165 8.81385 5.59022 8.26941L5.58523 8.15346L2.79464 6.0296L2.70333 6.07216C2.0982 7.25829 1.75098 8.59026 1.75098 9.99998C1.75098 11.4097 2.0982 12.7416 2.70333 13.9277L5.60014 11.7305Z" fill="#FBBC05"/>
-                        <path d="M10.6789 4.63331C12.3554 4.63331 13.4864 5.34303 14.1312 5.93612L16.6511 3.525C15.1035 2.11528 13.0895 1.25 10.6789 1.25C7.18676 1.25 4.17088 3.21387 2.70264 6.07218L5.58953 8.26943C6.31381 6.15972 8.31776 4.63331 10.6789 4.63331Z" fill="#EB4335"/>
-                    </svg>
-                    <span>Google</span>
-                </a>
-            </div>
-            <div class="col-sm-6">
-                <a href="{% provider_login_url 'github' %}" class="social-btn w-100">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                        <path d="M12 2.24902C6.51613 2.24902 2 6.70064 2 12.249C2 16.6361 4.87097 20.3781 8.87097 21.7329C9.3871 21.8297 9.54839 21.5071 9.54839 21.2813C9.54839 21.0555 9.54839 20.4103 9.51613 19.5393C6.74194 20.1845 6.16129 18.1845 6.16129 18.1845C5.70968 17.0555 5.03226 16.7329 5.03226 16.7329C4.12903 16.0877 5.06452 16.0877 5.06452 16.0877C6.06452 16.12 6.6129 17.12 6.6129 17.12C7.48387 18.6684 8.96774 18.2168 9.51613 17.9264C9.6129 17.2813 9.87097 16.8297 10.1613 16.5716C7.96774 16.3458 5.6129 15.4748 5.6129 11.6684C5.6129 10.5716 6.03226 9.70064 6.64516 9.02322C6.54839 8.79741 6.19355 7.76515 6.74194 6.37806C6.74194 6.37806 7.6129 6.11999 9.51613 7.41031C10.3226 7.18451 11.1613 7.05548 12.0323 7.05548C12.9032 7.05548 13.7742 7.15225 14.5484 7.41031C16.4516 6.15225 17.2903 6.37806 17.2903 6.37806C17.8387 7.73289 17.5161 8.79741 17.3871 9.02322C18.0323 9.70064 18.4194 10.6039 18.4194 11.6684C18.4194 15.4748 16.0645 16.3458 13.871 16.5716C14.2258 16.8942 14.5484 17.5393 14.5484 18.4426C14.5484 19.7974 14.5161 20.8619 14.5161 21.1845C14.5161 21.4426 14.7097 21.7329 15.1935 21.6361C19.129 20.3135 22 16.6039 22 12.1845C21.9677 6.70064 17.4839 2.24902 12 2.24902Z"/>
-                    </svg>
-                    <span>GitHub</span>
-                </a>
-            </div>
-        </div>
-
-        <div class="auth-divider">
-            <span>Or</span>
-        </div>
-
-        <!-- Registration Form -->
-        <form method="post" novalidate>
-            {% csrf_token %}
-
-            {% if form.non_field_errors %}
-            <div class="alert alert-danger py-2 px-3 small rounded-3 mb-3">
-                {% for error in form.non_field_errors %}
-                    <div>{{ error }}</div>
-                {% endfor %}
+    <!-- ==========================================
+         Authentication Container & Signup Card
+         ========================================== -->
+    <div class="login-wrapper">
+        <!-- Glowing background shapes for modern visual appearance -->
+        <div class="login-bg-shape login-bg-shape-1"></div>
+        <div class="login-bg-shape login-bg-shape-2"></div>
+        
+        <!-- Main centered card -->
+        <div class="login-card">
+            
+            <!-- Brand Identity -->
+            <a href="{% url 'home' %}" class="login-brand text-decoration-none">
+                <i class="bi bi-asterisk"></i>
+                <span>MARMOT</span>
+            </a>
+            
+            <h1 class="login-title">Create Account</h1>
+            <p class="login-subtitle">Join the next-generation algorithmic trading platform</p>
+            
+            {% if form.errors %}
+            <div class="alert alert-danger py-2 px-3 rounded-3 small mb-3 border-0" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">
+                <div class="d-flex align-items-center gap-2 mb-1 fw-semibold">
+                    <i class="bi bi-exclamation-triangle-fill"></i>
+                    <span>Please correct the errors below:</span>
+                </div>
+                <ul class="mb-0 ps-3 small">
+                    {% for field, errors in form.errors.items %}
+                        {% for error in errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    {% endfor %}
+                </ul>
             </div>
             {% endif %}
 
-            <div class="row g-3 mb-3">
-                <div class="col-sm-6">
-                    <label for="firstName" class="form-label">First name</label>
-                    <input type="text"
-                           name="first_name"
-                           id="firstName"
-                           class="form-control"
-                           placeholder="Your first name"
-                           value="{{ form.first_name.value|default:'' }}"
-                           required>
-                    {% if form.first_name.errors %}
-                        <div class="text-danger small mt-1">{{ form.first_name.errors.0 }}</div>
-                    {% endif %}
+            <!-- Signup Form -->
+            <form action="{% url 'users:marmot-signup' %}" method="POST" id="signupForm" class="needs-validation" novalidate>
+                {% csrf_token %}
+                
+                <!-- Username Input Group -->
+                <div class="login-form-group">
+                    <label for="id_username" class="login-form-label">Username</label>
+                    <div class="login-input-group">
+                        <i class="bi bi-person input-icon"></i>
+                        <input type="text" 
+                               name="username" 
+                               id="id_username" 
+                               class="login-input" 
+                               placeholder="Choose a username" 
+                               value="{{ form.username.value|default:'' }}"
+                               required 
+                               autofocus 
+                               autocomplete="username">
+                    </div>
                 </div>
 
-                <div class="col-sm-6">
-                    <label for="lastName" class="form-label">Last name</label>
-                    <input type="text"
-                           name="last_name"
-                           id="lastName"
-                           class="form-control"
-                           placeholder="Your last name"
-                           value="{{ form.last_name.value|default:'' }}"
-                           required>
-                    {% if form.last_name.errors %}
-                        <div class="text-danger small mt-1">{{ form.last_name.errors.0 }}</div>
-                    {% endif %}
+                <!-- Email Input Group -->
+                <div class="login-form-group">
+                    <label for="id_email" class="login-form-label">Email Address</label>
+                    <div class="login-input-group">
+                        <i class="bi bi-envelope input-icon"></i>
+                        <input type="email" 
+                               name="email" 
+                               id="id_email" 
+                               class="login-input" 
+                               placeholder="name@company.com" 
+                               value="{{ form.email.value|default:'' }}"
+                               required 
+                               autocomplete="email">
+                    </div>
                 </div>
-            </div>
-
-            <div class="mb-3">
-                <label for="email" class="form-label">Email address</label>
-                <input type="email"
-                       name="email"
-                       id="email"
-                       class="form-control"
-                       placeholder="Your email address"
-                       value="{{ form.email.value|default:'' }}"
-                       required>
-                {% if form.email.errors %}
-                    <div class="text-danger small mt-1">{{ form.email.errors.0 }}</div>
-                {% endif %}
-            </div>
-
-            <div class="mb-3">
-                <label for="password" class="form-label">Password</label>
-                <div class="password-wrapper">
-                    <input type="password"
-                           name="password"
-                           id="password"
-                           class="form-control"
-                           placeholder="Create password (min 6 chars)"
-                           required>
-                    <button type="button" class="password-toggle-btn" id="togglePasswordBtn" aria-label="Toggle Password Visibility">
-                        <span class="material-icons" id="togglePasswordIcon" style="font-size: 20px;">visibility_off</span>
-                    </button>
+                
+                <!-- Password 1 Input Group -->
+                <div class="login-form-group">
+                    <label for="id_password1" class="login-form-label">Password</label>
+                    <div class="login-input-group">
+                        <i class="bi bi-shield-lock input-icon"></i>
+                        <input type="password" 
+                               name="password1" 
+                               id="id_password1" 
+                               class="login-input login-input-password" 
+                               placeholder="Create a strong password" 
+                               required 
+                               autocomplete="new-password">
+                        <button type="button" class="password-toggle-btn" id="toggle-password-1" aria-label="Show password" onclick="togglePasswordVisibility('id_password1', 'passwordToggleIcon1')">
+                            <i class="bi bi-eye" id="passwordToggleIcon1"></i>
+                        </button>
+                    </div>
                 </div>
-                {% if form.password.errors %}
-                    <div class="text-danger small mt-1">{{ form.password.errors.0 }}</div>
-                {% endif %}
-            </div>
 
-            <div class="mb-4">
-                <div class="form-check">
-                    <input class="form-check-input" type="checkbox" name="remember_me" id="remember_me" checked>
-                    <label class="form-check-label" for="remember_me">
-                        Keep me logged in
-                    </label>
+                <!-- Password 2 Input Group -->
+                <div class="login-form-group">
+                    <label for="id_password2" class="login-form-label">Confirm Password</label>
+                    <div class="login-input-group">
+                        <i class="bi bi-shield-check input-icon"></i>
+                        <input type="password" 
+                               name="password2" 
+                               id="id_password2" 
+                               class="login-input login-input-password" 
+                               placeholder="Re-enter password" 
+                               required 
+                               autocomplete="new-password">
+                        <button type="button" class="password-toggle-btn" id="toggle-password-2" aria-label="Show password" onclick="togglePasswordVisibility('id_password2', 'passwordToggleIcon2')">
+                            <i class="bi bi-eye" id="passwordToggleIcon2"></i>
+                        </button>
+                    </div>
                 </div>
+                
+                <!-- Submit Button -->
+                <button type="submit" class="btn-login mt-4" id="btn-submit">
+                    <span>Create My Account</span>
+                    <i class="bi bi-arrow-right"></i>
+                </button>
+                
+            </form>
+            
+            <!-- Divider -->
+            <div class="login-divider">Or continue with</div>
+            
+            <!-- Social Logins -->
+            <div class="social-login-grid">
+                <a href="{% provider_login_url 'google' %}" class="btn-social" id="btn-google">
+                    <i class="bi bi-google text-danger"></i>
+                    <span>Google</span>
+                </a>
+                <a href="{% provider_login_url 'github' %}" class="btn-social" id="btn-github">
+                    <i class="bi bi-github"></i>
+                    <span>GitHub</span>
+                </a>
             </div>
-
-            <button type="submit" class="btn btn-submit">
-                Sign Up
-            </button>
-        </form>
-
-        <div class="auth-footer-link">
-            Already have an account? <a href="{% url 'users:marmot-login' %}">Sign In</a>
+            
+            <!-- Footer Link -->
+            <p class="login-footer-text">
+                Already have an account? <a href="{% url 'users:marmot-login' %}" id="link-login">Sign In</a>
+            </p>
+            
         </div>
     </div>
+    <!-- END: Authentication Container -->
 
-    <!-- Ambient SVG Glow Effect (from reference) -->
-    <div class="ambient-blob-container">
-        <svg width="930" height="760" viewBox="0 0 930 760" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <g opacity="0.35" filter="url(#filter0_f_blob)">
-                <circle cx="380.335" cy="380.335" r="179.665" fill="#FF58D5" />
-            </g>
-            <g opacity="0.65" filter="url(#filter1_f_blob)">
-                <circle cx="549.665" cy="380.335" r="179.665" fill="#4E6EFF" />
-            </g>
-            <defs>
-                <filter id="filter0_f_blob" x="0.67" y="0.67" width="759.33" height="759.33" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-                    <feFlood flood-opacity="0" result="BackgroundImageFix" />
-                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-                    <feGaussianBlur stdDeviation="100" result="effect1_foregroundBlur" />
-                </filter>
-                <filter id="filter1_f_blob" x="170" y="0.67" width="759.33" height="759.33" filterUnits="userSpaceOnUse" color-interpolation-filters="sRGB">
-                    <feFlood flood-opacity="0" result="BackgroundImageFix" />
-                    <feBlend mode="normal" in="SourceGraphic" in2="BackgroundImageFix" result="shape" />
-                    <feGaussianBlur stdDeviation="100" result="effect1_foregroundBlur" />
-                </filter>
-            </defs>
-        </svg>
-    </div>
+    <!-- Bootstrap Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 
+    <!-- Theme & Password Toggle Interactions -->
     <script>
-        // Password Show/Hide Toggle
-        (function() {
-            const toggleBtn = document.getElementById('togglePasswordBtn');
-            const passwordInput = document.getElementById('password');
-            const toggleIcon = document.getElementById('togglePasswordIcon');
-
-            if (toggleBtn && passwordInput && toggleIcon) {
-                toggleBtn.addEventListener('click', function() {
-                    const isPassword = passwordInput.type === 'password';
-                    passwordInput.type = isPassword ? 'text' : 'password';
-                    toggleIcon.textContent = isPassword ? 'visibility' : 'visibility_off';
-                });
+        function togglePasswordVisibility(inputId, iconId) {
+            const passwordInput = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (passwordInput.type === 'password') {
+                passwordInput.type = 'text';
+                icon.className = 'bi bi-eye-slash';
+            } else {
+                passwordInput.type = 'password';
+                icon.className = 'bi bi-eye';
             }
-        })();
+        }
 
-        // Theme Toggle
         (function() {
-            const htmlElement = document.documentElement;
+            const savedTheme = localStorage.getItem('marmot-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeUI(savedTheme);
+
             const toggleBtn = document.getElementById('themeToggleBtn');
-            const toggleIcon = document.getElementById('themeToggleIcon');
-            const toggleText = document.getElementById('themeToggleText');
-            const lightLogos = document.querySelectorAll('.light-logo');
-            const darkLogos = document.querySelectorAll('.dark-logo');
-
-            const savedTheme = localStorage.getItem('theme');
-            const systemPrefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-            const currentTheme = savedTheme || (systemPrefersDark ? 'dark' : 'light');
-
-            function applyTheme(theme) {
-                htmlElement.setAttribute('data-theme', theme);
-                localStorage.setItem('theme', theme);
-
-                if (theme === 'dark') {
-                    if (toggleIcon) toggleIcon.textContent = 'dark_mode';
-                    if (toggleText) toggleText.textContent = 'Dark';
-                    darkLogos.forEach(el => el.classList.replace('d-none', 'd-block'));
-                    lightLogos.forEach(el => el.classList.replace('d-block', 'd-none'));
-                } else {
-                    if (toggleIcon) toggleIcon.textContent = 'light_mode';
-                    if (toggleText) toggleText.textContent = 'Light';
-                    lightLogos.forEach(el => el.classList.replace('d-none', 'd-block'));
-                    darkLogos.forEach(el => el.classList.replace('d-block', 'd-none'));
-                }
-            }
-
-            applyTheme(currentTheme);
-
             if (toggleBtn) {
                 toggleBtn.addEventListener('click', function() {
-                    const activeTheme = htmlElement.getAttribute('data-theme');
-                    const newTheme = activeTheme === 'dark' ? 'light' : 'dark';
-                    applyTheme(newTheme);
+                    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('marmot-theme', newTheme);
+                    updateThemeUI(newTheme);
                 });
             }
-        })();
 
-        // Form Submit Double-Click & Dot-Pulse Loading Protection
-        (function() {
-            const form = document.querySelector('form');
-            const submitBtn = document.querySelector('.btn-submit');
-            if (form && submitBtn) {
-                form.addEventListener('submit', function() {
-                    if (submitBtn.classList.contains('btn-loading')) return;
-                    submitBtn.classList.add('btn-loading');
-                    submitBtn.innerHTML = '<span>Creating Account</span><div class="dot-pulse-loader"><span></span><span></span><span></span></div>';
-                });
+            function updateThemeUI(theme) {
+                const icon = document.getElementById('themeIcon');
+                const text = document.getElementById('themeText');
+                if (theme === 'dark') {
+                    if (icon) icon.className = 'bi bi-moon-stars-fill';
+                    if (text) text.textContent = 'Dark';
+                } else {
+                    if (icon) icon.className = 'bi bi-sun-fill';
+                    if (text) text.textContent = 'Light';
+                }
             }
-        })();
-    </script>
-
-    <!-- Lenis Smooth Scroll JS -->
-    <script src="https://unpkg.com/lenis@1.3.26/dist/lenis.min.js"></script>
-    <script>
-        (function() {
-            window.lenis = new Lenis({
-                autoRaf: true,
-                smoothWheel: true
-            });
-            document.addEventListener('htmx:afterSettle', function() {
-                if (window.lenis) window.lenis.resize();
-            });
-            document.addEventListener('htmx:afterSwap', function() {
-                if (window.lenis) window.lenis.resize();
-            });
         })();
     </script>
 </body>

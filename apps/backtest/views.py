@@ -24,15 +24,23 @@ from .models import BacktestTask, BacktestRule, TradingStrategy
 from .forms import IndexBacktestTaskForm, ForexBacktestTaskForm, BacktestRuleForm
 from .services import create_and_start_backtest_task, send_backtest_control_command
 
-class BacktestDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
+class BacktestDashboardView(LoginRequiredMixin, AdminRequiredMixin, ListView):
     """
     Unified Backtest Dashboard & List View with HTMX pagination.
     """
     model = BacktestTask
     template_name = 'admins/backtest_dashboard.html'
-    partial_template_name = 'admins/partials/backtest_dashboard_content.html'
+    partial_template_name = 'admins/partials/backtest_dashboard_list_content.html'
+    table_template_name = 'admins/partials/backtest_dashboard_content.html'
     context_object_name = 'backtests'
     paginate_by = settings.PAGINATION_COUNT
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Target') == 'backtest-dashboard-container':
+            return [self.table_template_name]
+        if self.request.headers.get('HX-Request'):
+            return [self.partial_template_name]
+        return [self.template_name]
 
     def get_queryset(self):
         queryset = super().get_queryset().filter(is_deleted=False)
@@ -1152,9 +1160,10 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         return response
 
 
-class RLTrainingIndexView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+class RLTrainingIndexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
     """Dedicated RL AI Training portal for Index Options (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, etc.)."""
     template_name = 'admins/rl_training_index.html'
+    partial_template_name = 'admins/partials/rl_training_index_content.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -1239,9 +1248,10 @@ class RLTrainingIndexView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
         return self.render_to_response(context)
 
 
-class RLTrainingForexView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+class RLTrainingForexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
     """Dedicated RL AI Training portal for Forex & CME Futures (MGC, M6E, M6J, MNQ, MES, MCL, etc.)."""
     template_name = 'admins/rl_training_forex.html'
+    partial_template_name = 'admins/partials/rl_training_forex_content.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)

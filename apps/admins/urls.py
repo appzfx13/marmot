@@ -18,6 +18,7 @@ from .views import (
     AdminTradeExecConfigDetailView,
     AdminTradeExecConfigUpdateView,
     AdminTradeExecConfigDeleteView,
+    AdminTradeExecConfigToggleView,
     AdminTradeExecUserAccountInfoView,
     # Postback Views
     PostbackLogListView,
@@ -34,6 +35,8 @@ from .views import (
     AdminTradeExecConfigBulkDeleteView,
     PostbackLogBulkDeleteView,
     AdminBrokerMasterBulkDeleteView,
+    AdminLiveDashboardView,
+    AdminSandboxDashboardView,
 )
 
 from apps.market.views import MarketBackupListView, MarketBackupChartView, MarketBackupBulkDeleteView
@@ -42,9 +45,11 @@ from apps.backtest.views import BacktestDashboardView, BacktestBulkDeleteView
 app_name = 'admins' 
 
 urlpatterns = [
-    # Auth & Dashboard
+    # Auth & Dashboards
     path('login/', AdminLoginView.as_view(), name='admin-login'),
     path('dashboard/', AdminDashboardView.as_view(), name='admin-dashboard'),
+    path('dashboard/live/', AdminLiveDashboardView.as_view(), name='admin-live-dashboard'),
+    path('dashboard/sandbox/', AdminSandboxDashboardView.as_view(), name='admin-sandbox-dashboard'),
     path('terminal/', AdminTerminalView.as_view(), name='admin-terminal'),
     path('logout/', AdminLogoutView.as_view(), name='admin-logout'),
 
@@ -80,6 +85,7 @@ urlpatterns = [
     path('trade-configs/<int:pk>/', AdminTradeExecConfigDetailView.as_view(), name='trade_exec_config_detail'),
     path('trade-configs/<int:pk>/edit/', AdminTradeExecConfigUpdateView.as_view(), name='trade_exec_config_edit'),
     path('trade-configs/<int:pk>/delete/', AdminTradeExecConfigDeleteView.as_view(), name='trade_exec_config_delete'),
+    path('trade-configs/<int:pk>/toggle/', AdminTradeExecConfigToggleView.as_view(), name='trade_exec_config_toggle'),
 
     # Master Brokers Management
     path('masters/brokers/', AdminBrokerMasterListView.as_view(), name='broker-master-list'),

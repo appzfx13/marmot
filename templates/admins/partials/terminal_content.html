@@ -1,62 +1,51 @@
 {% load static %}
-<div class="row g-3">
-    <!-- Top Admin Terminal Control Header -->
-    <div class="col-12">
-        <div class="glass-card p-3 rounded-4 border d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3"
-             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
-            
-            <div class="d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-danger bg-opacity-25 text-danger d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0"
-                     style="width: 48px; height: 48px; border: 1px solid rgba(239, 68, 68, 0.3);">
-                    <span class="material-icons fs-3">terminal</span>
-                </div>
-                <div>
-                    <div class="d-flex align-items-center gap-2">
-                        <h4 class="theme-text-main fw-bold mb-0">Admin Master Terminal</h4>
-                        {% if has_configured_master %}
-                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
-                                <span class="material-icons fs-6 align-middle me-1">admin_panel_settings</span>MASTER CONTROL
-                            </span>
-                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
-                                DHAN &amp; FYERS
-                            </span>
-                        {% else %}
-                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.75rem;">
-                                <span class="material-icons fs-6 align-middle me-1">warning</span>CONFIG REQUIRED
-                            </span>
-                        {% endif %}
-                    </div>
-                    <div class="theme-text-muted small">Global order execution, algorithmic strategy overrides, and broker gateway control.</div>
-                </div>
-            </div>
+<div class="d-flex flex-column gap-4">
 
-            <!-- Global Risk Status & Emergency Kill Switch Trigger -->
-            <div class="d-flex align-items-center gap-2 ms-md-auto">
+    <!-- START: Spark Page Header -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h1 class="page-title mb-0">Admin Master Terminal</h1>
                 {% if has_configured_master %}
-                    <div class="glass-card px-3 py-15 rounded-pill d-inline-flex align-items-center gap-2 border"
-                         style="background: rgba(255,255,255,0.03); border-color: var(--border-color) !important;">
-                        <span class="position-relative d-flex h-2 w-2">
-                            <span class="animate-ping position-absolute inline-flex h-full w-full rounded-circle bg-success opacity-75" style="width:8px;height:8px;"></span>
-                            <span class="relative inline-flex rounded-circle bg-success" style="width:8px;height:8px;"></span>
-                        </span>
-                        <span class="text-success fw-bold small" style="font-size:0.78rem;">GATEWAY ACTIVE</span>
-                    </div>
-
-                    <button class="btn btn-sm btn-danger rounded-pill px-3 py-15 fw-bold d-flex align-items-center gap-1 shadow-sm"
-                            hx-get="{% url 'users:user-kill-switch' %}"
-                            hx-target="#globalHtmxModalDialog">
-                        <span class="material-icons fs-6">bolt</span>
-                        <span>Emergency Kill Switch</span>
-                    </button>
+                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill py-1 px-2.5 fw-bold smaller">
+                        <i class="bi bi-shield-lock-fill me-1"></i>MASTER CONTROL
+                    </span>
+                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill py-1 px-2.5 fw-bold smaller">
+                        DHAN &amp; FYERS
+                    </span>
                 {% else %}
-                    <a href="{% url 'admins:trade_exec_config_create' %}" class="btn btn-sm btn-danger rounded-pill px-3 py-15 fw-bold text-white d-flex align-items-center gap-1 shadow-sm">
-                        <span class="material-icons fs-6">add</span>
-                        <span>Create Trade Config</span>
-                    </a>
+                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill py-1 px-2.5 fw-bold smaller">
+                        <i class="bi bi-exclamation-triangle-fill me-1"></i>CONFIG REQUIRED
+                    </span>
                 {% endif %}
             </div>
+            <p class="page-subtitle">Global order execution, algorithmic strategy overrides, and broker gateway control.</p>
+        </div>
+
+        <!-- Global Risk Status & Emergency Kill Switch Trigger -->
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            {% if has_configured_master %}
+                <span class="trend-badge trend-up py-1 px-3 fw-bold">
+                    <span class="pulse-dot active me-1"></span>GATEWAY ACTIVE
+                </span>
+
+                <button class="btn btn-danger rounded-pill px-3.5 py-2 fw-bold d-flex align-items-center gap-1.5 shadow-sm text-white"
+                        hx-get="{% url 'users:user-kill-switch' %}"
+                        hx-target="#globalHtmxModalDialog">
+                    <i class="bi bi-lightning-charge-fill"></i>
+                    <span>Emergency Kill Switch</span>
+                </button>
+            {% else %}
+                <a href="{% url 'admins:trade_exec_config_create' %}" class="btn btn-danger rounded-pill px-4 py-2 fw-bold text-white d-flex align-items-center gap-1.5 shadow-sm">
+                    <i class="bi bi-plus-circle-fill"></i>
+                    <span>Create Trade Config</span>
+                </a>
+            {% endif %}
         </div>
     </div>
+    <!-- END: Spark Page Header -->
+
+    <div class="row g-4">
 
     <!-- ═══════════════════════════════════════════════════════════════════
          TOP HERO CHART SECTION: TRADINGVIEW LIGHTWEIGHT CANVAS ENGINE
@@ -304,6 +293,7 @@
 
         </div>
     </div>
+</div>
 </div>
 
 <!-- Load Lightweight Charts Open Source Library -->

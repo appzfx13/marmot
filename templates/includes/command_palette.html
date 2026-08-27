@@ -1,0 +1,96 @@
+<!-- templates/includes/command_palette.html -->
+<div id="ag-cmd-palette" class="ag-cmd-backdrop" onclick="if(event.target === this) toggleCommandPalette(false)" aria-modal="true" role="dialog">
+  <div class="ag-cmd-box">
+    <!-- Search Bar Header -->
+    <div class="ag-cmd-input-wrapper">
+      <span class="material-icons" style="font-size: 20px; color: var(--primary);">search</span>
+      <input 
+        id="ag-cmd-input"
+        type="text" 
+        class="ag-cmd-input" 
+        placeholder="Type a command, search backtests, strategies, or navigate..."
+        oninput="filterCommandPalette(this)"
+        autocomplete="off"
+        spellcheck="false"
+      />
+      <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono); background: var(--bg-elevated); padding: 2px 6px; border-radius: 4px; border: 1px solid var(--border-default);">ESC</span>
+    </div>
+
+    <!-- Scrollable Results Pane -->
+    <div class="ag-cmd-results" id="ag-cmd-results">
+      <!-- Quick Navigation Group -->
+      <div class="ag-cmd-group" id="group-navigation">
+        <div class="ag-cmd-group-title">Navigation & Workspaces</div>
+        
+        <a href="/admins/" class="ag-cmd-item" onclick="toggleCommandPalette(false)">
+          <div class="d-flex align-items-center gap-2">
+            <span class="material-icons" style="font-size: 18px; color: var(--primary);">dashboard</span>
+            <span>Admin Central Dashboard</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">/admins/</span>
+        </a>
+
+        <a href="/admins/backtests/" class="ag-cmd-item" onclick="toggleCommandPalette(false)">
+          <div class="d-flex align-items-center gap-2">
+            <span class="material-icons" style="font-size: 18px; color: var(--info);">analytics</span>
+            <span>Backtest Engine & Reports</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">/admins/backtests/</span>
+        </a>
+
+        <a href="/admins/trade-config/" class="ag-cmd-item" onclick="toggleCommandPalette(false)">
+          <div class="d-flex align-items-center gap-2">
+            <span class="material-icons" style="font-size: 18px; color: var(--warning);">tune</span>
+            <span>Trade Execution & Risk Rules</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">/admins/trade-config/</span>
+        </a>
+
+        <a href="/admins/strategies/" class="ag-cmd-item" onclick="toggleCommandPalette(false)">
+          <div class="d-flex align-items-center gap-2">
+            <span class="material-icons" style="font-size: 18px; color: var(--success);">psychology</span>
+            <span>Modular Strategy Registry</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">/admins/strategies/</span>
+        </a>
+
+        <a href="/admins/rl-training/index/" class="ag-cmd-item" onclick="toggleCommandPalette(false)">
+          <div class="d-flex align-items-center gap-2">
+            <span class="material-icons" style="font-size: 18px; color: var(--info);">model_training</span>
+            <span>RL Index Training Cockpit</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">/admins/rl-training/</span>
+        </a>
+      </div>
+
+      <!-- Quick Actions Group -->
+      <div class="ag-cmd-group" id="group-actions" style="margin-top: 8px;">
+        <div class="ag-cmd-group-title">System Actions</div>
+        
+        <div class="ag-cmd-item" onclick="toggleTheme(); toggleCommandPalette(false);">
+          <div class="d-flex align-items-center gap-2">
+            <span class="material-icons" style="font-size: 18px; color: var(--warning);">brightness_medium</span>
+            <span>Toggle Theme (Light / Dark Mode)</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Action</span>
+        </div>
+
+        <a href="/admins/backtests/create/" class="ag-cmd-item" onclick="toggleCommandPalette(false)">
+          <div class="d-flex align-items-center gap-2">
+            <span class="material-icons" style="font-size: 18px; color: var(--primary);">add_circle</span>
+            <span>Dispatch New Backtest Task</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Create</span>
+        </a>
+
+        <a href="/admins/terminal/" class="ag-cmd-item" onclick="toggleCommandPalette(false)">
+          <div class="d-flex align-items-center gap-2">
+            <span class="material-icons" style="font-size: 18px; color: var(--danger);">terminal</span>
+            <span>High-Throughput Live Terminal</span>
+          </div>
+          <span style="font-size: 11px; color: var(--text-muted); font-family: var(--font-mono);">Live</span>
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

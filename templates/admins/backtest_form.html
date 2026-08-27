@@ -37,7 +37,7 @@
     }
 
     /* Standardized Custom Checkbox UI */
-    .glass-form-card input[type="checkbox"] {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *) {
         appearance: none;
         -webkit-appearance: none;
         width: 1.25rem !important;
@@ -58,17 +58,17 @@
         position: relative;
     }
 
-    .glass-form-card input[type="checkbox"]:hover {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *):hover {
         background-color: rgba(255, 255, 255, 0.1) !important;
         border-color: rgba(255, 255, 255, 0.3) !important;
     }
 
-    .glass-form-card input[type="checkbox"]:checked {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *):checked {
         background-color: #0d6efd !important;
         border-color: #0d6efd !important;
     }
 
-    .glass-form-card input[type="checkbox"]:checked::after {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *):checked::after {
         content: "";
         width: 6px;
         height: 10px;
@@ -78,7 +78,7 @@
         margin-bottom: 2px;
     }
 
-    .glass-form-card input[type="checkbox"]:focus {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *):focus {
         outline: none;
         box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.3) !important;
     }
@@ -148,17 +148,27 @@
     }
 
     .market-tab-btn {
-        background: rgba(255, 255, 255, 0.03);
-        border: 1px solid var(--border-color);
-        color: var(--text-muted);
-        transition: all 0.2s ease;
+        background: transparent !important;
+        border: 1px solid transparent !important;
+        border-radius: 8px !important;
+        padding: 0.65rem 1.25rem !important;
+        font-weight: 600 !important;
+        font-size: 0.85rem !important;
+        color: var(--text-muted, #94a3b8) !important;
+        transition: all 0.2s ease-in-out !important;
+    }
+
+    .market-tab-btn:hover {
+        color: #ffffff !important;
+        background-color: rgba(255, 255, 255, 0.04) !important;
     }
 
     .market-tab-btn.active {
-        background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%) !important;
         color: #ffffff !important;
-        border-color: #0d6efd !important;
-        box-shadow: 0 4px 14px rgba(13, 110, 253, 0.35);
+        background-color: rgba(180, 241, 5, 0.12) !important;
+        border: 1px solid rgba(180, 241, 5, 0.4) !important;
+        font-weight: 700 !important;
+        box-shadow: 0 0 14px rgba(180, 241, 5, 0.15) !important;
     }
 </style>
 {% endblock %}
@@ -191,7 +201,7 @@
 <div class="glass-card glass-form-card p-3 p-sm-4">
     {# Market Segment Selector Nav Tabs #}
     <div class="mb-4">
-        <ul class="nav nav-pills nav-justified gap-2 p-1.5 rounded-3 border" style="background: rgba(0, 0, 0, 0.25); border-color: rgba(255, 255, 255, 0.1) !important;" role="tablist">
+        <ul class="nav nav-pills nav-justified gap-2 p-1.5 rounded-3 border w-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;" role="tablist">
             <li class="nav-item" role="presentation">
                 <button class="market-tab-btn nav-link w-100 {% if active_market_type != 'FOREX_FUTURES' %}active{% endif %} rounded-2 fw-bold py-2.5 d-flex align-items-center justify-content-center gap-2" id="index-tab" data-bs-toggle="pill" data-bs-target="#index-form-pane" type="button" role="tab">
                     <span class="fs-5">🇮🇳</span>

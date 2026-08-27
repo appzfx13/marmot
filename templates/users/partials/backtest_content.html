@@ -1,165 +1,184 @@
 <!-- templates/users/partials/backtest_content.html -->
-<div class="user-backtest-viewport">
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+<div class="d-flex flex-column gap-4">
+
+    <!-- START: Spark Page Header -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
         <div>
-            <h2 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
-                <span class="material-icons text-primary fs-3">science</span>
-                <span>Strategy Backtesting</span>
-            </h2>
-            <p class="theme-text-muted small mb-0">Simulate market strategies, risk levels, and automated lot sizing rules for your account.</p>
+            <h1 class="page-title">Strategy Backtesting</h1>
+            <p class="page-subtitle">Simulate historical market strategies, risk levels, and automated lot sizing rules for your account.</p>
         </div>
-        <button type="button" 
-                class="btn theme-btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
-                hx-get="{% url 'users:user-backtest-create' %}"
-                hx-target="#globalHtmxModalDialog">
-            <span class="material-icons fs-5">play_arrow</span>
-            <span>Run New Simulation</span>
-        </button>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            <button type="button" 
+                    class="btn btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm text-white"
+                    hx-get="{% url 'users:user-backtest-create' %}"
+                    hx-target="#globalHtmxModalDialog">
+                <i class="bi bi-play-circle-fill"></i>
+                <span>Run New Simulation</span>
+            </button>
+        </div>
     </div>
+    <!-- END: Spark Page Header -->
 
     <!-- Backtest Quick Stats -->
-    <div class="row g-3 mb-4">
+    <div class="row g-4">
         <div class="col-12 col-md-4">
-            <div class="glass-card p-3 rounded-4 border theme-text-main" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <span class="small theme-text-muted text-uppercase fw-bold">My Backtest Tasks</span>
-                <h3 class="fw-bold mb-0 mt-1 theme-text-main">{{ total_backtests|default:0 }}</h3>
+            <div class="card card-stat h-100 mb-0">
+                <span class="stat-label">My Backtest Tasks</span>
+                <div class="stat-value text-primary">{{ total_backtests|default:0 }}</div>
+                <div class="trend-badge trend-up">
+                    <i class="bi bi-cpu-fill"></i>
+                    <span>Simulations run</span>
+                </div>
             </div>
         </div>
         <div class="col-12 col-md-4">
-            <div class="glass-card p-3 rounded-4 border theme-text-main" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <span class="small theme-text-muted text-uppercase fw-bold">Max Drawdown</span>
-                <h3 class="fw-bold mb-0 mt-1 text-warning">0.00%</h3>
+            <div class="card card-stat h-100 mb-0">
+                <span class="stat-label">Max Drawdown</span>
+                <div class="stat-value text-warning">0.00%</div>
+                <div class="trend-badge trend-up">
+                    <i class="bi bi-shield-check"></i>
+                    <span>Historical safety</span>
+                </div>
             </div>
         </div>
         <div class="col-12 col-md-4">
-            <div class="glass-card p-3 rounded-4 border theme-text-main" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-                <span class="small theme-text-muted text-uppercase fw-bold">Profit Factor</span>
-                <h3 class="fw-bold mb-0 mt-1 text-success">0.00</h3>
+            <div class="card card-stat h-100 mb-0">
+                <span class="stat-label">Profit Factor</span>
+                <div class="stat-value text-success">0.00</div>
+                <div class="trend-badge trend-up">
+                    <i class="bi bi-graph-up-arrow"></i>
+                    <span>Gross win / loss ratio</span>
+                </div>
             </div>
         </div>
     </div>
 
     <!-- Backtests Table Container -->
-    <div class="glass-card p-4 rounded-4 border shadow-sm" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-        <div class="d-flex justify-content-between align-items-center mb-3">
-            <h5 class="fw-bold theme-text-main mb-0">My Simulation Runs</h5>
+    <div class="card mb-0">
+        <div class="card-header d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <h2 class="card-title mb-0">My Simulation Runs</h2>
+                <span class="card-subtitle theme-text-muted small">Historical backtest records and execution telemetry</span>
+            </div>
         </div>
 
-        {% if backtests %}
-            <div class="table-responsive flex-grow-1 overflow-auto d-none d-md-block">
-                <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
-                    <thead>
-                        <tr class="theme-text-muted text-uppercase smaller border-bottom" style="border-color: var(--border-color) !important;">
-                            <th style="width: 36px;"></th>
-                            <th>ID</th>
-                            <th>Strategy</th>
-                            <th>Index</th>
-                            <th>Date Range</th>
-                            <th>Status</th>
-                            <th>Capital</th>
-                            <th class="text-end">Actions</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for task in backtests %}
-                            <tr class="border-bottom" style="border-color: var(--border-color) !important;">
-                                <td class="ps-2 py-2 text-center" style="width: 36px;">
-                                    <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center border-0"
-                                            style="width: 26px; height: 26px;"
-                                            type="button"
-                                            data-bs-toggle="collapse"
-                                            data-bs-target="#user-bt-exp-{{ task.id }}"
-                                            aria-expanded="false"
-                                            title="Expand Details">
-                                        <span class="material-icons fs-6 text-primary">keyboard_arrow_down</span>
-                                    </button>
-                                </td>
-                                <td class="fw-bold">#{{ task.id }}</td>
-                                <td><span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 px-2 py-1">{{ task.strategy_name }}</span></td>
-                                <td><span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 px-2 py-1">{{ task.index_name }}</span></td>
-                                <td class="small">{{ task.start_date|date:"M d, Y" }} — {{ task.end_date|date:"M d, Y" }}</td>
-                                <td>
-                                    {% if task.status == 'COMPLETED' or task.status == 'SUCCESS' or task.status == 'completed' %}
-                                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Completed</span>
-                                    {% elif task.status == 'FAILED' or task.status == 'error' %}
-                                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1">Failed</span>
-                                    {% else %}
-                                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Processing</span>
-                                    {% endif %}
-                                </td>
-                                <td class="small fw-semibold">₹{{ task.initial_capital }}</td>
-                                <td class="text-end">
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1"
-                                            hx-get="{% url 'users:user-backtest-detail' task.id %}"
-                                            hx-target="#globalHtmxModalDialog">
-                                        <span class="material-icons fs-6">visibility</span>
-                                        <span>View Results</span>
-                                    </button>
-                                </td>
+        <div class="card-body p-0">
+            {% if backtests %}
+                <div class="table-responsive flex-grow-1 overflow-auto d-none d-md-block">
+                    <table class="table table-custom align-middle mb-0 text-nowrap">
+                        <thead>
+                            <tr>
+                                <th class="ps-4">ID</th>
+                                <th>Strategy</th>
+                                <th>Index</th>
+                                <th>Date Range</th>
+                                <th>Status</th>
+                                <th>Capital</th>
+                                <th class="text-end">Actions</th>
+                                <th class="text-center pe-3" style="width: 44px;"></th>
                             </tr>
-                            <!-- Collapsible Drawer -->
-                            <tr class="collapse border-0" id="user-bt-exp-{{ task.id }}">
-                                <td colspan="8" class="p-0 border-0">
-                                    <div class="p-3 mx-2 my-1 rounded-3 small" style="background: var(--nav-hover); border: 1px solid var(--border-color);">
-                                        <div class="d-flex justify-content-between flex-wrap gap-2">
-                                            <div><span class="theme-text-muted">Algorithm Engine:</span> <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0">RL PPO Model</span></div>
-                                            <div><span class="theme-text-muted">Dynamic Lots:</span> <span class="text-success fw-bold">Date-Aware</span></div>
-                                            <div><span class="theme-text-muted">Capital Base:</span> <span class="theme-text-main fw-semibold">₹{{ task.initial_capital }}</span></div>
-                                            <div><span class="theme-text-muted">Execution Logs:</span> <span class="text-info font-monospace">Parquet Date-Partitioned</span></div>
+                        </thead>
+                        <tbody>
+                            {% for task in backtests %}
+                                <tr>
+                                    <td class="fw-bold ps-4">#{{ task.id }}</td>
+                                    <td><span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-1">{{ task.strategy_name }}</span></td>
+                                    <td><span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-1">{{ task.index_name }}</span></td>
+                                    <td class="small">{{ task.start_date|date:"M d, Y" }} — {{ task.end_date|date:"M d, Y" }}</td>
+                                    <td>
+                                        {% if task.status == 'COMPLETED' or task.status == 'SUCCESS' or task.status == 'completed' %}
+                                            <span class="trend-badge trend-up py-0.5 px-2.5">Completed</span>
+                                        {% elif task.status == 'FAILED' or task.status == 'error' %}
+                                            <span class="trend-badge trend-down py-0.5 px-2.5">Failed</span>
+                                        {% else %}
+                                            <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2.5 py-1">Processing</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="small fw-semibold font-monospace">₹{{ task.initial_capital }}</td>
+                                    <td class="text-end">
+                                        <button type="button" 
+                                                class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1.5"
+                                                hx-get="{% url 'users:user-backtest-detail' task.id %}"
+                                                hx-target="#globalHtmxModalDialog">
+                                            <i class="bi bi-eye"></i>
+                                            <span>View Results</span>
+                                        </button>
+                                    </td>
+                                    <td class="text-center pe-3 py-2" style="width: 44px;">
+                                        <button class="btn btn-sm btn-outline-secondary rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
+                                                style="width: 28px; height: 28px; min-width: 28px; border-radius: 50% !important; border: 1px solid var(--border-color) !important;"
+                                                type="button"
+                                                data-bs-toggle="collapse"
+                                                data-bs-target="#user-bt-exp-{{ task.id }}"
+                                                aria-expanded="false"
+                                                title="Expand Details">
+                                            <i class="bi bi-chevron-down text-primary" style="font-size: 0.8rem;"></i>
+                                        </button>
+                                    </td>
+                                </tr>
+                                <!-- Collapsible Drawer -->
+                                <tr class="collapse border-0" id="user-bt-exp-{{ task.id }}">
+                                    <td colspan="8" class="p-0 border-0">
+                                        <div class="p-3 mx-3 my-2 rounded-3 small" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
+                                            <div class="d-flex justify-content-between flex-wrap gap-2">
+                                                <div><span class="theme-text-muted">Algorithm Engine:</span> <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5">RL PPO Model</span></div>
+                                                <div><span class="theme-text-muted">Dynamic Lots:</span> <span class="text-success fw-bold">Date-Aware</span></div>
+                                                <div><span class="theme-text-muted">Capital Base:</span> <span class="theme-text-main fw-semibold">₹{{ task.initial_capital }}</span></div>
+                                                <div><span class="theme-text-muted">Execution Logs:</span> <span class="text-info font-monospace">Parquet Date-Partitioned</span></div>
+                                            </div>
                                         </div>
-                                    </div>
-                                </td>
-                            </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
+                                    </td>
+                                </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
 
-            <!-- Mobile View -->
-            <div class="d-block d-md-none">
-                {% for task in backtests %}
-                <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-                    <div class="d-flex justify-content-between align-items-center mb-2">
-                        <div>
-                            <div class="fw-bold theme-text-main">#{{ task.id }} — {{ task.strategy_name }}</div>
-                            <small class="theme-text-muted">{{ task.index_name }} | {{ task.start_date|date:"M d" }} → {{ task.end_date|date:"M d, Y" }}</small>
-                        </div>
-                        <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
-                                style="width: 32px; height: 32px;"
-                                type="button"
-                                data-bs-toggle="collapse"
-                                data-bs-target="#user-bt-mb-{{ task.id }}"
-                                aria-expanded="false">
-                            <span class="material-icons fs-5 text-primary">keyboard_arrow_down</span>
-                        </button>
-                    </div>
-                    <div class="collapse pt-2 border-top border-secondary border-opacity-25 small" id="user-bt-mb-{{ task.id }}">
-                        <div class="d-flex justify-content-between mb-1">
-                            <span class="theme-text-muted">Status:</span>
-                            <span class="badge {% if task.status == 'COMPLETED' or task.status == 'completed' %}bg-success{% else %}bg-primary{% endif %} bg-opacity-25 text-white-50 rounded-pill px-2 py-0">{{ task.status }}</span>
-                        </div>
-                        <div class="d-flex justify-content-between mb-2">
-                            <span class="theme-text-muted">Initial Capital:</span>
-                            <span class="theme-text-main fw-semibold">₹{{ task.initial_capital }}</span>
-                        </div>
-                        <div class="d-flex justify-content-end pt-1">
-                            <button type="button" 
-                                    class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1"
-                                    hx-get="{% url 'users:user-backtest-detail' task.id %}"
-                                    hx-target="#globalHtmxModalDialog">
-                                <span class="material-icons fs-6">visibility</span> View Results
+                <!-- Mobile View -->
+                <div class="d-block d-md-none p-3">
+                    {% for task in backtests %}
+                    <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--card-background);">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <div>
+                                <div class="fw-bold theme-text-main">#{{ task.id }} — {{ task.strategy_name }}</div>
+                                <small class="theme-text-muted">{{ task.index_name }} | {{ task.start_date|date:"M d" }} → {{ task.end_date|date:"M d, Y" }}</small>
+                            </div>
+                            <button class="btn btn-sm btn-outline-secondary rounded-circle p-0 d-flex align-items-center justify-content-center flex-shrink-0"
+                                    style="width: 32px; height: 32px; min-width: 32px; border-radius: 50% !important; border: 1px solid var(--border-color) !important;"
+                                    type="button"
+                                    data-bs-toggle="collapse"
+                                    data-bs-target="#user-bt-mb-{{ task.id }}"
+                                    aria-expanded="false">
+                                <i class="bi bi-chevron-down text-primary"></i>
                             </button>
                         </div>
+                        <div class="collapse pt-2 border-top border-secondary border-opacity-25 small" id="user-bt-mb-{{ task.id }}">
+                            <div class="d-flex justify-content-between mb-1">
+                                <span class="theme-text-muted">Status:</span>
+                                <span class="badge {% if task.status == 'COMPLETED' or task.status == 'completed' %}bg-success{% else %}bg-primary{% endif %} bg-opacity-25 rounded-pill px-2 py-0.5">{{ task.status }}</span>
+                            </div>
+                            <div class="d-flex justify-content-between mb-2">
+                                <span class="theme-text-muted">Initial Capital:</span>
+                                <span class="theme-text-main fw-semibold">₹{{ task.initial_capital }}</span>
+                            </div>
+                            <div class="d-flex justify-content-end pt-1">
+                                <button type="button" 
+                                        class="btn btn-sm btn-outline-primary rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1.5"
+                                        hx-get="{% url 'users:user-backtest-detail' task.id %}"
+                                        hx-target="#globalHtmxModalDialog">
+                                    <i class="bi bi-eye"></i> View Results
+                                </button>
+                            </div>
+                        </div>
                     </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
-            </div>
-        {% else %}
-            <div class="text-center py-5 theme-text-muted">
-                <span class="material-icons fs-1 mb-2">science</span>
-                <p class="mb-0">No active backtesting simulations available for your account.</p>
-            </div>
-        {% endif %}
+            {% else %}
+                <div class="text-center py-5 theme-text-muted">
+                    <i class="bi bi-cpu fs-1 mb-2 d-block opacity-50"></i>
+                    <p class="mb-0">No active backtesting simulations available for your account.</p>
+                </div>
+            {% endif %}
+        </div>
     </div>
 </div>

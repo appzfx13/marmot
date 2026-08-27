@@ -1,0 +1,320 @@
+<!-- templates/users/partials/live_dashboard_content.html -->
+<div class="d-flex flex-column gap-4">
+
+    <!-- START: Spark Dashboard Header Banner -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h1 class="page-title">Live Dashboard</h1>
+            <p class="page-subtitle">Realtime live broker telemetry, active portfolio margin, orders, and execution controls.</p>
+        </div>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            {% if request.user.trade_eligibility and not request.user.is_blocked %}
+                <span class="trend-badge trend-up py-1.5 px-3">
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>Trade Eligible</span>
+                </span>
+            {% else %}
+                <span class="trend-badge trend-down py-1.5 px-3">
+                    <i class="bi bi-slash-circle"></i>
+                    <span>Trade Blocked</span>
+                </span>
+            {% endif %}
+
+            {% if request.user.primary_freeze or request.user.final_freeze %}
+                <span class="trend-badge trend-down py-1.5 px-3 bg-warning text-dark">
+                    <i class="bi bi-snow"></i>
+                    <span>Frozen</span>
+                </span>
+            {% endif %}
+
+            <a href="{% url 'users:user-accounts' %}" 
+               class="btn-date-picker text-decoration-none"
+               hx-get="{% url 'users:user-accounts' %}"
+               hx-target="#user-portal-container"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-wallet2"></i>
+                <span>Accounts &amp; Tokens</span>
+                <i class="bi bi-chevron-right ms-1"></i>
+            </a>
+        </div>
+    </div>
+    <!-- END: Dashboard Header Banner -->
+
+    {% if not has_live_account %}
+    <!-- Onboarding Guide for Live Accounts -->
+    <div class="card p-4 text-center border-warning border-opacity-25" 
+         style="background: linear-gradient(135deg, rgba(255, 193, 7, 0.06) 0%, rgba(180, 241, 5, 0.04) 100%);">
+        <div class="rounded-circle bg-warning bg-opacity-25 text-warning d-inline-flex align-items-center justify-content-center mb-3 mx-auto" style="width: 54px; height: 54px;">
+            <i class="bi bi-link-45deg fs-2"></i>
+        </div>
+        <h5 class="fw-bold theme-text-main mb-2">No Active Live Broker Account Linked</h5>
+        <p class="theme-text-muted small mx-auto mb-3" style="max-width: 520px;">
+            To view live market portfolio telemetry, execute automated orders, and synchronize broker funds, please link your <strong>Dhan HQ</strong> or <strong>Fyers</strong> live trading credentials.
+        </p>
+        <div>
+            <a href="{% url 'users:user-accounts' %}" 
+               class="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm d-inline-flex align-items-center gap-2"
+               hx-get="{% url 'users:user-accounts' %}"
+               hx-target="#user-portal-container"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-plus-circle-fill"></i>
+                <span>Connect Live Broker Account</span>
+            </a>
+        </div>
+    </div>
+    {% elif needs_consent or not is_token_active %}
+    <!-- Re-auth / Daily Session Consent Banner -->
+    <div class="card p-3 rounded-4 border-warning border-opacity-50 shadow-none" 
+         style="background: linear-gradient(135deg, rgba(255, 193, 7, 0.08) 0%, rgba(180, 241, 5, 0.05) 100%);">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-warning bg-opacity-25 text-warning d-flex align-items-center justify-content-center flex-shrink-0" style="width: 46px; height: 46px;">
+                    <span class="material-icons fs-4">key</span>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-0.5">
+                        <h6 class="fw-bold theme-text-main mb-0">Live Broker Session Inactive or Daily Consent Required</h6>
+                        <span class="badge bg-warning text-dark fw-bold smaller px-2">Action Required</span>
+                    </div>
+                    <p class="theme-text-muted small mb-0">
+                        {{ broker_name }} &bull; Client ID: <strong class="theme-text-main">{{ live_account.broker_client_id }}</strong>. Authorize your live session or provide a fresh Access Token to synchronize real-time portfolio telemetry and order execution.
+                    </p>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                <button type="button" 
+                        class="btn rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+                        style="background: var(--brand-lime, #b4f105); color: #000000; border: none;"
+                        hx-get="{% url 'users:user-account-consent-modal' live_account.id %}"
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        data-bs-toggle="modal"
+                        data-bs-target="#globalHtmxModal">
+                    <span class="material-icons fs-5">verified_user</span>
+                    <span>Authorize {{ broker_name }} Session</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- START: Top Area Metric Cards -->
+    <div class="row g-4">
+        <!-- Stat Card 1: Live Status Banner -->
+        <div class="col-xl-4 col-md-6">
+            <div class="card alert-green-card h-100 d-flex flex-column justify-content-between">
+                <div class="position-relative z-index-2">
+                    {% if is_token_active %}
+                        <span class="alert-green-badge">Live API Online</span>
+                    {% else %}
+                        <span class="badge bg-warning text-dark fw-bold px-2 py-1 mb-2">Auth Required</span>
+                    {% endif %}
+                    <div class="alert-green-date">{{ broker_name }} {% if live_account.broker_client_id %}&bull; ID: {{ live_account.broker_client_id }}{% endif %}</div>
+                    <div class="alert-green-text">
+                        {% if is_token_active %}
+                            Realtime WebSocket Telemetry &amp; Order Router Online &bull; {{ open_positions_count }} Open Positions
+                        {% else %}
+                            Standby mode &bull; Re-authenticate token for live market execution
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="d-flex align-items-center justify-content-between z-index-2">
+                    <a href="{% url 'users:user-accounts' %}" 
+                       class="alert-green-link"
+                       hx-get="{% url 'users:user-accounts' %}"
+                       hx-target="#user-portal-container"
+                       hx-swap="innerHTML"
+                       hx-push-url="true">
+                        <span>Broker Settings</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                    {% if live_account %}
+                    <button type="button" 
+                            class="btn btn-sm btn-link text-white text-opacity-75 p-0 text-decoration-none smaller"
+                            hx-get="{% url 'users:user-account-consent-modal' live_account.id %}"
+                            hx-target="#globalHtmxModalDialog"
+                            hx-swap="innerHTML"
+                            data-bs-toggle="modal"
+                            data-bs-target="#globalHtmxModal">
+                        <i class="bi bi-key me-1"></i>Session Token
+                    </button>
+                    {% endif %}
+                </div>
+
+                <!-- Inline SVG geometric decoration -->
+                <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(50,50)">
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" />
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(60)" />
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(120)" />
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Stat Card 2: Live Net P&L -->
+        <div class="col-xl-4 col-md-6">
+            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
+                        <span class="stat-label">Live Net P&amp;L</span>
+                        {% if is_token_active %}
+                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-1 small fw-bold">Live Synced</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-1 small fw-bold">Offline</span>
+                        {% endif %}
+                    </div>
+                    <div class="stat-value {% if live_net_pnl > 0 %}text-success{% elif live_net_pnl < 0 %}text-danger{% endif %}">
+                        ₹{{ live_net_pnl|floatformat:2 }}
+                    </div>
+                    <div class="trend-badge {% if live_net_pnl >= 0 %}trend-up{% else %}trend-down{% endif %}">
+                        <i class="bi {% if live_net_pnl >= 0 %}bi-arrow-up-right{% else %}bi-arrow-down-left{% endif %}"></i>
+                        <span>{% if is_token_active %}{{ open_positions_count }} Positions Intraday{% else %}Session Disconnected{% endif %}</span>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
+                    <span>Intraday Performance</span>
+                    <span class="fw-semibold text-main">{{ todays_orders_count }} Orders Placed Today</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stat Card 3: Available Margin -->
+        <div class="col-xl-4 col-md-12">
+            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+                <div>
+                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
+                        <span class="stat-label">Available Margin</span>
+                        <div class="dropdown">
+                            <button class="card-more-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="bi bi-three-dots"></i>
+                            </button>
+                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-custom">
+                                <li>
+                                    <a class="dropdown-item" href="{% url 'users:user-live-dashboard' %}" hx-get="{% url 'users:user-live-dashboard' %}" hx-target="#user-portal-container" hx-swap="innerHTML">
+                                        <i class="bi bi-arrow-repeat"></i> Refresh Funds
+                                    </a>
+                                </li>
+                                {% if live_account %}
+                                <li>
+                                    <a class="dropdown-item" href="javascript:void(0);" 
+                                       hx-get="{% url 'users:user-account-consent-modal' live_account.id %}"
+                                       hx-target="#globalHtmxModalDialog"
+                                       hx-swap="innerHTML"
+                                       data-bs-toggle="modal"
+                                       data-bs-target="#globalHtmxModal">
+                                        <i class="bi bi-key"></i> Update Session Token
+                                    </a>
+                                </li>
+                                {% endif %}
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="stat-value">
+                        ₹{{ available_margin }}
+                    </div>
+                    <div class="trend-badge {% if is_token_active %}trend-up{% else %}trend-down{% endif %}">
+                        <i class="bi bi-wallet2"></i>
+                        <span>{% if is_token_active %}Live Broker Balance Synced{% else %}Awaiting Session Authorization{% endif %}</span>
+                    </div>
+                </div>
+                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
+                    <span>Cash: ₹{{ cash_balance }}</span>
+                    <span class="fw-semibold text-main">{{ live_strategy_configs.count }} Rules Active</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- END: Top Area Metric Cards -->
+
+    <!-- START: Active Live Strategy Controls Section -->
+    <div class="row g-4">
+        <div class="col-12">
+            <div class="card mb-0">
+                <div class="card-header d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2">
+                    <div>
+                        <h2 class="card-title mb-0">Live Strategy Execution Controls</h2>
+                        <span class="card-subtitle theme-text-muted small">Configured automated index and options execution rules</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1.5 small fw-bold">
+                            {{ live_strategy_configs.count }} ACTIVE RULES
+                        </span>
+                    </div>
+                </div>
+
+                <div class="card-body p-0">
+                    {% if live_strategy_configs %}
+                    <div class="table-responsive">
+                        <table class="table table-custom align-middle mb-0">
+                            <thead>
+                                <tr>
+                                    <th>Config Title</th>
+                                    <th>Market</th>
+                                    <th>Target Account</th>
+                                    <th>Max Loss Limit</th>
+                                    <th>Max Profit Limit</th>
+                                    <th class="text-end pe-4">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for cfg in live_strategy_configs %}
+                                <tr>
+                                    <td>
+                                        <div class="fw-bold theme-text-main">{{ cfg.name }}</div>
+                                        <div class="theme-text-muted smaller">ID: #{{ cfg.id }}</div>
+                                    </td>
+                                    <td>
+                                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-1 small">
+                                            {{ cfg.get_market_type_display|default:cfg.market_type }}
+                                        </span>
+                                    </td>
+                                    <td>
+                                        <div class="small theme-text-main fw-semibold">{{ cfg.trading_account.account_name|default:"Primary Live" }}</div>
+                                        <div class="smaller text-success">{{ cfg.trading_account.broker.name|default:"DHAN" }}</div>
+                                    </td>
+                                    <td>
+                                        {% if cfg.max_loss_status %}
+                                            <span class="badge bg-danger bg-opacity-25 text-danger font-monospace">₹{{ cfg.max_loss_limit|default:"0.00" }}</span>
+                                        {% else %}
+                                            <span class="theme-text-muted small">Disabled</span>
+                                        {% endif %}
+                                    </td>
+                                    <td>
+                                        {% if cfg.max_profit_status %}
+                                            <span class="badge bg-success bg-opacity-25 text-success font-monospace">₹{{ cfg.max_profit_limit|default:"0.00" }}</span>
+                                        {% else %}
+                                            <span class="theme-text-muted small">Disabled</span>
+                                        {% endif %}
+                                    </td>
+                                    <td class="text-end pe-4">
+                                        {% if cfg.is_active %}
+                                            <span class="trend-badge trend-up py-1 px-2.5 fs-xs d-inline-flex align-items-center gap-1">
+                                                <i class="bi bi-lightning-charge-fill"></i> Active
+                                            </span>
+                                        {% else %}
+                                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-1 small">
+                                                Standby
+                                            </span>
+                                        {% endif %}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <div class="text-center py-5 theme-text-muted">
+                        <i class="bi bi-sliders fs-1 opacity-50 mb-2 d-block"></i>
+                        <p class="mb-0">No active Live Execution Configurations found.<br>Configurations with <code>account_type='LIVE'</code> will appear here automatically.</p>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- END: Active Live Strategy Controls Section -->
+
+</div>

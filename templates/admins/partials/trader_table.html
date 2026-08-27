@@ -1,29 +1,29 @@
-<!-- Main Glass Card Container -->
-<div class="glass-card overflow-hidden d-flex flex-column min-vh-75" style="min-height: 700px;">
+<!-- Main Spark Card Container -->
+<div class="card overflow-hidden d-flex flex-column mb-0" style="min-height: 550px;">
     
     <!-- Bulk Action Toolbar -->
     <div class="bulk-action-bar px-4 py-2 border-bottom d-none align-items-center justify-content-between" style="background: rgba(220, 53, 69, 0.12); border-color: rgba(220, 53, 69, 0.25) !important;">
         <div class="d-flex align-items-center gap-2">
-            <span class="material-icons text-danger fs-5">check_circle</span>
+            <i class="bi bi-check-circle-fill text-danger"></i>
             <span class="fw-bold theme-text-main small"><span class="bulk-selected-count">0</span> traders marked</span>
         </div>
         <button type="button" 
                 class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
                 onclick="triggerBulkDelete(this, '{% url 'admins:trader_bulk_delete' %}')">
-            <span class="material-icons fs-6">delete</span>
+            <i class="bi bi-trash"></i>
             <span>Bulk Delete</span>
         </button>
     </div>
 
     <!-- DESKTOP / TABLET VIEW -->
     <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
-        <table class="table table-hover align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; --bs-table-hover-bg: var(--nav-hover); color: var(--text-main);">
+        <table class="table table-custom align-middle mb-0 text-nowrap">
             <thead>
-                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important;">
+                <tr>
                     <th scope="col" class="ps-4 py-3" style="width: 40px;">
                         <input class="form-check-input bulk-select-all" type="checkbox" title="Select All">
                     </th>
-                    <th scope="col" class="py-3 theme-text-muted">
+                    <th scope="col" class="py-3">
                         <a href="javascript:void(0);" 
                            class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
                            hx-get="{% url 'admins:trader_list' %}?sort={% if current_sort == 'username' %}-username{% else %}username{% endif %}&{{ current_filters }}"
@@ -31,15 +31,13 @@
                            hx-push-url="true"
                            title="Sort by Name">
                             Trader
-                            <span class="material-icons fs-6">
-                                {% if current_sort == 'username' %}arrow_upward{% elif current_sort == '-username' %}arrow_downward{% else %}swap_vert{% endif %}
-                            </span>
+                            <i class="bi {% if current_sort == 'username' %}bi-arrow-up{% elif current_sort == '-username' %}bi-arrow-down{% else %}bi-arrow-down-up{% endif %} ms-1"></i>
                         </a>
                     </th>
-                    <th scope="col" class="py-3 theme-text-muted">Contact</th>
-                    <th scope="col" class="py-3 theme-text-muted">Broker</th>
-                    <th scope="col" class="py-3 theme-text-muted">Trade Eligibility</th>
-                    <th scope="col" class="text-end pe-4 py-3 theme-text-muted">Actions</th>
+                    <th scope="col" class="py-3">Contact</th>
+                    <th scope="col" class="py-3">Broker</th>
+                    <th scope="col" class="py-3">Trade Eligibility</th>
+                    <th scope="col" class="text-end pe-4 py-3">Actions</th>
                 </tr>
             </thead>
             <tbody id="trader-table-body">
@@ -62,10 +60,8 @@
     </div>
 
     <!-- LOAD MORE FOOTER -->
-    <div class="border-top pt-2 pb-2 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-        <div class="d-flex justify-content-between align-items-center small theme-text-muted">
-            <span>Showing {{ paginator.count|default:traders|length }} traders (extendable via Load More)</span>
-            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-1" style="font-size: 0.68rem;">Continuous Table Active</span>
-        </div>
+    <div class="card-footer py-2 px-3 px-md-4 mt-auto border-top d-flex justify-content-between align-items-center small theme-text-muted">
+        <span>Showing {{ paginator.count|default:traders|length }} traders</span>
+        <span class="trend-badge trend-up py-0.5 px-2 font-monospace fs-xs">Continuous Table Active</span>
     </div>
 </div>

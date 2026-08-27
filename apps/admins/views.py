@@ -28,15 +28,21 @@ from django.views.generic import (
 from django.conf import settings
 from django_filters.views import FilterView
 
+import logging
+
 from apps.common.choices import AccountTypeChoices
 from apps.common.constants import Messages
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 from apps.trade_config.models import BrokerMaster, TradeExecConfig, UserTradingAccount
+from apps.trade_core.brokers import BrokerFactory
 from apps.users.mixins import HTMXPartialMixin
 from apps.users.models import BrokerChoices, MemberRoleChoices, PLStatusChoices, User
+from apps.users.services import get_user_profile
 from .filters import TradeExecConfigFilter
 from .forms import AdminTraderPasswordResetForm, BrokerMasterForm, TradeExecConfigForm, UserForm
 from .permissions import AdminRequiredMixin
+
+logger = logging.getLogger(__name__)
 
 
 # ==========================================
@@ -95,6 +101,105 @@ class AdminDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
         return context
 
 
+class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Standalone Admin Live Trading Dashboard with live broker API telemetry."""
+    template_name = 'admins/live_dashboard.html'
+    partial_template_name = 'admins/partials/live_dashboard_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        live_accounts = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name')
+        live_account = live_accounts.filter(is_default=True).first() or live_accounts.first()
+
+        context['active_tab'] = 'live-dashboard'
+        context['live_account'] = live_account
+        context['live_accounts'] = list(live_accounts)
+        context['has_live_account'] = bool(live_account)
+        context['marmot_profile'] = get_user_profile(user.username)
+
+        context['live_strategy_configs'] = TradeExecConfig.objects.filter(
+            admins_user=user,
+            account_type='LIVE',
+            is_deleted=False
+        ).select_related('trading_account')
+
+        is_token_active = False
+        needs_consent = False
+        broker_name = 'Dhan HQ'
+        available_margin = "0.00"
+        cash_balance = "0.00"
+        live_net_pnl = 0.00
+        open_positions_count = 0
+        todays_orders_count = 0
+
+        if live_account:
+            broker_name = live_account.broker.name if live_account.broker else 'DHAN'
+            try:
+                adapter = BrokerFactory.get_adapter(live_account)
+                if hasattr(adapter, 'get_live_dashboard_summary'):
+                    summary = adapter.get_live_dashboard_summary()
+                    is_token_active = summary.get('is_token_active', False)
+                    needs_consent = summary.get('needs_consent', False)
+                    available_margin = summary.get('available_margin', '0.00')
+                    cash_balance = summary.get('cash', '0.00')
+                    live_net_pnl = summary.get('live_net_pnl', 0.00)
+                    open_positions_count = summary.get('open_positions_count', 0)
+                    todays_orders_count = summary.get('todays_orders_count', 0)
+                    context['live_positions'] = summary.get('positions', [])
+                    context['live_orders'] = summary.get('orders', [])
+                else:
+                    auth_res = adapter.test_connection()
+                    is_token_active = auth_res.get('success', False)
+                    needs_consent = not is_token_active
+            except Exception as e:
+                logger.warning("Admin live dashboard telemetry error: %s", e)
+                is_token_active = False
+                needs_consent = True
+
+        context['broker_name'] = broker_name
+        context['is_token_active'] = is_token_active
+        context['needs_consent'] = needs_consent
+        context['available_margin'] = available_margin
+        context['cash_balance'] = cash_balance
+        context['live_net_pnl'] = live_net_pnl
+        context['open_positions_count'] = open_positions_count
+        context['todays_orders_count'] = todays_orders_count
+        return context
+
+
+class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Standalone Admin Sandbox Paper-Trading Dashboard running on local simulated ledger."""
+    template_name = 'admins/sandbox_dashboard.html'
+    partial_template_name = 'admins/partials/sandbox_dashboard_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        sandbox_accounts = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name')
+        sandbox_account = sandbox_accounts.filter(is_default=True).first() or sandbox_accounts.first()
+
+        context['active_tab'] = 'sandbox-dashboard'
+        context['sandbox_account'] = sandbox_account
+        context['sandbox_accounts'] = list(sandbox_accounts)
+        context['marmot_profile'] = get_user_profile(user.username)
+
+        context['sandbox_strategy_configs'] = TradeExecConfig.objects.filter(
+            admins_user=user,
+            account_type='SANDBOX',
+            is_deleted=False
+        ).select_related('trading_account')
+
+        context['virtual_capital'] = "10,00,000.00"
+        context['virtual_available_margin'] = "9,85,450.00"
+        context['simulated_pnl'] = "+14,550.00"
+        context['simulated_win_rate'] = "72.5%"
+        context['simulated_trades_count'] = 18
+        return context
+
+
 class AdminTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
     """Protected Admin View for absolute trading terminal supporting Dhan & Fyers."""
     template_name = 'admins/terminal.html'
@@ -120,6 +225,9 @@ class AdminLogoutView(View):
     """
     Logs out the admin user with HTMX client-side redirect support.
     """
+    def get(self, request, *args, **kwargs):
+        return self.post(request, *args, **kwargs)
+
     def post(self, request, *args, **kwargs):
         auth_logout(request)
         messages.info(request, Messages.LOGOUT_SUCCESS)
@@ -137,12 +245,20 @@ class AdminLogoutView(View):
 # TRADER MANAGEMENT VIEWS
 # ==========================================
 
-class AdminTraderListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
+class AdminTraderListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
     model = User
     template_name = 'admins/trader_list.html'
-    partial_template_name = 'admins/partials/trader_table.html'
+    partial_template_name = 'admins/partials/trader_list_content.html'
+    table_template_name = 'admins/partials/trader_table.html'
     context_object_name = 'traders'
     paginate_by = settings.PAGINATION_COUNT
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Target') == 'traderTableContainer':
+            return [self.table_template_name]
+        if self.request.headers.get('HX-Request'):
+            return [self.partial_template_name]
+        return [self.template_name]
 
     def get_queryset(self):
         queryset = super().get_queryset().filter(role=MemberRoleChoices.TRADERS, is_deleted=False)
@@ -344,14 +460,21 @@ class AdminTraderPasswordResetView(HtmxModalMixin, LoginRequiredMixin, AdminRequ
 # ==========================================
 # TRADE EXECUTION CONFIGURATION VIEWS
 # ==========================================
-# Update the view definition
-class AdminTradeExecConfigListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, FilterView):
+class AdminTradeExecConfigListView(LoginRequiredMixin, AdminRequiredMixin, FilterView):
     model = TradeExecConfig
     filterset_class = TradeExecConfigFilter
     template_name = 'admins/trade_exec_config_list.html'
-    partial_template_name = 'admins/partials/trade_exec_config_table_partial.html'
+    partial_template_name = 'admins/partials/trade_exec_config_list_content.html'
+    table_template_name = 'admins/partials/trade_exec_config_table_partial.html'
     context_object_name = 'configs'
     paginate_by = settings.PAGINATION_COUNT
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Target') == 'configTableContainer':
+            return [self.table_template_name]
+        if self.request.headers.get('HX-Request'):
+            return [self.partial_template_name]
+        return [self.template_name]
 
     def get_queryset(self):
         return super().get_queryset().select_related('admins_user')
@@ -393,6 +516,18 @@ class AdminTradeExecConfigDetailView(LoginRequiredMixin, AdminRequiredMixin, Det
     model = TradeExecConfig
     template_name = 'admins/trade_exec_config_detail.html'
     context_object_name = 'config'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        config = self.object
+        target_user = config.admins_user_id
+        trading_account = config.trading_account
+        if not trading_account and target_user:
+            accounts = UserTradingAccount.objects.filter(user_id=target_user, is_active=True).select_related('broker')
+            trading_account = accounts.filter(is_default=True).first() or accounts.first()
+        context['trading_account'] = trading_account
+        context['effective_account_type'] = trading_account.account_type if trading_account else config.account_type
+        return context
 
 
 class AdminTradeExecConfigCreateView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
@@ -469,6 +604,47 @@ class AdminTradeExecConfigUpdateView(HTMXPartialMixin, HtmxMessageMixin, LoginRe
         return super().form_valid(form)
 
 
+class AdminTradeExecConfigToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Live HTMX toggle endpoint for TradeExecConfig boolean fields from detail and list views."""
+
+    ALLOWED_FIELDS = {
+        'max_loss_status': 'Max Loss Limit rule',
+        'max_profit_status': 'Max Profit Limit rule',
+        'auto_lot_status': 'Auto Lot Sizing',
+        'auto_sl_status': 'Auto Stop Loss',
+        'layer_status': 'Order Layering',
+        'forecast_status': 'Predictive Forecasting',
+        'backtest_status': 'Backtest Mode',
+        'is_active': 'Master Active status',
+    }
+
+    def post(self, request, pk, *args, **kwargs):
+        config = get_object_or_404(TradeExecConfig, pk=pk, is_deleted=False)
+        field_name = request.GET.get('field') or request.POST.get('field')
+
+        if field_name not in self.ALLOWED_FIELDS:
+            response = HttpResponse(status=400)
+            response['HX-Trigger'] = json.dumps({
+                'showToast': {'message': 'Invalid toggle field requested.', 'level': 'error'}
+            })
+            return response
+
+        current_val = getattr(config, field_name)
+        new_val = not current_val
+        setattr(config, field_name, new_val)
+        config.save(update_fields=[field_name, 'updated_at'])
+
+        field_display = self.ALLOWED_FIELDS[field_name]
+        status_str = "enabled" if new_val else "disabled"
+
+        response = HttpResponse(status=204)
+        response['HX-Trigger'] = json.dumps({
+            'showToast': {'message': f"{field_display} {status_str}.", 'level': 'success' if new_val else 'info'},
+            'reloadConfigDetail': True
+        })
+        return response
+
+
 class AdminTradeExecUserAccountInfoView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Fetches user's default trading account and renders dynamic execution mode badge."""
 
@@ -524,12 +700,20 @@ class AdminTradeExecConfigDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequ
 from apps.common.models import PostbackLog
 from apps.admins.permissions import DeveloperOrAdminRequiredMixin
 
-class PostbackLogListView(HTMXPartialMixin, LoginRequiredMixin, DeveloperOrAdminRequiredMixin, ListView):
+class PostbackLogListView(LoginRequiredMixin, DeveloperOrAdminRequiredMixin, ListView):
     model = PostbackLog
     template_name = 'admins/postback_list.html'
-    partial_template_name = 'admins/partials/postback_list_content.html'
+    partial_template_name = 'admins/partials/postback_page_content.html'
+    table_template_name = 'admins/partials/postback_list_content.html'
     context_object_name = 'postbacks'
     paginate_by = 10
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Target') == 'postback-list-container':
+            return [self.table_template_name]
+        if self.request.headers.get('HX-Request'):
+            return [self.partial_template_name]
+        return [self.template_name]
 
     def get_queryset(self):
         queryset = PostbackLog.objects.filter(is_deleted=False).select_related('user')

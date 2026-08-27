@@ -122,5 +122,14 @@ class TradeExecConfig(BaseModel):
         if self.max_profit_status and (self.max_profit_limit is None or self.max_profit_limit < 0):
             raise ValidationError({'max_profit_limit': 'Max Profit Limit value is required when Max Profit rule is enabled.'})
 
+    def save(self, *args, **kwargs):
+        super().save(*args, **kwargs)
+        if self.is_active and not self.is_deleted:
+            TradeExecConfig.objects.filter(
+                admins_user=self.admins_user,
+                is_active=True,
+                is_deleted=False
+            ).exclude(pk=self.pk).update(is_active=False)
+
     def __str__(self):
         return f"{self.name} - Exec Config: {self.admins_user.username} (Active: {self.is_active})"

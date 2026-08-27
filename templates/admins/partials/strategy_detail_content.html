@@ -1,58 +1,58 @@
 {% load static %}
 
-<!-- Breadcrumb & Header Title -->
-<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+<!-- START: Spark Page Header -->
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
     <div>
         <div class="d-flex align-items-center gap-2 mb-1">
             <a href="{% url 'backtest:strategy_list' %}" class="theme-text-muted text-decoration-none small d-flex align-items-center gap-1">
-                <span class="material-icons fs-6">arrow_back</span> Back to Strategy Hub
+                <i class="bi bi-arrow-left"></i> <span>Back to Strategy Hub</span>
             </a>
         </div>
-        <h4 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
-            <span class="material-icons text-primary fs-3">code</span>
-            {{ strategy.name }}
-        </h4>
+        <h1 class="page-title mb-1">{{ strategy.name }}</h1>
         <div class="d-flex align-items-center gap-2 mt-1">
-            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold" style="font-size: 0.72rem;">
+            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 fw-bold smaller">
                 {{ strategy.category }}
             </span>
-            <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-3 py-1 smaller">
+            <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 smaller">
                 {{ strategy.target_index }}
             </span>
-            <span class="badge bg-dark bg-opacity-50 text-light border border-secondary border-opacity-25 rounded-pill px-3 py-1 font-monospace smaller">
+            <span class="badge bg-dark bg-opacity-50 text-light border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 font-monospace smaller">
                 {{ strategy.go_file_path }}
             </span>
         </div>
     </div>
 
-    <div class="d-flex align-items-center gap-2">
-        <a href="{% url 'backtest:backtest_create' %}?strategy={{ strategy.code_name }}" class="btn btn-primary rounded-pill px-4 py-2 d-flex align-items-center gap-2 shadow-sm">
-            <span class="material-icons fs-5">play_arrow</span>
+    <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+        <a href="{% url 'backtest:backtest_create' %}?strategy={{ strategy.code_name }}" class="btn btn-primary rounded-pill px-4 py-2 fw-semibold text-white d-inline-flex align-items-center gap-2 shadow-sm">
+            <i class="bi bi-play-circle-fill"></i>
             <span>Run Simulation</span>
         </a>
         {% if can_delete %}
         <button type="button" 
-                class="btn btn-outline-danger rounded-circle p-0 d-flex align-items-center justify-content-center" 
+                class="btn btn-outline-danger rounded-circle p-0 d-inline-flex align-items-center justify-content-center" 
                 style="width: 40px; height: 40px;"
                 hx-get="{% url 'backtest:strategy_delete' strategy.pk %}" 
                 hx-target="#global-modal-content" 
                 title="Delete Strategy">
-            <span class="material-icons fs-5">delete</span>
+            <i class="bi bi-trash"></i>
         </button>
         {% endif %}
     </div>
 </div>
+<!-- END: Spark Page Header -->
 
 <!-- Navigation Tabs -->
-<ul class="nav nav-tabs custom-glass-tabs mb-4 border-bottom border-secondary border-opacity-25" role="tablist">
+<ul class="nav nav-pills nav-fill gap-2 p-1.5 mb-4 rounded-3 border w-100" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important;" role="tablist">
     <li class="nav-item" role="presentation">
-        <button class="nav-link active fw-bold d-flex align-items-center gap-2 py-3 px-4" id="code-tab" data-bs-toggle="tab" data-bs-target="#code-editor-pane" type="button" role="tab">
-            <span class="material-icons fs-5">code</span> Go Code & Parameters Web UI Editor
+        <button class="nav-link active fw-bold py-2.5 px-4" id="code-tab" data-bs-toggle="tab" data-bs-target="#code-editor-pane" type="button" role="tab">
+            <span class="material-icons fs-5">code</span>
+            <span>Go Code & Parameters Web UI Editor</span>
         </button>
     </li>
     <li class="nav-item" role="presentation">
-        <button class="nav-link fw-bold d-flex align-items-center gap-2 py-3 px-4" id="manual-tab" data-bs-toggle="tab" data-bs-target="#user-manual-pane" type="button" role="tab">
-            <span class="material-icons fs-5">menu_book</span> Strategy User Manual & Rules
+        <button class="nav-link fw-bold py-2.5 px-4" id="manual-tab" data-bs-toggle="tab" data-bs-target="#user-manual-pane" type="button" role="tab">
+            <span class="material-icons fs-5">menu_book</span>
+            <span>Strategy User Manual & Rules</span>
         </button>
     </li>
 </ul>

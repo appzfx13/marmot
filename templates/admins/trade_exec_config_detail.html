@@ -1,130 +1,695 @@
 {% extends "admins/index.html" %}
 
-{% block title %}Config Details: {{ object.admins_user.username }} - Bug Tracker{% endblock %}
+{% block title %}Config Details: {{ object.name }} - Bug Tracker{% endblock %}
 
 {% block dashboard_content %}
-<div class="row mb-4">
-    <div class="col-12 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+<style>
+    /* Theme Glass Form Input Overrides for Readonly Detail Presentation */
+    .readonly-field-box {
+        background-color: var(--input-bg, rgba(255, 255, 255, 0.04)) !important;
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)) !important;
+        color: var(--text-main, #ffffff) !important;
+        border-radius: 8px !important;
+        padding: 8px 12px !important;
+        font-size: 0.875rem !important;
+        min-height: 40px !important;
+        width: 100% !important;
+        display: flex;
+        align-items: center;
+        user-select: text;
+    }
+
+    :root[data-theme="light"] .readonly-field-box {
+        background-color: #f8fafc !important;
+        border: 1px solid #e2e8f0 !important;
+        color: #0f172a !important;
+    }
+
+    /* ─── Premium Glassmorphic Switch Toggle UI (SVG Knob Track) ─────────── */
+    .form-check.form-switch {
+        padding-left: 0 !important;
+        margin-bottom: 0 !important;
+    }
+
+    .form-check.form-switch .form-check-input,
+    input[type="checkbox"][role="switch"] {
+        appearance: none !important;
+        -webkit-appearance: none !important;
+        -moz-appearance: none !important;
+        width: 3.2rem !important;
+        height: 1.65rem !important;
+        min-width: 3.2rem !important;
+        min-height: 1.65rem !important;
+        background-color: rgba(255, 255, 255, 0.15) !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e") !important;
+        background-position: left 2px center !important;
+        background-repeat: no-repeat !important;
+        background-size: 1.35rem 1.35rem !important;
+        border: 1.5px solid rgba(255, 255, 255, 0.25) !important;
+        border-radius: 2rem !important;
+        cursor: pointer !important;
+        transition: background-position 0.2s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease !important;
+        display: inline-block !important;
+        vertical-align: middle !important;
+        float: none !important;
+        margin: 0 !important;
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.4);
+    }
+
+    .form-check.form-switch .form-check-input:checked,
+    input[type="checkbox"][role="switch"]:checked {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+        background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e") !important;
+        background-position: right 2px center !important;
+        box-shadow: 0 0 14px rgba(13, 110, 253, 0.5), inset 0 1px 2px rgba(0, 0, 0, 0.2) !important;
+    }
+
+    .form-check.form-switch .form-check-input:disabled,
+    input[type="checkbox"][role="switch"]:disabled {
+        cursor: default !important;
+        pointer-events: none !important;
+    }
+
+    .form-check.form-switch .form-check-input:checked:disabled,
+    input[type="checkbox"][role="switch"]:checked:disabled {
+        background-color: #0d6efd !important;
+        border-color: #0d6efd !important;
+        opacity: 0.85 !important;
+        box-shadow: 0 0 8px rgba(13, 110, 253, 0.35) !important;
+    }
+
+    .form-check.form-switch .form-check-input:not(:checked):disabled,
+    input[type="checkbox"][role="switch"]:not(:checked):disabled {
+        background-color: rgba(255, 255, 255, 0.1) !important;
+        border-color: rgba(255, 255, 255, 0.18) !important;
+        opacity: 0.5 !important;
+    }
+
+    :root[data-theme="light"] .form-check.form-switch .form-check-input:not(:checked):disabled {
+        background-color: rgba(0, 0, 0, 0.1) !important;
+        border-color: rgba(0, 0, 0, 0.18) !important;
+    }
+
+    /* ─── Standardized Toggle Box & Card Units ───────────────────────────── */
+    .config-card-unit {
+        padding: 1.25rem;
+        border-radius: 12px;
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+        background: rgba(255, 255, 255, 0.02);
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+    }
+
+    .config-card-unit:hover {
+        border-color: rgba(122, 90, 248, 0.25);
+    }
+
+    .toggle-header-strip {
+        padding: 0.6rem 0.9rem;
+        border-radius: 9px;
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+        background: rgba(255, 255, 255, 0.03);
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        min-height: 48px;
+        margin-bottom: 0.9rem;
+        user-select: none;
+    }
+
+    .toggle-dep-container {
+        transition: opacity 0.25s cubic-bezier(0.16, 1, 0.3, 1), filter 0.25s ease;
+    }
+
+    .toggle-dep-container.is-dimmed {
+        opacity: 0.42;
+        pointer-events: none;
+    }
+
+    /* Market Type Tabs (Read-only styled) */
+    .market-tab-card {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 14px 20px;
+        border-radius: 12px;
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
+        background: rgba(255,255,255,0.02);
+        color: var(--text-muted);
+        font-size: 0.875rem;
+        flex: 1;
+        transition: all 0.25s ease;
+    }
+
+    .market-tab-card.active-index {
+        background: rgba(13,110,253,0.12) !important;
+        border-color: rgba(13,110,253,0.4) !important;
+        color: #60a5fa !important;
+        box-shadow: 0 4px 12px rgba(13,110,253,0.15);
+    }
+
+    .market-tab-card.active-forex {
+        background: rgba(16,185,129,0.12) !important;
+        border-color: rgba(16,185,129,0.4) !important;
+        color: #34d399 !important;
+        box-shadow: 0 4px 12px rgba(16,185,129,0.15);
+    }
+
+    .market-tab-card.inactive-segment {
+        opacity: 0.45;
+    }
+
+    :root[data-theme="light"] .market-tab-card.active-index {
+        background: rgba(13,110,253,0.12) !important;
+        border-color: rgba(13,110,253,0.4) !important;
+        color: #0d6efd !important;
+    }
+
+    :root[data-theme="light"] .market-tab-card.active-forex {
+        background: rgba(16,185,129,0.12) !important;
+        border-color: rgba(5,150,105,0.4) !important;
+        color: #059669 !important;
+    }
+</style>
+
+<div class="row">
+    <!-- Header with top spacing -->
+    <div class="col-12 pt-2 pt-md-3 mb-4 d-flex align-items-center justify-content-between flex-wrap gap-3">
         <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width: 54px; height: 54px; border: 1px solid rgba(13, 110, 253, 0.3);">
-                <span class="material-icons fs-3">tune</span>
-            </div>
-            <div>
-                <h2 class="theme-text-main fw-bold mb-0">Trade Execution Configuration</h2>
-                <div class="theme-text-muted small">Viewing configuration details for <strong>{{ object.admins_user.username }}</strong></div>
-            </div>
-        </div>
-        <div class="d-flex align-items-center gap-2">
-            <a href="{% url 'admins:trade_exec_config_edit' object.pk %}" class="btn btn-sm btn-primary rounded-pill px-3 py-2 small fw-bold d-flex align-items-center gap-1">
-                <span class="material-icons fs-6">edit</span> EDIT
-            </a>
-            <a href="{% url 'admins:trade_exec_config_list' %}" class="glass-icon-btn text-decoration-none" title="Back to List">
+            <a href="{% url 'admins:trade_exec_config_list' %}" 
+               class="glass-icon-btn text-decoration-none" 
+               title="Back to Configurations List"
+               hx-get="{% url 'admins:trade_exec_config_list' %}"
+               hx-target="#app-main-container"
+               hx-push-url="true">
                 <span class="material-icons fs-5">arrow_back</span>
             </a>
+            <div>
+                <h3 class="fw-bold mb-0 theme-text-main d-flex align-items-center gap-2">
+                    <span class="material-icons text-primary fs-3">tune</span>
+                    <span>Trade Execution Configuration</span>
+                </h3>
+                <p class="theme-text-muted mb-0 small">Viewing configuration details for <strong>{{ object.admins_user.username }}</strong></p>
+            </div>
         </div>
-    </div>
-</div>
-
-<div class="glass-card p-4 mb-4">
-    {# Status Header #}
-    <div class="d-flex align-items-center justify-content-between border-bottom pb-3 mb-4" style="border-color: var(--border-color) !important;">
         <div class="d-flex align-items-center gap-2">
-            <span class="material-icons text-primary fs-5">person</span>
-            <h5 class="fw-bold mb-0 theme-text-main">{{ object.admins_user.get_full_name|default:object.admins_user.username }}</h5>
-            <span class="text-muted small">(@{{ object.admins_user.username }})</span>
-        </div>
-        <div>
-            {% if object.is_active %}
-                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 px-3 py-2">Master Active</span>
-            {% else %}
-                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 px-3 py-2">Disabled</span>
-            {% endif %}
+            <a href="{% url 'admins:trade_exec_config_edit' object.pk %}" 
+               class="btn btn-sm btn-primary rounded-pill px-3 py-2 small fw-bold d-flex align-items-center gap-1 shadow-sm"
+               hx-get="{% url 'admins:trade_exec_config_edit' object.pk %}"
+               hx-target="#app-main-container"
+               hx-push-url="true">
+                <span class="material-icons fs-6">edit</span>
+                <span>Edit Configuration</span>
+            </a>
+            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
+                ID: #{{ object.pk }}
+            </span>
         </div>
     </div>
 
-    {# Config Parameters Grid #}
-    <div class="row g-4">
-        <!-- Risk Limits -->
-        <div class="col-12 col-md-6">
-            <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
-                <h6 class="text-uppercase text-primary small fw-bold mb-3 d-flex align-items-center gap-2">
-                    <span class="material-icons fs-6">shield</span> Risk Controls
-                </h6>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="theme-text-muted small">Max Loss Limit:</span>
-                    <span class="fw-bold text-danger">${{ object.max_loss_limit }}</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span class="theme-text-muted small">Max Profit Limit:</span>
-                    <span class="fw-bold text-success">${{ object.max_profit_limit }}</span>
+    <!-- Main Glass Detail Container -->
+    <div class="col-12"
+         id="trade-config-detail-container"
+         hx-get="{{ request.get_full_path }}"
+         hx-trigger="reloadConfigDetail from:body"
+         hx-target="this">
+        <div class="glass-card glass-form-card p-3 p-sm-4">
+            
+            <!-- SECTION 0: MARKET TYPE SELECTOR (Read-Only) -->
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                <span class="material-icons text-warning fs-5">public</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Market Segment Selection</h6>
+                <span class="ms-auto badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 small">Active Segment</span>
+            </div>
+
+            <div class="mb-4">
+                <div class="d-flex flex-column flex-sm-row gap-3">
+                    <!-- Index / F&O Card -->
+                    <div class="market-tab-card flex-grow-1 {% if object.market_type == 'INDEX_FO' %}active-index{% else %}inactive-segment{% endif %}">
+                        <div class="d-flex align-items-center justify-content-between w-100">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="material-icons fs-3 text-primary">candlestick_chart</span>
+                                <div>
+                                    <div class="fw-bold theme-text-main">INDEX / F&amp;O (India)</div>
+                                    <div class="small theme-text-muted">Nifty 50 · BankNifty · FinNifty · Stock Options</div>
+                                </div>
+                            </div>
+                            {% if object.market_type == 'INDEX_FO' %}
+                                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small">Selected</span>
+                            {% endif %}
+                        </div>
+                    </div>
+
+                    <!-- Forex / Futures Card -->
+                    <div class="market-tab-card flex-grow-1 {% if object.market_type == 'FOREX_FUTURES' %}active-forex{% else %}inactive-segment{% endif %}">
+                        <div class="d-flex align-items-center justify-content-between w-100">
+                            <div class="d-flex align-items-center gap-3">
+                                <span class="material-icons fs-3 text-success">currency_exchange</span>
+                                <div>
+                                    <div class="fw-bold theme-text-main">FOREX / CME Micro Futures</div>
+                                    <div class="small theme-text-muted">MGC Gold · M6E Euro · MNQ Nasdaq · MES S&amp;P</div>
+                                </div>
+                            </div>
+                            {% if object.market_type == 'FOREX_FUTURES' %}
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small">Selected</span>
+                            {% endif %}
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Lot & Stop Loss Sizing -->
-        <div class="col-12 col-md-6">
-            <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
-                <h6 class="text-uppercase text-primary small fw-bold mb-3 d-flex align-items-center gap-2">
-                    <span class="material-icons fs-6">calculate</span> Lot & Stop Loss Rules
-                </h6>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="theme-text-muted small">Auto Lot Sizing:</span>
-                    <span class="fw-bold">{{ object.auto_lot_status|yesno:"Enabled,Disabled" }}</span>
+            <!-- SECTION 1: GENERAL SETTINGS (Read-Only) -->
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                <span class="material-icons text-primary fs-5">settings</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">General Settings</h6>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <!-- Row 1: Name & Target User -->
+                <div class="col-12 col-lg-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Configuration Name</label>
+                    <div class="readonly-field-box fw-semibold">
+                        <span class="material-icons text-primary fs-5 me-2">tune</span>
+                        <span>{{ object.name }}</span>
+                    </div>
                 </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="theme-text-muted small">Default Lot Size:</span>
-                    <span class="fw-bold">{{ object.default_lot_size }}</span>
+                <div class="col-12 col-lg-6">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Target User</label>
+                    <div class="readonly-field-box">
+                        <span class="material-icons text-primary fs-5 me-2">person</span>
+                        <span class="fw-semibold">{{ object.admins_user.get_full_name|default:object.admins_user.username }}</span>
+                        <span class="theme-text-muted ms-2 small">(@{{ object.admins_user.username }})</span>
+                    </div>
                 </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="theme-text-muted small">Auto Stop Loss:</span>
-                    <span class="fw-bold">{{ object.auto_sl_status|yesno:"Enabled,Disabled" }}</span>
+
+                <!-- Row 2: Execution Mode & Master Active Switch -->
+                <div class="col-12 col-lg-8">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">Execution Mode</label>
+                        <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 rounded-pill px-2 py-0-5 small d-inline-flex align-items-center gap-1" style="font-size: 0.7rem;">
+                            <span class="material-icons" style="font-size: 11px;">lock</span>
+                            <span>Auto-Locked</span>
+                        </span>
+                    </div>
+                    <div class="p-2 px-3 rounded-3 border d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; min-height: 40px;">
+                        {% if trading_account %}
+                            {% if effective_account_type == 'LIVE' %}
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="material-icons text-success fs-5">verified</span>
+                                    <span class="fw-bold text-success small">LIVE ACCOUNT</span>
+                                </div>
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 px-2 py-1 small">
+                                    {{ trading_account.broker.name }}
+                                </span>
+                            {% else %}
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="material-icons text-warning fs-5">science</span>
+                                    <span class="fw-bold text-warning small">SANDBOX ACCOUNT</span>
+                                </div>
+                                <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 px-2 py-1 small">
+                                    {{ trading_account.broker.name }}
+                                </span>
+                            {% endif %}
+                        {% else %}
+                            <div class="d-flex align-items-center gap-2">
+                                <span class="material-icons theme-text-muted fs-5">science</span>
+                                <span class="fw-bold theme-text-muted small">SANDBOX ACCOUNT</span>
+                            </div>
+                            <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 px-2 py-1 small">
+                                Default Simulated
+                            </span>
+                        {% endif %}
+                    </div>
+                    {% if trading_account %}
+                        <div class="theme-text-muted small mt-1" style="font-size:0.75rem;">
+                            Linked: <span class="theme-text-main fw-semibold">{{ trading_account.account_name }}</span> {% if trading_account.broker_client_id %}({{ trading_account.broker_client_id }}){% endif %}
+                        </div>
+                    {% else %}
+                        <div class="theme-text-muted small mt-1" style="font-size:0.75rem;">
+                            No active broker account configured. Defaulting to sandbox mode.
+                        </div>
+                    {% endif %}
                 </div>
-                <div class="d-flex justify-content-between">
-                    <span class="theme-text-muted small">Risk Value / Type:</span>
-                    <span class="fw-bold">{{ object.default_risk_value }} ({{ object.default_risk_type }})</span>
+                <div class="col-12 col-lg-4">
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">Master Status</label>
+                        <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 rounded-pill px-2 py-0-5 small" style="font-size: 0.7rem;">Read-Only</span>
+                    </div>
+                    <div class="form-check form-switch p-2 px-3 rounded-3 border d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; min-height: 40px;">
+                        <label class="form-check-label theme-text-main small fw-bold mb-0" for="detail_is_active">
+                            {% if object.is_active %}Active Execution{% else %}Disabled{% endif %}
+                        </label>
+                        <input class="form-check-input"
+                               type="checkbox"
+                               role="switch"
+                               id="detail_is_active"
+                               {% if object.is_active %}checked{% endif %}
+                               disabled>
+                    </div>
+                    <div class="theme-text-muted small mt-1" style="font-size:0.75rem;">
+                        Master status for automated strategy order triggers.
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Layering & Strategy Features -->
-        <div class="col-12 col-md-6">
-            <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
-                <h6 class="text-uppercase text-primary small fw-bold mb-3 d-flex align-items-center gap-2">
-                    <span class="material-icons fs-6">layers</span> Layering & Pyramiding
-                </h6>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="theme-text-muted small">Order Layering:</span>
-                    <span class="fw-bold">{{ object.layer_status|yesno:"Enabled,Disabled" }}</span>
+            <!-- SECTION 2: RISK CONTROL LIMITS (Single-Line Inline) -->
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+                <span class="material-icons text-primary fs-5">shield</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Risk Control Limits</h6>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <!-- Max Loss Limit Card (Single-Line Inline) -->
+                <div class="col-12 col-lg-6">
+                    <div class="config-card-unit p-3">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                            <!-- Left: Switch and Title -->
+                            <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="detail_max_loss_status"
+                                       {% if object.max_loss_status %}checked{% endif %}
+                                       disabled>
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_max_loss_status">
+                                    <span class="material-icons text-danger fs-5">gpp_maybe</span>
+                                    <span>Enable Max Loss Limit</span>
+                                </label>
+                            </div>
+
+                            <!-- Right: Amount Box -->
+                            <div id="max_loss_dep_body" class="toggle-dep-container {% if not object.max_loss_status %}is-dimmed{% endif %}" style="min-width: 150px; max-width: 200px; flex: 1;">
+                                <div class="readonly-field-box font-monospace fw-bold text-danger justify-content-end">
+                                    {{ object.max_loss_limit|default:"0.00" }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
+                            Maximum allowed session loss limit before auto-freeze triggers.
+                        </div>
+                    </div>
                 </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="theme-text-muted small">Lots Per Layer Step:</span>
-                    <span class="fw-bold">{{ object.layer_add_in_lot_count }}</span>
-                </div>
-                <div class="d-flex justify-content-between">
-                    <span class="theme-text-muted small">Step Distance:</span>
-                    <span class="fw-bold">{{ object.layer_percentage }}%</span>
+
+                <!-- Max Profit Limit Card (Single-Line Inline) -->
+                <div class="col-12 col-lg-6">
+                    <div class="config-card-unit p-3">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                            <!-- Left: Switch and Title -->
+                            <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="detail_max_profit_status"
+                                       {% if object.max_profit_status %}checked{% endif %}
+                                       disabled>
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_max_profit_status">
+                                    <span class="material-icons text-success fs-5">verified</span>
+                                    <span>Enable Max Profit Limit</span>
+                                </label>
+                            </div>
+
+                            <!-- Right: Amount Box -->
+                            <div id="max_profit_dep_body" class="toggle-dep-container {% if not object.max_profit_status %}is-dimmed{% endif %}" style="min-width: 150px; max-width: 200px; flex: 1;">
+                                <div class="readonly-field-box font-monospace fw-bold text-success justify-content-end">
+                                    {{ object.max_profit_limit|default:"0.00" }}
+                                </div>
+                            </div>
+                        </div>
+                        <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
+                            Target session profit limit for automatic trade locking.
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <!-- Toggles & Timestamps -->
-        <div class="col-12 col-md-6">
-            <div class="p-3 rounded-3" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
-                <h6 class="text-uppercase text-primary small fw-bold mb-3 d-flex align-items-center gap-2">
-                    <span class="material-icons fs-6">settings</span> Toggles & Info
-                </h6>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="theme-text-muted small">Predictive Forecasting:</span>
-                    <span class="fw-bold">{{ object.forecast_status|yesno:"Active,Inactive" }}</span>
+            <!-- SECTION 3: INDEX / F&O RULES (Rendered if INDEX_FO) -->
+            {% if object.market_type == 'INDEX_FO' %}
+            <div class="market-section">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons text-primary fs-5">calculate</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Lot &amp; Stop Loss Rules</h6>
+                    <span class="ms-2 badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small">INDEX / F&amp;O</span>
                 </div>
-                <div class="d-flex justify-content-between mb-2">
-                    <span class="theme-text-muted small">Backtest Simulation:</span>
-                    <span class="fw-bold">{{ object.backtest_status|yesno:"Active,Inactive" }}</span>
+
+                <div class="row g-3 mb-4">
+                    <!-- Auto Lot Card -->
+                    <div class="col-12 col-lg-6">
+                        <div class="config-card-unit">
+                            <div class="form-check form-switch toggle-header-strip">
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_auto_lot_status">
+                                    <span class="material-icons text-primary fs-5">widgets</span>
+                                    <span>Auto Lot Size Calculation</span>
+                                </label>
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="detail_auto_lot_status"
+                                       {% if object.auto_lot_status %}checked{% endif %}
+                                       disabled>
+                            </div>
+                            <div class="toggle-dep-container {% if not object.auto_lot_status %}is-dimmed{% endif %}">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Default Lot Size (Lots)</label>
+                                <div class="readonly-field-box font-monospace fw-bold">
+                                    {{ object.default_lot_size }} Lots
+                                </div>
+                                <div class="theme-text-muted small mt-1">Base quantity lot count used for initial order execution.</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Auto Stop Loss Card -->
+                    <div class="col-12 col-lg-6">
+                        <div class="config-card-unit">
+                            <div class="form-check form-switch toggle-header-strip">
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_auto_sl_status">
+                                    <span class="material-icons text-danger fs-5">security</span>
+                                    <span>Auto Attach Stop Loss</span>
+                                </label>
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="detail_auto_sl_status"
+                                       {% if object.auto_sl_status %}checked{% endif %}
+                                       disabled>
+                            </div>
+                            <div class="toggle-dep-container {% if not object.auto_sl_status %}is-dimmed{% endif %}">
+                                <div class="row g-2">
+                                    <div class="col-12 col-sm-6">
+                                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Default Risk Value</label>
+                                        <div class="readonly-field-box font-monospace fw-bold">
+                                            {{ object.default_risk_value }}
+                                        </div>
+                                    </div>
+                                    <div class="col-12 col-sm-6">
+                                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Risk Calculation Mode</label>
+                                        <div class="readonly-field-box fw-semibold">
+                                            {{ object.get_default_risk_type_display|default:object.default_risk_type }}
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="theme-text-muted small mt-1">Automatically attach defensive SL bracket upon trade entry fill.</div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
-                <div class="d-flex justify-content-between">
-                    <span class="theme-text-muted small">Last Updated:</span>
-                    <span class="small text-muted">{{ object.updated_at|date:"Y-m-d H:i" }}</span>
+            </div>
+            {% endif %}
+
+            <!-- SECTION 4: FOREX / CME MICRO FUTURES SETTINGS (Rendered if FOREX_FUTURES) -->
+            {% if object.market_type == 'FOREX_FUTURES' %}
+            <div class="market-section">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons fs-5 text-success">currency_exchange</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Forex / CME Micro Futures Settings</h6>
+                    <span class="ms-2 badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small">FOREX / FUTURES</span>
                 </div>
+
+                <div class="row g-3 mb-4">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase">CME Micro Instrument</label>
+                        <div class="readonly-field-box fw-bold text-success">
+                            {{ object.forex_instrument|default:"Not Set" }}
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Max Contracts Per Trade</label>
+                        <div class="readonly-field-box font-monospace">
+                            {{ object.forex_max_contracts|default:"1" }}
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Contract Size (units)</label>
+                        <div class="readonly-field-box font-monospace">
+                            {{ object.forex_contract_size|default:"-" }}
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Tick Value (USD)</label>
+                        <div class="readonly-field-box font-monospace">
+                            ${{ object.forex_tick_value|default:"-" }}
+                        </div>
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Broker Account ID</label>
+                        <div class="readonly-field-box font-monospace">
+                            {{ object.forex_account_id|default:"Not configured" }}
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase">API Key / Token Status</label>
+                        <div class="readonly-field-box">
+                            {% if object.forex_broker_api_key %}
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 px-2 py-1 small">Configured &amp; Encrypted</span>
+                            {% else %}
+                                <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 px-2 py-1 small">Not Provided</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Quick Reference Table -->
+                <div class="p-3 mb-4 rounded-3 border" style="background: rgba(255, 255, 255, 0.015); border-color: var(--border-color) !important;">
+                    <div class="theme-text-main small fw-bold mb-2 d-flex align-items-center gap-1">
+                        <span class="material-icons fs-6 text-primary me-1">info</span>
+                        <span>CME Micro Futures Quick Reference Guide</span>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="table table-sm table-borderless mb-0 align-middle" style="font-size:0.775rem;">
+                            <thead>
+                                <tr class="border-bottom" style="border-color: var(--border-color) !important;">
+                                    <th class="theme-text-main fw-bold">Instrument</th>
+                                    <th class="theme-text-main fw-bold">Market</th>
+                                    <th class="theme-text-main fw-bold">Size</th>
+                                    <th class="theme-text-main fw-bold">Tick Value</th>
+                                    <th class="theme-text-main fw-bold">Margin Approx.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr><td><strong class="theme-text-main">MGC</strong></td><td>XAUUSD / Gold</td><td>10 oz</td><td>$1.00</td><td>~$800</td></tr>
+                                <tr><td><strong class="theme-text-main">M6E</strong></td><td>EURUSD</td><td>12,500 EUR</td><td>$1.25</td><td>~$220</td></tr>
+                                <tr><td><strong class="theme-text-main">M6J</strong></td><td>USDJPY</td><td>1.25M JPY</td><td>$1.25</td><td>~$200</td></tr>
+                                <tr><td><strong class="theme-text-main">MYM</strong></td><td>US30 / Dow</td><td>$0.50/pt</td><td>$0.50</td><td>~$800</td></tr>
+                                <tr><td><strong class="theme-text-main">MNQ</strong></td><td>NAS100</td><td>$2.00/pt</td><td>$2.00</td><td>~$1,700</td></tr>
+                                <tr><td><strong class="theme-text-main">MES</strong></td><td>SPX500</td><td>$5.00/pt</td><td>$1.25</td><td>~$700</td></tr>
+                                <tr><td><strong class="theme-text-main">MCL</strong></td><td>USOIL / Crude</td><td>100 bbl</td><td>$1.00</td><td>~$500</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+
+            <!-- SECTION 5: LAYERING & ADVANCED FEATURES (3-Column Grid) -->
+            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+                <span class="material-icons text-primary fs-5">layers</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Layering &amp; Advanced Features</h6>
+            </div>
+
+            <div class="row g-3 mb-4">
+                <!-- Layering Card -->
+                <div class="col-12 col-lg-4">
+                    <div class="config-card-unit">
+                        <div class="form-check form-switch toggle-header-strip">
+                            <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_layer_status">
+                                <span class="material-icons text-primary fs-5">stacked_line_chart</span>
+                                <span>Enable Order Layering</span>
+                            </label>
+                            <input class="form-check-input"
+                                   type="checkbox"
+                                   role="switch"
+                                   id="detail_layer_status"
+                                   {% if object.layer_status %}checked{% endif %}
+                                   disabled>
+                        </div>
+                        <div class="toggle-dep-container {% if not object.layer_status %}is-dimmed{% endif %}">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Lots Per Layer Entry</label>
+                            <div class="readonly-field-box font-monospace fw-bold">
+                                {{ object.layer_add_in_lot_count }} Lots
+                            </div>
+                            <div class="theme-text-muted small mt-1">Additional lots added on each pyramiding trigger.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Layer Step Distance Card -->
+                <div class="col-12 col-lg-4">
+                    <div class="config-card-unit">
+                        <div class="toggle-header-strip">
+                            <span class="theme-text-main small fw-bold d-flex align-items-center gap-2">
+                                <span class="material-icons text-info fs-5">straighten</span>
+                                <span>Layer Step Parameters</span>
+                            </span>
+                            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 small">Pyramiding</span>
+                        </div>
+                        <div class="toggle-dep-container {% if not object.layer_status %}is-dimmed{% endif %}">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Layer Step Distance (%)</label>
+                            <div class="readonly-field-box font-monospace fw-bold">
+                                {{ object.layer_percentage }}%
+                            </div>
+                            <div class="theme-text-muted small mt-1">Price movement percentage required to trigger next layer entry.</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- AI & Backtest Modes Card -->
+                <div class="col-12 col-lg-4">
+                    <div class="config-card-unit d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="form-check form-switch toggle-header-strip mb-2">
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_forecast_status">
+                                    <span class="material-icons text-warning fs-5">psychology</span>
+                                    <span>Predictive Forecasting</span>
+                                </label>
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="detail_forecast_status"
+                                       {% if object.forecast_status %}checked{% endif %}
+                                       disabled>
+                            </div>
+                            <div class="form-check form-switch toggle-header-strip mb-0">
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_backtest_status">
+                                    <span class="material-icons text-success fs-5">science</span>
+                                    <span>Backtest Simulation Mode</span>
+                                </label>
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="detail_backtest_status"
+                                       {% if object.backtest_status %}checked{% endif %}
+                                       disabled>
+                            </div>
+                        </div>
+                        <div class="theme-text-muted small mt-2" style="font-size:0.75rem;">
+                            Independent simulation &amp; AI prediction execution toggles.
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Action Buttons -->
+            <div class="d-flex align-items-center justify-content-end gap-3 pt-3 border-top" style="border-color: var(--border-color) !important;">
+                <a href="{% url 'admins:trade_exec_config_list' %}" 
+                   class="btn btn-outline-secondary rounded-pill px-4 py-2 small fw-bold border-secondary border-opacity-25 theme-text-muted text-decoration-none"
+                   hx-get="{% url 'admins:trade_exec_config_list' %}"
+                   hx-target="#app-main-container"
+                   hx-push-url="true">
+                    Back to List
+                </a>
+                <a href="{% url 'admins:trade_exec_config_edit' object.pk %}" 
+                   class="btn btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none"
+                   hx-get="{% url 'admins:trade_exec_config_edit' object.pk %}"
+                   hx-target="#app-main-container"
+                   hx-push-url="true">
+                    <span class="material-icons fs-5">edit</span>
+                    <span>Edit Configuration</span>
+                </a>
             </div>
         </div>
     </div>

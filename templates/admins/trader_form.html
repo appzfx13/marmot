@@ -36,7 +36,7 @@
     }
 
     /* Fixed & Standardized Checkbox UI */
-    .glass-form-card input[type="checkbox"] {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *) {
         appearance: none;
         -webkit-appearance: none;
         width: 1.25rem !important;
@@ -57,17 +57,17 @@
         position: relative;
     }
 
-    .glass-form-card input[type="checkbox"]:hover {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *):hover {
         background-color: rgba(255, 255, 255, 0.1) !important;
         border-color: rgba(255, 255, 255, 0.3) !important;
     }
 
-    .glass-form-card input[type="checkbox"]:checked {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *):checked {
         background-color: #0d6efd !important;
         border-color: #0d6efd !important;
     }
 
-    .glass-form-card input[type="checkbox"]:checked::after {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *):checked::after {
         content: "";
         width: 6px;
         height: 10px;
@@ -77,7 +77,7 @@
         margin-bottom: 2px;
     }
 
-    .glass-form-card input[type="checkbox"]:focus {
+    .glass-form-card input[type="checkbox"]:not([role="switch"]):not(.form-switch *):focus {
         outline: none;
         box-shadow: 0 0 0 0.2rem rgba(13, 110, 253, 0.3) !important;
     }
@@ -329,13 +329,19 @@
 <!-- Glassmorphic Confirmation Modal -->
 <div class="modal fade" id="confirmSaveModal" tabindex="-1" aria-labelledby="confirmSaveModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content glass-modal-content rounded-4 border-0 p-2">
+        <div class="modal-content glass-card p-3 border shadow-lg" style="max-width: 520px; width: 100%; margin: 0 auto; border-radius: 16px; background: var(--glass-bg); border: 1px solid var(--border-color) !important;">
             <div class="modal-header border-0 pb-0">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="material-icons text-primary fs-4">published_with_changes</span>
-                    <h5 class="modal-title theme-text-main fw-bold" id="confirmSaveModalLabel">Confirm Save</h5>
+                <div class="d-flex align-items-center gap-2.5">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
+                         style="width: 40px; height: 40px; background: rgba(180, 241, 5, 0.15); color: var(--brand-lime); border: 1px solid rgba(180, 241, 5, 0.3);">
+                        <span class="material-icons fs-5">published_with_changes</span>
+                    </div>
+                    <div>
+                        <h5 class="modal-title theme-text-main fw-bold mb-0" id="confirmSaveModalLabel">Confirm Save</h5>
+                        <small class="theme-text-muted" style="font-size: 0.78rem;">Trader profile settings will update immediately.</small>
+                    </div>
                 </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div class="modal-body py-3">
                 <p class="theme-text-muted mb-0 small">
@@ -343,11 +349,12 @@
                 </p>
             </div>
             <div class="modal-footer border-0 pt-0 gap-2">
-                <button type="button" class="btn btn-sm btn-outline-light rounded-pill px-4 py-2 small fw-bold" data-bs-dismiss="modal">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4 py-2 small fw-bold" data-bs-dismiss="modal">
                     Cancel
                 </button>
-                <button type="button" class="btn btn-sm btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm" id="confirmSubmitBtn">
-                    Confirm & Save
+                <button type="button" class="btn btn-primary rounded-pill px-4 py-2 small fw-bold shadow-sm d-inline-flex align-items-center gap-1.5" id="confirmSubmitBtn">
+                    <i class="bi bi-check2-circle"></i>
+                    <span>Confirm & Save</span>
                 </button>
             </div>
         </div>

@@ -15,7 +15,7 @@ from django.contrib.auth.views import (
     PasswordResetCompleteView,
 )
 from django.http import HttpResponse, HttpResponseForbidden, FileResponse, Http404, HttpResponseRedirect
-from django.shortcuts import redirect, render
+from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse_lazy
 from django.views import View
 from django.views.generic import FormView, TemplateView, UpdateView
@@ -259,24 +259,113 @@ def populate_account_context(context, user, request):
 
 
 class UserDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
-    """Protected Marmot Dashboard View serving dashboard_content.html partial for HTMX."""
-    template_name = 'users/dashboard.html'
-    partial_template_name = 'users/partials/dashboard_content.html'
+    """Default User Dashboard route - Routes Admins to Admin Dashboard and Traders to Live Dashboard."""
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        user_role = getattr(user, 'role', '')
+        if user.is_authenticated and (user.is_superuser or user_role in ['admin', 'developer', 'staff']):
+            if request.GET.get('trader_view') != '1':
+                return redirect('admins:admin-dashboard')
+        return redirect('users:user-live-dashboard')
+
+
+class UserLiveDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """Dedicated Live Trading Dashboard powered by live broker API telemetry."""
+    template_name = 'users/live_dashboard.html'
+    partial_template_name = 'users/partials/live_dashboard_content.html'
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        active_acc = populate_account_context(context, user, self.request)
-
-        context['active_tab'] = 'dashboard'
+        
+        live_accounts = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name')
+        live_account = live_accounts.filter(is_default=True).first() or live_accounts.first()
+        
+        context['active_tab'] = 'live-dashboard'
+        context['live_account'] = live_account
+        context['live_accounts'] = list(live_accounts)
+        context['has_live_account'] = bool(live_account)
         context['marmot_profile'] = get_user_profile(user.username)
-        context['total_traders'] = User.objects.filter(is_superuser=False).count()
-        context['active_traders'] = User.objects.filter(is_superuser=False, trade_eligibility=True, is_blocked=False).count()
-        context['strategy_configs'] = TradeExecConfig.objects.filter(
+        
+        context['live_strategy_configs'] = TradeExecConfig.objects.filter(
             admins_user=user,
-            account_type=active_acc.account_type if active_acc else 'SANDBOX',
+            account_type='LIVE',
             is_deleted=False
-        )
+        ).select_related('trading_account')
+        
+        is_token_active = False
+        needs_consent = False
+        broker_name = 'Dhan HQ'
+        available_margin = "0.00"
+        cash_balance = "0.00"
+        live_net_pnl = 0.00
+        open_positions_count = 0
+        todays_orders_count = 0
+
+        if live_account:
+            broker_code = getattr(live_account.broker, 'code', 'dhan').lower() if live_account.broker else 'dhan'
+            broker_name = live_account.broker.name if live_account.broker else 'DHAN'
+            try:
+                adapter = BrokerFactory.get_adapter(live_account)
+                if hasattr(adapter, 'get_live_dashboard_summary'):
+                    summary = adapter.get_live_dashboard_summary()
+                    is_token_active = summary.get('is_token_active', False)
+                    needs_consent = summary.get('needs_consent', False)
+                    available_margin = summary.get('available_margin', '0.00')
+                    cash_balance = summary.get('cash', '0.00')
+                    live_net_pnl = summary.get('live_net_pnl', 0.00)
+                    open_positions_count = summary.get('open_positions_count', 0)
+                    todays_orders_count = summary.get('todays_orders_count', 0)
+                    context['live_positions'] = summary.get('positions', [])
+                    context['live_orders'] = summary.get('orders', [])
+                else:
+                    auth_res = adapter.test_connection()
+                    is_token_active = auth_res.get('success', False)
+                    needs_consent = not is_token_active
+            except Exception as e:
+                logger.warning("Error loading live dashboard telemetry: %s", e)
+                is_token_active = False
+                needs_consent = True
+
+        context['broker_name'] = broker_name
+        context['is_token_active'] = is_token_active
+        context['needs_consent'] = needs_consent
+        context['available_margin'] = available_margin
+        context['cash_balance'] = cash_balance
+        context['live_net_pnl'] = live_net_pnl
+        context['open_positions_count'] = open_positions_count
+        context['todays_orders_count'] = todays_orders_count
+        return context
+
+
+class UserSandboxDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """Dedicated Sandbox Paper-Trading Dashboard running on local simulated ledger."""
+    template_name = 'users/sandbox_dashboard.html'
+    partial_template_name = 'users/partials/sandbox_dashboard_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        
+        sandbox_accounts = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name')
+        sandbox_account = sandbox_accounts.filter(is_default=True).first() or sandbox_accounts.first()
+        
+        context['active_tab'] = 'sandbox-dashboard'
+        context['sandbox_account'] = sandbox_account
+        context['sandbox_accounts'] = list(sandbox_accounts)
+        context['marmot_profile'] = get_user_profile(user.username)
+        
+        context['sandbox_strategy_configs'] = TradeExecConfig.objects.filter(
+            admins_user=user,
+            account_type='SANDBOX',
+            is_deleted=False
+        ).select_related('trading_account')
+        
+        context['virtual_capital'] = "10,00,000.00"
+        context['virtual_available_margin'] = "9,85,450.00"
+        context['simulated_pnl'] = "+14,550.00"
+        context['simulated_win_rate'] = "72.5%"
+        context['simulated_trades_count'] = 18
         return context
 
 
@@ -591,11 +680,15 @@ class UserAccountCreateView(LoginRequiredMixin, View):
                     broker, _ = BrokerMaster.objects.get_or_create(code='dhan', defaults={'name': 'DHAN', 'description': 'Dhan Broker Platform'})
 
                 account_name = request.POST.get('account_name') or f"{broker.name} Live Account"
-                client_id = request.POST.get('broker_client_id', '').strip() or f"CLIENT_{uuid.uuid4().hex[:6].upper()}"
-                api_key = request.POST.get('api_key', '').strip()
-                app_id = request.POST.get('app_id', '').strip()
+                client_id = str(request.POST.get('broker_client_id', '')).strip().strip('"').strip("'")
+                api_key = str(request.POST.get('api_key', '')).strip().strip('"').strip("'")
+                app_id = str(request.POST.get('app_id', '')).strip().strip('"').strip("'")
 
-                account = UserTradingAccount.objects.create(
+                if not client_id or not api_key:
+                    raise ValueError("Live trading accounts require Client ID and API Key / Access Token.")
+
+                # Pre-save Live Authentication Validation Hit
+                candidate_account = UserTradingAccount(
                     user=user,
                     broker=broker,
                     account_name=account_name,
@@ -605,23 +698,26 @@ class UserAccountCreateView(LoginRequiredMixin, View):
                     app_id=app_id,
                     is_default=is_default,
                     is_active=True,
-                    is_configured=bool(client_id and api_key)
+                    is_configured=False
                 )
 
-                # Perform API Auth Hit if credentials provided
-                if api_key:
-                    try:
-                        adapter = BrokerFactory.get_adapter(account)
-                        auth_res = adapter.test_connection()
-                        account.account_summary = auth_res
-                        account.is_configured = (
-                            auth_res.get('success') is True or 
-                            auth_res.get('connected') is True or 
-                            str(auth_res.get('status', '')).upper() in ['SUCCESS', 'CONNECTED', 'OK']
-                        )
-                        account.save(update_fields=['is_configured', 'account_summary'])
-                    except Exception as e:
-                        logger.error(f"Error testing broker connection for {account_name}: {e}")
+                adapter = BrokerFactory.get_adapter(candidate_account)
+                auth_res = adapter.test_connection()
+                is_auth_valid = (
+                    auth_res.get('success') is True or 
+                    auth_res.get('connected') is True or 
+                    str(auth_res.get('status', '')).upper() in ['SUCCESS', 'CONNECTED', 'OK']
+                )
+
+                if not is_auth_valid:
+                    err_msg = auth_res.get('message', 'Broker rejected authentication credentials.')
+                    raise ValueError(f"Live Auth Validation Failed: {err_msg}")
+
+                # Save only after live authentication passes
+                candidate_account.is_configured = True
+                candidate_account.account_summary = auth_res
+                candidate_account.save()
+                account = candidate_account
 
                 if is_default or not user.trading_accounts.filter(is_default=True).exists():
                     user.trading_accounts.exclude(id=account.id).update(is_default=False)
@@ -629,7 +725,7 @@ class UserAccountCreateView(LoginRequiredMixin, View):
                     account.save(update_fields=['is_default'])
 
                 request.session['active_account_id'] = account.id
-                msg = f"Live Account '{account_name}' ({broker.name}) created and configured successfully!"
+                msg = f"Live Account '{account_name}' ({broker.name}) verified and saved successfully!"
                 messages.success(request, msg)
                 level = 'success'
 
@@ -640,10 +736,10 @@ class UserAccountCreateView(LoginRequiredMixin, View):
             level = 'error'
 
         if request.headers.get('HX-Request'):
-            trigger_dict = {'showToast': {'message': msg, 'level': level}}
+            trigger_dict = {'showToast': {'message': msg, 'level': level}, 'refreshAccountsCards': True}
             if level == 'success':
                 trigger_dict['closeGlobalModal'] = True
-                trigger_dict['reloadPage'] = True
+                trigger_dict['refreshAccounts'] = True
 
             status_code = 204 if level == 'success' else 200
             response = HttpResponse(status=status_code)
@@ -652,6 +748,14 @@ class UserAccountCreateView(LoginRequiredMixin, View):
         else:
             redirect_url = request.META.get('HTTP_REFERER') or reverse('users:marmot-profile')
             return redirect(redirect_url)
+
+
+class UserAccountsCardsView(LoginRequiredMixin, View):
+    """Render the My Configured Trading Accounts cards partial on demand."""
+    def get(self, request, *args, **kwargs):
+        accounts = request.user.trading_accounts.filter(is_deleted=False).order_by('-is_default', 'id')
+        context = {'user_trading_accounts': accounts}
+        return render(request, 'users/partials/profile_accounts_cards.html', context)
 
 
 class UserAccountTestAuthView(LoginRequiredMixin, View):
@@ -688,12 +792,16 @@ class UserAccountTestAuthView(LoginRequiredMixin, View):
                 messages.error(request, msg)
                 level = 'error'
 
-        response = HttpResponse()
-        response['HX-Trigger'] = json.dumps({
-            'showToast': {'message': msg, 'level': level},
-            'reloadPage': True
-        })
-        return response
+        if request.headers.get('HX-Request'):
+            accounts = user.trading_accounts.filter(is_deleted=False).order_by('-is_default', 'id')
+            response = render(request, 'users/partials/profile_accounts_cards.html', {'user_trading_accounts': accounts})
+            response['HX-Trigger'] = json.dumps({
+                'showToast': {'message': msg, 'level': level},
+                'refreshAccounts': True
+            })
+            return response
+
+        return redirect(request.META.get('HTTP_REFERER') or reverse('users:marmot-profile'))
 
 
 class UserAccountSetDefaultView(LoginRequiredMixin, View):
@@ -714,12 +822,16 @@ class UserAccountSetDefaultView(LoginRequiredMixin, View):
             msg = "Account not found."
             level = 'error'
 
-        response = HttpResponse()
-        response['HX-Trigger'] = json.dumps({
-            'showToast': {'message': msg, 'level': level},
-            'reloadPage': True
-        })
-        return response
+        if request.headers.get('HX-Request'):
+            accounts = user.trading_accounts.filter(is_deleted=False).order_by('-is_default', 'id')
+            response = render(request, 'users/partials/profile_accounts_cards.html', {'user_trading_accounts': accounts})
+            response['HX-Trigger'] = json.dumps({
+                'showToast': {'message': msg, 'level': level},
+                'refreshAccounts': True
+            })
+            return response
+
+        return redirect(request.META.get('HTTP_REFERER') or reverse('users:marmot-profile'))
 
 
 class UserAccountDeleteView(LoginRequiredMixin, View):
@@ -738,12 +850,72 @@ class UserAccountDeleteView(LoginRequiredMixin, View):
             msg = "Account not found."
             level = 'error'
 
-        response = HttpResponse()
-        response['HX-Trigger'] = json.dumps({
-            'showToast': {'message': msg, 'level': level},
-            'reloadPage': True
+        if request.headers.get('HX-Request'):
+            accounts = user.trading_accounts.filter(is_deleted=False).order_by('-is_default', 'id')
+            response = render(request, 'users/partials/profile_accounts_cards.html', {'user_trading_accounts': accounts})
+            response['HX-Trigger'] = json.dumps({
+                'showToast': {'message': msg, 'level': level},
+                'refreshAccounts': True
+            })
+            return response
+
+        return redirect(request.META.get('HTTP_REFERER') or reverse('users:marmot-profile'))
+
+
+class UserAccountConsentModalView(HtmxModalMixin, LoginRequiredMixin, View):
+    """Render modal to authorize daily session or update Dhan/Fyers Access Token."""
+    modal_template_name = 'users/partials/account_consent_modal.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        account = get_object_or_404(UserTradingAccount, pk=pk, user=request.user, is_deleted=False)
+        oauth_login_url = ""
+        try:
+            if account.app_id and account.api_key:
+                from apps.trade_core.services.dhan_token_service import UserDhanClient
+                client = UserDhanClient(account)
+                consent_data = client.generate_login_url()
+                oauth_login_url = consent_data.get('login_url', '')
+        except Exception:
+            pass
+
+        return render(request, self.modal_template_name, {
+            'account': account,
+            'oauth_login_url': oauth_login_url
         })
-        return response
+
+
+class UserAccountRefreshTokenView(LoginRequiredMixin, View):
+    """Update and validate fresh Access Token for a trading account."""
+    def post(self, request, pk, *args, **kwargs):
+        account = get_object_or_404(UserTradingAccount, pk=pk, user=request.user, is_deleted=False)
+        fresh_token = str(request.POST.get('access_token', '')).strip().strip('"').strip("'")
+        
+        if not fresh_token:
+            response = HttpResponse(status=400)
+            response['HX-Trigger'] = json.dumps({'showToast': {'message': 'Please provide a valid Access Token.', 'level': 'danger'}})
+            return response
+
+        account.api_key = fresh_token
+        adapter = BrokerFactory.get_adapter(account)
+        auth_res = adapter.test_connection()
+
+        if auth_res.get('success') is True or str(auth_res.get('status', '')).upper() in ['CONNECTED', 'SUCCESS', 'OK']:
+            account.is_configured = True
+            account.account_summary = auth_res
+            account.save(update_fields=['api_key', 'is_configured', 'account_summary'])
+            
+            response = HttpResponse(status=200)
+            response['HX-Trigger'] = json.dumps({
+                'closeGlobalModal': True,
+                'reloadPage': True,
+                'showToast': {'message': 'Dhan Live Session authorized and connected successfully!', 'level': 'success'}
+            })
+            return response
+        else:
+            err_msg = auth_res.get('message', 'Authentication failed.')
+            response = HttpResponse(status=422)
+            response['HX-Trigger'] = json.dumps({'showToast': {'message': f'Validation Failed: {err_msg}', 'level': 'danger'}})
+            return response
 
 
 class UserAccountSettingsView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):

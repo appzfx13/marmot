@@ -236,12 +236,12 @@ class UserProfileForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email Address'}),
             'phone_number': forms.TextInput(attrs={'class': 'form-control', 'placeholder': 'Phone Number'}),
             'description': forms.Textarea(attrs={'class': 'form-control', 'rows': 3, 'placeholder': 'Profile bio / notes'}),
-            'is_email_verified': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'is_mobile_verified': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'trade_eligibility': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'is_blocked': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'primary_freeze': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
-            'final_freeze': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'is_email_verified': forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
+            'is_mobile_verified': forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
+            'trade_eligibility': forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
+            'is_blocked': forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
+            'primary_freeze': forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
+            'final_freeze': forms.CheckboxInput(attrs={'class': 'form-check-input', 'role': 'switch'}),
         }
 
     def __init__(self, *args, request_user=None, **kwargs):

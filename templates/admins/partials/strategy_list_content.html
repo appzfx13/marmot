@@ -1,311 +1,316 @@
 {% load static %}
 
-<!-- Header Title Bar -->
-<div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
-    <div>
-        <h4 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
-            <span class="material-icons text-primary fs-3">psychology</span>
-            Strategy Library & Execution Hub
-        </h4>
-        <p class="theme-text-muted small mb-0">Explore, edit Go strategy logic, configure parameters, and launch backtest simulations.</p>
-    </div>
-    <div class="d-flex align-items-center gap-2">
-        <a href="{% url 'backtest:rule_list' %}" class="btn btn-outline-primary rounded-pill px-3 py-2 d-flex align-items-center gap-2">
-            <span class="material-icons fs-5">rule</span>
-            <span>Strategy Rules</span>
-        </a>
-        <a href="{% url 'backtest:backtest_create' %}" class="btn btn-primary rounded-pill px-3 py-2 d-flex align-items-center gap-2 shadow-sm">
-            <span class="material-icons fs-5">play_arrow</span>
-            <span>Run Strategy Simulation</span>
-        </a>
-    </div>
-</div>
+<!-- templates/admins/partials/strategy_list_content.html -->
+<div class="d-flex flex-column gap-4">
 
-<!-- Search Controls Bar -->
-<div class="glass-card p-3 mb-4">
-    <form method="GET" action="{% url 'backtest:strategy_list' %}" class="row g-3 align-items-center" hx-get="{% url 'backtest:strategy_list' %}" hx-target="#strategy-list-container" hx-push-url="true">
-        <div class="col-12 col-md-6 col-lg-5">
-            <div class="input-group">
-                <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
-                    <span class="material-icons fs-6">search</span>
-                </span>
-                <input type="text" name="q" value="{{ current_q|default:'' }}"
-                    class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25"
-                    placeholder="Search strategy by name, category, or index..." 
-                    hx-get="{% url 'backtest:strategy_list' %}"
-                    hx-target="#strategy-list-container" 
-                    hx-trigger="input changed delay:300ms, search"
-                    hx-push-url="true">
-            </div>
+    <!-- START: Spark Page Header -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h1 class="page-title">Strategy Library &amp; Execution Hub</h1>
+            <p class="page-subtitle">Explore, edit Go strategy logic, configure parameters, and launch backtest simulations.</p>
         </div>
-    </form>
-</div>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            <a href="{% url 'backtest:rule_list' %}" class="btn btn-outline-secondary rounded-pill px-3 py-1.5 fw-semibold d-flex align-items-center gap-2 shadow-sm">
+                <i class="bi bi-card-checklist"></i>
+                <span>Strategy Rules</span>
+            </a>
+            <a href="{% url 'backtest:backtest_create' %}" class="btn btn-primary rounded-pill px-4 py-2 fw-bold d-flex align-items-center gap-2 shadow-sm text-white">
+                <i class="bi bi-play-circle-fill"></i>
+                <span>Run Simulation</span>
+            </a>
+        </div>
+    </div>
+    <!-- END: Spark Page Header -->
 
-<!-- Strategy Table & Cards Glass Container -->
-<div class="glass-card overflow-hidden d-flex flex-column border" style="background: var(--glass-bg); border-color: var(--border-color) !important; min-height: 600px;">
-    
-    <!-- DESKTOP / TABLET VIEW: TABLE -->
-    <div class="d-none d-md-block flex-grow-1" style="width: 100%;">
-        <table class="table table-hover custom-glass-table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main); width: 100%; table-layout: fixed;">
-            <thead>
-                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important; font-size: 0.72rem;">
-                    <th scope="col" class="ps-3 py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 28%;">Strategy & Category</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 14%;">Target Asset</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 24%;">Default Configuration</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 18%;">Go Engine Path</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 6%;">Latency</th>
-                    <th scope="col" class="text-center py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 10%; min-width: 80px;">Actions</th>
-                </tr>
-            </thead>
-            <tbody>
+    <!-- Search Controls Bar -->
+    <div class="card mb-0">
+        <div class="card-body p-3 p-md-4">
+            <form method="GET" action="{% url 'backtest:strategy_list' %}" class="row g-3 align-items-center" hx-get="{% url 'backtest:strategy_list' %}" hx-target="#strategy-list-container" hx-push-url="true">
+                <div class="col-12 col-md-6 col-lg-5">
+                    <div class="input-group">
+                        <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
+                            <i class="bi bi-search"></i>
+                        </span>
+                        <input type="text" name="q" value="{{ current_q|default:'' }}"
+                            class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25"
+                            placeholder="Search strategy by name, category, or index..." 
+                            hx-get="{% url 'backtest:strategy_list' %}"
+                            hx-target="#strategy-list-container" 
+                            hx-trigger="input changed delay:300ms, search"
+                            hx-push-url="true">
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Strategy Table & Cards Glass Container -->
+    <div class="card mb-0">
+        <div class="card-body p-0">
+            <!-- DESKTOP / TABLET VIEW: TABLE -->
+            <div class="d-none d-md-block flex-grow-1" style="width: 100%;">
+                <table class="table table-custom align-middle mb-0" style="width: 100%; table-layout: fixed;">
+                    <thead>
+                        <tr>
+                            <th scope="col" class="ps-3 py-3" style="width: 28%;">Strategy &amp; Category</th>
+                            <th scope="col" class="py-3" style="width: 14%;">Target Asset</th>
+                            <th scope="col" class="py-3" style="width: 24%;">Default Configuration</th>
+                            <th scope="col" class="py-3" style="width: 18%;">Go Engine Path</th>
+                            <th scope="col" class="py-3 text-center" style="width: 6%;">Latency</th>
+                            <th scope="col" class="text-center py-3" style="width: 10%; min-width: 80px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for strategy in strategies %}
+                        <tr>
+                            <td class="ps-3 py-3">
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                                        <i class="bi bi-cpu fs-5"></i>
+                                    </div>
+                                    <div>
+                                        <div class="fw-bold theme-text-main">
+                                            <a href="{% url 'backtest:strategy_detail' strategy.pk %}" class="text-decoration-none theme-text-main">
+                                                {{ strategy.name }}
+                                            </a>
+                                        </div>
+                                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller fw-bold">
+                                            {{ strategy.category }}
+                                        </span>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <td class="py-3">
+                                <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-1">
+                                    {{ strategy.target_index }}
+                                </span>
+                            </td>
+
+                            <td class="py-3">
+                                <div class="d-flex align-items-center gap-2 small">
+                                    <span class="theme-text-main">Lots: <strong class="text-primary">{{ strategy.default_parameters.lots_count|default:1 }}</strong></span>
+                                    <span class="theme-text-muted">•</span>
+                                    <span class="theme-text-main">Strike: <strong class="text-info">{{ strategy.default_parameters.strike_selection|default:'ATM' }}</strong></span>
+                                    <span class="theme-text-muted">•</span>
+                                    <span class="theme-text-main">R:R: <strong class="text-success">1:{{ strategy.default_parameters.risk_reward_ratio|default:2.0 }}</strong></span>
+                                </div>
+                            </td>
+
+                            <td class="py-3">
+                                <span class="badge bg-dark text-light border border-secondary border-opacity-25 font-monospace smaller px-2 py-1">
+                                    {{ strategy.go_file_path }}
+                                </span>
+                            </td>
+
+                            <td class="py-3 text-center">
+                                <span class="trend-badge trend-up py-0.5 px-2">
+                                    &lt; 10 µs
+                                </span>
+                            </td>
+
+                            <td class="text-center py-2 px-1">
+                                <div class="d-flex align-items-center justify-content-center gap-1">
+                                    <!-- View & Edit Code Button -->
+                                    <a href="{% url 'backtest:strategy_detail' strategy.pk %}" class="btn btn-sm btn-outline-secondary rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="View & Edit Code">
+                                        <i class="bi bi-code-slash"></i>
+                                    </a>
+
+                                    <!-- Run Simulation Button -->
+                                    <a href="{% url 'backtest:backtest_create' %}?strategy={{ strategy.code_name }}" class="btn btn-sm btn-outline-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-primary" style="width: 32px; height: 32px;" title="Run Simulation">
+                                        <i class="bi bi-play-fill"></i>
+                                    </a>
+
+                                    {# Admin Delete Button #}
+                                    {% if can_delete %}
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-danger border-0 rounded-circle p-0 d-inline-flex align-items-center justify-content-center" 
+                                            style="width: 32px; height: 32px;"
+                                            hx-get="{% url 'backtest:strategy_delete' strategy.pk %}" 
+                                            hx-target="#global-modal-content" 
+                                            title="Admin Delete Strategy">
+                                        <i class="bi bi-trash"></i>
+                                    </button>
+                                    {% endif %}
+
+                                    <!-- Dropdown Arrow Icon Button to Expand Details Drawer -->
+                                    <button class="btn btn-sm btn-outline-secondary rounded-circle border-0 p-0 d-inline-flex align-items-center justify-content-center"
+                                            style="width: 32px; height: 32px;"
+                                            type="button"
+                                            data-bs-toggle="collapse"
+                                            data-bs-target="#strategy-row-expand-{{ strategy.id }}"
+                                            aria-expanded="false"
+                                            aria-controls="strategy-row-expand-{{ strategy.id }}"
+                                            title="Expand Strategy Description & Rules">
+                                        <i class="bi bi-chevron-down text-primary"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+
+                        <!-- Expanded Desktop Table Row Drawer -->
+                        <tr class="collapse border-bottom border-secondary border-opacity-25" id="strategy-row-expand-{{ strategy.id }}">
+                            <td colspan="6" class="p-4" style="background: rgba(255,255,255,0.02);">
+                                <div class="row g-3">
+                                    <div class="col-12 col-md-8">
+                                        <h6 class="fw-bold theme-text-main mb-2">Strategy Description &amp; Execution Logic</h6>
+                                        <p class="theme-text-muted small mb-3" style="line-height: 1.6;">
+                                            {{ strategy.description }}
+                                        </p>
+                                    </div>
+                                    <div class="col-12 col-md-4">
+                                        <div class="p-3 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                                            <h6 class="fw-bold theme-text-main small mb-2 text-uppercase">Rules Summary</h6>
+                                            <ul class="list-unstyled theme-text-muted smaller mb-0 d-flex flex-column gap-1">
+                                                <li>• <strong>Target Asset:</strong> {{ strategy.target_index }}</li>
+                                                <li>• <strong>Position Sizing:</strong> {{ strategy.default_parameters.lots_count|default:1 }} Lot(s)</li>
+                                                <li>• <strong>Strike Selection:</strong> {{ strategy.default_parameters.strike_selection|default:'ATM' }}</li>
+                                                <li>• <strong>Risk Target:</strong> 1:{{ strategy.default_parameters.risk_reward_ratio|default:2.0 }} R:R Ratio</li>
+                                            </ul>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                        {% empty %}
+                        <tr class="border-0">
+                            <td colspan="6" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                                <i class="bi bi-cpu fs-1 mb-2 d-block opacity-50"></i>
+                                <p class="mb-0 fw-medium">No strategy modules found matching your search.</p>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- MOBILE VIEW: EXPANDABLE TILE CARDS WITH DROPDOWN ARROW -->
+            <div class="flex-grow-1 overflow-auto p-3 d-block d-md-none">
                 {% for strategy in strategies %}
-                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
-                    <td class="ps-4 py-3 bg-transparent">
+                <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--card-background);">
+                    <div class="d-flex justify-content-between align-items-center gap-2">
                         <div class="d-flex align-items-center gap-3">
                             <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
-                                <span class="material-icons fs-5">psychology</span>
+                                <i class="bi bi-cpu fs-5"></i>
                             </div>
                             <div>
-                                <div class="fw-bold theme-text-main">
+                                <div class="fw-bold theme-text-main fs-6 mb-1">
                                     <a href="{% url 'backtest:strategy_detail' strategy.pk %}" class="text-decoration-none theme-text-main">
                                         {{ strategy.name }}
                                     </a>
                                 </div>
-                                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0 smaller fw-bold">
-                                    {{ strategy.category }}
-                                </span>
-                            </div>
-                        </div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <span class="badge bg-secondary bg-opacity-25 theme-text-main border border-secondary border-opacity-25 rounded-pill px-3 py-1">
-                            {{ strategy.target_index }}
-                        </span>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <div class="d-flex align-items-center gap-2 small">
-                            <span class="theme-text-main">Lots: <strong class="text-primary">{{ strategy.default_parameters.lots_count|default:1 }}</strong></span>
-                            <span class="theme-text-muted">•</span>
-                            <span class="theme-text-main">Strike: <strong class="text-info">{{ strategy.default_parameters.strike_selection|default:'ATM' }}</strong></span>
-                            <span class="theme-text-muted">•</span>
-                            <span class="theme-text-main">R:R: <strong class="text-success">1:{{ strategy.default_parameters.risk_reward_ratio|default:2.0 }}</strong></span>
-                        </div>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <span class="badge bg-dark text-light border border-secondary border-opacity-25 font-monospace smaller px-2 py-1">
-                            {{ strategy.go_file_path }}
-                        </span>
-                    </td>
-
-                    <td class="py-3 bg-transparent">
-                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1 smaller">
-                            &lt; 10 µs
-                        </span>
-                    </td>
-
-                    <td class="text-center py-2 px-1 bg-transparent">
-                        <div class="d-flex align-items-center justify-content-center gap-1">
-                            <!-- View & Edit Code Button -->
-                            <a href="{% url 'backtest:strategy_detail' strategy.pk %}" class="glass-icon-btn rounded-circle" style="width: 36px; height: 36px;" title="View & Edit Code">
-                                <span class="material-icons fs-6">code</span>
-                            </a>
-
-                            <!-- Run Simulation Button -->
-                            <a href="{% url 'backtest:backtest_create' %}?strategy={{ strategy.code_name }}" class="glass-icon-btn text-primary rounded-circle" style="width: 36px; height: 36px;" title="Run Simulation">
-                                <span class="material-icons fs-6">play_arrow</span>
-                            </a>
-
-                            {# Admin Delete Button #}
-                            {% if can_delete %}
-                            <button type="button" 
-                                    class="glass-icon-btn text-danger border-0 rounded-circle" 
-                                    style="width: 36px; height: 36px;"
-                                    hx-get="{% url 'backtest:strategy_delete' strategy.pk %}" 
-                                    hx-target="#global-modal-content" 
-                                    title="Admin Delete Strategy">
-                                <span class="material-icons fs-6">delete</span>
-                            </button>
-                            {% endif %}
-
-                            <!-- Dropdown Arrow Icon Button to Expand Details Drawer -->
-                            <button class="glass-icon-btn text-primary rounded-circle border-0"
-                                    style="width: 36px; height: 36px;"
-                                    type="button"
-                                    data-bs-toggle="collapse"
-                                    data-bs-target="#strategy-row-expand-{{ strategy.id }}"
-                                    aria-expanded="false"
-                                    aria-controls="strategy-row-expand-{{ strategy.id }}"
-                                    title="Expand Strategy Description & Rules">
-                                <span class="material-icons fs-6">keyboard_arrow_down</span>
-                            </button>
-                        </div>
-                    </td>
-                </tr>
-
-                <!-- Expanded Desktop Table Row Drawer -->
-                <tr class="collapse border-bottom border-secondary border-opacity-25" id="strategy-row-expand-{{ strategy.id }}">
-                    <td colspan="6" class="p-4" style="background: var(--nav-hover);">
-                        <div class="row g-3">
-                            <div class="col-12 col-md-8">
-                                <h6 class="fw-bold theme-text-main mb-2">Strategy Description & Execution Logic</h6>
-                                <p class="theme-text-muted small mb-3" style="line-height: 1.6;">
-                                    {{ strategy.description }}
-                                </p>
-                            </div>
-                            <div class="col-12 col-md-4">
-                                <div class="p-3 rounded" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color);">
-                                    <h6 class="fw-bold theme-text-main small mb-2 text-uppercase">Rules Summary</h6>
-                                    <ul class="list-unstyled theme-text-muted smaller mb-0 d-flex flex-column gap-1">
-                                        <li>• <strong>Target Asset:</strong> {{ strategy.target_index }}</li>
-                                        <li>• <strong>Position Sizing:</strong> {{ strategy.default_parameters.lots_count|default:1 }} Lot(s)</li>
-                                        <li>• <strong>Strike Selection:</strong> {{ strategy.default_parameters.strike_selection|default:'ATM' }}</li>
-                                        <li>• <strong>Risk Target:</strong> 1:{{ strategy.default_parameters.risk_reward_ratio|default:2.0 }} R:R Ratio</li>
-                                    </ul>
+                                <div class="d-flex align-items-center gap-2">
+                                    <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0 smaller fw-bold">{{ strategy.category }}</span>
+                                    <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2 py-0 smaller">{{ strategy.target_index }}</span>
                                 </div>
                             </div>
                         </div>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr class="border-0">
-                    <td colspan="6" class="text-center py-5 theme-text-muted border-0 bg-transparent">
-                        <span class="material-icons fs-1 mb-2 opacity-50">psychology_alt</span>
-                        <p class="mb-0 fw-medium">No strategy modules found matching your search.</p>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
 
-    <!-- MOBILE VIEW: EXPANDABLE TILE CARDS WITH DROPDOWN ARROW -->
-    <div class="flex-grow-1 overflow-auto p-3 d-block d-md-none">
-        {% for strategy in strategies %}
-        <div class="p-3 mb-3 rounded-4 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-            <div class="d-flex justify-content-between align-items-center gap-2">
-                <div class="d-flex align-items-center gap-3">
-                    <div class="rounded-circle bg-primary bg-opacity-10 text-primary p-2 d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
-                        <span class="material-icons fs-5">psychology</span>
+                        <!-- Right Side Dropdown Arrow Icon Button -->
+                        <button class="btn btn-sm btn-outline-secondary rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
+                                style="width: 36px; height: 36px;"
+                                type="button"
+                                data-bs-toggle="collapse"
+                                data-bs-target="#strategy-mb-expand-{{ strategy.id }}"
+                                aria-expanded="false"
+                                aria-controls="strategy-mb-expand-{{ strategy.id }}"
+                                title="Expand Details">
+                            <i class="bi bi-chevron-down text-primary"></i>
+                        </button>
                     </div>
-                    <div>
-                        <div class="fw-bold theme-text-main fs-6 mb-1">
-                            <a href="{% url 'backtest:strategy_detail' strategy.pk %}" class="text-decoration-none theme-text-main">
-                                {{ strategy.name }}
+
+                    <!-- Collapsible Mobile Details Container -->
+                    <div class="collapse mt-3 pt-3 border-top border-secondary border-opacity-25" id="strategy-mb-expand-{{ strategy.id }}">
+                        <div class="d-flex flex-column gap-2 mb-3">
+                            <div class="d-flex justify-content-between small">
+                                <span class="theme-text-muted">Lots:</span>
+                                <strong class="text-primary">{{ strategy.default_parameters.lots_count|default:1 }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="theme-text-muted">Strike Selection:</span>
+                                <strong class="text-info">{{ strategy.default_parameters.strike_selection|default:'ATM' }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="theme-text-muted">Risk:Reward Ratio:</span>
+                                <strong class="text-success">1:{{ strategy.default_parameters.risk_reward_ratio|default:2.0 }}</strong>
+                            </div>
+                            <div class="d-flex justify-content-between small">
+                                <span class="theme-text-muted">Go Implementation:</span>
+                                <span class="badge bg-dark text-light border border-secondary border-opacity-25 font-monospace smaller px-2 py-0">{{ strategy.go_file_path }}</span>
+                            </div>
+                        </div>
+
+                        <p class="theme-text-muted small mb-3" style="line-height: 1.5;">
+                            {{ strategy.description }}
+                        </p>
+
+                        <div class="d-flex justify-content-end gap-2 border-top pt-2" style="border-color: var(--border-color) !important;">
+                            <a href="{% url 'backtest:strategy_detail' strategy.pk %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1.5">
+                                <i class="bi bi-code-slash"></i> View Code
                             </a>
+                            <a href="{% url 'backtest:backtest_create' %}?strategy={{ strategy.code_name }}" class="btn btn-sm btn-primary rounded-pill px-3 d-flex align-items-center gap-1.5 shadow-sm text-white">
+                                <i class="bi bi-play-fill"></i> Run
+                            </a>
+                            {% if can_delete %}
+                            <button type="button" 
+                                    class="btn btn-sm btn-outline-danger rounded-circle p-0 d-flex align-items-center justify-content-center" 
+                                    style="width: 32px; height: 32px;"
+                                    hx-get="{% url 'backtest:strategy_delete' strategy.pk %}" 
+                                    hx-target="#global-modal-content" 
+                                    title="Admin Delete Strategy">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                            {% endif %}
                         </div>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0 smaller fw-bold">{{ strategy.category }}</span>
-                            <span class="badge bg-secondary bg-opacity-25 theme-text-main rounded-pill px-2 py-0 smaller">{{ strategy.target_index }}</span>
-                        </div>
                     </div>
                 </div>
-
-                <!-- Right Side Dropdown Arrow Icon Button -->
-                <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border-0 flex-shrink-0"
-                        style="width: 36px; height: 36px; background: rgba(255, 255, 255, 0.08); color: var(--text-main);"
-                        type="button"
-                        data-bs-toggle="collapse"
-                        data-bs-target="#strategy-mb-expand-{{ strategy.id }}"
-                        aria-expanded="false"
-                        aria-controls="strategy-mb-expand-{{ strategy.id }}"
-                        title="Expand Details">
-                    <span class="material-icons fs-5 text-primary">keyboard_arrow_down</span>
-                </button>
+                {% empty %}
+                <div class="text-center py-4 theme-text-muted">No strategy modules found.</div>
+                {% endfor %}
             </div>
 
-            <!-- Collapsible Mobile Details Container -->
-            <div class="collapse mt-3 pt-3 border-top border-secondary border-opacity-25" id="strategy-mb-expand-{{ strategy.id }}">
-                <div class="d-flex flex-column gap-2 mb-3">
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Lots:</span>
-                        <strong class="text-primary">{{ strategy.default_parameters.lots_count|default:1 }}</strong>
+            <!-- Pinned Pagination Footer -->
+            <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important;">
+                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
+                    <div class="small theme-text-muted text-center text-sm-start">
+                        {% if is_paginated %}
+                            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} strategies
+                        {% else %}
+                            Showing {{ strategies|length }} strategies
+                        {% endif %}
                     </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Strike Selection:</span>
-                        <strong class="text-info">{{ strategy.default_parameters.strike_selection|default:'ATM' }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Risk:Reward Ratio:</span>
-                        <strong class="text-success">1:{{ strategy.default_parameters.risk_reward_ratio|default:2.0 }}</strong>
-                    </div>
-                    <div class="d-flex justify-content-between small">
-                        <span class="theme-text-muted">Go Implementation:</span>
-                        <span class="badge bg-dark text-light border border-secondary border-opacity-25 font-monospace smaller px-2 py-0">{{ strategy.go_file_path }}</span>
-                    </div>
-                </div>
+                    
+                    <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
+                        {% if is_paginated and page_obj.has_previous %}
+                        <li class="page-item mb-0">
+                            <a class="page-link btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center p-0" 
+                               style="width: 36px; height: 36px;"
+                               hx-get="{% url 'backtest:strategy_list' %}?page={{ page_obj.previous_page_number }}&q={{ current_q }}" 
+                               hx-target="#strategy-list-container" hx-push-url="true">
+                               <i class="bi bi-chevron-left"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                        
+                        <li class="page-item mb-0">
+                            <span class="page-link btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center fw-bold p-0 text-white" style="width: 36px; height: 36px;">
+                                {% if is_paginated %}{{ page_obj.number }}{% else %}1{% endif %}
+                            </span>
+                        </li>
 
-                <p class="theme-text-muted small mb-3" style="line-height: 1.5;">
-                    {{ strategy.description }}
-                </p>
-
-                <div class="d-flex justify-content-end gap-2 border-top pt-2" style="border-color: var(--border-color) !important;">
-                    <a href="{% url 'backtest:strategy_detail' strategy.pk %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 d-flex align-items-center gap-1">
-                        <span class="material-icons fs-6">code</span> View Code
-                    </a>
-                    <a href="{% url 'backtest:backtest_create' %}?strategy={{ strategy.code_name }}" class="btn btn-sm btn-primary rounded-pill px-3 d-flex align-items-center gap-1 shadow-sm">
-                        <span class="material-icons fs-6">play_arrow</span> Run
-                    </a>
-                    {% if can_delete %}
-                    <button type="button" 
-                            class="btn btn-sm btn-outline-danger rounded-circle p-0 d-flex align-items-center justify-content-center" 
-                            style="width: 32px; height: 32px;"
-                            hx-get="{% url 'backtest:strategy_delete' strategy.pk %}" 
-                            hx-target="#global-modal-content" 
-                            title="Admin Delete Strategy">
-                        <span class="material-icons fs-6">delete</span>
-                    </button>
-                    {% endif %}
+                        {% if is_paginated and page_obj.has_next %}
+                        <li class="page-item mb-0">
+                            <a class="page-link btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center p-0" 
+                               style="width: 36px; height: 36px;"
+                               hx-get="{% url 'backtest:strategy_list' %}?page={{ page_obj.next_page_number }}&q={{ current_q }}" 
+                               hx-target="#strategy-list-container" hx-push-url="true">
+                               <i class="bi bi-chevron-right"></i>
+                            </a>
+                        </li>
+                        {% endif %}
+                    </ul>
                 </div>
             </div>
-        </div>
-        {% empty %}
-        <div class="text-center py-4 theme-text-muted">No strategy modules found.</div>
-        {% endfor %}
-    </div>
-
-    <!-- Pinned Pagination Footer -->
-    <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
-            <div class="small theme-text-muted text-center text-sm-start">
-                {% if is_paginated %}
-                    Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} strategies
-                {% else %}
-                    Showing {{ strategies|length }} strategies
-                {% endif %}
-            </div>
-            
-            <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
-                {% if is_paginated and page_obj.has_previous %}
-                <li class="page-item mb-0">
-                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
-                       style="width: 36px; height: 36px;"
-                       hx-get="{% url 'backtest:strategy_list' %}?page={{ page_obj.previous_page_number }}&q={{ current_q }}" 
-                       hx-target="#strategy-list-container" hx-push-url="true">
-                       <span class="material-icons fs-6">chevron_left</span>
-                    </a>
-                </li>
-                {% endif %}
-                
-                <li class="page-item mb-0">
-                    <span class="page-link glass-icon-btn active border-0 rounded-circle d-flex align-items-center justify-content-center fw-bold text-decoration-none p-0" style="width: 36px; height: 36px;">
-                        {% if is_paginated %}{{ page_obj.number }}{% else %}1{% endif %}
-                    </span>
-                </li>
-
-                {% if is_paginated and page_obj.has_next %}
-                <li class="page-item mb-0">
-                    <a class="page-link glass-icon-btn border-0 rounded-circle d-flex align-items-center justify-content-center text-decoration-none p-0" 
-                       style="width: 36px; height: 36px;"
-                       hx-get="{% url 'backtest:strategy_list' %}?page={{ page_obj.next_page_number }}&q={{ current_q }}" 
-                       hx-target="#strategy-list-container" hx-push-url="true">
-                       <span class="material-icons fs-6">chevron_right</span>
-                    </a>
-                </li>
-                {% endif %}
-            </ul>
         </div>
     </div>
 </div>

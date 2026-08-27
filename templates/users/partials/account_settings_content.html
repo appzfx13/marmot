@@ -1,119 +1,129 @@
 <!-- templates/users/partials/account_settings_content.html -->
-<div class="user-account-viewport">
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
+<div class="d-flex flex-column gap-4">
+
+    <!-- START: Spark Page Header -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
         <div>
-            <h2 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
-                <span class="material-icons text-primary fs-3">account_balance_wallet</span>
-                <span>Trading Accounts & Configurations</span>
-            </h2>
-            <p class="theme-text-muted small mb-0">Manage multi-broker live trading accounts, API credentials, and paper trading balances.</p>
+            <h1 class="page-title">Trading Accounts &amp; Configurations</h1>
+            <p class="page-subtitle">Manage multi-broker live trading accounts, API credentials, and paper trading balances.</p>
+        </div>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            <a href="{% url 'users:marmot-profile' %}" 
+               class="btn btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm text-white"
+               hx-get="{% url 'users:marmot-profile' %}"
+               hx-target="#user-portal-container"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-plus-circle-fill"></i>
+                <span>Add Broker Account</span>
+            </a>
         </div>
     </div>
+    <!-- END: Spark Page Header -->
 
     <!-- Active Trading Account Summary Card -->
-    <div class="glass-card p-4 rounded-4 border mb-4" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-        <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+    <div class="card mb-0">
+        <div class="card-header d-flex align-items-center justify-content-between pb-3 border-bottom" style="border-color: var(--border-color) !important;">
             <div class="d-flex align-items-center gap-2">
-                <span class="material-icons text-primary fs-4">account_balance_wallet</span>
-                <h5 class="fw-bold mb-0 theme-text-main">
+                <i class="bi bi-wallet2 text-primary fs-4"></i>
+                <h2 class="card-title mb-0">
                     Active Account: {{ active_trading_account.account_name|default:"Default Sandbox" }}
-                </h5>
+                </h2>
             </div>
-            <span class="badge {% if active_trading_account.account_type == 'LIVE' %}bg-success text-white{% else %}bg-secondary text-white-50{% endif %} rounded-pill px-3 py-1 fw-bold fs-6">
+            <span class="trend-badge {% if active_trading_account.account_type == 'LIVE' %}trend-up{% else %}trend-neutral{% endif %} py-1 px-3 fw-bold">
                 {{ active_trading_account.account_type|default:"SANDBOX" }} MODE
             </span>
         </div>
 
-        <div class="row g-3">
-            <div class="col-12 col-md-3">
-                <span class="small theme-text-muted d-block fw-bold mb-1">Broker Platform</span>
-                <span class="fw-bold theme-text-main fs-6">{{ active_trading_account.broker.name|default:"DHAN" }}</span>
-            </div>
-            <div class="col-12 col-md-3">
-                <span class="small theme-text-muted d-block fw-bold mb-1">Broker Client ID</span>
-                <span class="fw-bold theme-text-main font-monospace">{{ active_trading_account.broker_client_id|default:"N/A" }}</span>
-            </div>
-            <div class="col-12 col-md-3">
-                <span class="small theme-text-muted d-block fw-bold mb-1">Account Realtime PnL</span>
-                <span class="fw-bold {% if active_trading_account.realtime_pnl >= 0 %}text-success{% else %}text-danger{% endif %} font-monospace fs-6">
-                    ₹{{ active_trading_account.realtime_pnl|default:"0.00" }}
-                </span>
-            </div>
-            <div class="col-12 col-md-3">
-                <span class="small theme-text-muted d-block fw-bold mb-1">Configuration Status</span>
-                {% if active_trading_account.is_configured %}
-                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-3 py-1 fw-bold">CONFIGURED</span>
-                {% else %}
-                    <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-3 py-1 fw-bold">PENDING SETUP</span>
-                {% endif %}
+        <div class="card-body">
+            <div class="row g-4">
+                <div class="col-12 col-md-3">
+                    <span class="stat-label d-block mb-1">Broker Platform</span>
+                    <span class="fw-bold theme-text-main fs-6">{{ active_trading_account.broker.name|default:"DHAN" }}</span>
+                </div>
+                <div class="col-12 col-md-3">
+                    <span class="stat-label d-block mb-1">Broker Client ID</span>
+                    <span class="fw-bold theme-text-main font-monospace fs-6">{{ active_trading_account.broker_client_id|default:"N/A" }}</span>
+                </div>
+                <div class="col-12 col-md-3">
+                    <span class="stat-label d-block mb-1">Account Realtime PnL</span>
+                    <span class="fw-bold {% if active_trading_account.realtime_pnl >= 0 %}text-success{% else %}text-danger{% endif %} font-monospace fs-6">
+                        ₹{{ active_trading_account.realtime_pnl|default:"0.00" }}
+                    </span>
+                </div>
+                <div class="col-12 col-md-3">
+                    <span class="stat-label d-block mb-1">Configuration Status</span>
+                    {% if active_trading_account.is_configured %}
+                        <span class="trend-badge trend-up py-0.5 px-2.5 fw-bold">CONFIGURED</span>
+                    {% else %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2.5 py-1 fw-bold">PENDING SETUP</span>
+                    {% endif %}
+                </div>
             </div>
         </div>
     </div>
 
     <!-- All Configured Trading Accounts List -->
-    <div class="glass-card p-4 rounded-4 border mb-4" style="background: var(--glass-bg); border-color: var(--border-color) !important;">
-        <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-            <h5 class="fw-bold theme-text-main mb-0">Configured Broker Trading Accounts</h5>
-            <a href="{% url 'users:marmot-profile' %}" 
-               class="btn btn-sm btn-primary rounded-pill px-3 fw-bold"
-               hx-get="{% url 'users:marmot-profile' %}"
-               hx-target="#user-portal-container"
-               hx-swap="innerHTML"
-               hx-push-url="true">
-                <span class="material-icons fs-6 me-1">add</span>Add Broker Account
-            </a>
+    <div class="card mb-0">
+        <div class="card-header d-flex align-items-center justify-content-between mb-3">
+            <div>
+                <h2 class="card-title mb-0">Configured Broker Trading Accounts</h2>
+                <span class="card-subtitle theme-text-muted small">Multi-account routing and credential status</span>
+            </div>
         </div>
 
-        <div class="table-responsive flex-grow-1 overflow-auto">
-            <table class="table table-hover custom-glass-table align-middle mb-0 text-nowrap border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
-                <thead>
-                    <tr class="theme-text-muted smaller text-uppercase">
-                        <th>Account Name</th>
-                        <th>Broker</th>
-                        <th>Mode</th>
-                        <th>Client ID</th>
-                        <th>Default</th>
-                        <th>Status</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {% for acc in user_trading_accounts %}
-                        <tr class="{% if active_trading_account.id == acc.id %}table-active bg-primary bg-opacity-10{% endif %}">
-                            <td class="fw-bold">
-                                {{ acc.account_name }}
-                                {% if active_trading_account.id == acc.id %}
-                                    <span class="badge bg-primary text-white ms-2 smaller">ACTIVE</span>
-                                {% endif %}
-                            </td>
-                            <td class="fw-semibold">{{ acc.broker.name }}</td>
-                            <td>
-                                <span class="badge {% if acc.account_type == 'LIVE' %}bg-success bg-opacity-25 text-success{% else %}bg-secondary bg-opacity-25 theme-text-muted{% endif %} rounded-pill px-2 py-1">
-                                    {{ acc.account_type }}
-                                </span>
-                            </td>
-                            <td class="font-monospace small">{{ acc.broker_client_id|default:"-" }}</td>
-                            <td>
-                                {% if acc.is_default %}
-                                    <span class="material-icons text-warning fs-6">star</span>
-                                {% else %}
-                                    <span class="theme-text-muted small">-</span>
-                                {% endif %}
-                            </td>
-                            <td>
-                                {% if acc.is_active %}
-                                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill">Active</span>
-                                {% else %}
-                                    <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill">Inactive</span>
-                                {% endif %}
-                            </td>
-                        </tr>
-                    {% empty %}
+        <div class="card-body p-0">
+            <div class="table-responsive flex-grow-1 overflow-auto">
+                <table class="table table-custom align-middle mb-0 text-nowrap">
+                    <thead>
                         <tr>
-                            <td colspan="6" class="text-center theme-text-muted py-4">No broker accounts configured.</td>
+                            <th class="ps-4">Account Name</th>
+                            <th>Broker</th>
+                            <th>Mode</th>
+                            <th>Client ID</th>
+                            <th>Default</th>
+                            <th class="text-end pe-4">Status</th>
                         </tr>
-                    {% endfor %}
-                </tbody>
-            </table>
+                    </thead>
+                    <tbody>
+                        {% for acc in user_trading_accounts %}
+                            <tr class="{% if active_trading_account.id == acc.id %}table-active{% endif %}">
+                                <td class="ps-4 fw-bold">
+                                    {{ acc.account_name }}
+                                    {% if active_trading_account.id == acc.id %}
+                                        <span class="badge bg-primary text-white ms-2 rounded-pill px-2 py-0.5 smaller">ACTIVE</span>
+                                    {% endif %}
+                                </td>
+                                <td class="fw-semibold">{{ acc.broker.name }}</td>
+                                <td>
+                                    <span class="badge {% if acc.account_type == 'LIVE' %}bg-success bg-opacity-25 text-success{% else %}bg-secondary bg-opacity-25 theme-text-muted{% endif %} rounded-pill px-2.5 py-1">
+                                        {{ acc.account_type }}
+                                    </span>
+                                </td>
+                                <td class="font-monospace small">{{ acc.broker_client_id|default:"-" }}</td>
+                                <td>
+                                    {% if acc.is_default %}
+                                        <i class="bi bi-star-fill text-warning"></i>
+                                    {% else %}
+                                        <span class="theme-text-muted small">-</span>
+                                    {% endif %}
+                                </td>
+                                <td class="text-end pe-4">
+                                    {% if acc.is_active %}
+                                        <span class="trend-badge trend-up py-0.5 px-2.5">Active</span>
+                                    {% else %}
+                                        <span class="trend-badge trend-down py-0.5 px-2.5">Inactive</span>
+                                    {% endif %}
+                                </td>
+                            </tr>
+                        {% empty %}
+                            <tr>
+                                <td colspan="6" class="text-center theme-text-muted py-4">No broker accounts configured.</td>
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
         </div>
     </div>
 </div>

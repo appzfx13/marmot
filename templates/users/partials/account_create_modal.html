@@ -1,9 +1,16 @@
 <!-- templates/users/partials/account_create_modal.html -->
-<div class="modal-content glass-card p-2 border-0 shadow-lg" style="background: var(--nav-hover, rgba(20,20,25,0.95)); backdrop-filter: blur(16px); border: 1px solid var(--border-color, rgba(255,255,255,0.15)) !important;">
-    <div class="modal-header border-0 pb-0">
+<div class="modal-content glass-card p-3 border shadow-lg" style="background: var(--glass-bg, #0d1527); backdrop-filter: blur(20px); border: 1px solid var(--border-color) !important; border-radius: 16px; color: var(--theme-text-main, #fff);">
+    
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3 pt-1">
         <div class="d-flex align-items-center gap-2">
-            <span class="material-icons text-primary fs-4">account_balance_wallet</span>
-            <h5 class="modal-title fw-bold theme-text-main">Add New Trading Account</h5>
+            <div class="rounded-circle bg-primary bg-opacity-15 text-primary d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border: 1px solid rgba(180, 241, 5, 0.3);">
+                <span class="material-icons fs-5">account_balance_wallet</span>
+            </div>
+            <div>
+                <h5 class="modal-title fw-bold theme-text-main mb-0">Add New Trading Account</h5>
+                <small class="theme-text-muted">Configure a new Live Broker Account or Paper-Trading Sandbox Account.</small>
+            </div>
         </div>
         <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
@@ -11,15 +18,48 @@
     <form id="accountCreateForm" action="{% url 'users:user-account-create' %}" method="POST" hx-post="{% url 'users:user-account-create' %}" hx-swap="none">
         {% csrf_token %}
         <div class="modal-body py-3">
-            <p class="theme-text-muted small mb-3">Configure a new Live Broker Account or Paper-Trading Sandbox Account.</p>
+            <style>
+                .modal-tab-pill {
+                    color: var(--text-muted, #94a3b8) !important;
+                    background: transparent !important;
+                    border: 1px solid transparent !important;
+                    border-radius: 8px !important;
+                    padding: 0.55rem 1rem !important;
+                    font-weight: 600 !important;
+                    font-size: 0.8rem !important;
+                    letter-spacing: 0.5px;
+                    transition: all 0.2s ease-in-out !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 0.4rem !important;
+                }
+                .modal-tab-pill:hover {
+                    color: #FFFFFF !important;
+                    background-color: rgba(255, 255, 255, 0.04) !important;
+                }
+                .modal-tab-pill.active {
+                    color: #FFFFFF !important;
+                    background-color: rgba(180, 241, 5, 0.12) !important;
+                    border: 1px solid rgba(180, 241, 5, 0.4) !important;
+                    font-weight: 700 !important;
+                    box-shadow: 0 0 14px rgba(180, 241, 5, 0.15) !important;
+                }
+                .modal-tab-pill.active .material-icons,
+                .modal-tab-pill.active i {
+                    color: var(--brand-lime, #b4f105) !important;
+                }
+            </style>
 
             <!-- Account Type Switch Pills -->
-            <div class="nav nav-pills nav-fill mb-3 glass-card p-1 rounded-pill" role="tablist">
-                <button class="nav-link active rounded-pill fw-bold py-1 small" id="live-tab" data-bs-toggle="pill" data-bs-target="#live-panel" type="button" role="tab" onclick="document.getElementById('account_type_input').value='LIVE';">
-                    <span class="material-icons fs-6 align-middle me-1">monetization_on</span>LIVE ACCOUNT
+            <div class="nav nav-pills nav-fill mb-3 p-1 rounded-3 d-flex gap-2" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);" role="tablist">
+                <button class="nav-link active modal-tab-pill flex-grow-1" id="live-tab" data-bs-toggle="pill" data-bs-target="#live-panel" type="button" role="tab" onclick="document.getElementById('account_type_input').value='LIVE';">
+                    <span class="material-icons fs-6">monetization_on</span>
+                    <span>LIVE ACCOUNT</span>
                 </button>
-                <button class="nav-link rounded-pill fw-bold py-1 small" id="sandbox-tab" data-bs-toggle="pill" data-bs-target="#sandbox-panel" type="button" role="tab" onclick="document.getElementById('account_type_input').value='SANDBOX';">
-                    <span class="material-icons fs-6 align-middle me-1">science</span>SANDBOX DEMO
+                <button class="nav-link modal-tab-pill flex-grow-1" id="sandbox-tab" data-bs-toggle="pill" data-bs-target="#sandbox-panel" type="button" role="tab" onclick="document.getElementById('account_type_input').value='SANDBOX';">
+                    <span class="material-icons fs-6">science</span>
+                    <span>SANDBOX DEMO</span>
                 </button>
             </div>
             <input type="hidden" name="account_type" id="account_type_input" value="LIVE">
@@ -29,11 +69,11 @@
                 <div class="tab-pane fade show active" id="live-panel" role="tabpanel">
                     <div class="mb-3">
                         <label class="form-label theme-text-muted small fw-bold">Select Broker Platform *</label>
-                        <select name="broker_id" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25">
+                        <select name="broker_id" id="brokerSelectInput" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25">
                             {% for b in brokers %}
-                                <option value="{{ b.id }}" class="bg-dark text-white">{{ b.name }} ({{ b.code|upper }})</option>
+                                <option value="{{ b.id }}" data-code="{{ b.code|lower }}" class="bg-dark text-white">{{ b.name }} ({{ b.code|upper }})</option>
                             {% empty %}
-                                <option value="" class="bg-dark text-white">DHAN (Default)</option>
+                                <option value="" data-code="dhan" class="bg-dark text-white">DHAN (Default)</option>
                             {% endfor %}
                         </select>
                     </div>
@@ -44,23 +84,26 @@
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label theme-text-muted small fw-bold">Broker Client ID / User ID *</label>
-                        <input type="text" name="broker_client_id" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. 1000000001">
+                        <label class="form-label theme-text-muted small fw-bold">Client ID *</label>
+                        <input type="text" name="broker_client_id" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. 1000000001 (10-digit Client ID)" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label theme-text-muted small fw-bold">API Key / Token *</label>
-                        <input type="password" name="api_key" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Enter API Key / Token">
+                        <label class="form-label theme-text-muted small fw-bold">API Key / Access Token *</label>
+                        <input type="password" name="api_key" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Paste Access Token (starts with eyJ...) or API Key" required>
                     </div>
 
                     <div class="mb-3">
-                        <label class="form-label theme-text-muted small fw-bold">App ID / Secret Key (Optional)</label>
-                        <input type="password" name="app_id" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Enter App Secret if required">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label theme-text-muted small fw-bold mb-0">API Secret</label>
+                            <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller">Optional for Access Token</span>
+                        </div>
+                        <input type="password" name="app_id" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Enter API Secret (Optional if using direct Access Token)">
                     </div>
 
-                    <div class="alert alert-info bg-info bg-opacity-10 border-info border-opacity-25 theme-text-main p-2 small mb-0 rounded-3 d-flex align-items-center gap-2">
+                    <div class="alert alert-info bg-info bg-opacity-10 border-info border-opacity-25 theme-text-main p-2.5 small mb-0 rounded-3 d-flex align-items-center gap-2">
                         <span class="material-icons fs-5 text-info">verified_user</span>
-                        <span>Saving requires an automatic API connection authentication test with the broker.</span>
+                        <span style="font-size: 0.76rem;">Enter your 10-digit Client ID & Access Token (starts with <code>eyJ...</code> from web.dhan.co). Instant validation verifies connectivity with live broker servers.</span>
                     </div>
                 </div>
 
