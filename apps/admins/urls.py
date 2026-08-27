@@ -18,6 +18,7 @@ from .views import (
     AdminTradeExecConfigDetailView,
     AdminTradeExecConfigUpdateView,
     AdminTradeExecConfigDeleteView,
+    AdminTradeExecUserAccountInfoView,
     # Postback Views
     PostbackLogListView,
     PostbackLogScrollView,
@@ -75,6 +76,7 @@ urlpatterns = [
     path('trade-configs/scroll/', AdminTradeExecConfigScrollView.as_view(), name='trade_exec_config_scroll'),
     path('trade-configs/bulk-delete/', AdminTradeExecConfigBulkDeleteView.as_view(), name='trade_exec_config_bulk_delete'),
     path('trade-configs/create/', AdminTradeExecConfigCreateView.as_view(), name='trade_exec_config_create'),
+    path('trade-configs/user-account-info/', AdminTradeExecUserAccountInfoView.as_view(), name='trade_exec_user_account_info'),
     path('trade-configs/<int:pk>/', AdminTradeExecConfigDetailView.as_view(), name='trade_exec_config_detail'),
     path('trade-configs/<int:pk>/edit/', AdminTradeExecConfigUpdateView.as_view(), name='trade_exec_config_edit'),
     path('trade-configs/<int:pk>/delete/', AdminTradeExecConfigDeleteView.as_view(), name='trade_exec_config_delete'),

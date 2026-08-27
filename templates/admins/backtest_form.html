@@ -146,6 +146,20 @@
         color: #34d399 !important;
         font-weight: 700 !important;
     }
+
+    .market-tab-btn {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid var(--border-color);
+        color: var(--text-muted);
+        transition: all 0.2s ease;
+    }
+
+    .market-tab-btn.active {
+        background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%) !important;
+        color: #ffffff !important;
+        border-color: #0d6efd !important;
+        box-shadow: 0 4px 14px rgba(13, 110, 253, 0.35);
+    }
 </style>
 {% endblock %}
 
@@ -162,7 +176,7 @@
                     Configure Strategy Backtest
                 </h2>
                 <div class="theme-text-muted small">
-                    Configure TensorTrade RL Strategy parameters, dataset selection, execution rules, and capital.
+                    Select target market segment to access dedicated Index Options or Forex Futures backtest parameters.
                 </div>
             </div>
         </div>
@@ -175,231 +189,34 @@
 </div>
 
 <div class="glass-card glass-form-card p-3 p-sm-4">
-    <form id="backtestForm" method="POST" action="{% url 'backtest:backtest_create' %}">
-        {% csrf_token %}
+    {# Market Segment Selector Nav Tabs #}
+    <div class="mb-4">
+        <ul class="nav nav-pills nav-justified gap-2 p-1.5 rounded-3 border" style="background: rgba(0, 0, 0, 0.25); border-color: rgba(255, 255, 255, 0.1) !important;" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="market-tab-btn nav-link w-100 {% if active_market_type != 'FOREX_FUTURES' %}active{% endif %} rounded-2 fw-bold py-2.5 d-flex align-items-center justify-content-center gap-2" id="index-tab" data-bs-toggle="pill" data-bs-target="#index-form-pane" type="button" role="tab">
+                    <span class="fs-5">🇮🇳</span>
+                    <span>INDEX / F&O Backtest (India Options)</span>
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="market-tab-btn nav-link w-100 {% if active_market_type == 'FOREX_FUTURES' %}active{% endif %} rounded-2 fw-bold py-2.5 d-flex align-items-center justify-content-center gap-2" id="forex-tab" data-bs-toggle="pill" data-bs-target="#forex-form-pane" type="button" role="tab">
+                    <span class="fs-5">🌐</span>
+                    <span>FOREX / Futures Backtest (CME Micros)</span>
+                </button>
+            </li>
+        </ul>
+    </div>
 
-        {% if form.non_field_errors %}
-            <div class="alert alert-danger mb-4 rounded-3 border-0 bg-danger bg-opacity-25 text-danger">
-                {% for error in form.non_field_errors %}
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="material-icons fs-6">error_outline</span>
-                        <span>{{ error }}</span>
-                    </div>
-                {% endfor %}
-            </div>
-        {% endif %}
-
-        {# Section 1: Pre-downloaded Dataset (Optional) #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-            <span class="material-icons text-primary fs-5">dataset</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Pre-downloaded Market Dataset (Optional)</h6>
+    <div class="tab-content">
+        {# Tab Pane 1: Dedicated Index F&O Form #}
+        <div class="tab-pane fade {% if active_market_type != 'FOREX_FUTURES' %}show active{% endif %}" id="index-form-pane" role="tabpanel">
+            {% include 'admins/partials/backtest_index_form.html' %}
         </div>
 
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.backup_task.id_for_label }}" style="min-width: 180px;">
-                Backup Dataset
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.backup_task }}
-                <small class="form-text theme-text-muted mt-1 d-block">Selecting a completed market backup dataset will link contract option candles.</small>
-                {% for error in form.backup_task.errors %}
-                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
-                {% endfor %}
-            </div>
+        {# Tab Pane 2: Dedicated Forex Futures Form (NO Strike Selection) #}
+        <div class="tab-pane fade {% if active_market_type == 'FOREX_FUTURES' %}show active{% endif %}" id="forex-form-pane" role="tabpanel">
+            {% include 'admins/partials/backtest_forex_form.html' %}
         </div>
-
-        {# Section 2: Strategy Engine & Asset Selection #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-            <span class="material-icons text-primary fs-5">psychology</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Strategy Engine & Asset Selection</h6>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.strategy_name.id_for_label }}" style="min-width: 180px;">
-                RL Strategy Engine<span class="text-danger ms-1">*</span>
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.strategy_name }}
-                <small class="form-text theme-text-muted d-block mt-1">TensorTrade RL (Deep Reinforcement Learning) engine with PPO policy optimization.</small>
-                {% for error in form.strategy_name.errors %}
-                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.index_name.id_for_label }}" style="min-width: 180px;">
-                Target Index<span class="text-danger ms-1">*</span>
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.index_name }}
-                {% for error in form.index_name.errors %}
-                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
-                {% endfor %}
-            </div>
-        </div>
-
-        {# Section 3: Predefined Strategy Rules & AI Directives #}
-        <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-            <div class="d-flex align-items-center gap-2">
-                <span class="material-icons text-primary fs-5">rule</span>
-                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Constraint Rules & AI Directives</h6>
-            </div>
-            <a href="{% url 'backtest:rule_list' %}" class="small text-info text-decoration-none d-flex align-items-center gap-1" target="_blank">
-                <span class="material-icons fs-6">settings</span>
-                <span>Manage Rules</span>
-            </a>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase pt-2 mb-md-0" style="min-width: 180px;">
-                Execution Rules
-            </label>
-            <div class="flex-grow-1 w-100">
-                <div class="d-flex align-items-center justify-content-between mb-2">
-                    <span class="theme-text-muted small">Select active rules & guardrails:</span>
-                    <div class="d-flex align-items-center gap-1.5">
-                        <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-0.5 fw-semibold" style="font-size: 0.68rem;" onclick="selectAllFormRules(true)">
-                            Select All
-                        </button>
-                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-0.5 fw-semibold" style="font-size: 0.68rem;" onclick="selectAllFormRules(false)">
-                            Clear
-                        </button>
-                    </div>
-                </div>
-                <div class="custom-scrollable-rules p-2 rounded-2" style="max-height: 250px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(0, 0, 0, 0.2);">
-                    <div class="row g-2">
-                        {% for choice in form.rules %}
-                        <div class="col-12 col-md-6">
-                            <label for="{{ choice.id_for_label }}" class="custom-check-item w-100 h-100 p-2 d-flex align-items-center gap-2 rounded-2 border" style="background: rgba(255, 255, 255, 0.02); border-color: rgba(255, 255, 255, 0.06) !important; cursor: pointer;">
-                                {{ choice.tag }}
-                                <span class="theme-text-main small fw-semibold">{{ choice.choice_label }}</span>
-                            </label>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-                <small class="form-text theme-text-muted mt-2 d-block">
-                    Select one or more constraints to mask invalid trading regimes in TensorTrade RL (e.g. 0DTE Expiry afternoons, 09:20-10:30 ORB, or 15:15 Auto Square-off).
-                </small>
-            </div>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase pt-2 mb-md-0" for="{{ form.prompt_directives.id_for_label }}" style="min-width: 180px;">
-                AI Directives Prompt
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.prompt_directives }}
-                <small class="form-text theme-text-muted mt-1 d-block">
-                    Optional natural language prompt instructions for TensorTrade RL (e.g. <em>"Max 3 trades per day, strictly exit on 1:2 risk-reward"</em>).
-                </small>
-                {% for error in form.prompt_directives.errors %}
-                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
-                {% endfor %}
-            </div>
-        </div>
-
-        {# Section 4: Time Horizon & Capital #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-            <span class="material-icons text-primary fs-5">date_range</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Backtest Horizon & Capital</h6>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.initial_capital.id_for_label }}" style="min-width: 180px;">
-                Initial Capital (INR)<span class="text-danger ms-1">*</span>
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.initial_capital }}
-                {% for error in form.initial_capital.errors %}
-                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.start_date.id_for_label }}" style="min-width: 180px;">
-                Start Date<span class="text-danger ms-1">*</span>
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.start_date }}
-                {% for error in form.start_date.errors %}
-                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
-                {% endfor %}
-            </div>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.end_date.id_for_label }}" style="min-width: 180px;">
-                End Date<span class="text-danger ms-1">*</span>
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.end_date }}
-                {% for error in form.end_date.errors %}
-                    <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
-                {% endfor %}
-            </div>
-        </div>
-
-        {# Section 5: Strike & Position Sizing Parameters #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-            <span class="material-icons text-primary fs-5">tune</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Strike & Position Sizing Parameters</h6>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.strike_selection.id_for_label }}" style="min-width: 180px;">
-                Strike Selection
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.strike_selection }}
-                <small class="form-text theme-text-muted d-block mt-1">Target Strike offset: ATM, ITM (+/- 1, 2) or OTM (+/- 1, 2).</small>
-            </div>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.lots_count.id_for_label }}" style="min-width: 180px;">
-                Lots Count (Qty)
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.lots_count }}
-                <small class="form-text theme-text-muted d-block mt-1">Number of lots to trade per signal (e.g. 1, 2, 5).</small>
-            </div>
-        </div>
-
-        <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.risk_reward_ratio.id_for_label }}" style="min-width: 180px;">
-                Risk:Reward Ratio
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.risk_reward_ratio }}
-            </div>
-        </div>
-
-        <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
-            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ form.stop_loss_points.id_for_label }}" style="min-width: 180px;">
-                Stop Loss (Points)
-            </label>
-            <div class="flex-grow-1 w-100">
-                {{ form.stop_loss_points }}
-            </div>
-        </div>
-
-        <div class="d-flex align-items-center justify-content-end gap-3 pt-4 border-top" style="border-color: var(--border-color) !important;">
-            <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
-            <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold text-white d-inline-flex align-items-center gap-2" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
-                <span class="material-icons fs-5">play_circle</span>
-                <span>Initialize Backtest Engine</span>
-            </button>
-        </div>
-    </form>
+    </div>
 </div>
-
-<script>
-function selectAllFormRules(shouldCheck) {
-    const checkboxes = document.querySelectorAll('input[name="rules"]');
-    checkboxes.forEach(cb => cb.checked = shouldCheck);
-}
-</script>
 {% endblock %}

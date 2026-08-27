@@ -1,14 +1,16 @@
 from django.db import models
 from apps.common.models import BaseModel
-from apps.common.choices import TaskStatusChoices, IndexChoices, StrategyChoices
+from apps.common.choices import TaskStatusChoices, IndexChoices, StrategyChoices, MarketTypeChoices, ForexInstrumentChoices
 from apps.common.constants import MAX_LOG_LINES
-from .choices import BacktestRuleTypeChoices
+from .choices import BacktestRuleTypeChoices, RuleMarketTypeChoices
 
 
 class BacktestRule(BaseModel):
     RuleTypeChoices = BacktestRuleTypeChoices
+    MarketTypeChoices = RuleMarketTypeChoices
 
     name = models.CharField(max_length=120, help_text="Rule Name e.g. Intraday Only (Auto Square-off 15:15)")
+    market_type = models.CharField(max_length=20, choices=MarketTypeChoices.choices, default='ALL', help_text="Target market segment: Index F&O, Forex Futures, or Shared across all markets.")
     rule_type = models.CharField(max_length=50, choices=RuleTypeChoices.choices, default=RuleTypeChoices.INTRADAY)
     description = models.TextField(blank=True, default="", help_text="Detailed description of the trading rule")
     prompt_directive = models.TextField(blank=True, default="", help_text="Natural language prompt directive for AI TensorTrade RL Engine")
@@ -22,13 +24,22 @@ class BacktestRule(BaseModel):
         verbose_name_plural = "Backtest Rules"
 
     def __str__(self):
-        return f"{self.name} ({self.get_rule_type_display()})"
+        return f"{self.name} ({self.get_market_type_display()} - {self.get_rule_type_display()})"
 
 
 class BacktestTask(BaseModel):
     StrategyChoices = StrategyChoices
     StatusChoices = TaskStatusChoices
     IndexChoices = IndexChoices
+    MarketTypeChoices = MarketTypeChoices
+
+    # Market segment selector
+    market_type = models.CharField(
+        max_length=20,
+        choices=MarketTypeChoices.choices,
+        default=MarketTypeChoices.INDEX_FO,
+        help_text="Target market segment: INDEX/F&O (India) or FOREX/Futures (CME Micros)"
+    )
 
     # Optional Pre-Downloaded Backup Dataset Selection
     backup_task = models.ForeignKey('market.MarketBackupTask', on_delete=models.SET_NULL, null=True, blank=True, related_name='backtests', help_text="Optional selected backup dataset")
@@ -36,7 +47,7 @@ class BacktestTask(BaseModel):
 
     # Strategy Input Configuration
     strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.TENSORTRADE_RL)
-    index_name = models.CharField(max_length=50, choices=IndexChoices.choices, default=IndexChoices.NIFTY)
+    index_name = models.CharField(max_length=50, choices=IndexChoices.choices + ForexInstrumentChoices.choices, default=IndexChoices.NIFTY)
     start_date = models.DateField()
     end_date = models.DateField()
     initial_capital = models.FloatField(default=100000.0, help_text="Starting capital in INR")

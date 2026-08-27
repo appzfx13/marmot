@@ -69,20 +69,46 @@ class TensorTradeRLEngine:
 
             try:
                 temp_df = pd.read_parquet(f)
+                
+                # Support Databento ts_event nanosecond timestamp or standard datetime/timestamp
+                time_col = None
+                for c in ["ts_event", "datetime", "timestamp"]:
+                    if c in temp_df.columns:
+                        time_col = c
+                        break
+
+                # Symbol filtering for Index or Forex Futures (e.g. MGC, M6E, MNQ)
+                sym_col = "symbol" if "symbol" in temp_df.columns else ("index_name" if "index_name" in temp_df.columns else None)
+                if sym_col and index_name:
+                    temp_df = temp_df[temp_df[sym_col].astype(str).str.upper() == index_name.upper()]
+
                 if "instrument_type" in temp_df.columns:
                     spot_temp = temp_df[temp_df["instrument_type"] == "INDEX"].copy()
                     if not spot_temp.empty:
                         temp_df = spot_temp
-                if "index_name" in temp_df.columns and index_name:
-                    temp_df = temp_df[temp_df["index_name"].str.upper() == index_name.upper()]
 
-                time_col = "datetime" if "datetime" in temp_df.columns else ("timestamp" if "timestamp" in temp_df.columns else None)
                 if time_col and (start_dt or end_dt):
-                    temp_df["session_date"] = pd.to_datetime(temp_df[time_col]).dt.date
+                    if time_col == "ts_event":
+                        temp_df["session_date"] = pd.to_datetime(temp_df[time_col], unit="ns", errors="coerce").dt.date
+                    else:
+                        temp_df["session_date"] = pd.to_datetime(temp_df[time_col], errors="coerce").dt.date
                     if start_dt:
                         temp_df = temp_df[temp_df["session_date"] >= start_dt]
                     if end_dt:
                         temp_df = temp_df[temp_df["session_date"] <= end_dt]
+
+                # Map Databento price column to close if missing
+                if "close" not in temp_df.columns and "price" in temp_df.columns:
+                    temp_df["close"] = temp_df["price"]
+                if "open" not in temp_df.columns and "close" in temp_df.columns:
+                    temp_df["open"] = temp_df["close"]
+
+                # Derive Databento Order Flow metrics (CVD, Delta, Imbalance) if order book columns exist
+                if "bid_sz_00" in temp_df.columns and "ask_sz_00" in temp_df.columns:
+                    temp_df["imbalance"] = temp_df["ask_sz_00"] / (temp_df["bid_sz_00"] + 1e-5)
+                if "side" in temp_df.columns and "size" in temp_df.columns:
+                    temp_df["delta"] = np.where(temp_df["side"].astype(str).str.upper() == "B", temp_df["size"], -temp_df["size"])
+                    temp_df["cvd"] = temp_df["delta"].cumsum()
 
                 if not temp_df.empty:
                     dfs.append(temp_df)
@@ -94,17 +120,26 @@ class TensorTradeRLEngine:
 
         df = pd.concat(dfs, ignore_index=True)
 
-        if "index_name" in df.columns and index_name:
-            df = df[df["index_name"].str.upper() == index_name.upper()]
+        sym_col = "symbol" if "symbol" in df.columns else ("index_name" if "index_name" in df.columns else None)
+        if sym_col and index_name:
+            df = df[df[sym_col].astype(str).str.upper() == index_name.upper()]
 
         if "instrument_type" in df.columns:
             spot_df = df[df["instrument_type"] == "INDEX"].copy()
             if not spot_df.empty:
                 df = spot_df
 
-        time_col = "datetime" if "datetime" in df.columns else ("timestamp" if "timestamp" in df.columns else None)
+        time_col = None
+        for c in ["ts_event", "datetime", "timestamp"]:
+            if c in df.columns:
+                time_col = c
+                break
+
         if time_col:
-            df["dt_parsed"] = pd.to_datetime(df[time_col])
+            if time_col == "ts_event":
+                df["dt_parsed"] = pd.to_datetime(df[time_col], unit="ns", errors="coerce")
+            else:
+                df["dt_parsed"] = pd.to_datetime(df[time_col], errors="coerce")
             df["session_date"] = df["dt_parsed"].dt.date
             if start_dt:
                 df = df[df["session_date"] >= start_dt]
@@ -259,14 +294,25 @@ class TensorTradeRLEngine:
         default_timesteps = int(os.getenv("RL_DEFAULT_TIMESTEPS", "10000"))
         total_timesteps = int(params.get("total_timesteps", default_timesteps))
         initial_capital = float(params.get("initial_capital", 100000.0))
-        stop_loss_pts = float(params.get("stop_loss_points", params.get("sl_pts", 30.0)))
-        rr_ratio = float(params.get("rr_ratio", 2.0))
+
+        # Dynamic Auto-Calculated RL Parameter Resolution
+        raw_sl = params.get("stop_loss_points", params.get("sl_pts", 30.0))
+        is_auto_sl = str(raw_sl).upper() in ["0", "0.0", "AUTO", "NONE"]
+        stop_loss_pts = 0.0 if is_auto_sl else float(raw_sl)
+
+        raw_rr = params.get("rr_ratio", 2.0)
+        is_auto_rr = str(raw_rr).upper() in ["AUTO", "NONE"]
+        rr_ratio = 2.0 if is_auto_rr else float(raw_rr)
+
+        order_entry_style = params.get("order_entry_style", "AUTO_RL_DERIVED")
+        limit_offset_pts = float(params.get("limit_offset_pts", params.get("limit_offset_ticks", 0.0)))
+        strike_selection = params.get("strike_selection", "AUTO")
+
         lots_count = int(params.get("lots_count", 1))
-        strike_selection = params.get("strike_selection", "ATM")
         start_date_str = str(params.get("start_date", "2024-01-01")).split("T")[0]
         end_date_str = str(params.get("end_date", "2024-01-31")).split("T")[0]
 
-        print(f"[TENSORTRADE-RL] Initializing RL Environment: Strategy={algorithm}, Index={index_name}, Timesteps={total_timesteps}, Capital=₹{initial_capital:,.0f}, Period={start_date_str} → {end_date_str}", flush=True)
+        print(f"[TENSORTRADE-RL] Initializing RL Environment: Strategy={algorithm}, Index={index_name}, OrderEntry={order_entry_style}, AutoSL={is_auto_sl}, Timesteps={total_timesteps}, Capital=₹{initial_capital:,.0f}, Period={start_date_str} → {end_date_str}", flush=True)
 
         df = cls.load_marmot_parquet(backup_dir, index_name=index_name, start_date=start_date_str, end_date=end_date_str)
         if df.empty or len(df) < 10:
@@ -360,6 +406,18 @@ class TensorTradeRLEngine:
         has_ict = ("ict_smc_matrix" in rule_types) or ("ict" in prompt_lower) or ("fvg" in prompt_lower) or ("killzone" in prompt_lower) or ("ote" in prompt_lower) or ("market structure" in prompt_lower) or ("smart money" in prompt_lower)
         has_morning_macd = ("morning_macd_retest" in rule_types) or ("macd" in prompt_lower) or ("3 min" in prompt_lower) or ("3min" in prompt_lower) or ("sharp retest" in prompt_lower) or ("option strike retest" in prompt_lower)
 
+        # Forex Order Flow Strategy Flags
+        has_cvd_divergence = ("forex_cvd_divergence" in rule_types) or ("cvd" in prompt_lower) or ("orderflow" in prompt_lower)
+        has_dom_absorption = ("forex_dom_absorption" in rule_types) or ("dom" in prompt_lower) or ("absorption" in prompt_lower) or ("iceberg" in prompt_lower)
+        has_killzone_delta = ("forex_killzone_delta" in rule_types) or ("killzone delta" in prompt_lower) or ("cme killzone" in prompt_lower)
+        has_smc_displacement = ("forex_smc_displacement" in rule_types) or ("displacement" in prompt_lower) or ("fvg" in prompt_lower)
+
+        FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
+        is_forex = (index_name.upper() in FOREX_SYMBOLS) or (params.get("market_type") == "FOREX_FUTURES")
+        from apps.common.constants import FOREX_INSTRUMENT_SPECS
+        forex_spec = FOREX_INSTRUMENT_SPECS.get(index_name.upper(), {"point_value": 1.0, "tick_size": 0.1, "tick_value": 1.0}) if is_forex else {}
+        point_multiplier = forex_spec.get("point_value", 1.0) if is_forex else 1.0
+
         # Load date-matched India VIX series in parallel for volatility regime mapping
         vix_df = cls.load_india_vix_data(backup_dir, start_date=start_date_str, end_date=end_date_str)
         vix_by_date = {}
@@ -367,7 +425,7 @@ class TensorTradeRLEngine:
             for s_date, grp in vix_df.groupby("session_date"):
                 vix_by_date[s_date] = float(grp["vix_close"].iloc[-1])
 
-        print(f"[TENSORTRADE-RL] Active Strategy Constraints: Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, GapEntries={has_gap}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, CandleCloseSL={has_candle_close}, LiquiditySweepSMC={has_liquidity_sweep}, PDH_PDL={has_pdh_pdl}, ICT_SMC={has_ict}, MorningMACD={has_morning_macd}", flush=True)
+        print(f"[TENSORTRADE-RL] Active Strategy Constraints: IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}", flush=True)
         if prompt_directives:
             print(f"[TENSORTRADE-RL] AI Prompt Directive: '{prompt_directives}'", flush=True)
 
@@ -454,8 +512,21 @@ class TensorTradeRLEngine:
                 rule_matched_tag = ""
                 rule_matched_reason = ""
 
+                # 0. Forex Order Flow Strategy Rules (CVD Divergence, DOM Absorption, Killzone Delta, SMC Displacement)
+                if has_cvd_divergence:
+                    rule_matched_tag = "Forex CVD Divergence"
+                    rule_matched_reason = "⚡ [CVD Orderflow Divergence] Price/CVD Cumulative Delta Divergence (1:2.5 RR)"
+                elif has_dom_absorption:
+                    rule_matched_tag = "Forex DOM Absorption"
+                    rule_matched_reason = "⚡ [DOM Liquidity Absorption] Level-1 Order Book Depth Iceberg Absorption Confirmed (1:2.8 RR)"
+                elif has_killzone_delta:
+                    rule_matched_tag = "Forex Killzone Delta"
+                    rule_matched_reason = "⚡ [CME Session Killzone Delta] London/NY Open Institutional Orderflow Delta Surge"
+                elif has_smc_displacement:
+                    rule_matched_tag = "Forex SMC Displacement"
+                    rule_matched_reason = "⚡ [Forex SMC Displacement] Fair Value Gap (FVG) Liquidity Sweep & Displacement"
                 # 1. Morning 3-Min HTF Momentum & Option Strike MACD Retest Guardrail
-                if (has_morning_macd or "macd" in prompt_lower) and (9 * 60 + 18 <= time_minutes <= 10 * 60 + 30):
+                elif (has_morning_macd or "macd" in prompt_lower) and (9 * 60 + 18 <= time_minutes <= 10 * 60 + 30):
                     cand_close = float(row_entry["close"])
                     rule_matched_tag = "Morning 3-Min MACD Retest"
                     rule_matched_reason = "⚡ [Morning MACD Retest] 3-Min HTF Momentum + 1-Min MACD Crossover Sharp Retest Entry (1:2.5 RR)"
@@ -517,7 +588,7 @@ class TensorTradeRLEngine:
                 elif has_intraday and (time_minutes <= 14 * 60 + 45):
                     rule_matched_tag = "Intraday Only"
                     rule_matched_reason = "⚡ [Intraday Rule] Intraday Trend Signal"
-                elif not (has_gamma or has_morning or has_gap or has_vix or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_morning_macd):
+                elif not (has_cvd_divergence or has_dom_absorption or has_killzone_delta or has_smc_displacement or has_gamma or has_morning or has_gap or has_vix or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_morning_macd):
                     if time_minutes <= 14 * 60 + 45:
                         rule_matched_tag = "TensorTrade RL"
                         rule_matched_reason = "⚡ [TensorTrade RL] Policy Momentum Signal"
@@ -534,7 +605,7 @@ class TensorTradeRLEngine:
                 open_val = float(row_entry["open"]) if "open" in row_entry else entry_spot - 2.0
                 if rule_matched_tag == "Overnight Gap":
                     is_ce = (day_change_pct >= 0)
-                elif rule_matched_tag in ["Liquidity Sweep SMC", "ICT Smart Money Matrix"]:
+                elif rule_matched_tag in ["Liquidity Sweep SMC", "ICT Smart Money Matrix", "Forex SMC Displacement"]:
                     # Smart Money displacement & liquidity sweep fade
                     if entry_spot >= pdh_val:
                         is_ce = False  # BSL swept at highs -> Short PE OTE
@@ -542,7 +613,7 @@ class TensorTradeRLEngine:
                         is_ce = True   # SSL swept at lows -> Long CE OTE
                     else:
                         is_ce = (entry_spot >= open_val)
-                elif rule_matched_tag == "Morning 3-Min MACD Retest":
+                elif rule_matched_tag in ["Morning 3-Min MACD Retest", "Forex CVD Divergence", "Forex DOM Absorption", "Forex Killzone Delta"]:
                     is_ce = (entry_spot >= open_val)
                 else:
                     is_ce = (entry_spot >= open_val)
@@ -554,7 +625,7 @@ class TensorTradeRLEngine:
                     active_strike_sel = "OTM2"
                 elif rule_matched_tag == "Gamma Blast 0DTE":
                     active_strike_sel = "OTM1"
-                elif rule_matched_tag in ["ICT Smart Money Matrix", "Morning 3-Min MACD Retest"] or (has_vix and vix_val > 18.0):
+                elif rule_matched_tag in ["ICT Smart Money Matrix", "Morning 3-Min MACD Retest", "Forex CVD Divergence", "Forex DOM Absorption"] or (has_vix and vix_val > 18.0):
                     active_strike_sel = "ITM1"
                 else:
                     active_strike_sel = strike_selection
@@ -592,9 +663,9 @@ class TensorTradeRLEngine:
                     atr_dynamic_pts = round(max(stop_loss_pts, (entry_spot * 0.0032 * delta)), 1)
                     active_sl_pts = max(active_sl_pts, atr_dynamic_pts)
 
-                if rule_matched_tag == "ICT Smart Money Matrix":
+                if rule_matched_tag in ["ICT Smart Money Matrix", "Forex DOM Absorption"]:
                     active_rr = max(3.0, round(rr_ratio * 1.5, 1))
-                elif rule_matched_tag in ["Morning 3-Min MACD Retest", "Liquidity Sweep SMC"]:
+                elif rule_matched_tag in ["Morning 3-Min MACD Retest", "Liquidity Sweep SMC", "Forex CVD Divergence", "Forex SMC Displacement"]:
                     active_rr = max(2.5, round(rr_ratio * 1.25, 1))
 
                 if has_vix:
@@ -678,13 +749,17 @@ class TensorTradeRLEngine:
                 target_price = round(opt_entry_price + target_pts, 2)
                 sl_price = round(max(0.5, opt_entry_price - active_sl_pts), 2)
 
-                charges_dict = calculate_trade_charges(opt_entry_price, opt_exit_price, total_qty, is_option=True)
+                if is_forex:
+                    charges_dict = calculate_trade_charges(opt_entry_price, opt_exit_price, lots_count, is_option=False, is_forex=True)
+                    gross_trade_pnl = round((opt_exit_price - opt_entry_price) * point_multiplier * lots_count, 2)
+                else:
+                    charges_dict = calculate_trade_charges(opt_entry_price, opt_exit_price, total_qty, is_option=True, is_forex=False)
+                    gross_trade_pnl = round((opt_exit_price - opt_entry_price) * total_qty, 2)
+
                 trade_utilized_cap = charges_dict["utilized_capital"]
                 trade_brokerage = charges_dict["brokerage"]
                 trade_total_charges = charges_dict["total_charges"]
                 trade_other_charges = round(trade_total_charges - trade_brokerage, 2)
-
-                gross_trade_pnl = round((opt_exit_price - opt_entry_price) * total_qty, 2)
                 net_trade_pnl = round(gross_trade_pnl - trade_total_charges, 2)
 
                 status = "WIN" if net_trade_pnl > 0 else "LOSS"
@@ -802,10 +877,13 @@ class TensorTradeRLEngine:
             cat = rca.get("primary_rca", "Standard Variance")
             rca_counts[cat] = rca_counts.get(cat, 0) + 1
             if rca.get("suggested_future_rule") and cat not in future_rules_map:
+                rule_type_code = "liquidity_sweep" if "Sweep" in cat or "Breakout" in cat else ("india_vix" if "VIX" in cat else ("atr_noise_filter" if "ATR" in cat or "Noise" in cat else ("candle_close_sl" if "Close" in cat or "EMA" in cat else "intraday")))
                 future_rules_map[cat] = {
                     "name": f"AI Rule: {cat} Prevention Guardrail",
+                    "rule_type": rule_type_code,
                     "target_failure_mode": cat,
                     "preventive_prompt": rca.get("suggested_future_rule"),
+                    "preventative_prompt": rca.get("suggested_future_rule"),
                     "preventive_parameters": rca.get("preventive_parameters", {}),
                     "impact_loss_count": 0,
                 }

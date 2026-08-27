@@ -29,33 +29,41 @@
 <!-- Search & Filter Controls Bar -->
 <div class="glass-card p-3 mb-4">
     <form method="GET" action="{% url 'backtest:rule_list' %}" class="row g-3 align-items-center" hx-get="{% url 'backtest:rule_list' %}" hx-target="#rule-list-container" hx-push-url="true">
-        <div class="col-12 col-md-5">
+        <div class="col-12 col-md-4">
             <div class="input-group">
                 <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
                     <span class="material-icons fs-6">search</span>
                 </span>
                 <input type="text" name="q" value="{{ current_filters.q|default:'' }}"
                     class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25"
-                    placeholder="Search rules by name, prompt directive, or keywords..." 
+                    placeholder="Search rules..." 
                     hx-get="{% url 'backtest:rule_list' %}"
                     hx-target="#rule-list-container" 
                     hx-trigger="input changed delay:300ms, search"
                     hx-push-url="true">
             </div>
         </div>
-        <div class="col-12 col-sm-6 col-md-4">
+        <div class="col-12 col-sm-6 col-md-3">
+            <select name="market_type" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25" hx-get="{% url 'backtest:rule_list' %}" hx-target="#rule-list-container" hx-trigger="change" hx-push-url="true">
+                <option value="">All Market Segments</option>
+                {% for code, label in market_types %}
+                <option value="{{ code }}" {% if current_filters.market_type == code %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-12 col-sm-6 col-md-3">
             <select name="rule_type" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25" hx-get="{% url 'backtest:rule_list' %}" hx-target="#rule-list-container" hx-trigger="change" hx-push-url="true">
-                <option value="">All Rule Types</option>
+                <option value="">All Rule Regimes</option>
                 {% for code, label in rule_types %}
                 <option value="{{ code }}" {% if current_filters.rule_type == code %}selected{% endif %}>{{ label }}</option>
                 {% endfor %}
             </select>
         </div>
-        <div class="col-12 col-sm-6 col-md-3">
+        <div class="col-12 col-sm-6 col-md-2">
             <select name="is_active" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25" hx-get="{% url 'backtest:rule_list' %}" hx-target="#rule-list-container" hx-trigger="change" hx-push-url="true">
                 <option value="">All Statuses</option>
-                <option value="true" {% if current_filters.is_active == 'true' %}selected{% endif %}>Active Rules</option>
-                <option value="false" {% if current_filters.is_active == 'false' %}selected{% endif %}>Inactive Rules</option>
+                <option value="true" {% if current_filters.is_active == 'true' %}selected{% endif %}>Active</option>
+                <option value="false" {% if current_filters.is_active == 'false' %}selected{% endif %}>Inactive</option>
             </select>
         </div>
     </form>
@@ -70,10 +78,11 @@
             <thead>
                 <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important; font-size: 0.72rem;">
                     <th scope="col" class="text-center py-2.5 px-1" style="width: 4%; min-width: 32px;">#</th>
-                    <th scope="col" class="py-2.5 ps-3 pe-2" style="width: 28%;">Rule Name & Regime</th>
-                    <th scope="col" class="py-2.5 px-3" style="width: 34%;">Execution Constraints</th>
-                    <th scope="col" class="py-2.5 px-1 text-center" style="width: 12%;">Scope</th>
-                    <th scope="col" class="py-2.5 px-1 text-center" style="width: 10%;">Status</th>
+                    <th scope="col" class="py-2.5 ps-3 pe-2" style="width: 26%;">Rule Name & Regime</th>
+                    <th scope="col" class="py-2.5 px-2 text-center" style="width: 14%;">Market Type</th>
+                    <th scope="col" class="py-2.5 px-3" style="width: 24%;">Execution Constraints</th>
+                    <th scope="col" class="py-2.5 px-1 text-center" style="width: 11%;">Scope</th>
+                    <th scope="col" class="py-2.5 px-1 text-center" style="width: 9%;">Status</th>
                     <th scope="col" class="text-center py-2.5 px-1" style="width: 12%; min-width: 105px;">Actions</th>
                 </tr>
             </thead>
@@ -150,6 +159,22 @@
                                 </div>
                             </div>
                         </div>
+                    </td>
+
+                    <td class="py-2.5 px-2 bg-transparent text-center">
+                        {% if rule.market_type == 'INDEX_FO' %}
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-0.5 fw-semibold" style="font-size: 0.66rem;">
+                            <span class="material-icons align-middle me-0.5" style="font-size: 0.72rem !important;">show_chart</span> Index F&amp;O
+                        </span>
+                        {% elif rule.market_type == 'FOREX_FUTURES' %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2.5 py-0.5 fw-semibold" style="font-size: 0.66rem;">
+                            <span class="material-icons align-middle me-0.5" style="font-size: 0.72rem !important;">attach_money</span> Forex Futures
+                        </span>
+                        {% else %}
+                        <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-2.5 py-0.5 fw-semibold" style="font-size: 0.66rem;">
+                            <span class="material-icons align-middle me-0.5" style="font-size: 0.72rem !important;">public</span> All Markets
+                        </span>
+                        {% endif %}
                     </td>
 
                     <td class="py-2.5 px-3 bg-transparent">
@@ -249,7 +274,7 @@
 
                 <!-- Collapsible Detailed Rule Drawer -->
                 <tr class="collapse border-0" id="rule-exp-{{ rule.id }}" style="white-space: normal;">
-                    <td colspan="6" class="p-0 border-0" style="white-space: normal;">
+                    <td colspan="7" class="p-0 border-0" style="white-space: normal;">
                         <div class="p-3 mx-2 my-2 rounded-3 shadow-lg" style="background: var(--card-bg, rgba(15, 23, 42, 0.95)); backdrop-filter: blur(16px); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)); white-space: normal;">
                             <div class="row g-3 align-items-stretch">
                                 
@@ -340,7 +365,7 @@
                 </tr>
                 {% empty %}
                 <tr>
-                    <td colspan="6" class="text-center py-5 theme-text-muted">
+                    <td colspan="7" class="text-center py-5 theme-text-muted">
                         <div class="d-flex flex-column align-items-center justify-content-center gap-2">
                             <span class="material-icons text-muted fs-1 opacity-50">rule</span>
                             <span class="fw-semibold">No Strategy Rules found</span>
@@ -378,8 +403,15 @@
                     {% endif %}
                 </button>
             </div>
-            <div class="mb-2 d-flex align-items-center gap-1">
+            <div class="mb-2 d-flex align-items-center gap-1 flex-wrap">
                 <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0" style="font-size: 0.65rem;">{{ rule.get_rule_type_display }}</span>
+                {% if rule.market_type == 'INDEX_FO' %}
+                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0" style="font-size: 0.65rem;">Index F&amp;O</span>
+                {% elif rule.market_type == 'FOREX_FUTURES' %}
+                <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0" style="font-size: 0.65rem;">Forex Futures</span>
+                {% else %}
+                <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0" style="font-size: 0.65rem;">All Markets</span>
+                {% endif %}
                 {% if rule.is_system_preset %}
                 <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0" style="font-size: 0.65rem;">Preset</span>
                 {% endif %}

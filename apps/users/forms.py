@@ -292,21 +292,33 @@ class UserProfilePasswordChangeForm(PasswordChangeForm):
 
 
 from apps.backtest.models import BacktestTask
+from apps.backtest.forms import BackupTaskSelectWidget
 from apps.market.models import MarketBackupTask
+from apps.common.choices import IndexChoices, ForexInstrumentChoices, MarketTypeChoices
 
 class UserBacktestTaskForm(forms.ModelForm):
+    market_type = forms.ChoiceField(
+        choices=MarketTypeChoices.choices,
+        initial=MarketTypeChoices.INDEX_FO,
+        widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_user_market_type'})
+    )
     backup_task = forms.ModelChoiceField(
         queryset=MarketBackupTask.objects.filter(is_deleted=False),
         required=False,
         empty_label="-- Select Existing Backup File (Optional) --",
-        widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_user_backup_task'})
+        widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_user_backup_task'})
+    )
+    index_name = forms.ChoiceField(
+        choices=IndexChoices.choices + ForexInstrumentChoices.choices,
+        required=True,
+        widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_user_index_name'})
     )
     risk_reward_ratio = forms.FloatField(initial=2.0, required=False, help_text="Risk to Reward Ratio (e.g. 2.0)")
     stop_loss_pct = forms.FloatField(initial=0.5, required=False, help_text="Stop Loss Percentage (e.g. 0.5%)")
 
     class Meta:
         model = BacktestTask
-        fields = ['backup_task', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital']
+        fields = ['market_type', 'backup_task', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital']
         widgets = {
             'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_user_index_name'}),

@@ -28,14 +28,15 @@ from django.views.generic import (
 from django.conf import settings
 from django_filters.views import FilterView
 
-from apps.users.models import User, MemberRoleChoices, BrokerChoices, PLStatusChoices
-from apps.users.mixins import HTMXPartialMixin
-from apps.trade_config.models import TradeExecConfig, BrokerMaster
-from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
+from apps.common.choices import AccountTypeChoices
 from apps.common.constants import Messages
-from apps.admins.filters import TradeExecConfigFilter
+from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
+from apps.trade_config.models import BrokerMaster, TradeExecConfig, UserTradingAccount
+from apps.users.mixins import HTMXPartialMixin
+from apps.users.models import BrokerChoices, MemberRoleChoices, PLStatusChoices, User
+from .filters import TradeExecConfigFilter
+from .forms import AdminTraderPasswordResetForm, BrokerMasterForm, TradeExecConfigForm, UserForm
 from .permissions import AdminRequiredMixin
-from .forms import TradeExecConfigForm, UserForm, AdminTraderPasswordResetForm, BrokerMasterForm
 
 
 # ==========================================
@@ -394,20 +395,101 @@ class AdminTradeExecConfigDetailView(LoginRequiredMixin, AdminRequiredMixin, Det
     context_object_name = 'config'
 
 
-class AdminTradeExecConfigCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
+class AdminTradeExecConfigCreateView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
     model = TradeExecConfig
     form_class = TradeExecConfigForm
     template_name = 'admins/trade_exec_config_form.html'
+    partial_template_name = 'admins/partials/trade_exec_config_form_content.html'
     success_url = reverse_lazy('admins:trade_exec_config_list')
     success_message = Messages.CONFIG_CREATED
 
+    def get_initial(self):
+        initial = super().get_initial()
+        target_user = self.request.GET.get('user')
+        if target_user:
+            initial['admins_user'] = target_user
+        else:
+            initial['admins_user'] = self.request.user.pk
+        return initial
 
-class AdminTradeExecConfigUpdateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, UpdateView):
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        target_user = self.request.GET.get('user') or (self.request.user.pk if self.request.user.is_authenticated else None)
+        default_account = None
+        if target_user:
+            accounts = UserTradingAccount.objects.filter(user_id=target_user, is_active=True).select_related('broker')
+            default_account = accounts.filter(is_default=True).first() or accounts.first()
+        context['default_account'] = default_account
+        context['selected_mode'] = default_account.account_type if default_account else AccountTypeChoices.SANDBOX
+        context['trading_account_id'] = default_account.pk if default_account else ''
+        context['account_type_choices'] = AccountTypeChoices.choices
+        return context
+
+    def form_valid(self, form):
+        if not form.cleaned_data.get('admins_user'):
+            form.instance.admins_user = self.request.user
+        trading_acc_id = self.request.POST.get('trading_account')
+        if trading_acc_id and not form.instance.trading_account_id:
+            try:
+                form.instance.trading_account_id = int(trading_acc_id)
+            except (ValueError, TypeError):
+                pass
+        return super().form_valid(form)
+
+
+class AdminTradeExecConfigUpdateView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, UpdateView):
     model = TradeExecConfig
     form_class = TradeExecConfigForm
     template_name = 'admins/trade_exec_config_form.html'
+    partial_template_name = 'admins/partials/trade_exec_config_form_content.html'
     success_url = reverse_lazy('admins:trade_exec_config_list')
     success_message = Messages.CONFIG_UPDATED
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        config = self.object
+        target_user = config.admins_user_id
+        default_account = config.trading_account
+        if not default_account and target_user:
+            accounts = UserTradingAccount.objects.filter(user_id=target_user, is_active=True).select_related('broker')
+            default_account = accounts.filter(is_default=True).first() or accounts.first()
+        context['default_account'] = default_account
+        context['selected_mode'] = config.account_type
+        context['trading_account_id'] = default_account.pk if default_account else ''
+        context['account_type_choices'] = AccountTypeChoices.choices
+        return context
+
+    def form_valid(self, form):
+        trading_acc_id = self.request.POST.get('trading_account')
+        if trading_acc_id:
+            try:
+                form.instance.trading_account_id = int(trading_acc_id)
+            except (ValueError, TypeError):
+                pass
+        return super().form_valid(form)
+
+
+class AdminTradeExecUserAccountInfoView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Fetches user's default trading account and renders dynamic execution mode badge."""
+
+    def get(self, request, *args, **kwargs):
+        user_id = request.GET.get('admins_user') or request.GET.get('user_id') or request.GET.get('user')
+        current_account_type = request.GET.get('account_type')
+        default_account = None
+
+        if user_id:
+            accounts = UserTradingAccount.objects.filter(user_id=user_id, is_active=True).select_related('broker')
+            default_account = accounts.filter(is_default=True).first() or accounts.first()
+
+        selected_mode = current_account_type or (default_account.account_type if default_account else AccountTypeChoices.SANDBOX)
+
+        context = {
+            'default_account': default_account,
+            'selected_mode': selected_mode,
+            'trading_account_id': default_account.pk if default_account else '',
+            'account_type_choices': AccountTypeChoices.choices,
+        }
+        return render(request, 'admins/partials/trade_exec_user_account_badge.html', context)
 
 
 class AdminTradeExecConfigDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, DeleteView):

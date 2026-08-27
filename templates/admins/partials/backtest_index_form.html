@@ -1,0 +1,247 @@
+<form method="post" action="{% url 'backtest:backtest_create' %}" id="indexBacktestForm">
+    {% csrf_token %}
+    <input type="hidden" name="market_type" value="INDEX_FO">
+
+    {% if index_form.non_field_errors %}
+        <div class="alert alert-danger mb-4 rounded-3 border-0 bg-danger bg-opacity-25 text-danger">
+            {% for error in index_form.non_field_errors %}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons fs-6">error_outline</span>
+                    <span>{{ error }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# Section 1: Pre-downloaded Dataset (Optional) #}
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+        <span class="material-icons text-primary fs-5">dataset</span>
+        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Pre-downloaded Index Dataset (Optional)</h6>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.backup_task.id_for_label }}" style="min-width: 180px;">
+            Backup Dataset
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.backup_task }}
+            <small class="form-text theme-text-muted mt-1 d-block">Selecting a completed Index backup dataset will populate target index and dates.</small>
+            {% for error in index_form.backup_task.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Section 2: Strategy Engine & Index Selection #}
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+        <span class="material-icons text-primary fs-5">psychology</span>
+        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Strategy Engine & Index Selection</h6>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.strategy_name.id_for_label }}" style="min-width: 180px;">
+            RL Strategy Engine<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.strategy_name }}
+            <small class="form-text theme-text-muted d-block mt-1">TensorTrade RL (Deep Reinforcement Learning) engine with PPO policy optimization.</small>
+            {% for error in index_form.strategy_name.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.index_name.id_for_label }}" style="min-width: 180px;">
+            Target Index (F&O)<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.index_name }}
+            {% for error in index_form.index_name.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Section 3: Index F&O Constraint Rules #}
+    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-primary fs-5">rule</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Index F&O Constraint Rules & AI Directives</h6>
+        </div>
+        <a href="{% url 'backtest:rule_list' %}" class="small text-info text-decoration-none d-flex align-items-center gap-1" target="_blank">
+            <span class="material-icons fs-6">settings</span>
+            <span>Manage Rules</span>
+        </a>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase pt-2 mb-md-0" style="min-width: 180px;">
+            Execution Rules
+        </label>
+        <div class="flex-grow-1 w-100">
+            <div class="custom-scrollable-rules p-2 rounded-2" style="max-height: 250px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(0, 0, 0, 0.2);">
+                <div class="row g-2">
+                    {% for choice in index_form.rules %}
+                    <div class="col-12 col-md-6">
+                        <label for="{{ choice.id_for_label }}" class="custom-check-item w-100 h-100 p-2 d-flex align-items-center gap-2 rounded-2 border" style="background: rgba(255, 255, 255, 0.02); border-color: rgba(255, 255, 255, 0.06) !important; cursor: pointer;">
+                            {{ choice.tag }}
+                            <span class="theme-text-main small fw-semibold">{{ choice.choice_label }}</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <small class="form-text theme-text-muted mt-2 d-block">
+                Select active Index & F&O constraint rules for TensorTrade RL simulation.
+            </small>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase pt-2 mb-md-0" for="{{ index_form.prompt_directives.id_for_label }}" style="min-width: 180px;">
+            AI Directives Prompt
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.prompt_directives }}
+            <small class="form-text theme-text-muted mt-1 d-block">
+                Optional natural language instructions for TensorTrade RL (e.g. <em>"Only take CE trades when index crosses yesterday's high"</em>).
+            </small>
+            {% for error in index_form.prompt_directives.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Section 4: Horizon & Capital #}
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+        <span class="material-icons text-primary fs-5">date_range</span>
+        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Backtest Horizon & Capital</h6>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.initial_capital.id_for_label }}" style="min-width: 180px;">
+            Initial Capital (INR ₹)<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.initial_capital }}
+            {% for error in index_form.initial_capital.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.start_date.id_for_label }}" style="min-width: 180px;">
+            Start Date<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.start_date }}
+            {% for error in index_form.start_date.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.end_date.id_for_label }}" style="min-width: 180px;">
+            End Date<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.end_date }}
+            {% for error in index_form.end_date.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Section 5: Option Strike & Position Sizing #}
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+        <span class="material-icons text-primary fs-5">tune</span>
+        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Option Strike & Position Sizing</h6>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.strike_selection.id_for_label }}" style="min-width: 180px;">
+            Strike Selection
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.strike_selection }}
+            <small class="form-text theme-text-muted d-block mt-1">Target Strike offset: ATM, ITM (+/- 1, 2) or OTM (+/- 1, 2).</small>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.lots_count.id_for_label }}" style="min-width: 180px;">
+            Lots Count (Option Lots)
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.lots_count }}
+            <small class="form-text theme-text-muted d-block mt-1">Number of option lots to trade per signal (e.g. 1, 2, 5).</small>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.risk_reward_ratio.id_for_label }}" style="min-width: 180px;">
+            Risk:Reward Ratio
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.risk_reward_ratio }}
+        </div>
+    </div>
+
+    <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ index_form.stop_loss_points.id_for_label }}" style="min-width: 180px;">
+            Stop Loss (Index/Option Pts)
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ index_form.stop_loss_points }}
+            <small class="form-text theme-text-muted d-block mt-1">Stop loss in index points or option premium points (e.g. 30 pts).</small>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-end gap-3 pt-4 border-top" style="border-color: var(--border-color) !important;">
+        <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold text-white d-inline-flex align-items-center gap-2" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
+            <span class="material-icons fs-5">play_circle</span>
+            <span>Initialize Index F&O Backtest</span>
+        </button>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const backupTaskSelect = document.getElementById('id_index_backup_task');
+    const indexSelect = document.getElementById('id_index_index_name');
+
+    if (backupTaskSelect) {
+        backupTaskSelect.addEventListener('change', function () {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption) {
+                const indexVal = selectedOption.getAttribute('data-index');
+                const startDateVal = selectedOption.getAttribute('data-start-date');
+                const endDateVal = selectedOption.getAttribute('data-end-date');
+
+                if (indexVal && indexSelect) {
+                    let hasOption = Array.from(indexSelect.options).some(opt => opt.value === indexVal);
+                    if (!hasOption) {
+                        const newOpt = document.createElement('option');
+                        newOpt.value = indexVal;
+                        newOpt.textContent = indexVal;
+                        indexSelect.appendChild(newOpt);
+                    }
+                    indexSelect.value = indexVal;
+                }
+                if (startDateVal) {
+                    const startDateInput = document.getElementById('id_index_start_date');
+                    if (startDateInput) startDateInput.value = startDateVal;
+                }
+                if (endDateVal) {
+                    const endDateInput = document.getElementById('id_index_end_date');
+                    if (endDateInput) endDateInput.value = endDateVal;
+                }
+            }
+        });
+    }
+});
+</script>

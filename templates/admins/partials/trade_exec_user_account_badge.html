@@ -1,0 +1,50 @@
+<div class="d-flex align-items-center justify-content-between mb-1">
+    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">Execution Mode *</label>
+    <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 rounded-pill px-2 py-0-5 small d-inline-flex align-items-center gap-1" style="font-size: 0.7rem;">
+        <span class="material-icons" style="font-size: 11px;">lock</span>
+        <span>Auto-Locked</span>
+    </span>
+</div>
+
+<div class="p-2 px-3 rounded-3 border d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; min-height: 40px;">
+    {% if default_account %}
+        {% if default_account.account_type == 'LIVE' %}
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons text-success fs-5">verified</span>
+                <span class="fw-bold text-success small">LIVE ACCOUNT</span>
+            </div>
+            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 px-2 py-1 small">
+                {{ default_account.broker.name }}
+            </span>
+        {% else %}
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons text-warning fs-5">science</span>
+                <span class="fw-bold text-warning small">SANDBOX ACCOUNT</span>
+            </div>
+            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 px-2 py-1 small">
+                {{ default_account.broker.name }}
+            </span>
+        {% endif %}
+    {% else %}
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons theme-text-muted fs-5">science</span>
+            <span class="fw-bold theme-text-muted small">SANDBOX ACCOUNT</span>
+        </div>
+        <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 px-2 py-1 small">
+            Default Simulated
+        </span>
+    {% endif %}
+</div>
+
+<input type="hidden" name="account_type" id="id_account_type" value="{{ selected_mode }}">
+<input type="hidden" name="trading_account" id="id_trading_account" value="{{ trading_account_id }}">
+
+{% if default_account %}
+    <div class="theme-text-muted small mt-1" style="font-size:0.75rem;">
+        Linked: <span class="theme-text-main fw-semibold">{{ default_account.account_name }}</span> {% if default_account.broker_client_id %}({{ default_account.broker_client_id }}){% endif %}
+    </div>
+{% else %}
+    <div class="theme-text-muted small mt-1" style="font-size:0.75rem;">
+        No active broker account configured. Defaulting to sandbox mode.
+    </div>
+{% endif %}

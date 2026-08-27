@@ -141,6 +141,24 @@
         background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='-4 -4 8 8'%3e%3ccircle r='3' fill='%23ffffff'/%3e%3c/svg%3e") !important;
     }
 
+    /* Sticky Modal Footer with Backdrop Blur */
+    .edit-modal-footer-sticky {
+        position: sticky;
+        bottom: 0;
+        z-index: 30;
+        border-top: 1px solid var(--border-color) !important;
+        backdrop-filter: blur(12px) !important;
+        -webkit-backdrop-filter: blur(12px) !important;
+    }
+    :root[data-theme="dark"] .edit-modal-footer-sticky {
+        background: rgba(3, 6, 16, 0.96) !important;
+        box-shadow: 0 -10px 25px rgba(0, 0, 0, 0.6) !important;
+    }
+    :root[data-theme="light"] .edit-modal-footer-sticky {
+        background: rgba(255, 255, 255, 0.96) !important;
+        box-shadow: 0 -8px 20px rgba(15, 23, 42, 0.08) !important;
+    }
+
     /* Custom Scrollbar for Rules */
     .edit-rules-scroller::-webkit-scrollbar {
         width: 7px;
@@ -199,11 +217,22 @@
           hx-target="#globalHtmxModalDialog">
         {% csrf_token %}
 
-        <div class="modal-body px-4 px-md-4.5 py-4" style="max-height: 84vh; overflow-y: auto; overscroll-behavior: contain;">
+        <div class="modal-body px-4 px-md-4.5 py-4" style="max-height: 72vh; overflow-y: auto; overscroll-behavior: contain;">
             
             <!-- Strategy & Index Context Summary Banner -->
             <div class="p-3.5 mb-4 rounded-3 border edit-modal-subpanel d-flex flex-wrap align-items-center justify-content-between gap-3">
                 <div class="d-flex align-items-center gap-2.5 flex-wrap">
+                    {% if is_forex or backtest.market_type == 'FOREX_FUTURES' %}
+                    <span class="badge rounded-pill px-3 py-1.5 fw-bold font-monospace shadow-sm" 
+                          style="font-size: 0.80rem; background: rgba(147, 51, 234, 0.25); color: #c084fc; border: 1px solid rgba(147, 51, 234, 0.5);">
+                        🌐 FOREX FUTURES
+                    </span>
+                    {% else %}
+                    <span class="badge rounded-pill px-3 py-1.5 fw-bold font-monospace shadow-sm" 
+                          style="font-size: 0.80rem; background: rgba(14, 165, 233, 0.25); color: #38bdf8; border: 1px solid rgba(14, 165, 233, 0.5);">
+                        🇮🇳 INDEX F&O
+                    </span>
+                    {% endif %}
                     <span class="badge rounded-pill px-3 py-1.5 fw-bold font-monospace shadow-sm" 
                           style="font-size: 0.80rem; background: rgba(99, 102, 241, 0.25); color: #a5b4fc; border: 1px solid rgba(99, 102, 241, 0.5);">
                         <span class="material-icons align-middle me-1" style="font-size: 0.90rem;">psychology</span>
@@ -238,13 +267,37 @@
                 </div>
                 <div class="col-12 col-md-4">
                     <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_initial_capital" style="font-size: 0.75rem; letter-spacing: 0.5px;">
-                        Initial Capital (₹)<span class="text-danger ms-1">*</span>
+                        {% if is_forex or backtest.market_type == 'FOREX_FUTURES' %}Initial Capital ($ USD){% else %}Initial Capital (₹){% endif %}<span class="text-danger ms-1">*</span>
                     </label>
                     <input type="number" step="1000" min="1000" name="initial_capital" id="edit_initial_capital" class="form-control edit-modal-input font-monospace fw-bold text-success" value="{{ initial_capital_val }}" required style="font-size: 0.88rem;">
                 </div>
             </div>
 
-            <!-- 2. Row: Lots, Strike, Stop Loss, Risk-Reward (4 Columns Spacious) -->
+            <!-- 2. Row: Position Sizing & Risk Parameters -->
+            {% if is_forex or backtest.market_type == 'FOREX_FUTURES' %}
+            <!-- Forex Parameters (NO Strike Selection) -->
+            <div class="row g-3.5 mb-4">
+                <div class="col-12 col-md-4">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_lots_count" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                        Contract Quantity (Micro Lots)<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="number" min="1" max="100" name="lots_count" id="edit_lots_count" class="form-control edit-modal-input font-monospace fw-bold" value="{{ lots_count_val }}" required style="font-size: 0.88rem;">
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_stop_loss_points" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                        Stop Loss (Pips / Ticks)<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="number" step="0.1" min="0.1" name="stop_loss_points" id="edit_stop_loss_points" class="form-control edit-modal-input font-monospace fw-bold text-danger" value="{{ stop_loss_points_val }}" required style="font-size: 0.88rem;">
+                </div>
+                <div class="col-6 col-md-4">
+                    <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_rr_ratio" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                        Risk : Reward (1:X)<span class="text-danger ms-1">*</span>
+                    </label>
+                    <input type="number" step="0.1" min="0.5" max="20" name="rr_ratio" id="edit_rr_ratio" class="form-control edit-modal-input font-monospace fw-bold text-primary" value="{{ rr_ratio_val }}" required style="font-size: 0.88rem;">
+                </div>
+            </div>
+            {% else %}
+            <!-- Index F&O Parameters (With Strike Selection) -->
             <div class="row g-3.5 mb-4">
                 <div class="col-6 col-md-3">
                     <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_lots_count" style="font-size: 0.75rem; letter-spacing: 0.5px;">
@@ -278,6 +331,7 @@
                     <input type="number" step="0.1" min="0.5" max="20" name="rr_ratio" id="edit_rr_ratio" class="form-control edit-modal-input font-monospace fw-bold text-primary" value="{{ rr_ratio_val }}" required style="font-size: 0.88rem;">
                 </div>
             </div>
+            {% endif %}
 
             <!-- 3. Strategy Rules Selection (Generous Height Scrollable Container with Green/Grey Toggles at Right End) -->
             <div class="mb-4 p-3.5 rounded-3 border edit-modal-subpanel">
@@ -288,7 +342,7 @@
                             Active Strategy Rules & Execution Guardrails
                         </span>
                         <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-0.5 ms-1" style="font-size: 0.70rem;">
-                            {{ available_rules|length }} Active Available
+                            {% if is_forex or backtest.market_type == 'FOREX_FUTURES' %}Forex Rules ({{ available_rules|length }}){% else %}Index Rules ({{ available_rules|length }}){% endif %}
                         </span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
@@ -349,8 +403,8 @@
 
         </div>
 
-        <!-- Modal Footer -->
-        <div class="modal-footer border-top px-4 px-md-4.5 py-3 d-flex justify-content-end gap-2.5" style="border-color: var(--border-color) !important; background: rgba(0, 0, 0, 0.06);">
+        <!-- Modal Footer (Sticky Pinned at Bottom) -->
+        <div class="modal-footer edit-modal-footer-sticky px-4 px-md-4.5 py-3 d-flex justify-content-end gap-2.5">
             <button type="button" class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1.5 px-4 py-2" data-bs-dismiss="modal" style="font-size: 0.85rem;">
                 <span>Cancel</span>
             </button>

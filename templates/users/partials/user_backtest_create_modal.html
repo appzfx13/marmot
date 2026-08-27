@@ -75,3 +75,42 @@
         </div>
     </form>
 </div>
+
+<script>
+(function() {
+    const backupTaskSelect = document.getElementById('id_user_backup_task');
+    if (backupTaskSelect) {
+        backupTaskSelect.addEventListener('change', function () {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption) {
+                const indexVal = selectedOption.getAttribute('data-index');
+                const startDateVal = selectedOption.getAttribute('data-start-date');
+                const endDateVal = selectedOption.getAttribute('data-end-date');
+
+                if (indexVal) {
+                    const indexSelect = document.getElementById('id_user_index_name');
+                    if (indexSelect) {
+                        let hasOption = Array.from(indexSelect.options).some(opt => opt.value === indexVal);
+                        if (!hasOption) {
+                            const newOpt = document.createElement('option');
+                            newOpt.value = indexVal;
+                            newOpt.textContent = indexVal;
+                            indexSelect.appendChild(newOpt);
+                        }
+                        indexSelect.value = indexVal;
+                    }
+                }
+                if (startDateVal) {
+                    const startDateInput = document.getElementById('id_user_start_date');
+                    if (startDateInput) startDateInput.value = startDateVal;
+                }
+                if (endDateVal) {
+                    const endDateInput = document.getElementById('id_user_end_date');
+                    if (endDateInput) endDateInput.value = endDateVal;
+                }
+            }
+        });
+    }
+})();
+</script>
+

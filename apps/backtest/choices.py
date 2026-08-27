@@ -1,4 +1,11 @@
 from django.db import models
+from apps.common.choices import MarketTypeChoices
+
+
+class RuleMarketTypeChoices(models.TextChoices):
+    INDEX_FO = MarketTypeChoices.INDEX_FO.value, MarketTypeChoices.INDEX_FO.label
+    FOREX_FUTURES = MarketTypeChoices.FOREX_FUTURES.value, MarketTypeChoices.FOREX_FUTURES.label
+    ALL = 'ALL', 'All Markets (Shared)'
 
 
 class BacktestRuleTypeChoices(models.TextChoices):
@@ -17,5 +24,9 @@ class BacktestRuleTypeChoices(models.TextChoices):
     PDH_PDL = 'pdh_pdl', 'PDH & PDL Breakout / Liquidity Sweep Filter'
     ICT_SMC = 'ict_smc_matrix', 'ICT Institutional Smart Money (Killzone, MSS, FVG & OTE)'
     MORNING_MACD_RETEST = 'morning_macd_retest', 'Morning 3-Min HTF & Option MACD Retest'
+    FOREX_CVD_DIVERGENCE = 'forex_cvd_divergence', 'Forex CVD (Cumulative Volume Delta) Divergence'
+    FOREX_DOM_ABSORPTION = 'forex_dom_absorption', 'Forex Level-10 DOM Depth & Iceberg Absorption'
+    FOREX_KILLZONE_DELTA = 'forex_killzone_delta', 'Forex London & NY Killzone Order Flow Surge'
+    FOREX_SMC_DISPLACEMENT = 'forex_smc_displacement', 'Forex SMC Displacement & FVG Retest'
     CUSTOM_PROMPT = 'custom_prompt', 'AI Prompt Directive'
     TECHNICAL = 'technical', 'Technical / Indicator'

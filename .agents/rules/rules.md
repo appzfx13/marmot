@@ -9,6 +9,7 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
 ---
 
 ## 1. Scope, Minimality & Code Simplicity
+- **Direct Question Answering (HIGH PRIORITY):** Whenever the user asks a question, ALWAYS reply and answer the question directly and completely first before proposing or executing any code changes.
 - **User Approval Required Before Any Code Changes (HIGH PRIORITY):** NEVER modify any file, write code, apply patches, or execute modifying commands without explicitly presenting the proposed plan or change to the user and receiving explicit user confirmation/approval first.
 - **Required Changes Only:** Make **only strictly required changes** to fulfill the specific prompt or task. Never perform unsolicited refactoring, code reorganization, or stylistic rewrites on untouched files or methods.
 - **Preserve Unrelated Code:** Preserve all existing comments, type annotations, and logic in untouched code sections.

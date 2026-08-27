@@ -9,7 +9,11 @@
      hx-get="{{ request.get_full_path }}" 
      hx-trigger="reloadBacktestDetail from:body" 
      hx-target="this">
-    {% include 'admins/partials/backtest_detail_content.html' %}
+    {% if is_forex or backtest.market_type == 'FOREX_FUTURES' %}
+        {% include 'admins/partials/backtest_forex_detail_content.html' %}
+    {% else %}
+        {% include 'admins/partials/backtest_detail_content.html' %}
+    {% endif %}
 </div>
 {% endblock %}
 

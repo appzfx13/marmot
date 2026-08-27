@@ -32,10 +32,22 @@
     </td>
 
     <!-- Max Loss -->
-    <td class="py-3 text-end text-danger fw-semibold bg-transparent">${{ config.max_loss_limit }}</td>
+    <td class="py-3 text-end fw-semibold bg-transparent">
+        {% if config.max_loss_status and config.max_loss_limit is not None %}
+            <span class="text-danger">${{ config.max_loss_limit }}</span>
+        {% else %}
+            <span class="theme-text-muted opacity-50 small">—</span>
+        {% endif %}
+    </td>
 
     <!-- Max Profit -->
-    <td class="py-3 text-end text-success fw-semibold bg-transparent">${{ config.max_profit_limit }}</td>
+    <td class="py-3 text-end fw-semibold bg-transparent">
+        {% if config.max_profit_status and config.max_profit_limit is not None %}
+            <span class="text-success">${{ config.max_profit_limit }}</span>
+        {% else %}
+            <span class="theme-text-muted opacity-50 small">—</span>
+        {% endif %}
+    </td>
 
     <!-- Lot Size -->
     <td class="py-3 text-center fw-bold theme-text-main bg-transparent">{{ config.default_lot_size }}</td>
@@ -52,7 +64,13 @@
             <a href="{% url 'admins:trade_exec_config_detail' config.pk %}" class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;" title="View Details">
                 <span class="material-icons fs-6">visibility</span>
             </a>
-            <a href="{% url 'admins:trade_exec_config_edit' config.pk %}" class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;" title="Edit">
+            <a href="{% url 'admins:trade_exec_config_edit' config.pk %}" 
+               class="glass-icon-btn text-decoration-none rounded-circle d-flex align-items-center justify-content-center" 
+               style="width: 36px; height: 36px;" 
+               title="Edit"
+               hx-get="{% url 'admins:trade_exec_config_edit' config.pk %}"
+               hx-target="#app-main-container"
+               hx-push-url="true">
                 <span class="material-icons fs-6">edit</span>
             </a>
             <button type="button" 

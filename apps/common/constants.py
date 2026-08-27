@@ -262,10 +262,36 @@ def get_option_expiry_analysis(index_name: str, trade_date=None, strike_price: f
     }
 
 
-def calculate_trade_charges(entry_price: float, exit_price: float, quantity: int, is_option: bool = True) -> dict:
-    """Calculates Indian regulatory brokerage, STT/CTT, exchange charges, SEBI charges, stamp duty, and GST."""
+FOREX_INSTRUMENT_SPECS = {
+    'MGC': {"name": "Micro Gold", "tick_size": 0.1, "point_value": 10.0, "tick_value": 1.0, "currency": "USD"},
+    'M6E': {"name": "Micro Euro", "tick_size": 0.0001, "point_value": 125000.0, "tick_value": 1.25, "currency": "USD"},
+    'MNQ': {"name": "Micro E-mini Nasdaq-100", "tick_size": 0.25, "point_value": 2.0, "tick_value": 0.50, "currency": "USD"},
+    'MES': {"name": "Micro E-mini S&P 500", "tick_size": 0.25, "point_value": 5.0, "tick_value": 1.25, "currency": "USD"},
+    'MCL': {"name": "Micro WTI Crude Oil", "tick_size": 0.01, "point_value": 100.0, "tick_value": 1.0, "currency": "USD"},
+    'MYM': {"name": "Micro E-mini Dow", "tick_size": 1.0, "point_value": 0.5, "tick_value": 0.50, "currency": "USD"},
+    'M6J': {"name": "Micro Japanese Yen", "tick_size": 0.000001, "point_value": 1250000.0, "tick_value": 1.25, "currency": "USD"},
+}
+
+
+def calculate_trade_charges(entry_price: float, exit_price: float, quantity: int, is_option: bool = True, is_forex: bool = False) -> dict:
+    """Calculates regulatory & broker charges for Indian Options or CME Forex Micro Futures."""
     buy_turnover = float(entry_price) * int(quantity)
     sell_turnover = float(exit_price) * int(quantity)
+
+    if is_forex:
+        # CME Micro Futures Commission: ~$0.75 per side ($1.50 round-turn per micro contract)
+        total_brokerage = round(float(quantity) * 1.50, 2)
+        return {
+            "brokerage": total_brokerage,
+            "stt": 0.0,
+            "exchange_charges": 0.0,
+            "sebi_charges": 0.0,
+            "stamp_duty": 0.0,
+            "gst": 0.0,
+            "total_charges": total_brokerage,
+            "utilized_capital": round(buy_turnover, 2),
+        }
+
     total_turnover = buy_turnover + sell_turnover
 
     brokerage_entry = min(20.0, buy_turnover * 0.0005) if buy_turnover > 0 else 0.0

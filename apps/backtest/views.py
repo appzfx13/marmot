@@ -5,10 +5,10 @@ from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
-from django.shortcuts import render, get_object_or_404
-from django.urls import reverse_lazy
+from django.shortcuts import render, get_object_or_404, redirect
+from django.urls import reverse_lazy, reverse
 from django.db.models import Q
-from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView, View
+from django.views.generic import ListView, CreateView, DetailView, UpdateView, DeleteView, View, TemplateView
 
 from apps.common.constants import (
     get_historical_lot_size,
@@ -21,7 +21,7 @@ from apps.admins.permissions import AdminRequiredMixin
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 
 from .models import BacktestTask, BacktestRule, TradingStrategy
-from .forms import BacktestTaskForm, BacktestRuleForm
+from .forms import IndexBacktestTaskForm, ForexBacktestTaskForm, BacktestRuleForm
 from .services import create_and_start_backtest_task, send_backtest_control_command
 
 class BacktestDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
@@ -53,14 +53,45 @@ class BacktestDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredM
 
 class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
     model = BacktestTask
-    form_class = BacktestTaskForm
+    form_class = IndexBacktestTaskForm
     template_name = 'admins/backtest_form.html'
     success_url = reverse_lazy('backtest:backtest_dashboard')
     success_message = "Backtest strategy initialized in CREATED status. Click 'Start' to execute."
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        if 'index_form' not in context:
+            context['index_form'] = IndexBacktestTaskForm()
+        if 'forex_form' not in context:
+            context['forex_form'] = ForexBacktestTaskForm()
+        active_tab = self.request.GET.get('market_type', 'INDEX_FO')
+        context['active_market_type'] = active_tab
+        return context
+
+    def post(self, request, *args, **kwargs):
+        self.object = None
+        market_type = request.POST.get('market_type', 'INDEX_FO')
+        if market_type == 'FOREX_FUTURES':
+            form = ForexBacktestTaskForm(request.POST)
+        else:
+            form = IndexBacktestTaskForm(request.POST)
+
+        if form.is_valid():
+            return self.form_valid(form)
+        else:
+            context = self.get_context_data()
+            if market_type == 'FOREX_FUTURES':
+                context['forex_form'] = form
+                context['active_market_type'] = 'FOREX_FUTURES'
+            else:
+                context['index_form'] = form
+                context['active_market_type'] = 'INDEX_FO'
+            return self.render_to_response(context)
+
     def form_valid(self, form):
         selected_rules = form.cleaned_data.get('rules')
         prompt_directives = form.cleaned_data.get('prompt_directives', '').strip()
+        market_type = form.cleaned_data.get('market_type', 'INDEX_FO')
         rule_list = []
         if selected_rules:
             for r in selected_rules:
@@ -77,10 +108,14 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
             "stop_loss_points": form.cleaned_data.get('stop_loss_points', 30.0),
             "sl_pts": form.cleaned_data.get('stop_loss_points', 30.0),
             "lots_count": form.cleaned_data.get('lots_count', 1),
-            "strike_selection": form.cleaned_data.get('strike_selection', 'ATM'),
             "rules": rule_list,
             "prompt_directives": prompt_directives,
         }
+
+        # Strike selection only applies to Index Options
+        if 'strike_selection' in form.cleaned_data and form.cleaned_data['strike_selection']:
+            params["strike_selection"] = form.cleaned_data['strike_selection']
+
         backup_task = form.cleaned_data.get('backup_task')
         self.object = create_and_start_backtest_task(
             strategy_name=form.cleaned_data['strategy_name'],
@@ -92,6 +127,9 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
             user=self.request.user,
             backup_task=backup_task
         )
+        self.object.market_type = market_type
+        self.object.save(update_fields=['market_type'])
+
         if selected_rules:
             self.object.rules.set(selected_rules)
 
@@ -510,6 +548,18 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
                 'is_active': r.is_active,
             })
 
+        # Sanitize AI suggested future rules to guarantee preventive_prompt key exists
+        if self.object.results and isinstance(self.object.results, dict) and 'ai_suggested_future_rules' in self.object.results:
+            ai_rules = self.object.results['ai_suggested_future_rules']
+            if isinstance(ai_rules, list):
+                for rule_item in ai_rules:
+                    if isinstance(rule_item, dict):
+                        p_val = rule_item.get('preventive_prompt') or rule_item.get('preventative_prompt') or ''
+                        rule_item['preventive_prompt'] = p_val
+                        rule_item['preventative_prompt'] = p_val
+
+        FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
+        context['is_forex'] = (self.object.market_type == 'FOREX_FUTURES' or (self.object.index_name and self.object.index_name.upper() in FOREX_SYMBOLS))
         context['rules_performance'] = rules_performance
         context['equity_curve_json'] = json.dumps(equity_curve_points)
         context['trades_page'] = trade_data['trades_page']
@@ -851,6 +901,9 @@ class BacktestRuleListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMi
         q = self.request.GET.get('q', '').strip()
         if q:
             queryset = queryset.filter(Q(name__icontains=q) | Q(description__icontains=q) | Q(prompt_directive__icontains=q))
+        market_type = self.request.GET.get('market_type', '').strip()
+        if market_type:
+            queryset = queryset.filter(market_type=market_type)
         rule_type = self.request.GET.get('rule_type', '').strip()
         if rule_type:
             queryset = queryset.filter(rule_type=rule_type)
@@ -865,8 +918,10 @@ class BacktestRuleListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMi
         context = super().get_context_data(**kwargs)
         context['page_title'] = "Backtest Strategy Rules"
         context['rule_types'] = BacktestRule.RuleTypeChoices.choices
+        context['market_types'] = BacktestRule.MarketTypeChoices.choices
         context['current_filters'] = {
             'q': self.request.GET.get('q', ''),
+            'market_type': self.request.GET.get('market_type', ''),
             'rule_type': self.request.GET.get('rule_type', ''),
             'is_active': self.request.GET.get('is_active', ''),
         }
@@ -969,7 +1024,13 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
 
     def get(self, request, pk, *args, **kwargs):
         task = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
-        available_rules = BacktestRule.objects.filter(is_active=True, is_deleted=False)
+        FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
+        is_forex = (task.market_type == 'FOREX_FUTURES' or (task.index_name and task.index_name.upper() in FOREX_SYMBOLS))
+
+        if is_forex:
+            available_rules = BacktestRule.objects.filter(is_active=True, is_deleted=False, market_type__in=['FOREX_FUTURES', 'ALL'])
+        else:
+            available_rules = BacktestRule.objects.filter(is_active=True, is_deleted=False, market_type__in=['INDEX_FO', 'ALL'])
 
         active_rule_ids = set(task.rules.values_list('id', flat=True))
         if not active_rule_ids and task.parameters and 'rules' in task.parameters:
@@ -981,9 +1042,24 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
                     if matched:
                         active_rule_ids.add(matched.id)
 
+        add_rule_type = request.GET.get('add_rule_type', '').strip()
+        add_rule_id = request.GET.get('add_rule_id', '').strip()
+
+        if add_rule_type:
+            rule_match = BacktestRule.objects.filter(rule_type=add_rule_type, is_active=True, is_deleted=False).first()
+            if rule_match:
+                active_rule_ids.add(rule_match.id)
+
+        if add_rule_id:
+            try:
+                active_rule_ids.add(int(add_rule_id))
+            except ValueError:
+                pass
+
         params = task.parameters or {}
         context = {
             'backtest': task,
+            'is_forex': is_forex,
             'available_rules': available_rules,
             'active_rule_ids': active_rule_ids,
             'start_date_val': task.start_date.strftime('%Y-%m-%d') if task.start_date else '',
@@ -999,6 +1075,8 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
 
     def post(self, request, pk, *args, **kwargs):
         task = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
+        is_forex = (task.market_type == 'FOREX_FUTURES' or (task.index_name and task.index_name.upper() in FOREX_SYMBOLS))
 
         start_date_str = request.POST.get('start_date', '').strip()
         end_date_str = request.POST.get('end_date', '').strip()
@@ -1029,11 +1107,14 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         except ValueError:
             lots_count = 1
 
-        strike_selection = request.POST.get('strike_selection', 'ATM').strip()
+        strike_selection = 'SPOT' if is_forex else request.POST.get('strike_selection', 'ATM').strip()
         prompt_directives = request.POST.get('prompt_directives', '').strip()
 
         selected_rule_ids = request.POST.getlist('rules')
-        rules_qs = BacktestRule.objects.filter(id__in=selected_rule_ids, is_deleted=False)
+        if is_forex:
+            rules_qs = BacktestRule.objects.filter(id__in=selected_rule_ids, is_active=True, is_deleted=False, market_type__in=['FOREX_FUTURES', 'ALL'])
+        else:
+            rules_qs = BacktestRule.objects.filter(id__in=selected_rule_ids, is_active=True, is_deleted=False, market_type__in=['INDEX_FO', 'ALL'])
 
         rules_list = []
         for r in rules_qs:
@@ -1047,6 +1128,7 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
 
         task.parameters = {
             **(task.parameters or {}),
+            "market_type": "FOREX_FUTURES" if is_forex else "INDEX_FO",
             "rr_ratio": rr_ratio,
             "stop_loss_points": sl_pts,
             "sl_pts": sl_pts,
@@ -1067,6 +1149,351 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             'reloadBacktestDetail': True,
             'reloadBacktestTable': True,
         })
+        return response
+
+
+class RLTrainingIndexView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Dedicated RL AI Training portal for Index Options (NIFTY, BANKNIFTY, FINNIFTY, SENSEX, etc.)."""
+    template_name = 'admins/rl_training_index.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['index_form'] = IndexBacktestTaskForm(initial={'strategy_name': 'tensortrade_rl'})
+        context['backtests'] = BacktestTask.objects.filter(
+            strategy_name='tensortrade_rl'
+        ).select_related('created_by', 'backup_task').order_by('-created_at')[:10]
+        context['active_market_type'] = 'INDEX_FO'
+        context['ws_url'] = settings.MARMOT_WS_URL
+        return context
+
+    def post(self, request, *args, **kwargs):
+        post_data = request.POST.copy()
+        if post_data.get('risk_reward_ratio') == 'AUTO':
+            post_data['risk_reward_ratio'] = '2.0'
+        if post_data.get('strike_selection') == 'AUTO':
+            post_data['strike_selection'] = 'ATM'
+
+        form = IndexBacktestTaskForm(post_data)
+        if form.is_valid():
+            selected_rules = form.cleaned_data.get('rules')
+            prompt_directives = form.cleaned_data.get('prompt_directives', '').strip()
+            rule_list = []
+            if selected_rules:
+                for r in selected_rules:
+                    rule_list.append({
+                        'id': r.id,
+                        'name': r.name,
+                        'rule_type': r.rule_type,
+                        'prompt_directive': r.prompt_directive,
+                        'parameters': r.parameters or {}
+                    })
+
+            limit_offset_pts = float(request.POST.get('limit_offset_pts', 0.0))
+            order_entry_style = request.POST.get('order_entry_style', 'LIMIT_ORDER')
+            algorithm = request.POST.get('algorithm', 'PPO')
+            reward_metric = request.POST.get('reward_metric', 'sharpe')
+            total_timesteps = int(request.POST.get('total_timesteps', 10000))
+
+            params = {
+                "market_type": "INDEX_FO",
+                "algorithm": algorithm,
+                "reward_metric": reward_metric,
+                "total_timesteps": total_timesteps,
+                "order_entry_style": order_entry_style,
+                "limit_offset_pts": limit_offset_pts,
+                "rr_ratio": form.cleaned_data.get('risk_reward_ratio', 2.0),
+                "stop_loss_points": form.cleaned_data.get('stop_loss_points', 30.0),
+                "sl_pts": form.cleaned_data.get('stop_loss_points', 30.0),
+                "lots_count": form.cleaned_data.get('lots_count', 1),
+                "rules": rule_list,
+                "prompt_directives": prompt_directives,
+            }
+
+            if 'strike_selection' in form.cleaned_data and form.cleaned_data['strike_selection']:
+                params["strike_selection"] = form.cleaned_data['strike_selection']
+
+            backup_task = form.cleaned_data.get('backup_task')
+            task = create_and_start_backtest_task(
+                strategy_name='tensortrade_rl',
+                index_name=form.cleaned_data.get('index_name', 'NIFTY'),
+                start_date=form.cleaned_data.get('start_date'),
+                end_date=form.cleaned_data.get('end_date'),
+                initial_capital=form.cleaned_data.get('initial_capital', 100000.0),
+                parameters=params,
+                user=request.user,
+                backup_task=backup_task
+            )
+            if selected_rules:
+                task.rules.set(selected_rules)
+
+            send_backtest_control_command(task.id, 'START')
+
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=200)
+                response['HX-Redirect'] = reverse('backtest:backtest_detail', kwargs={'pk': task.id})
+                return response
+            return redirect('backtest:backtest_detail', pk=task.id)
+
+        context = self.get_context_data()
+        context['index_form'] = form
+        return self.render_to_response(context)
+
+
+class RLTrainingForexView(LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Dedicated RL AI Training portal for Forex & CME Futures (MGC, M6E, M6J, MNQ, MES, MCL, etc.)."""
+    template_name = 'admins/rl_training_forex.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['forex_form'] = ForexBacktestTaskForm(initial={'strategy_name': 'tensortrade_rl', 'index_name': 'MNQ'})
+        context['backtests'] = BacktestTask.objects.filter(
+            strategy_name='tensortrade_rl'
+        ).select_related('created_by', 'backup_task').order_by('-created_at')[:10]
+        context['active_market_type'] = 'FOREX_FUTURES'
+        context['ws_url'] = settings.MARMOT_WS_URL
+        return context
+
+    def post(self, request, *args, **kwargs):
+        post_data = request.POST.copy()
+        if post_data.get('risk_reward_ratio') == 'AUTO':
+            post_data['risk_reward_ratio'] = '2.0'
+
+        form = ForexBacktestTaskForm(post_data)
+        if form.is_valid():
+            selected_rules = form.cleaned_data.get('rules')
+            prompt_directives = form.cleaned_data.get('prompt_directives', '').strip()
+            rule_list = []
+            if selected_rules:
+                for r in selected_rules:
+                    rule_list.append({
+                        'id': r.id,
+                        'name': r.name,
+                        'rule_type': r.rule_type,
+                        'prompt_directive': r.prompt_directive,
+                        'parameters': r.parameters or {}
+                    })
+
+            limit_offset_ticks = float(request.POST.get('limit_offset_ticks', 0.0))
+            order_entry_style = request.POST.get('order_entry_style', 'LIMIT_ORDER')
+            algorithm = request.POST.get('algorithm', 'PPO')
+            reward_metric = request.POST.get('reward_metric', 'sharpe')
+            total_timesteps = int(request.POST.get('total_timesteps', 10000))
+
+            params = {
+                "market_type": "FOREX_FUTURES",
+                "algorithm": algorithm,
+                "reward_metric": reward_metric,
+                "total_timesteps": total_timesteps,
+                "order_entry_style": order_entry_style,
+                "limit_offset_ticks": limit_offset_ticks,
+                "rr_ratio": form.cleaned_data.get('risk_reward_ratio', 2.0),
+                "stop_loss_points": form.cleaned_data.get('stop_loss_points', 30.0),
+                "sl_pts": form.cleaned_data.get('stop_loss_points', 30.0),
+                "lots_count": form.cleaned_data.get('lots_count', 1),
+                "rules": rule_list,
+                "prompt_directives": prompt_directives,
+            }
+
+            backup_task = form.cleaned_data.get('backup_task')
+            task = create_and_start_backtest_task(
+                strategy_name='tensortrade_rl',
+                index_name=form.cleaned_data.get('index_name', 'MNQ'),
+                start_date=form.cleaned_data.get('start_date'),
+                end_date=form.cleaned_data.get('end_date'),
+                initial_capital=form.cleaned_data.get('initial_capital', 100000.0),
+                parameters=params,
+                user=request.user,
+                backup_task=backup_task
+            )
+            if selected_rules:
+                task.rules.set(selected_rules)
+
+            send_backtest_control_command(task.id, 'START')
+
+            if request.headers.get('HX-Request'):
+                response = HttpResponse(status=200)
+                response['HX-Redirect'] = reverse('backtest:backtest_detail', kwargs={'pk': task.id})
+                return response
+            return redirect('backtest:backtest_detail', pk=task.id)
+
+        context = self.get_context_data()
+        context['forex_form'] = form
+        return self.render_to_response(context)
+
+
+import io
+import openpyxl
+from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
+from openpyxl.utils import get_column_letter
+
+class BacktestExportExcelView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Generates a professional multi-sheet Excel report (.xlsx) for a BacktestTask."""
+
+    def get(self, request, pk, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        trade_data = get_backtest_trades_context(backtest, request)
+        all_trades = trade_data['all_trades']
+
+        wb = openpyxl.Workbook()
+
+        # -------------------------------------------------------------
+        # SHEET 1: SUMMARY (Executive Dashboard)
+        # -------------------------------------------------------------
+        ws_summary = wb.active
+        ws_summary.title = "Summary"
+        ws_summary.views.sheetView[0].showGridLines = True
+
+        title_font = Font(name="Calibri", size=15, bold=True, color="1E293B")
+        section_font = Font(name="Calibri", size=11, bold=True, color="0F172A")
+        header_font = Font(name="Calibri", size=10, bold=True, color="FFFFFF")
+        bold_font = Font(name="Calibri", size=10, bold=True, color="0F172A")
+        regular_font = Font(name="Calibri", size=10, color="334155")
+
+        header_fill = PatternFill(start_color="1E293B", end_color="1E293B", fill_type="solid")
+        card_fill = PatternFill(start_color="F8FAFC", end_color="F8FAFC", fill_type="solid")
+        accent_fill = PatternFill(start_color="F1F5F9", end_color="F1F5F9", fill_type="solid")
+
+        thin_border = Border(
+            left=Side(style='thin', color='CBD5E1'),
+            right=Side(style='thin', color='CBD5E1'),
+            top=Side(style='thin', color='CBD5E1'),
+            bottom=Side(style='thin', color='CBD5E1')
+        )
+
+        ws_summary.merge_cells("A1:F1")
+        ws_summary["A1"] = f"MARMOT QUANT ENGINE — BACKTEST EXECUTIVE REPORT #BT-{backtest.id:04d}"
+        ws_summary["A1"].font = title_font
+        ws_summary["A1"].alignment = Alignment(vertical="center")
+
+        ws_summary.merge_cells("A2:F2")
+        from django.utils import timezone
+        ws_summary["A2"] = f"Generated on: {timezone.now().strftime('%Y-%m-%d %H:%M:%S')} | Strategy: {backtest.get_strategy_name_display()} | Asset: {backtest.index_name}"
+        ws_summary["A2"].font = Font(name="Calibri", size=9, italic=True, color="64748B")
+
+        ws_summary.cell(row=4, column=1, value="BACKTEST METADATA").font = section_font
+        meta_items = [
+            ("Backtest ID", f"#BT-{backtest.id:04d}"),
+            ("Strategy Name", backtest.get_strategy_name_display()),
+            ("Market Asset", backtest.index_name),
+            ("Market Type", getattr(backtest, 'market_type', 'INDEX_FO')),
+            ("Date Period", f"{backtest.start_date} to {backtest.end_date}"),
+            ("Initial Capital", f"₹{float(backtest.initial_capital or 100000):,.2f}"),
+            ("Execution Status", str(backtest.status).upper()),
+        ]
+
+        for r_idx, (label, val) in enumerate(meta_items, start=5):
+            ws_summary.cell(row=r_idx, column=1, value=label).font = bold_font
+            ws_summary.cell(row=r_idx, column=2, value=val).font = regular_font
+            ws_summary.cell(row=r_idx, column=1).fill = card_fill
+            ws_summary.cell(row=r_idx, column=2).fill = card_fill
+            ws_summary.cell(row=r_idx, column=1).border = thin_border
+            ws_summary.cell(row=r_idx, column=2).border = thin_border
+
+        res = backtest.results or {}
+        net_pnl = float(res.get('net_pnl', 0.0))
+        gross_pnl = float(res.get('gross_pnl', net_pnl))
+        total_trades = int(res.get('total_trades', len(all_trades)))
+        win_count = int(res.get('win_trades', sum(1 for t in all_trades if float(t.get('pnl', 0)) > 0)))
+        loss_count = int(res.get('loss_trades', total_trades - win_count))
+        win_rate = float(res.get('win_rate', (win_count / total_trades * 100) if total_trades > 0 else 0.0))
+        max_utilized = float(res.get('max_utilized_capital', res.get('max_capital_used', 0.0)))
+        total_charges = float(res.get('total_charges', res.get('statutory_taxes', 0.0)))
+        sharpe = float(res.get('sharpe_ratio', 0.0))
+        max_dd_pct = float(res.get('max_drawdown_pct', 0.0))
+        init_cap = float(backtest.initial_capital or 100000.0)
+        roi_total = ((net_pnl / init_cap) * 100.0) if init_cap > 0 else 0.0
+        roi_utilized = ((net_pnl / max_utilized) * 100.0) if max_utilized > 0 else roi_total
+
+        ws_summary.cell(row=4, column=4, value="EXECUTIVE FINANCIAL METRICS").font = section_font
+        metrics_items = [
+            ("Gross PnL", f"₹{gross_pnl:,.2f}"),
+            ("Statutory Fees & Taxes", f"₹{total_charges:,.2f}"),
+            ("NET PnL", f"₹{net_pnl:,.2f}"),
+            ("Win Rate %", f"{win_rate:.1f}%"),
+            ("Total Trades (Win / Loss)", f"{total_trades} (Win: {win_count} | Loss: {loss_count})"),
+            ("Max Utilized Capital", f"₹{max_utilized:,.2f}"),
+            ("ROI on Utilized Capital %", f"{roi_utilized:.2f}%"),
+            ("ROI on Total Capital %", f"{roi_total:.2f}%"),
+            ("Sharpe Ratio", f"{sharpe:.2f}"),
+            ("Max Drawdown %", f"{max_dd_pct:.2f}%"),
+        ]
+
+        for r_idx, (label, val) in enumerate(metrics_items, start=5):
+            ws_summary.cell(row=r_idx, column=4, value=label).font = bold_font
+            cell_v = ws_summary.cell(row=r_idx, column=5, value=val)
+            cell_v.font = bold_font if label == "NET PnL" else regular_font
+            ws_summary.cell(row=r_idx, column=4).fill = accent_fill
+            ws_summary.cell(row=r_idx, column=5).fill = accent_fill
+            ws_summary.cell(row=r_idx, column=4).border = thin_border
+            ws_summary.cell(row=r_idx, column=5).border = thin_border
+
+        # -------------------------------------------------------------
+        # SHEET 2: TRADES DATA (Detailed Trade Log Table)
+        # -------------------------------------------------------------
+        ws_trades = wb.create_sheet(title="Trades Data")
+        ws_trades.views.sheetView[0].showGridLines = True
+
+        headers = [
+            "Trade #", "Timestamp", "Symbol", "Direction", "Entry Price", "Exit Price", 
+            "Lots / Qty", "Gross PnL", "Brokerage", "Statutory Taxes", "Net PnL", 
+            "Equity Before", "Equity After", "Trade ROI %", "Exit Reason", "RCA Diagnosis"
+        ]
+
+        for col_idx, h_text in enumerate(headers, start=1):
+            cell = ws_trades.cell(row=1, column=col_idx, value=h_text)
+            cell.font = header_font
+            cell.fill = header_fill
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            cell.border = thin_border
+
+        for r_idx, t in enumerate(all_trades, start=2):
+            sn = t.get('serial_no', r_idx - 1)
+            ts = str(t.get('timestamp', t.get('entry_time', '')))
+            sym = str(t.get('symbol', t.get('strike', backtest.index_name)))
+            side = str(t.get('trade_type', t.get('side', t.get('action', 'BUY')))).upper()
+            entry_p = float(t.get('index_entry_price', t.get('entry_price', 0.0)))
+            exit_p = float(t.get('index_exit_price', t.get('exit_price', 0.0)))
+            qty = int(t.get('qty', t.get('quantity', t.get('lots', 1))))
+            gross = float(t.get('gross_pnl', t.get('pnl', 0.0)))
+            brok = float(t.get('brokerage', 20.0))
+            taxes = float(t.get('statutory_taxes', t.get('stt', 0.0)))
+            net = float(t.get('net_pnl', t.get('pnl', 0.0)))
+            eq_before = float(t.get('equity_before', 100000.0))
+            eq_after = float(t.get('equity_after', eq_before + net))
+            roi_pct = float(t.get('trade_equity_change_pct', 0.0))
+            reason = str(t.get('reason', t.get('status', 'TARGET')))
+            rca_diag = str(t.get('rca_primary_cause', t.get('rca_summary', 'Normal Execution')))
+
+            row_vals = [
+                sn, ts, sym, side, entry_p, exit_p, qty, gross, brok, taxes, net, 
+                eq_before, eq_after, roi_pct, reason, rca_diag
+            ]
+
+            for c_idx, val in enumerate(row_vals, start=1):
+                c = ws_trades.cell(row=r_idx, column=c_idx, value=val)
+                c.font = regular_font
+                c.border = thin_border
+                if c_idx in [1, 2, 4, 15]:
+                    c.alignment = Alignment(horizontal="center")
+                elif c_idx in [5, 6, 7, 8, 9, 10, 11, 12, 13, 14]:
+                    c.alignment = Alignment(horizontal="right")
+
+        for sheet in [ws_summary, ws_trades]:
+            for col in sheet.columns:
+                max_len = max(len(str(cell.value or '')) for cell in col)
+                col_letter = get_column_letter(col[0].column)
+                sheet.column_dimensions[col_letter].width = max(max_len + 3, 12)
+
+        buffer = io.BytesIO()
+        wb.save(buffer)
+        buffer.seek(0)
+
+        filename = f"Marmot_Backtest_Report_BT-{backtest.id:04d}_{backtest.index_name}.xlsx"
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+        )
+        response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
 
 

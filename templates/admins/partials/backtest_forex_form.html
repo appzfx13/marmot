@@ -1,0 +1,237 @@
+<form method="post" action="{% url 'backtest:backtest_create' %}" id="forexBacktestForm">
+    {% csrf_token %}
+    <input type="hidden" name="market_type" value="FOREX_FUTURES">
+
+    {% if forex_form.non_field_errors %}
+        <div class="alert alert-danger mb-4 rounded-3 border-0 bg-danger bg-opacity-25 text-danger">
+            {% for error in forex_form.non_field_errors %}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons fs-6">error_outline</span>
+                    <span>{{ error }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    {# Section 1: Databento Forex Dataset (Optional) #}
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+        <span class="material-icons text-primary fs-5">dataset</span>
+        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Pre-downloaded Databento Forex/Futures Dataset (Optional)</h6>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.backup_task.id_for_label }}" style="min-width: 180px;">
+            Backup Dataset
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.backup_task }}
+            <small class="form-text theme-text-muted mt-1 d-block">Selecting a completed Databento Forex/CME backup dataset will populate target asset and dates.</small>
+            {% for error in forex_form.backup_task.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Section 2: Strategy Engine & CME Futures Asset #}
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+        <span class="material-icons text-primary fs-5">psychology</span>
+        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Strategy Engine & CME Futures Asset</h6>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.strategy_name.id_for_label }}" style="min-width: 180px;">
+            RL Strategy Engine<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.strategy_name }}
+            <small class="form-text theme-text-muted d-block mt-1">TensorTrade RL (Deep Reinforcement Learning) engine with PPO policy optimization.</small>
+            {% for error in forex_form.strategy_name.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.index_name.id_for_label }}" style="min-width: 180px;">
+            CME Futures Asset<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.index_name }}
+            {% for error in forex_form.index_name.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Section 3: Forex Order Flow Constraint Rules #}
+    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-primary fs-5">rule</span>
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Forex Order Flow Rules & AI Directives</h6>
+        </div>
+        <a href="{% url 'backtest:rule_list' %}" class="small text-info text-decoration-none d-flex align-items-center gap-1" target="_blank">
+            <span class="material-icons fs-6">settings</span>
+            <span>Manage Rules</span>
+        </a>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase pt-2 mb-md-0" style="min-width: 180px;">
+            Execution Rules
+        </label>
+        <div class="flex-grow-1 w-100">
+            <div class="custom-scrollable-rules p-2 rounded-2" style="max-height: 250px; overflow-y: auto; border: 1px solid rgba(255, 255, 255, 0.08); background: rgba(0, 0, 0, 0.2);">
+                <div class="row g-2">
+                    {% for choice in forex_form.rules %}
+                    <div class="col-12 col-md-6">
+                        <label for="{{ choice.id_for_label }}" class="custom-check-item w-100 h-100 p-2 d-flex align-items-center gap-2 rounded-2 border" style="background: rgba(255, 255, 255, 0.02); border-color: rgba(255, 255, 255, 0.06) !important; cursor: pointer;">
+                            {{ choice.tag }}
+                            <span class="theme-text-main small fw-semibold">{{ choice.choice_label }}</span>
+                        </label>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+            <small class="form-text theme-text-muted mt-2 d-block">
+                Select active Forex Order Flow (CVD, DOM Absorption, Killzones, SMC Displacement) & Shared strategy rules.
+            </small>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase pt-2 mb-md-0" for="{{ forex_form.prompt_directives.id_for_label }}" style="min-width: 180px;">
+            AI Order Flow Prompt
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.prompt_directives }}
+            <small class="form-text theme-text-muted mt-1 d-block">
+                Optional natural language prompt instructions for TensorTrade RL (e.g. <em>"Only enter long when CVD sweeps support with net positive delta"</em>).
+            </small>
+            {% for error in forex_form.prompt_directives.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Section 4: Horizon & Capital #}
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+        <span class="material-icons text-primary fs-5">date_range</span>
+        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Backtest Horizon & Capital</h6>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.initial_capital.id_for_label }}" style="min-width: 180px;">
+            Initial Capital (USD $)<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.initial_capital }}
+            {% for error in forex_form.initial_capital.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.start_date.id_for_label }}" style="min-width: 180px;">
+            Start Date<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.start_date }}
+            {% for error in forex_form.start_date.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.end_date.id_for_label }}" style="min-width: 180px;">
+            End Date<span class="text-danger ms-1">*</span>
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.end_date }}
+            {% for error in forex_form.end_date.errors %}
+                <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Section 5: Forex Position Sizing & Risk Parameters (NO Strike Selection field!) #}
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+        <span class="material-icons text-primary fs-5">tune</span>
+        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Forex Position Sizing & Risk Parameters</h6>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.lots_count.id_for_label }}" style="min-width: 180px;">
+            Contract Quantity (Micro Lots)
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.lots_count }}
+            <small class="form-text theme-text-muted d-block mt-1">Number of CME Micro Contracts / Lots to trade per signal (e.g. 1, 2, 5).</small>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.risk_reward_ratio.id_for_label }}" style="min-width: 180px;">
+            Risk:Reward Ratio
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.risk_reward_ratio }}
+        </div>
+    </div>
+
+    <div class="mb-4 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.stop_loss_points.id_for_label }}" style="min-width: 180px;">
+            Stop Loss (Pips / Ticks)
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.stop_loss_points }}
+            <small class="form-text theme-text-muted d-block mt-1">Stop loss distance in Forex Pips or Ticks (e.g. 25 pips / 100 ticks).</small>
+        </div>
+    </div>
+
+    <div class="d-flex align-items-center justify-content-end gap-3 pt-4 border-top" style="border-color: var(--border-color) !important;">
+        <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
+        <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold text-white d-inline-flex align-items-center gap-2" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">
+            <span class="material-icons fs-5">play_circle</span>
+            <span>Initialize Forex Futures Backtest</span>
+        </button>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const backupTaskSelect = document.getElementById('id_forex_backup_task');
+    const indexSelect = document.getElementById('id_forex_index_name');
+
+    if (backupTaskSelect) {
+        backupTaskSelect.addEventListener('change', function () {
+            const selectedOption = this.options[this.selectedIndex];
+            if (selectedOption) {
+                const indexVal = selectedOption.getAttribute('data-index');
+                const startDateVal = selectedOption.getAttribute('data-start-date');
+                const endDateVal = selectedOption.getAttribute('data-end-date');
+
+                if (indexVal && indexSelect) {
+                    let hasOption = Array.from(indexSelect.options).some(opt => opt.value === indexVal);
+                    if (!hasOption) {
+                        const newOpt = document.createElement('option');
+                        newOpt.value = indexVal;
+                        newOpt.textContent = indexVal;
+                        indexSelect.appendChild(newOpt);
+                    }
+                    indexSelect.value = indexVal;
+                }
+                if (startDateVal) {
+                    const startDateInput = document.getElementById('id_forex_start_date');
+                    if (startDateInput) startDateInput.value = startDateVal;
+                }
+                if (endDateVal) {
+                    const endDateInput = document.getElementById('id_forex_end_date');
+                    if (endDateInput) endDateInput.value = endDateVal;
+                }
+            }
+        });
+    }
+});
+</script>

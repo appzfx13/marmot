@@ -1,0 +1,213 @@
+{% extends 'admins/index.html' %}
+{% load static %}
+
+{% block title %}Forex & CME Futures RL AI Training Hub - Marmot Quant Engine{% endblock %}
+{% block nav_rl_forex_active %}active{% endblock %}
+
+{% block dashboard_content %}
+<div id="rl-forex-training-container" class="w-100 col-12 pt-2">
+    <!-- Header Banner -->
+    <div class="glass-card p-4 mb-4 border border-secondary border-opacity-25 rounded-4 position-relative overflow-hidden shadow-lg" style="background: linear-gradient(135deg, rgba(13, 202, 240, 0.08) 0%, rgba(102, 16, 242, 0.05) 100%);">
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-2">
+                    <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1 fw-bold fs-7">
+                        <i class="bi bi-cpu-fill me-1"></i> DATABENTO CME ORDER FLOW RL
+                    </span>
+                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold fs-7">
+                        🌐 FOREX & CME FUTURES (MGC / MNQ / M6E)
+                    </span>
+                </div>
+                <h2 class="fw-extrabold theme-text-main mb-1 tracking-tight">Forex & CME Futures RL AI Training Portal</h2>
+                <p class="theme-text-muted mb-0">Train autonomous order flow policy agents with CVD Divergence, DOM Absorption, CME Killzone Delta, and Limit Bracket order execution.</p>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill theme-text-muted border-secondary border-opacity-25 px-3 py-2 border shadow-sm">
+                    <i class="bi bi-list-task me-1"></i> Backtest Dashboard
+                </a>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Grid: Form + Active Runs -->
+    <div class="row g-4">
+        <!-- Form Column -->
+        <div class="col-12 col-xl-8">
+            <div class="glass-card p-4 rounded-4 border border-secondary border-opacity-25 shadow-sm h-100">
+                <h4 class="fw-bold theme-text-main mb-3 d-flex align-items-center gap-2 pb-2 border-bottom border-secondary border-opacity-25">
+                    <i class="bi bi-sliders text-info"></i> Agent Hyperparameters & Order Flow Limit Bracket Setup
+                </h4>
+
+                <form method="POST" action="{% url 'backtest:rl_training_forex_futures' %}" id="rl-forex-form">
+                    {% csrf_token %}
+                    <input type="hidden" name="strategy_name" value="tensortrade_rl">
+                    <input type="hidden" name="market_type" value="FOREX_FUTURES">
+
+                    <!-- Target Asset Cards -->
+                    <div class="mb-4">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-2">Target CME Futures Contract</label>
+                        <div class="row g-2 align-items-stretch">
+                            {% for forex_val, forex_label in forex_form.fields.index_name.choices %}
+                            <div class="col-6 col-sm-4 col-md-3">
+                                <input type="radio" class="btn-check" name="index_name" id="forex_{{ forex_val }}" value="{{ forex_val }}" {% if forex_val == 'MNQ' or forloop.first %}checked{% endif %}>
+                                <label class="btn btn-outline-info theme-text-main border-secondary border-opacity-25 w-100 h-100 py-2.5 rounded-3 text-center d-flex flex-column align-items-center justify-content-center shadow-xs" for="forex_{{ forex_val }}">
+                                    <span class="fw-bold fs-6 mb-0">{{ forex_val }}</span>
+                                    <span class="theme-text-muted text-xs opacity-75 mt-1" style="font-size: 0.7rem;">
+                                        {% if forex_val == 'MGC' %}Micro Gold ($10)
+                                        {% elif forex_val == 'M6E' %}EUR/USD ($12.5)
+                                        {% elif forex_val == 'M6J' %}JPY/USD ($12.5)
+                                        {% elif forex_val == 'MYM' %}Micro Dow ($0.5)
+                                        {% elif forex_val == 'MNQ' %}Micro Nasdaq ($2)
+                                        {% elif forex_val == 'MES' %}Micro S&P ($5)
+                                        {% elif forex_val == 'MCL' %}Micro Crude ($100)
+                                        {% else %}Futures Spec{% endif %}
+                                    </span>
+                                </label>
+                            </div>
+                            {% endfor %}
+                        </div>
+                    </div>
+
+                    <!-- Limit Order Entry & Bracket Settings -->
+                    <div class="p-3.5 mb-4 rounded-3 border border-secondary border-opacity-25 bg-transparent">
+                        <h6 class="fw-bold theme-text-main mb-3 d-flex align-items-center gap-2 pb-2 border-bottom border-secondary border-opacity-25">
+                            <i class="bi bi-crosshair text-success"></i> Limit Order Entry & Bracket Style
+                        </h6>
+                        <div class="row g-3">
+                            <div class="col-12 col-md-6">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Order Entry Mode</label>
+                                <select class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="order_entry_style">
+                                    <option value="AUTO_RL_DERIVED" selected>🤖 Auto-Calculated by RL Agent (Dynamic Entry)</option>
+                                    <option value="LIMIT_ORDER">🎯 Limit Order Entry (Order Flow Pullback)</option>
+                                    <option value="MARKET_ORDER">⚡ Market Order Entry (Candle Close)</option>
+                                </select>
+                                <span class="form-text theme-text-muted mt-1 d-block" style="font-size: 0.75rem;">Auto mode lets RL dynamically decide Limit vs Market entry per bar.</span>
+                            </div>
+
+                            <div class="col-6 col-md-3">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Limit Offset (Ticks)</label>
+                                <input type="number" step="1" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="limit_offset_ticks" value="0" min="0" max="50">
+                                <span class="form-text theme-text-muted mt-1 d-block" style="font-size: 0.75rem;">0 = Auto Ticks</span>
+                            </div>
+
+                            <div class="col-6 col-md-3">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Stop Loss (SL Ticks)</label>
+                                <input type="number" step="1" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="stop_loss_points" value="0" min="0" max="200">
+                                <span class="form-text theme-text-muted mt-1 d-block" style="font-size: 0.75rem;">0 = Auto Ticks</span>
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Risk-to-Reward (RR Ratio)</label>
+                                <select class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="risk_reward_ratio">
+                                    <option value="AUTO" selected>🤖 Auto-Optimized by RL Agent</option>
+                                    <option value="1.5">1 : 1.5</option>
+                                    <option value="2.0">1 : 2.0 (Recommended)</option>
+                                    <option value="2.5">1 : 2.5</option>
+                                    <option value="3.0">1 : 3.0 (High RR)</option>
+                                    <option value="4.0">1 : 4.0</option>
+                                </select>
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Contract Quantity</label>
+                                <input type="number" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="lots_count" value="1" min="1" max="100">
+                            </div>
+
+                            <div class="col-12 col-md-4">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Initial Capital ($)</label>
+                                <input type="number" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="initial_capital" value="50000" step="5000">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- RL Policy Hyperparameters -->
+                    <div class="row g-3 mb-4">
+                        <div class="col-12 col-md-4">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">RL Algorithm</label>
+                            <select class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="algorithm">
+                                <option value="PPO" selected>PPO (Proximal Policy Optimization)</option>
+                                <option value="A2C">A2C (Advantage Actor-Critic)</option>
+                                <option value="DQN">DQN (Deep Q-Network)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Reward Function</label>
+                            <select class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="reward_metric">
+                                <option value="sharpe" selected>Sharpe Ratio (Risk-Adjusted)</option>
+                                <option value="sortino">Sortino Ratio (Downside Risk)</option>
+                                <option value="pnl">Net PnL (Statutory Deducted)</option>
+                            </select>
+                        </div>
+
+                        <div class="col-12 col-md-4">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Training Timesteps</label>
+                            <input type="number" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="total_timesteps" value="10000" step="1000" min="1000" max="100000">
+                        </div>
+
+                        <div class="col-6 col-md-6">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Start Date</label>
+                            <input type="date" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="start_date" value="2024-01-01">
+                        </div>
+
+                        <div class="col-6 col-md-6">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">End Date</label>
+                            <input type="date" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="end_date" value="2024-01-31">
+                        </div>
+                    </div>
+
+                    <!-- Databento Parquet Backup Source -->
+                    <div class="mb-4">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Databento Order Flow Parquet Dataset</label>
+                        {{ forex_form.backup_task }}
+                        <span class="form-text theme-text-muted mt-1 d-block">Select an existing Databento CME dataset backup or leave empty to auto-synthesize.</span>
+                    </div>
+
+                    <div class="d-flex justify-content-end gap-2 pt-2 border-top border-secondary border-opacity-25">
+                        <button type="submit" class="btn btn-info text-white rounded-pill px-5 py-2.5 fw-bold shadow-sm" style="background: linear-gradient(135deg, #0dcaf0 0%, #0b5ed7 100%);">
+                            <i class="bi bi-play-fill me-1"></i> Start Order Flow RL Training
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Telemetry & Recent Runs Column -->
+        <div class="col-12 col-xl-4">
+            <div class="glass-card p-4 rounded-4 border border-secondary border-opacity-25 shadow-sm h-100">
+                <h4 class="fw-bold theme-text-main mb-3 d-flex align-items-center gap-2 pb-2 border-bottom border-secondary border-opacity-25">
+                    <i class="bi bi-activity text-warning"></i> Active Telemetry & Trained Agents
+                </h4>
+
+                {% if backtests %}
+                <div class="list-group list-group-flush gap-2">
+                    {% for b in backtests %}
+                    <div class="glass-card p-3 rounded-3 border border-secondary border-opacity-25 mb-2 shadow-xs">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-bold theme-text-main">#BT-{{ b.id|stringformat:"04d" }} ({{ b.index_name }})</span>
+                            <span class="badge {% if b.status == 'COMPLETED' %}bg-success{% elif b.status == 'RUNNING' %}bg-primary{% else %}bg-secondary{% endif %} rounded-pill">
+                                {{ b.status }}
+                            </span>
+                        </div>
+                        <div class="progress mb-2 bg-transparent border border-secondary border-opacity-25" style="height: 6px;">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-info" role="progressbar" style="width: {{ b.progress }}%;"></div>
+                        </div>
+                        <div class="d-flex align-items-center justify-content-between text-xs theme-text-muted" style="font-size: 0.75rem;">
+                            <span>Net PnL: <strong class="{% if b.results.net_pnl > 0 %}text-success{% elif b.results.net_pnl < 0 %}text-danger{% else %}theme-text-main{% endif %}">${{ b.results.net_pnl|default:0|floatformat:2 }}</strong></span>
+                            <span>Trades: {{ b.results.total_trades|default:0 }}</span>
+                            <a href="{% url 'backtest:backtest_detail' pk=b.id %}" class="btn btn-xs btn-outline-info rounded-pill px-2 py-0">View</a>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="text-center py-5 theme-text-muted">
+                    <i class="bi bi-cpu fs-1 opacity-50 mb-2"></i>
+                    <p class="mb-0">No trained Forex Futures RL models found.<br>Configure parameters and click <strong>Start Order Flow RL Training</strong>.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

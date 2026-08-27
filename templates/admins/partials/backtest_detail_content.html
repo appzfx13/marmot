@@ -88,6 +88,10 @@
             <span class="fw-medium">Back to Dashboard</span>
         </a>
         <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" class="btn btn-success text-white rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3.5 py-2 fw-bold" style="background: linear-gradient(135deg, #198754 0%, #157347 100%);" title="Download Executive Multi-Sheet Excel Report">
+                <i class="bi bi-file-earmark-excel-fill fs-6"></i>
+                <span>Download Excel Report</span>
+            </a>
             <a href="{% url 'backtest:rule_list' %}" class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm" target="_blank" title="Manage Execution Rules">
                 <span class="material-icons">rule</span>
                 <span class="fw-medium">Strategy Rules</span>
@@ -758,12 +762,22 @@
                                         {{ future_rule.name }}
                                     </span>
                                 </div>
-                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-1 font-monospace fw-bold flex-shrink-0" style="font-size: 0.74rem;">
-                                    🛡️ Prevents ~{{ future_rule.impact_loss_count }} Losses
-                                </span>
+                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-1 font-monospace fw-bold" style="font-size: 0.74rem;">
+                                        🛡️ Prevents ~{{ future_rule.impact_loss_count }} Losses
+                                    </span>
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm transition-all"
+                                            hx-get="{% url 'backtest:backtest_edit_modal' backtest.pk %}?add_rule_type={{ future_rule.rule_type|default:'liquidity_sweep' }}"
+                                            hx-target="#globalHtmxModalDialog"
+                                            style="font-size: 0.75rem;">
+                                        <span class="material-icons" style="font-size: 0.88rem;">add_circle</span>
+                                        <span>+ Add This Rule</span>
+                                    </button>
+                                </div>
                             </div>
-                            <div class="theme-text-muted mt-1.5 ps-4" style="font-size: 0.82rem; line-height: 1.5;">
-                                {{ future_rule.preventative_prompt }}
+                            <div class="theme-text-muted mt-1.5 ps-4 font-monospace" style="font-size: 0.82rem; line-height: 1.5; color: #a7f3d0 !important;">
+                                {{ future_rule.preventive_prompt }}
                             </div>
                         </div>
                         {% empty %}

@@ -315,16 +315,20 @@
             background: var(--nav-hover);
             border: 1px solid var(--border-color);
             color: var(--text-main);
-            width: 30px;
-            height: 30px;
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
             border-radius: 50%;
             display: inline-flex;
             align-items: center;
             justify-content: center;
             cursor: pointer;
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
             position: relative;
             padding: 0;
+            margin: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            flex-shrink: 0;
         }
 
         .glass-icon-btn .material-icons {
@@ -376,8 +380,11 @@
         }
 
         .glass-icon-btn:hover {
-            background: var(--btn-secondary-bg);
+            background: var(--btn-secondary-bg, var(--nav-hover));
+            border-color: var(--nav-active-border);
+            color: var(--text-main);
             transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
         }
 
         .glass-icon-btn-danger {
@@ -395,26 +402,31 @@
         }
 
         .profile-avatar-btn {
-            width: 30px;
-            height: 30px;
+            width: 34px;
+            height: 34px;
+            min-width: 34px;
             border-radius: 50%;
             border: 1px solid var(--border-color);
             background: var(--nav-hover);
             color: var(--text-main);
-            display: flex;
+            display: inline-flex;
             align-items: center;
             justify-content: center;
             font-weight: 700;
             font-size: 0.75rem;
             cursor: pointer;
             overflow: hidden;
-            transition: all 0.2s ease;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
             padding: 0;
+            margin: 0;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+            flex-shrink: 0;
         }
 
         .profile-avatar-btn:hover {
             transform: translateY(-1px);
             border-color: var(--nav-active-border);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.18);
         }
 
         .sidebar-overlay {
@@ -789,9 +801,6 @@
         }
 
         .glass-icon-btn {
-            width: 38px !important;
-            height: 38px !important;
-            min-width: 38px !important;
             border-radius: 50% !important;
             padding: 0 !important;
             display: inline-flex !important;
@@ -1303,6 +1312,19 @@
                 <a class="nav-link {% if '/backtest/list/' in request.path or request.resolver_match.url_name == 'backtest_dashboard' %}active{% endif %}" 
                    href="{% url 'backtest:backtest_dashboard' %}"> 
                     <span class="material-icons">analytics</span>Backtest Engine
+                </a>
+
+                <!-- Section: RL AI ENGINE -->
+                <div class="sidebar-section-header px-3 pt-3 pb-1">
+                    RL AI Engine
+                </div>
+                <a class="nav-link {% if '/backtest/rl-training/index-fo/' in request.path or request.resolver_match.url_name == 'rl_training_index_fo' %}active{% endif %}" 
+                   href="{% url 'backtest:rl_training_index_fo' %}"> 
+                    <span class="material-icons">model_training</span>Index Options RL
+                </a>
+                <a class="nav-link {% if '/backtest/rl-training/forex-futures/' in request.path or request.resolver_match.url_name == 'rl_training_forex_futures' %}active{% endif %}" 
+                   href="{% url 'backtest:rl_training_forex_futures' %}"> 
+                    <span class="material-icons">currency_exchange</span>Forex Futures RL
                 </a>
 
                 <!-- Section: MARKET -->
