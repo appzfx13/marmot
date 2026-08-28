@@ -50,6 +50,10 @@
 /* ---------------------------------------------------------------------
    2. Design System Variables
 --------------------------------------------------------------------- */
+html {
+    font-size: 87.5%;
+}
+
 :root {
     /* Base Font Family */
     --bs-body-font-family: 'Plus Jakarta Sans', sans-serif;
@@ -286,6 +290,171 @@ body::after {
     box-shadow: var(--shadow-lg) !important;
 }
 
+/* Modal Background Scroll Lock & Content Scroll Containment */
+body.modal-open, html.modal-open {
+    overflow: hidden !important;
+    padding-right: 0 !important;
+}
+.modal-dialog-scrollable form {
+    display: flex;
+    flex-direction: column;
+    flex-grow: 1;
+    overflow: hidden;
+    min-height: 0;
+}
+.modal-dialog-scrollable .modal-body {
+    overflow-y: auto !important;
+    max-height: calc(85vh - 120px);
+}
+
+/* Standardized Page Subheading & Layout Spacing */
+.page-subtitle, .page-header-subtitle {
+    margin-bottom: 0.5rem !important;
+}
+.page-header {
+    margin-bottom: 0.75rem !important;
+}
+
+/* Compact Filter Widgets & Laptop 125% FHD Density */
+.card-filter, .filter-widget, .filter-card {
+    padding: 0.5rem 0.75rem !important;
+    margin-bottom: 0.75rem !important;
+}
+.card-filter .form-control,
+.card-filter .form-select,
+.filter-widget .form-control,
+.filter-widget .form-select,
+.filter-card .form-control,
+.filter-card .form-select {
+    min-height: 32px !important;
+    height: 32px !important;
+    font-size: 0.78rem !important;
+    padding: 0.25rem 0.6rem !important;
+}
+.card-filter .input-group-text,
+.filter-widget .input-group-text,
+.filter-card .input-group-text {
+    min-height: 32px !important;
+    height: 32px !important;
+    padding: 0.25rem 0.5rem !important;
+}
+
+/* Universal Filter Search Pill Wrapper & Input (Strictly matching Navbar Search Pill) */
+.filter-search-wrapper {
+    position: relative !important;
+    width: 100% !important;
+    display: flex !important;
+    align-items: center !important;
+}
+.filter-search-wrapper .form-control,
+.filter-search-wrapper input[type="text"],
+.filter-search-wrapper .filter-search-input {
+    width: 100% !important;
+    background-color: var(--input-bg, transparent) !important;
+    border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15)) !important;
+    border-radius: 50rem !important;
+    padding: 0.35rem 2.25rem 0.35rem 1rem !important;
+    font-size: 0.8rem !important;
+    font-weight: 500 !important;
+    color: var(--text-main) !important;
+    outline: none !important;
+    box-shadow: var(--shadow-sm, none) !important;
+    height: 32px !important;
+    min-height: 32px !important;
+    transition: all 0.2s ease-in-out !important;
+}
+.filter-search-wrapper .form-control::placeholder,
+.filter-search-wrapper input[type="text"]::placeholder {
+    color: var(--text-muted, rgba(255, 255, 255, 0.45)) !important;
+    opacity: 0.85 !important;
+}
+.filter-search-wrapper .form-control:focus,
+.filter-search-wrapper input[type="text"]:focus {
+    border-color: var(--brand-forest-medium, #10b981) !important;
+    box-shadow: 0 0 0 3px var(--brand-lime-translucent, rgba(180, 241, 5, 0.2)) !important;
+}
+.filter-search-wrapper .search-icon,
+.filter-search-wrapper .navbar-search-btn,
+.filter-search-wrapper .filter-search-btn {
+    position: absolute !important;
+    right: 0.85rem !important;
+    top: 50% !important;
+    transform: translateY(-50%) !important;
+    background: transparent !important;
+    border: none !important;
+    color: var(--text-muted, rgba(255, 255, 255, 0.5)) !important;
+    padding: 0 !important;
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    pointer-events: none !important;
+    font-size: 0.85rem !important;
+}
+[data-theme="light"] .filter-search-wrapper .form-control,
+[data-theme="light"] .filter-search-wrapper input[type="text"] {
+    background-color: #FFFFFF !important;
+    border-color: #CBD5E1 !important;
+    color: #0F172A !important;
+}
+[data-theme="light"] .filter-search-wrapper .search-icon {
+    color: #64748B !important;
+}
+
+/* Global Dotted Progress Loader (Universal Loading State) */
+.loading-dots, .dot-pulse, .spinner-dots {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 4px !important;
+    height: 14px !important;
+    vertical-align: middle !important;
+}
+.loading-dots span, .dot-pulse span, .spinner-dots span {
+    width: 5px !important;
+    height: 5px !important;
+    border-radius: 50% !important;
+    background-color: currentColor !important;
+    display: inline-block !important;
+    animation: dotPulse 1.4s infinite ease-in-out both !important;
+}
+.loading-dots span:nth-child(1), .dot-pulse span:nth-child(1), .spinner-dots span:nth-child(1) { animation-delay: -0.32s !important; }
+.loading-dots span:nth-child(2), .dot-pulse span:nth-child(2), .spinner-dots span:nth-child(2) { animation-delay: -0.16s !important; }
+.loading-dots span:nth-child(3), .dot-pulse span:nth-child(3), .spinner-dots span:nth-child(3) { animation-delay: 0s !important; }
+
+@keyframes dotPulse {
+    0%, 80%, 100% {
+        transform: scale(0.4);
+        opacity: 0.3;
+    }
+    40% {
+        transform: scale(1.1);
+        opacity: 1;
+    }
+}
+
+/* Global Filter & Form Dropdown Dual-Theme Styling */
+select, .form-select, select.form-select {
+    background-color: var(--card-bg, #072F1F) !important;
+    color: var(--text-main, #FFFFFF) !important;
+    border-color: var(--border-color, rgba(255, 255, 255, 0.12)) !important;
+}
+select option, .form-select option {
+    background-color: var(--card-bg, #072F1F) !important;
+    color: var(--text-main, #FFFFFF) !important;
+}
+[data-theme="light"] select,
+[data-theme="light"] .form-select,
+[data-theme="light"] select.form-select {
+    background-color: #FFFFFF !important;
+    color: #0F172A !important;
+    border-color: #CBD5E1 !important;
+}
+[data-theme="light"] select option,
+[data-theme="light"] .form-select option {
+    background-color: #FFFFFF !important;
+    color: #0F172A !important;
+}
+
 /* Global Selection Highlight */
 ::selection {
     background-color: rgba(180, 241, 5, 0.35);
@@ -488,11 +657,11 @@ a:hover {
     font-size: 1.35rem;
     font-weight: 700;
     color: #FFFFFF;
-    margin-bottom: 2rem;
+    margin-bottom: 1.5rem;
     padding-left: 0.5rem;
     text-decoration: none;
     transition: color 0.25s ease;
-    flex-shrink: 0;
+    flex-shrink: 0 !important;
 }
 
 .sidebar-brand:hover {
@@ -510,35 +679,28 @@ a:hover {
     color: var(--brand-lime-hover);
 }
 
-.sidebar-wrapper .overflow-y-auto {
-    flex: 1 1 0%;
-    min-height: 0;
-    height: 100%;
-    overflow-y: auto !important;
+/* Middle Navigation Scrollable Container */
+.sidebar-wrapper .overflow-y-auto,
+.sidebar-nav-container {
+    flex: 1 1 auto !important;
+    min-height: 0 !important;
+    height: 100% !important;
+    max-height: 100% !important;
+    overflow-y: scroll !important;
     overflow-x: hidden !important;
-    overscroll-behavior: contain;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(255, 255, 255, 0.25) transparent;
-    padding-right: 0.25rem;
-    margin-right: -0.25rem;
+    overscroll-behavior: contain !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important; /* Firefox */
+    -ms-overflow-style: none !important; /* IE and Edge */
+    padding-right: 0.15rem;
+    touch-action: pan-y;
 }
 
-.sidebar-wrapper .overflow-y-auto::-webkit-scrollbar {
-    width: 4px;
-}
-
-.sidebar-wrapper .overflow-y-auto::-webkit-scrollbar-track {
-    background: transparent;
-}
-
-.sidebar-wrapper .overflow-y-auto::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.25);
-    border-radius: 10px;
-}
-
-.sidebar-wrapper .overflow-y-auto::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.4);
+.sidebar-wrapper .overflow-y-auto::-webkit-scrollbar,
+.sidebar-nav-container::-webkit-scrollbar {
+    display: none !important; /* Chrome, Safari, Opera */
+    width: 0 !important;
+    height: 0 !important;
 }
 
 .sidebar-menu-section {
@@ -671,7 +833,8 @@ a:hover {
 
 /* Bottom Profile Card in Sidebar */
 .sidebar-profile {
-    margin-top: auto;
+    margin-top: auto !important;
+    flex-shrink: 0 !important;
     display: flex;
     align-items: center;
     gap: 0.75rem;
@@ -875,8 +1038,8 @@ body.sidebar-minimized .sidebar-profile a:hover {
     border-radius: var(--radius-xl) !important;
     box-shadow: var(--dropdown-shadow) !important;
     padding: 0.5rem 0 !important;
-    margin-top: 0.5rem !important;
-    animation: dropdownFadeIn 0.2s ease;
+    animation: dropdownFadeIn 0.15s ease-out;
+    transition: opacity 0.15s ease-out !important;
 }
 
 .dropdown-menu-quick-action .dropdown-header,
@@ -1042,18 +1205,16 @@ body.sidebar-minimized .sidebar-profile a:hover {
     border-radius: var(--radius-xl) !important;
     border: 1px solid var(--dropdown-border) !important;
     box-shadow: var(--dropdown-shadow) !important;
-    margin-top: 0.5rem !important;
-    animation: dropdownFadeIn 0.2s ease;
+    animation: dropdownFadeIn 0.15s ease-out;
+    transition: opacity 0.15s ease-out !important;
 }
 
 @keyframes dropdownFadeIn {
     from {
         opacity: 0;
-        transform: translateY(-6px);
     }
     to {
         opacity: 1;
-        transform: translateY(0);
     }
 }
 
@@ -2026,8 +2187,8 @@ span.flatpickr-weekday {
     box-shadow: var(--shadow-lg) !important;
     padding: 8px 6px !important;
     min-width: 170px !important;
-    margin-top: 6px !important;
-    transition: all 0.2s ease !important;
+    animation: dropdownFadeIn 0.15s ease-out;
+    transition: opacity 0.15s ease-out !important;
     border: 1px solid var(--border-light) !important;
     z-index: 1050 !important;
 }
@@ -2629,9 +2790,9 @@ span.flatpickr-weekday {
     border-radius: var(--radius-xl) !important;
     box-shadow: var(--shadow-lg) !important;
     padding: 0.5rem 0 !important;
-    margin-top: 0.5rem !important;
     border: none !important;
-    animation: dropdownFadeIn 0.2s ease;
+    animation: dropdownFadeIn 0.15s ease-out;
+    transition: opacity 0.15s ease-out !important;
 }
 
 

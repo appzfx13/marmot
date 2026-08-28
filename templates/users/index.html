@@ -97,6 +97,32 @@
             --sidebar-width: 250px;
         }
 
+        /* Global Dotted Progress Loader */
+        .loading-dots, .dot-pulse, .spinner-dots {
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            gap: 4px !important;
+            height: 14px !important;
+            vertical-align: middle !important;
+        }
+        .loading-dots span, .dot-pulse span, .spinner-dots span {
+            width: 5px !important;
+            height: 5px !important;
+            border-radius: 50% !important;
+            background-color: currentColor !important;
+            display: inline-block !important;
+            animation: dotPulse 1.4s infinite ease-in-out both !important;
+        }
+        .loading-dots span:nth-child(1), .dot-pulse span:nth-child(1), .spinner-dots span:nth-child(1) { animation-delay: -0.32s !important; }
+        .loading-dots span:nth-child(2), .dot-pulse span:nth-child(2), .spinner-dots span:nth-child(2) { animation-delay: -0.16s !important; }
+        .loading-dots span:nth-child(3), .dot-pulse span:nth-child(3), .spinner-dots span:nth-child(3) { animation-delay: 0s !important; }
+
+        @keyframes dotPulse {
+            0%, 80%, 100% { transform: scale(0.4); opacity: 0.3; }
+            40% { transform: scale(1.1); opacity: 1; }
+        }
+
         @media (max-width: 1440px) {
             :root {
                 --sidebar-width: 240px;
@@ -108,7 +134,7 @@
         }
 
         html {
-            font-size: 90%;
+            font-size: 87.5%;
         }
 
         html, body {
@@ -272,6 +298,32 @@
             background: linear-gradient(135deg, rgba(122, 90, 248, 0.16) 0%, rgba(122, 90, 248, 0.06) 100%);
             border-color: rgba(122, 90, 248, 0.25);
             box-shadow: 0 4px 14px rgba(122, 90, 248, 0.15), inset 0 1px 0 rgba(255, 255, 255, 0.7);
+        }
+
+        .sidebar-menu-section,
+        .sidebar-menu-list,
+        .sidebar-menu-item {
+            position: relative;
+            z-index: 2;
+        }
+
+        .sidebar-menu-link {
+            position: relative;
+            z-index: 2;
+            text-decoration: none;
+        }
+
+        .sidebar-menu-link.active {
+            color: #FFFFFF !important;
+            font-weight: 600;
+        }
+
+        .sidebar-menu-link.active span {
+            color: #FFFFFF !important;
+        }
+
+        .sidebar-menu-link.active i {
+            color: var(--brand-lime, #B4F105) !important;
         }
 
         .sidebar-section-header {
@@ -793,20 +845,44 @@
             background-color: transparent !important;
             color: inherit !important;
             border-color: var(--border-color) !important;
-            padding: 0.42rem 0.65rem !important;
-            font-size: 0.78rem !important;
+            padding: 0.35rem 0.55rem !important;
+            font-size: 0.76rem !important;
             vertical-align: middle;
         }
 
         .table th, .custom-glass-table th {
-            font-size: 0.6875rem !important;
+            font-size: 0.68rem !important;
             font-weight: 700 !important;
             text-transform: uppercase;
             letter-spacing: 0.04em;
             color: var(--text-muted) !important;
         }
 
-        /* Global Button Design System (Standardized to Homepage Pill Standard: 38px Height, 50px Radius) */
+        /* Compact Filter Widgets & Laptop 125% FHD Density */
+        .card-filter, .filter-widget, .filter-card {
+            padding: 0.5rem 0.75rem !important;
+            margin-bottom: 0.65rem !important;
+        }
+        .card-filter .form-control,
+        .card-filter .form-select,
+        .filter-widget .form-control,
+        .filter-widget .form-select,
+        .filter-card .form-control,
+        .filter-card .form-select {
+            min-height: 32px !important;
+            height: 32px !important;
+            font-size: 0.78rem !important;
+            padding: 0.25rem 0.6rem !important;
+        }
+        .card-filter .input-group-text,
+        .filter-widget .input-group-text,
+        .filter-card .input-group-text {
+            min-height: 32px !important;
+            height: 32px !important;
+            padding: 0.25rem 0.5rem !important;
+        }
+
+        /* Global Button Design System (Compact 34px Height for 125% FHD Density) */
         .btn, 
         .btn-primary, 
         .btn-secondary, 
@@ -822,9 +898,9 @@
         .btn-info,
         .theme-pill-btn,
         .auth-nav-btn {
-            height: 38px !important;
-            padding: 0 14px !important;
-            font-size: 0.875rem !important;
+            height: 34px !important;
+            padding: 0 12px !important;
+            font-size: 0.8125rem !important;
             font-weight: 500 !important;
             border-radius: 50px !important;
             display: inline-flex !important;
@@ -891,6 +967,24 @@
 
         .modal-dialog-scrollable .modal-content {
             max-height: 85vh;
+        }
+
+        .modal-dialog-scrollable form {
+            display: flex;
+            flex-direction: column;
+            flex-grow: 1;
+            overflow: hidden;
+            min-height: 0;
+        }
+
+        .modal-dialog-scrollable .modal-body {
+            overflow-y: auto !important;
+            max-height: calc(85vh - 120px);
+        }
+
+        body.modal-open, html.modal-open {
+            overflow: hidden !important;
+            padding-right: 0 !important;
         }
 
         :root[data-theme="dark"] .btn-close {
@@ -1116,7 +1210,7 @@
            START: Spark Sidebar Component
            Highly polished, dark-green sticky navigation
            ========================================== -->
-    <div class="sidebar-wrapper" id="sidebar">
+    <div class="sidebar-wrapper" id="sidebar" data-lenis-prevent>
         <!-- Brand Logo / Identity -->
         <a href="{% url 'users:user-live-dashboard' %}" 
            class="sidebar-brand"
@@ -1130,7 +1224,7 @@
         </a>
 
         <!-- Navigation Menu -->
-        <div class="flex-grow-1 overflow-y-auto">
+        <div class="sidebar-nav-container flex-grow-1 overflow-y-auto" id="userSidebarNav" data-lenis-prevent>
             <!-- Group: Terminal -->
             <div class="sidebar-menu-section">
                 <div class="sidebar-menu-title">Terminal</div>
@@ -1600,6 +1694,7 @@
 
         // Global Bootstrap Modal Relocation & Stacking Engine
         document.addEventListener('show.bs.modal', function(event) {
+            if (window.lenis) window.lenis.stop();
             const modal = event.target;
             if (modal && modal instanceof HTMLElement && modal.id !== 'globalHtmxModal' && !modal.closest('#globalHtmxModal')) {
                 if (modal.parentElement !== document.body) {
@@ -1610,6 +1705,7 @@
 
         document.addEventListener('hidden.bs.modal', function() {
             if (!document.querySelector('.modal.show')) {
+                if (window.lenis) window.lenis.start();
                 document.querySelectorAll('.modal-backdrop').forEach(function(el) { el.remove(); });
                 document.body.classList.remove('modal-open');
                 document.body.style.removeProperty('overflow');
@@ -1667,17 +1763,35 @@
 
         // Active Link Sync on Click & HTMX Settle
         function syncActiveSidebarLinks() {
-            const currentPath = window.location.pathname;
-            document.querySelectorAll('.sidebar-menu-link').forEach(link => {
-                const href = link.getAttribute('href');
-                if (href && currentPath === href) {
-                    document.querySelectorAll('.sidebar-menu-link').forEach(l => l.classList.remove('active'));
-                    link.classList.add('active');
+            var currentPath = window.location.pathname;
+            var bestMatch = null;
+            var maxMatchLen = 0;
+            var links = document.querySelectorAll('.sidebar-menu-link');
+            links.forEach(function(link) {
+                var href = link.getAttribute('href');
+                if (href && (currentPath === href || (href !== '/' && currentPath.startsWith(href)))) {
+                    if (href.length > maxMatchLen) {
+                        maxMatchLen = href.length;
+                        bestMatch = link;
+                    }
                 }
             });
+            if (bestMatch) {
+                links.forEach(function(l) { l.classList.remove('active'); });
+                bestMatch.classList.add('active');
+            }
         }
-        document.addEventListener('DOMContentLoaded', syncActiveSidebarLinks);
+        document.addEventListener('DOMContentLoaded', function() {
+            syncActiveSidebarLinks();
+            document.querySelectorAll('.sidebar-menu-link').forEach(function(link) {
+                link.addEventListener('click', function() {
+                    document.querySelectorAll('.sidebar-menu-link').forEach(function(l) { l.classList.remove('active'); });
+                    this.classList.add('active');
+                });
+            });
+        });
         document.addEventListener('htmx:afterSettle', syncActiveSidebarLinks);
+        window.addEventListener('popstate', syncActiveSidebarLinks);
     </script>
 
     <!-- Lenis Smooth Scroll JS -->
@@ -1694,6 +1808,22 @@
             document.addEventListener('htmx:afterSwap', function() {
                 if (window.lenis) window.lenis.resize();
             });
+
+            // Ensure mouse wheel directly scrolls the fixed sidebar navigation
+            function initSidebarWheel() {
+                const sNav = document.getElementById('userSidebarNav') || document.querySelector('.sidebar-nav-container');
+                if (sNav) {
+                    sNav.addEventListener('wheel', function(e) {
+                        e.stopPropagation();
+                        sNav.scrollTop += e.deltaY;
+                    }, { passive: false });
+                }
+            }
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', initSidebarWheel);
+            } else {
+                initSidebarWheel();
+            }
         })();
     </script>
 </body>

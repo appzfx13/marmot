@@ -28,37 +28,38 @@
     }
 </style>
 
-<div class="glass-card p-0 overflow-hidden mb-4 border-0">
+<!-- Main Spark Card Container -->
+<div class="card overflow-hidden d-flex flex-column mb-0" style="min-height: 550px;">
     <!-- Bulk Action Toolbar -->
     <div class="bulk-action-bar px-4 py-2 border-bottom d-none align-items-center justify-content-between" style="background: rgba(220, 53, 69, 0.12); border-color: rgba(220, 53, 69, 0.25) !important;">
         <div class="d-flex align-items-center gap-2">
-            <span class="material-icons text-danger fs-5">check_circle</span>
+            <i class="bi bi-check-circle-fill text-danger"></i>
             <span class="fw-bold theme-text-main small"><span class="bulk-selected-count">0</span> backtest tasks marked</span>
         </div>
         <button type="button" 
                 class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
                 onclick="triggerBulkDelete(this, '{% url 'backtest:backtest_bulk_delete' %}')">
-            <span class="material-icons fs-6">delete</span>
+            <i class="bi bi-trash"></i>
             <span>Bulk Delete</span>
         </button>
     </div>
 
     <!-- DESKTOP VIEW: INSTITUTIONAL COMPACT TABLE WITH EXPAND ACCORDIONS -->
-    <div class="d-none d-md-block flex-grow-1" style="width: 100%;">
-        <table class="table table-hover custom-glass-table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main); width: 100%; table-layout: fixed;">
+    <div class="table-responsive flex-grow-1 overflow-auto d-none d-md-block">
+        <table class="table table-custom align-middle mb-0 text-nowrap">
             <thead>
-                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important; font-size: 0.72rem;">
-                    <th scope="col" class="ps-3 py-2 text-center" style="width: 3%; min-width: 28px;">
+                <tr>
+                    <th scope="col" class="ps-4 py-3" style="width: 40px;">
                         <input class="form-check-input select-all-checkbox" type="checkbox" id="selectAllDesktop">
                     </th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 7%;">Task ID</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 17%;">Strategy & Asset</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 12%;">Date Horizon</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 11%;">Capital / Lots</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 12%;">Realized Net PnL</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold" style="width: 12%;">Execution Progress</th>
-                    <th scope="col" class="py-2 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 11%;">Status</th>
-                    <th scope="col" class="text-center py-2 pe-4 ps-1 theme-text-muted text-uppercase small fw-semibold" style="width: 15%; min-width: 120px;">Quick Actions</th>
+                    <th scope="col" class="py-3">Task ID</th>
+                    <th scope="col" class="py-3">Strategy &amp; Asset</th>
+                    <th scope="col" class="py-3">Date Horizon</th>
+                    <th scope="col" class="py-3">Capital / Lots</th>
+                    <th scope="col" class="py-3">Realized Net PnL</th>
+                    <th scope="col" class="py-3">Execution Progress</th>
+                    <th scope="col" class="py-3 text-center">Status</th>
+                    <th scope="col" class="text-end pe-4 py-3">Quick Actions</th>
                 </tr>
             </thead>
             <tbody id="backtest-table-body">
@@ -66,8 +67,8 @@
                     {% include "admins/partials/backtest_dashboard_rows.html" %}
                 {% else %}
                 <tr class="border-0">
-                    <td colspan="10" class="text-center py-5 theme-text-muted border-0 bg-transparent">
-                        <span class="material-icons fs-1 mb-2 opacity-50">analytics</span>
+                    <td colspan="9" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                        <i class="bi bi-bar-chart-line fs-1 mb-2 opacity-50 d-block"></i>
                         <p class="mb-0 fw-medium">No strategy backtests found.</p>
                         <small class="opacity-75">Click "Run New Backtest" above to initialize a plug-and-play strategy execution.</small>
                     </td>
@@ -86,12 +87,10 @@
         {% endif %}
     </div>
 
-    <!-- Infinite Scroll Status Footer -->
-    <div class="border-top pt-2 pb-2 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-        <div class="d-flex justify-content-between align-items-center small theme-text-muted">
-            <span>Showing {{ paginator.count|default:backtests|length }} backtests (auto-extends on scroll)</span>
-            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-1" style="font-size: 0.68rem;">Continuous Scroll Active</span>
-        </div>
+    <!-- LOAD MORE FOOTER -->
+    <div class="card-footer py-2 px-3 px-md-4 mt-auto border-top d-flex justify-content-between align-items-center small theme-text-muted">
+        <span>Showing {{ paginator.count|default:backtests|length }} backtests</span>
+        <span class="trend-badge trend-up py-0.5 px-2 font-monospace fs-xs">Continuous Table Active</span>
     </div>
 </div>
 

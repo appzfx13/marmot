@@ -8,8 +8,8 @@
     }
 </style>
 
-<!-- Main Glass Card Container with Min-height for optimal layout flow -->
-<div class="glass-card overflow-hidden d-flex flex-column min-vh-75 w-100" style="min-height: 700px;" 
+<!-- Main Spark Card Container -->
+<div class="card overflow-hidden d-flex flex-column mb-0 w-100" style="min-height: 550px;" 
      id="backup-dashboard-container"
      hx-get="{{ request.get_full_path }}" 
      hx-trigger="reloadBackupTable from:body" 
@@ -18,26 +18,26 @@
     <!-- Bulk Action Toolbar -->
     <div class="bulk-action-bar px-4 py-2 border-bottom d-none align-items-center justify-content-between" style="background: rgba(220, 53, 69, 0.12); border-color: rgba(220, 53, 69, 0.25) !important;">
         <div class="d-flex align-items-center gap-2">
-            <span class="material-icons text-danger fs-5">check_circle</span>
+            <i class="bi bi-check-circle-fill text-danger"></i>
             <span class="fw-bold theme-text-main small"><span class="bulk-selected-count">0</span> backup entries marked</span>
         </div>
         <button type="button" 
                 class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
                 onclick="triggerBulkDelete(this, '{% url 'market:market_backup_bulk_delete' %}')">
-            <span class="material-icons fs-6">delete</span>
+            <i class="bi bi-trash"></i>
             <span>Bulk Delete</span>
         </button>
     </div>
 
     <!-- DESKTOP / LARGE TABLET VIEW -->
-    <div class="d-none d-lg-block flex-grow-1" style="width: 100%;">
-        <table class="table table-hover custom-glass-table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main); width: 100%; table-layout: fixed;">
+    <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
+        <table class="table table-custom align-middle mb-0 text-nowrap">
             <thead>
-                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important; font-size: 0.72rem;">
-                    <th scope="col" class="ps-3 py-2 text-center" style="width: 3%; min-width: 28px;">
+                <tr>
+                    <th scope="col" class="ps-4 py-3" style="width: 40px;">
                         <input class="form-check-input bulk-select-all" type="checkbox" title="Select All">
                     </th>
-                    <th scope="col" class="py-2 theme-text-muted" style="width: 22%;">
+                    <th scope="col" class="py-3">
                         <a href="javascript:void(0);" 
                            class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
                            hx-get="{% url 'market:market_backup_list' %}?sort={% if current_sort == 'index_name' %}-index_name{% else %}index_name{% endif %}&{{ current_filters }}"
@@ -45,15 +45,13 @@
                            hx-push-url="true"
                            title="Sort by Index">
                             Backup ID / Index
-                            <span class="material-icons fs-6">
-                                {% if current_sort == 'index_name' %}arrow_upward{% elif current_sort == '-index_name' %}arrow_downward{% else %}swap_vert{% endif %}
-                            </span>
+                            <i class="bi {% if current_sort == 'index_name' %}bi-arrow-up{% elif current_sort == '-index_name' %}bi-arrow-down{% else %}bi-arrow-down-up{% endif %} ms-1"></i>
                         </a>
                     </th>
-                    <th scope="col" class="py-2 theme-text-muted" style="width: 17%;">Date Range</th>
-                    <th scope="col" class="py-2 theme-text-muted" style="width: 18%;">Strikes / Storage</th>
-                    <th scope="col" class="py-2 theme-text-muted" style="width: 16%;">Progress</th>
-                    <th scope="col" class="py-2 theme-text-muted text-center" style="width: 10%;">
+                    <th scope="col" class="py-3">Date Range</th>
+                    <th scope="col" class="py-3">Strikes / Storage</th>
+                    <th scope="col" class="py-3">Progress</th>
+                    <th scope="col" class="py-3 text-center">
                         <a href="javascript:void(0);" 
                            class="text-decoration-none theme-text-muted d-inline-flex align-items-center gap-1"
                            hx-get="{% url 'market:market_backup_list' %}?sort={% if current_sort == 'status' %}-status{% else %}status{% endif %}&{{ current_filters }}"
@@ -61,12 +59,10 @@
                            hx-push-url="true"
                            title="Sort by Status">
                             Status
-                            <span class="material-icons fs-6">
-                                {% if current_sort == 'status' %}arrow_upward{% elif current_sort == '-status' %}arrow_downward{% else %}swap_vert{% endif %}
-                            </span>
+                            <i class="bi {% if current_sort == 'status' %}bi-arrow-up{% elif current_sort == '-status' %}bi-arrow-down{% else %}bi-arrow-down-up{% endif %} ms-1"></i>
                         </a>
                     </th>
-                    <th scope="col" class="text-center py-2 theme-text-muted" style="width: 14%; min-width: 100px;">Controls & Actions</th>
+                    <th scope="col" class="text-end pe-4 py-3">Controls &amp; Actions</th>
                 </tr>
             </thead>
             <tbody id="backup-table-body">
@@ -75,7 +71,7 @@
                 {% else %}
                 <tr class="border-0">
                     <td colspan="7" class="text-center py-5 theme-text-muted border-0 bg-transparent">
-                        <span class="material-icons fs-1 mb-2 opacity-50">cloud_off</span>
+                        <i class="bi bi-cloud-slash fs-1 mb-2 opacity-50 d-block"></i>
                         <p class="mb-0 fw-medium">No market backup jobs found.</p>
                         <small class="opacity-75">Adjust your filters or run a new backup.</small>
                     </td>
@@ -91,18 +87,16 @@
             {% include "admins/partials/backup_dashboard_cards.html" %}
         {% else %}
         <div class="text-center py-5 theme-text-muted">
-            <span class="material-icons fs-1 mb-2 opacity-50">cloud_off</span>
+            <i class="bi bi-cloud-slash fs-1 mb-2 opacity-50 d-block"></i>
             <p class="mb-0 fw-medium">No market backup jobs found.</p>
         </div>
         {% endif %}
     </div>
 
-    <!-- Load More Status Footer -->
-    <div class="border-top pt-2 pb-2 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
-        <div class="d-flex justify-content-between align-items-center small theme-text-muted">
-            <span>Showing {{ paginator.count|default:backups|length }} backup tasks (extendable via Load More)</span>
-            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-1" style="font-size: 0.68rem;">Continuous Table Active</span>
-        </div>
+    <!-- LOAD MORE FOOTER -->
+    <div class="card-footer py-2 px-3 px-md-4 mt-auto border-top d-flex justify-content-between align-items-center small theme-text-muted">
+        <span>Showing {{ paginator.count|default:backups|length }} backup tasks</span>
+        <span class="trend-badge trend-up py-0.5 px-2 font-monospace fs-xs">Continuous Table Active</span>
     </div>
 
     <script>

@@ -23,21 +23,21 @@
     <!-- END: Spark Page Header -->
 
     <!-- Search Controls Bar -->
-    <div class="card mb-0">
-        <div class="card-body p-3 p-md-4">
-            <form method="GET" action="{% url 'backtest:strategy_list' %}" class="row g-3 align-items-center" hx-get="{% url 'backtest:strategy_list' %}" hx-target="#strategy-list-container" hx-push-url="true">
+    <div class="card card-filter mb-0">
+        <div class="card-body p-2 px-3">
+            <form method="GET" action="{% url 'backtest:strategy_list' %}" class="row g-2 align-items-center" hx-get="{% url 'backtest:strategy_list' %}" hx-target="#strategy-list-container" hx-push-url="true">
                 <div class="col-12 col-md-6 col-lg-5">
-                    <div class="input-group">
-                        <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
-                            <i class="bi bi-search"></i>
-                        </span>
+                    <div class="filter-search-wrapper">
                         <input type="text" name="q" value="{{ current_q|default:'' }}"
-                            class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25"
+                            class="form-control"
                             placeholder="Search strategy by name, category, or index..." 
                             hx-get="{% url 'backtest:strategy_list' %}"
                             hx-target="#strategy-list-container" 
                             hx-trigger="input changed delay:300ms, search"
                             hx-push-url="true">
+                        <span class="search-icon">
+                            <i class="bi bi-search"></i>
+                        </span>
                     </div>
                 </div>
             </form>
@@ -45,11 +45,11 @@
     </div>
 
     <!-- Strategy Table & Cards Glass Container -->
-    <div class="card mb-0">
-        <div class="card-body p-0">
+    <div class="card overflow-hidden d-flex flex-column mb-0" style="min-height: 550px;">
+        <div class="card-body p-0 d-flex flex-column flex-grow-1">
             <!-- DESKTOP / TABLET VIEW: TABLE -->
             <div class="d-none d-md-block flex-grow-1" style="width: 100%;">
-                <table class="table table-custom align-middle mb-0" style="width: 100%; table-layout: fixed;">
+                <table class="table table-custom align-middle mb-0 text-nowrap" style="width: 100%;">
                     <thead>
                         <tr>
                             <th scope="col" class="ps-3 py-3" style="width: 28%;">Strategy &amp; Category</th>
@@ -110,32 +110,32 @@
                             </td>
 
                             <td class="text-center py-2 px-1">
-                                <div class="d-flex align-items-center justify-content-center gap-1">
+                                <div class="d-flex align-items-center justify-content-center gap-1.5">
                                     <!-- View & Edit Code Button -->
-                                    <a href="{% url 'backtest:strategy_detail' strategy.pk %}" class="btn btn-sm btn-outline-secondary rounded-circle p-0 d-inline-flex align-items-center justify-content-center" style="width: 32px; height: 32px;" title="View & Edit Code">
-                                        <i class="bi bi-code-slash"></i>
+                                    <a href="{% url 'backtest:strategy_detail' strategy.pk %}" class="glass-icon-btn rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 36px; height: 36px;" title="View & Edit Code">
+                                        <span class="material-icons fs-6">code</span>
                                     </a>
 
                                     <!-- Run Simulation Button -->
-                                    <a href="{% url 'backtest:backtest_create' %}?strategy={{ strategy.code_name }}" class="btn btn-sm btn-outline-primary rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-primary" style="width: 32px; height: 32px;" title="Run Simulation">
-                                        <i class="bi bi-play-fill"></i>
+                                    <a href="{% url 'backtest:backtest_create' %}?strategy={{ strategy.code_name }}" class="glass-icon-btn rounded-circle d-inline-flex align-items-center justify-content-center text-primary" style="width: 36px; height: 36px;" title="Run Simulation">
+                                        <span class="material-icons fs-6">play_arrow</span>
                                     </a>
 
                                     {# Admin Delete Button #}
                                     {% if can_delete %}
                                     <button type="button" 
-                                            class="btn btn-sm btn-outline-danger border-0 rounded-circle p-0 d-inline-flex align-items-center justify-content-center" 
-                                            style="width: 32px; height: 32px;"
+                                            class="glass-icon-btn text-danger border-0 rounded-circle d-inline-flex align-items-center justify-content-center" 
+                                            style="width: 36px; height: 36px;"
                                             hx-get="{% url 'backtest:strategy_delete' strategy.pk %}" 
                                             hx-target="#global-modal-content" 
                                             title="Admin Delete Strategy">
-                                        <i class="bi bi-trash"></i>
+                                        <span class="material-icons fs-6">delete</span>
                                     </button>
                                     {% endif %}
 
                                     <!-- Dropdown Arrow Icon Button to Expand Details Drawer -->
-                                    <button class="btn btn-sm btn-outline-secondary rounded-circle border-0 p-0 d-inline-flex align-items-center justify-content-center"
-                                            style="width: 32px; height: 32px;"
+                                    <button class="glass-icon-btn rounded-circle border-0 d-inline-flex align-items-center justify-content-center"
+                                            style="width: 36px; height: 36px;"
                                             type="button"
                                             data-bs-toggle="collapse"
                                             data-bs-target="#strategy-row-expand-{{ strategy.id }}"
@@ -267,49 +267,10 @@
                 {% empty %}
                 <div class="text-center py-4 theme-text-muted">No strategy modules found.</div>
                 {% endfor %}
-            </div>
-
-            <!-- Pinned Pagination Footer -->
-            <div class="border-top pt-3 pb-3 px-3 px-md-4 mt-auto" style="border-color: var(--border-color) !important;">
-                <div class="d-flex flex-column flex-sm-row justify-content-between align-items-center gap-3">
-                    <div class="small theme-text-muted text-center text-sm-start">
-                        {% if is_paginated %}
-                            Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ paginator.count }} strategies
-                        {% else %}
-                            Showing {{ strategies|length }} strategies
-                        {% endif %}
-                    </div>
-                    
-                    <ul class="pagination mb-0 gap-1 gap-sm-2 align-items-center flex-wrap justify-content-center">
-                        {% if is_paginated and page_obj.has_previous %}
-                        <li class="page-item mb-0">
-                            <a class="page-link btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center p-0" 
-                               style="width: 36px; height: 36px;"
-                               hx-get="{% url 'backtest:strategy_list' %}?page={{ page_obj.previous_page_number }}&q={{ current_q }}" 
-                               hx-target="#strategy-list-container" hx-push-url="true">
-                               <i class="bi bi-chevron-left"></i>
-                            </a>
-                        </li>
-                        {% endif %}
-                        
-                        <li class="page-item mb-0">
-                            <span class="page-link btn btn-sm btn-primary rounded-circle d-flex align-items-center justify-content-center fw-bold p-0 text-white" style="width: 36px; height: 36px;">
-                                {% if is_paginated %}{{ page_obj.number }}{% else %}1{% endif %}
-                            </span>
-                        </li>
-
-                        {% if is_paginated and page_obj.has_next %}
-                        <li class="page-item mb-0">
-                            <a class="page-link btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center p-0" 
-                               style="width: 36px; height: 36px;"
-                               hx-get="{% url 'backtest:strategy_list' %}?page={{ page_obj.next_page_number }}&q={{ current_q }}" 
-                               hx-target="#strategy-list-container" hx-push-url="true">
-                               <i class="bi bi-chevron-right"></i>
-                            </a>
-                        </li>
-                        {% endif %}
-                    </ul>
-                </div>
+                     <!-- LOAD MORE FOOTER -->
+            <div class="card-footer py-2 px-3 px-md-4 mt-auto border-top d-flex justify-content-between align-items-center small theme-text-muted">
+                <span>Showing {{ paginator.count|default:strategies|length }} strategies</span>
+                <span class="trend-badge trend-up py-0.5 px-2 font-monospace fs-xs">Continuous Table Active</span>
             </div>
         </div>
     </div>

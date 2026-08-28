@@ -201,7 +201,7 @@
      style="background: linear-gradient(135deg, var(--primary-subdued) 0%, transparent 100%);">
     <div class="d-flex align-items-center justify-content-between mb-2">
         <div class="d-flex align-items-center gap-2">
-            <span class="spinner-border spinner-border-sm text-primary" role="status"></span>
+            <span class="loading-dots text-primary"><span></span><span></span><span></span></span>
             <strong class="theme-text-main small text-uppercase tracking-wider">Reinforcement Learning & Options Execution Simulation In Progress</strong>
         </div>
         <span id="backtest-live-progress-pct" class="badge bg-primary rounded-pill px-3 py-1 font-monospace fw-bold">{{ backtest.progress|default:0 }}%</span>
@@ -974,28 +974,28 @@
 
         <div class="col-12 col-md-3">
             <label class="form-label theme-text-muted smaller fw-bold mb-1 text-uppercase">Search Contract / Strike</label>
-            <div class="input-group input-group-sm">
-                <input type="text" name="q" value="{{ current_filters.q }}" placeholder="Search Strike, Symbol..." class="form-control theme-text-main">
-                <button class="btn btn-primary" type="submit">
-                    <span class="material-icons fs-6">search</span>
-                </button>
+            <div class="filter-search-wrapper">
+                <input type="text" name="q" value="{{ current_filters.q|default:'' }}" placeholder="Search Strike, Symbol..." class="form-control">
+                <span class="search-icon">
+                    <i class="bi bi-search"></i>
+                </span>
             </div>
         </div>
     </form>
 </div>
 
 <!-- Infinite Scrolling Trade Signals & Orders Table -->
-<div class="glass-card p-0 overflow-hidden mb-4 border-0" id="backtest-orders-container">
+<div class="card overflow-hidden d-flex flex-column mb-4" id="backtest-orders-container">
     <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex flex-wrap align-items-center justify-content-between gap-2">
         <div>
             <h5 class="fw-bold theme-text-main mb-1 d-flex align-items-center gap-2">
-                <span class="material-icons text-primary fs-5">format_list_bulleted</span>
-                <span>Executed Strategy Orders & Signals</span>
+                <i class="bi bi-list-ul text-primary"></i>
+                <span>Executed Strategy Orders &amp; Signals</span>
             </h5>
             <div class="theme-text-muted small">
                 <span>Total <strong class="theme-text-main font-monospace">{{ total_trades_count }}</strong> Signals recorded</span>
                 <span class="opacity-40 mx-1.5">•</span>
-                <span class="opacity-75">Infinite scroll auto-appends on scroll</span>
+                <span class="opacity-75">Continuous table auto-extends on scroll</span>
             </div>
         </div>
         <span class="badge rounded-pill px-3 py-1 font-monospace fw-semibold" style="background: var(--primary-subdued); color: var(--primary); border: 1px solid var(--primary-border);">
@@ -1006,7 +1006,7 @@
     <!-- Interactive Chart Filter Banner -->
     <div id="chart-trade-filter-banner" class="px-3 py-2 border-bottom d-none align-items-center justify-content-between" style="background: var(--info-subdued); border-color: var(--info-border) !important;">
         <div class="d-flex align-items-center gap-2">
-            <span class="material-icons text-info fs-5">show_chart</span>
+            <i class="bi bi-graph-up text-info"></i>
             <span class="small fw-semibold theme-text-main">
                 Chart Filter Active: <span id="chart-filtered-trade-title" class="text-info font-monospace">Trade #1</span>
             </span>
@@ -1014,25 +1014,25 @@
         <button type="button" 
                 class="btn btn-sm btn-outline-info rounded-pill px-3 py-0.5 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
                 onclick="window.clearTradeChartFilter && window.clearTradeChartFilter()">
-            <span class="material-icons" style="font-size: 0.9rem;">close</span>
+            <i class="bi bi-x-lg"></i>
             <span>Show All Trades</span>
         </button>
     </div>
 
-    <!-- DESKTOP / LAPTOP: COMPACT INSTITUTIONAL TRADES TABLE (Strict 100% Column Width Sum) -->
-    <div class="w-100 d-none d-lg-block">
-        <table class="table table-hover custom-glass-table align-middle mb-0 border-0 w-100" style="width: 100%; table-layout: fixed; --bs-table-bg: transparent; color: var(--text-main);">
+    <!-- DESKTOP / LAPTOP: COMPACT INSTITUTIONAL TRADES TABLE -->
+    <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
+        <table class="table table-custom align-middle mb-0 text-nowrap">
             <thead>
-                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-default) !important;">
-                    <th scope="col" class="ps-2 py-2 theme-text-muted text-uppercase text-center small fw-semibold" style="width: 4%; min-width: 32px; font-size: 0.72rem;">#</th>
-                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 16%; font-size: 0.72rem;">Contract / Strike</th>
-                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 13%; font-size: 0.72rem;">Entry / Exit Time</th>
-                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 12%; font-size: 0.72rem;">Spot Index</th>
-                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 14%; font-size: 0.72rem;">Type & Qty</th>
-                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 14%; font-size: 0.72rem;">Option & Margin</th>
-                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 15%; font-size: 0.72rem;">Net PnL & Equity</th>
-                    <th scope="col" class="py-2 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 7%; font-size: 0.72rem;">Outcome</th>
-                    <th scope="col" class="text-center py-2 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 5%; min-width: 40px; font-size: 0.72rem;" title="Expand Details">Action</th>
+                <tr>
+                    <th scope="col" class="ps-2 py-3 text-center" style="width: 4%;">#</th>
+                    <th scope="col" class="py-3 px-1">Contract / Strike</th>
+                    <th scope="col" class="py-3 px-1">Entry / Exit Time</th>
+                    <th scope="col" class="py-3 px-1">Spot Index</th>
+                    <th scope="col" class="py-3 px-1">Type &amp; Qty</th>
+                    <th scope="col" class="py-3 px-1">Option &amp; Margin</th>
+                    <th scope="col" class="py-3 px-1">Net PnL &amp; Equity</th>
+                    <th scope="col" class="py-3 px-1 text-center">Outcome</th>
+                    <th scope="col" class="text-end pe-4 py-3" title="Expand Details">Action</th>
                 </tr>
             </thead>
             <tbody id="trades-table-body">
@@ -1042,19 +1042,19 @@
                 <tr class="border-0">
                     <td colspan="9" class="text-center py-5 theme-text-muted border-0 bg-transparent">
                         {% if backtest.status|lower == 'created' %}
-                            <span class="material-icons fs-1 mb-2 text-primary opacity-75">hourglass_empty</span>
+                            <i class="bi bi-hourglass fs-1 mb-2 text-primary opacity-75 d-block"></i>
                             <p class="mb-1 fw-bold theme-text-main">Backtest Ready for Execution</p>
                             <small class="opacity-75">Click "Start Execution" above to run the simulation and generate trade results.</small>
                         {% elif backtest.status|lower == 'running' or backtest.status|lower == 'in_progress' %}
-                            <span class="spinner-border spinner-border-sm mb-2 text-warning" style="width: 28px; height: 28px;"></span>
+                            <div class="mb-2 text-warning"><span class="loading-dots"><span></span><span></span><span></span></span></div>
                             <p class="mb-1 fw-bold text-warning">Simulation Running...</p>
                             <small class="opacity-75">Generating trade signals in real-time. Results will appear as orders execute.</small>
                         {% elif total_trades_count == 0 %}
-                            <span class="material-icons fs-1 mb-2 opacity-50">event_busy</span>
+                            <i class="bi bi-calendar-x fs-1 mb-2 opacity-50 d-block"></i>
                             <p class="mb-1 fw-bold theme-text-main">No Trades Generated During Simulation</p>
                             <small class="opacity-75">0 order signals met the strategy entry conditions for {{ backtest.index_name }} across {{ backtest.start_date|date:"M d, Y" }} – {{ backtest.end_date|date:"M d, Y" }}.</small>
                         {% else %}
-                            <span class="material-icons fs-1 mb-2 opacity-50">filter_alt_off</span>
+                            <i class="bi bi-funnel fs-1 mb-2 opacity-50 d-block"></i>
                             <p class="mb-1 fw-bold theme-text-main">No order signals match your filter criteria.</p>
                             <small class="opacity-75">Try clearing your search query or adjusting your date and trade type filters.</small>
                         {% endif %}
@@ -1072,31 +1072,29 @@
         {% else %}
         <div class="text-center py-4 theme-text-muted">
             {% if backtest.status|lower == 'created' %}
-                <span class="material-icons fs-2 mb-2 text-primary opacity-75">hourglass_empty</span>
+                <i class="bi bi-hourglass fs-2 mb-2 text-primary opacity-75 d-block"></i>
                 <p class="mb-1 fw-bold theme-text-main">Backtest Ready for Execution</p>
                 <small class="opacity-75">Click "Start Execution" above to run the simulation.</small>
             {% elif backtest.status|lower == 'running' or backtest.status|lower == 'in_progress' %}
-                <span class="spinner-border spinner-border-sm mb-2 text-warning" style="width: 24px; height: 24px;"></span>
+                <div class="mb-2 text-warning"><span class="loading-dots"><span></span><span></span><span></span></span></div>
                 <p class="mb-1 fw-bold text-warning">Simulation Running...</p>
             {% elif total_trades_count == 0 %}
-                <span class="material-icons fs-2 mb-2 opacity-50">event_busy</span>
+                <i class="bi bi-calendar-x fs-2 mb-2 opacity-50 d-block"></i>
                 <p class="mb-1 fw-bold theme-text-main">No Trades Generated</p>
                 <small class="opacity-75">0 signals met entry conditions for this date range.</small>
             {% else %}
-                <span class="material-icons fs-2 mb-2 opacity-50">filter_alt_off</span>
-                <p class="mb-1 fw-bold theme-text-main">No order signals match your filter criteria.</p>
-                <small class="opacity-75">Try clearing your search query or filters.</small>
+                <i class="bi bi-funnel fs-2 mb-2 opacity-50 d-block"></i>
+                <p class="mb-1 fw-bold theme-text-main">No Matching Orders</p>
+                <small class="opacity-75">Adjust filters or search query.</small>
             {% endif %}
         </div>
         {% endif %}
     </div>
 
-    <!-- Infinite Scroll Footer Status -->
-    <div class="border-top pt-2 pb-2 px-3 px-md-4 mt-auto" style="border-color: var(--border-default) !important; background-color: var(--nav-hover);">
-        <div class="d-flex justify-content-between align-items-center small theme-text-muted font-monospace">
-            <span>Showing {{ filtered_trades_count }} matching orders (auto-extends on scroll)</span>
-            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-1" style="font-size: 0.68rem;">Continuous Scroll Active</span>
-        </div>
+    <!-- LOAD MORE FOOTER -->
+    <div class="card-footer py-2 px-3 px-md-4 mt-auto border-top d-flex justify-content-between align-items-center small theme-text-muted">
+        <span>Showing {{ filtered_trades_count }} matching orders</span>
+        <span class="trend-badge trend-up py-0.5 px-2 font-monospace fs-xs">Continuous Table Active</span>
     </div>
 </div>
 

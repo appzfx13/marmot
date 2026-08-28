@@ -34,26 +34,26 @@
     <!-- END: Spark Page Header -->
 
     <!-- Search & Filter Controls -->
-    <div class="card mb-0">
-        <div class="card-body p-3 p-md-4">
-            <form method="GET" action="{{ request.path }}" class="row g-3 align-items-center">
+    <div class="card card-filter mb-0">
+        <div class="card-body p-2 px-3">
+            <form method="GET" action="{{ request.path }}" class="row g-2 align-items-center">
                 
                 <!-- Search Input -->
                 <div class="col-12 col-sm-6 col-lg-3">
-                    <div class="input-group">
-                        <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
-                            <i class="bi bi-search"></i>
-                        </span>
+                    <div class="filter-search-wrapper">
                         <input type="text" 
                                name="q" 
-                               value="{{ current_q }}" 
-                               class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25" 
+                               value="{{ current_q|default:'' }}" 
+                               class="form-control" 
                                placeholder="Order ID, symbol..." 
                                hx-get="{{ request.path }}"
                                hx-target="#postback-list-container"
                                hx-trigger="input changed delay:400ms, search"
                                hx-include="[name='user_id'], [name='start_date'], [name='end_date']"
                                hx-push-url="true">
+                        <span class="search-icon">
+                            <i class="bi bi-search"></i>
+                        </span>
                     </div>
                 </div>
 
@@ -66,9 +66,9 @@
                             hx-trigger="change"
                             hx-include="[name='q'], [name='start_date'], [name='end_date']"
                             hx-push-url="true">
-                        <option value="" class="text-dark">All Users</option>
+                        <option value="">All Users</option>
                         {% for u in users_list %}
-                        <option value="{{ u.id }}" class="text-dark" {% if current_user_id == u.id|stringformat:"i" %}selected{% endif %}>
+                        <option value="{{ u.id }}" {% if current_user_id == u.id|stringformat:"i" %}selected{% endif %}>
                             {{ u.username }} ({% if u.role %}{{ u.role|title }}{% else %}Trader{% endif %})
                         </option>
                         {% endfor %}

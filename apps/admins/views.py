@@ -354,10 +354,11 @@ class AdminTraderScrollView(LoginRequiredMixin, AdminRequiredMixin, BaseHtmxScro
         return context
 
 
-class AdminTraderCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
+class AdminTraderCreateView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
     model = User
     form_class = UserForm
     template_name = 'admins/trader_form.html'
+    partial_template_name = 'admins/partials/trader_form_content.html'
     success_url = reverse_lazy('admins:trader_list')
     success_message = Messages.TRADER_CREATED
 
@@ -366,10 +367,11 @@ class AdminTraderCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredM
         return super().form_valid(form)
 
 
-class AdminTraderUpdateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, UpdateView):
+class AdminTraderUpdateView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, UpdateView):
     model = User
     form_class = UserForm
     template_name = 'admins/trader_form.html'
+    partial_template_name = 'admins/partials/trader_form_content.html'
     success_url = reverse_lazy('admins:trader_list')
     success_message = Messages.TRADER_UPDATED
 

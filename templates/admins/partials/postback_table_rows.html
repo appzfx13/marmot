@@ -10,14 +10,15 @@
 
     <td class="py-3 bg-transparent">
         {% if log.user %}
-        <div class="fw-semibold text-info">{{ log.user.username }}</div>
-        {% if log.broker_client_id %}
-        <div class="small text-warning" style="font-size: 0.75rem;">Client: {{ log.broker_client_id }}</div>
-        {% else %}
-        <div class="small theme-text-muted" style="font-size: 0.75rem;">ID: #{{ log.user.id }}</div>
-        {% endif %}
-        <div class="fw-bold theme-text-main">{{ log.user.get_full_name|default:log.user.username }}</div>
-        <small class="theme-text-muted">@{{ log.user.username }}</small>
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold" style="width: 32px; height: 32px; border: 1px solid rgba(13, 110, 253, 0.3);">
+                {{ log.user.username|slice:":1"|upper }}
+            </div>
+            <div>
+                <div class="fw-medium theme-text-main">{{ log.user.get_full_name|default:log.user.username }}</div>
+                <small class="theme-text-muted">@{{ log.user.username }}</small>
+            </div>
+        </div>
         {% else %}
         <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-2 py-0">Unassigned</span>
         {% endif %}
@@ -84,7 +85,7 @@
                 <span class="fw-bold" style="font-size: 0.8rem;">Load More Logs (Page {{ page_obj.next_page_number }} of {{ paginator.num_pages }})</span>
             </span>
             <span class="load-more-loading d-none align-items-center gap-2">
-                <span class="spinner-border spinner-border-sm" role="status" aria-hidden="true" style="width: 14px; height: 14px;"></span>
+                <span class="loading-dots me-1"><span></span><span></span><span></span></span>
                 <span class="fw-bold" style="font-size: 0.8rem;">Loading logs...</span>
             </span>
         </button>

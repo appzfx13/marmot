@@ -24,20 +24,20 @@
 <!-- END: Spark Page Header -->
 
 <!-- Search & Filter Controls Bar -->
-<div class="glass-card p-3 mb-4">
-    <form method="GET" action="{% url 'backtest:rule_list' %}" class="row g-3 align-items-center" hx-get="{% url 'backtest:rule_list' %}" hx-target="#rule-list-container" hx-push-url="true">
+<div class="glass-card card-filter p-2 px-3 mb-2.5">
+    <form method="GET" action="{% url 'backtest:rule_list' %}" class="row g-2 align-items-center" hx-get="{% url 'backtest:rule_list' %}" hx-target="#rule-list-container" hx-push-url="true">
         <div class="col-12 col-md-4">
-            <div class="input-group">
-                <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
-                    <span class="material-icons fs-6">search</span>
-                </span>
+            <div class="filter-search-wrapper">
                 <input type="text" name="q" value="{{ current_filters.q|default:'' }}"
-                    class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25"
+                    class="form-control"
                     placeholder="Search rules..." 
                     hx-get="{% url 'backtest:rule_list' %}"
                     hx-target="#rule-list-container" 
                     hx-trigger="input changed delay:300ms, search"
                     hx-push-url="true">
+                <span class="search-icon">
+                    <i class="bi bi-search"></i>
+                </span>
             </div>
         </div>
         <div class="col-12 col-sm-6 col-md-3">
@@ -67,20 +67,20 @@
 </div>
 
 <!-- Rule Table & Cards Glass Container -->
-<div class="glass-card overflow-hidden d-flex flex-column border" style="background: var(--glass-bg); border-color: var(--border-color) !important; min-height: 500px;">
+<div class="card overflow-hidden d-flex flex-column mb-0" style="min-height: 550px;">
     
     <!-- DESKTOP / TABLET VIEW: TABLE -->
-    <div class="d-none d-md-block flex-grow-1" style="width: 100%;">
-        <table class="table table-hover custom-glass-table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main); width: 100%; table-layout: fixed;">
+    <div class="table-responsive flex-grow-1 overflow-auto d-none d-md-block" style="width: 100%;">
+        <table class="table table-custom align-middle mb-0 text-nowrap" style="width: 100%;">
             <thead>
-                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-color) !important; font-size: 0.72rem;">
-                    <th scope="col" class="text-center py-2.5 px-1" style="width: 4%; min-width: 32px;">#</th>
-                    <th scope="col" class="py-2.5 ps-3 pe-2" style="width: 26%;">Rule Name & Regime</th>
-                    <th scope="col" class="py-2.5 px-2 text-center" style="width: 14%;">Market Type</th>
-                    <th scope="col" class="py-2.5 px-3" style="width: 24%;">Execution Constraints</th>
-                    <th scope="col" class="py-2.5 px-1 text-center" style="width: 11%;">Scope</th>
-                    <th scope="col" class="py-2.5 px-1 text-center" style="width: 9%;">Status</th>
-                    <th scope="col" class="text-center py-2.5 px-1" style="width: 12%; min-width: 105px;">Actions</th>
+                <tr>
+                    <th scope="col" class="text-center py-3 px-1" style="width: 4%; min-width: 32px;">#</th>
+                    <th scope="col" class="py-3 ps-3 pe-2" style="width: 26%;">Rule Name &amp; Regime</th>
+                    <th scope="col" class="py-3 px-2 text-center" style="width: 14%;">Market Type</th>
+                    <th scope="col" class="py-3 px-3" style="width: 24%;">Execution Constraints</th>
+                    <th scope="col" class="py-3 px-1 text-center" style="width: 11%;">Scope</th>
+                    <th scope="col" class="py-3 px-1 text-center" style="width: 9%;">Status</th>
+                    <th scope="col" class="text-center py-3 px-1" style="width: 12%; min-width: 105px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -472,5 +472,11 @@
         {% empty %}
         <div class="text-center py-4 theme-text-muted small">No strategy rules found.</div>
         {% endfor %}
+    </div>
+
+    <!-- LOAD MORE FOOTER -->
+    <div class="card-footer py-2 px-3 px-md-4 mt-auto border-top d-flex justify-content-between align-items-center small theme-text-muted">
+        <span>Showing {{ rules|length }} strategy rules</span>
+        <span class="trend-badge trend-up py-0.5 px-2 font-monospace fs-xs">Continuous Table Active</span>
     </div>
 </div>

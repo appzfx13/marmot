@@ -45,25 +45,25 @@
     <!-- END: Spark Page Header -->
 
     <!-- Search & Filter Controls -->
-    <div class="card mb-0">
-        <div class="card-body p-3 p-md-4">
-            <form method="GET" action="{{ request.path }}" class="row g-3 align-items-center">
+    <div class="card card-filter mb-0">
+        <div class="card-body p-2 px-3">
+            <form method="GET" action="{{ request.path }}" class="row g-2 align-items-center">
                 
                 <div class="col-12 col-sm-6 col-lg-4">
-                    <div class="input-group">
-                        <span class="input-group-text bg-transparent border-end-0 theme-text-muted border-secondary border-opacity-25">
-                            <i class="bi bi-search"></i>
-                        </span>
+                    <div class="filter-search-wrapper">
                         <input type="text" 
                                name="q" 
-                               value="{{ request.GET.q }}" 
-                               class="form-control bg-transparent border-start-0 theme-text-main border-secondary border-opacity-25" 
+                               value="{{ request.GET.q|default:'' }}" 
+                               class="form-control" 
                                placeholder="Search strategy or ID..."
                                hx-get="{{ request.path }}"
                                hx-target="#backtest-dashboard-container"
                                hx-trigger="input changed delay:400ms, search"
                                hx-include="[name='status']"
                                hx-push-url="true">
+                        <span class="search-icon">
+                            <i class="bi bi-search"></i>
+                        </span>
                     </div>
                 </div>
 
@@ -75,11 +75,11 @@
                             hx-trigger="change"
                             hx-include="[name='q']"
                             hx-push-url="true">
-                        <option value="" class="text-dark">All Statuses</option>
-                        <option value="created" class="text-dark" {% if request.GET.status == 'created' %}selected{% endif %}>Created</option>
-                        <option value="running" class="text-dark" {% if request.GET.status == 'running' %}selected{% endif %}>Running</option>
-                        <option value="completed" class="text-dark" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
-                        <option value="error" class="text-dark" {% if request.GET.status == 'error' %}selected{% endif %}>Error</option>
+                        <option value="">All Statuses</option>
+                        <option value="created" {% if request.GET.status == 'created' %}selected{% endif %}>Created</option>
+                        <option value="running" {% if request.GET.status == 'running' %}selected{% endif %}>Running</option>
+                        <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
+                        <option value="error" {% if request.GET.status == 'error' %}selected{% endif %}>Error</option>
                     </select>
                 </div>
 

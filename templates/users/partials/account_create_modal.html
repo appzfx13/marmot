@@ -51,13 +51,13 @@
                 }
             </style>
 
-            <!-- Account Type Switch Pills -->
-            <div class="nav nav-pills nav-fill mb-3 p-1 rounded-3 d-flex gap-2" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);" role="tablist">
-                <button class="nav-link active modal-tab-pill flex-grow-1" id="live-tab" data-bs-toggle="pill" data-bs-target="#live-panel" type="button" role="tab" onclick="document.getElementById('account_type_input').value='LIVE';">
+            <!-- Account Type Switch Pills (2 in single line) -->
+            <div class="nav nav-pills nav-fill mb-3 p-1 rounded-3 d-flex flex-row flex-nowrap w-100 gap-2" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);" role="tablist">
+                <button class="nav-link active modal-tab-pill flex-fill text-nowrap" id="live-tab" data-bs-toggle="pill" data-bs-target="#live-panel" type="button" role="tab" onclick="document.getElementById('account_type_input').value='LIVE';">
                     <span class="material-icons fs-6">monetization_on</span>
                     <span>LIVE ACCOUNT</span>
                 </button>
-                <button class="nav-link modal-tab-pill flex-grow-1" id="sandbox-tab" data-bs-toggle="pill" data-bs-target="#sandbox-panel" type="button" role="tab" onclick="document.getElementById('account_type_input').value='SANDBOX';">
+                <button class="nav-link modal-tab-pill flex-fill text-nowrap" id="sandbox-tab" data-bs-toggle="pill" data-bs-target="#sandbox-panel" type="button" role="tab" onclick="document.getElementById('account_type_input').value='SANDBOX';">
                     <span class="material-icons fs-6">science</span>
                     <span>SANDBOX DEMO</span>
                 </button>
@@ -67,66 +67,69 @@
             <div class="tab-content">
                 <!-- Live Account Panel -->
                 <div class="tab-pane fade show active" id="live-panel" role="tabpanel">
-                    <div class="mb-3">
-                        <label class="form-label theme-text-muted small fw-bold">Select Broker Platform *</label>
-                        <select name="broker_id" id="brokerSelectInput" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25">
-                            {% for b in brokers %}
-                                <option value="{{ b.id }}" data-code="{{ b.code|lower }}" class="bg-dark text-white">{{ b.name }} ({{ b.code|upper }})</option>
-                            {% empty %}
-                                <option value="" data-code="dhan" class="bg-dark text-white">DHAN (Default)</option>
-                            {% endfor %}
-                        </select>
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small fw-bold mb-1">Select Broker Platform *</label>
+                            <select name="broker_id" id="brokerSelectInput" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25">
+                                {% for b in brokers %}
+                                    <option value="{{ b.id }}" data-code="{{ b.code|lower }}" class="bg-dark text-white">{{ b.name }} ({{ b.code|upper }})</option>
+                                {% empty %}
+                                    <option value="" data-code="dhan" class="bg-dark text-white">DHAN (Default)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small fw-bold mb-1">Account Name / Nickname *</label>
+                            <input type="text" name="account_name" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. My Primary Dhan Live">
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label theme-text-muted small fw-bold">Account Name / Nickname *</label>
-                        <input type="text" name="account_name" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. My Primary Dhan Live">
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small fw-bold mb-1">Client ID *</label>
+                            <input type="text" name="broker_client_id" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. 1000000001 (10-digit ID)" required>
+                        </div>
+                        <div class="col-6">
+                            <div class="d-flex justify-content-between align-items-center mb-1">
+                                <label class="form-label theme-text-muted small fw-bold mb-0">API Secret</label>
+                                <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller" style="font-size: 0.65rem;">Optional</span>
+                            </div>
+                            <input type="password" name="app_id" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Enter API Secret">
+                        </div>
                     </div>
 
-                    <div class="mb-3">
-                        <label class="form-label theme-text-muted small fw-bold">Client ID *</label>
-                        <input type="text" name="broker_client_id" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. 1000000001 (10-digit Client ID)" required>
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label theme-text-muted small fw-bold">API Key / Access Token *</label>
+                    <div class="mb-2">
+                        <label class="form-label theme-text-muted small fw-bold mb-1">API Key / Access Token *</label>
                         <input type="password" name="api_key" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Paste Access Token (starts with eyJ...) or API Key" required>
                     </div>
 
-                    <div class="mb-3">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <label class="form-label theme-text-muted small fw-bold mb-0">API Secret</label>
-                            <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller">Optional for Access Token</span>
-                        </div>
-                        <input type="password" name="app_id" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Enter API Secret (Optional if using direct Access Token)">
-                    </div>
-
-                    <div class="alert alert-info bg-info bg-opacity-10 border-info border-opacity-25 theme-text-main p-2.5 small mb-0 rounded-3 d-flex align-items-center gap-2">
+                    <div class="alert alert-info bg-info bg-opacity-10 border-info border-opacity-25 theme-text-main p-2 small mb-0 rounded-3 d-flex align-items-center gap-2">
                         <span class="material-icons fs-5 text-info">verified_user</span>
-                        <span style="font-size: 0.76rem;">Enter your 10-digit Client ID & Access Token (starts with <code>eyJ...</code> from web.dhan.co). Instant validation verifies connectivity with live broker servers.</span>
+                        <span style="font-size: 0.74rem;">Enter your 10-digit Client ID & Access Token (starts with <code>eyJ...</code> from web.dhan.co). Instant validation verifies connectivity with live broker servers.</span>
                     </div>
                 </div>
 
                 <!-- Sandbox Panel -->
                 <div class="tab-pane fade" id="sandbox-panel" role="tabpanel">
-                    <div class="mb-3">
-                        <label class="form-label theme-text-muted small fw-bold">Sandbox Account Name *</label>
-                        <input type="text" name="sandbox_account_name" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. Demo Strategy Tester">
-                    </div>
-
-                    <div class="mb-3">
-                        <label class="form-label theme-text-muted small fw-bold">Initial Virtual Capital (₹) *</label>
-                        <input type="number" name="initial_capital" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" value="100000" step="5000" min="1000">
+                    <div class="row g-2 mb-2">
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small fw-bold mb-1">Sandbox Account Name *</label>
+                            <input type="text" name="sandbox_account_name" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. Demo Strategy Tester">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small fw-bold mb-1">Initial Virtual Capital (₹) *</label>
+                            <input type="number" name="initial_capital" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" value="100000" step="5000" min="1000">
+                        </div>
                     </div>
 
                     <div class="alert alert-success bg-success bg-opacity-10 border-success border-opacity-25 theme-text-main p-2 small mb-0 rounded-3 d-flex align-items-center gap-2">
                         <span class="material-icons fs-5 text-success">science</span>
-                        <span>Sandbox accounts use simulated paper-trading funds without requiring live API keys.</span>
+                        <span style="font-size: 0.74rem;">Sandbox accounts use simulated paper-trading funds without requiring live API keys.</span>
                     </div>
                 </div>
             </div>
 
-            <div class="form-check mt-3">
+            <div class="form-check mt-2">
                 <input class="form-check-input" type="checkbox" name="is_default" id="is_default_check">
                 <label class="form-check-label theme-text-muted small fw-bold" for="is_default_check">
                     Set as my Primary Default Account
