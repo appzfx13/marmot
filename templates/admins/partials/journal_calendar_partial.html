@@ -1,0 +1,218 @@
+<!-- OOB SWAP FOR INLINE CALENDAR YEAR ARROW CONTROLS AT LINE 1 -->
+<div id="journal-year-controls" hx-swap-oob="true" class="d-flex align-items-center gap-2 rounded-pill px-2 py-1 border shadow-sm" style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important;">
+    <button type="button" 
+            class="btn btn-outline-secondary rounded-circle p-0 d-inline-flex align-items-center justify-content-center theme-text-main shadow-xs flex-shrink-0"
+            style="width: 28px; height: 28px; min-width: 28px; min-height: 28px; aspect-ratio: 1 / 1; border-color: var(--border-color) !important;"
+            hx-get="{% url 'admins:admin-journal-calendar' %}?year={{ prev_year }}"
+            hx-target="#journal-calendar-container"
+            hx-swap="innerHTML"
+            title="Previous Year ({{ prev_year }})">
+        <span class="material-icons fs-6">chevron_left</span>
+    </button>
+    <span class="fw-extrabold theme-text-main px-1" style="font-size: 0.95rem;">{{ year }}</span>
+    {% if can_go_next %}
+    <button type="button" 
+            class="btn btn-outline-secondary rounded-circle p-0 d-inline-flex align-items-center justify-content-center theme-text-main shadow-xs flex-shrink-0"
+            style="width: 28px; height: 28px; min-width: 28px; min-height: 28px; aspect-ratio: 1 / 1; border-color: var(--border-color) !important;"
+            hx-get="{% url 'admins:admin-journal-calendar' %}?year={{ next_year }}"
+            hx-target="#journal-calendar-container"
+            hx-swap="innerHTML"
+            title="Next Year ({{ next_year }})">
+        <span class="material-icons fs-6">chevron_right</span>
+    </button>
+    {% else %}
+    <button type="button" 
+            class="btn btn-outline-secondary rounded-circle p-0 d-inline-flex align-items-center justify-content-center theme-text-muted shadow-xs flex-shrink-0 disabled opacity-25"
+            style="width: 28px; height: 28px; min-width: 28px; min-height: 28px; aspect-ratio: 1 / 1; border-color: var(--border-color) !important; cursor: not-allowed;"
+            disabled
+            title="Future year navigation disabled">
+        <span class="material-icons fs-6">chevron_right</span>
+    </button>
+    {% endif %}
+</div>
+
+<!-- OOB SWAP FOR TOP 3x3 SUMMARY CARDS (YEAR-WISE METRICS) -->
+<div id="journal-stats-container" hx-swap-oob="true" class="mb-4">
+    {% include "admins/partials/journal_stats_partial.html" with stats=stats %}
+</div>
+
+<!-- OOB SWAP FOR CHART SYNC ON YEAR SWITCH -->
+<div id="journal-chart-container" hx-swap-oob="true" hx-get="{% url 'admins:admin-journal-chart' %}?year={{ year }}" hx-trigger="load" hx-swap="innerHTML">
+    <div class="text-center py-5 theme-text-muted">
+        <span class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+        <span>Updating Equity Chart for {{ year }}...</span>
+    </div>
+</div>
+
+<!-- OOB SWAP TO INSTANTLY RENDER ORDER LOG TABLE ON YEAR SWITCH (VALID DIV SWAP) -->
+<div id="journal-orders-container" hx-swap-oob="true">
+    {% include "admins/partials/journal_orders_table_partial.html" with trades=trades has_more=has_more next_page=next_page page=page filter_year=filter_year filter_date=filter_date total_trades_count=total_trades_count %}
+</div>
+
+<style>
+    .journal-day-cell {
+        margin: 2px 0 !important;
+    }
+    .journal-day-clickable {
+        transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        position: relative;
+    }
+    .journal-day-clickable:hover {
+        transform: translateY(-2px) scale(1.06);
+        filter: brightness(1.25);
+        z-index: 2;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    }
+    .journal-day-active {
+        outline: 2px solid var(--brand-lime, #b4f105) !important;
+        outline-offset: 2px;
+        box-shadow: 0 0 14px rgba(180, 241, 5, 0.5) !important;
+        transform: scale(1.08) !important;
+        z-index: 5 !important;
+    }
+
+    /* Profile Dropdown Themed High-Contrast Tooltip */
+    .tooltip {
+        --bs-tooltip-bg: var(--dropdown-bg, #0B1D16) !important;
+        --bs-tooltip-color: var(--text-main, #F1F5F9) !important;
+        --bs-tooltip-border-color: var(--dropdown-border, rgba(255, 255, 255, 0.12)) !important;
+        --bs-tooltip-padding-x: 0.85rem !important;
+        --bs-tooltip-padding-y: 0.65rem !important;
+        --bs-tooltip-border-radius: 12px !important;
+        --bs-tooltip-opacity: 1 !important;
+        z-index: 1080 !important;
+    }
+    .tooltip .tooltip-inner {
+        background: var(--dropdown-bg, #0B1D16) !important;
+        color: var(--text-main, #F1F5F9) !important;
+        border: 1px solid var(--dropdown-border, rgba(255, 255, 255, 0.14)) !important;
+        box-shadow: var(--dropdown-shadow, 0 18px 40px rgba(0, 0, 0, 0.7)) !important;
+        backdrop-filter: blur(14px) !important;
+        -webkit-backdrop-filter: blur(14px) !important;
+        border-radius: 12px !important;
+        padding: 10px 14px !important;
+        font-family: inherit !important;
+        text-align: left !important;
+        line-height: 1.45 !important;
+    }
+    .tooltip .tooltip-arrow::before {
+        border-top-color: var(--dropdown-border, rgba(255, 255, 255, 0.14)) !important;
+        border-bottom-color: var(--dropdown-border, rgba(255, 255, 255, 0.14)) !important;
+    }
+</style>
+
+<!-- 12-MONTH CALENDAR GRID (1 INLINE MOBILE, 3 INLINE TABLET, 6 INLINE WEB) -->
+<div class="row g-2 g-xl-3">
+    {% for month in months %}
+    <div class="col-12 col-md-4 col-lg-4 col-xl-2">
+        <div class="glass-card p-2 p-md-2.5 rounded-3 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+            
+            <!-- Month Card Header -->
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-1.5 border-bottom border-secondary border-opacity-20 flex-wrap gap-1">
+                <h6 class="fw-bold theme-text-main mb-0 text-truncate" style="font-size: 0.82rem;">{{ month.name }}</h6>
+                {% if month.monthly_pnl >= 0 %}
+                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-1.5 py-0.5 fw-bold" style="font-size: 0.65rem;">
+                    +₹{{ month.monthly_pnl|floatformat:0 }}
+                </span>
+                {% else %}
+                <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-1.5 py-0.5 fw-bold" style="font-size: 0.65rem;">
+                    -₹{{ month.monthly_pnl_abs|floatformat:0 }}
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- Day Headers (Mon - Sun) -->
+            <div class="row g-0.5 text-center theme-text-muted fw-bold mb-1.5" style="font-size: 0.65rem; text-transform: uppercase;">
+                <div class="col">M</div>
+                <div class="col">T</div>
+                <div class="col">W</div>
+                <div class="col">T</div>
+                <div class="col">F</div>
+                <div class="col text-warning opacity-75">S</div>
+                <div class="col text-warning opacity-75">S</div>
+            </div>
+
+            <!-- Calendar Days Grid (7 Columns Crisp Grid Layout) -->
+            <div class="row g-0.5 text-center" style="margin: -1px;">
+                {% for day in month.days %}
+                <div class="col-auto p-0.5" style="width: 14.285%;">
+                    {% if day.is_current_month %}
+                        {% if day.status == 'profit' %}
+                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm journal-day-cell journal-day-clickable"
+                             style="{% if day.intensity == 'high' %}background: rgba(16, 185, 129, 0.42); border: 1px solid rgba(16, 185, 129, 0.75);{% elif day.intensity == 'med' %}background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.50);{% else %}background: rgba(16, 185, 129, 0.13); border: 1px solid rgba(16, 185, 129, 0.32);{% endif %} min-height: 28px; cursor: pointer;"
+                             hx-get="{% url 'admins:admin-journal-trades' %}?date={{ day.date|date:'Y-m-d' }}"
+                             hx-target="#journal-orders-container"
+                             hx-swap="innerHTML"
+                             onclick="handleJournalDayClick(this)"
+                             data-bs-toggle="tooltip"
+                             data-bs-html="true"
+                             title="<div class='fw-bold border-bottom pb-1 mb-1.5 text-white' style='border-color: var(--border-color) !important; font-size: 0.82rem;'>{{ day.date|date:'d M Y' }}</div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Gross P/L:</span><span class='text-success fw-bold'>+₹{{ day.gross_pnl|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Net P/L:</span><span class='text-success fw-bold'>+₹{{ day.pnl|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Brokerage:</span><span class='fw-semibold text-light'>₹{{ day.brokerage|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Govt Charges:</span><span class='fw-semibold text-light'>₹{{ day.govt_charges|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-1 small'><span class='theme-text-muted'>Trades:</span><span class='fw-bold text-primary'>{{ day.trades }}</span></div><div class='text-center border-top pt-1 text-success fw-bold' style='border-color: var(--border-color) !important; font-size: 0.68rem;'>Click to view Trader Diary</div>">
+                            <span class="fw-bold text-success" style="font-size: 0.78rem; line-height: 1;">{{ day.day_num }}</span>
+                        </div>
+                        {% elif day.status == 'loss' %}
+                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm journal-day-cell journal-day-clickable"
+                             style="{% if day.intensity == 'high' %}background: rgba(239, 68, 68, 0.45); border: 1px solid rgba(239, 68, 68, 0.78);{% elif day.intensity == 'med' %}background: rgba(239, 68, 68, 0.28); border: 1px solid rgba(239, 68, 68, 0.55);{% else %}background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(239, 68, 68, 0.32);{% endif %} min-height: 28px; cursor: pointer;"
+                             hx-get="{% url 'admins:admin-journal-trades' %}?date={{ day.date|date:'Y-m-d' }}"
+                             hx-target="#journal-orders-container"
+                             hx-swap="innerHTML"
+                             onclick="handleJournalDayClick(this)"
+                             data-bs-toggle="tooltip"
+                             data-bs-html="true"
+                             title="<div class='fw-bold border-bottom pb-1 mb-1.5 text-white' style='border-color: var(--border-color) !important; font-size: 0.82rem;'>{{ day.date|date:'d M Y' }}</div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Gross P/L:</span><span class='text-danger fw-bold'>-₹{{ day.gross_pnl_abs|default:day.pnl_abs|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Net P/L:</span><span class='text-danger fw-bold'>-₹{{ day.pnl_abs|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Brokerage:</span><span class='fw-semibold text-light'>₹{{ day.brokerage|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Govt Charges:</span><span class='fw-semibold text-light'>₹{{ day.govt_charges|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-1 small'><span class='theme-text-muted'>Trades:</span><span class='fw-bold text-primary'>{{ day.trades }}</span></div><div class='text-center border-top pt-1 text-danger fw-bold' style='border-color: var(--border-color) !important; font-size: 0.68rem;'>Click to view Trader Diary</div>">
+                            <span class="fw-bold text-danger" style="font-size: 0.78rem; line-height: 1;">{{ day.day_num }}</span>
+                        </div>
+                        {% else %}
+                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center opacity-60 journal-day-cell"
+                             style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color) !important; min-height: 28px;"
+                             data-bs-toggle="tooltip"
+                             title="{{ day.date|date:'M d, Y' }} - No trades">
+                            <span class="theme-text-muted fw-semibold" style="font-size: 0.74rem; line-height: 1;">{{ day.day_num }}</span>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                    <!-- Days outside current month -->
+                    <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center opacity-15" style="min-height: 28px;">
+                        <span class="theme-text-muted fw-medium" style="font-size: 0.65rem;">{{ day.day_num }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Month Summary Footer -->
+            <div class="theme-text-muted mt-2 pt-1.5 border-top border-secondary border-opacity-10 d-flex justify-content-between align-items-center" style="font-size: 0.68rem;">
+                <span>W: <strong class="text-success fw-bold">{{ month.profit_days }}</strong></span>
+                <span>L: <strong class="text-danger fw-bold">{{ month.loss_days }}</strong></span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Initialize Bootstrap tooltips on HTMX swap and Day Click Handler -->
+<script>
+    function handleJournalDayClick(el) {
+        document.querySelectorAll('.journal-day-active').forEach(function(item) {
+            item.classList.remove('journal-day-active');
+        });
+        if (el) {
+            el.classList.add('journal-day-active');
+        }
+        var targetSection = document.getElementById('journal-trades-table-card');
+        if (targetSection) {
+            targetSection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+    function clearJournalActiveDate() {
+        document.querySelectorAll('.journal-day-active').forEach(function(item) {
+            item.classList.remove('journal-day-active');
+        });
+    }
+    if (typeof bootstrap !== 'undefined') {
+        var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+        var tooltipList = tooltipTriggerList.map(function (tooltipTriggerEl) {
+            return new bootstrap.Tooltip(tooltipTriggerEl);
+        });
+    }
+</script>

@@ -1,0 +1,340 @@
+<!-- Metric Highlights Banner Above Chart with Dynamic Mode Status -->
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 pb-2 border-bottom border-secondary border-opacity-10">
+    <!-- Dynamic Metric Chip Sets based on active chart mode -->
+    <div class="d-flex align-items-center gap-3 flex-wrap" id="chartMetricChipsContainer">
+        <!-- Metric Chips -->
+        <div class="chart-chip-group d-flex align-items-center gap-3 flex-wrap" id="chipsCumulative">
+            <div>
+                <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.68rem; letter-spacing: 0.05em;">Deposit Baseline</span>
+                <div class="fw-bold theme-text-main" style="font-size: 0.95rem;">₹{{ base_deposit|floatformat:2 }}</div>
+            </div>
+            <div class="border-start border-secondary border-opacity-20 ps-3">
+                <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.68rem; letter-spacing: 0.05em;">Net Trading P&amp;L</span>
+                <div class="fw-bold {% if total_trading_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 0.95rem;">
+                    {% if total_trading_pnl >= 0 %}+{% endif %}₹{{ total_trading_pnl|floatformat:2 }}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <div class="d-flex align-items-center gap-2">
+        <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold smaller d-inline-flex align-items-center gap-1">
+            <span class="material-icons fs-6" style="font-size: 0.85rem !important;">verified</span>
+            <span>DhanHQ Live Verified</span>
+        </span>
+    </div>
+</div>
+
+<!-- Chart Canvas with Increased Height (420px) -->
+<div style="height: 420px; width: 100%; position: relative;">
+    <canvas id="journalEquityChartCanvas"></canvas>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script>
+(function() {
+    var ctx = document.getElementById('journalEquityChartCanvas');
+    if (!ctx) return;
+    
+    var labels = {{ chart_labels_json|safe }};
+    var equityData = {{ equity_data_json|safe }};
+    var drawdownData = {{ drawdown_data_json|safe }};
+    var depositData = {{ deposit_data_json|safe }};
+    var openingBalData = {{ opening_balance_data_json|safe }};
+    var dailyPnlData = {{ daily_pnl_data_json|safe }};
+    var dailyGrossPnlData = {{ daily_gross_pnl_data_json|safe }};
+    var cumPnlData = {{ cum_pnl_data_json|safe }};
+    var pnlColors = {{ pnl_bar_colors_json|safe }};
+    
+    var isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+    var gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+    var textColor = isDark ? '#94a3b8' : '#64748b';
+    var tooltipBg = isDark ? '#0B1D16' : '#ffffff';
+    var tooltipBorder = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)';
+    var tooltipTitle = isDark ? '#f8fafc' : '#0f172a';
+    var tooltipBody = isDark ? '#cbd5e1' : '#334155';
+
+    window.chartDatasetsStore = {
+        labels: labels,
+        equityData: equityData,
+        drawdownData: drawdownData,
+        depositData: depositData,
+        openingBalData: openingBalData,
+        dailyPnlData: dailyPnlData,
+        dailyGrossPnlData: dailyGrossPnlData,
+        cumPnlData: cumPnlData,
+        pnlColors: pnlColors,
+        gridColor: gridColor,
+        textColor: textColor,
+        tooltipBg: tooltipBg,
+        tooltipBorder: tooltipBorder,
+        tooltipTitle: tooltipTitle,
+        tooltipBody: tooltipBody
+    };
+
+    window.renderJournalChart = function(mode) {
+        if (!ctx) return;
+        var store = window.chartDatasetsStore;
+        if (window.journalEquityChartInstance) {
+            window.journalEquityChartInstance.destroy();
+        }
+
+        var chartConfig = {};
+
+        if (mode === 'balance') {
+            // Mode 2: Daily Opening Balance / Ledger Capital Curve
+            chartConfig = {
+                type: 'line',
+                data: {
+                    labels: store.labels,
+                    datasets: [
+                        {
+                            label: 'Day Opening Capital / Balance (₹)',
+                            data: store.openingBalData,
+                            borderColor: '#3b82f6',
+                            backgroundColor: 'rgba(59, 130, 246, 0.12)',
+                            fill: true,
+                            tension: 0.25,
+                            borderWidth: 2.5,
+                            pointRadius: 3,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#3b82f6',
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Deposit Baseline (₹)',
+                            data: store.depositData,
+                            borderColor: '#94a3b8',
+                            borderWidth: 1.5,
+                            borderDash: [6, 4],
+                            pointRadius: 0,
+                            fill: false,
+                            yAxisID: 'y'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: store.textColor, font: { family: 'Plus Jakarta Sans, sans-serif', size: 12, weight: '600' }, usePointStyle: true }
+                        },
+                        tooltip: {
+                            backgroundColor: store.tooltipBg,
+                            borderColor: store.tooltipBorder,
+                            borderWidth: 1,
+                            titleColor: store.tooltipTitle,
+                            bodyColor: store.tooltipBody,
+                            padding: 12,
+                            boxPadding: 6,
+                            usePointStyle: true,
+                            callbacks: {
+                                label: function(ctx) { return ' ' + ctx.dataset.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', {minimumFractionDigits: 2}); }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: store.gridColor }, ticks: { color: store.textColor, font: { family: 'Plus Jakarta Sans, sans-serif', size: 11 } } },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: { color: store.gridColor },
+                            ticks: {
+                                color: store.textColor,
+                                font: { family: 'Plus Jakarta Sans, sans-serif', size: 11 },
+                                callback: function(val) { return '₹' + (val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val); }
+                            }
+                        }
+                    }
+                }
+            };
+        } else if (mode === 'pnl') {
+            // Mode 3: Trade P&L Win/Loss Bar Chart + Cumulative Curve
+            chartConfig = {
+                type: 'bar',
+                data: {
+                    labels: store.labels,
+                    datasets: [
+                        {
+                            type: 'bar',
+                            label: 'Daily Net P&L (₹)',
+                            data: store.dailyPnlData,
+                            backgroundColor: store.pnlColors,
+                            borderRadius: 4,
+                            borderSkipped: false,
+                            yAxisID: 'y',
+                            order: 2
+                        },
+                        {
+                            type: 'line',
+                            label: 'Cumulative Net P&L Trajectory (₹)',
+                            data: store.cumPnlData,
+                            borderColor: '#b4f105',
+                            backgroundColor: 'transparent',
+                            borderWidth: 2.2,
+                            tension: 0.3,
+                            pointRadius: 2.5,
+                            pointHoverRadius: 5,
+                            pointBackgroundColor: '#b4f105',
+                            yAxisID: 'y',
+                            order: 1
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: store.textColor, font: { family: 'Plus Jakarta Sans, sans-serif', size: 12, weight: '600' }, usePointStyle: true }
+                        },
+                        tooltip: {
+                            backgroundColor: store.tooltipBg,
+                            borderColor: store.tooltipBorder,
+                            borderWidth: 1,
+                            titleColor: store.tooltipTitle,
+                            bodyColor: store.tooltipBody,
+                            padding: 12,
+                            boxPadding: 6,
+                            usePointStyle: true,
+                            callbacks: {
+                                label: function(ctx) { return ' ' + ctx.dataset.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', {minimumFractionDigits: 2}); }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: store.gridColor }, ticks: { color: store.textColor, font: { family: 'Plus Jakarta Sans, sans-serif', size: 11 } } },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: { color: store.gridColor },
+                            ticks: {
+                                color: store.textColor,
+                                font: { family: 'Plus Jakarta Sans, sans-serif', size: 11 },
+                                callback: function(val) { return '₹' + (Math.abs(val) >= 1000 ? (val / 1000).toFixed(1) + 'k' : val); }
+                            }
+                        }
+                    }
+                }
+            };
+        } else {
+            // Mode 1: Cumulative Equity Curve & Drawdown
+            chartConfig = {
+                type: 'line',
+                data: {
+                    labels: store.labels,
+                    datasets: [
+                        {
+                            label: 'Cumulative Account Equity (₹)',
+                            data: store.equityData,
+                            borderColor: '#10b981',
+                            backgroundColor: 'rgba(16, 185, 129, 0.12)',
+                            fill: true,
+                            tension: 0.35,
+                            borderWidth: 2.5,
+                            pointRadius: 3,
+                            pointHoverRadius: 6,
+                            pointBackgroundColor: '#10b981',
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Deposit Baseline (₹)',
+                            data: store.depositData,
+                            borderColor: '#94a3b8',
+                            borderWidth: 1.5,
+                            borderDash: [6, 4],
+                            pointRadius: 0,
+                            fill: false,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Drawdown (%)',
+                            data: store.drawdownData,
+                            borderColor: '#f59e0b',
+                            backgroundColor: 'rgba(245, 158, 11, 0.08)',
+                            fill: true,
+                            tension: 0.2,
+                            borderWidth: 1.5,
+                            borderDash: [4, 4],
+                            pointRadius: 0,
+                            yAxisID: 'y1'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    interaction: { mode: 'index', intersect: false },
+                    plugins: {
+                        legend: {
+                            display: true,
+                            position: 'top',
+                            labels: { color: store.textColor, font: { family: 'Plus Jakarta Sans, sans-serif', size: 12, weight: '600' }, usePointStyle: true }
+                        },
+                        tooltip: {
+                            backgroundColor: store.tooltipBg,
+                            borderColor: store.tooltipBorder,
+                            borderWidth: 1,
+                            titleColor: store.tooltipTitle,
+                            bodyColor: store.tooltipBody,
+                            padding: 12,
+                            boxPadding: 6,
+                            usePointStyle: true,
+                            callbacks: {
+                                label: function(ctx) {
+                                    if (ctx.dataset.yAxisID === 'y1') {
+                                        return ' ' + ctx.dataset.label + ': ' + Number(ctx.raw).toFixed(2) + '%';
+                                    }
+                                    return ' ' + ctx.dataset.label + ': ₹' + Number(ctx.raw).toLocaleString('en-IN', {minimumFractionDigits: 2});
+                                }
+                            }
+                        }
+                    },
+                    scales: {
+                        x: { grid: { color: store.gridColor }, ticks: { color: store.textColor, font: { family: 'Plus Jakarta Sans, sans-serif', size: 11 } } },
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            grid: { color: store.gridColor },
+                            ticks: {
+                                color: store.textColor,
+                                font: { family: 'Plus Jakarta Sans, sans-serif', size: 11 },
+                                callback: function(val) { return '₹' + (val >= 1000 ? (val / 1000).toFixed(1) + 'k' : val); }
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            grid: { drawOnChartArea: false },
+                            ticks: {
+                                color: '#f59e0b',
+                                font: { family: 'Plus Jakarta Sans, sans-serif', size: 10 },
+                                callback: function(val) { return val + '%'; }
+                            },
+                            min: -25,
+                            max: 5
+                        }
+                    }
+                }
+            };
+        }
+
+        window.journalEquityChartInstance = new Chart(ctx, chartConfig);
+    };
+
+    // Render default chart on initial load (pnl mode)
+    var activeMode = window.currentJournalChartMode || 'pnl';
+    window.renderJournalChart(activeMode);
+})();
+</script>

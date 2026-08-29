@@ -75,21 +75,12 @@ func (j *BackupJob) Run(ctx context.Context) {
 		securityID = getIndexSecurityID(indexName)
 	}
 
-	// Resolve Dhan credentials: payload-injected token takes priority over global config env vars
+	// Resolve Dhan credentials: read directly from dynamic Redis payload
 	dhanClientID := params.DhanClientID
-	tokenSource := "payload"
-	if dhanClientID == "" && j.config != nil {
-		dhanClientID = j.config.DhanClientID
-		tokenSource = "config_env"
-	}
 	dhanAccessToken := params.DhanAccessToken
-	if dhanAccessToken == "" && j.config != nil {
-		dhanAccessToken = j.config.DhanAccessToken
-		tokenSource = "config_env"
-	}
 
-	log.Printf("🔑 [Task #%s] Dhan Auth | source=%s | client_id=%s | token_len=%d (preview: %s)",
-		taskID, tokenSource, dhanClientID, len(dhanAccessToken), debugTokenPreview(dhanAccessToken))
+	log.Printf("🔑 [Task #%s] Dhan Auth | client_id=%s | token_len=%d (preview: %s)",
+		taskID, dhanClientID, len(dhanAccessToken), debugTokenPreview(dhanAccessToken))
 
 	log.Printf("🚀 [Task #%s] Starting Unified Parquet Backup (Spot + ATM±%d Option Strikes) for User #%s | %s → %s",
 		taskID, strikeCount, userID, startDate, endDate)
@@ -108,9 +99,11 @@ func (j *BackupJob) Run(ctx context.Context) {
 		log.Printf("⚠️ [Task #%s] Failed to set initial DB status: %v\n", taskID, err)
 		return
 	}
+	hasOptions := !strings.EqualFold(indexName, "INDIAVIX") && strikeCount > 0
+
 	// ── STEP 1: Download Index Spot Data into Staging Parquet ─────────────────
 	log.Printf("📥 [Task #%s] [Step 1/2] Downloading Index Spot candles (%s)...", taskID, indexName)
-	spotFiles := j.downloadIndexSpot(ctx, taskID, stagingDir, indexName, securityID, startDate, endDate, startProgress, dhanClientID, dhanAccessToken)
+	spotFiles := j.downloadIndexSpot(ctx, taskID, stagingDir, indexName, securityID, startDate, endDate, hasOptions, dhanClientID, dhanAccessToken)
 	if spotFiles == nil && ctx.Err() == nil {
 		log.Printf("🛑 [Task #%s] Index Spot download aborted due to unrecoverable error. Halting task.", taskID)
 		return
@@ -125,7 +118,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 	// ── STEP 2: Download Option Strikes into Staging Parquet ───────────────────
 	var optionFiles []string
-	if strings.EqualFold(indexName, "INDIAVIX") || strikeCount <= 0 {
+	if !hasOptions {
 		log.Printf("ℹ️ [Task #%s] Skipping Option Strikes Download for %s (Index Spot only).", taskID, indexName)
 	} else {
 		log.Printf("📥 [Task #%s] [Step 2/2] Downloading Option Strikes (ATM±%d CE & PE)...", taskID, strikeCount)
@@ -192,7 +185,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 func (j *BackupJob) downloadIndexSpot(
 	ctx context.Context,
 	taskID, stagingDir, indexName, securityID, startDate, endDate string,
-	startProgress int,
+	hasOptions bool,
 	dhanClientID, dhanAccessToken string,
 ) []string {
 	var createdFiles []string
@@ -247,13 +240,23 @@ func (j *BackupJob) downloadIndexSpot(
 			log.Printf("⏩ [Task #%s] Resumed: Skipping already downloaded spot chunk %s (%d rows)", taskID, chunkFileName, rows)
 			createdFiles = append(createdFiles, chunkFilePath)
 			completedChunks++
+			allocatedRange := 40.0
+			if !hasOptions {
+				allocatedRange = 90.0
+			}
+			progress := 5 + int((float64(completedChunks)/float64(totalChunks))*allocatedRange)
+			if progress > 95 {
+				progress = 95
+			}
+			_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
+			j.broadcastProgress(ctx, taskID, progress, "running", 0.0, chunkFilePath)
 			chunkStart = chunkEnd.AddDate(0, 0, 1)
 			continue
 		}
 
 		reqPayload := map[string]interface{}{
 			"securityId":      securityID,
-			"exchangeSegment": "IDX_I",
+			"exchangeSegment": getIndexExchangeSegment(indexName),
 			"instrument":      "INDEX",
 			"interval":        "1",
 			"oi":              false,
@@ -323,7 +326,14 @@ func (j *BackupJob) downloadIndexSpot(
 		}
 
 		completedChunks++
-		progress := startProgress + int((float64(completedChunks)/float64(totalChunks))*40)
+		allocatedRange := 40.0
+		if !hasOptions {
+			allocatedRange = 90.0
+		}
+		progress := 5 + int((float64(completedChunks)/float64(totalChunks))*allocatedRange)
+		if progress > 95 {
+			progress = 95
+		}
 		_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", progress)
 		j.broadcastProgress(ctx, taskID, progress, "running", 0.0, chunkFilePath)
 
@@ -500,7 +510,7 @@ func (j *BackupJob) downloadRollingOptionChunks(
 
 		reqPayload := map[string]interface{}{
 			"securityId":      securityID,
-			"exchangeSegment": "NSE_FNO",
+			"exchangeSegment": getOptionExchangeSegment(indexName),
 			"instrument":      instrument,
 			"interval":        "1",
 			"expiryFlag":      "WEEK",
@@ -635,11 +645,29 @@ func getIndexSecurityID(indexName string) string {
 		return "27"
 	case "MIDCPNIFTY":
 		return "26"
+	case "SENSEX":
+		return "51"
+	case "GIFTNIFTY", "GIFT NIFTY":
+		return "28"
 	case "INDIAVIX", "INDIA VIX":
 		return "17"
 	default: // NIFTY
 		return "13"
 	}
+}
+
+func getIndexExchangeSegment(indexName string) string {
+	if strings.EqualFold(indexName, "SENSEX") {
+		return "BSE_IDX"
+	}
+	return "IDX_I"
+}
+
+func getOptionExchangeSegment(indexName string) string {
+	if strings.EqualFold(indexName, "SENSEX") {
+		return "BSE_FNO"
+	}
+	return "NSE_FNO"
 }
 
 // parseRollingOptionParquetRecords extracts records from /charts/rollingoption payload into MarketCandleRecord
@@ -782,6 +810,16 @@ func parseHistoricalParquetRecords(body []byte, indexName string) []models.Marke
 func (j *BackupJob) broadcastProgress(ctx context.Context, taskID string, progress int, status string, fileSizeMB float64, filePath string) {
 	if j.hub == nil {
 		return
+	}
+
+	if status == "running" && progress > 95 {
+		progress = 95
+	}
+	if progress > 100 {
+		progress = 100
+	}
+	if progress < 0 {
+		progress = 0
 	}
 
 	var etaStr string

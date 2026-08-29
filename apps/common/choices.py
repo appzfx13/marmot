@@ -17,7 +17,10 @@ class IndexChoices(models.TextChoices):
     BANKNIFTY = 'BANKNIFTY', 'Bank Nifty'
     FINNIFTY = 'FINNIFTY', 'Fin Nifty'
     MIDCPNIFTY = 'MIDCPNIFTY', 'Midcp Nifty'
+    SENSEX = 'SENSEX', 'BSE Sensex'
+    GIFTNIFTY = 'GIFTNIFTY', 'GIFT Nifty'
     INDIAVIX = 'INDIAVIX', 'India VIX'
+
 
 
 # Strategy Choices

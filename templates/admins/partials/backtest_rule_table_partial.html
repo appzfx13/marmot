@@ -11,14 +11,14 @@
             <i class="bi bi-play-circle-fill"></i>
             <span>New Backtest</span>
         </a>
-        <button type="button" 
-                hx-get="{% url 'backtest:rule_create' %}" 
-                hx-target="#globalHtmxModalDialog" 
-                hx-swap="innerHTML"
-                class="btn btn-primary rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm text-white">
+        <a href="{% url 'backtest:rule_create' %}" 
+           hx-get="{% url 'backtest:rule_create' %}" 
+           hx-target="#app-main-container" 
+           hx-push-url="true"
+           class="btn btn-primary rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm text-white">
             <i class="bi bi-plus-circle-fill"></i>
             <span>Create Custom Rule</span>
-        </button>
+        </a>
     </div>
 </div>
 <!-- END: Spark Page Header -->
@@ -74,13 +74,12 @@
         <table class="table table-custom align-middle mb-0 text-nowrap" style="width: 100%;">
             <thead>
                 <tr>
-                    <th scope="col" class="text-center py-3 px-1" style="width: 4%; min-width: 32px;">#</th>
-                    <th scope="col" class="py-3 ps-3 pe-2" style="width: 26%;">Rule Name &amp; Regime</th>
-                    <th scope="col" class="py-3 px-2 text-center" style="width: 14%;">Market Type</th>
-                    <th scope="col" class="py-3 px-3" style="width: 24%;">Execution Constraints</th>
-                    <th scope="col" class="py-3 px-1 text-center" style="width: 11%;">Scope</th>
-                    <th scope="col" class="py-3 px-1 text-center" style="width: 9%;">Status</th>
-                    <th scope="col" class="text-center py-3 px-1" style="width: 12%; min-width: 105px;">Actions</th>
+                    <th scope="col" class="text-center py-3 px-1" style="width: 5%;">#</th>
+                    <th scope="col" class="py-3 ps-3 pe-2" style="width: 45%;">Rule Name &amp; Regime</th>
+                    <th scope="col" class="py-3 px-2 text-center" style="width: 18%;">Market Type</th>
+                    <th scope="col" class="py-3 px-1 text-center" style="width: 12%;">Scope</th>
+                    <th scope="col" class="py-3 px-1 text-center" style="width: 10%;">Status</th>
+                    <th scope="col" class="text-center py-3 px-1" style="width: 10%; min-width: 90px;">Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -174,21 +173,6 @@
                         {% endif %}
                     </td>
 
-                    <td class="py-2.5 px-3 bg-transparent">
-                        <div class="d-flex flex-wrap gap-1.5 align-items-center">
-                            {% for k, v in rule.parameters.items|slice:":3" %}
-                            <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.64rem;">
-                                {{ k }}: <strong class="text-info">{{ v }}</strong>
-                            </span>
-                            {% empty %}
-                            <span class="theme-text-muted small" style="font-size: 0.7rem;">Standard Rule</span>
-                            {% endfor %}
-                            {% if rule.parameters|length > 3 %}
-                            <span class="badge bg-dark bg-opacity-50 text-muted rounded-pill px-1.5 py-0.5 font-monospace" style="font-size: 0.6rem;">+{{ rule.parameters|length|add:"-3" }} more</span>
-                            {% endif %}
-                        </div>
-                    </td>
-
                     <td class="py-2.5 px-1 bg-transparent text-center">
                         {% if rule.is_system_preset %}
                         <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.66rem;">
@@ -221,48 +205,40 @@
                     </td>
 
                     <td class="text-center py-2.5 px-1 bg-transparent">
-                        <div class="d-inline-flex align-items-center justify-content-center p-1 rounded-pill mx-auto" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08)); gap: 3px;">
+                        <div class="d-flex align-items-center justify-content-center gap-2">
                             <!-- Edit Button -->
-                            <button type="button" 
-                                    hx-get="{% url 'backtest:rule_update' rule.pk %}" 
-                                    hx-target="#globalHtmxModalDialog" 
-                                    hx-swap="innerHTML"
-                                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-primary" 
-                                    style="width: 25px; height: 25px;" 
-                                    title="Edit Rule & Parameters">
-                                <span class="material-icons" style="font-size: 0.82rem;">edit</span>
-                            </button>
+                            <a href="{% url 'backtest:rule_update' rule.pk %}" 
+                               hx-get="{% url 'backtest:rule_update' rule.pk %}" 
+                               hx-target="#app-main-container" 
+                               hx-push-url="true" 
+                               class="glass-icon-btn rounded-circle d-inline-flex align-items-center justify-content-center text-primary" 
+                               style="width: 32px !important; height: 32px !important; aspect-ratio: 1 / 1 !important; border-radius: 50% !important; border: 1px solid var(--border-color) !important;" 
+                               title="Edit Rule & Parameters">
+                                <span class="material-icons" style="font-size: 0.9rem;">edit</span>
+                            </a>
 
-                            <!-- Expand Dropdown Button (Kept Together next to Edit) -->
-                            <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center border-0"
-                                    style="width: 25px; height: 25px; background: rgba(56, 189, 248, 0.12); color: #38bdf8;"
+                            <!-- Expand Dropdown Button -->
+                            <button class="glass-icon-btn rounded-circle d-inline-flex align-items-center justify-content-center"
+                                    style="width: 32px !important; height: 32px !important; aspect-ratio: 1 / 1 !important; border-radius: 50% !important; border: 1px solid var(--border-color) !important; background: rgba(56, 189, 248, 0.12); color: #38bdf8;"
                                     type="button"
                                     data-bs-toggle="collapse"
                                     data-bs-target="#rule-exp-{{ rule.id }}"
                                     aria-expanded="false"
                                     aria-controls="rule-exp-{{ rule.id }}"
                                     title="Expand Rule Directives & Parameters">
-                                <span class="material-icons" style="font-size: 0.95rem; color: #38bdf8;">keyboard_arrow_down</span>
+                                <span class="material-icons" style="font-size: 1rem; color: #38bdf8;">keyboard_arrow_down</span>
                             </button>
 
-                            <!-- Delete / Lock Button -->
+                            <!-- Delete Button (Custom Rules Only) -->
                             {% if not rule.is_system_preset %}
                             <button type="button" 
                                     hx-get="{% url 'backtest:rule_delete' rule.pk %}" 
                                     hx-target="#globalHtmxModalDialog" 
                                     hx-swap="innerHTML"
-                                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-danger" 
-                                    style="width: 25px; height: 25px;" 
+                                    class="glass-icon-btn rounded-circle d-inline-flex align-items-center justify-content-center text-danger" 
+                                    style="width: 32px !important; height: 32px !important; aspect-ratio: 1 / 1 !important; border-radius: 50% !important; border: 1px solid var(--border-color) !important;" 
                                     title="Delete Custom Rule">
-                                <span class="material-icons" style="font-size: 0.82rem;">delete</span>
-                            </button>
-                            {% else %}
-                            <button type="button" 
-                                    class="btn btn-sm glass-icon-btn rounded-circle p-0 d-inline-flex align-items-center justify-content-center text-muted opacity-25" 
-                                    style="width: 25px; height: 25px; cursor: not-allowed;" 
-                                    disabled
-                                    title="System Presets cannot be deleted">
-                                <span class="material-icons" style="font-size: 0.82rem;">lock</span>
+                                <span class="material-icons" style="font-size: 0.9rem;">delete</span>
                             </button>
                             {% endif %}
                         </div>
@@ -271,26 +247,26 @@
 
                 <!-- Collapsible Detailed Rule Drawer -->
                 <tr class="collapse border-0" id="rule-exp-{{ rule.id }}" style="white-space: normal;">
-                    <td colspan="7" class="p-0 border-0" style="white-space: normal;">
-                        <div class="p-3 mx-2 my-2 rounded-3 shadow-lg" style="background: var(--card-bg, rgba(15, 23, 42, 0.95)); backdrop-filter: blur(16px); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)); white-space: normal;">
+                    <td colspan="6" class="p-0 border-0" style="white-space: normal;">
+                        <div class="p-3 mx-2 my-2 rounded-3 shadow-lg" style="background: rgba(180, 241, 5, 0.02) !important; backdrop-filter: blur(16px); border: 1px solid var(--border-color) !important; white-space: normal;">
                             <div class="row g-3 align-items-stretch">
                                 
                                 <!-- Card 1: AI Prompt Directive (RL Optimization) -->
                                 <div class="col-12 col-lg-4 col-md-6 d-flex flex-column" style="min-width: 0;">
-                                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: var(--card-bg, rgba(255, 255, 255, 0.03)) !important; border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1)) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);">
                                         <div>
                                             <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-20">
                                                 <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.75rem;">
                                                     <span class="material-icons" style="font-size: 0.95rem; color: #38bdf8;">auto_awesome</span>
                                                     <span class="theme-text-main">AI Prompt Directive</span>
                                                 </span>
-                                                <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.68rem;">RL Optimization</span>
+                                                <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0.5" style="font-size: 0.68rem;">RL Optimization</span>
                                             </div>
-                                            <div class="small font-monospace mb-2">
+                                            <div class="small mb-2">
                                                 <span class="theme-text-muted">Target Regime:</span>
                                                 <span class="text-info fw-semibold ms-1">{{ rule.get_rule_type_display }}</span>
                                             </div>
-                                            <div class="p-2.5 rounded-2 font-monospace" style="background: rgba(14, 165, 233, 0.12); border: 1px solid rgba(14, 165, 233, 0.28); font-size: 0.73rem; line-height: 1.45; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
+                                            <div class="p-2.5 rounded-2" style="background: rgba(14, 165, 233, 0.1); border: 1px solid rgba(14, 165, 233, 0.25); font-size: 0.73rem; line-height: 1.45; color: var(--text-main); word-break: break-word; overflow-wrap: anywhere;">
                                                 "{{ rule.prompt_directive|default:rule.description }}"
                                             </div>
                                         </div>
@@ -303,20 +279,20 @@
 
                                 <!-- Card 2: Execution Constraints & Parameters -->
                                 <div class="col-12 col-lg-4 col-md-6 d-flex flex-column" style="min-width: 0;">
-                                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: var(--card-bg, rgba(255, 255, 255, 0.03)) !important; border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1)) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);">
                                         <div>
                                             <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-20">
                                                 <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.75rem;">
                                                     <span class="material-icons" style="font-size: 0.95rem; color: #fbbf24;">tune</span>
                                                     <span class="theme-text-main">Execution Parameters</span>
                                                 </span>
-                                                <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.68rem;">JSON Constraints</span>
+                                                <span class="badge bg-secondary bg-opacity-25 text-info border border-secondary border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.68rem;">JSON Constraints</span>
                                             </div>
-                                            <div class="d-flex flex-column small font-monospace">
+                                            <div class="d-flex flex-column small">
                                                 {% for k, v in rule.parameters.items %}
                                                 <div class="d-flex justify-content-between align-items-center py-1.5 {% if not forloop.last %}border-bottom border-secondary border-opacity-10{% endif %}">
                                                     <span class="theme-text-muted">{{ k }}:</span>
-                                                    <span class="fw-bold text-info font-monospace">{{ v }}</span>
+                                                    <span class="fw-bold text-info">{{ v }}</span>
                                                 </div>
                                                 {% empty %}
                                                 <div class="py-2 theme-text-muted fst-italic">Standard rule configuration without overriding JSON constraints.</div>
@@ -332,7 +308,7 @@
 
                                 <!-- Card 3: Rule Mechanics & Description -->
                                 <div class="col-12 col-lg-4 col-md-12 d-flex flex-column" style="min-width: 0;">
-                                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: rgba(15, 23, 42, 0.75) !important; border: 1px solid rgba(255, 255, 255, 0.1) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);">
+                                    <div class="glass-card p-3 h-100 overflow-hidden d-flex flex-column justify-content-between rounded-3" style="min-width: 0; background: var(--card-bg, rgba(255, 255, 255, 0.03)) !important; border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1)) !important; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);">
                                         <div>
                                             <div class="d-flex justify-content-between align-items-center mb-2 pb-2 border-bottom border-secondary border-opacity-20">
                                                 <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.75rem;">
@@ -345,7 +321,7 @@
                                                 <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.68rem;">Custom Rule</span>
                                                 {% endif %}
                                             </div>
-                                            <div class="small font-monospace mb-2" style="font-size: 0.73rem; line-height: 1.45; color: var(--text-main); word-break: break-word;">
+                                            <div class="small mb-2" style="font-size: 0.73rem; line-height: 1.45; color: var(--text-main); word-break: break-word;">
                                                 {{ rule.description|default:"Detailed strategy execution rule for reinforcement learning backtesting simulations." }}
                                             </div>
                                         </div>
@@ -423,7 +399,7 @@
                     <div class="fw-bold text-info mb-1">Full AI Prompt Directive:</div>
                     "{{ rule.prompt_directive|default:rule.description }}"
                 </div>
-                <div class="p-2.5 rounded-2 font-monospace mb-2" style="background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(255, 255, 255, 0.1); font-size: 0.72rem;">
+                <div class="p-2.5 rounded-2 font-monospace mb-2" style="background: var(--card-bg, rgba(255, 255, 255, 0.03)) !important; border: 1px solid var(--border-color) !important; font-size: 0.72rem;">
                     <div class="fw-bold text-warning mb-1">Parameters:</div>
                     {% for k, v in rule.parameters.items %}
                     <div class="d-flex justify-content-between py-1 border-bottom border-secondary border-opacity-10">
@@ -450,13 +426,13 @@
                     <span>Details</span>
                 </button>
                 <div class="d-flex gap-2">
-                    <button type="button" 
-                            hx-get="{% url 'backtest:rule_update' rule.pk %}" 
-                            hx-target="#globalHtmxModalDialog" 
-                            hx-swap="innerHTML"
-                            class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1">
+                    <a href="{% url 'backtest:rule_update' rule.pk %}" 
+                       hx-get="{% url 'backtest:rule_update' rule.pk %}" 
+                       hx-target="#app-main-container" 
+                       hx-push-url="true"
+                       class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1">
                         Edit
-                    </button>
+                    </a>
                     {% if not rule.is_system_preset %}
                     <button type="button" 
                             hx-get="{% url 'backtest:rule_delete' rule.pk %}" 

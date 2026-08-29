@@ -126,19 +126,23 @@
 
 <!-- Header -->
 <div class="row mb-4">
-    <div class="col-12 d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
-        <div class="d-flex align-items-center gap-3">
-            <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width:54px;height:54px;border:1px solid rgba(13,110,253,0.3);">
-                <span class="material-icons fs-3">cloud_download</span>
+    <div class="col-12">
+        <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div class="page-header-top-bar d-flex align-items-center justify-content-between w-100">
+                <div class="rounded-circle bg-primary bg-opacity-25 text-primary d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width:48px;height:48px;border:1px solid rgba(13,110,253,0.3);">
+                    <span class="material-icons fs-3">cloud_download</span>
+                </div>
+                <div class="page-header-actions d-flex align-items-center">
+                    <a href="{% url 'market:market_backup_list' %}" class="glass-icon-btn text-decoration-none page-header-back-btn" title="Back to List">
+                        <span class="material-icons fs-5">arrow_back</span>
+                    </a>
+                </div>
             </div>
-            <div class="text-break">
-                <h2 class="theme-text-main fw-bold mb-0 text-wrap">Initialize Market Backup</h2>
-                <div class="theme-text-muted small">Configure parameters for downloading and serializing market data.</div>
+            <div class="page-header-title-wrapper text-center">
+                <h1 class="page-title mb-0">Initialize Market Backup</h1>
+                <p class="page-subtitle">Configure parameters for downloading and serializing market data.</p>
             </div>
         </div>
-        <a href="{% url 'market:market_backup_list' %}" class="glass-icon-btn text-decoration-none" title="Back to List">
-            <span class="material-icons fs-5">arrow_back</span>
-        </a>
     </div>
 </div>
 
@@ -170,7 +174,7 @@
                         id="tabIndexFO"
                         onclick="setMarketType('INDEX_FO')">
                     <span class="material-icons fs-5">candlestick_chart</span>
-                    <span>INDEX / F&amp;O<br><small class="opacity-75 fw-normal">Nifty · BankNifty · Fin Nifty</small></span>
+                    <span>INDEX / F&amp;O<br><small class="opacity-75 fw-normal">Nifty · BankNifty · Sensex · GIFT Nifty</small></span>
                 </button>
                 <button type="button"
                         class="market-tab-btn"
@@ -237,7 +241,7 @@
                         Strike Count (± ATM)
                     </label>
                     {{ form.strike_count }}
-                    <div class="theme-text-muted small mt-1">Number of strikes to track above and below ATM (e.g. 5).</div>
+                    <div class="theme-text-muted small mt-1">Number of strikes to track above and below ATM (enter 0 for Index Spot only).</div>
                     {% for error in form.strike_count.errors %}
                         <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
                     {% endfor %}
@@ -397,7 +401,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 if (strikeInput) strikeInput.value = '0';
             } else {
                 strikeCountRow.style.display = '';
-                if (strikeInput && (strikeInput.value === '0' || !strikeInput.value)) {
+                if (strikeInput && strikeInput.value === '') {
                     strikeInput.value = '5';
                 }
             }

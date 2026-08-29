@@ -21,9 +21,9 @@
 
     <!-- Backup List Table Container -->
     <div class="card mb-0">
-        <div class="card-header d-flex justify-content-between align-items-center mb-3">
+        <div class="card-header px-4 py-3.5 border-bottom border-secondary border-opacity-10 d-flex justify-content-between align-items-center mb-0">
             <div>
-                <h2 class="card-title mb-0">My Generated Backup Datasets</h2>
+                <h5 class="card-title mb-1 fw-bold theme-text-main fs-5">My Generated Backup Datasets</h5>
                 <span class="card-subtitle theme-text-muted small">Date-partitioned Parquet datasets available for your account</span>
             </div>
         </div>
@@ -40,8 +40,7 @@
                                 <th>Strikes</th>
                                 <th>Status</th>
                                 <th>File Size</th>
-                                <th class="text-end">Actions</th>
-                                <th class="text-center pe-3" style="width: 44px;"></th>
+                                <th class="text-end pe-4">Actions</th>
                             </tr>
                         </thead>
                         <tbody>
@@ -66,34 +65,36 @@
                                         {% endif %}
                                     </td>
                                     <td class="small font-monospace">{{ backup.file_size_mb|default:"0.0" }} MB</td>
-                                    <td class="text-end">
-                                        {% if backup.parquet_file_path or backup.status == 'COMPLETED' or backup.status == 'SUCCESS' or backup.status == 'completed' %}
-                                            <a href="{% url 'users:user-backup-download' backup.id %}" 
-                                               class="btn btn-sm btn-outline-success rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1.5">
-                                                <i class="bi bi-download"></i>
-                                                <span>Download Data</span>
-                                            </a>
-                                        {% else %}
-                                            <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled>
-                                                Generating...
+                                    <td class="text-end pe-4 py-2">
+                                        <div class="d-flex align-items-center justify-content-end gap-2">
+                                            {% if backup.parquet_file_path or backup.status == 'COMPLETED' or backup.status == 'SUCCESS' or backup.status == 'completed' %}
+                                                <a href="{% url 'users:user-backup-download' backup.id %}" 
+                                                   class="btn btn-sm btn-outline-success rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1.5">
+                                                    <i class="bi bi-download"></i>
+                                                    <span>Download Data</span>
+                                                </a>
+                                            {% else %}
+                                                <button class="btn btn-sm btn-outline-secondary rounded-pill px-3" disabled>
+                                                    Generating...
+                                                </button>
+                                            {% endif %}
+                                            
+                                            <!-- Standardized Circle Glass Expand Button -->
+                                            <button class="glass-icon-btn text-primary border-0 rounded-circle d-inline-flex align-items-center justify-content-center"
+                                                    style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; aspect-ratio: 1 / 1; border-radius: 50% !important;"
+                                                    type="button"
+                                                    data-bs-toggle="collapse"
+                                                    data-bs-target="#user-bkp-exp-{{ backup.id }}"
+                                                    aria-expanded="false"
+                                                    title="Expand Details">
+                                                <span class="material-icons fs-6">keyboard_arrow_down</span>
                                             </button>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-center pe-3 py-2" style="width: 44px;">
-                                        <button class="btn btn-sm btn-outline-secondary rounded-circle p-0 d-inline-flex align-items-center justify-content-center"
-                                                style="width: 28px; height: 28px; min-width: 28px; border-radius: 50% !important; border: 1px solid var(--border-color) !important;"
-                                                type="button"
-                                                data-bs-toggle="collapse"
-                                                data-bs-target="#user-bkp-exp-{{ backup.id }}"
-                                                aria-expanded="false"
-                                                title="Expand Details">
-                                            <i class="bi bi-chevron-down text-primary" style="font-size: 0.8rem;"></i>
-                                        </button>
+                                        </div>
                                     </td>
                                 </tr>
                                 <!-- Collapsible Drawer -->
                                 <tr class="collapse border-0" id="user-bkp-exp-{{ backup.id }}">
-                                    <td colspan="8" class="p-0 border-0">
+                                    <td colspan="7" class="p-0 border-0">
                                         <div class="p-3 mx-3 my-2 rounded-3 small" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color);">
                                             <div class="d-flex justify-content-between flex-wrap gap-2">
                                                 <div><span class="theme-text-muted">Dataset Task ID:</span> <span class="fw-bold theme-text-main">#{{ backup.id }}</span></div>

@@ -1,0 +1,189 @@
+<!-- 3x3 DETAILED TRADING SUMMARY CARDS GRID (9 CARDS TOTAL) -->
+<div class="row g-3">
+    <!-- Card 1: Total Net P/L -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Total Net P/L</span>
+                {% if stats.total_pnl >= 0 %}
+                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">+{{ stats.pnl_pct }}%</span>
+                {% else %}
+                <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">{{ stats.pnl_pct }}%</span>
+                {% endif %}
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                {% if stats.total_pnl >= 0 %}
+                <h3 class="fw-extrabold text-success mb-0" style="font-size: 1.55rem;">+₹{{ stats.total_pnl|floatformat:2 }}</h3>
+                {% else %}
+                <h3 class="fw-extrabold text-danger mb-0" style="font-size: 1.55rem;">-₹{{ stats.total_pnl_abs|floatformat:2 }}</h3>
+                {% endif %}
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Account P/L Growth</span>
+                <span class="{% if stats.total_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">Net Profit</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Win Rate -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Win Rate %</span>
+                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Win Metric</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold theme-text-main mb-0" style="font-size: 1.55rem;">{{ stats.win_rate }}%</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Win / Loss Ratio</span>
+                <span class="theme-text-main fw-bold">{{ stats.wins_count }}W / {{ stats.losses_count }}L</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Total Trades -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Total Trades</span>
+                <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Executed</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold theme-text-main mb-0" style="font-size: 1.55rem;">{{ stats.total_trades }}</h3>
+                <span class="theme-text-muted small fw-semibold">Orders</span>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Daily Execution Avg</span>
+                <span class="text-info fw-bold">{{ stats.avg_trades_day }} / Day</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Max Drawdown -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Max Drawdown</span>
+                <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Controlled Risk</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold text-warning mb-0" style="font-size: 1.55rem;">{{ stats.max_drawdown }}%</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Recovery Time</span>
+                <span class="text-warning fw-bold">{{ stats.recovery_days }} Days</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 5: Gross Profit / Loss Breakdown -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Gross PnL Breakdown</span>
+                <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Profit vs Loss</span>
+            </div>
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">GROSS PROFIT</div>
+                    <span class="fw-extrabold text-success" style="font-size: 1.08rem;">+₹{{ stats.gross_profit|floatformat:2 }}</span>
+                </div>
+                <div class="text-end">
+                    <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">GROSS LOSS</div>
+                    <span class="fw-extrabold text-danger" style="font-size: 1.08rem;">-₹{{ stats.gross_loss_abs|floatformat:2 }}</span>
+                </div>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Profit Factor</span>
+                <span class="theme-text-main fw-bold">{{ stats.profit_factor }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 6: Risk-Reward & Avg Trade -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Risk - Reward Ratio</span>
+                <span class="badge {% if stats.expectancy >= 0 %}bg-success bg-opacity-25 text-success{% else %}bg-danger bg-opacity-25 text-danger{% endif %} rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">
+                    {% if stats.expectancy >= 0 %}+{% endif %}₹{{ stats.expectancy }}/day Edge
+                </span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold theme-text-main mb-0" style="font-size: 1.55rem;">1 : {{ stats.risk_reward_ratio }}</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Avg Win / Avg Loss</span>
+                <span class="theme-text-main fw-bold">Avg Win: ₹{{ stats.avg_win|floatformat:0 }} | Avg Loss: ₹{{ stats.avg_loss_abs|floatformat:0 }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 7: Execution Streaks -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Trade Streaks</span>
+                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Consistency</span>
+            </div>
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">MAX WIN STREAK</div>
+                    <span class="fw-extrabold text-success" style="font-size: 1.15rem;">{{ stats.max_win_streak }} Wins</span>
+                </div>
+                <div class="text-end">
+                    <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">MAX LOSS STREAK</div>
+                    <span class="fw-extrabold text-danger" style="font-size: 1.15rem;">{{ stats.max_loss_streak }} Losses</span>
+                </div>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Current Streak</span>
+                <span class="text-success fw-bold">{{ stats.current_streak }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 8: Total Charges & Fees -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Charges &amp; Brokerage</span>
+                <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">STT + SEBI</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold text-danger mb-0" style="font-size: 1.55rem;">₹{{ stats.total_charges|floatformat:2 }}</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Exchange Charges</span>
+                <span class="theme-text-muted fw-bold">STT / GST Included</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 9: Capital & Funds Deposited / Withdrawn -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Capital Deposited</span>
+                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Ledger Data</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold text-success mb-0" style="font-size: 1.55rem;">₹{{ stats.total_deposited|floatformat:2 }}</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Withdrawn: <strong class="text-danger fw-bold">₹{{ stats.total_withdrawn|floatformat:0 }}</strong></span>
+                <span>Net Capital: <strong class="theme-text-main fw-bold">₹{{ stats.net_capital|floatformat:0 }}</strong></span>
+            </div>
+        </div>
+    </div>
+</div>

@@ -1,387 +1,181 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" data-ui-theme="{{ UI_THEME }}">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Sign In with Email OTP — Marmot Platform</title>
-    
-    <!-- Google Fonts: Google Sans Flex & Code -->
+
+    <!-- SEO Optimization -->
+    <meta name="description" content="Sign In with Email OTP to Marmot Algorithmic Trading">
+    <meta name="author" content="Marmot Core">
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
+
+    <!-- Third-Party Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:wght@400;500;600;700&family=Google+Sans+Flex:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
-    
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Dynamic Shadcn Theme Stylesheet -->
-    <link rel="stylesheet" href="{% static 'css/theme-shadcn.css' %}">
 
+    <!-- Main Design System & Custom Stylesheet -->
+    <link rel="stylesheet" href="{% static 'css/spark-theme.css' %}">
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <style>
-        :root[data-theme="dark"] {
-            --bg-page: #000000;
-            --aurora-1: rgba(122, 90, 248, 0.16);
-            --aurora-2: rgba(26, 115, 232, 0.14);
-            --bg-card: rgba(12, 16, 29, 0.75);
-            --card-border: rgba(255, 255, 255, 0.1);
-            --text-title: #ffffff;
-            --text-subtitle: rgba(255, 255, 255, 0.7);
-            --input-bg: rgba(255, 255, 255, 0.05);
-            --input-border: rgba(255, 255, 255, 0.15);
-            --input-text: #ffffff;
-            --btn-primary: #7a5af8;
-            --btn-primary-hover: #6941c6;
-            --btn-text: #ffffff;
-            --toggle-bg: rgba(255, 255, 255, 0.08);
-            --toggle-border: rgba(255, 255, 255, 0.15);
-        }
-
-        :root[data-theme="light"] {
-            --bg-page: #f8fafc;
-            --aurora-1: rgba(122, 90, 248, 0.08);
-            --aurora-2: rgba(26, 115, 232, 0.06);
-            --bg-card: rgba(255, 255, 255, 0.85);
-            --card-border: rgba(0, 0, 0, 0.08);
-            --text-title: #0f172a;
-            --text-subtitle: #64748b;
-            --input-bg: #ffffff;
-            --input-border: #cbd5e1;
-            --input-text: #0f172a;
-            --btn-primary: #7a5af8;
-            --btn-primary-hover: #6941c6;
-            --btn-text: #ffffff;
-            --toggle-bg: rgba(0, 0, 0, 0.05);
-            --toggle-border: rgba(0, 0, 0, 0.1);
-        }
-
-        * {
-            box-sizing: border-box;
-        }
-
-        html, body {
+        html { font-size: 90%; }
+        #ssoEmailField, form input[type="email"] {
             width: 100%;
-            max-width: 100%;
-            overflow-x: hidden;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Google Sans Flex', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Plus Jakarta Sans', sans-serif;
-            background-color: var(--bg-page);
-            background-image: 
-                radial-gradient(circle at 50% 10%, var(--aurora-1) 0%, transparent 60%),
-                radial-gradient(circle at 80% 35%, var(--aurora-2) 0%, transparent 50%);
-            background-attachment: fixed;
-            min-height: 100vh;
-            min-height: 100dvh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            justify-content: center;
-            margin: 0;
-            padding: 36px 14px 16px 14px;
-            position: relative;
-            letter-spacing: -0.01em;
-            overflow-x: hidden;
-            transition: background-color 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-        }
-
-        .auth-nav-top {
-            position: fixed;
-            top: 16px;
-            left: 20px;
-            right: 20px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            z-index: 1000;
-            max-width: 100%;
-            pointer-events: none;
-        }
-
-        .auth-nav-btn {
-            background: var(--toggle-bg);
-            border: 1px solid var(--toggle-border);
-            color: var(--text-title);
-            backdrop-filter: blur(16px);
-            -webkit-backdrop-filter: blur(16px);
-            border-radius: 50px;
-            padding: 0 14px;
-            height: 38px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            text-decoration: none;
-            font-size: 0.875rem;
-            font-weight: 500;
-            transition: all 0.2s ease;
-            pointer-events: auto;
-            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
-            box-sizing: border-box;
-            white-space: nowrap;
-        }
-
-        .auth-nav-btn:hover {
-            background: var(--tab-active-bg);
-            color: var(--text-title);
-            transform: translateY(-1px);
-            text-decoration: none;
-        }
-
-        .auth-card {
-            position: relative;
-            z-index: 10;
-            width: 100%;
-            max-width: 390px;
-            background: var(--bg-card);
-            backdrop-filter: blur(28px) saturate(180%);
-            -webkit-backdrop-filter: blur(28px) saturate(180%);
-            border: 1px solid var(--card-border);
-            border-radius: 16px;
-            padding: 22px 22px;
-            box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.25);
-            animation: cardFadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            text-align: center;
-        }
-
-        @media (max-width: 576px) {
-            body {
-                padding: 48px 10px 16px 10px;
-            }
-            .auth-nav-top {
-                top: 12px;
-                left: 14px;
-                right: 14px;
-            }
-            .auth-nav-btn {
-                height: 36px;
-                padding: 0 12px;
-                font-size: 0.8125rem;
-            }
-            .auth-card {
-                padding: 18px 14px;
-                border-radius: 14px;
-            }
-        }
-
-        @keyframes cardFadeIn {
-            from { opacity: 0; transform: translateY(12px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .auth-title {
-            color: var(--text-title);
-            font-size: 1.25rem;
-            font-weight: 700;
-            letter-spacing: -0.02em;
-            margin-bottom: 2px;
-        }
-
-        .auth-subtitle {
-            color: var(--text-subtitle);
-            font-size: 0.78rem;
-            margin-bottom: 14px;
-            line-height: 1.45;
-        }
-
-        .form-label {
-            color: var(--text-subtitle);
-            font-size: 0.75rem;
-            font-weight: 500;
-            margin-bottom: 3px;
-            text-align: start;
-            display: block;
-        }
-
-        .form-control {
-            background-color: var(--input-bg) !important;
-            border: 1px solid var(--input-border) !important;
-            color: var(--input-text) !important;
-            border-radius: 8px;
-            padding: 6px 12px;
-            font-size: 0.8125rem;
-            height: 36px;
-            transition: all 0.2s ease;
-        }
-
-        .form-control:focus {
-            border-color: var(--btn-primary) !important;
-            box-shadow: 0 0 0 4px rgba(122, 90, 248, 0.25) !important;
-        }
-
-        .btn-submit {
-            background-color: var(--btn-primary);
-            color: var(--btn-text);
-            border: none;
-            border-radius: 50px;
-            padding: 0 20px;
-            font-size: 0.875rem;
+            height: 2.5rem;
+            background-color: var(--bs-body-bg);
+            border: 1px solid var(--border-light);
+            border-radius: var(--radius-lg);
+            padding: 0.55rem 1.25rem 0.55rem 2.85rem;
+            font-size: 0.9rem;
             font-weight: 600;
-            width: 100%;
-            height: 38px;
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
-            transition: all 0.2s ease;
-            box-shadow: 0 4px 14px rgba(122, 90, 248, 0.35);
-            box-sizing: border-box;
+            color: var(--text-main);
+            outline: none;
+            transition: all 0.25s ease-in-out;
         }
-
-        .btn-submit:hover:not(:disabled) {
-            background-color: var(--btn-primary-hover);
-            color: var(--btn-text);
-            transform: translateY(-1px);
-        }
-
-        .btn-submit:disabled, .btn-submit.btn-loading {
-            opacity: 0.85;
-            cursor: not-allowed;
-            pointer-events: none;
-            transform: none !important;
-        }
-
-        /* Global Dot Pulse Animation */
-        .dot-pulse-loader {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            margin-left: 6px;
-            vertical-align: middle;
-        }
-
-        .dot-pulse-loader span {
-            width: 5px;
-            height: 5px;
-            background-color: currentColor;
-            border-radius: 50%;
-            display: inline-block;
-            animation: dotPulse 1.2s infinite ease-in-out both;
-        }
-
-        .dot-pulse-loader span:nth-child(1) { animation-delay: -0.32s; }
-        .dot-pulse-loader span:nth-child(2) { animation-delay: -0.16s; }
-        .dot-pulse-loader span:nth-child(3) { animation-delay: 0s; }
-
-        @keyframes dotPulse {
-            0%, 80%, 100% {
-                transform: scale(0.4);
-                opacity: 0.4;
-            }
-            40% {
-                transform: scale(1);
-                opacity: 1;
-            }
+        #ssoEmailField:focus, form input[type="email"]:focus {
+            background-color: #FFFFFF;
+            border-color: var(--brand-forest-medium);
+            box-shadow: 0 0 0 4px var(--brand-lime-translucent);
         }
     </style>
-    <style>html { font-size: 90%; }</style>
 </head>
 <body>
 
-    <!-- Fixed Header: Back to Home & Dark/Light Toggle -->
-    <div class="auth-nav-top">
-        <a href="{% url 'users:marmot-login' %}" class="auth-nav-btn" title="Back to Password Login">
-            <span class="material-icons" style="font-size: 16px;">arrow_back</span>
-            <span>Back</span>
-        </a>
-        <button id="themeToggleBtn" class="auth-nav-btn" type="button" title="Toggle color theme">
-            <span class="material-icons" id="themeIcon" style="font-size: 16px;">light_mode</span>
-            <span id="themeText">Light</span>
+    <!-- Theme Toggle Button (Top Right Corner) -->
+    <div class="theme-toggle-corner">
+        <button type="button" 
+                class="btn btn-sm rounded-pill d-inline-flex align-items-center gap-2 px-3 py-1.5 shadow-sm" 
+                id="themeToggleBtn" 
+                title="Toggle Theme" 
+                style="background: var(--card-background); border: 1px solid var(--border-color); color: var(--text-main);">
+            <i class="bi bi-moon-stars-fill" id="themeIcon" style="color: var(--brand-lime);"></i>
+            <span class="small fw-semibold" id="themeText">Dark</span>
         </button>
     </div>
 
-    <!-- Main Card -->
-    <div class="auth-card">
-        <div class="d-inline-flex align-items-center justify-content-center mb-3 p-3 rounded-circle" style="background: rgba(122, 90, 248, 0.12); color: #7a5af8;">
-            <span class="material-icons" style="font-size: 36px;">key</span>
-        </div>
-
-        <h1 class="auth-title">Email SSO Login</h1>
-        <p class="auth-subtitle">
-            Enter your registered email address. We'll send a 6-digit one-time password (OTP) to sign in securely.
-        </p>
-
-        {% if messages %}
-        <div class="mb-3">
-            {% for message in messages %}
-            <div class="alert alert-{{ message.tags|default:'info' }} py-2 px-3 small rounded-3 mb-2 text-start">
-                {{ message }}
-            </div>
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        {% if form.errors %}
-        <div class="alert alert-danger py-2 px-3 small rounded-3 mb-3 text-start">
-            {% for field, errors in form.errors.items %}
-                {% for error in errors %}
-                <div>{{ error }}</div>
-                {% endfor %}
-            {% endfor %}
-        </div>
-        {% endif %}
-
-        <form method="post" id="ssoForm" novalidate>
-            {% csrf_token %}
-
-            <div class="mb-4 text-start">
-                <label class="form-label" for="ssoEmailField">Registered Email Address</label>
-                {{ form.email }}
-            </div>
-
-            <button type="submit" class="btn btn-submit mb-3" id="ssoSubmitBtn">
-                <span>Send One-Time Passcode</span>
-                <span class="material-icons" style="font-size: 18px;">arrow_forward</span>
-            </button>
-        </form>
-
-        <div style="border-top: 1px solid var(--card-border); padding-top: 16px; margin-top: 12px;">
-            <a href="{% url 'users:marmot-login' %}" style="color: var(--text-subtitle); font-size: 0.8125rem; text-decoration: none;">
-                Prefer to sign in with password? <strong style="color: var(--btn-primary);">Sign In</strong>
+    <!-- Authentication Container & Card -->
+    <div class="login-wrapper min-vh-100 d-flex flex-column align-items-center justify-content-center py-2">
+        <!-- Glowing background shapes for modern visual appearance -->
+        <div class="login-bg-shape login-bg-shape-1"></div>
+        <div class="login-bg-shape login-bg-shape-2"></div>
+        
+        <!-- Main centered card -->
+        <div class="login-card">
+            
+            <!-- Brand Identity -->
+            <a href="{% url 'home' %}" class="login-brand text-decoration-none">
+                <i class="bi bi-asterisk"></i>
+                <span>MARMOT</span>
             </a>
+            
+            <h1 class="login-title">Email SSO Login</h1>
+            <p class="login-subtitle">Enter your registered email address. We'll send a 6-digit one-time password (OTP) to sign in securely.</p>
+
+            {% if messages %}
+            <div class="mb-3">
+                {% for message in messages %}
+                <div class="alert alert-{{ message.tags|default:'info' }} py-2 px-3 small rounded-3 mb-2 border-0 d-flex align-items-center gap-2" style="background: rgba(180, 241, 5, 0.15); color: var(--text-main);">
+                    <i class="bi bi-info-circle-fill"></i>
+                    <span>{{ message }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if form.errors %}
+            <div class="alert alert-danger py-2 px-3 small rounded-3 mb-3 border-0 d-flex align-items-center gap-2" style="background: rgba(239, 68, 68, 0.15); color: #ef4444;">
+                <i class="bi bi-exclamation-triangle-fill"></i>
+                {% for field, errors in form.errors.items %}
+                    {% for error in errors %}
+                    <div>{{ error }}</div>
+                    {% endfor %}
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- SSO Form -->
+            <form method="post" id="ssoForm" novalidate>
+                {% csrf_token %}
+
+                <!-- Email Input Group -->
+                <div class="login-form-group text-start">
+                    <label class="login-form-label" for="ssoEmailField">Registered Email Address</label>
+                    <div class="login-input-group">
+                        <i class="bi bi-envelope input-icon"></i>
+                        {{ form.email }}
+                    </div>
+                </div>
+
+                <!-- Submit Button -->
+                <button type="submit" class="btn-login mt-3" id="ssoSubmitBtn">
+                    <span>Send One-Time Passcode</span>
+                    <i class="bi bi-arrow-right"></i>
+                </button>
+            </form>
+
+            <!-- Divider -->
+            <div class="login-divider">Or continue with</div>
+
+            <!-- Footer Text -->
+            <p class="login-footer-text">
+                Prefer to sign in with password? <a href="{% url 'users:marmot-login' %}">Sign In</a>
+            </p>
+            
         </div>
     </div>
 
+    <!-- Bootstrap Bundle -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- Theme & Form Interactions -->
     <script>
-        document.addEventListener('DOMContentLoaded', () => {
+        (function() {
+            const savedTheme = localStorage.getItem('marmot_theme') || localStorage.getItem('theme') || localStorage.getItem('marmot-theme') || 'dark';
+            document.documentElement.setAttribute('data-theme', savedTheme);
+            updateThemeUI(savedTheme);
+
+            const toggleBtn = document.getElementById('themeToggleBtn');
+            if (toggleBtn) {
+                toggleBtn.addEventListener('click', function() {
+                    const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
+                    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+                    document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('marmot_theme', newTheme);
+                    localStorage.setItem('theme', newTheme);
+                    localStorage.setItem('marmot-theme', newTheme);
+                    updateThemeUI(newTheme);
+                });
+            }
+
+            function updateThemeUI(theme) {
+                const icon = document.getElementById('themeIcon');
+                const text = document.getElementById('themeText');
+                if (theme === 'dark') {
+                    if (icon) icon.className = 'bi bi-moon-stars-fill';
+                    if (text) text.textContent = 'Dark';
+                } else {
+                    if (icon) icon.className = 'bi bi-sun-fill';
+                    if (text) text.textContent = 'Light';
+                }
+            }
+        })();
+
+        // Form Submit Loading State
+        (function() {
             const form = document.getElementById('ssoForm');
             const submitBtn = document.getElementById('ssoSubmitBtn');
             if (form && submitBtn) {
-                form.addEventListener('submit', () => {
-                    if (submitBtn.classList.contains('btn-loading')) return;
-                    submitBtn.classList.add('btn-loading');
-                    submitBtn.innerHTML = '<span>Sending Code</span><div class="dot-pulse-loader"><span></span><span></span><span></span></div>';
-                });
-            }
-        });
-
-        (function() {
-            const htmlElement = document.documentElement;
-            const themeBtn = document.getElementById('themeToggleBtn');
-            const themeIcon = document.getElementById('themeIcon');
-            const themeText = document.getElementById('themeText');
-
-            function applyTheme(theme) {
-                htmlElement.setAttribute('data-theme', theme);
-                localStorage.setItem('theme', theme);
-                if (theme === 'dark') {
-                    if (themeIcon) themeIcon.textContent = 'light_mode';
-                    if (themeText) themeText.textContent = 'Light';
-                } else {
-                    if (themeIcon) themeIcon.textContent = 'dark_mode';
-                    if (themeText) themeText.textContent = 'Dark';
-                }
-            }
-
-            const savedTheme = localStorage.getItem('theme') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
-            applyTheme(savedTheme);
-
-            if (themeBtn) {
-                themeBtn.addEventListener('click', () => {
-                    const currentTheme = htmlElement.getAttribute('data-theme');
-                    applyTheme(currentTheme === 'dark' ? 'light' : 'dark');
+                form.addEventListener('submit', function() {
+                    if (submitBtn.disabled) return;
+                    submitBtn.disabled = true;
+                    submitBtn.innerHTML = '<span>Sending Code...</span><div class="spinner-border spinner-border-sm ms-2" role="status"></div>';
                 });
             }
         })();

@@ -1,0 +1,180 @@
+{% load static %}
+
+<!-- START: Spark Page Header -->
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <a href="{% url 'backtest:rule_list' %}" 
+           hx-get="{% url 'backtest:rule_list' %}" 
+           hx-target="#app-main-container" 
+           hx-push-url="true" 
+           class="btn btn-outline-secondary rounded-circle d-inline-flex align-items-center justify-content-center flex-shrink-0" 
+           style="width: 40px; height: 40px; border-radius: 50% !important; border: 1px solid var(--border-color) !important;" 
+           title="Back to Strategy Rules">
+            <i class="bi bi-arrow-left fs-5"></i>
+        </a>
+        <div>
+            <h1 class="page-title mb-1">
+                {% if form.instance.pk %}Edit Strategy Rule: {{ form.instance.name }}{% else %}Create Custom Strategy Rule{% endif %}
+            </h1>
+            <p class="page-subtitle mb-0">Configure constraint parameters, execution regimes, and natural language prompt directives.</p>
+        </div>
+    </div>
+    <div class="page-header-actions d-flex align-items-center gap-2">
+        <a href="{% url 'backtest:rule_list' %}" 
+           hx-get="{% url 'backtest:rule_list' %}" 
+           hx-target="#app-main-container" 
+           hx-push-url="true" 
+           class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-semibold">
+            Cancel
+        </a>
+    </div>
+</div>
+<!-- END: Spark Page Header -->
+
+<!-- Rule Form Glass Card Container -->
+<div class="card glass-card border shadow-lg overflow-hidden mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 16px;">
+    <div class="card-body p-4">
+        
+        <form method="POST" 
+              action="{% if form.instance.pk %}{% url 'backtest:rule_update' form.instance.pk %}{% else %}{% url 'backtest:rule_create' %}{% endif %}" 
+              hx-post="{% if form.instance.pk %}{% url 'backtest:rule_update' form.instance.pk %}{% else %}{% url 'backtest:rule_create' %}{% endif %}" 
+              hx-target="#app-main-container"
+              hx-push-url="true">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+            <div class="alert alert-danger rounded-3 py-2.5 px-3 mb-4 small bg-danger bg-opacity-25 text-danger border-0">
+                {% for error in form.non_field_errors %}
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons fs-6">error_outline</span>
+                    <span>{{ error }}</span>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            <!-- SECTION 1: GENERAL CONFIGURATION -->
+            <div class="mb-4">
+                <h5 class="fw-bold theme-text-main mb-3 pb-2 border-bottom border-secondary border-opacity-20 d-flex align-items-center gap-2" style="font-size: 1rem;">
+                    <span class="material-icons text-primary fs-5">settings</span>
+                    <span>General Rule Identification</span>
+                </h5>
+
+                <div class="row g-3 align-items-center">
+                    <div class="col-12 col-md-8">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="{{ form.name.id_for_label }}">
+                            Rule Name<span class="text-danger ms-1">*</span>
+                        </label>
+                        {{ form.name }}
+                        {% if form.name.errors %}
+                        <div class="text-danger small mt-1">{{ form.name.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1 d-block">
+                            Activation Status
+                        </label>
+                        <div class="form-check form-switch p-2.5 rounded-3 border d-flex align-items-center justify-content-between px-3" style="background: rgba(255,255,255,0.03); border-color: var(--border-color) !important; min-height: 42px;">
+                            <label class="form-check-label theme-text-main small fw-semibold mb-0" for="{{ form.is_active.id_for_label }}">
+                                Enable Rule Execution
+                            </label>
+                            {{ form.is_active }}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 2: MARKET SEGMENT & REGIME -->
+            <div class="mb-4">
+                <h5 class="fw-bold theme-text-main mb-3 pb-2 border-bottom border-secondary border-opacity-20 d-flex align-items-center gap-2" style="font-size: 1rem;">
+                    <span class="material-icons text-warning fs-5">category</span>
+                    <span>Market Segment &amp; Execution Regime</span>
+                </h5>
+
+                <div class="row g-3">
+                    <div class="col-12 col-md-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="{{ form.market_type.id_for_label }}">
+                            Target Market Segment<span class="text-danger ms-1">*</span>
+                        </label>
+                        {{ form.market_type }}
+                        {% if form.market_type.errors %}
+                        <div class="text-danger small mt-1">{{ form.market_type.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+
+                    <div class="col-12 col-md-6">
+                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="{{ form.rule_type.id_for_label }}">
+                            Rule Regime / Category<span class="text-danger ms-1">*</span>
+                        </label>
+                        {{ form.rule_type }}
+                        {% if form.rule_type.errors %}
+                        <div class="text-danger small mt-1">{{ form.rule_type.errors.0 }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <!-- SECTION 3: AI PROMPT DIRECTIVE -->
+            <div class="mb-4 p-3.5 rounded-3" style="background: rgba(14, 165, 233, 0.05); border: 1px solid rgba(14, 165, 233, 0.25);">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <label class="form-label text-info small fw-bold text-uppercase mb-0 d-flex align-items-center gap-1.5" for="{{ form.prompt_directive.id_for_label }}">
+                        <span class="material-icons fs-5">auto_awesome</span>
+                        <span>AI Prompt Directive (TensorTrade RL Instruction)</span>
+                    </label>
+                    <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2.5 py-0.5" style="font-size: 0.68rem;">Natural Language</span>
+                </div>
+                {{ form.prompt_directive }}
+                <small class="form-text theme-text-muted mt-2 d-block" style="font-size: 0.74rem;">
+                    Natural language prompt instruction passed directly into the Deep RL policy optimization loop during backtest evaluation.
+                </small>
+                {% if form.prompt_directive.errors %}
+                <div class="text-danger small mt-1">{{ form.prompt_directive.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <!-- SECTION 4: RULE DESCRIPTION & MECHANICS -->
+            <div class="mb-4">
+                <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="{{ form.description.id_for_label }}">
+                    Rule Description &amp; Trading Mechanics
+                </label>
+                {{ form.description }}
+                {% if form.description.errors %}
+                <div class="text-danger small mt-1">{{ form.description.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <!-- SECTION 5: JSON EXECUTION CONSTRAINTS -->
+            <div class="mb-4">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0" for="{{ form.parameters_json.id_for_label }}">
+                        JSON Execution Filters &amp; Overrides (Optional)
+                    </label>
+                    <span class="theme-text-muted small font-monospace" style="font-size: 0.68rem;">JSON Format</span>
+                </div>
+                {{ form.parameters_json }}
+                <small class="form-text theme-text-muted mt-1.5 d-block" style="font-size: 0.74rem;">
+                    Supported keys: <code>start_time</code>, <code>end_time</code>, <code>is_0dte_only</code>, <code>min_gap_pct</code>, <code>cutoff_time</code>, <code>max_trades</code>.
+                </small>
+                {% if form.parameters_json.errors %}
+                <div class="text-danger small mt-1">{{ form.parameters_json.errors.0 }}</div>
+                {% endif %}
+            </div>
+
+            <!-- SUBMIT BUTTONS -->
+            <div class="d-flex align-items-center justify-content-end gap-3 pt-3 border-top border-secondary border-opacity-20">
+                <a href="{% url 'backtest:rule_list' %}" 
+                   hx-get="{% url 'backtest:rule_list' %}" 
+                   hx-target="#app-main-container" 
+                   hx-push-url="true" 
+                   class="btn btn-outline-secondary rounded-pill px-4 py-2 fw-semibold">
+                    Cancel
+                </a>
+                <button type="submit" class="btn btn-primary rounded-pill px-4 py-2 fw-bold text-white d-inline-flex align-items-center gap-2 shadow-sm">
+                    <span class="material-icons fs-5">save</span>
+                    <span>{% if form.instance.pk %}Update Strategy Rule{% else %}Create Strategy Rule{% endif %}</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>

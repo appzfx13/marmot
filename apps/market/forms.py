@@ -57,8 +57,8 @@ class MarketBackupForm(forms.ModelForm):
                 self.add_error('index_name', 'Please select a target index.')
             if index_name == 'INDIAVIX':
                 cleaned_data['strike_count'] = 0
-            elif strike_count is None or strike_count <= 0:
-                self.add_error('strike_count', 'Strike count must be at least 1 for index options.')
+            elif strike_count is None or strike_count < 0:
+                self.add_error('strike_count', 'Strike count cannot be negative.')
             # Clear forex field
             cleaned_data['forex_instrument'] = None
 

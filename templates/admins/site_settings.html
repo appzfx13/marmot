@@ -1,0 +1,164 @@
+{% extends 'admins/index.html' %}
+{% load static %}
+
+{% block title %}Site Settings — Marmot Admin{% endblock %}
+
+{% block content %}
+<div class="container-fluid px-4 py-4 max-w-7xl mx-auto">
+    <!-- Header Title Row -->
+    <div class="page-header flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6 pb-4 border-b border-white/10">
+        <div class="page-header-title-wrapper text-center">
+            <h1 class="page-title text-2xl font-bold text-slate-100 flex items-center justify-center gap-2.5">
+                <svg class="w-6 h-6 text-[#B4F105]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                </svg>
+                Platform Site Settings
+            </h1>
+            <p class="page-subtitle text-sm text-slate-400 mt-1">Manage global brand identity, logos, favicons, and Redis-cached site metadata.</p>
+        </div>
+        <div class="page-header-actions flex items-center justify-center gap-2">
+            <span class="inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-xs font-mono bg-[#0B1D16] border border-[#B4F105]/30 text-[#B4F105]">
+                <span class="w-2 h-2 rounded-full bg-[#B4F105] animate-ping"></span>
+                Redis Cache Active
+            </span>
+        </div>
+    </div>
+
+    <!-- Django Messages Alert Banner -->
+    {% if messages %}
+        <div class="mb-6 space-y-2">
+            {% for message in messages %}
+                <div class="p-4 rounded-xl text-sm font-medium border flex items-center justify-between {% if message.tags == 'error' %}bg-rose-500/10 border-rose-500/30 text-rose-300{% else %}bg-[#B4F105]/10 border-[#B4F105]/30 text-[#B4F105]{% endif %}">
+                    <span>{{ message }}</span>
+                    <button onclick="this.parentElement.remove()" class="opacity-70 hover:opacity-100">&times;</button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- 1. HTMX Logo & Favicon Upload Grid -->
+    <div class="mb-8">
+        <h2 class="text-lg font-bold text-slate-200 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-[#B4F105]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+            </svg>
+            Brand Logos & Favicon Assets (HTMX Asynchronous Uploads)
+        </h2>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Logo Dark Card -->
+            <div class="bg-[#0B1D16] border border-white/10 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-100 mb-1">Dark Mode Logo</h3>
+                    <p class="text-xs text-slate-400 mb-4">Displayed on dark canvas headers (.svg, .png, .jpg).</p>
+                    
+                    <div id="preview-container-logo_dark" class="mb-4">
+                        {% include 'admins/partials/_logo_preview.html' with field_name='logo_dark' image_url=settings_obj.logo_dark.url|default:'' %}
+                    </div>
+                </div>
+
+                <form hx-post="{% url 'admins:site-settings-logo-upload' 'logo_dark' %}"
+                      hx-encoding="multipart/form-data"
+                      hx-target="#preview-container-logo_dark"
+                      hx-swap="innerHTML"
+                      class="space-y-3">
+                    {% csrf_token %}
+                    <input type="file" name="logo_dark" accept=".svg,.png,.jpg,.jpeg,.webp" required
+                           class="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#B4F105]/15 file:text-[#B4F105] hover:file:bg-[#B4F105]/25 cursor-pointer">
+                    <button type="submit" class="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-[#B4F105] text-[#051C12] hover:bg-[#c1f824] transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#B4F105]/10">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Upload Dark Logo
+                    </button>
+                </form>
+            </div>
+
+            <!-- Logo Light Card -->
+            <div class="bg-[#0B1D16] border border-white/10 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-100 mb-1">Light Mode Logo</h3>
+                    <p class="text-xs text-slate-400 mb-4">Displayed on light canvas headers (.svg, .png, .jpg).</p>
+                    
+                    <div id="preview-container-logo_light" class="mb-4">
+                        {% include 'admins/partials/_logo_preview.html' with field_name='logo_light' image_url=settings_obj.logo_light.url|default:'' %}
+                    </div>
+                </div>
+
+                <form hx-post="{% url 'admins:site-settings-logo-upload' 'logo_light' %}"
+                      hx-encoding="multipart/form-data"
+                      hx-target="#preview-container-logo_light"
+                      hx-swap="innerHTML"
+                      class="space-y-3">
+                    {% csrf_token %}
+                    <input type="file" name="logo_light" accept=".svg,.png,.jpg,.jpeg,.webp" required
+                           class="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#B4F105]/15 file:text-[#B4F105] hover:file:bg-[#B4F105]/25 cursor-pointer">
+                    <button type="submit" class="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-[#B4F105] text-[#051C12] hover:bg-[#c1f824] transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#B4F105]/10">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Upload Light Logo
+                    </button>
+                </form>
+            </div>
+
+            <!-- Favicon Card -->
+            <div class="bg-[#0B1D16] border border-white/10 rounded-2xl p-5 shadow-xl flex flex-col justify-between">
+                <div>
+                    <h3 class="text-sm font-semibold text-slate-100 mb-1">Platform Favicon</h3>
+                    <p class="text-xs text-slate-400 mb-4">Browser tab favicon asset (.ico, .png, .svg).</p>
+                    
+                    <div id="preview-container-favicon" class="mb-4">
+                        {% include 'admins/partials/_logo_preview.html' with field_name='favicon' image_url=settings_obj.favicon.url|default:'' %}
+                    </div>
+                </div>
+
+                <form hx-post="{% url 'admins:site-settings-logo-upload' 'favicon' %}"
+                      hx-encoding="multipart/form-data"
+                      hx-target="#preview-container-favicon"
+                      hx-swap="innerHTML"
+                      class="space-y-3">
+                    {% csrf_token %}
+                    <input type="file" name="favicon" accept=".ico,.svg,.png,.jpg,.jpeg,.webp" required
+                           class="w-full text-xs text-slate-300 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-[#B4F105]/15 file:text-[#B4F105] hover:file:bg-[#B4F105]/25 cursor-pointer">
+                    <button type="submit" class="w-full py-2 px-4 rounded-xl text-xs font-semibold bg-[#B4F105] text-[#051C12] hover:bg-[#c1f824] transition-all flex items-center justify-center gap-1.5 shadow-lg shadow-[#B4F105]/10">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path></svg>
+                        Upload Favicon
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Main Site Configuration Form -->
+    <div class="bg-[#0B1D16] border border-white/10 rounded-2xl p-6 shadow-xl">
+        <h2 class="text-lg font-bold text-slate-200 mb-4 flex items-center gap-2">
+            <svg class="w-5 h-5 text-[#B4F105]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path>
+            </svg>
+            Brand Identity & JSON Metadata Configuration
+        </h2>
+
+        <form action="{% url 'admins:site-settings' %}" method="POST" class="space-y-6">
+            {% csrf_token %}
+
+            <div>
+                <label for="id_brand_name" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Platform Brand Name</label>
+                <input type="text" id="id_brand_name" name="brand_name" value="{{ settings_obj.brand_name }}" required
+                       class="w-full px-4 py-3 rounded-xl bg-[#04140D] border border-white/15 text-slate-100 text-sm focus:outline-none focus:border-[#B4F105] focus:ring-1 focus:ring-[#B4F105] transition-all">
+            </div>
+
+            <div>
+                <label for="id_meta_config" class="block text-xs font-semibold uppercase tracking-wider text-slate-300 mb-2">Meta Configuration (Extensible JSON Payload)</label>
+                <textarea id="id_meta_config" name="meta_config" rows="6"
+                          class="w-full px-4 py-3 rounded-xl bg-[#04140D] border border-white/15 text-slate-100 font-mono text-xs focus:outline-none focus:border-[#B4F105] focus:ring-1 focus:ring-[#B4F105] transition-all">{{ meta_config_json }}</textarea>
+                <p class="text-xs text-slate-400 mt-2">Enter valid JSON format (e.g. SEO tags, social handles, analytics IDs).</p>
+            </div>
+
+            <div class="flex justify-end pt-2">
+                <button type="submit" class="py-3 px-6 rounded-xl text-sm font-semibold bg-[#B4F105] text-[#051C12] hover:bg-[#c1f824] transition-all flex items-center gap-2 shadow-xl shadow-[#B4F105]/15">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg>
+                    Save Site Settings
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

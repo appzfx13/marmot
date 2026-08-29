@@ -1,0 +1,92 @@
+<!-- Main Spark Trader-Style Order & Fund Log Section -->
+<div class="border-top border-secondary border-opacity-20 py-3 px-4 bg-transparent d-flex justify-content-between align-items-center flex-wrap gap-2" id="journal-trades-table-card">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="material-icons text-success fs-5">receipt_long</span>
+        <h5 class="card-title theme-text-main fw-bold mb-0" style="font-size: 1.05rem;">Order &amp; Fund Activity Log</h5>
+        <div id="journal-trades-filter-badge" class="d-inline-flex align-items-center gap-2">
+            {% if filter_date %}
+                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold smaller d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6" style="font-size: 0.85rem !important;">calendar_today</span>
+                    <span>Date: {{ day_summary.date_str|default:filter_date }} ({{ total_trades_count }} Records)</span>
+                </span>
+                <button type="button"
+                        hx-get="{% url 'admins:admin-journal-trades' %}?year={{ filter_year }}"
+                        hx-target="#journal-orders-container"
+                        hx-swap="innerHTML"
+                        onclick="clearJournalActiveDate()"
+                        class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-0.5 smaller text-decoration-none d-inline-flex align-items-center gap-1 fw-semibold">
+                    <span class="material-icons fs-6" style="font-size: 0.8rem !important;">close</span> Reset Filter
+                </button>
+            {% elif filter_year %}
+                <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fw-bold smaller">
+                    {% if filter_year == 'all' or filter_year == 'overall' %}All Time / Overall{% else %}Year: {{ filter_year }}{% endif %} ({{ total_trades_count }} Records)
+                </span>
+            {% endif %}
+        </div>
+    </div>
+    <span class="theme-text-muted small fw-medium" style="font-size: 0.76rem;">DhanHQ v2 Executions, Bank Payins &amp; Payouts</span>
+</div>
+
+{% if day_summary %}
+<!-- Dhan Style Daily Trade Summary Card Header -->
+<div class="px-4 py-3 border-top border-secondary border-opacity-15" style="background: rgba(255, 255, 255, 0.015);">
+    <div class="row g-3 text-center align-items-center">
+        <div class="col-6 col-md">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Overall P&amp;L</div>
+            <div class="fw-extrabold mt-1 {% if day_summary.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 1.15rem;">
+                {% if day_summary.gross_pnl >= 0 %}+₹{{ day_summary.gross_pnl|floatformat:2 }}{% else %}-₹{{ day_summary.gross_pnl_abs|floatformat:2 }}{% endif %}
+            </div>
+        </div>
+        <div class="col-6 col-md border-start border-secondary border-opacity-20">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Net P&amp;L</div>
+            <div class="fw-extrabold mt-1 {% if day_summary.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 1.15rem;">
+                {% if day_summary.net_pnl >= 0 %}+₹{{ day_summary.net_pnl|floatformat:2 }}{% else %}-₹{{ day_summary.net_pnl_abs|floatformat:2 }}{% endif %}
+            </div>
+        </div>
+        <div class="col-4 col-md border-start border-secondary border-opacity-20">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Govt Charges</div>
+            <div class="fw-bold mt-1 theme-text-main" style="font-size: 1.05rem;">
+                ₹{{ day_summary.govt_charges|floatformat:2 }}
+            </div>
+        </div>
+        <div class="col-4 col-md border-start border-secondary border-opacity-20">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Brokerage</div>
+            <div class="fw-bold mt-1 theme-text-main" style="font-size: 1.05rem;">
+                ₹{{ day_summary.brokerage|floatformat:2 }}
+            </div>
+        </div>
+        <div class="col-4 col-md border-start border-secondary border-opacity-20">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Total Trades</div>
+            <div class="fw-extrabold mt-1 text-primary" style="font-size: 1.15rem;">
+                {{ day_summary.trades }}
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="table-responsive flex-grow-1 overflow-auto">
+    <table class="table table-custom align-middle mb-0 text-nowrap" style="border-color: var(--border-color) !important;">
+        <thead>
+            <tr class="theme-text-muted border-bottom" style="border-color: var(--border-color) !important; font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase;">
+                <th scope="col" class="ps-4 py-3">Time</th>
+                <th scope="col" class="py-3">Item / Instrument</th>
+                <th scope="col" class="py-3">Order / Mode</th>
+                <th scope="col" class="py-3 text-center">Side / Action</th>
+                <th scope="col" class="py-3 text-end">Qty</th>
+                <th scope="col" class="py-3 text-end">Amount / Value</th>
+                <th scope="col" class="py-3 text-end">Executed Price</th>
+                <th scope="col" class="pe-4 py-3 text-end">Reference ID</th>
+            </tr>
+        </thead>
+        <tbody id="journal-trades-body">
+            {% include "admins/partials/journal_trades_rows_partial.html" with trades=trades has_more=has_more next_page=next_page page=page filter_date=filter_date filter_year=filter_year total_trades_count=total_trades_count total_pages=total_pages %}
+        </tbody>
+    </table>
+</div>
+
+<!-- Main Spark Card Footer with Continuous Table Status (Trader Table Layout) -->
+<div class="card-footer py-2 px-3 px-md-4 mt-auto border-top border-secondary border-opacity-20 d-flex justify-content-between align-items-center small theme-text-muted">
+    <span>Showing {{ total_trades_count }} records total</span>
+    <span class="trend-badge trend-up py-0.5 px-2 fw-semibold fs-xs">Continuous Table Active</span>
+</div>

@@ -10,32 +10,32 @@
     <div class="col-12">
 
         <!-- Page Header -->
-        <div class="pt-2 pt-md-3 d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <a href="{% url 'admins:trader_list' %}" class="glass-icon-btn text-decoration-none" title="Back to Traders List">
+        <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+            <div class="page-header-top-bar d-flex align-items-center justify-content-between w-100">
+                <a href="{% url 'admins:trader_list' %}" class="glass-icon-btn text-decoration-none page-header-back-btn" title="Back to Traders List">
                     <span class="material-icons">arrow_back</span>
                 </a>
-                <div>
-                    <h3 class="fw-bold mb-0 theme-text-main d-flex align-items-center gap-2">
-                        <span>Trader Profile: {{ trader.get_full_name|default:trader.username }}</span>
-                    </h3>
-                    <p class="theme-text-muted mb-0 small">Audit trader credentials, configured broker trading accounts, and execution controls.</p>
+                <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+                    <button type="button" 
+                            class="btn btn-outline-warning rounded-pill px-3 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+                            hx-get="{% url 'admins:trader_password_reset' trader.pk %}"
+                            hx-target="#globalHtmxModalDialog">
+                        <span class="material-icons fs-5">vpn_key</span>
+                        <span>Reset Password</span>
+                    </button>
+
+                    <a href="{% url 'admins:trader_edit' trader.pk %}" 
+                       class="btn btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm">
+                        <span class="material-icons fs-5">edit</span>
+                        <span>Edit Trader</span>
+                    </a>
                 </div>
             </div>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
-                <button type="button" 
-                        class="btn btn-outline-warning rounded-pill px-3 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
-                        hx-get="{% url 'admins:trader_password_reset' trader.pk %}"
-                        hx-target="#globalHtmxModalDialog">
-                    <span class="material-icons fs-5">vpn_key</span>
-                    <span>Reset Password</span>
-                </button>
-
-                <a href="{% url 'admins:trader_edit' trader.pk %}" 
-                   class="btn btn-primary rounded-pill px-4 py-2 small fw-bold d-inline-flex align-items-center gap-2 shadow-sm">
-                    <span class="material-icons fs-5">edit</span>
-                    <span>Edit Trader</span>
-                </a>
+            <div class="page-header-title-wrapper text-center">
+                <h1 class="page-title d-flex align-items-center justify-content-center flex-wrap gap-2">
+                    <span>Trader Profile: {{ trader.get_full_name|default:trader.username }}</span>
+                </h1>
+                <p class="page-subtitle">Audit trader credentials, configured broker trading accounts, and execution controls.</p>
             </div>
         </div>
 

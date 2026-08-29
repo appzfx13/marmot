@@ -154,14 +154,6 @@
     }
   });
 
-  // Auto-close on orientation change to desktop landscape
-  if (window.matchMedia) {
-    try {
-      window.matchMedia('(orientation: portrait)').addEventListener('change', function(e) {
-        if (!e.matches && window.innerWidth >= 992) {
-          window.closeGlobalSidebar();
-        }
-      });
     } catch (err) {}
   }
 

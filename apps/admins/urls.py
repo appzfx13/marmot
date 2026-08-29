@@ -37,6 +37,14 @@ from .views import (
     AdminBrokerMasterBulkDeleteView,
     AdminLiveDashboardView,
     AdminSandboxDashboardView,
+    SiteSettingsAdminView,
+    SiteSettingsLogoUploadView,
+    # Trading Journal & Analytics Views
+    AdminJournalView,
+    AdminJournalStatsView,
+    AdminJournalCalendarView,
+    AdminJournalChartView,
+    AdminJournalTradesView,
 )
 
 from apps.market.views import MarketBackupListView, MarketBackupChartView, MarketBackupBulkDeleteView
@@ -52,6 +60,13 @@ urlpatterns = [
     path('dashboard/sandbox/', AdminSandboxDashboardView.as_view(), name='admin-sandbox-dashboard'),
     path('terminal/', AdminTerminalView.as_view(), name='admin-terminal'),
     path('logout/', AdminLogoutView.as_view(), name='admin-logout'),
+
+    # Trading Journal & Analytics Routes
+    path('journal/', AdminJournalView.as_view(), name='admin-journal'),
+    path('journal/stats/', AdminJournalStatsView.as_view(), name='admin-journal-stats'),
+    path('journal/calendar/', AdminJournalCalendarView.as_view(), name='admin-journal-calendar'),
+    path('journal/chart/', AdminJournalChartView.as_view(), name='admin-journal-chart'),
+    path('journal/trades/', AdminJournalTradesView.as_view(), name='admin-journal-trades'),
 
     # Control Routes for Market Backup & Backtest
     path('market-backup/', MarketBackupListView.as_view(), name='market_backup_list'),
@@ -96,4 +111,8 @@ urlpatterns = [
     path('masters/brokers/<int:pk>/edit/', AdminBrokerMasterSaveView.as_view(), name='broker-master-edit'),
     path('masters/brokers/<int:pk>/delete-modal/', AdminBrokerMasterDeleteModalView.as_view(), name='broker-master-delete-modal'),
     path('masters/brokers/<int:pk>/delete/', AdminBrokerMasterDeleteView.as_view(), name='broker-master-delete'),
+
+    # Site Settings Management
+    path('settings/', SiteSettingsAdminView.as_view(), name='site-settings'),
+    path('settings/upload-logo/<str:field_name>/', SiteSettingsLogoUploadView.as_view(), name='site-settings-logo-upload'),
 ]

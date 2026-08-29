@@ -173,11 +173,11 @@ func ATMStrikesForIndex(spotPrice float64, strikeInterval int, count int) []floa
 // StrikeIntervalForIndex returns the strike step size for a given index name.
 func StrikeIntervalForIndex(indexName string) int {
 	switch strings.ToUpper(indexName) {
-	case "BANKNIFTY":
+	case "BANKNIFTY", "SENSEX":
 		return 100
 	case "MIDCPNIFTY":
 		return 25
-	default: // NIFTY, FINNIFTY
+	default: // NIFTY, FINNIFTY, GIFTNIFTY
 		return 50
 	}
 }

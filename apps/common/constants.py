@@ -9,6 +9,8 @@ INDEX_INSTRUMENT_MAP = {
     'BANKNIFTY':  {"security_id": "25",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
     'FINNIFTY':   {"security_id": "27",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
     'MIDCPNIFTY': {"security_id": "26",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
+    'SENSEX':     {"security_id": "51",  "exchange_segment": "BSE_IDX", "instrument": "INDEX"},
+    'GIFTNIFTY':  {"security_id": "28",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
     'INDIAVIX':   {"security_id": "17",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
 }
 
@@ -18,6 +20,8 @@ INDEX_OPTIONS_MAP = {
     'BANKNIFTY':  {"exchange_segment": "NSE_FO", "instrument": "OPTIDX"},
     'FINNIFTY':   {"exchange_segment": "NSE_FO", "instrument": "OPTIDX"},
     'MIDCPNIFTY': {"exchange_segment": "NSE_FO", "instrument": "OPTIDX"},
+    'SENSEX':     {"exchange_segment": "BSE_FO", "instrument": "OPTIDX"},
+    'GIFTNIFTY':  {"exchange_segment": "NSE_FO", "instrument": "OPTIDX"},
 }
 
 # Strike Price Step per Index
@@ -26,6 +30,8 @@ INDEX_STRIKE_INTERVAL = {
     'BANKNIFTY':  100,
     'FINNIFTY':   50,
     'MIDCPNIFTY': 25,
+    'SENSEX':     100,
+    'GIFTNIFTY':  50,
 }
 
 # Historical Lot Size Timelines for Indian Indices (NSE & BSE Circulars 2020 to Present)
@@ -59,6 +65,10 @@ HISTORICAL_INDEX_LOT_SIZES = {
         ('2023-05-15', 10),      # Relaunch May 2023 to Nov 2024: 10
         ('1990-01-01', 10),      # Fallback: 10
     ],
+    'GIFTNIFTY': [
+        ('2024-04-26', 25),      # April 2024 revision: 25
+        ('1990-01-01', 50),      # Fallback: 50
+    ],
     'BANKEX': [
         ('2024-11-20', 30),      # Nov 20, 2024 revision: 30
         ('2023-05-15', 15),      # Relaunch May 2023 to Nov 2024: 15
@@ -90,6 +100,10 @@ HISTORICAL_INDEX_EXPIRY_DAYS = {
     'SENSEX': [
         ('2023-05-15', 'Friday', 4),   # Relaunch May 2023 to Present: Friday
         ('1990-01-01', 'Friday', 4),
+    ],
+    'GIFTNIFTY': [
+        ('2020-01-01', 'Thursday', 3), # Thursday
+        ('1990-01-01', 'Thursday', 3),
     ],
     'BANKEX': [
         ('2023-05-15', 'Monday', 0),   # Relaunch May 2023 to Nov 2024: Monday

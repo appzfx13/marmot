@@ -102,21 +102,23 @@
 {% block dashboard_content %}
 {% block page_header %}
 {# Header Section #}
-<div class="row mb-4 align-items-center">
-    <div class="col d-flex align-items-center">
-        <span class="material-icons text-primary fs-2 me-2">group_add</span>
-        <div>
-            <h2 class="text-white fw-bold mb-1">
-                {% if form.instance.pk %}Edit Team Member{% else %}Create Team Member{% endif %}
-            </h2>
-            <p class="text-white-50 small mb-0">Manage member details and team assignment profiles.</p>
-        </div>
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div class="page-header-top-bar d-flex align-items-center justify-content-between w-100">
+        <a href="{% url 'users:team_list' %}" class="glass-icon-btn text-decoration-none page-header-back-btn" title="Back to Teams">
+            <span class="material-icons fs-5">arrow_back</span>
+        </a>
+    </div>
+    <div class="page-header-title-wrapper text-center">
+        <h1 class="page-title">
+            {% if form.instance.pk %}Edit Team Member{% else %}Create Team Member{% endif %}
+        </h1>
+        <p class="page-subtitle">Manage member details and team assignment profiles.</p>
     </div>
 </div>
 {% endblock %}
 
 {% block content %}
-<div class="form-card p-4 text-white">
+<div class="form-card p-4 theme-text-main">
     {# Visual Theme Accent Line #}
     <div class="position-absolute start-0 top-0 bottom-0 bg-primary" style="width: 4px; opacity: 0.7;"></div>
 
@@ -245,7 +247,7 @@
             <label class="form-label horizontal-label" for="{{ form.is_active_developer.id_for_label }}">Developer Status</label>
             <div class="d-flex align-items-center">
                 {{ form.is_active_developer }}
-                <label class="text-white-50 small ms-2 mb-0" for="{{ form.is_active_developer.id_for_label }}">Active Developer</label>
+                <label class="theme-text-muted small ms-2 mb-0" for="{{ form.is_active_developer.id_for_label }}">Active Developer</label>
                 {% for error in form.is_active_developer.errors %}
                     <div class="text-danger smaller ms-2"><span class="material-icons align-middle fs-6 me-1">error_outline</span>{{ error }}</div>
                 {% endfor %}

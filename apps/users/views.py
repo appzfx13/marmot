@@ -16,7 +16,7 @@ from django.contrib.auth.views import (
 )
 from django.http import HttpResponse, HttpResponseForbidden, FileResponse, Http404, HttpResponseRedirect
 from django.shortcuts import redirect, render, get_object_or_404
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.views.generic import FormView, TemplateView, UpdateView
 
@@ -869,19 +869,58 @@ class UserAccountConsentModalView(HtmxModalMixin, LoginRequiredMixin, View):
     def get(self, request, pk, *args, **kwargs):
         account = get_object_or_404(UserTradingAccount, pk=pk, user=request.user, is_deleted=False)
         oauth_login_url = ""
+        totp_login_url = "https://web.dhan.co"
         try:
+            from apps.trade_core.services.dhan_token_service import UserDhanClient
+            client = UserDhanClient(account)
             if account.app_id and account.api_key:
-                from apps.trade_core.services.dhan_token_service import UserDhanClient
-                client = UserDhanClient(account)
                 consent_data = client.generate_login_url()
                 oauth_login_url = consent_data.get('login_url', '')
         except Exception:
             pass
 
+        if not oauth_login_url and account.broker and account.broker.name.lower() == 'dhan':
+            oauth_login_url = reverse('trade_core:dhan-user-login-account', kwargs={'account_id': account.id})
+
         return render(request, self.modal_template_name, {
             'account': account,
-            'oauth_login_url': oauth_login_url
+            'oauth_login_url': oauth_login_url,
+            'totp_login_url': totp_login_url,
         })
+
+
+class UserAccountTotpTokenView(HtmxMessageMixin, LoginRequiredMixin, View):
+    """Generates Dhan access token instantly via PIN & TOTP 2FA code (DhanHQ v2)."""
+
+    def post(self, request, pk, *args, **kwargs):
+        account = get_object_or_404(UserTradingAccount, pk=pk, user=request.user, is_deleted=False)
+        pin = request.POST.get('pin', '').strip()
+        totp = request.POST.get('totp', '').strip()
+
+        if not pin or not totp:
+            messages.error(request, "Please enter both 6-digit Dhan PIN and TOTP code.")
+            response = HttpResponse(status=400)
+            response['HX-Trigger'] = 'showToast'
+            return response
+
+        try:
+            from apps.trade_core.services.dhan_token_service import UserDhanClient
+            client = UserDhanClient(account)
+            res = client.generate_access_token_via_totp(pin=pin, totp=totp)
+            access_token = res.get('accessToken', '')
+            if access_token:
+                account.api_key = access_token
+                account.save(update_fields=['api_key'])
+                messages.success(request, f"✅ Dhan session authorized successfully for {account.broker_client_id} via TOTP!")
+            else:
+                messages.error(request, "Failed to acquire access token from Dhan API.")
+        except Exception as e:
+            logger.error("Dhan TOTP token generation error for account #%s: %s", account.id, e)
+            messages.error(request, f"Dhan TOTP authentication failed: {e}")
+
+        response = HttpResponse(status=200)
+        response['HX-Trigger'] = 'reloadAccounts, closeHtmxModal'
+        return response
 
 
 class UserAccountRefreshTokenView(LoginRequiredMixin, View):

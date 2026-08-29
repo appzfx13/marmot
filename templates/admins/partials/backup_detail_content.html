@@ -87,43 +87,19 @@
         }
     </style>
 
-    <!-- Top Back Navigation -->
-    <div class="d-flex align-items-center justify-content-between mb-4 flex-wrap gap-3">
-        <a href="{% url 'market:market_backup_list' %}"
-           class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3"
-           hx-get="{% url 'market:market_backup_list' %}"
-           hx-target="#app-main-container"
-           hx-push-url="true">
-            <span class="material-icons" style="font-size: 1.1rem;">arrow_back</span>
-            <span class="fw-medium">Back to Backups</span>
-        </a>
-    </div>
-
     <!-- ── 1. TOP HEADER BANNER ───────────────────────────────────────────── -->
-    <div class="detail-card p-4 mb-4">
-        <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-            <div class="d-flex align-items-center gap-3">
-                <div class="d-flex align-items-center justify-content-center rounded-circle" 
-                     style="width: 48px; height: 48px; background: var(--nav-active); color: #0d6efd; border: 1px solid var(--border-color);">
-                    <span class="material-icons fs-4">analytics</span>
-                </div>
-                <div>
-                    <div class="d-flex align-items-center gap-2 mb-1">
-                        <h4 class="fw-bold mb-0 theme-text-main">{{ backup.display_symbol }}</h4>
-                        <span class="badge {% if backup.market_type == 'FOREX_FUTURES' %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25{% endif %} rounded-pill px-2.5 py-1 small">
-                            {% if backup.market_type == 'FOREX_FUTURES' %}FOREX / CME Futures · Provider: {{ backup.provider_name }}{% else %}INDEX / F&amp;O · Provider: {{ backup.provider_name }}{% endif %}
-                        </span>
-                    </div>
-                    <p class="theme-text-muted small mb-0 d-flex align-items-center gap-2">
-                        <span>Job #{{ backup.id|stringformat:"04d" }}</span>
-                        <span>•</span>
-                        <span>Created {{ backup.created_at|date:"M d, Y H:i" }}</span>
-                    </p>
-                </div>
-            </div>
-
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+        <div class="page-header-top-bar d-flex align-items-center justify-content-between w-100">
+            <a href="{% url 'market:market_backup_list' %}"
+               class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 page-header-back-btn"
+               hx-get="{% url 'market:market_backup_list' %}"
+               hx-target="#app-main-container"
+               hx-push-url="true">
+                <span class="material-icons" style="font-size: 1.1rem;">arrow_back</span>
+                <span class="fw-medium">Back to Backups</span>
+            </a>
             <!-- Status Badge -->
-            <div id="backup-status-badge">
+            <div id="backup-status-badge" class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
                 {% if backup.status == 'completed' %}
                     <span class="d-inline-flex align-items-center gap-2 rounded-pill px-3 py-2 fw-semibold" 
                           style="background: rgba(16,185,129,0.18); color: #10b981; border: 1.5px solid rgba(16,185,129,0.4); font-size: 0.875rem;">
@@ -156,6 +132,19 @@
                     </span>
                 {% endif %}
             </div>
+        </div>
+        <div class="page-header-title-wrapper">
+            <div class="d-flex align-items-center justify-content-center gap-2 mb-1 flex-wrap">
+                <h1 class="page-title mb-0 theme-text-main">{{ backup.display_symbol }}</h1>
+                <span class="badge {% if backup.market_type == 'FOREX_FUTURES' %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25{% endif %} rounded-pill px-2.5 py-1 small">
+                    {% if backup.market_type == 'FOREX_FUTURES' %}FOREX / CME Futures · Provider: {{ backup.provider_name }}{% else %}INDEX / F&amp;O · Provider: {{ backup.provider_name }}{% endif %}
+                </span>
+            </div>
+            <p class="page-subtitle mb-0 d-flex align-items-center justify-content-center gap-2">
+                <span>Job #{{ backup.id|stringformat:"04d" }}</span>
+                <span>•</span>
+                <span>Created {{ backup.created_at|date:"M d, Y H:i" }}</span>
+            </p>
         </div>
     </div>
 

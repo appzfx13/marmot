@@ -39,11 +39,26 @@
         {% elif action == 'resume' or action == 'start' %}
         Are you sure you want to <strong class="text-success">start / resume</strong> Backup Job
         <strong class="theme-text-main">#{{ backup.id|stringformat:"04d" }}</strong>?
-        <div
-            class="alert alert-success bg-success bg-opacity-10 border-success border-opacity-25 text-success small rounded-3 mt-3 mb-0">
+        <div class="alert alert-success bg-success bg-opacity-10 border-success border-opacity-25 text-success small rounded-3 mt-3 mb-2">
             <div class="d-flex align-items-center gap-2">
                 <span class="material-icons fs-6">info</span>
                 <span>The task will resume progress execution from the last saved state.</span>
+            </div>
+        </div>
+
+        {# Optional Dhan Access Token Input for 401 token renewals #}
+        <div class="mt-3 text-start">
+            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1" for="id_resume_dhan_token">
+                Dhan Access Token (Optional)
+            </label>
+            <input type="text"
+                   name="dhan_access_token"
+                   id="id_resume_dhan_token"
+                   class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace small"
+                   placeholder="Paste fresh 24h Dhan Access Token if current token expired..."
+                   style="color-scheme: dark;">
+            <div class="theme-text-muted smaller mt-1">
+                If the task failed with HTTP 401, paste a fresh token from <a href="https://web.dhan.co" target="_blank" class="text-info text-decoration-none">web.dhan.co</a>.
             </div>
         </div>
         {% else %}
@@ -62,7 +77,9 @@
     <div class="modal-footer border-0">
         <button type="button" class="btn btn-outline-light rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
         <button type="button" hx-post="{% url 'market:market_backup_control' backup.pk %}"
-            hx-vals='{"action": "{{ action }}"}' hx-swap="none"
+            hx-vals='{"action": "{{ action }}"}'
+            {% if action == 'resume' or action == 'start' %}hx-include="#id_resume_dhan_token"{% endif %}
+            hx-swap="none"
             class="btn rounded-pill px-4 fw-semibold {% if action == 'pause' %}btn-warning{% elif action == 'resume' or action == 'start' %}btn-success{% else %}btn-danger{% endif %}"
             id="confirmControlBtn">
             {% if action == 'pause' %}

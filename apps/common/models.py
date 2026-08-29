@@ -92,3 +92,34 @@ class PostbackLog(BaseModel):
     def __str__(self):
         user_str = self.user.username if self.user else "Anonymous"
         return f"Postback [{self.broker}] - User: {user_str} | Order: {self.order_id} ({self.order_status})"
+
+
+def site_setting_logo_path(instance, filename):
+    ext = filename.split('.')[-1].lower()
+    return f"site/logos/{uuid.uuid4().hex[:8]}.{ext}"
+
+
+class SiteSettings(BaseModel):
+    """Singleton site configuration model for branding, logos, and meta configs."""
+    brand_name = models.CharField(max_length=100, default='Marmot', help_text="Platform brand name")
+    logo_dark = models.ImageField(upload_to=site_setting_logo_path, null=True, blank=True, help_text="Dark theme logo (.svg, .png, .jpg)")
+    logo_light = models.ImageField(upload_to=site_setting_logo_path, null=True, blank=True, help_text="Light theme logo (.svg, .png, .jpg)")
+    favicon = models.ImageField(upload_to=site_setting_logo_path, null=True, blank=True, help_text="Favicon icon (.ico, .png, .svg)")
+    meta_config = models.JSONField(default=dict, blank=True, help_text="Extensible metadata & SEO configuration")
+
+    class Meta:
+        verbose_name = "Site Settings"
+        verbose_name_plural = "Site Settings"
+
+    def __str__(self):
+        return f"SiteSettings ({self.brand_name})"
+
+    def save(self, *args, **kwargs):
+        self.id = 1
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        obj, _ = cls.objects.get_or_create(pk=1)
+        return obj

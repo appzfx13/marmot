@@ -111,9 +111,9 @@
         </div>
     </div>
 
-    <div class="d-flex flex-wrap align-items-center justify-content-between gap-3">
-        <div>
-            <h3 class="fw-bold mb-1 theme-text-main d-flex align-items-center flex-wrap gap-2">
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div class="page-header-title-wrapper">
+            <h1 class="page-title d-flex align-items-center justify-content-center flex-wrap gap-2">
                 <span>Backtest Analytics #BT-{{ backtest.id|stringformat:"04d" }}</span>
                 <span class="fs-6 fw-normal text-primary">({{ backtest.get_strategy_name_display }})</span>
                 <span id="backtest-status-badge-container">
@@ -129,15 +129,15 @@
                         <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Ready</span>
                     {% endif %}
                 </span>
-            </h3>
-            <p class="theme-text-muted mb-0 small">
+            </h1>
+            <p class="page-subtitle mb-0">
                 Index: <strong class="theme-text-main">{{ backtest.index_name }}</strong> &nbsp;|&nbsp; 
                 Period: <span class="theme-font-mono">{{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</span> &nbsp;|&nbsp; 
                 Initial Capital: <strong class="theme-font-mono text-success">₹{{ backtest.initial_capital|floatformat:0 }}</strong>
             </p>
         </div>
 
-        <div id="backtest-control-actions" class="d-flex align-items-center gap-2 flex-wrap">
+        <div id="backtest-control-actions" class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
             {% if backtest.status|lower == 'created' %}
             <button type="button" 
                     hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 

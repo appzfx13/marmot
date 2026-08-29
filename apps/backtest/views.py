@@ -936,44 +936,44 @@ class BacktestRuleListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMi
         return context
 
 
-class BacktestRuleCreateView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
-    """Modal creation view for new custom strategy rules."""
+class BacktestRuleCreateView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
+    """Dedicated full-page creation view for new custom strategy rules."""
     model = BacktestRule
     form_class = BacktestRuleForm
-    template_name = 'admins/partials/backtest_rule_form_modal.html'
-    modal_template_name = 'admins/partials/backtest_rule_form_modal.html'
+    template_name = 'admins/index.html'
+    partial_template_name = 'admins/partials/backtest_rule_form_content.html'
     success_message = "Strategy Rule created successfully."
+    success_url = reverse_lazy('backtest:rule_list')
 
     def form_valid(self, form):
         self.object = form.save(commit=False)
         self.object.is_system_preset = False
         self.object.save()
-        response = HttpResponse(status=204)
-        response['HX-Trigger'] = json.dumps({
-            'closeGlobalModal': True,
-            'showToast': {'message': str(self.success_message), 'level': 'success'},
-            'reloadRuleTable': True
-        })
-        return response
+        messages.success(self.request, self.success_message)
+        if self.request.headers.get('HX-Request'):
+            response = HttpResponseRedirect(reverse('backtest:rule_list'))
+            response['HX-Redirect'] = reverse('backtest:rule_list')
+            return response
+        return super().form_valid(form)
 
 
-class BacktestRuleUpdateView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, UpdateView):
-    """Modal update view for strategy rules."""
+class BacktestRuleUpdateView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, UpdateView):
+    """Dedicated full-page update view for strategy rules."""
     model = BacktestRule
     form_class = BacktestRuleForm
-    template_name = 'admins/partials/backtest_rule_form_modal.html'
-    modal_template_name = 'admins/partials/backtest_rule_form_modal.html'
+    template_name = 'admins/index.html'
+    partial_template_name = 'admins/partials/backtest_rule_form_content.html'
     success_message = "Strategy Rule updated successfully."
+    success_url = reverse_lazy('backtest:rule_list')
 
     def form_valid(self, form):
         self.object = form.save()
-        response = HttpResponse(status=204)
-        response['HX-Trigger'] = json.dumps({
-            'closeGlobalModal': True,
-            'showToast': {'message': str(self.success_message), 'level': 'success'},
-            'reloadRuleTable': True
-        })
-        return response
+        messages.success(self.request, self.success_message)
+        if self.request.headers.get('HX-Request'):
+            response = HttpResponseRedirect(reverse('backtest:rule_list'))
+            response['HX-Redirect'] = reverse('backtest:rule_list')
+            return response
+        return super().form_valid(form)
 
 
 class BacktestRuleDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, DeleteView):

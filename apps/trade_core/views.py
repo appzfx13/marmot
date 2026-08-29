@@ -46,6 +46,10 @@ class DhanUserConsentLoginView(LoginRequiredMixin, View):
             messages.error(request, "No active Dhan trading account found.")
             return redirect('/users/accounts/')
 
+        if not account.app_id or not account.api_key:
+            messages.warning(request, "Dhan OAuth login requires an API Key & Secret created on web.dhan.co. Please use Option 1 (PIN & TOTP) or Option 3 (Manual Token).")
+            return redirect('/users/accounts/')
+
         try:
             client = UserDhanClient(account)
             result = client.generate_login_url()
@@ -54,7 +58,7 @@ class DhanUserConsentLoginView(LoginRequiredMixin, View):
             return redirect(result['login_url'])
         except Exception as e:
             logger.error("User Dhan consent generation failed for account #%s: %s", getattr(account, 'id', 'unknown'), e)
-            messages.error(request, f"Failed to generate Dhan login link: {e}")
+            messages.error(request, "Failed to generate Dhan OAuth consent link. Please use Option 1 (PIN & TOTP) or Option 3 (Manual Token).")
             return redirect('/users/accounts/')
 
 

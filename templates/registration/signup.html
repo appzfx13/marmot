@@ -46,7 +46,7 @@
     <!-- ==========================================
          Authentication Container & Signup Card
          ========================================== -->
-    <div class="login-wrapper">
+    <div class="login-wrapper min-vh-100 d-flex flex-column align-items-center justify-content-center py-2">
         <!-- Glowing background shapes for modern visual appearance -->
         <div class="login-bg-shape login-bg-shape-1"></div>
         <div class="login-bg-shape login-bg-shape-2"></div>
@@ -153,7 +153,7 @@
                 </div>
                 
                 <!-- Submit Button -->
-                <button type="submit" class="btn-login mt-4" id="btn-submit">
+                <button type="submit" class="btn-login mt-3" id="btn-submit">
                     <span>Create My Account</span>
                     <i class="bi bi-arrow-right"></i>
                 </button>
@@ -202,7 +202,7 @@
         }
 
         (function() {
-            const savedTheme = localStorage.getItem('marmot-theme') || 'dark';
+            const savedTheme = localStorage.getItem('marmot_theme') || localStorage.getItem('theme') || localStorage.getItem('marmot-theme') || 'dark';
             document.documentElement.setAttribute('data-theme', savedTheme);
             updateThemeUI(savedTheme);
 
@@ -212,6 +212,8 @@
                     const currentTheme = document.documentElement.getAttribute('data-theme') || 'dark';
                     const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
                     document.documentElement.setAttribute('data-theme', newTheme);
+                    localStorage.setItem('marmot_theme', newTheme);
+                    localStorage.setItem('theme', newTheme);
                     localStorage.setItem('marmot-theme', newTheme);
                     updateThemeUI(newTheme);
                 });

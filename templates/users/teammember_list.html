@@ -73,16 +73,16 @@
 {% block dashboard_content %}
 {% block page_header %}
 {# Header Section #}
-<div class="row mb-4 align-items-center">
-    <div class="col d-flex align-items-center">
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div class="d-flex align-items-center gap-2">
         <span class="material-icons text-primary fs-2 me-2">group</span>
         <div>
-            <h2 class="text-white fw-bold mb-1">Team Members</h2>
-            <p class="text-white-50 small mb-0">Manage your developers and assignments.</p>
+            <h1 class="page-title">Team Members</h1>
+            <p class="page-subtitle">Manage your developers and assignments.</p>
         </div>
     </div>
     {% if request.user.is_authenticated and request.user.team_member and request.user.team_member.has_management_role or request.user.is_superuser %}
-        <div class="col-auto d-flex align-items-center">
+        <div class="page-header-actions d-flex align-items-center">
             <a href="{% url 'users:teammember_create' %}"
                class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-flex align-items-center">
                 <span class="material-icons me-1 fs-6">add</span>
@@ -158,22 +158,22 @@
                 </div>
                 
                 {# Single-line formatted layout attributes #}
-                <div class="d-flex flex-column gap-1 smaller text-white-50 mb-3 ps-4">
+                <div class="d-flex flex-column gap-1 smaller theme-text-muted mb-3 ps-4">
                     <div>
                         Team: 
-                        <strong class="text-white">
+                        <strong class="theme-text-main">
                             {% if member.team %}{{ member.team.name }}{% else %}<span class="fst-italic opacity-50">Unassigned</span>{% endif %}
                         </strong>
                     </div>
-                    <div>Employee ID: <strong class="text-white">{{ member.employee_id|default:"-" }}</strong></div>
+                    <div>Employee ID: <strong class="theme-text-main">{{ member.employee_id|default:"-" }}</strong></div>
                     <div class="d-flex align-items-center gap-1 mt-1">
                         <span class="material-icons opacity-50" style="font-size: 0.9rem;">calendar_today</span>
-                        <span>Joined: <strong class="text-white">{{ member.date_joined_company|default:"Not Set" }}</strong></span>
+                        <span>Joined: <strong class="theme-text-main">{{ member.date_joined_company|default:"Not Set" }}</strong></span>
                     </div>
                 </div>
 
                 <div class="ps-4">
-                    <span class="badge {% if member.is_active_developer %}bg-success-subtle text-success border border-success border-opacity-25{% else %}bg-secondary-subtle text-white-50 border border-secondary border-opacity-25{% endif %}" style="font-size: 0.65rem;">
+                    <span class="badge {% if member.is_active_developer %}bg-success-subtle text-success border border-success border-opacity-25{% else %}bg-secondary-subtle theme-text-muted border border-secondary border-opacity-25{% endif %}" style="font-size: 0.65rem;">
                         {% if member.is_active_developer %}ACTIVE DEVELOPER{% else %}INACTIVE{% endif %}
                     </span>
                 </div>
@@ -199,10 +199,10 @@
     </div>
     {% empty %}
     <div class="col-12">
-        <div class="metric-empty-box text-center py-5 text-white">
-            <span class="material-icons fs-1 text-white-50 mb-2">group</span>
-            <h4 class="text-white-50 fw-bold mb-1">No team members found</h4>
-            <p class="text-white-50 smaller mb-3">Add members to start building your team ecosystem.</p>
+        <div class="metric-empty-box text-center py-5 theme-text-main">
+            <span class="material-icons fs-1 theme-text-muted mb-2">group</span>
+            <h4 class="theme-text-muted fw-bold mb-1">No team members found</h4>
+            <p class="theme-text-muted smaller mb-3">Add members to start building your team ecosystem.</p>
             <a href="{% url 'users:teammember_create' %}"
                class="btn btn-sm btn-primary py-2 px-3 fw-bold tracking-tighter d-inline-flex align-items-center">
                 <span class="material-icons me-1 fs-6">add</span>

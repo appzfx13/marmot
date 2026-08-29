@@ -245,8 +245,9 @@ class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         if not task:
             return JsonResponse({'error': 'Task not found'}, status=404)
 
-        # Get the requested action from HTMX/Frontend
+        # Get the requested action and optional access token from HTMX/Frontend
         action = request.POST.get('action', '').upper()
+        dhan_token = request.POST.get('dhan_access_token', '').strip()
         
         # Map frontend actions to Go Engine commands
         command_map = {
@@ -262,7 +263,7 @@ class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         if command:
             try:
                 # Dispatch the command through the Service Layer
-                send_control_command(task.id, command)
+                send_control_command(task.id, command, dhan_access_token=dhan_token if dhan_token else None)
                 
                 # Setup UI response
                 msg = f'Task command {command} sent to engine.'
