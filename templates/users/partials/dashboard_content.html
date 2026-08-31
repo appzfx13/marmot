@@ -45,21 +45,30 @@
     <div class="row g-4">
         <!-- Stat Card 1: Green Alert Banner -->
         <div class="col-xl-3 col-md-6">
-            <div class="card alert-green-card h-100 d-flex flex-column justify-content-between">
+            <div class="card alert-green-card">
                 <div class="position-relative z-index-2">
-                    <span class="alert-green-badge">Session</span>
-                    <div class="alert-green-date">{{ request.user.first_name|default:request.user.username }}</div>
-                    <div class="alert-green-text">Active trader terminal with multi-broker routing</div>
+                    <span class="alert-green-badge">Live Status</span>
+                    <div class="alert-green-date">{{ request.user.get_broker_display|default:"Broker Connected" }}</div>
+                    <div class="alert-green-text">
+                        {% if request.user.trade_eligibility and not request.user.is_blocked %}
+                            Ready for Execution &bull; Normal Risk
+                        {% else %}
+                            Account Paused &bull; Contact Admin
+                        {% endif %}
+                    </div>
                 </div>
-                <a href="{% url 'users:user-terminal' %}" 
-                   class="alert-green-link z-index-2"
-                   hx-get="{% url 'users:user-terminal' %}"
-                   hx-target="#user-portal-container"
-                   hx-swap="innerHTML"
-                   hx-push-url="true">
-                    <span>Open Terminal</span>
-                    <i class="bi bi-arrow-right"></i>
-                </a>
+                <div class="metric-card-footer border-dark border-opacity-10 z-index-2">
+                    <a href="{% url 'users:user-live-dashboard' %}" 
+                       class="alert-green-link"
+                       hx-get="{% url 'users:user-live-dashboard' %}"
+                       hx-target="#user-portal-container"
+                       hx-swap="innerHTML"
+                       hx-push-url="true">
+                        <span>Live Terminal</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                    <span class="badge bg-dark bg-opacity-25 text-white smaller px-2 py-0.5">Trader</span>
+                </div>
 
                 <!-- Inline SVG geometric decoration -->
                 <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -74,77 +83,82 @@
 
         <!-- Stat Card 2: Net P&L -->
         <div class="col-xl-3 col-md-6">
-            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+            <div class="card theme-metric-card">
                 <div>
-                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
-                        <span class="stat-label">Net P&amp;L</span>
-                        <span class="badge {% if request.user.stats == 'PROFIT' %}bg-success bg-opacity-25 text-success{% elif request.user.stats == 'LOSS' %}bg-danger bg-opacity-25 text-danger{% else %}bg-secondary bg-opacity-25 theme-text-muted{% endif %} rounded-pill px-2 py-1 small fw-bold">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-graph-up-arrow text-primary"></i>
+                            <span>Net P&amp;L</span>
+                        </span>
+                        <span class="badge {% if request.user.stats == 'PROFIT' %}bg-success bg-opacity-25 text-success{% elif request.user.stats == 'LOSS' %}bg-danger bg-opacity-25 text-danger{% else %}bg-secondary bg-opacity-25 text-muted{% endif %} rounded-pill px-2 py-0.5 smaller fw-bold">
                             {{ request.user.get_stats_display|default:"No Trade" }}
                         </span>
                     </div>
-                    <div class="stat-value {% if request.user.pl_integer > 0 %}text-success{% elif request.user.pl_integer < 0 %}text-danger{% endif %}">
+                    <div class="metric-card-date">Today's Session Performance</div>
+                    <div class="metric-card-value {% if request.user.pl_integer > 0 %}text-success{% elif request.user.pl_integer < 0 %}text-danger{% endif %}">
                         ₹{{ request.user.pl_integer|default:"0.00" }}
                     </div>
-                    <div class="trend-badge {% if request.user.pl_integer >= 0 %}trend-up{% else %}trend-down{% endif %}">
-                        <i class="bi {% if request.user.pl_integer >= 0 %}bi-arrow-up-right{% else %}bi-arrow-down-left{% endif %}"></i>
-                        <span>Today's Total Performance</span>
-                    </div>
                 </div>
-                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
-                    <span>Performance</span>
-                    <span class="fw-semibold text-main">Session PnL</span>
+                <div class="metric-card-footer">
+                    <div class="trend-badge {% if request.user.pl_integer >= 0 %}trend-up{% else %}trend-down{% endif %} py-0 px-0 fs-xs">
+                        <i class="bi {% if request.user.pl_integer >= 0 %}bi-arrow-up-right text-success{% else %}bi-arrow-down-left text-danger{% endif %}"></i>
+                        <span>PnL Track</span>
+                    </div>
+                    <span>Intraday</span>
                 </div>
             </div>
         </div>
 
         <!-- Stat Card 3: Freeze Status -->
         <div class="col-xl-3 col-md-6">
-            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+            <div class="card theme-metric-card">
                 <div>
-                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
-                        <span class="stat-label">Safety Status</span>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-shield-check text-warning"></i>
+                            <span>Safety Status</span>
+                        </span>
                         <i class="bi bi-shield-lock text-warning"></i>
                     </div>
-                    <div class="stat-value">
+                    <div class="metric-card-date">Risk &amp; Drawdown Safety</div>
+                    <div class="metric-card-value fs-5">
                         {% if request.user.final_freeze %}
-                            <span class="text-danger fs-5">Final Freeze</span>
+                            <span class="text-danger">Final Freeze</span>
                         {% elif request.user.primary_freeze %}
-                            <span class="text-warning fs-5">Primary Freeze</span>
+                            <span class="text-warning">Primary Freeze</span>
                         {% else %}
-                            <span class="text-success fs-5">Active / Unfrozen</span>
+                            <span class="text-success">Active / Unfrozen</span>
                         {% endif %}
                     </div>
-                    <div class="trend-badge trend-up">
-                        <i class="bi bi-check2-shield"></i>
-                        <span>Risk &amp; drawdown safety</span>
-                    </div>
                 </div>
-                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
-                    <span>Risk Level</span>
-                    <span class="fw-semibold text-main">Normal</span>
+                <div class="metric-card-footer">
+                    <span>
+                        <i class="bi bi-check2-shield text-success me-1"></i>Risk Level
+                    </span>
+                    <span class="text-success fw-bold smaller">Normal</span>
                 </div>
             </div>
         </div>
 
         <!-- Stat Card 4: Broker Health -->
         <div class="col-xl-3 col-md-6">
-            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+            <div class="card theme-metric-card">
                 <div>
-                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
-                        <span class="stat-label">Broker Link</span>
-                        <i class="bi bi-broadcast text-info"></i>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-broadcast text-info"></i>
+                            <span>Broker Link</span>
+                        </span>
+                        <i class="bi bi-link-45deg text-info"></i>
                     </div>
-                    <div class="stat-value fs-5">
+                    <div class="metric-card-date">Client ID: {{ request.user.broker_client_id|default:"Configured" }}</div>
+                    <div class="metric-card-value fs-5">
                         {{ request.user.get_broker_display|default:"Dhan Broker" }}
                     </div>
-                    <div class="trend-badge trend-up">
-                        <i class="bi bi-key-fill"></i>
-                        <span>Client ID: {{ request.user.broker_client_id|default:"Configured" }}</span>
-                    </div>
                 </div>
-                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
+                <div class="metric-card-footer">
                     <span>API Token</span>
-                    <span class="fw-semibold text-main">{% if request.user.api_key %}Connected{% else %}Ready{% endif %}</span>
+                    <span class="{% if request.user.api_key %}text-success{% else %}text-muted{% endif %} fw-bold smaller">{% if request.user.api_key %}Connected{% else %}Ready{% endif %}</span>
                 </div>
             </div>
         </div>

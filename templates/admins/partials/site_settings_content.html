@@ -1,0 +1,182 @@
+<!-- templates/admins/partials/site_settings_content.html -->
+{% load static %}
+<div class="d-flex flex-column gap-4">
+
+    <!-- START: Spark Dashboard Header Banner -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h1 class="page-title">Platform Site Settings</h1>
+            <p class="page-subtitle">Manage global brand identity, logos, favicons, and Redis-cached site metadata.</p>
+        </div>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            <span class="trend-badge trend-up py-1.5 px-3">
+                <i class="bi bi-hdd-network-fill"></i>
+                <span>Redis Cache Active</span>
+            </span>
+        </div>
+    </div>
+    <!-- END: Dashboard Header Banner -->
+
+    <!-- Django Messages Alert Banner -->
+    {% if messages %}
+        <div class="mb-2">
+            {% for message in messages %}
+                <div class="alert {% if message.tags == 'error' %}alert-danger{% else %}alert-success{% endif %} alert-dismissible fade show d-flex align-items-center justify-content-between rounded-3 border-0 py-2.5 px-3" role="alert">
+                    <div class="d-flex align-items-center gap-2 small fw-semibold">
+                        <i class="bi {% if message.tags == 'error' %}bi-exclamation-triangle-fill{% else %}bi-check-circle-fill{% endif %}"></i>
+                        <span>{{ message }}</span>
+                    </div>
+                    <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close" style="padding: 0.85rem;"></button>
+                </div>
+            {% endfor %}
+        </div>
+    {% endif %}
+
+    <!-- 1. HTMX Logo & Favicon Upload Row (3 Cards in a Row) -->
+    <div class="row g-3">
+        <div class="col-12">
+            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small d-flex align-items-center gap-2">
+                <i class="bi bi-images text-primary"></i>
+                <span>Brand Logos & Favicon Assets</span>
+            </h6>
+        </div>
+
+        <!-- Logo Dark Card -->
+        <div class="col-12 col-lg-4">
+            <div class="card mb-0 h-100" style="padding: 1.15rem !important; border: 1px solid var(--border-color) !important; border-radius: var(--radius-xxl) !important;">
+                <div class="d-flex flex-column h-100 justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <h6 class="card-title mb-0 fs-6">Dark Mode Logo</h6>
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary rounded-pill px-2 py-0.5 fs-xs">Header</span>
+                        </div>
+                        <p class="theme-text-muted small mb-3">Rendered on dark theme canvas (.svg, .png, .jpg).</p>
+                        
+                        <div id="preview-container-logo_dark" class="mb-3">
+                            {% include 'admins/partials/_logo_preview.html' with field_name='logo_dark' asset_file=settings_obj.logo_dark image_url=settings_obj.logo_dark_url %}
+                        </div>
+                    </div>
+
+                    <form hx-post="{% url 'admins:site-settings-logo-upload' 'logo_dark' %}"
+                          hx-encoding="multipart/form-data"
+                          hx-target="#preview-container-logo_dark"
+                          hx-swap="innerHTML"
+                          class="d-flex flex-column gap-2 pt-2 border-top" style="border-color: var(--border-color) !important;">
+                        {% csrf_token %}
+                        <input type="file" name="logo_dark" accept=".svg,.png,.jpg,.jpeg,.webp" required class="form-control form-control-sm">
+                        <button type="submit" class="btn btn-sm btn-primary rounded-pill fw-bold d-flex align-items-center justify-content-center gap-1.5 shadow-sm text-white">
+                            <i class="bi bi-cloud-arrow-up-fill"></i>
+                            <span>Upload Dark Logo</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Logo Light Card -->
+        <div class="col-12 col-lg-4">
+            <div class="card mb-0 h-100" style="padding: 1.15rem !important; border: 1px solid var(--border-color) !important; border-radius: var(--radius-xxl) !important;">
+                <div class="d-flex flex-column h-100 justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <h6 class="card-title mb-0 fs-6">Light Mode Logo</h6>
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary rounded-pill px-2 py-0.5 fs-xs">Header</span>
+                        </div>
+                        <p class="theme-text-muted small mb-3">Rendered on light theme canvas (.svg, .png, .jpg).</p>
+                        
+                        <div id="preview-container-logo_light" class="mb-3">
+                            {% include 'admins/partials/_logo_preview.html' with field_name='logo_light' asset_file=settings_obj.logo_light image_url=settings_obj.logo_light_url %}
+                        </div>
+                    </div>
+
+                    <form hx-post="{% url 'admins:site-settings-logo-upload' 'logo_light' %}"
+                          hx-encoding="multipart/form-data"
+                          hx-target="#preview-container-logo_light"
+                          hx-swap="innerHTML"
+                          class="d-flex flex-column gap-2 pt-2 border-top" style="border-color: var(--border-color) !important;">
+                        {% csrf_token %}
+                        <input type="file" name="logo_light" accept=".svg,.png,.jpg,.jpeg,.webp" required class="form-control form-control-sm">
+                        <button type="submit" class="btn btn-sm btn-primary rounded-pill fw-bold d-flex align-items-center justify-content-center gap-1.5 shadow-sm text-white">
+                            <i class="bi bi-cloud-arrow-up-fill"></i>
+                            <span>Upload Light Logo</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Favicon Card -->
+        <div class="col-12 col-lg-4">
+            <div class="card mb-0 h-100" style="padding: 1.15rem !important; border: 1px solid var(--border-color) !important; border-radius: var(--radius-xxl) !important;">
+                <div class="d-flex flex-column h-100 justify-content-between">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <h6 class="card-title mb-0 fs-6">Platform Favicon</h6>
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary rounded-pill px-2 py-0.5 fs-xs">Browser Tab</span>
+                        </div>
+                        <p class="theme-text-muted small mb-3">Browser favicon icon (.ico, .png, .svg).</p>
+                        
+                        <div id="preview-container-favicon" class="mb-3">
+                            {% include 'admins/partials/_logo_preview.html' with field_name='favicon' asset_file=settings_obj.favicon image_url=settings_obj.favicon_url %}
+                        </div>
+                    </div>
+
+                    <form hx-post="{% url 'admins:site-settings-logo-upload' 'favicon' %}"
+                          hx-encoding="multipart/form-data"
+                          hx-target="#preview-container-favicon"
+                          hx-swap="innerHTML"
+                          class="d-flex flex-column gap-2 pt-2 border-top" style="border-color: var(--border-color) !important;">
+                        {% csrf_token %}
+                        <input type="file" name="favicon" accept=".ico,.svg,.png,.jpg,.jpeg,.webp" required class="form-control form-control-sm">
+                        <button type="submit" class="btn btn-sm btn-primary rounded-pill fw-bold d-flex align-items-center justify-content-center gap-1.5 shadow-sm text-white">
+                            <i class="bi bi-cloud-arrow-up-fill"></i>
+                            <span>Upload Favicon</span>
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 2. Main Site Configuration Form Card -->
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="card mb-0" style="padding: 0 !important; border: 1px solid var(--border-color) !important; border-radius: var(--radius-xxl) !important; overflow: hidden !important;">
+                <div class="card-header d-flex align-items-center justify-content-between border-bottom" style="border-color: var(--border-color) !important; padding: 1.15rem !important;">
+                    <div>
+                        <h2 class="card-title mb-0 fs-6">Brand Identity & JSON Metadata Configuration</h2>
+                        <span class="card-subtitle theme-text-muted small">Update platform identity parameters and extensible runtime configurations</span>
+                    </div>
+                    <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-3 py-1 small fw-bold">Platform Configuration</span>
+                </div>
+
+                <div class="card-body" style="padding: 1.15rem !important;">
+                    <form action="{% url 'admins:site-settings' %}" method="POST" class="d-flex flex-column gap-3">
+                        {% csrf_token %}
+
+                        <div>
+                            <label for="id_brand_name" class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Platform Brand Name</label>
+                            <input type="text" id="id_brand_name" name="brand_name" value="{{ settings_obj.brand_name }}" required class="form-control">
+                        </div>
+
+                        <div>
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <label for="id_meta_config" class="form-label theme-text-muted small fw-bold text-uppercase mb-0">Meta Configuration (Extensible JSON Payload)</label>
+                                <span class="small theme-text-muted" style="font-size: 0.75rem;">Valid JSON format (SEO, social handles, runtime switches)</span>
+                            </div>
+                            <textarea id="id_meta_config" name="meta_config" rows="7" class="form-control font-monospace small">{{ meta_config_json }}</textarea>
+                        </div>
+
+                        <div class="d-flex justify-content-end pt-2">
+                            <button type="submit" class="btn btn-primary rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm text-white">
+                                <i class="bi bi-check2-circle"></i>
+                                <span>Save Site Settings</span>
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>

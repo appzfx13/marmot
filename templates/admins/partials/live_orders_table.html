@@ -1,0 +1,239 @@
+{% load static %}
+<!-- templates/admins/partials/live_orders_table.html -->
+<div id="live-orders-container" class="card mb-0 border-0 shadow-none bg-transparent">
+    <!-- Sub-header & Filter Tabs -->
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 pb-3 mb-2 border-bottom" style="border-color: var(--border-color) !important;">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="fw-bold theme-text-main small d-flex align-items-center gap-1.5 me-1">
+                <i class="bi bi-funnel text-primary"></i>
+                <span>Filter Orders:</span>
+            </span>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <button type="button" 
+                        class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'ALL' or not filter_status %}border-primary text-primary fw-bold{% endif %}"
+                        style="{% if filter_status == 'ALL' or not filter_status %}background: rgba(var(--brand-primary-rgb, 13, 110, 253), 0.12); border-color: var(--brand-primary, #0d6efd) !important; color: #fff !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                        hx-get="{% url 'admins:admin-live-orders-partial' %}?status=ALL"
+                        hx-target="#live-orders-container"
+                        hx-swap="outerHTML">
+                    <i class="bi bi-list-check {% if filter_status == 'ALL' or not filter_status %}text-primary{% else %}opacity-75{% endif %}"></i>
+                    <span class="fw-semibold">All</span>
+                    <span class="badge {% if filter_status == 'ALL' or not filter_status %}bg-primary text-white{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 ms-1 smaller">{{ orders_count|default:live_orders|length }}</span>
+                </button>
+
+                <button type="button" 
+                        class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'OPEN' %}border-warning text-warning fw-bold{% endif %}"
+                        style="{% if filter_status == 'OPEN' %}background: rgba(255, 193, 7, 0.15); border-color: #ffc107 !important; color: #ffc107 !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                        hx-get="{% url 'admins:admin-live-orders-partial' %}?status=OPEN"
+                        hx-target="#live-orders-container"
+                        hx-swap="outerHTML">
+                    <i class="bi bi-hourglass-split {% if filter_status == 'OPEN' %}text-warning{% else %}opacity-75{% endif %}"></i>
+                    <span class="fw-semibold">Pending / Open</span>
+                    <span class="badge {% if filter_status == 'OPEN' %}bg-warning text-dark{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 ms-1 smaller">{{ open_orders_count|default:"0" }}</span>
+                </button>
+
+                <button type="button" 
+                        class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'TRADED' %}border-success text-success fw-bold{% endif %}"
+                        style="{% if filter_status == 'TRADED' %}background: rgba(25, 135, 84, 0.15); border-color: #198754 !important; color: #198754 !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                        hx-get="{% url 'admins:admin-live-orders-partial' %}?status=TRADED"
+                        hx-target="#live-orders-container"
+                        hx-swap="outerHTML">
+                    <i class="bi bi-check2-all {% if filter_status == 'TRADED' %}text-success{% else %}opacity-75{% endif %}"></i>
+                    <span class="fw-semibold">Executed</span>
+                    <span class="badge {% if filter_status == 'TRADED' %}bg-success text-white{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 ms-1 smaller">{{ traded_orders_count|default:"0" }}</span>
+                </button>
+
+                <button type="button" 
+                        class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'CANCELLED' %}border-danger text-danger fw-bold{% endif %}"
+                        style="{% if filter_status == 'CANCELLED' %}background: rgba(220, 53, 69, 0.15); border-color: #dc3545 !important; color: #dc3545 !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                        hx-get="{% url 'admins:admin-live-orders-partial' %}?status=CANCELLED"
+                        hx-target="#live-orders-container"
+                        hx-swap="outerHTML">
+                    <i class="bi bi-x-circle {% if filter_status == 'CANCELLED' %}text-danger{% else %}opacity-75{% endif %}"></i>
+                    <span class="fw-semibold">Cancelled / Rejected</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25 rounded-pill px-3 py-1.5 small fw-bold d-inline-flex align-items-center gap-1.5">
+                <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                <span>Live Order Stream</span>
+            </span>
+            <button type="button" 
+                    class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1.5"
+                    style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
+                    hx-get="{% url 'admins:admin-live-orders-partial' %}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.number|default:1 }}"
+                    hx-target="#live-orders-container"
+                    hx-swap="outerHTML"
+                    title="Refresh Orders">
+                <i class="bi bi-arrow-clockwise"></i>
+            </button>
+        </div>
+    </div>
+
+    <!-- Live Orders Table -->
+    {% if live_orders %}
+    <div class="table-responsive">
+        <table class="table table-custom align-middle mb-0">
+            <thead>
+                <tr>
+                    <th>Time &amp; Order ID</th>
+                    <th>Instrument</th>
+                    <th>Side</th>
+                    <th>Type / Product</th>
+                    <th class="text-center">Quantity</th>
+                    <th class="text-end">Price</th>
+                    <th class="text-center">Live Status</th>
+                    <th class="text-end pe-3">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for ord in live_orders %}
+                <tr>
+                    <td>
+                        <div class="font-monospace small theme-text-main fw-bold">#{{ ord.order_id }}</div>
+                        <div class="theme-text-muted smaller">{{ ord.create_time|default:"Today" }}</div>
+                    </td>
+                    <td>
+                        <div class="fw-bold theme-text-main font-monospace">{{ ord.trading_symbol }}</div>
+                        <span class="badge bg-secondary bg-opacity-25 px-1.5 py-0.5 rounded text-uppercase fs-xs">{{ ord.exchange_segment }}</span>
+                    </td>
+                    <td>
+                        {% if ord.transaction_type == 'BUY' %}
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5 fw-bold fs-xs">
+                                BUY
+                            </span>
+                        {% else %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5 fw-bold fs-xs">
+                                SELL
+                            </span>
+                        {% endif %}
+                    </td>
+                    <td>
+                        <div class="small theme-text-main fw-semibold">{{ ord.order_type }}</div>
+                        <div class="theme-text-muted smaller">{{ ord.product_type }} &bull; {{ ord.validity }}</div>
+                    </td>
+                    <td class="text-center">
+                        <div class="font-monospace fw-bold theme-text-main">{{ ord.filled_qty }} / {{ ord.quantity }}</div>
+                        {% if ord.filled_qty == ord.quantity and ord.quantity > 0 %}
+                            <div class="text-success smaller">100% Filled</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-end font-monospace small">
+                        ₹{{ ord.price|floatformat:2 }}
+                        {% if ord.trigger_price > 0 %}
+                            <div class="theme-text-muted smaller">Trig: ₹{{ ord.trigger_price|floatformat:2 }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="text-center">
+                        {% if ord.order_status == 'TRADED' %}
+                            <span class="trend-badge trend-up py-1 px-2.5 fs-xs d-inline-flex align-items-center gap-1">
+                                <i class="bi bi-check2-circle"></i> TRADED
+                            </span>
+                        {% elif ord.order_status == 'PENDING' or ord.order_status == 'TRANSIT' or ord.order_status == 'CONFIRM' %}
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1">
+                                <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.5rem; height: 0.5rem;"></span>
+                                {{ ord.order_status }}
+                            </span>
+                        {% elif ord.order_status == 'CANCELLED' %}
+                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-1 fs-xs">
+                                CANCELLED
+                            </span>
+                        {% elif ord.order_status == 'REJECTED' %}
+                            <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1 fs-xs fw-bold"
+                                  title="{{ ord.oms_error_desc|default:'Rejected by Broker' }}">
+                                <i class="bi bi-exclamation-triangle-fill me-1"></i> REJECTED
+                            </span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 fs-xs">
+                                {{ ord.order_status }}
+                            </span>
+                        {% endif %}
+                        {% if ord.oms_error_desc %}
+                            <div class="text-danger smaller text-truncate" style="max-width: 150px;" title="{{ ord.oms_error_desc }}">
+                                {{ ord.oms_error_desc }}
+                            </div>
+                        {% endif %}
+                    </td>
+                    <td class="text-end pe-3">
+                        {% if ord.order_status == 'PENDING' or ord.order_status == 'TRANSIT' %}
+                            <form hx-post="{% url 'admins:admin-live-order-cancel' ord.order_id %}"
+                                  hx-confirm="Are you sure you want to cancel order #{{ ord.order_id }}?"
+                                  class="d-inline">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-1 smaller fw-bold shadow-sm">
+                                    Cancel
+                                </button>
+                            </form>
+                        {% else %}
+                            <span class="text-white-50 smaller">&mdash;</span>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination Controls Component -->
+    {% if is_paginated %}
+    <div class="d-flex flex-column flex-sm-row align-items-center justify-content-between gap-3 pt-3 mt-2 border-top" style="border-color: var(--border-color) !important;">
+        <div class="text-white-50 smaller">
+            Showing <strong class="theme-text-main">{{ page_obj.start_index }}</strong> to <strong class="theme-text-main">{{ page_obj.end_index }}</strong> of <strong class="theme-text-main">{{ paginator.count }}</strong> Orders
+        </div>
+        <div class="d-flex align-items-center gap-1.5">
+            {% if page_obj.has_previous %}
+                <button type="button"
+                        class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1"
+                        style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
+                        hx-get="{% url 'admins:admin-live-orders-partial' %}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.previous_page_number }}"
+                        hx-target="#live-orders-container"
+                        hx-swap="outerHTML"
+                        aria-label="Previous Page">
+                    <i class="bi bi-chevron-left"></i>
+                </button>
+            {% endif %}
+
+            {% for num in paginator.page_range %}
+                {% if page_obj.number == num %}
+                    <span class="btn-date-picker text-decoration-none shadow-sm px-3 py-1 fw-bold"
+                          style="background: rgba(var(--brand-primary-rgb, 13, 110, 253), 0.25); border: 1px solid var(--brand-primary, #0d6efd) !important; color: #fff !important;">
+                        {{ num }}
+                    </span>
+                {% elif num > page_obj.number|add:'-3' and num < page_obj.number|add:'3' %}
+                    <button type="button"
+                            class="btn-date-picker text-decoration-none shadow-sm px-3 py-1"
+                            style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
+                            hx-get="{% url 'admins:admin-live-orders-partial' %}?status={{ filter_status|default:'ALL' }}&page={{ num }}"
+                            hx-target="#live-orders-container"
+                            hx-swap="outerHTML">
+                        {{ num }}
+                    </button>
+                {% endif %}
+            {% endfor %}
+
+            {% if page_obj.has_next %}
+                <button type="button"
+                        class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1"
+                        style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
+                        hx-get="{% url 'admins:admin-live-orders-partial' %}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.next_page_number }}"
+                        hx-target="#live-orders-container"
+                        hx-swap="outerHTML"
+                        aria-label="Next Page">
+                    <i class="bi bi-chevron-right"></i>
+                </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+
+    {% else %}
+    <div class="text-center py-5 theme-text-muted">
+        <div class="rounded-circle bg-secondary bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-3" style="width: 54px; height: 54px;">
+            <i class="bi bi-clock-history fs-3 opacity-50"></i>
+        </div>
+        <h6 class="theme-text-main fw-bold mb-1">No Orders Placed Today</h6>
+        <p class="small mb-0 opacity-75">Automated and manual orders placed via Dhan API will stream here in real-time with live execution status.</p>
+    </div>
+    {% endif %}
+</div>

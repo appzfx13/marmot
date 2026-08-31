@@ -111,6 +111,18 @@ class SiteSettings(BaseModel):
         verbose_name = "Site Settings"
         verbose_name_plural = "Site Settings"
 
+    @property
+    def logo_dark_url(self):
+        return self.logo_dark.url if self.logo_dark else ''
+
+    @property
+    def logo_light_url(self):
+        return self.logo_light.url if self.logo_light else ''
+
+    @property
+    def favicon_url(self):
+        return self.favicon.url if self.favicon else ''
+
     def __str__(self):
         return f"SiteSettings ({self.brand_name})"
 

@@ -27,25 +27,28 @@
     </div>
     <!-- END: Dashboard Header Banner -->
 
-    <!-- START: Top Area Metric Cards -->
-    <div class="row g-4">
+    <!-- START: Top Area Metric Cards (4-Card Setup) -->
+    <div class="row g-3">
         <!-- Stat Card 1: Green Alert Banner -->
-        <div class="col-xl-4 col-md-6">
-            <div class="card alert-green-card h-100 d-flex flex-column justify-content-between">
+        <div class="col-xl-3 col-md-6">
+            <div class="card alert-green-card">
                 <div class="position-relative z-index-2">
                     <span class="alert-green-badge">Paper Simulation</span>
-                    <div class="alert-green-date">Local Sandbox Engine &bull; Zero Commission</div>
-                    <div class="alert-green-text">Simulated ticks and order books are active for strategy testing</div>
+                    <div class="alert-green-date">Local Sandbox Engine &bull; Zero Risk</div>
+                    <div class="alert-green-text">Simulated ticks &amp; orders active</div>
                 </div>
-                <a href="{% url 'users:user-backtest' %}" 
-                   class="alert-green-link z-index-2"
-                   hx-get="{% url 'users:user-backtest' %}"
-                   hx-target="#user-portal-container"
-                   hx-swap="innerHTML"
-                   hx-push-url="true">
-                    <span>Explore Backtest Hub</span>
-                    <i class="bi bi-arrow-right"></i>
-                </a>
+                <div class="metric-card-footer border-dark border-opacity-10 z-index-2">
+                    <a href="{% url 'users:backtest-dashboard' %}" 
+                       class="alert-green-link"
+                       hx-get="{% url 'users:backtest-dashboard' %}"
+                       hx-target="#user-portal-container"
+                       hx-swap="innerHTML"
+                       hx-push-url="true">
+                        <span>Backtest Hub</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                    <span class="badge bg-dark bg-opacity-25 text-white smaller px-2 py-0.5">Mock Mode</span>
+                </div>
 
                 <!-- Inline SVG geometric decoration -->
                 <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -59,52 +62,77 @@
         </div>
 
         <!-- Stat Card 2: Virtual Capital -->
-        <div class="col-xl-4 col-md-6">
-            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
                 <div>
-                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
-                        <span class="stat-label">Virtual Capital</span>
-                        <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-1 small fw-bold">Paper Pool</span>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-wallet2 text-info"></i>
+                            <span>Virtual Capital</span>
+                        </span>
+                        <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0.5 smaller fw-bold">Paper Pool</span>
                     </div>
-                    <div class="stat-value text-info">
+                    <div class="metric-card-date">Simulated Balance Allocation</div>
+                    <div class="metric-card-value text-info">
                         ₹{{ virtual_capital|default:"10,00,000.00" }}
                     </div>
-                    <div class="trend-badge trend-up">
-                        <i class="bi bi-arrow-up-right"></i>
-                        <span>Simulated balance</span>
-                    </div>
                 </div>
-                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
-                    <span>Virtual Pool</span>
-                    <span class="fw-semibold text-main">Ready for sandbox orders</span>
+                <div class="metric-card-footer">
+                    <span>Margin: ₹{{ virtual_available_margin|default:"9,85,450.00" }}</span>
+                    <span class="text-success fw-bold smaller">Order Ready</span>
                 </div>
             </div>
         </div>
 
         <!-- Stat Card 3: Simulated P&L -->
-        <div class="col-xl-4 col-md-12">
-            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
                 <div>
-                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
-                        <span class="stat-label">Simulated P&amp;L</span>
-                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-1 small fw-bold">Win Rate: {{ simulated_win_rate|default:"72.5%" }}</span>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-graph-up-arrow text-success"></i>
+                            <span>Simulated P&amp;L</span>
+                        </span>
+                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Win: {{ simulated_win_rate|default:"72.5%" }}</span>
                     </div>
-                    <div class="stat-value text-success">
+                    <div class="metric-card-date">Mock Ledger Returns</div>
+                    <div class="metric-card-value text-success">
                         {{ simulated_pnl|default:"+14,550.00" }}
                     </div>
-                    <div class="trend-badge trend-up">
-                        <i class="bi bi-graph-up-arrow"></i>
-                        <span>{{ simulated_trades_count|default:"18" }} Mock orders executed</span>
+                </div>
+                <div class="metric-card-footer">
+                    <span>
+                        <i class="bi bi-graph-up-arrow text-success me-1"></i>Performance
+                    </span>
+                    <span>{{ simulated_trades_count|default:"18" }} Trades</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stat Card 4: Sandbox Active Rules -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-cpu text-primary"></i>
+                            <span>Sandbox Rules</span>
+                        </span>
+                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller fw-bold">Paper Sync</span>
+                    </div>
+                    <div class="metric-card-date">Active Sandbox Ledger</div>
+                    <div class="metric-card-value text-primary">
+                        {{ sandbox_strategy_configs.count }}
                     </div>
                 </div>
-                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
-                    <span>Performance</span>
-                    <span class="fw-semibold text-main">{{ sandbox_strategy_configs.count }} Rules Active</span>
+                <div class="metric-card-footer">
+                    <span>Engine Status</span>
+                    <span class="text-success fw-bold smaller">Mock Ticks Live</span>
                 </div>
             </div>
         </div>
     </div>
-    <!-- END: Top Area Metric Cards -->
+    <!-- END: Top Area Metric Cards (4-Card Setup) -->
 
     <!-- START: Active Sandbox Strategy Configurations Section -->
     <div class="row g-4">

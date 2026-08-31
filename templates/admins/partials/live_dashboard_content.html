@@ -100,11 +100,11 @@
     </div>
     {% endif %}
 
-    <!-- START: Top Area Metric Cards -->
-    <div class="row g-4">
+    <!-- START: Top Area Metric Cards (4-Card Modern Grid Setup) -->
+    <div class="row g-3">
         <!-- Stat Card 1: Live Status Banner -->
-        <div class="col-xl-4 col-md-6">
-            <div class="card alert-green-card h-100 d-flex flex-column justify-content-between">
+        <div class="col-xl-3 col-md-6">
+            <div class="card alert-green-card">
                 <div class="position-relative z-index-2">
                     {% if is_token_active %}
                         <span class="alert-green-badge">Live API Online</span>
@@ -114,20 +114,20 @@
                     <div class="alert-green-date">{{ broker_name }} {% if live_account.broker_client_id %}&bull; ID: {{ live_account.broker_client_id }}{% endif %}</div>
                     <div class="alert-green-text">
                         {% if is_token_active %}
-                            Realtime WebSocket Telemetry &amp; Order Router Online &bull; {{ open_positions_count }} Open Positions
+                            Realtime Stream &bull; {{ open_positions_count }} Open
                         {% else %}
-                            Standby mode &bull; Re-authenticate token for live market execution
+                            Standby &bull; Re-auth session
                         {% endif %}
                     </div>
                 </div>
-                <div class="d-flex align-items-center justify-content-between z-index-2">
+                <div class="metric-card-footer border-dark border-opacity-10 z-index-2">
                     <a href="{% url 'users:user-accounts' %}" 
                        class="alert-green-link"
                        hx-get="{% url 'users:user-accounts' %}"
-                       hx-target="#user-portal-container"
+                       hx-target="#app-main-container"
                        hx-swap="innerHTML"
                        hx-push-url="true">
-                        <span>Broker Settings</span>
+                        <span>Accounts</span>
                         <i class="bi bi-arrow-right"></i>
                     </a>
                     {% if live_account %}
@@ -138,7 +138,7 @@
                             hx-swap="innerHTML"
                             data-bs-toggle="modal"
                             data-bs-target="#globalHtmxModal">
-                        <i class="bi bi-key me-1"></i>Session Token
+                        <i class="bi bi-key me-1"></i>Token
                     </button>
                     {% endif %}
                 </div>
@@ -155,79 +155,194 @@
         </div>
 
         <!-- Stat Card 2: Live Net P&L -->
-        <div class="col-xl-4 col-md-6">
-            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
                 <div>
-                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
-                        <span class="stat-label">Live Net P&amp;L</span>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-graph-up-arrow text-primary"></i>
+                            <span>Live Net P&amp;L</span>
+                        </span>
                         {% if is_token_active %}
-                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-1 small fw-bold">Live Synced</span>
+                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Live Synced</span>
                         {% else %}
-                            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-1 small fw-bold">Offline</span>
+                            <span class="badge bg-secondary bg-opacity-25 text-muted rounded-pill px-2 py-0.5 smaller fw-bold">Offline</span>
                         {% endif %}
                     </div>
-                    <div class="stat-value {% if live_net_pnl > 0 %}text-success{% elif live_net_pnl < 0 %}text-danger{% endif %}">
+                    <div class="metric-card-date">Intraday Realtime Return</div>
+                    <div class="metric-card-value {% if live_net_pnl > 0 %}text-success{% elif live_net_pnl < 0 %}text-danger{% endif %}">
                         ₹{{ live_net_pnl|floatformat:2 }}
                     </div>
-                    <div class="trend-badge {% if live_net_pnl >= 0 %}trend-up{% else %}trend-down{% endif %}">
-                        <i class="bi {% if live_net_pnl >= 0 %}bi-arrow-up-right{% else %}bi-arrow-down-left{% endif %}"></i>
-                        <span>{% if is_token_active %}{{ open_positions_count }} Positions Intraday{% else %}Session Disconnected{% endif %}</span>
-                    </div>
                 </div>
-                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
-                    <span>Intraday Performance</span>
-                    <span class="fw-semibold text-main">{{ todays_orders_count }} Orders Placed Today</span>
+                <div class="metric-card-footer">
+                    <div class="trend-badge {% if live_net_pnl >= 0 %}trend-up{% else %}trend-down{% endif %} py-0 px-0 fs-xs">
+                        <i class="bi {% if live_net_pnl >= 0 %}bi-arrow-up-right text-success{% else %}bi-arrow-down-left text-danger{% endif %}"></i>
+                        <span>{% if is_token_active %}{{ open_positions_count }} Pos{% else %}Offline{% endif %}</span>
+                    </div>
+                    <span>{{ todays_orders_count }} Orders</span>
                 </div>
             </div>
         </div>
 
         <!-- Stat Card 3: Available Margin -->
-        <div class="col-xl-4 col-md-12">
-            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
                 <div>
-                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
-                        <span class="stat-label">Available Margin</span>
-                        <div class="dropdown">
-                            <button class="card-more-btn" type="button" data-bs-toggle="dropdown" aria-expanded="false">
-                                <i class="bi bi-three-dots"></i>
-                            </button>
-                            <ul class="dropdown-menu dropdown-menu-end dropdown-menu-custom">
-                                <li>
-                                    <a class="dropdown-item" href="{% url 'admins:admin-live-dashboard' %}" hx-get="{% url 'admins:admin-live-dashboard' %}" hx-target="#user-portal-container" hx-swap="innerHTML">
-                                        <i class="bi bi-arrow-repeat"></i> Refresh Funds
-                                    </a>
-                                </li>
-                                {% if live_account %}
-                                <li>
-                                    <a class="dropdown-item" href="javascript:void(0);" 
-                                       hx-get="{% url 'users:user-account-consent-modal' live_account.id %}"
-                                       hx-target="#globalHtmxModalDialog"
-                                       hx-swap="innerHTML"
-                                       data-bs-toggle="modal"
-                                       data-bs-target="#globalHtmxModal">
-                                        <i class="bi bi-key"></i> Update Session Token
-                                    </a>
-                                </li>
-                                {% endif %}
-                            </ul>
-                        </div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-wallet2 text-success"></i>
+                            <span>Available Margin</span>
+                        </span>
+                        <a href="{% url 'admins:admin-live-dashboard' %}" 
+                           class="btn btn-sm btn-link theme-text-muted p-0 text-decoration-none smaller"
+                           hx-get="{% url 'admins:admin-live-dashboard' %}"
+                           hx-target="#app-main-container"
+                           hx-swap="innerHTML"
+                           title="Refresh Margin">
+                            <i class="bi bi-arrow-repeat"></i>
+                        </a>
                     </div>
-                    <div class="stat-value">
+                    <div class="metric-card-date">Broker Funds &bull; Cash: ₹{{ cash_balance }}</div>
+                    <div class="metric-card-value">
                         ₹{{ available_margin }}
                     </div>
-                    <div class="trend-badge {% if is_token_active %}trend-up{% else %}trend-down{% endif %}">
-                        <i class="bi bi-wallet2"></i>
-                        <span>{% if is_token_active %}Live Broker Balance Synced{% else %}Awaiting Session Authorization{% endif %}</span>
+                </div>
+                <div class="metric-card-footer">
+                    <span>
+                        <i class="bi bi-check2-circle text-success me-1"></i>{% if is_token_active %}Synced{% else %}Standby{% endif %}
+                    </span>
+                    <span>{{ live_strategy_configs.count }} Rules</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stat Card 4: Emergency Risk & Kill Controls -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-shield-lock-fill text-danger"></i>
+                            <span>Risk Shield</span>
+                        </span>
+                        {% if request.user.primary_freeze or request.user.final_freeze %}
+                            <span class="badge bg-danger text-white rounded-pill px-2 py-0.5 smaller fw-bold">Frozen</span>
+                        {% else %}
+                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Active</span>
+                        {% endif %}
+                    </div>
+                    <div class="metric-card-date">Tiered Capital Protection</div>
+                    <div class="d-flex align-items-center justify-content-between my-0.5">
+                        <div class="metric-card-value fs-5">
+                            {% if request.user.primary_freeze or request.user.final_freeze %}Trading Paused{% else %}Normal Arm{% endif %}
+                        </div>
+                        <button type="button"
+                                class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm text-white"
+                                hx-get="{% url 'users:user-kill-switch' %}"
+                                hx-target="#globalHtmxModalDialog"
+                                hx-swap="innerHTML"
+                                data-bs-toggle="modal"
+                                data-bs-target="#globalHtmxModal"
+                                title="Kill Switch">
+                            <i class="bi bi-lightning-fill"></i>
+                            <span>Kill</span>
+                        </button>
                     </div>
                 </div>
-                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
-                    <span>Cash: ₹{{ cash_balance }}</span>
-                    <span class="fw-semibold text-main">{{ live_strategy_configs.count }} Rules Active</span>
+                <div class="metric-card-footer">
+                    <span>Gate: {% if request.user.trade_eligibility and not request.user.is_blocked %}Enabled{% else %}Blocked{% endif %}</span>
+                    <span class="text-danger fw-bold smaller">Instant Freeze</span>
                 </div>
             </div>
         </div>
     </div>
-    <!-- END: Top Area Metric Cards -->
+    <!-- END: Top Area Metric Cards (4-Card Setup) -->
+
+    <!-- START: Advanced Realtime Broker Telemetry Tabs (Positions, Holdings, Live Orders) -->
+    <div class="row g-3">
+        <div class="col-12">
+            <div class="card mb-0" style="padding: 0 !important; border: 1px solid var(--border-color) !important; border-radius: var(--radius-xxl) !important; overflow: hidden !important;">
+                <div class="card-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 border-bottom" style="border-color: var(--border-color) !important; padding: 1.15rem !important;">
+                    <div>
+                        <div class="d-flex align-items-center gap-2 mb-1">
+                            <h2 class="card-title mb-0">Broker Execution Telemetry</h2>
+                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 fs-xs fw-bold d-inline-flex align-items-center gap-1">
+                                <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                                LIVE FEED
+                            </span>
+                        </div>
+                        <span class="card-subtitle theme-text-muted small">Realtime DhanHQ v2 Intraday Positions, Portfolio Holdings, and Live Order Feed</span>
+                    </div>
+
+                    <!-- Telemetry Navigation Tabs -->
+                    <ul class="nav nav-pills gap-2" id="liveTelemetryTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active rounded-pill px-3 py-1.5 small fw-bold d-flex align-items-center gap-1.5" 
+                                    id="positions-tab" 
+                                    data-bs-toggle="pill" 
+                                    data-bs-target="#positions-tab-pane" 
+                                    type="button" 
+                                    role="tab" 
+                                    aria-controls="positions-tab-pane" 
+                                    aria-selected="true">
+                                <i class="bi bi-layers-half"></i>
+                                <span>Positions</span>
+                                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller">{{ open_positions_count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-pill px-3 py-1.5 small fw-bold d-flex align-items-center gap-1.5" 
+                                    id="holdings-tab" 
+                                    data-bs-toggle="pill" 
+                                    data-bs-target="#holdings-tab-pane" 
+                                    type="button" 
+                                    role="tab" 
+                                    aria-controls="holdings-tab-pane" 
+                                    aria-selected="false">
+                                <i class="bi bi-pie-chart-fill"></i>
+                                <span>Holdings</span>
+                                <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 smaller">{{ holdings_count }}</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-pill px-3 py-1.5 small fw-bold d-flex align-items-center gap-1.5" 
+                                    id="orders-tab" 
+                                    data-bs-toggle="pill" 
+                                    data-bs-target="#orders-tab-pane" 
+                                    type="button" 
+                                    role="tab" 
+                                    aria-controls="orders-tab-pane" 
+                                    aria-selected="false">
+                                <i class="bi bi-broadcast"></i>
+                                <span>Live Orders</span>
+                                <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0.5 smaller">{{ todays_orders_count }}</span>
+                            </button>
+                        </li>
+                    </ul>
+                </div>
+
+                <div class="card-body" style="padding: 1.15rem !important;">
+                    <div class="tab-content" id="liveTelemetryTabsContent">
+                        <!-- Tab 1: Positions -->
+                        <div class="tab-pane fade show active" id="positions-tab-pane" role="tabpanel" aria-labelledby="positions-tab" tabindex="0">
+                            {% include 'admins/partials/live_positions_table.html' %}
+                        </div>
+
+                        <!-- Tab 2: Holdings -->
+                        <div class="tab-pane fade" id="holdings-tab-pane" role="tabpanel" aria-labelledby="holdings-tab" tabindex="0">
+                            {% include 'admins/partials/live_holdings_table.html' %}
+                        </div>
+
+                        <!-- Tab 3: Live Orders -->
+                        <div class="tab-pane fade" id="orders-tab-pane" role="tabpanel" aria-labelledby="orders-tab" tabindex="0">
+                            {% include 'admins/partials/live_orders_table.html' %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- END: Advanced Realtime Broker Telemetry Tabs -->
 
     <!-- START: Active Live Strategy Controls Section -->
     <div class="row g-4">
@@ -277,7 +392,7 @@
                                     </td>
                                     <td>
                                         {% if cfg.max_loss_status %}
-                                            <span class="badge bg-danger bg-opacity-25 text-danger font-monospace">₹{{ cfg.max_loss_limit|default:"0.00" }}</span>
+                                             <span class="badge bg-danger bg-opacity-25 text-danger font-monospace">₹{{ cfg.max_loss_limit|default:"0.00" }}</span>
                                         {% else %}
                                             <span class="theme-text-muted small">Disabled</span>
                                         {% endif %}

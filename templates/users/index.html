@@ -1695,8 +1695,7 @@
         <div class="sidebar-profile">
             <img src="{% static 'images/avatar.png' %}" alt="Trader" class="sidebar-profile-img">
             <div class="sidebar-profile-info">
-                <div class="sidebar-profile-name">{% if request.user.first_name %}{{ request.user.first_name }}{% else
-                    %}{{ request.user.username }}{% endif %}</div>
+                <div class="sidebar-profile-name">{% if request.user.first_name %}{{ request.user.first_name }}{% else %}{{ request.user.username }}{% endif %}</div>
                 <div class="sidebar-profile-email">{{ request.user.email|default:"Trader Active" }}</div>
             </div>
             <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-auto" data-bs-toggle="modal"
@@ -1826,15 +1825,13 @@
                     <button class="navbar-profile-btn dropdown-toggle" type="button" data-bs-toggle="dropdown"
                         aria-expanded="false" id="profile-dropdown">
                         <img src="{% static 'images/avatar.png' %}" alt="Profile Image" class="navbar-profile-img">
-                        <span class="navbar-profile-name d-none d-md-inline">{% if request.user.get_full_name %}{{
-                            request.user.get_full_name }}{% else %}{{ request.user.username }}{% endif %}</span>
+                        <span class="navbar-profile-name d-none d-md-inline">{% if request.user.get_full_name %}{{ request.user.get_full_name }}{% else %}{{ request.user.username }}{% endif %}</span>
                         <i class="bi bi-chevron-down navbar-profile-caret"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-profile"
                         aria-labelledby="profile-dropdown">
                         <li class="dropdown-header">Welcome !</li>
-                        {% if request.user.is_superuser or request.user.role == 'admin' or request.user.role ==
-                        'developer' or request.user.role == 'staff' %}
+                        {% if request.user.is_superuser or request.user.role == 'admin' or request.user.role == 'developer' or request.user.role == 'staff' %}
                         <li>
                             <a class="dropdown-item text-primary fw-semibold" href="{% url 'admins:admin-dashboard' %}">
                                 <i class="bi bi-shield-lock"></i> Switch to Admin Console
@@ -1976,7 +1973,13 @@
                     if (icon) {
                         icon.className = document.body.classList.contains('sidebar-minimized') ? 'bi bi-chevron-bar-right' : 'bi bi-chevron-bar-left';
                     }
+                    if (typeof moveSidebarPill === 'function') {
+                        moveSidebarPill();
+                    }
                     setTimeout(function () {
+                        if (typeof moveSidebarPill === 'function') {
+                            moveSidebarPill();
+                        }
                         window.dispatchEvent(new Event('resize'));
                     }, 300);
                 });

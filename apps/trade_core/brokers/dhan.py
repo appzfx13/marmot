@@ -213,13 +213,97 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             logger.warning("Dhan get_fund_limits exception: %s", e)
             return {'success': False, 'status': 'ERROR', 'available_balance': '0.00', 'cash': '0.00'}
 
+    def get_holdings(self) -> Dict[str, Any]:
+        """Fetches long-term Demat & CNC Equity portfolio holdings from DhanHQ v2 API: GET /v2/holdings."""
+        account_id = getattr(self.account, 'id', None) or getattr(self.user, 'id', 'default')
+        cache_key = f"marmot:dhan:holdings:{account_id}"
+
+        try:
+            cached_json = _get_redis().get(cache_key)
+            if cached_json:
+                return json.loads(cached_json)
+        except Exception as cache_err:
+            logger.warning("Redis read exception in get_holdings: %s", cache_err)
+
+        import requests
+        token = str(self.get_access_token() or '').strip().strip('"').strip("'")
+        client_id = str(self.client_id or '').strip().strip('"').strip("'")
+        if not token or not client_id:
+            return {'success': False, 'holdings': [], 'total_invested': 0.00, 'current_value': 0.00, 'total_pnl': 0.00, 'pnl_pct': 0.00, 'holdings_count': 0}
+
+        try:
+            url = "https://api.dhan.co/v2/holdings"
+            headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
+            resp = requests.get(url, headers=headers, timeout=6)
+            if resp.status_code == 200:
+                raw_data = resp.json()
+                if not isinstance(raw_data, list):
+                    raw_data = []
+
+                total_invested = 0.0
+                current_val = 0.0
+                parsed_holdings = []
+
+                for item in raw_data:
+                    total_qty = int(item.get("totalQty", 0) or 0)
+                    dp_qty = int(item.get("dpQty", 0) or 0)
+                    available_qty = int(item.get("availableQty", total_qty) or total_qty)
+                    avg_cost = float(item.get("avgCostPrice", item.get("costPrice", 0.0)) or 0.0)
+                    ltp = float(item.get("lastTradedPrice", item.get("ltp", avg_cost)) or avg_cost)
+                    
+                    inv_item = round(total_qty * avg_cost, 2)
+                    cur_item = round(total_qty * ltp, 2)
+                    pnl_item = round(cur_item - inv_item, 2)
+                    pnl_pct_item = round((pnl_item / max(inv_item, 1.0)) * 100, 2) if inv_item > 0 else 0.0
+
+                    total_invested += inv_item
+                    current_val += cur_item
+
+                    parsed_holdings.append({
+                        'trading_symbol': item.get("tradingSymbol", "EQUITY"),
+                        'exchange': item.get("exchange", "NSE"),
+                        'security_id': item.get("securityId", ""),
+                        'isin': item.get("isin", ""),
+                        'total_qty': total_qty,
+                        'dp_qty': dp_qty,
+                        'available_qty': available_qty,
+                        'avg_cost_price': avg_cost,
+                        'last_traded_price': ltp,
+                        'invested_value': inv_item,
+                        'current_value': cur_item,
+                        'pnl': pnl_item,
+                        'pnl_pct': pnl_pct_item,
+                    })
+
+                total_pnl = round(current_val - total_invested, 2)
+                pnl_pct = round((total_pnl / max(total_invested, 1.0)) * 100, 2) if total_invested > 0 else 0.0
+
+                result = {
+                    'success': True,
+                    'holdings': parsed_holdings,
+                    'total_invested': round(total_invested, 2),
+                    'current_value': round(current_val, 2),
+                    'total_pnl': total_pnl,
+                    'pnl_pct': pnl_pct,
+                    'holdings_count': len(parsed_holdings)
+                }
+                try:
+                    _get_redis().setex(cache_key, 30, json.dumps(result))
+                except Exception:
+                    pass
+                return result
+            return {'success': False, 'holdings': [], 'total_invested': 0.00, 'current_value': 0.00, 'total_pnl': 0.00, 'pnl_pct': 0.00, 'holdings_count': 0}
+        except Exception as e:
+            logger.warning("Dhan get_holdings exception: %s", e)
+            return {'success': False, 'holdings': [], 'total_invested': 0.00, 'current_value': 0.00, 'total_pnl': 0.00, 'pnl_pct': 0.00, 'holdings_count': 0}
+
     def get_live_positions(self) -> Dict[str, Any]:
         """Fetches live intraday positions and real-time net PnL from Dhan /v2/positions."""
         import requests
         token = str(self.get_access_token() or '').strip().strip('"').strip("'")
         client_id = str(self.client_id or '').strip().strip('"').strip("'")
         if not token or not client_id:
-            return {'success': False, 'positions': [], 'net_pnl': 0.00, 'open_positions_count': 0}
+            return {'success': False, 'positions': [], 'net_pnl': 0.00, 'realized_pnl': 0.00, 'unrealized_pnl': 0.00, 'open_positions_count': 0, 'closed_positions_count': 0}
 
         try:
             url = "https://api.dhan.co/v2/positions"
@@ -230,23 +314,64 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                 if not isinstance(positions_data, list):
                     positions_data = []
                 net_pnl = 0.0
+                total_realized = 0.0
+                total_unrealized = 0.0
                 open_count = 0
+                closed_count = 0
+                parsed_positions = []
+
                 for pos in positions_data:
                     realized = float(pos.get("realizedProfit", 0.0) or 0.0)
                     unrealized = float(pos.get("unrealizedProfit", 0.0) or 0.0)
-                    net_pnl += (realized + unrealized)
-                    if int(pos.get("netQty", 0) or 0) != 0:
+                    tot_pos_pnl = round(realized + unrealized, 2)
+                    net_qty = int(pos.get("netQty", 0) or 0)
+                    buy_qty = int(pos.get("buyQty", 0) or 0)
+                    sell_qty = int(pos.get("sellQty", 0) or 0)
+                    buy_avg = float(pos.get("buyAvg", 0.0) or 0.0)
+                    sell_avg = float(pos.get("sellAvg", 0.0) or 0.0)
+                    
+                    if net_qty != 0:
                         open_count += 1
+                        pos_status = "OPEN"
+                    else:
+                        closed_count += 1
+                        pos_status = "CLOSED"
+
+                    net_pnl += tot_pos_pnl
+                    total_realized += realized
+                    total_unrealized += unrealized
+
+                    parsed_positions.append({
+                        'position_type': pos.get("positionType", "LONG" if net_qty > 0 else ("SHORT" if net_qty < 0 else "CLOSED")),
+                        'trading_symbol': pos.get("tradingSymbol", ""),
+                        'security_id': pos.get("securityId", ""),
+                        'exchange_segment': pos.get("exchangeSegment", "NSE_FNO"),
+                        'product_type': pos.get("productType", "INTRADAY"),
+                        'buy_qty': buy_qty,
+                        'sell_qty': sell_qty,
+                        'net_qty': net_qty,
+                        'buy_avg': buy_avg,
+                        'sell_avg': sell_avg,
+                        'realized_profit': round(realized, 2),
+                        'unrealized_profit': round(unrealized, 2),
+                        'total_pnl': tot_pos_pnl,
+                        'status': pos_status,
+                        'cross_currency': pos.get("crossCurrency", False),
+                    })
+
                 return {
                     'success': True,
-                    'positions': positions_data,
+                    'positions': parsed_positions,
                     'net_pnl': round(net_pnl, 2),
-                    'open_positions_count': open_count
+                    'realized_pnl': round(total_realized, 2),
+                    'unrealized_pnl': round(total_unrealized, 2),
+                    'open_positions_count': open_count,
+                    'closed_positions_count': closed_count,
                 }
-            return {'success': False, 'positions': [], 'net_pnl': 0.00, 'open_positions_count': 0}
+            return {'success': False, 'positions': [], 'net_pnl': 0.00, 'realized_pnl': 0.00, 'unrealized_pnl': 0.00, 'open_positions_count': 0, 'closed_positions_count': 0}
         except Exception as e:
             logger.warning("Dhan get_live_positions exception: %s", e)
-            return {'success': False, 'positions': [], 'net_pnl': 0.00, 'open_positions_count': 0}
+            return {'success': False, 'positions': [], 'net_pnl': 0.00, 'realized_pnl': 0.00, 'unrealized_pnl': 0.00, 'open_positions_count': 0, 'closed_positions_count': 0}
 
     def get_live_orders(self) -> Dict[str, Any]:
         """Fetches today's live orders telemetry from Dhan /v2/orders."""
@@ -254,7 +379,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         token = str(self.get_access_token() or '').strip().strip('"').strip("'")
         client_id = str(self.client_id or '').strip().strip('"').strip("'")
         if not token or not client_id:
-            return {'success': False, 'orders': [], 'orders_count': 0}
+            return {'success': False, 'orders': [], 'orders_count': 0, 'open_orders_count': 0, 'traded_orders_count': 0}
 
         try:
             url = "https://api.dhan.co/v2/orders"
@@ -264,11 +389,83 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                 orders_data = resp.json()
                 if not isinstance(orders_data, list):
                     orders_data = []
-                return {'success': True, 'orders': orders_data, 'orders_count': len(orders_data)}
-            return {'success': False, 'orders': [], 'orders_count': 0}
+                
+                open_cnt = 0
+                traded_cnt = 0
+                parsed_orders = []
+                for ord_item in orders_data:
+                    st = str(ord_item.get("orderStatus", "")).upper()
+                    if st in ["PENDING", "TRANSIT", "CONFIRM"]:
+                        open_cnt += 1
+                    elif st == "TRADED":
+                        traded_cnt += 1
+
+                    parsed_orders.append({
+                        'order_id': ord_item.get("orderId", ""),
+                        'exchange_order_id': ord_item.get("exchangeOrderId", ""),
+                        'order_status': st,
+                        'transaction_type': str(ord_item.get("transactionType", "BUY")).upper(),
+                        'exchange_segment': ord_item.get("exchangeSegment", "NSE_FNO"),
+                        'product_type': ord_item.get("productType", "INTRADAY"),
+                        'order_type': ord_item.get("orderType", "MARKET"),
+                        'validity': ord_item.get("validity", "DAY"),
+                        'trading_symbol': ord_item.get("tradingSymbol", ""),
+                        'security_id': ord_item.get("securityId", ""),
+                        'quantity': int(ord_item.get("quantity", 0) or 0),
+                        'filled_qty': int(ord_item.get("filledQty", ord_item.get("quantity", 0)) or 0),
+                        'price': float(ord_item.get("price", 0.0) or 0.0),
+                        'trigger_price': float(ord_item.get("triggerPrice", 0.0) or 0.0),
+                        'create_time': ord_item.get("createTime", ""),
+                        'update_time': ord_item.get("updateTime", ""),
+                        'oms_error_code': ord_item.get("omsErrorCode", ""),
+                        'oms_error_desc': ord_item.get("omsErrorDescription", ""),
+                    })
+
+                # Sort newest first by create_time
+                parsed_orders.sort(key=lambda x: str(x.get('create_time', '')), reverse=True)
+
+                return {
+                    'success': True,
+                    'orders': parsed_orders,
+                    'orders_count': len(parsed_orders),
+                    'open_orders_count': open_cnt,
+                    'traded_orders_count': traded_cnt,
+                }
+            return {'success': False, 'orders': [], 'orders_count': 0, 'open_orders_count': 0, 'traded_orders_count': 0}
         except Exception as e:
             logger.warning("Dhan get_live_orders exception: %s", e)
-            return {'success': False, 'orders': [], 'orders_count': 0}
+            return {'success': False, 'orders': [], 'orders_count': 0, 'open_orders_count': 0, 'traded_orders_count': 0}
+
+    def cancel_live_order(self, order_id: str) -> Dict[str, Any]:
+        """Cancels an active live order via DhanHQ v2 API: DELETE /v2/orders/{orderId}."""
+        import requests
+        token = str(self.get_access_token() or '').strip().strip('"').strip("'")
+        client_id = str(self.client_id or '').strip().strip('"').strip("'")
+        if not token or not client_id:
+            return {'success': False, 'message': 'Missing Dhan credentials or active session token.'}
+
+        try:
+            url = f"https://api.dhan.co/v2/orders/{order_id}"
+            headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
+            resp = requests.delete(url, headers=headers, timeout=6)
+            if resp.status_code == 200:
+                return {'success': True, 'order_id': order_id, 'message': f'Order {order_id} cancelled successfully.'}
+            return {'success': False, 'order_id': order_id, 'message': f'Cancel failed (HTTP {resp.status_code}): {resp.text}'}
+        except Exception as e:
+            logger.error("Dhan cancel_live_order error for %s: %s", order_id, e)
+            return {'success': False, 'order_id': order_id, 'message': f'Network error cancelling order: {e}'}
+
+    def square_off_position(self, symbol: str, quantity: int, side: str, product_type: str = 'INTRADAY', security_id: str = '') -> Dict[str, Any]:
+        """Squares off an active position by routing an opposite MARKET order."""
+        exit_side = 'SELL' if side.upper() == 'BUY' or int(quantity) > 0 else 'BUY'
+        exit_qty = abs(int(quantity))
+        return self.place_order(
+            symbol=symbol,
+            quantity=exit_qty,
+            side=exit_side,
+            order_type='MARKET',
+            account_type='LIVE'
+        )
 
     def get_trade_book(self) -> Dict[str, Any]:
         """Fetches executed trade book telemetry from Dhan /v2/trades (DhanHQ v2 API) with Redis caching."""
@@ -413,17 +610,19 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         except Exception as cache_err:
             logger.warning("Redis read exception in get_live_dashboard_summary: %s", cache_err)
 
-        # Parallel execution of 3 HTTP API requests to Dhan
-        with ThreadPoolExecutor(max_workers=3) as executor:
+        # Parallel execution of 4 HTTP API requests to Dhan
+        with ThreadPoolExecutor(max_workers=4) as executor:
             future_funds = executor.submit(self.get_fund_limits)
             future_positions = executor.submit(self.get_live_positions)
+            future_holdings = executor.submit(self.get_holdings)
             future_orders = executor.submit(self.get_live_orders)
 
             funds = future_funds.result()
             positions = future_positions.result()
+            holdings = future_holdings.result()
             orders = future_orders.result()
 
-        is_active = funds.get('success') or positions.get('success')
+        is_active = funds.get('success') or positions.get('success') or holdings.get('success')
         needs_consent = not is_active
 
         result = {
@@ -434,9 +633,20 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             'collateral': funds.get('collateral', '0.00'),
             'margin_utilized': funds.get('margin_utilized', '0.00'),
             'live_net_pnl': positions.get('net_pnl', 0.00),
+            'realized_pnl': positions.get('realized_pnl', 0.00),
+            'unrealized_pnl': positions.get('unrealized_pnl', 0.00),
             'open_positions_count': positions.get('open_positions_count', 0),
+            'closed_positions_count': positions.get('closed_positions_count', 0),
             'todays_orders_count': orders.get('orders_count', 0),
+            'open_orders_count': orders.get('open_orders_count', 0),
+            'traded_orders_count': orders.get('traded_orders_count', 0),
             'positions': positions.get('positions', []),
+            'holdings': holdings.get('holdings', []),
+            'total_invested': holdings.get('total_invested', 0.00),
+            'current_value': holdings.get('current_value', 0.00),
+            'holdings_pnl': holdings.get('total_pnl', 0.00),
+            'holdings_pnl_pct': holdings.get('pnl_pct', 0.00),
+            'holdings_count': holdings.get('holdings_count', 0),
             'orders': orders.get('orders', [])
         }
 

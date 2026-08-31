@@ -1,4 +1,5 @@
 
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.views.generic import DeleteView
@@ -100,6 +101,8 @@ class AdminDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
         context['active_traders'] = User.objects.filter(
             role=MemberRoleChoices.TRADERS, trade_eligibility=True
         ).count()
+        context['active_configs_count'] = TradeExecConfig.objects.filter(is_active=True, is_deleted=False).count()
+        context['broker_masters_count'] = BrokerMaster.objects.filter(is_active=True).count()
         return context
 
 
@@ -132,9 +135,25 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         broker_name = 'Dhan HQ'
         available_margin = "0.00"
         cash_balance = "0.00"
+        collateral = "0.00"
+        margin_utilized = "0.00"
         live_net_pnl = 0.00
+        realized_pnl = 0.00
+        unrealized_pnl = 0.00
         open_positions_count = 0
+        closed_positions_count = 0
         todays_orders_count = 0
+        open_orders_count = 0
+        traded_orders_count = 0
+        total_invested = 0.00
+        current_value = 0.00
+        holdings_pnl = 0.00
+        holdings_pnl_pct = 0.00
+        holdings_count = 0
+
+        context['live_positions'] = []
+        context['live_holdings'] = []
+        context['live_orders'] = []
 
         if live_account:
             broker_name = live_account.broker.name if live_account.broker else 'DHAN'
@@ -146,11 +165,36 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
                     needs_consent = summary.get('needs_consent', False)
                     available_margin = summary.get('available_margin', '0.00')
                     cash_balance = summary.get('cash', '0.00')
+                    collateral = summary.get('collateral', '0.00')
+                    margin_utilized = summary.get('margin_utilized', '0.00')
                     live_net_pnl = summary.get('live_net_pnl', 0.00)
+                    realized_pnl = summary.get('realized_pnl', 0.00)
+                    unrealized_pnl = summary.get('unrealized_pnl', 0.00)
                     open_positions_count = summary.get('open_positions_count', 0)
+                    closed_positions_count = summary.get('closed_positions_count', 0)
                     todays_orders_count = summary.get('todays_orders_count', 0)
-                    context['live_positions'] = summary.get('positions', [])
-                    context['live_orders'] = summary.get('orders', [])
+                    open_orders_count = summary.get('open_orders_count', 0)
+                    traded_orders_count = summary.get('traded_orders_count', 0)
+                    total_invested = summary.get('total_invested', 0.00)
+                    current_value = summary.get('current_value', 0.00)
+                    holdings_pnl = summary.get('holdings_pnl', 0.00)
+                    holdings_pnl_pct = summary.get('holdings_pnl_pct', 0.00)
+                    holdings_count = summary.get('holdings_count', 0)
+                    raw_pos = summary.get('positions', [])
+                    context['all_positions_count'] = len(raw_pos)
+                    pos_paginator = Paginator(raw_pos, 10)
+                    context['live_positions'] = pos_paginator.page(1).object_list
+                    context['page_obj'] = pos_paginator.page(1)
+                    context['is_paginated'] = pos_paginator.num_pages > 1
+
+                    raw_hld = summary.get('holdings', [])
+                    hld_paginator = Paginator(raw_hld, 10)
+                    context['live_holdings'] = hld_paginator.page(1).object_list
+
+                    raw_ord = summary.get('orders', [])
+                    context['orders_count'] = len(raw_ord)
+                    ord_paginator = Paginator(raw_ord, 10)
+                    context['live_orders'] = ord_paginator.page(1).object_list
                 else:
                     auth_res = adapter.test_connection()
                     is_token_active = auth_res.get('success', False)
@@ -165,10 +209,197 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context['needs_consent'] = needs_consent
         context['available_margin'] = available_margin
         context['cash_balance'] = cash_balance
+        context['collateral'] = collateral
+        context['margin_utilized'] = margin_utilized
         context['live_net_pnl'] = live_net_pnl
+        context['realized_pnl'] = realized_pnl
+        context['unrealized_pnl'] = unrealized_pnl
         context['open_positions_count'] = open_positions_count
+        context['closed_positions_count'] = closed_positions_count
         context['todays_orders_count'] = todays_orders_count
+        context['open_orders_count'] = open_orders_count
+        context['traded_orders_count'] = traded_orders_count
+        context['total_invested'] = total_invested
+        context['current_value'] = current_value
+        context['holdings_pnl'] = holdings_pnl
+        context['holdings_pnl_pct'] = holdings_pnl_pct
+        context['holdings_count'] = holdings_count
         return context
+
+
+class AdminLivePositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial view returning live positions table and PnL metrics with pagination."""
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first()
+        positions_res = {'positions': [], 'net_pnl': 0.00, 'realized_pnl': 0.00, 'unrealized_pnl': 0.00, 'open_positions_count': 0, 'closed_positions_count': 0}
+        
+        if live_account:
+            try:
+                adapter = BrokerFactory.get_adapter(live_account)
+                positions_res = adapter.get_live_positions()
+            except Exception as e:
+                logger.warning("Error fetching live positions partial: %s", e)
+
+        filter_status = request.GET.get('status', 'ALL').upper()
+        raw_positions = positions_res.get('positions', [])
+        if filter_status == 'OPEN':
+            filtered_positions = [p for p in raw_positions if p.get('status') == 'OPEN']
+        elif filter_status == 'CLOSED':
+            filtered_positions = [p for p in raw_positions if p.get('status') == 'CLOSED']
+        else:
+            filtered_positions = raw_positions
+
+        page_num = request.GET.get('page', 1)
+        paginator = Paginator(filtered_positions, 10)
+        try:
+            page_obj = paginator.page(page_num)
+        except (PageNotAnInteger, EmptyPage):
+            page_obj = paginator.page(1)
+
+        context = {
+            'live_positions': page_obj.object_list,
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': paginator.num_pages > 1,
+            'all_positions_count': len(raw_positions),
+            'open_positions_count': positions_res.get('open_positions_count', 0),
+            'closed_positions_count': positions_res.get('closed_positions_count', 0),
+            'live_net_pnl': positions_res.get('net_pnl', 0.00),
+            'realized_pnl': positions_res.get('realized_pnl', 0.00),
+            'unrealized_pnl': positions_res.get('unrealized_pnl', 0.00),
+            'filter_status': filter_status,
+            'live_account': live_account,
+        }
+        return render(request, 'admins/partials/live_positions_table.html', context)
+
+
+class AdminLiveHoldingsPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial view returning long-term equity holdings and portfolio statistics."""
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first()
+        holdings_res = {'holdings': [], 'total_invested': 0.00, 'current_value': 0.00, 'total_pnl': 0.00, 'pnl_pct': 0.00, 'holdings_count': 0}
+        
+        if live_account:
+            try:
+                adapter = BrokerFactory.get_adapter(live_account)
+                holdings_res = adapter.get_holdings()
+            except Exception as e:
+                logger.warning("Error fetching live holdings partial: %s", e)
+
+        raw_holdings = holdings_res.get('holdings', [])
+        page_num = request.GET.get('page', 1)
+        paginator = Paginator(raw_holdings, 10)
+        try:
+            page_obj = paginator.page(page_num)
+        except (PageNotAnInteger, EmptyPage):
+            page_obj = paginator.page(1)
+
+        context = {
+            'live_holdings': page_obj.object_list,
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': paginator.num_pages > 1,
+            'total_invested': holdings_res.get('total_invested', 0.00),
+            'current_value': holdings_res.get('current_value', 0.00),
+            'holdings_pnl': holdings_res.get('total_pnl', 0.00),
+            'holdings_pnl_pct': holdings_res.get('pnl_pct', 0.00),
+            'holdings_count': holdings_res.get('holdings_count', 0),
+            'live_account': live_account,
+        }
+        return render(request, 'admins/partials/live_holdings_table.html', context)
+
+
+class AdminLiveOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial view returning live order updates stream and filter tabs with pagination."""
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first()
+        orders_res = {'orders': [], 'orders_count': 0, 'open_orders_count': 0, 'traded_orders_count': 0}
+        
+        if live_account:
+            try:
+                adapter = BrokerFactory.get_adapter(live_account)
+                orders_res = adapter.get_live_orders()
+            except Exception as e:
+                logger.warning("Error fetching live orders partial: %s", e)
+
+        filter_status = request.GET.get('status', 'ALL').upper()
+        raw_orders = orders_res.get('orders', [])
+        if filter_status == 'OPEN':
+            filtered_orders = [o for o in raw_orders if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM']]
+        elif filter_status == 'TRADED':
+            filtered_orders = [o for o in raw_orders if str(o.get('order_status', '')).upper() == 'TRADED']
+        elif filter_status == 'CANCELLED':
+            filtered_orders = [o for o in raw_orders if str(o.get('order_status', '')).upper() in ['CANCELLED', 'REJECTED', 'EXPIRED']]
+        else:
+            filtered_orders = raw_orders
+
+        page_num = request.GET.get('page', 1)
+        paginator = Paginator(filtered_orders, 10)
+        try:
+            page_obj = paginator.page(page_num)
+        except (PageNotAnInteger, EmptyPage):
+            page_obj = paginator.page(1)
+
+        context = {
+            'live_orders': page_obj.object_list,
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': paginator.num_pages > 1,
+            'orders_count': orders_res.get('orders_count', 0),
+            'open_orders_count': orders_res.get('open_orders_count', 0),
+            'traded_orders_count': orders_res.get('traded_orders_count', 0),
+            'filter_status': filter_status,
+            'live_account': live_account,
+        }
+        return render(request, 'admins/partials/live_orders_table.html', context)
+
+
+class AdminLiveOrderCancelView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Cancels an active live broker order."""
+    def post(self, request, order_id, *args, **kwargs):
+        user = request.user
+        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first()
+        if not live_account:
+            return HttpResponse("No live account configured", status=400)
+
+        adapter = BrokerFactory.get_adapter(live_account)
+        res = adapter.cancel_live_order(order_id)
+        
+        response = HttpResponse()
+        msg = res.get('message', f'Order {order_id} cancellation sent.')
+        response['HX-Trigger'] = json.dumps({
+            'showToast': {'message': msg, 'level': 'success' if res.get('success') else 'error'},
+            'reloadLiveOrders': True,
+        })
+        return response
+
+
+class AdminLivePositionSquareOffView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Squares off an active intraday position via live broker API."""
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        symbol = request.POST.get('symbol', '').strip()
+        qty = int(request.POST.get('quantity', 0) or 0)
+        side = request.POST.get('side', 'BUY').strip().upper()
+        prod = request.POST.get('product_type', 'INTRADAY').strip()
+
+        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first()
+        if not live_account or not symbol or qty == 0:
+            return HttpResponse("Invalid square off request parameters", status=400)
+
+        adapter = BrokerFactory.get_adapter(live_account)
+        res = adapter.square_off_position(symbol=symbol, quantity=qty, side=side, product_type=prod)
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'showToast': {'message': f'Square-off market order routed for {symbol} ({qty} Qty).', 'level': 'success'},
+            'reloadLivePositions': True,
+            'closeGlobalModal': True,
+        })
+        return response
 
 
 class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
@@ -1069,6 +1300,9 @@ class AdminBrokerMasterBulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, Vi
 
 class SiteSettingsAdminView(AdminRequiredMixin, View):
     """Render and update platform site settings."""
+    template_name = 'admins/site_settings.html'
+    partial_template_name = 'admins/partials/site_settings_content.html'
+
     def get(self, request, *args, **kwargs):
         settings_obj = SiteSettings.load()
         meta_config_json = json.dumps(settings_obj.meta_config or {}, indent=2)
@@ -1076,7 +1310,9 @@ class SiteSettingsAdminView(AdminRequiredMixin, View):
             'settings_obj': settings_obj,
             'meta_config_json': meta_config_json,
         }
-        return render(request, 'admins/site_settings.html', context)
+        if request.headers.get('HX-Request'):
+            return render(request, self.partial_template_name, context)
+        return render(request, self.template_name, context)
 
     def post(self, request, *args, **kwargs):
         settings_obj = SiteSettings.load()
@@ -1117,7 +1353,11 @@ class SiteSettingsLogoUploadView(AdminRequiredMixin, View):
 
         image_file = getattr(settings_obj, field_name)
         image_url = image_file.url if image_file else ''
-
+        context = {
+            'field_name': field_name,
+            'asset_file': image_file,
+            'image_url': image_url,
+        }
         return render(request, 'admins/partials/_logo_preview.html', context)
 
 

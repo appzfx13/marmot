@@ -4,6 +4,7 @@ import os
 from django.conf import settings
 from django.contrib import messages
 from django.core.mail import send_mail
+from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 
 logger = logging.getLogger(__name__)
 from django.contrib.auth import login as auth_login, logout as auth_logout, update_session_auth_hash
@@ -298,12 +299,27 @@ class UserLiveDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateV
         broker_name = 'Dhan HQ'
         available_margin = "0.00"
         cash_balance = "0.00"
+        collateral = "0.00"
+        margin_utilized = "0.00"
         live_net_pnl = 0.00
+        realized_pnl = 0.00
+        unrealized_pnl = 0.00
         open_positions_count = 0
+        closed_positions_count = 0
         todays_orders_count = 0
+        open_orders_count = 0
+        traded_orders_count = 0
+        total_invested = 0.00
+        current_value = 0.00
+        holdings_pnl = 0.00
+        holdings_pnl_pct = 0.00
+        holdings_count = 0
+
+        context['live_positions'] = []
+        context['live_holdings'] = []
+        context['live_orders'] = []
 
         if live_account:
-            broker_code = getattr(live_account.broker, 'code', 'dhan').lower() if live_account.broker else 'dhan'
             broker_name = live_account.broker.name if live_account.broker else 'DHAN'
             try:
                 adapter = BrokerFactory.get_adapter(live_account)
@@ -313,11 +329,36 @@ class UserLiveDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateV
                     needs_consent = summary.get('needs_consent', False)
                     available_margin = summary.get('available_margin', '0.00')
                     cash_balance = summary.get('cash', '0.00')
+                    collateral = summary.get('collateral', '0.00')
+                    margin_utilized = summary.get('margin_utilized', '0.00')
                     live_net_pnl = summary.get('live_net_pnl', 0.00)
+                    realized_pnl = summary.get('realized_pnl', 0.00)
+                    unrealized_pnl = summary.get('unrealized_pnl', 0.00)
                     open_positions_count = summary.get('open_positions_count', 0)
+                    closed_positions_count = summary.get('closed_positions_count', 0)
                     todays_orders_count = summary.get('todays_orders_count', 0)
-                    context['live_positions'] = summary.get('positions', [])
-                    context['live_orders'] = summary.get('orders', [])
+                    open_orders_count = summary.get('open_orders_count', 0)
+                    traded_orders_count = summary.get('traded_orders_count', 0)
+                    total_invested = summary.get('total_invested', 0.00)
+                    current_value = summary.get('current_value', 0.00)
+                    holdings_pnl = summary.get('holdings_pnl', 0.00)
+                    holdings_pnl_pct = summary.get('holdings_pnl_pct', 0.00)
+                    holdings_count = summary.get('holdings_count', 0)
+                    raw_pos = summary.get('positions', [])
+                    context['all_positions_count'] = len(raw_pos)
+                    pos_paginator = Paginator(raw_pos, 10)
+                    context['live_positions'] = pos_paginator.page(1).object_list
+                    context['page_obj'] = pos_paginator.page(1)
+                    context['is_paginated'] = pos_paginator.num_pages > 1
+
+                    raw_hld = summary.get('holdings', [])
+                    hld_paginator = Paginator(raw_hld, 10)
+                    context['live_holdings'] = hld_paginator.page(1).object_list
+
+                    raw_ord = summary.get('orders', [])
+                    context['orders_count'] = len(raw_ord)
+                    ord_paginator = Paginator(raw_ord, 10)
+                    context['live_orders'] = ord_paginator.page(1).object_list
                 else:
                     auth_res = adapter.test_connection()
                     is_token_active = auth_res.get('success', False)
@@ -332,9 +373,21 @@ class UserLiveDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateV
         context['needs_consent'] = needs_consent
         context['available_margin'] = available_margin
         context['cash_balance'] = cash_balance
+        context['collateral'] = collateral
+        context['margin_utilized'] = margin_utilized
         context['live_net_pnl'] = live_net_pnl
+        context['realized_pnl'] = realized_pnl
+        context['unrealized_pnl'] = unrealized_pnl
         context['open_positions_count'] = open_positions_count
+        context['closed_positions_count'] = closed_positions_count
         context['todays_orders_count'] = todays_orders_count
+        context['open_orders_count'] = open_orders_count
+        context['traded_orders_count'] = traded_orders_count
+        context['total_invested'] = total_invested
+        context['current_value'] = current_value
+        context['holdings_pnl'] = holdings_pnl
+        context['holdings_pnl_pct'] = holdings_pnl_pct
+        context['holdings_count'] = holdings_count
         return context
 
 
@@ -734,6 +787,126 @@ class UserAccountCreateView(LoginRequiredMixin, View):
             msg = f"Failed to create account: {str(ex)}"
             messages.error(request, msg)
             level = 'error'
+
+        if request.headers.get('HX-Request'):
+            trigger_dict = {'showToast': {'message': msg, 'level': level}, 'refreshAccountsCards': True}
+            if level == 'success':
+                trigger_dict['closeGlobalModal'] = True
+                trigger_dict['refreshAccounts'] = True
+
+            status_code = 204 if level == 'success' else 200
+            response = HttpResponse(status=status_code)
+            response['HX-Trigger'] = json.dumps(trigger_dict)
+            return response
+        else:
+            redirect_url = request.META.get('HTTP_REFERER') or reverse('users:marmot-profile')
+            return redirect(redirect_url)
+
+
+class UserAccountEditModalView(HtmxModalMixin, LoginRequiredMixin, View):
+    """Render HTMX modal for editing an existing Live or Sandbox trading account."""
+    modal_template_name = 'users/partials/account_edit_modal.html'
+    template_name = 'users/partials/account_edit_modal.html'
+
+    def get(self, request, pk, *args, **kwargs):
+        user = request.user
+        account = user.trading_accounts.filter(pk=pk, is_deleted=False).first()
+        if not account and (user.is_superuser or getattr(user, 'role', '') in ['admin', 'developer']):
+            account = UserTradingAccount.objects.filter(pk=pk, is_deleted=False).first()
+        if not account:
+            messages.error(request, "Trading account not found.")
+            return HttpResponse('<div class="p-3 text-danger">Trading account not found.</div>')
+
+        brokers = BrokerMaster.objects.filter(is_active=True).exclude(code='sandbox')
+        return render(request, self.modal_template_name, {'account': account, 'brokers': brokers})
+
+
+class UserAccountEditView(LoginRequiredMixin, View):
+    """Handle editing an existing trading account with optional Live API re-validation."""
+    def post(self, request, pk, *args, **kwargs):
+        user = request.user
+        account = user.trading_accounts.filter(pk=pk, is_deleted=False).first()
+        if not account and (user.is_superuser or getattr(user, 'role', '') in ['admin', 'developer']):
+            account = UserTradingAccount.objects.filter(pk=pk, is_deleted=False).first()
+
+        if not account:
+            msg = "Trading account not found."
+            level = 'error'
+        else:
+            try:
+                is_default = request.POST.get('is_default') == 'on'
+
+                if account.account_type == 'SANDBOX':
+                    account_name = request.POST.get('sandbox_account_name') or request.POST.get('account_name') or account.account_name
+                    try:
+                        capital = float(request.POST.get('initial_capital', 100000))
+                    except ValueError:
+                        capital = float(account.account_summary.get('initial_capital', 100000))
+
+                    account.account_name = account_name
+                    summary = dict(account.account_summary) if isinstance(account.account_summary, dict) else {}
+                    summary['initial_capital'] = capital
+                    summary['balance'] = capital
+                    account.account_summary = summary
+                    account.is_default = is_default
+                    account.save()
+
+                    if is_default:
+                        account.user.trading_accounts.exclude(id=account.id).update(is_default=False)
+
+                    msg = f"Sandbox Account '{account_name}' updated successfully!"
+                    messages.success(request, msg)
+                    level = 'success'
+                else:
+                    # LIVE Account Update
+                    broker_id = request.POST.get('broker_id')
+                    if broker_id:
+                        broker = BrokerMaster.objects.filter(id=broker_id, is_deleted=False).first()
+                        if broker:
+                            account.broker = broker
+
+                    account_name = request.POST.get('account_name') or account.account_name
+                    client_id = str(request.POST.get('broker_client_id', '')).strip().strip('"').strip("'")
+                    api_key = str(request.POST.get('api_key', '')).strip().strip('"').strip("'")
+                    app_id = str(request.POST.get('app_id', '')).strip().strip('"').strip("'")
+
+                    account.account_name = account_name
+                    if client_id:
+                        account.broker_client_id = client_id
+                    if app_id:
+                        account.app_id = app_id
+
+                    # If a new API key was provided, re-test connection
+                    if api_key:
+                        account.api_key = api_key
+                        adapter = BrokerFactory.get_adapter(account)
+                        auth_res = adapter.test_connection()
+                        is_auth_valid = (
+                            auth_res.get('success') is True or 
+                            auth_res.get('connected') is True or 
+                            str(auth_res.get('status', '')).upper() in ['SUCCESS', 'CONNECTED', 'OK']
+                        )
+                        if not is_auth_valid:
+                            err_msg = auth_res.get('message', 'Broker rejected authentication credentials.')
+                            raise ValueError(f"Live Auth Validation Failed: {err_msg}")
+                        account.is_configured = True
+                        account.account_summary = auth_res
+
+                    account.is_default = is_default
+                    account.save()
+
+                    if is_default:
+                        account.user.trading_accounts.exclude(id=account.id).update(is_default=False)
+
+                    msg = f"Live Account '{account_name}' updated successfully!"
+                    messages.success(request, msg)
+                    level = 'success'
+
+            except Exception as ex:
+                logger.error(f"Error updating trading account: {ex}")
+                msg = f"Failed to update account: {str(ex)}"
+                messages.error(request, msg)
+                level = 'error'
 
         if request.headers.get('HX-Request'):
             trigger_dict = {'showToast': {'message': msg, 'level': level}, 'refreshAccountsCards': True}

@@ -27,25 +27,28 @@
     </div>
     <!-- END: Dashboard Header Banner -->
 
-    <!-- START: Top Area Metric Cards -->
-    <div class="row g-4">
+    <!-- START: Top Area Metric Cards (4-Card Setup) -->
+    <div class="row g-3">
         <!-- Stat Card 1: Green Alert Banner -->
-        <div class="col-xl-4 col-md-6">
-            <div class="card alert-green-card h-100 d-flex flex-column justify-content-between">
+        <div class="col-xl-3 col-md-6">
+            <div class="card alert-green-card">
                 <div class="position-relative z-index-2">
                     <span class="alert-green-badge">Engine Status</span>
                     <div class="alert-green-date">Platform Core &bull; High-Throughput</div>
-                    <div class="alert-green-text">Trading engine, worker pools, and broker telemetry online</div>
+                    <div class="alert-green-text">Trading engine &amp; telemetry online</div>
                 </div>
-                <a href="{% url 'admins:admin-live-dashboard' %}" 
-                   class="alert-green-link z-index-2"
-                   hx-get="{% url 'admins:admin-live-dashboard' %}"
-                   hx-target="#app-main-container"
-                   hx-swap="innerHTML"
-                   hx-push-url="true">
-                    <span>Live Console</span>
-                    <i class="bi bi-arrow-right"></i>
-                </a>
+                <div class="metric-card-footer border-dark border-opacity-10 z-index-2">
+                    <a href="{% url 'admins:admin-live-dashboard' %}" 
+                       class="alert-green-link"
+                       hx-get="{% url 'admins:admin-live-dashboard' %}"
+                       hx-target="#app-main-container"
+                       hx-swap="innerHTML"
+                       hx-push-url="true">
+                        <span>Live Console</span>
+                        <i class="bi bi-arrow-right"></i>
+                    </a>
+                    <span class="badge bg-dark bg-opacity-25 text-white smaller px-2 py-0.5">Dual-Engine</span>
+                </div>
 
                 <!-- Inline SVG geometric decoration -->
                 <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -59,52 +62,93 @@
         </div>
 
         <!-- Stat Card 2: Total Registered Traders -->
-        <div class="col-xl-4 col-md-6">
-            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
                 <div>
-                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
-                        <span class="stat-label">Total Registered Traders</span>
-                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-1 small fw-bold">Traders</span>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-people-fill text-primary"></i>
+                            <span>Total Traders</span>
+                        </span>
+                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller fw-bold">All Users</span>
                     </div>
-                    <div class="stat-value text-primary">
+                    <div class="metric-card-date">Platform User Base</div>
+                    <div class="metric-card-value text-primary">
                         {{ total_traders|default:0 }}
                     </div>
-                    <div class="trend-badge trend-up">
-                        <i class="bi bi-person-check-fill"></i>
-                        <span>Accounts created across all roles</span>
-                    </div>
                 </div>
-                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
-                    <span>Account Base</span>
-                    <span class="fw-semibold text-main">System Users</span>
+                <div class="metric-card-footer">
+                    <span>
+                        <i class="bi bi-person-check-fill text-primary me-1"></i>Registered
+                    </span>
+                    <a href="{% url 'admins:trader_list' %}" 
+                       class="text-primary text-decoration-none fw-semibold"
+                       hx-get="{% url 'admins:trader_list' %}"
+                       hx-target="#app-main-container"
+                       hx-swap="innerHTML"
+                       hx-push-url="true">
+                        <span>Traders &rarr;</span>
+                    </a>
                 </div>
             </div>
         </div>
 
         <!-- Stat Card 3: Active Traders -->
-        <div class="col-xl-4 col-md-12">
-            <div class="card card-stat h-100 d-flex flex-column justify-content-between">
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
                 <div>
-                    <div class="card-header p-0 mb-3 border-0 bg-transparent d-flex align-items-center justify-content-between">
-                        <span class="stat-label">Active / Eligible Traders</span>
-                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-1 small fw-bold">Live Ready</span>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-shield-check text-success"></i>
+                            <span>Active Traders</span>
+                        </span>
+                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Live Ready</span>
                     </div>
-                    <div class="stat-value text-success">
+                    <div class="metric-card-date">Trade-Eligible Accounts</div>
+                    <div class="metric-card-value text-success">
                         {{ active_traders|default:0 }}
                     </div>
-                    <div class="trend-badge trend-up">
-                        <i class="bi bi-shield-check"></i>
-                        <span>Eligible for real-time strategy execution</span>
+                </div>
+                <div class="metric-card-footer">
+                    <span>
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>Enabled
+                    </span>
+                    <span class="text-success fw-bold smaller">Execution Ready</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stat Card 4: Strategy Rules & Execution Controls -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-sliders text-info"></i>
+                            <span>Strategy Rules</span>
+                        </span>
+                        <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0.5 smaller fw-bold">Active</span>
+                    </div>
+                    <div class="metric-card-date">{{ broker_masters_count|default:0 }} Broker Masters Linked</div>
+                    <div class="metric-card-value text-info">
+                        {{ active_configs_count|default:0 }}
                     </div>
                 </div>
-                <div class="mt-3 pt-2 border-top border-light-subtle d-flex justify-content-between align-items-center smaller theme-text-muted">
-                    <span>Execution Ready</span>
-                    <span class="fw-semibold text-main">Trade Enabled</span>
+                <div class="metric-card-footer">
+                    <span>Engine Configs</span>
+                    <a href="{% url 'admins:trade_exec_config_list' %}" 
+                       class="text-info text-decoration-none fw-semibold"
+                       hx-get="{% url 'admins:trade_exec_config_list' %}"
+                       hx-target="#app-main-container"
+                       hx-swap="innerHTML"
+                       hx-push-url="true">
+                        <span>Manage &rarr;</span>
+                    </a>
                 </div>
             </div>
         </div>
     </div>
-    <!-- END: Top Area Metric Cards -->
+    <!-- END: Top Area Metric Cards (4-Card Setup) -->
 
     <!-- START: Quick Management Actions Card -->
     <div class="row g-4">

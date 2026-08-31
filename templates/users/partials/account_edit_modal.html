@@ -1,0 +1,155 @@
+<!-- templates/users/partials/account_edit_modal.html -->
+<div class="modal-content glass-card p-3 border shadow-lg" style="max-width: 620px; width: 100%; margin: 0 auto; background: var(--glass-bg, #0d1527); backdrop-filter: blur(20px); border: 1px solid var(--border-color) !important; border-radius: 16px; color: var(--theme-text-main, #fff);">
+    
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3 pt-1">
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle bg-primary bg-opacity-15 text-primary d-flex align-items-center justify-content-center" style="width: 40px; height: 40px; border: 1px solid rgba(180, 241, 5, 0.3);">
+                <span class="material-icons fs-5">edit_note</span>
+            </div>
+            <div>
+                <h5 class="modal-title fw-bold theme-text-main mb-0">Edit Trading Account</h5>
+                <small class="theme-text-muted">Update configuration, API keys, or paper-trading parameters for <strong>{{ account.account_name }}</strong>.</small>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <form id="accountEditForm" action="{% url 'users:user-account-edit' account.id %}" method="POST" hx-post="{% url 'users:user-account-edit' account.id %}" hx-swap="none">
+        {% csrf_token %}
+        <div class="modal-body py-3">
+            <style>
+                .modal-tab-pill {
+                    color: var(--text-muted, #94a3b8) !important;
+                    background: transparent !important;
+                    border: 1px solid transparent !important;
+                    border-radius: 8px !important;
+                    padding: 0.55rem 1rem !important;
+                    font-weight: 600 !important;
+                    font-size: 0.8rem !important;
+                    letter-spacing: 0.5px;
+                    transition: all 0.2s ease-in-out !important;
+                    display: inline-flex !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    gap: 0.4rem !important;
+                }
+                .modal-tab-pill:hover {
+                    color: #FFFFFF !important;
+                    background-color: rgba(255, 255, 255, 0.04) !important;
+                }
+                .modal-tab-pill.active {
+                    color: #FFFFFF !important;
+                    background-color: rgba(180, 241, 5, 0.12) !important;
+                    border: 1px solid rgba(180, 241, 5, 0.4) !important;
+                    font-weight: 700 !important;
+                    box-shadow: 0 0 14px rgba(180, 241, 5, 0.15) !important;
+                }
+                .modal-tab-pill.active .material-icons,
+                .modal-tab-pill.active i {
+                    color: var(--brand-lime, #b4f105) !important;
+                }
+            </style>
+
+            <!-- Account Type Badge / Indicator -->
+            <div class="d-flex align-items-center justify-content-between mb-3 p-2 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small theme-text-muted fw-bold">Account Mode:</span>
+                    <span class="badge {% if account.account_type == 'LIVE' %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25{% endif %} rounded-pill px-3 py-1 fw-bold">
+                        {{ account.account_type }}
+                    </span>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="small theme-text-muted fw-bold">Broker:</span>
+                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 font-monospace fw-bold">
+                        {{ account.broker.name|upper }}
+                    </span>
+                </div>
+            </div>
+            <input type="hidden" name="account_type" id="account_type_edit_input" value="{{ account.account_type }}">
+
+            {% if account.account_type == 'LIVE' %}
+                <!-- Live Account Panel -->
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold mb-1">Select Broker Platform *</label>
+                        <select name="broker_id" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25">
+                            {% for b in brokers %}
+                                <option value="{{ b.id }}" {% if account.broker.id == b.id %}selected{% endif %} class="bg-dark text-white">{{ b.name }} ({{ b.code|upper }})</option>
+                            {% empty %}
+                                <option value="{{ account.broker.id }}" selected class="bg-dark text-white">{{ account.broker.name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold mb-1">Account Name / Nickname *</label>
+                        <input type="text" name="account_name" value="{{ account.account_name }}" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. My Primary Dhan Live" required>
+                    </div>
+                </div>
+
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold mb-1">Client ID *</label>
+                        <input type="text" name="broker_client_id" value="{{ account.broker_client_id|default:'' }}" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. 1000000001 (10-digit ID)" required>
+                    </div>
+                    <div class="col-6">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <label class="form-label theme-text-muted small fw-bold mb-0">API Secret</label>
+                            <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller" style="font-size: 0.65rem;">Optional</span>
+                        </div>
+                        <input type="password" name="app_id" value="{{ account.app_id|default:'' }}" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Leave empty to keep existing API secret">
+                    </div>
+                </div>
+
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label theme-text-muted small fw-bold mb-0">API Key / Access Token</label>
+                        <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller" style="font-size: 0.65rem;">Leave empty to keep existing token</span>
+                    </div>
+                    <input type="password" name="api_key" value="" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Paste new Access Token or leave blank to keep saved credentials">
+                </div>
+
+                <div class="alert alert-info bg-info bg-opacity-10 border-info border-opacity-25 theme-text-main p-2 small mb-0 rounded-3 d-flex align-items-center gap-2">
+                    <span class="material-icons fs-5 text-info">verified_user</span>
+                    <span style="font-size: 0.74rem;">If you enter new credentials, they will be verified with the live broker servers upon saving.</span>
+                </div>
+            {% else %}
+                <!-- Sandbox Panel -->
+                <div class="row g-2 mb-2">
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold mb-1">Sandbox Account Name *</label>
+                        <input type="text" name="sandbox_account_name" value="{{ account.account_name }}" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="e.g. Demo Strategy Tester" required>
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label theme-text-muted small fw-bold mb-1">Virtual Capital Balance (₹) *</label>
+                        <input type="number" name="initial_capital" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" value="{{ account.account_summary.initial_capital|default:100000 }}" step="5000" min="1000" required>
+                    </div>
+                </div>
+
+                <div class="alert alert-success bg-success bg-opacity-10 border-success border-opacity-25 theme-text-main p-2 small mb-0 rounded-3 d-flex align-items-center gap-2">
+                    <span class="material-icons fs-5 text-success">science</span>
+                    <span style="font-size: 0.74rem;">Sandbox accounts simulate live fills in real-time paper trading without risk to real funds.</span>
+                </div>
+            {% endif %}
+
+            <div class="form-check mt-3">
+                <input class="form-check-input" type="checkbox" name="is_default" id="is_default_edit_check" {% if account.is_default %}checked{% endif %}>
+                <label class="form-check-label theme-text-muted small fw-bold" for="is_default_edit_check">
+                    Set as my Primary Default Account
+                </label>
+            </div>
+        </div>
+
+        <div class="modal-footer border-0 pt-0">
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+            <button type="button" 
+                    class="btn btn-sm btn-primary rounded-pill px-4 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                    hx-post="{% url 'users:user-account-edit' account.id %}"
+                    hx-include="#accountEditForm"
+                    hx-swap="none">
+                <span class="material-icons fs-6">save</span>
+                <span>Update Account</span>
+            </button>
+        </div>
+    </form>
+</div>
