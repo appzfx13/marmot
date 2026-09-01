@@ -42,6 +42,7 @@ from .views import (
     AdminLiveOrderCancelView,
     AdminLivePositionSquareOffView,
     AdminSandboxDashboardView,
+    AdminAIDashboardView,
     SiteSettingsAdminView,
     SiteSettingsLogoUploadView,
     # Trading Journal & Analytics Views
@@ -68,6 +69,7 @@ urlpatterns = [
     path('dashboard/live/orders/<str:order_id>/cancel/', AdminLiveOrderCancelView.as_view(), name='admin-live-order-cancel'),
     path('dashboard/live/positions/square-off/', AdminLivePositionSquareOffView.as_view(), name='admin-live-position-square-off'),
     path('dashboard/sandbox/', AdminSandboxDashboardView.as_view(), name='admin-sandbox-dashboard'),
+    path('dashboard/ai/', AdminAIDashboardView.as_view(), name='admin-ai-dashboard'),
     path('terminal/', AdminTerminalView.as_view(), name='admin-terminal'),
     path('logout/', AdminLogoutView.as_view(), name='admin-logout'),
 

@@ -18,8 +18,13 @@
         href="https://fonts.googleapis.com/css2?family=Google+Symbols:opsz,wght,FILL,GRAD,ROND@20..48,100..700,0..1,-50..200,0..100&display=block"
         rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    {% if site_settings.favicon %}
+    <link rel="icon" href="{{ site_settings.favicon }}">
+    <link rel="shortcut icon" href="{{ site_settings.favicon }}">
+    {% else %}
     <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
     <link rel="shortcut icon" href="{% static 'images/ref/logo/logo-icon.png' %}">
+    {% endif %}
 
     <!-- Flatpickr Date Picker CSS -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
@@ -1152,6 +1157,13 @@
             z-index: 1070 !important;
         }
 
+        .modal.show,
+        .modal.fade.show {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+        }
+
         .modal-backdrop {
             z-index: 1060 !important;
         }
@@ -1159,12 +1171,18 @@
         .modal-dialog {
             z-index: 1075 !important;
             position: relative;
-            max-height: 90vh;
-            margin: 1rem auto;
+            margin: auto !important;
+        }
+
+        .modal-dialog-centered {
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            margin: auto !important;
         }
 
         .modal-dialog-scrollable .modal-content {
-            max-height: 85vh;
+            max-height: calc(100vh - 3.5rem);
         }
 
         .modal-dialog-scrollable form {
@@ -1177,7 +1195,7 @@
 
         .modal-dialog-scrollable .modal-body {
             overflow-y: auto !important;
-            max-height: calc(85vh - 120px);
+            max-height: calc(100vh - 200px);
         }
 
         body.modal-open,
@@ -1579,8 +1597,14 @@
         <a href="{% url 'users:user-live-dashboard' %}" class="sidebar-brand"
             hx-get="{% url 'users:user-live-dashboard' %}" hx-target="#user-portal-container" hx-swap="innerHTML"
             hx-push-url="true">
-            <i class="bi bi-asterisk"></i>
-            <span>MARMOT</span>
+            {% if site_settings.favicon %}
+                <img src="{{ site_settings.favicon }}" alt="{{ site_settings.brand_name|default:'Marmot' }}" class="sidebar-brand-icon" style="width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; border-radius: 6px;">
+            {% elif site_settings.logo_dark %}
+                <img src="{{ site_settings.logo_dark }}" alt="{{ site_settings.brand_name|default:'Marmot' }}" class="sidebar-brand-icon" style="height: 28px; max-width: 32px; object-fit: contain; flex-shrink: 0; border-radius: 6px;">
+            {% else %}
+                <i class="bi bi-asterisk"></i>
+            {% endif %}
+            <span>{{ site_settings.brand_name|default:'MARMOT'|upper }}</span>
             <span
                 class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 py-0 px-1 ms-auto"
                 style="font-size: 0.65rem;">TRADER</span>
@@ -1626,6 +1650,15 @@
                             hx-target="#user-portal-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-cpu-fill text-info"></i>
                             <span>Sandbox Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="{% url 'users:user-ai-dashboard' %}"
+                            class="sidebar-menu-link {% if active_tab == 'ai-dashboard' or request.resolver_match.url_name == 'user-ai-dashboard' %}active{% endif %}"
+                            id="menu-ai-dashboard" hx-get="{% url 'users:user-ai-dashboard' %}"
+                            hx-target="#user-portal-container" hx-swap="innerHTML" hx-push-url="true">
+                            <i class="bi bi-robot text-warning"></i>
+                            <span>AI Dashboard</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
@@ -1693,7 +1726,7 @@
 
         <!-- Sidebar Profile Card (Dynamic Footer) -->
         <div class="sidebar-profile">
-            <img src="{% static 'images/avatar.png' %}" alt="Trader" class="sidebar-profile-img">
+            <img src="{% if request.user.avatar %}{{ request.user.avatar.url }}{% else %}{% static 'images/avatar.png' %}{% endif %}" alt="Trader" class="sidebar-profile-img">
             <div class="sidebar-profile-info">
                 <div class="sidebar-profile-name">{% if request.user.first_name %}{{ request.user.first_name }}{% else %}{{ request.user.username }}{% endif %}</div>
                 <div class="sidebar-profile-email">{{ request.user.email|default:"Trader Active" }}</div>
@@ -1824,7 +1857,7 @@
                 <div class="dropdown ms-2">
                     <button class="navbar-profile-btn dropdown-toggle" type="button" data-bs-toggle="dropdown"
                         aria-expanded="false" id="profile-dropdown">
-                        <img src="{% static 'images/avatar.png' %}" alt="Profile Image" class="navbar-profile-img">
+                        <img src="{% if request.user.avatar %}{{ request.user.avatar.url }}{% else %}{% static 'images/avatar.png' %}{% endif %}" alt="Profile Image" class="navbar-profile-img">
                         <span class="navbar-profile-name d-none d-md-inline">{% if request.user.get_full_name %}{{ request.user.get_full_name }}{% else %}{{ request.user.username }}{% endif %}</span>
                         <i class="bi bi-chevron-down navbar-profile-caret"></i>
                     </button>

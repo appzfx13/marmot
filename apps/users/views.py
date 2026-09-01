@@ -422,6 +422,20 @@ class UserSandboxDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, Templa
         return context
 
 
+class UserAIDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """View for Trader AI Intelligence Dashboard and Gemini Copilot."""
+    template_name = 'users/dashboard.html'
+    partial_template_name = 'users/partials/ai_dashboard_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        populate_account_context(context, user, self.request)
+        context['active_tab'] = 'ai-dashboard'
+        context['gemini_active'] = bool(getattr(settings, 'GEMINI_API_KEY', ''))
+        return context
+
+
 class UserTerminalView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
     """View for user absolute trading terminal supporting Dhan & Fyers."""
     template_name = 'users/dashboard.html'
@@ -750,6 +764,7 @@ class UserAccountCreateView(LoginRequiredMixin, View):
                     api_key=api_key,
                     app_id=app_id,
                     is_default=is_default,
+                    keep_alive=(request.POST.get('keep_alive') == 'on'),
                     is_active=True,
                     is_configured=False
                 )
@@ -893,6 +908,7 @@ class UserAccountEditView(LoginRequiredMixin, View):
                         account.account_summary = auth_res
 
                     account.is_default = is_default
+                    account.keep_alive = (request.POST.get('keep_alive') == 'on')
                     account.save()
 
                     if is_default:

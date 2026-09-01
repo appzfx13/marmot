@@ -1,145 +1,362 @@
 <!-- templates/404.html -->
+{% load static %}
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>404 - Page Not Found</title>
-    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <title>404 - Page Not Found | {{ site_settings.brand_name|default:'MARMOT' }}</title>
+    
+    <!-- Dynamic Favicon -->
+    {% if site_settings.favicon %}
+        <link rel="icon" href="{{ site_settings.favicon }}">
+        <link rel="shortcut icon" href="{{ site_settings.favicon }}">
+    {% else %}
+        <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
+    {% endif %}
+
+    <!-- Google Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
     <style>
-        html { font-size: 87.5%; }
-        * { margin: 0; padding: 0; box-sizing: border-box; }
+        :root {
+            --brand-lime: #B4F105;
+            --brand-forest-dark: #04140D;
+            --brand-forest-medium: #082115;
+            --brand-emerald: #10B981;
+            --text-main: #FFFFFF;
+            --text-muted: #94A3B8;
+            --border-color: rgba(180, 241, 5, 0.18);
+            --glass-bg: rgba(6, 26, 17, 0.75);
+            --glass-card: rgba(8, 33, 21, 0.85);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
         body {
-            font-family: 'Poppins', sans-serif;
-            background: linear-gradient(135deg, #0c0c0c 0%, #1a1a2e 50%, #16213e 100%);
-            color: #fff;
+            font-family: 'Plus Jakarta Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+            background-color: var(--brand-forest-dark);
+            background-image: 
+                radial-gradient(circle at 50% 15%, rgba(180, 241, 5, 0.08) 0%, transparent 60%),
+                radial-gradient(circle at 10% 80%, rgba(16, 185, 129, 0.05) 0%, transparent 50%),
+                radial-gradient(circle at 90% 80%, rgba(180, 241, 5, 0.04) 0%, transparent 50%),
+                linear-gradient(rgba(180, 241, 5, 0.02) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(180, 241, 5, 0.02) 1px, transparent 1px);
+            background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+            color: var(--text-main);
             min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 2rem 1rem;
             overflow-x: hidden;
+            position: relative;
         }
-        .stars {
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            pointer-events: none; z-index: 1;
-        }
-        .star {
+
+        /* Top Brand Navigation */
+        .brand-header {
             position: absolute;
-            background: #fff;
-            border-radius: 50%;
-            animation: twinkle 2s infinite alternate;
+            top: 2rem;
+            left: 2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            text-decoration: none;
+            z-index: 10;
         }
-        @keyframes twinkle {
-            0% { opacity: 0.3; transform: scale(1); }
-            100% { opacity: 1; transform: scale(1.2); }
+
+        .brand-logo-img {
+            height: 38px;
+            width: auto;
+            object-fit: contain;
         }
-        .container { min-height: 100vh; display: flex; align-items: center; justify-content: center; position: relative; z-index: 2; }
-        .error-card {
-            background: rgba(15, 15, 25, 0.9);
-            backdrop-filter: blur(20px);
-            border: 1px solid rgba(255,255,255,0.1);
-            border-radius: 30px;
-            padding: 60px 40px;
+
+        .brand-text {
+            font-size: 1.35rem;
+            font-weight: 800;
+            letter-spacing: 1.5px;
+            color: #FFFFFF;
+            text-transform: uppercase;
+        }
+
+        /* Glassmorphic 404 Hero Card */
+        .error-container {
+            max-width: 680px;
+            width: 100%;
+            background: var(--glass-card);
+            backdrop-filter: blur(24px);
+            -webkit-backdrop-filter: blur(24px);
+            border: 1px solid var(--border-color);
+            border-radius: 28px;
+            padding: 3.5rem 2.5rem;
             text-align: center;
-            max-width: 500px;
-            width: 90%;
-            zoom: 0.9;
-            box-shadow: 0 25px 50px rgba(0,0,0,0.5);
-            animation: slideUp 1s ease-out;
+            position: relative;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.6), 0 0 40px rgba(180, 241, 5, 0.08);
+            animation: cardAppear 0.8s cubic-bezier(0.16, 1, 0.3, 1);
+            z-index: 5;
         }
-        @keyframes slideUp {
-            from { opacity: 0; transform: translateY(50px); }
-            to { opacity: 1; transform: translateY(0); }
+
+        @keyframes cardAppear {
+            0% {
+                opacity: 0;
+                transform: translateY(30px) scale(0.97);
+            }
+            100% {
+                opacity: 1;
+                transform: translateY(0) scale(1);
+            }
         }
-        .error-code {
-            font-size: 8rem;
+
+        /* Neon Status Badge */
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(180, 241, 5, 0.1);
+            border: 1px solid rgba(180, 241, 5, 0.35);
+            color: var(--brand-lime);
+            padding: 0.35rem 1rem;
+            border-radius: 50px;
+            font-size: 0.8rem;
             font-weight: 700;
-            background: linear-gradient(45deg, #ff6b6b, #4ecdc4, #45b7d1, #f9ca24);
+            letter-spacing: 1px;
+            text-transform: uppercase;
+            margin-bottom: 1.5rem;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-pulse {
+            width: 8px;
+            height: 8px;
+            background-color: var(--brand-lime);
+            border-radius: 50%;
+            box-shadow: 0 0 10px var(--brand-lime);
+            animation: pulse 1.8s infinite;
+        }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.4; transform: scale(0.85); }
+        }
+
+        /* 404 Large Code */
+        .error-code {
+            font-size: clamp(5.5rem, 14vw, 8.5rem);
+            font-weight: 800;
+            font-family: 'JetBrains Mono', monospace;
+            line-height: 1;
+            background: linear-gradient(180deg, #FFFFFF 0%, #B4F105 100%);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
-            margin-bottom: 20px;
-            animation: glow 2s ease-in-out infinite alternate;
+            letter-spacing: -3px;
+            margin-bottom: 1rem;
+            filter: drop-shadow(0 0 25px rgba(180, 241, 5, 0.25));
         }
-        @keyframes glow {
-            from { filter: drop-shadow(0 0 20px rgba(255,107,107,0.5)); }
-            to { filter: drop-shadow(0 0 30px rgba(78,205,196,0.8)); }
+
+        .error-title {
+            font-size: 1.75rem;
+            font-weight: 700;
+            margin-bottom: 0.85rem;
+            color: #FFFFFF;
         }
-        h1 { font-size: 2.5rem; font-weight: 600; margin-bottom: 15px; color: #fff; }
-        p { color: #b8b8b8; font-size: 1.1rem; line-height: 1.6; margin-bottom: 40px; }
-        .btn-home {
+
+        .error-desc {
+            color: var(--text-muted);
+            font-size: 0.98rem;
+            line-height: 1.6;
+            margin-bottom: 2.5rem;
+            max-width: 520px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Action Buttons */
+        .action-buttons {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 1rem;
+            flex-wrap: wrap;
+        }
+
+        .btn-primary-custom {
             display: inline-flex;
             align-items: center;
-            gap: 12px;
-            background: linear-gradient(45deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 15px 40px;
-            border: none;
+            gap: 0.5rem;
+            background: var(--brand-lime);
+            color: #04140D;
+            font-weight: 700;
+            font-size: 0.92rem;
+            padding: 0.85rem 1.85rem;
             border-radius: 50px;
-            font-size: 1.1rem;
-            font-weight: 500;
             text-decoration: none;
-            transition: all 0.3s ease;
-            box-shadow: 0 10px 30px rgba(102,126,234,0.4);
+            border: 1px solid var(--brand-lime);
+            box-shadow: 0 8px 24px rgba(180, 241, 5, 0.25);
+            transition: all 0.25s ease;
         }
-        .btn-home:hover {
-            transform: translateY(-3px);
-            box-shadow: 0 15px 40px rgba(102,126,234,0.6);
+
+        .btn-primary-custom:hover {
+            background: #c7fb28;
+            transform: translateY(-2px);
+            box-shadow: 0 12px 30px rgba(180, 241, 5, 0.4);
+            color: #000;
         }
-        .floating-shapes {
+
+        .btn-outline-custom {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            background: rgba(255, 255, 255, 0.04);
+            color: #FFFFFF;
+            font-weight: 600;
+            font-size: 0.92rem;
+            padding: 0.85rem 1.75rem;
+            border-radius: 50px;
+            text-decoration: none;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            transition: all 0.25s ease;
+            cursor: pointer;
+        }
+
+        .btn-outline-custom:hover {
+            background: rgba(255, 255, 255, 0.09);
+            border-color: rgba(255, 255, 255, 0.35);
+            color: #FFFFFF;
+            transform: translateY(-2px);
+        }
+
+        /* Ambient Orbs */
+        .ambient-orb {
             position: absolute;
-            width: 100%; height: 100%; overflow: hidden; z-index: 0;
-        }
-        .shape {
-            position: absolute;
-            background: rgba(255,255,255,0.05);
             border-radius: 50%;
-            animation: float 6s infinite linear;
+            pointer-events: none;
+            filter: blur(80px);
+            z-index: 1;
         }
-        @keyframes float {
-            0%, 100% { transform: translateY(0px) rotate(0deg); }
-            50% { transform: translateY(-20px) rotate(180deg); }
+
+        .orb-1 {
+            width: 320px;
+            height: 320px;
+            background: rgba(180, 241, 5, 0.12);
+            top: 20%;
+            left: 15%;
+            animation: orbFloat 8s infinite alternate ease-in-out;
         }
-        @media (max-width: 768px) {
-            .error-code { font-size: 5rem; }
-            .error-card { padding: 40px 20px; margin: 20px; }
+
+        .orb-2 {
+            width: 280px;
+            height: 280px;
+            background: rgba(16, 185, 129, 0.1);
+            bottom: 20%;
+            right: 15%;
+            animation: orbFloat 10s infinite alternate-reverse ease-in-out;
+        }
+
+        @keyframes orbFloat {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(25px, -30px); }
+        }
+
+        /* Footer Copyright */
+        .footer-note {
+            position: absolute;
+            bottom: 1.5rem;
+            font-size: 0.8rem;
+            color: rgba(255, 255, 255, 0.4);
+            font-family: 'JetBrains Mono', monospace;
+            text-align: center;
+        }
+
+        @media (max-width: 576px) {
+            .brand-header {
+                position: relative;
+                top: 0;
+                left: 0;
+                margin-bottom: 2rem;
+            }
+            .error-container {
+                padding: 2.5rem 1.5rem;
+            }
+            .action-buttons {
+                flex-direction: column;
+                width: 100%;
+            }
+            .btn-primary-custom,
+            .btn-outline-custom {
+                width: 100%;
+                justify-content: center;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="stars" id="stars"></div>
-    <div class="floating-shapes">
-        <div class="shape" style="width: 80px; height: 80px; top: 20%; left: 10%; animation-delay: 0s;"></div>
-        <div class="shape" style="width: 120px; height: 120px; top: 60%; right: 15%; animation-delay: 2s;"></div>
-        <div class="shape" style="width: 60px; height: 60px; bottom: 20%; left: 20%; animation-delay: 4s;"></div>
-    </div>
-    
-    <div class="container">
-        <div class="error-card">
-            <div class="error-code">404</div>
-            <h1>Oops! Page Not Found</h1>
-            <p>The page you are looking for doesn't exist or has been moved to a parallel universe.</p>
-            <a href="/" class="btn-home">
-                <span class="material-icons">home</span>
-                Go Home
-            </a>
+    <!-- Ambient Glow Orbs -->
+    <div class="ambient-orb orb-1"></div>
+    <div class="ambient-orb orb-2"></div>
+
+    <!-- Top Brand Header -->
+    <a href="{% url 'home' %}" class="brand-header">
+        {% if site_settings.logo_dark %}
+            <img src="{{ site_settings.logo_dark }}" alt="{{ site_settings.brand_name|default:'MARMOT' }}" class="brand-logo-img">
+        {% else %}
+            <img src="{% static 'images/ref/logo/logo-icon.png' %}" alt="Logo" class="brand-logo-img">
+        {% endif %}
+        <span class="brand-text">{{ site_settings.brand_name|default:'MARMOT'|upper }}</span>
+    </a>
+
+    <!-- Main 404 Glass Card -->
+    <div class="error-container">
+        <div class="status-badge">
+            <span class="status-pulse"></span>
+            <span>HTTP 404 • ROUTE UNRESOLVED</span>
+        </div>
+
+        <div class="error-code">404</div>
+        <h1 class="error-title">Page Not Found</h1>
+        <p class="error-desc">
+            The requested trading terminal endpoint, analysis route, or resource is unavailable or has moved to an alternate path.
+        </p>
+
+        <div class="action-buttons">
+            {% if request.user.is_authenticated %}
+                {% if request.user.is_superuser or request.user.role == 'admin' or request.user.role == 'developer' %}
+                    <a href="{% url 'admins:admin-dashboard' %}" class="btn-primary-custom">
+                        <i class="bi bi-speedometer2"></i>
+                        <span>Admin Dashboard</span>
+                    </a>
+                {% else %}
+                    <a href="{% url 'users:user-live-dashboard' %}" class="btn-primary-custom">
+                        <i class="bi bi-graph-up-arrow"></i>
+                        <span>Trader Dashboard</span>
+                    </a>
+                {% endif %}
+            {% else %}
+                <a href="{% url 'home' %}" class="btn-primary-custom">
+                    <i class="bi bi-house-door-fill"></i>
+                    <span>Back to Home</span>
+                </a>
+            {% endif %}
+
+            <button type="button" class="btn-outline-custom" onclick="window.history.length > 1 ? window.history.back() : window.location.href='/';">
+                <i class="bi bi-arrow-left"></i>
+                <span>Previous Page</span>
+            </button>
         </div>
     </div>
 
-    <script>
-        // Animated stars
-        function createStars() {
-            const stars = document.getElementById('stars');
-            for (let i = 0; i < 100; i++) {
-                const star = document.createElement('div');
-                star.className = 'star';
-                star.style.left = Math.random() * 100 + '%';
-                star.style.top = Math.random() * 100 + '%';
-                star.style.width = star.style.height = (Math.random() * 3 + 1) + 'px';
-                star.style.animationDelay = Math.random() * 2 + 's';
-                stars.appendChild(star);
-            }
-        }
-        createStars();
-    </script>
+    <!-- Bottom Copyright -->
+    <div class="footer-note">
+        &copy; {% now "Y" %} {{ site_settings.brand_name|default:'MARMOT' }} Trading Systems. All rights reserved.
+    </div>
 </body>
 </html>

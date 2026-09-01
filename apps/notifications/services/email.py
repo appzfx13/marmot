@@ -6,6 +6,7 @@ from django.template.loader import render_to_string
 from django.utils.html import strip_tags
 from apps.common.logger import Logger
 from apps.common.constants import EmailTemplateConstants, EmailSubjectConstants
+from apps.common.cache import get_site_settings
 
 
 class EmailService:
@@ -36,6 +37,8 @@ class EmailService:
         sender = from_email or getattr(settings, 'DEFAULT_FROM_EMAIL', 'Marmot Trading <noreply@marmot.local>')
         ctx = context.copy() if context else {}
         ctx.setdefault('current_year', datetime.now().year)
+        ctx.setdefault('site_settings', get_site_settings())
+        ctx.setdefault('site_url', getattr(settings, 'SITE_URL', ''))
 
         html_content = None
         if template_name:

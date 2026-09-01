@@ -1,0 +1,797 @@
+<!-- templates/users/partials/ai_dashboard_content.html -->
+{% load static %}
+<div class="d-flex flex-column gap-4" id="ai-dashboard-view">
+
+    <!-- START: Header Banner -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h1 class="page-title mb-0">AI Intelligence Dashboard</h1>
+                <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-25 rounded-pill px-2.5 py-0.5 smaller fw-bold">
+                    <i class="bi bi-stars me-1"></i>Gemini 1.5 Flash
+                </span>
+            </div>
+            <p class="page-subtitle">Autonomous market regime classification, neural Greek analytics, alpha signals, and live Gemini Copilot.</p>
+        </div>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            <span class="trend-badge trend-up py-1.5 px-3">
+                <i class="bi bi-cpu-fill"></i>
+                <span>Neural Inference: 14ms</span>
+            </span>
+
+            <button type="button" class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                    onclick="toggleFloatingAiChat()" style="background-color: var(--brand-lime, #B4F105); color: #04140D; border: 1px solid var(--brand-lime, #B4F105);">
+                <i class="bi bi-chat-dots-fill"></i>
+                <span>Open AI Copilot</span>
+            </button>
+        </div>
+    </div>
+    <!-- END: Header Banner -->
+
+    <!-- START: Top 4 Metric Cards -->
+    <div class="row g-3">
+        <!-- Card 1: Glowing Engine Telemetry -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card alert-green-card">
+                <div class="position-relative z-index-2">
+                    <span class="alert-green-badge">Neural Engine</span>
+                    <div class="alert-green-date">Google Gemini Core &bull; Online</div>
+                    <div class="alert-green-text">99.98% Confidence &bull; Sub-second Telemetry</div>
+                </div>
+                <div class="metric-card-footer border-dark border-opacity-10 z-index-2">
+                    <span class="text-dark fw-bold small">
+                        <i class="bi bi-check-circle-fill text-success me-1"></i>Active Prompt Cache
+                    </span>
+                    <span class="badge bg-dark bg-opacity-25 text-white smaller px-2 py-0.5">Flash 1.5</span>
+                </div>
+                <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                    <g transform="translate(50,50)">
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" />
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(60)" />
+                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(120)" />
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Card 2: Market Regime Prediction -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-activity text-primary"></i>
+                            <span>Market Regime</span>
+                        </span>
+                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">84.2% Bullish</span>
+                    </div>
+                    <div class="metric-card-date">Multi-Timeframe Classification</div>
+                    <div class="metric-card-value text-primary">
+                        Volatility Compression
+                    </div>
+                </div>
+                <div class="metric-card-footer">
+                    <span>
+                        <i class="bi bi-lightning-charge-fill text-warning me-1"></i>Favors Delta-Neutral
+                    </span>
+                    <span class="theme-text-muted smaller">Confidence 84%</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Alpha Signals Generated -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-stars text-warning"></i>
+                            <span>Alpha Signals</span>
+                        </span>
+                        <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0.5 smaller fw-bold">Today</span>
+                    </div>
+                    <div class="metric-card-date">Automated SMC &amp; 0DTE Signals</div>
+                    <div class="metric-card-value text-warning">
+                        248 <span class="fs-6 fw-normal text-muted">Signals</span>
+                    </div>
+                </div>
+                <div class="metric-card-footer">
+                    <span>
+                        <i class="bi bi-trophy-fill text-success me-1"></i>78.4% Win Rate
+                    </span>
+                    <span class="theme-text-muted smaller">Avg R:R 1:2.8</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Autonomous Neural Agents -->
+        <div class="col-xl-3 col-md-6">
+            <div class="card theme-metric-card">
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="metric-card-badge">
+                            <i class="bi bi-robot text-info"></i>
+                            <span>Neural Agents</span>
+                        </span>
+                        <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0.5 smaller fw-bold">Running</span>
+                    </div>
+                    <div class="metric-card-date">Active Execution Bots</div>
+                    <div class="metric-card-value text-info">
+                        12 <span class="fs-6 fw-normal text-muted">Online</span>
+                    </div>
+                </div>
+                <div class="metric-card-footer">
+                    <span>
+                        <i class="bi bi-shield-check text-info me-1"></i>4 SMC Radars
+                    </span>
+                    <span class="theme-text-muted smaller">Latency &lt; 8ms</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- END: Top 4 Metric Cards -->
+
+    <!-- START: Middle Grid (Sentiment Radar & Telemetry) -->
+    <div class="row g-4">
+        <!-- Left: Multi-Index Sentiment Heatmap -->
+        <div class="col-lg-8">
+            <div class="card h-100 mb-0">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h2 class="card-title mb-0">Multi-Index Sentiment &amp; Order Flow Radar</h2>
+                        <span class="card-subtitle theme-text-muted small">Real-time institutional liquidity imbalance &amp; Greek bias.</span>
+                    </div>
+                    <span class="badge bg-success bg-opacity-15 text-success rounded-pill px-3 py-1 smaller fw-bold">
+                        <span class="spinner-grow spinner-grow-sm me-1" style="width: 7px; height: 7px;"></span> Live Streaming
+                    </span>
+                </div>
+
+                <div class="card-body">
+                    <div class="row g-3">
+                        <!-- NIFTY -->
+                        <div class="col-md-6">
+                            <div class="p-3 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold fs-6 text-white">NIFTY 50</span>
+                                    <span class="badge bg-success bg-opacity-20 text-success fw-bold">Bullish (82%)</span>
+                                </div>
+                                <div class="progress mb-2" style="height: 6px; background: rgba(255,255,255,0.08);">
+                                    <div class="progress-bar bg-success" style="width: 82%;"></div>
+                                </div>
+                                <div class="d-flex justify-content-between smaller" style="color: #94A3B8;">
+                                    <span>PCR: <strong class="text-white">1.18</strong></span>
+                                    <span>IV Rank: <strong class="text-white">14.2%</strong></span>
+                                    <span>Max Pain: <strong class="text-white">25,000</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- BANKNIFTY -->
+                        <div class="col-md-6">
+                            <div class="p-3 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold fs-6 text-white">BANKNIFTY</span>
+                                    <span class="badge bg-success bg-opacity-20 text-success fw-bold">Bullish (76%)</span>
+                                </div>
+                                <div class="progress mb-2" style="height: 6px; background: rgba(255,255,255,0.08);">
+                                    <div class="progress-bar bg-success" style="width: 76%;"></div>
+                                </div>
+                                <div class="d-flex justify-content-between smaller" style="color: #94A3B8;">
+                                    <span>PCR: <strong class="text-white">1.05</strong></span>
+                                    <span>IV Rank: <strong class="text-white">18.6%</strong></span>
+                                    <span>Max Pain: <strong class="text-white">51,500</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FINNIFTY -->
+                        <div class="col-md-6">
+                            <div class="p-3 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold fs-6 text-white">FINNIFTY</span>
+                                    <span class="badge bg-warning bg-opacity-20 text-warning fw-bold">Neutral (54%)</span>
+                                </div>
+                                <div class="progress mb-2" style="height: 6px; background: rgba(255,255,255,0.08);">
+                                    <div class="progress-bar bg-warning" style="width: 54%;"></div>
+                                </div>
+                                <div class="d-flex justify-content-between smaller" style="color: #94A3B8;">
+                                    <span>PCR: <strong class="text-white">0.94</strong></span>
+                                    <span>IV Rank: <strong class="text-white">12.1%</strong></span>
+                                    <span>Max Pain: <strong class="text-white">23,800</strong></span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- SENSEX -->
+                        <div class="col-md-6">
+                            <div class="p-3 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);">
+                                <div class="d-flex justify-content-between align-items-center mb-2">
+                                    <span class="fw-bold fs-6 text-white">SENSEX</span>
+                                    <span class="badge bg-success bg-opacity-20 text-success fw-bold">Bullish (80%)</span>
+                                </div>
+                                <div class="progress mb-2" style="height: 6px; background: rgba(255,255,255,0.08);">
+                                    <div class="progress-bar bg-success" style="width: 80%;"></div>
+                                </div>
+                                <div class="d-flex justify-content-between smaller" style="color: #94A3B8;">
+                                    <span>PCR: <strong class="text-white">1.12</strong></span>
+                                    <span>IV Rank: <strong class="text-white">16.4%</strong></span>
+                                    <span>Max Pain: <strong class="text-white">82,000</strong></span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-3 mt-3" style="background: rgba(180, 241, 5, 0.04); border: 1px dashed rgba(180, 241, 5, 0.25);">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-lightbulb-fill text-warning fs-5"></i>
+                            <div class="smaller" style="color: #CBD5E1;">
+                                <strong class="text-white">AI Synthesis:</strong> Institutional accumulation detected at 24,900 NIFTY PE. Skew divergence favors ATM Iron Butterflies with delta rebalancing at 14:00 IST.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Right: Neural Model Performance & Token Usage -->
+        <div class="col-lg-4">
+            <div class="card h-100 mb-0">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h2 class="card-title mb-0">Model Telemetry</h2>
+                        <span class="card-subtitle theme-text-muted small">Inference &amp; Token Metrics</span>
+                    </div>
+                    <span class="badge bg-primary bg-opacity-20 text-primary smaller fw-bold">Real-Time</span>
+                </div>
+
+                <div class="card-body d-flex flex-column gap-3">
+                    <div>
+                        <div class="d-flex justify-content-between smaller mb-1" style="color: #94A3B8;">
+                            <span>Daily Token Utilization</span>
+                            <span class="text-white fw-bold">18,450 / 100,000</span>
+                        </div>
+                        <div class="progress" style="height: 8px; background: rgba(255,255,255,0.08);">
+                            <div class="progress-bar bg-info" style="width: 18.5%;"></div>
+                        </div>
+                    </div>
+
+                    <div class="p-3 rounded-3" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);">
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="smaller" style="color: #94A3B8;">Inference Latency (P50)</span>
+                            <span class="fw-bold text-success smaller">12.4 ms</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-2">
+                            <span class="smaller" style="color: #94A3B8;">Context Prompt Cache Hit</span>
+                            <span class="fw-bold text-primary smaller">94.8%</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-0">
+                            <span class="smaller" style="color: #94A3B8;">Model Temperature</span>
+                            <span class="fw-bold text-warning smaller">0.3 (Deterministic)</span>
+                        </div>
+                    </div>
+
+                    <div>
+                        <h6 class="smaller fw-bold text-uppercase mb-2" style="color: #94A3B8;">Top Prompt Automation Triggers</h6>
+                        <div class="d-flex flex-column gap-1.5">
+                            <span class="badge bg-dark bg-opacity-50 text-light border border-secondary border-opacity-25 text-start py-2 px-2.5 font-mono smaller">
+                                ⚡ 0DTE Delta Spike Alert
+                            </span>
+                            <span class="badge bg-dark bg-opacity-50 text-light border border-secondary border-opacity-25 text-start py-2 px-2.5 font-mono smaller">
+                                🎯 SMC Liquidity Sweep Trigger
+                            </span>
+                            <span class="badge bg-dark bg-opacity-50 text-light border border-secondary border-opacity-25 text-start py-2 px-2.5 font-mono smaller">
+                                🛡️ Max Drawdown Guard Anomaly
+                            </span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- END: Middle Grid -->
+
+    <!-- START: Bottom Grid (Strategies & Risk Radar) -->
+    <div class="row g-4 mb-4">
+        <!-- Strategy Recommendations -->
+        <div class="col-lg-6">
+            <div class="card h-100 mb-0">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h2 class="card-title mb-0">Autonomous Strategy Recommendations</h2>
+                        <span class="card-subtitle theme-text-muted small">Live quantitative setups</span>
+                    </div>
+                    <span class="badge bg-success bg-opacity-15 text-success smaller fw-bold">AI Ranked</span>
+                </div>
+
+                <div class="card-body p-0">
+                    <div class="table-responsive">
+                        <table class="table table-dark table-hover align-middle mb-0" style="background: transparent;">
+                            <thead>
+                                <tr class="smaller text-uppercase" style="color: #94A3B8; border-bottom: 1px solid rgba(255,255,255,0.08);">
+                                    <th class="ps-4">Strategy</th>
+                                    <th>Asset</th>
+                                    <th>Expected Sharpe</th>
+                                    <th>R:R</th>
+                                    <th class="text-end pe-4">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody class="smaller">
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td class="ps-4"><strong class="text-white">Gamma Scalper 0DTE</strong></td>
+                                    <td><span class="badge bg-secondary">NIFTY</span></td>
+                                    <td><span class="text-success fw-bold">2.84</span></td>
+                                    <td class="text-white">1:3.2</td>
+                                    <td class="text-end pe-4">
+                                        <a href="{% url 'users:user-terminal' %}" class="btn btn-sm btn-outline-success py-0.5 px-3 rounded-pill">Deploy</a>
+                                    </td>
+                                </tr>
+                                <tr style="border-bottom: 1px solid rgba(255,255,255,0.05);">
+                                    <td class="ps-4"><strong class="text-white">SMC FVG Breakout</strong></td>
+                                    <td><span class="badge bg-secondary">BANKNIFTY</span></td>
+                                    <td><span class="text-success fw-bold">2.41</span></td>
+                                    <td class="text-white">1:2.5</td>
+                                    <td class="text-end pe-4">
+                                        <a href="{% url 'users:user-terminal' %}" class="btn btn-sm btn-outline-success py-0.5 px-3 rounded-pill">Deploy</a>
+                                    </td>
+                                </tr>
+                                <tr>
+                                    <td class="ps-4"><strong class="text-white">Theta Capture Fly</strong></td>
+                                    <td><span class="badge bg-secondary">FINNIFTY</span></td>
+                                    <td><span class="text-success fw-bold">1.95</span></td>
+                                    <td class="text-white">1:2.0</td>
+                                    <td class="text-end pe-4">
+                                        <a href="{% url 'users:user-terminal' %}" class="btn btn-sm btn-outline-success py-0.5 px-3 rounded-pill">Deploy</a>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Risk Anomaly Detection Radar -->
+        <div class="col-lg-6">
+            <div class="card h-100 mb-0">
+                <div class="card-header d-flex align-items-center justify-content-between">
+                    <div>
+                        <h2 class="card-title mb-0">Real-Time Risk Anomaly Radar</h2>
+                        <span class="card-subtitle theme-text-muted small">Live circuit &amp; execution health</span>
+                    </div>
+                    <span class="badge bg-info bg-opacity-15 text-info smaller fw-bold">Zero Threat</span>
+                </div>
+
+                <div class="card-body d-flex flex-column gap-2.5">
+                    <div class="p-3 rounded-3 d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="bi bi-shield-check text-success fs-4"></i>
+                            <div>
+                                <div class="fw-bold text-white smaller">Drawdown Limit Guard</div>
+                                <div class="smaller" style="color: #94A3B8;">Total portfolio loss limited to 1.5% max hard stop.</div>
+                            </div>
+                        </div>
+                        <span class="badge bg-success bg-opacity-20 text-success fw-bold">SAFE</span>
+                    </div>
+
+                    <div class="p-3 rounded-3 d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="bi bi-exclamation-triangle text-warning fs-4"></i>
+                            <div>
+                                <div class="fw-bold text-white smaller">High IV Skew Alert on 25200 CE</div>
+                                <div class="smaller" style="color: #94A3B8;">Call wing implied volatility elevated (+3.2%).</div>
+                            </div>
+                        </div>
+                        <span class="badge bg-warning bg-opacity-20 text-warning fw-bold">MONITOR</span>
+                    </div>
+
+                    <div class="p-3 rounded-3 d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.02); border: 1px solid rgba(255, 255, 255, 0.07);">
+                        <div class="d-flex align-items-center gap-3">
+                            <i class="bi bi-lightning-charge text-info fs-4"></i>
+                            <div>
+                                <div class="fw-bold text-white smaller">Broker Execution Latency</div>
+                                <div class="smaller" style="color: #94A3B8;">Dhan &amp; Sandbox DMA execution round-trip &lt; 16ms.</div>
+                            </div>
+                        </div>
+                        <span class="badge bg-info bg-opacity-20 text-info fw-bold">OPTIMAL</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- END: Bottom Grid -->
+
+    <!-- ==========================================
+         FLOATING AI CHAT WIDGET (SCOPED TO AI DASHBOARD)
+         ========================================== -->
+    <div id="floating-ai-copilot-container">
+        <!-- Floating Trigger Button (Bottom-Right) -->
+        <button id="floatingAiChatBtn" class="floating-ai-btn shadow-lg" onclick="toggleFloatingAiChat()" title="Open Marmot Gemini Copilot" aria-label="Open AI Copilot">
+            <span class="ai-btn-pulse"></span>
+            <i class="bi bi-stars fs-4"></i>
+            <span class="floating-ai-label d-none d-sm-inline">AI Copilot</span>
+        </button>
+
+        <!-- Floating Chat Modal Window -->
+        <div id="floatingAiChatWindow" class="floating-chat-window shadow-lg d-none">
+            <!-- Chat Window Header -->
+            <div class="chat-header d-flex align-items-center justify-content-between px-3 py-2.5">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="chat-avatar-icon">
+                        <i class="bi bi-robot"></i>
+                    </div>
+                    <div>
+                        <div class="chat-title">Marmot Gemini AI</div>
+                        <div class="chat-status d-flex align-items-center gap-1">
+                            <span class="status-dot"></span>
+                            <span>gemini-1.5-flash &bull; Active</span>
+                        </div>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-1">
+                    <button type="button" class="btn btn-sm btn-link text-muted p-1" onclick="clearAiChatHistory()" title="Clear Chat">
+                        <i class="bi bi-trash3"></i>
+                    </button>
+                    <button type="button" class="btn btn-sm btn-link text-muted p-1" onclick="toggleFloatingAiChat()" title="Minimize">
+                        <i class="bi bi-dash-lg"></i>
+                    </button>
+                </div>
+            </div>
+
+            <!-- Quick Action Prompt Chips -->
+            <div class="chat-quick-chips px-3 py-2 d-flex gap-1.5 overflow-x-auto">
+                <button type="button" class="chip-btn" onclick="sendQuickPrompt('Analyze NIFTY 50 Market Sentiment')">⚡ NIFTY Sentiment</button>
+                <button type="button" class="chip-btn" onclick="sendQuickPrompt('Suggest best 0DTE Options strategy for current IV')">🎯 0DTE Strategy</button>
+                <button type="button" class="chip-btn" onclick="sendQuickPrompt('Check current Risk Limits & Drawdown')">🛡️ Risk Check</button>
+                <button type="button" class="chip-btn" onclick="sendQuickPrompt('Scan for SMC Liquidity Sweeps')">📊 SMC Scan</button>
+            </div>
+
+            <!-- Chat Messages Log Container -->
+            <div class="chat-body p-3 overflow-y-auto" id="aiChatMessagesList">
+                <!-- Welcome Message -->
+                <div class="chat-msg ai-msg">
+                    <div class="msg-bubble">
+                        Hello Trader! 👋 I am your <strong>Marmot Gemini AI Copilot</strong>. I analyze market regimes, option Greeks, SMC liquidity, and risk limits in real time.<br><br>
+                        How can I assist your execution today?
+                    </div>
+                </div>
+            </div>
+
+            <!-- Chat Input Form -->
+            <div class="chat-footer p-2.5 border-top border-dark border-opacity-25">
+                <form id="aiChatForm" onsubmit="handleAiChatSubmit(event)" class="d-flex align-items-center gap-2">
+                    <input type="text" id="aiChatInput" class="form-control form-control-sm chat-input"
+                           placeholder="Ask Gemini AI (e.g. NIFTY Greeks, 0DTE)..." autocomplete="off" required>
+                    <button type="submit" id="aiChatSendBtn" class="btn btn-sm btn-primary btn-send">
+                        <i class="bi bi-send-fill"></i>
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scoped Styles for Floating AI Chat -->
+    <style>
+        .floating-ai-btn {
+            position: fixed;
+            bottom: 24px;
+            right: 24px;
+            z-index: 1060;
+            background: #B4F105;
+            color: #04140D;
+            border: 1px solid #B4F105;
+            border-radius: 50px;
+            padding: 10px 18px;
+            font-weight: 700;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            cursor: pointer;
+            box-shadow: 0 10px 30px rgba(180, 241, 5, 0.4);
+            transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .floating-ai-btn:hover {
+            background: #c7fb28;
+            transform: translateY(-3px) scale(1.03);
+            box-shadow: 0 14px 40px rgba(180, 241, 5, 0.55);
+            color: #000;
+        }
+
+        .ai-btn-pulse {
+            width: 8px;
+            height: 8px;
+            background: #04140D;
+            border-radius: 50%;
+            display: inline-block;
+            animation: aiPulse 1.8s infinite;
+        }
+
+        @keyframes aiPulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(0.7); }
+        }
+
+        .floating-chat-window {
+            position: fixed;
+            bottom: 84px;
+            right: 24px;
+            width: 390px;
+            max-width: calc(100vw - 32px);
+            height: 530px;
+            max-height: calc(100vh - 120px);
+            background: rgba(8, 33, 21, 0.95);
+            backdrop-filter: blur(28px);
+            -webkit-backdrop-filter: blur(28px);
+            border: 1px solid rgba(180, 241, 5, 0.25);
+            border-radius: 20px;
+            z-index: 1065;
+            display: flex;
+            flex-direction: column;
+            box-shadow: 0 20px 50px rgba(0, 0, 0, 0.65), 0 0 30px rgba(180, 241, 5, 0.1);
+            animation: slideUpAiChat 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            overflow: hidden;
+        }
+
+        @keyframes slideUpAiChat {
+            from { opacity: 0; transform: translateY(20px) scale(0.96); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        .chat-header {
+            background: rgba(4, 20, 13, 0.85);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .chat-avatar-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: rgba(180, 241, 5, 0.15);
+            color: #B4F105;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+        }
+
+        .chat-title {
+            font-size: 0.9rem;
+            font-weight: 700;
+            color: #FFFFFF;
+            line-height: 1.2;
+        }
+
+        .chat-status {
+            font-size: 0.72rem;
+            color: #94A3B8;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .status-dot {
+            width: 6px;
+            height: 6px;
+            background: #10B981;
+            border-radius: 50%;
+            box-shadow: 0 0 6px #10B981;
+        }
+
+        .chat-quick-chips {
+            background: rgba(0, 0, 0, 0.2);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            white-space: nowrap;
+        }
+
+        .chip-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #F1F5F9;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 4px 10px;
+            border-radius: 50px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            flex-shrink: 0;
+        }
+
+        .chip-btn:hover {
+            background: rgba(180, 241, 5, 0.2);
+            border-color: #B4F105;
+            color: #FFFFFF;
+        }
+
+        .chat-body {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            font-size: 0.84rem;
+        }
+
+        .chat-msg {
+            display: flex;
+            width: 100%;
+        }
+
+        .chat-msg.user-msg {
+            justify-content: flex-end;
+        }
+
+        .chat-msg.ai-msg {
+            justify-content: flex-start;
+        }
+
+        .msg-bubble {
+            max-width: 85%;
+            padding: 10px 14px;
+            border-radius: 16px;
+            line-height: 1.5;
+            word-break: break-word;
+        }
+
+        .user-msg .msg-bubble {
+            background: #B4F105;
+            color: #04140D;
+            border-bottom-right-radius: 4px;
+            font-weight: 600;
+        }
+
+        .ai-msg .msg-bubble {
+            background: rgba(255, 255, 255, 0.06);
+            color: #F1F5F9;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-bottom-left-radius: 4px;
+        }
+
+        .chat-input {
+            background: rgba(255, 255, 255, 0.06) !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+            color: #FFFFFF !important;
+            border-radius: 50px;
+            padding: 8px 14px;
+            font-size: 0.85rem;
+        }
+
+        .chat-input:focus {
+            border-color: #B4F105 !important;
+            box-shadow: 0 0 10px rgba(180, 241, 5, 0.25) !important;
+        }
+
+        .btn-send {
+            background: #B4F105;
+            color: #04140D;
+            border: none;
+            border-radius: 50%;
+            width: 34px;
+            height: 34px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            font-weight: 700;
+        }
+
+        .btn-send:hover {
+            background: #c7fb28;
+            color: #000;
+        }
+    </style>
+
+    <!-- Interactive JavaScript for Floating Chat -->
+    <script>
+        let aiChatHistory = [];
+
+        function toggleFloatingAiChat() {
+            const chatWin = document.getElementById('floatingAiChatWindow');
+            if (!chatWin) return;
+            if (chatWin.classList.contains('d-none')) {
+                chatWin.classList.remove('d-none');
+                setTimeout(() => {
+                    const inp = document.getElementById('aiChatInput');
+                    if (inp) inp.focus();
+                }, 100);
+            } else {
+                chatWin.classList.add('d-none');
+            }
+        }
+
+        function clearAiChatHistory() {
+            aiChatHistory = [];
+            const list = document.getElementById('aiChatMessagesList');
+            if (list) {
+                list.innerHTML = `
+                    <div class="chat-msg ai-msg">
+                        <div class="msg-bubble">
+                            Chat history cleared. How can I assist your quantitative analysis now?
+                        </div>
+                    </div>
+                `;
+            }
+        }
+
+        function sendQuickPrompt(text) {
+            const input = document.getElementById('aiChatInput');
+            if (input) {
+                input.value = text;
+                const form = document.getElementById('aiChatForm');
+                if (form) form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
+            }
+        }
+
+        async function handleAiChatSubmit(event) {
+            event.preventDefault();
+            const input = document.getElementById('aiChatInput');
+            const messageList = document.getElementById('aiChatMessagesList');
+            const sendBtn = document.getElementById('aiChatSendBtn');
+            if (!input || !messageList) return;
+
+            const text = input.value.trim();
+            if (!text) return;
+
+            // Append User Message
+            const userMsgDiv = document.createElement('div');
+            userMsgDiv.className = 'chat-msg user-msg';
+            userMsgDiv.innerHTML = `<div class="msg-bubble">${escapeHtml(text)}</div>`;
+            messageList.appendChild(userMsgDiv);
+            input.value = '';
+            messageList.scrollTop = messageList.scrollHeight;
+
+            // Append Typing Indicator
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'chat-msg ai-msg typing-indicator-msg';
+            typingDiv.innerHTML = `<div class="msg-bubble"><span class="spinner-border spinner-border-sm me-1"></span> Gemini reasoning...</div>`;
+            messageList.appendChild(typingDiv);
+            messageList.scrollTop = messageList.scrollHeight;
+
+            if (sendBtn) sendBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/ai-chat/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ message: text, history: aiChatHistory })
+                });
+
+                const data = await response.json();
+                typingDiv.remove();
+
+                const aiReply = data.reply || "Unable to generate response.";
+                
+                // Format basic markdown (bold, bullet points)
+                const formattedReply = formatAiMarkdown(aiReply);
+
+                const aiMsgDiv = document.createElement('div');
+                aiMsgDiv.className = 'chat-msg ai-msg';
+                aiMsgDiv.innerHTML = `<div class="msg-bubble">${formattedReply}</div>`;
+                messageList.appendChild(aiMsgDiv);
+
+                // Update history
+                aiChatHistory.push({ role: 'user', text: text });
+                aiChatHistory.push({ role: 'model', text: aiReply });
+
+            } catch (err) {
+                typingDiv.remove();
+                const errDiv = document.createElement('div');
+                errDiv.className = 'chat-msg ai-msg';
+                errDiv.innerHTML = `<div class="msg-bubble text-danger">Error contacting AI Copilot. Please check network.</div>`;
+                messageList.appendChild(errDiv);
+            } finally {
+                if (sendBtn) sendBtn.disabled = false;
+                messageList.scrollTop = messageList.scrollHeight;
+            }
+        }
+
+        function escapeHtml(str) {
+            return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+        }
+
+        function formatAiMarkdown(text) {
+            let formatted = escapeHtml(text);
+            formatted = formatted.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+            formatted = formatted.replace(/\*(.*?)\*/g, '<em>$1</em>');
+            formatted = formatted.replace(/`([^`]+)`/g, '<code style="background: rgba(0,0,0,0.3); padding: 1px 4px; border-radius: 4px; color: #B4F105;">$1</code>');
+            formatted = formatted.replace(/\n/g, '<br>');
+            return formatted;
+        }
+    </script>
+</div>

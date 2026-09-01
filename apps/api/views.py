@@ -87,3 +87,27 @@ class PostbackWebhookView(View):
 
     def get(self, request, *args, **kwargs):
         return JsonResponse({"status": "active", "message": "Postback webhook endpoint is ready for POST requests."}, status=200)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class AIChatAPIView(View):
+    """API endpoint for AI Copilot chat conversations powered by Google Gemini."""
+
+    def post(self, request, *args, **kwargs):
+        try:
+            if request.body:
+                payload = json.loads(request.body.decode('utf-8'))
+            else:
+                payload = request.POST.dict()
+        except Exception:
+            payload = {}
+
+        message = (payload.get('message') or '').strip()
+        history = payload.get('history') or []
+
+        if not message:
+            return JsonResponse({"success": False, "error": "Message prompt cannot be empty."}, status=400)
+
+        from apps.common.services.gemini_service import GeminiAIService
+        result = GeminiAIService.generate_chat_response(message=message, history=history)
+        return JsonResponse(result, status=200)

@@ -34,7 +34,11 @@
                         <!-- Header -->
                         <div class="email-header">
                             <a href="{{ site_url|default:'#' }}" class="email-logo">
-                                MARMOT <span>TRADING</span>
+                                {% if site_settings.logo_dark or site_settings.logo_light %}
+                                    <img src="{{ site_settings.logo_dark|default:site_settings.logo_light }}" alt="{{ site_settings.brand_name|default:'Marmot' }}" style="max-height: 38px; width: auto; vertical-align: middle; margin-bottom: 4px;">
+                                {% else %}
+                                    {{ site_settings.brand_name|default:'MARMOT'|upper }} <span>TRADING</span>
+                                {% endif %}
                             </a>
                         </div>
 
@@ -45,9 +49,9 @@
 
                         <!-- Footer -->
                         <div class="email-footer">
-                            <p style="margin: 0 0 8px 0;">Marmot Algorithmic & High-Frequency Trading Terminal</p>
-                            <p style="margin: 0 0 8px 0;">Automated notification sent via Marmot Core Engine. Please do not reply directly to this email.</p>
-                            <p style="margin: 0;">&copy; {{ current_year|default:'2026' }} Marmot Platform. All rights reserved.</p>
+                            <p style="margin: 0 0 8px 0;">{{ site_settings.brand_name|default:'Marmot' }} Algorithmic & High-Frequency Trading Terminal</p>
+                            <p style="margin: 0 0 8px 0;">Automated notification sent via {{ site_settings.brand_name|default:'Marmot' }} Core Engine. Please do not reply directly to this email.</p>
+                            <p style="margin: 0;">&copy; {{ current_year|default:'2026' }} {{ site_settings.brand_name|default:'Marmot' }} Platform. All rights reserved.</p>
                         </div>
                     </div>
                 </td>

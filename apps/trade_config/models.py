@@ -46,6 +46,8 @@ class UserTradingAccount(BaseModel):
     is_active = models.BooleanField(default=True, help_text="Account active toggle")
     is_configured = models.BooleanField(default=False, help_text="API key credentials validated")
     is_trader_active = models.BooleanField(default=False, help_text="Real-time trading execution loop active for this account")
+    keep_alive = models.BooleanField(default=False, help_text="Auto-refresh access token every 8 hours")
+    last_token_refreshed_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp of last successful token renewal")
     realtime_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Realtime account PnL")
 
     # Live API Telemetry & Summary

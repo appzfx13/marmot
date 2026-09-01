@@ -12,6 +12,7 @@ from .views import (
     UserDashboardView,
     UserLiveDashboardView,
     UserSandboxDashboardView,
+    UserAIDashboardView,
     UserTerminalView,
     UserJournalView,
     UserBacktestView,
@@ -60,6 +61,7 @@ urlpatterns = [
     path('dashboard/', UserDashboardView.as_view(), name='marmot-dashboard'),
     path('dashboard/live/', UserLiveDashboardView.as_view(), name='user-live-dashboard'),
     path('dashboard/sandbox/', UserSandboxDashboardView.as_view(), name='user-sandbox-dashboard'),
+    path('dashboard/ai/', UserAIDashboardView.as_view(), name='user-ai-dashboard'),
 
     path('journal/', UserJournalView.as_view(), name='user-journal'),
     path('backtest/', UserBacktestView.as_view(), name='user-backtest'),

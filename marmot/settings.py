@@ -87,7 +87,6 @@ INSTALLED_APPS = [
     'allauth.account',
     'allauth.socialaccount',
     'allauth.socialaccount.providers.google',
-    'allauth.socialaccount.providers.github',
 ]
 
 MIDDLEWARE = [
@@ -263,17 +262,6 @@ SOCIALACCOUNT_PROVIDERS = {
         'AUTH_PARAMS': {
             'access_type': 'online',
         }
-    },
-    'github': {
-        'APP': {
-            'client_id': os.getenv('GITHUB_CLIENT_ID'),
-            'secret': os.getenv('GITHUB_CLIENT_SECRET'),
-            'key': ''
-        },
-        'SCOPE': [
-            'user:email',
-            'read:user',
-        ],
     }
 }
 
@@ -282,4 +270,7 @@ UI_THEME = os.getenv('UI_THEME', 'default')
 
 # Databento Order Flow & CME Futures API Configuration
 DATABENTO_API_KEY = os.getenv('DATABENTO_API_KEY', '')
+
+# Google Gemini AI Copilot Configuration
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') 
 

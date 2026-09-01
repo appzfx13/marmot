@@ -11,7 +11,12 @@
     <meta name="author" content="Marmot Core">
 
     <!-- Favicon -->
+    {% if site_settings.favicon %}
+    <link rel="icon" href="{{ site_settings.favicon }}">
+    <link rel="shortcut icon" href="{{ site_settings.favicon }}">
+    {% else %}
     <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
+    {% endif %}
 
     <!-- Third-Party Fonts & Icons -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -109,8 +114,17 @@
             
             <!-- Brand Identity -->
             <a href="{% url 'home' %}" class="login-brand text-decoration-none">
-                <i class="bi bi-asterisk"></i>
-                <span>MARMOT</span>
+                {% if site_settings.logo_dark and site_settings.logo_light and site_settings.logo_dark != site_settings.logo_light %}
+                    <img src="{{ site_settings.logo_dark }}" alt="{{ site_settings.brand_name|default:'Marmot' }}" class="dark-logo" style="max-height: 36px; width: auto; object-fit: contain;">
+                    <img src="{{ site_settings.logo_light }}" alt="{{ site_settings.brand_name|default:'Marmot' }}" class="light-logo d-none" style="max-height: 36px; width: auto; object-fit: contain;">
+                {% elif site_settings.logo_dark or site_settings.logo_light %}
+                    <img src="{{ site_settings.logo_dark|default:site_settings.logo_light }}" alt="{{ site_settings.brand_name|default:'Marmot' }}" style="max-height: 36px; width: auto; object-fit: contain;">
+                {% elif site_settings.favicon %}
+                    <img src="{{ site_settings.favicon }}" alt="{{ site_settings.brand_name|default:'Marmot' }}" style="height: 32px; width: 32px; object-fit: contain;">
+                {% else %}
+                    <i class="bi bi-asterisk"></i>
+                {% endif %}
+                <span>{{ site_settings.brand_name|default:'MARMOT'|upper }}</span>
             </a>
             
             <h1 class="login-title">Verify Your Email</h1>

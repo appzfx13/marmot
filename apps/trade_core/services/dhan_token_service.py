@@ -77,8 +77,14 @@ def renew_access_token(client_id: str, access_token: str) -> str:
     try:
         resp = requests.post(url, headers=headers, timeout=10)
         resp.raise_for_status()
-        data = resp.json()
-        new_token = data.get("accessToken") or data.get("access_token") or access_token
+        data = resp.json() if resp.content else {}
+        new_token = (
+            (data.get("data") if isinstance(data.get("data"), dict) else {}).get("accessToken")
+            or (data.get("data") if isinstance(data.get("data"), dict) else {}).get("access_token")
+            or data.get("accessToken")
+            or data.get("access_token")
+            or access_token
+        )
 
         cache_key = f"dhan_token:{client_id}"
         _get_redis().setex(cache_key, _TOKEN_TTL_SECONDS, new_token)

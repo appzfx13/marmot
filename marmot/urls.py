@@ -3,6 +3,7 @@ from django.conf import settings
 from django.conf.urls.static import static
 from django.urls import path, include
 from apps.common.views import HomePageView
+from marmot.views import page_not_found_preview
 
 urlpatterns = [
     # Enterprise Home Page
@@ -29,7 +30,14 @@ urlpatterns = [
     # REST API & Webhook Routes
     path('api/', include(('apps.postback.urls', 'postback'), namespace='postback')),
     path('api/', include(('apps.api.urls', 'api'), namespace='api')),
+
+    # 404 Preview Route
+    path('404/', page_not_found_preview, name='404-preview'),
 ]
+
+# Standard Root Handlers
+handler404 = 'marmot.views.handler404'
+handler500 = 'marmot.views.handler500'
 
 # Static + Media files (Development only)
 if settings.DEBUG:

@@ -433,6 +433,18 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         return context
 
 
+class AdminAIDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Protected Admin View for AI Intelligence Dashboard and Gemini Copilot."""
+    template_name = 'admins/dashboard.html'
+    partial_template_name = 'admins/partials/ai_dashboard_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'admin-ai-dashboard'
+        context['gemini_active'] = bool(getattr(settings, 'GEMINI_API_KEY', ''))
+        return context
+
+
 class AdminTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
     """Protected Admin View for absolute trading terminal supporting Dhan & Fyers."""
     template_name = 'admins/terminal.html'
