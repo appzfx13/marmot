@@ -1,11 +1,7 @@
-import json
 import logging
-import requests
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
-
-GEMINI_API_ENDPOINT = "https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent"
 
 SYSTEM_INSTRUCTION = (
     "You are Marmot Copilot, an institutional-grade quantitative trading and derivative intelligence AI. "
@@ -16,95 +12,85 @@ SYSTEM_INSTRUCTION = (
 
 
 class GeminiAIService:
-    """Service to interact with Google Gemini API for quantitative trading assistance."""
+    """Service to interact with Google Gemini API via official PyPI google-genai SDK."""
 
     @classmethod
     def generate_chat_response(cls, message: str, history: list = None) -> dict:
-        """Send prompt to Gemini 1.5 Flash API or return an intelligent market insight fallback."""
+        """Send prompt to Gemini 1.5 Flash via google-genai SDK."""
         api_key = getattr(settings, 'GEMINI_API_KEY', '') or ''
-        
+
         if not api_key:
-            return cls._get_mock_fallback_response(message)
+            return {
+                "success": False,
+                "reply": "❌ `GEMINI_API_KEY` is missing in settings / `.env`. Please add your key to enable live AI reasoning.",
+                "model": "gemini-1.5-flash",
+                "is_fallback": False,
+                "error": "Missing GEMINI_API_KEY"
+            }
 
         try:
-            url = f"{GEMINI_API_ENDPOINT}?key={api_key}"
-            
+            from google import genai
+            from google.genai import types
+
+            client = genai.Client(api_key=api_key)
+
+            # Build multi-turn contents list
             contents = []
             if history:
                 for item in history[-6:]:
                     role = "user" if item.get("role") == "user" else "model"
-                    contents.append({"role": role, "parts": [{"text": item.get("text", "")}]})
+                    text = item.get("text", "")
+                    if text:
+                        contents.append(
+                            types.Content(
+                                role=role,
+                                parts=[types.Part.from_text(text=text)]
+                            )
+                        )
 
-            contents.append({"role": "user", "parts": [{"text": message}]})
+            contents.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part.from_text(text=message)]
+                )
+            )
 
-            payload = {
-                "systemInstruction": {
-                    "parts": [{"text": SYSTEM_INSTRUCTION}]
-                },
-                "contents": contents,
-                "generationConfig": {
-                    "temperature": 0.3,
-                    "topP": 0.85,
-                    "topK": 40,
-                    "maxOutputTokens": 800,
+            config = types.GenerateContentConfig(
+                system_instruction=SYSTEM_INSTRUCTION,
+                temperature=0.3,
+                top_p=0.85,
+                top_k=40,
+                max_output_tokens=800,
+            )
+
+            response = client.models.generate_content(
+                model="gemini-3.6-flash",
+                contents=contents,
+                config=config,
+            )
+
+            reply_text = response.text or ""
+            if reply_text:
+                return {
+                    "success": True,
+                    "reply": reply_text,
+                    "model": "gemini-3.6-flash",
+                    "is_fallback": False
                 }
+
+            return {
+                "success": False,
+                "reply": "⚠️ Gemini returned an empty response.",
+                "model": "gemini-3.6-flash",
+                "is_fallback": False
             }
 
-            response = requests.post(url, json=payload, headers={"Content-Type": "application/json"}, timeout=15)
-            
-            if response.status_code == 200:
-                data = response.json()
-                text = data.get("candidates", [{}])[0].get("content", {}).get("parts", [{}])[0].get("text", "")
-                if text:
-                    return {"success": True, "reply": text, "model": "gemini-1.5-flash", "is_fallback": False}
-            
-            logger.warning(f"Gemini API returned status {response.status_code}: {response.text}")
-            return cls._get_mock_fallback_response(message, error=f"HTTP {response.status_code}")
-
         except Exception as e:
-            logger.error(f"Error invoking Gemini API: {str(e)}", exc_info=True)
-            return cls._get_mock_fallback_response(message, error=str(e))
-
-    @staticmethod
-    def _get_mock_fallback_response(message: str, error: str = None) -> dict:
-        """Provide domain-specific quantitative trading insight when API key is missing or network fails."""
-        msg_lower = message.lower()
-        
-        if "nifty" in msg_lower or "sentiment" in msg_lower:
-            reply = (
-                "**NIFTY 50 Quant Sentiment Analysis:**\n\n"
-                "• **Current Bias:** Moderate Bullish (Confidence: `78.4%`)\n"
-                "• **Key Levels:** Support at `24,850` (Heavy PE OI accumulation); Resistance at `25,200`.\n"
-                "• **Greeks Snapshot:** Put-Call Ratio (PCR) at `1.18`. Net Delta positive with IV percentile at `14.2%`.\n"
-                "• **SMC Liquidity:** 15m Fair Value Gap (FVG) resting between `24,920 - 24,960`."
-            )
-        elif "0dte" in msg_lower or "gamma" in msg_lower:
-            reply = (
-                "**0DTE Gamma & Volatility Assessment:**\n\n"
-                "• **Recommended Setup:** Dynamic Delta-Neutral Iron Fly with 25% stop on wings.\n"
-                "• **Expected IV Crush:** Sharp theta decay expected between `13:30 - 15:00 IST`.\n"
-                "• **Risk Threshold:** Exit all open naked short legs if Underlying spot crosses `±0.45%` from strike center."
-            )
-        elif "risk" in msg_lower or "kill" in msg_lower or "shield" in msg_lower:
-            reply = (
-                "**Risk Controller & Execution Guard:**\n\n"
-                "• **Drawdown Status:** Within safe operating limits (`0.8%` max drawdown reached today).\n"
-                "• **Kill-Switch Readiness:** Armed and responsive (latency `< 4ms`).\n"
-                "• **Max Open Positions:** 4 Active Multi-Leg Baskets across Dhan & Sandbox."
-            )
-        else:
-            reply = (
-                f"**Marmot AI Assistant:**\n\n"
-                f"Analysis for: *\"{message}\"*\n\n"
-                f"• **Market Regime:** Volatility Compression • Range-Bound with positive underlying delta.\n"
-                f"• **Strategy Advice:** Favor mean-reversion or theta collection strategies while VIX remains sub-14.\n"
-                f"• **Inference Note:** Running on Gemini Neural Engine. Configure your `GEMINI_TOKEN` in `.env` for customized deep live reasoning."
-            )
-
-        return {
-            "success": True,
-            "reply": reply,
-            "model": "gemini-1.5-flash (local quant engine)",
-            "is_fallback": True,
-            "note": error
-        }
+            logger.error(f"Error invoking Gemini via google-genai SDK: {str(e)}", exc_info=True)
+            return {
+                "success": False,
+                "reply": f"⚠️ Gemini API Error: {str(e)}",
+                "model": "gemini-1.5-flash",
+                "is_fallback": False,
+                "error": str(e)
+            }
