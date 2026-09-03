@@ -394,13 +394,31 @@ class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
         asset_tag = task.asset_code.lower()
 
         backup_id = str(task.id)
-        candidate_paths = [
-            task.parquet_file_path,
-            os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id, 'dataset.parquet'),
-            os.path.join('/app', 'backup', user_id, backup_id, 'dataset.parquet'),
-            os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id),
-            os.path.join('/app', 'backup', user_id, backup_id),
-        ]
+        if task.is_macro_assist:
+            macro_file_name = f"macro_{task.macro_timeframe or '1h'}_{task.asset_code}.parquet"
+            candidate_paths = [
+                task.parquet_file_path,
+                os.path.join('/app', 'backup', user_id, backup_id, macro_file_name),
+                os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id, macro_file_name),
+            ]
+            if task.linked_backup_task:
+                linked_id = str(task.linked_backup_task.id)
+                candidate_paths.extend([
+                    os.path.join('/app', 'backup', user_id, linked_id, macro_file_name),
+                    os.path.join(settings.BASE_DIR, 'backup', user_id, linked_id, macro_file_name),
+                ])
+            candidate_paths.extend([
+                os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id, 'dataset.parquet'),
+                os.path.join('/app', 'backup', user_id, backup_id, 'dataset.parquet'),
+            ])
+        else:
+            candidate_paths = [
+                task.parquet_file_path,
+                os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id, 'dataset.parquet'),
+                os.path.join('/app', 'backup', user_id, backup_id, 'dataset.parquet'),
+                os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id),
+                os.path.join('/app', 'backup', user_id, backup_id),
+            ]
 
         target_path = None
         for p in candidate_paths:
@@ -410,7 +428,8 @@ class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
 
         if not target_path:
             messages.error(request, "Backup dataset is not available on disk or still processing.")
-            return HttpResponseRedirect(reverse_lazy('market:market_backup_list'))
+            redirect_url = reverse_lazy('market:market_macro_backup_list') if task.is_macro_assist else reverse_lazy('market:market_backup_list')
+            return HttpResponseRedirect(redirect_url)
 
         # 1. If directory of chunk parquet files exists, stream a ZIP archive
         if os.path.isdir(target_path):
@@ -428,7 +447,10 @@ class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
             return FileResponse(zip_buffer, as_attachment=True, filename=zip_filename)
 
         # 2. Single consolidated parquet file
-        filename = f"marmot_{user_slug}_{market_tag}_{asset_tag}_{provider_tag}_task_{task.id}_from_{task.start_date}_to_{task.end_date}.parquet"
+        if task.is_macro_assist:
+            filename = f"marmot_macro_{task.macro_timeframe or '1h'}_{asset_tag}_task_{task.id}_from_{task.start_date}_to_{task.end_date}.parquet"
+        else:
+            filename = f"marmot_{user_slug}_{market_tag}_{asset_tag}_{provider_tag}_task_{task.id}_from_{task.start_date}_to_{task.end_date}.parquet"
         response = FileResponse(open(target_path, 'rb'), content_type='application/vnd.apache.parquet')
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         response['Content-Length'] = os.path.getsize(target_path)

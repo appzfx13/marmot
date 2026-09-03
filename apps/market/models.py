@@ -8,6 +8,8 @@ from apps.common.choices import TaskStatusChoices, IndexChoices, MarketTypeChoic
 class MarketBackupTask(BaseModel):
     StatusChoices = TaskStatusChoices
     IndexChoices = IndexChoices
+    MarketTypeChoices = MarketTypeChoices
+    ForexInstrumentChoices = ForexInstrumentChoices
     DatabentoSchemaChoices = DatabentoSchemaChoices
     MacroTimeframeChoices = MacroTimeframeChoices
 

@@ -5,6 +5,7 @@ import pyarrow.parquet as pq
 import redis
 from django.conf import settings
 from apps.common.constants import REDIS_CHANNEL, INDEX_INSTRUMENT_MAP
+from apps.common.choices import MarketTypeChoices
 from apps.trade_core.services.dhan_token_service import AdminDhanClient
 from .models import MarketBackupTask
 
@@ -16,7 +17,7 @@ redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, dhan_access_token=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None):
     """Creates the backup record in Postgres with pre-stored path and caches token if provided."""
     task = MarketBackupTask.objects.create(
-        market_type=market_type or MarketBackupTask.MarketTypeChoices.INDEX_FO,
+        market_type=market_type or MarketTypeChoices.INDEX_FO,
         start_date=start_date,
         end_date=end_date,
         index_name=index_name,
@@ -51,7 +52,7 @@ def run_macro_sync_worker(task_id):
         task.progress = 20
         task.save(update_fields=['status', 'progress'])
 
-        symbol = task.forex_instrument if task.market_type == MarketBackupTask.MarketTypeChoices.FOREX_FUTURES else task.index_name
+        symbol = task.forex_instrument if task.market_type == MarketTypeChoices.FOREX_FUTURES else task.index_name
         symbol = symbol or "NIFTY"
 
         # Broadcast progress via Redis
@@ -107,9 +108,10 @@ def run_macro_sync_worker(task_id):
         task.status = MarketBackupTask.StatusChoices.COMPLETED
         task.progress = 100
         task.file_size_mb = max(0.01, file_size_mb)
+        task.error_logs = None
         if saved_path:
             task.parquet_file_path = saved_path
-        task.save(update_fields=['status', 'progress', 'file_size_mb', 'parquet_file_path'])
+        task.save(update_fields=['status', 'progress', 'file_size_mb', 'parquet_file_path', 'error_logs'])
 
         redis_client.publish(REDIS_CHANNEL, json.dumps({
             "type": "progress",
@@ -135,7 +137,7 @@ def create_and_start_macro_backup_task(start_date, end_date, market_type='INDEX_
     import threading
 
     task = MarketBackupTask.objects.create(
-        market_type=market_type or MarketBackupTask.MarketTypeChoices.INDEX_FO,
+        market_type=market_type or MarketTypeChoices.INDEX_FO,
         start_date=start_date,
         end_date=end_date,
         index_name=index_name,
@@ -234,11 +236,32 @@ def inspect_parquet_dataset(task, query=None, limit=50):
     user_id = str(task.created_by.id if getattr(task, 'created_by', None) else 1)
     task_id = str(task.id)
 
-    candidate_paths = [
-        task.parquet_file_path,
-        os.path.join(settings.BASE_DIR, 'backup', user_id, task_id, 'dataset.parquet'),
-        os.path.join('/app', 'backup', user_id, task_id, 'dataset.parquet'),
-    ]
+    if task.is_macro_assist:
+        symbol = task.forex_instrument if task.market_type == MarketTypeChoices.FOREX_FUTURES else task.index_name
+        symbol = symbol or "NIFTY"
+        tf = task.macro_timeframe or "1h"
+        macro_name = f"macro_{tf}_{symbol}.parquet"
+        candidate_paths = [
+            task.parquet_file_path,
+            os.path.join('/app', 'backup', user_id, task_id, macro_name),
+            os.path.join(settings.BASE_DIR, 'backup', user_id, task_id, macro_name),
+        ]
+        if task.linked_backup_task:
+            linked_id = str(task.linked_backup_task.id)
+            candidate_paths.extend([
+                os.path.join('/app', 'backup', user_id, linked_id, macro_name),
+                os.path.join(settings.BASE_DIR, 'backup', user_id, linked_id, macro_name),
+            ])
+        candidate_paths.extend([
+            os.path.join('/app', 'backup', user_id, task_id, 'dataset.parquet'),
+            os.path.join(settings.BASE_DIR, 'backup', user_id, task_id, 'dataset.parquet'),
+        ])
+    else:
+        candidate_paths = [
+            task.parquet_file_path,
+            os.path.join(settings.BASE_DIR, 'backup', user_id, task_id, 'dataset.parquet'),
+            os.path.join('/app', 'backup', user_id, task_id, 'dataset.parquet'),
+        ]
 
     target_path = None
     for p in candidate_paths:
