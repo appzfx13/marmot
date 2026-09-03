@@ -91,9 +91,41 @@ class PostbackWebhookView(View):
 
 @method_decorator(csrf_exempt, name='dispatch')
 class AIChatAPIView(View):
-    """API endpoint for AI Copilot chat conversations powered by Google Gemini."""
+    """API endpoint for AI Copilot chat conversations with database persistence and Gemini inference."""
+
+    def _get_session_id(self, request):
+        """Resolve persistent session identifier for authenticated user or browser session."""
+        if request.user.is_authenticated:
+            return f"user_{request.user.id}"
+        if not request.session.session_key:
+            request.session.create()
+        return f"anon_{request.session.session_key}"
+
+    def get(self, request, *args, **kwargs):
+        """Retrieve stored chat history from database."""
+        from apps.common.models import AIChatMessage
+        session_id = self._get_session_id(request)
+        user = request.user if request.user.is_authenticated else None
+
+        queryset = AIChatMessage.objects.filter(session_id=session_id)
+        if user:
+            queryset = queryset | AIChatMessage.objects.filter(user=user)
+
+        messages = list(queryset.order_by('created_at').values('id', 'role', 'content', 'created_at'))
+        
+        formatted_history = []
+        for msg in messages:
+            formatted_history.append({
+                "id": msg['id'],
+                "role": msg['role'],
+                "text": msg['content'],
+                "created_at": msg['created_at'].isoformat() if msg.get('created_at') else None
+            })
+
+        return JsonResponse({"success": True, "history": formatted_history}, status=200)
 
     def post(self, request, *args, **kwargs):
+        """Process user message via Gemini AI, store both user prompt and response in database."""
         try:
             if request.body:
                 payload = json.loads(request.body.decode('utf-8'))
@@ -108,6 +140,48 @@ class AIChatAPIView(View):
         if not message:
             return JsonResponse({"success": False, "error": "Message prompt cannot be empty."}, status=400)
 
+        session_id = self._get_session_id(request)
+        user = request.user if request.user.is_authenticated else None
+
+        # 1. Save user query to database
+        from apps.common.models import AIChatMessage
+        from apps.common.choices import AIChatRoleChoices
+        
+        user_chat_record = AIChatMessage.objects.create(
+            user=user,
+            session_id=session_id,
+            role=AIChatRoleChoices.USER,
+            content=message,
+            created_by=user,
+        )
+
+        # 2. Invoke Gemini AI Service
         from apps.common.services.gemini_service import GeminiAIService
         result = GeminiAIService.generate_chat_response(message=message, history=history)
+
+        # 3. If response generated successfully, persist AI response
+        if result.get("success") and result.get("reply"):
+            AIChatMessage.objects.create(
+                user=user,
+                session_id=session_id,
+                role=AIChatRoleChoices.MODEL,
+                content=result.get("reply"),
+                model_name=result.get("model", "gemini-3.6-flash"),
+                created_by=user,
+            )
+
         return JsonResponse(result, status=200)
+
+    def delete(self, request, *args, **kwargs):
+        """Clear conversation history from database for the current user/session."""
+        from apps.common.models import AIChatMessage
+        session_id = self._get_session_id(request)
+        user = request.user if request.user.is_authenticated else None
+
+        queryset = AIChatMessage.objects.filter(session_id=session_id)
+        if user:
+            queryset = queryset | AIChatMessage.objects.filter(user=user)
+
+        deleted_count = queryset.delete()
+        return JsonResponse({"success": True, "message": "Chat history cleared.", "deleted": deleted_count[0] if deleted_count else 0}, status=200)
+

@@ -135,6 +135,12 @@ class LoggerCategoryChoices(models.TextChoices):
     SYSTEM = "SYSTEM", "Core System"
 
 
+# AI Copilot Chat Role Choices
+class AIChatRoleChoices(models.TextChoices):
+    USER = "user", "User"
+    MODEL = "model", "Model"
+
+
 class PermanentLogTargets:
     """Defines target tuples (app, log_type) that should never be cleaned up."""
     ALL = [
@@ -144,3 +150,4 @@ class PermanentLogTargets:
         ("notifications", "email_audit"),
         ("postback", "webhook_audit"),
     ]
+

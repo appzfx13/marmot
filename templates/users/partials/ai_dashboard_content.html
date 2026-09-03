@@ -145,7 +145,7 @@
         </button>
 
         <!-- Floating Chat Modal Window -->
-        <div id="floatingAiChatWindow" class="floating-chat-window shadow-lg d-none">
+        <div id="floatingAiChatWindow" class="floating-chat-window shadow-lg d-none" data-lenis-prevent>
             <!-- Chat Window Header -->
             <div class="chat-header d-flex align-items-center justify-content-between px-3.5 py-3">
                 <div class="d-flex align-items-center gap-2.5">
@@ -171,7 +171,7 @@
             </div>
 
             <!-- Quick Action Prompt Chips -->
-            <div class="chat-quick-chips px-3 py-2 d-flex gap-1.5 overflow-x-auto">
+            <div class="chat-quick-chips px-3 py-2 d-flex gap-1.5 overflow-x-auto" data-lenis-prevent>
                 <button type="button" class="chip-btn" onclick="sendQuickPrompt('Analyze NIFTY 50 Market Sentiment')">⚡ NIFTY Sentiment</button>
                 <button type="button" class="chip-btn" onclick="sendQuickPrompt('Suggest best 0DTE Options strategy for current IV')">🎯 0DTE Strategy</button>
                 <button type="button" class="chip-btn" onclick="sendQuickPrompt('Check current Risk Limits & Drawdown')">🛡️ Risk Check</button>
@@ -179,7 +179,7 @@
             </div>
 
             <!-- Chat Messages Log Container -->
-            <div class="chat-body p-3 overflow-y-auto" id="aiChatMessagesList">
+            <div class="chat-body p-3 overflow-y-auto" id="aiChatMessagesList" data-lenis-prevent>
                 <!-- Welcome Message -->
                 <div class="chat-msg ai-msg">
                     <div class="msg-bubble">
@@ -244,16 +244,16 @@
             50% { opacity: 0.3; transform: scale(0.7); }
         }
 
-        /* Expanded Chat Modal Window */
+        /* Expanded Chat Modal Window - 540px Width */
         .floating-chat-window {
             position: fixed;
             bottom: 86px;
             right: 24px;
-            width: 460px;
-            max-width: min(460px, calc(100vw - 32px));
-            height: 560px;
+            width: 540px;
+            max-width: min(540px, calc(100vw - 32px));
+            height: 600px;
             max-height: calc(100vh - 110px);
-            background: rgba(5, 22, 14, 0.94);
+            background: rgba(5, 22, 14, 0.96);
             backdrop-filter: blur(32px) saturate(180%);
             -webkit-backdrop-filter: blur(32px) saturate(180%);
             border: 1px solid rgba(180, 241, 5, 0.28);
@@ -263,8 +263,8 @@
             flex-direction: column;
             box-shadow: 0 24px 60px rgba(0, 0, 0, 0.75), 0 0 35px rgba(180, 241, 5, 0.12);
             animation: slideUpAiChat 0.3s cubic-bezier(0.16, 1, 0.3, 1);
-            overflow-x: hidden !important;
-            overflow-y: hidden;
+            overflow: hidden !important;
+            contain: layout style;
         }
 
         @keyframes slideUpAiChat {
@@ -273,7 +273,7 @@
         }
 
         .chat-header {
-            background: rgba(4, 20, 13, 0.92);
+            background: rgba(4, 20, 13, 0.95);
             border-bottom: 1px solid rgba(255, 255, 255, 0.08);
             flex-shrink: 0;
             padding: 14px 18px !important;
@@ -321,10 +321,11 @@
         }
 
         .chat-quick-chips {
-            background: rgba(0, 0, 0, 0.25);
+            background: rgba(0, 0, 0, 0.3);
             border-bottom: 1px solid rgba(255, 255, 255, 0.06);
             white-space: nowrap;
             flex-shrink: 0;
+            overscroll-behavior: contain;
         }
 
         .chip-btn {
@@ -346,39 +347,44 @@
             color: #FFFFFF;
         }
 
-        /* Chat Body & Lenis Smooth Scroll Style */
+        /* Chat Body: Isolated Smooth Scroll & Overscroll Containment */
         .chat-body {
-            flex-grow: 1;
+            flex: 1 1 auto;
+            min-height: 0;
             display: flex;
             flex-direction: column;
-            gap: 12px;
-            font-size: 0.85rem;
+            gap: 14px;
+            font-size: 0.86rem;
             overflow-y: auto !important;
             overflow-x: hidden !important;
+            overscroll-behavior: contain;
+            -webkit-overflow-scrolling: touch;
             scroll-behavior: smooth;
+            padding: 16px !important;
         }
 
         /* Sleek Webkit Scrollbar */
         .chat-body::-webkit-scrollbar,
         .chat-code-block::-webkit-scrollbar {
-            width: 5px;
-            height: 5px;
+            width: 6px;
+            height: 6px;
         }
 
         .chat-body::-webkit-scrollbar-track,
         .chat-code-block::-webkit-scrollbar-track {
-            background: transparent;
+            background: rgba(0, 0, 0, 0.15);
+            border-radius: 8px;
         }
 
         .chat-body::-webkit-scrollbar-thumb,
         .chat-code-block::-webkit-scrollbar-thumb {
-            background: rgba(180, 241, 5, 0.3);
+            background: rgba(180, 241, 5, 0.35);
             border-radius: 10px;
         }
 
         .chat-body::-webkit-scrollbar-thumb:hover,
         .chat-code-block::-webkit-scrollbar-thumb:hover {
-            background: rgba(180, 241, 5, 0.65);
+            background: rgba(180, 241, 5, 0.75);
         }
 
         .chat-msg {
@@ -386,6 +392,8 @@
             width: 100%;
             max-width: 100%;
             overflow-x: hidden;
+            flex-shrink: 0;
+            position: relative;
         }
 
         .chat-msg.user-msg {
@@ -397,13 +405,14 @@
         }
 
         .msg-bubble {
-            max-width: 90%;
-            padding: 10px 15px;
+            max-width: 92%;
+            padding: 12px 16px;
             border-radius: 16px;
-            line-height: 1.55;
+            line-height: 1.6;
             word-break: break-word;
             overflow-wrap: anywhere;
             box-sizing: border-box;
+            position: relative;
         }
 
         .user-msg .msg-bubble {
@@ -420,6 +429,7 @@
             border: 1px solid rgba(255, 255, 255, 0.1);
             border-bottom-left-radius: 4px;
             box-shadow: 0 4px 16px rgba(0, 0, 0, 0.3);
+            padding-bottom: 30px;
         }
 
         .ai-msg .msg-bubble ul,
@@ -436,14 +446,78 @@
             margin-bottom: 0;
         }
 
-        /* Isolated Code Block Horizontal Scrolling */
-        .chat-code-block {
-            display: block;
-            background: rgba(0, 0, 0, 0.55);
+        /* Message Copy Button */
+        .msg-copy-btn {
+            position: absolute;
+            bottom: 6px;
+            right: 8px;
+            background: rgba(0, 0, 0, 0.4);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #94A3B8;
+            font-size: 0.72rem;
+            padding: 2px 8px;
+            border-radius: 6px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.2s ease;
+        }
+
+        .msg-copy-btn:hover {
+            background: rgba(180, 241, 5, 0.2);
+            border-color: #B4F105;
+            color: #FFFFFF;
+        }
+
+        .msg-copy-btn.copied {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10B981;
+            color: #34D399;
+        }
+
+        /* Isolated Code Block Container & Header */
+        .code-block-wrapper {
+            position: relative;
+            margin: 10px 0;
+            background: rgba(0, 0, 0, 0.65);
             border: 1px solid rgba(180, 241, 5, 0.25);
             border-radius: 8px;
+            overflow: hidden;
+        }
+
+        .code-block-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 4px 10px;
+            background: rgba(255, 255, 255, 0.04);
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+            font-size: 0.7rem;
+            color: #94A3B8;
+            font-family: 'JetBrains Mono', monospace;
+        }
+
+        .code-copy-btn {
+            background: transparent;
+            border: none;
+            color: #94A3B8;
+            font-size: 0.7rem;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: color 0.2s ease;
+        }
+
+        .code-copy-btn:hover {
+            color: #B4F105;
+        }
+
+        .chat-code-block {
+            display: block;
             padding: 10px 12px;
-            margin: 8px 0;
+            margin: 0;
             font-family: 'Google Sans Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace !important;
             font-size: 0.78rem;
             color: #E2E8F0;
@@ -506,12 +580,63 @@
     <!-- Interactive JavaScript for Floating Chat -->
     <script>
         let aiChatHistory = [];
+        let isAiWheelBound = false;
+        let isHistoryLoaded = false;
+
+        function initAiChatWheelSupport() {
+            const messageList = document.getElementById('aiChatMessagesList');
+            if (!messageList || isAiWheelBound) return;
+            
+            messageList.addEventListener('wheel', function(e) {
+                e.stopPropagation();
+                messageList.scrollTop += e.deltaY;
+            }, { passive: false });
+
+            isAiWheelBound = true;
+        }
+
+        async function loadStoredChatHistory() {
+            if (isHistoryLoaded) return;
+            const messageList = document.getElementById('aiChatMessagesList');
+            if (!messageList) return;
+
+            try {
+                const response = await fetch('/api/ai-chat/', { method: 'GET' });
+                const data = await response.json();
+
+                if (data.success && Array.isArray(data.history) && data.history.length > 0) {
+                    messageList.innerHTML = '';
+                    aiChatHistory = [];
+
+                    data.history.forEach(item => {
+                        aiChatHistory.push({ role: item.role, text: item.text });
+                        if (item.role === 'user') {
+                            const userMsgDiv = document.createElement('div');
+                            userMsgDiv.className = 'chat-msg user-msg';
+                            userMsgDiv.innerHTML = `<div class="msg-bubble">${escapeHtml(item.text)}</div>`;
+                            messageList.appendChild(userMsgDiv);
+                        } else {
+                            const aiMsgDiv = document.createElement('div');
+                            aiMsgDiv.className = 'chat-msg ai-msg';
+                            aiMsgDiv.innerHTML = createAiMessageBubbleHtml(item.text);
+                            messageList.appendChild(aiMsgDiv);
+                        }
+                    });
+                    scrollChatToBottom(false);
+                }
+                isHistoryLoaded = true;
+            } catch (err) {
+                console.error("Failed to load stored AI chat history:", err);
+            }
+        }
 
         function toggleFloatingAiChat() {
             const chatWin = document.getElementById('floatingAiChatWindow');
             if (!chatWin) return;
             if (chatWin.classList.contains('d-none')) {
                 chatWin.classList.remove('d-none');
+                initAiChatWheelSupport();
+                loadStoredChatHistory();
                 setTimeout(() => {
                     const inp = document.getElementById('aiChatInput');
                     if (inp) inp.focus();
@@ -521,7 +646,18 @@
             }
         }
 
-        function clearAiChatHistory() {
+        // Initialize wheel listener on DOM ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => {
+                initAiChatWheelSupport();
+                loadStoredChatHistory();
+            });
+        } else {
+            initAiChatWheelSupport();
+            loadStoredChatHistory();
+        }
+
+        async function clearAiChatHistory() {
             aiChatHistory = [];
             const list = document.getElementById('aiChatMessagesList');
             if (list) {
@@ -533,6 +669,11 @@
                     </div>
                 `;
             }
+            try {
+                await fetch('/api/ai-chat/', { method: 'DELETE' });
+            } catch (e) {
+                console.warn("Error clearing backend AI history:", e);
+            }
         }
 
         function sendQuickPrompt(text) {
@@ -542,6 +683,66 @@
                 const form = document.getElementById('aiChatForm');
                 if (form) form.dispatchEvent(new Event('submit', { cancelable: true, bubbles: true }));
             }
+        }
+
+        function scrollChatToBottom(smooth = true) {
+            const messageList = document.getElementById('aiChatMessagesList');
+            if (!messageList) return;
+            requestAnimationFrame(() => {
+                messageList.scrollTo({
+                    top: messageList.scrollHeight,
+                    behavior: smooth ? 'smooth' : 'auto'
+                });
+            });
+        }
+
+        function copyMessageText(btn) {
+            const bubble = btn.closest('.msg-bubble');
+            if (!bubble) return;
+            
+            // Extract raw text excluding the copy button itself
+            const clone = bubble.cloneNode(true);
+            const btnInClone = clone.querySelector('.msg-copy-btn');
+            if (btnInClone) btnInClone.remove();
+            const textToCopy = clone.innerText.trim();
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                btn.classList.add('copied');
+                btn.innerHTML = `<i class="bi bi-check2"></i> Copied!`;
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    btn.innerHTML = `<i class="bi bi-clipboard"></i> Copy`;
+                }, 2000);
+            }).catch(() => {
+                btn.innerHTML = `Failed`;
+            });
+        }
+
+        function copyCodeSnippet(btn) {
+            const wrapper = btn.closest('.code-block-wrapper');
+            if (!wrapper) return;
+            const codeElem = wrapper.querySelector('code');
+            if (!codeElem) return;
+            const textToCopy = codeElem.innerText;
+
+            navigator.clipboard.writeText(textToCopy).then(() => {
+                btn.innerHTML = `<i class="bi bi-check2 text-success"></i> Copied!`;
+                setTimeout(() => {
+                    btn.innerHTML = `<i class="bi bi-clipboard"></i> Copy`;
+                }, 2000);
+            });
+        }
+
+        function createAiMessageBubbleHtml(rawAiText) {
+            const formatted = formatAiMarkdown(rawAiText);
+            return `
+                <div class="msg-bubble">
+                    ${formatted}
+                    <button type="button" class="msg-copy-btn" onclick="copyMessageText(this)" title="Copy entire response">
+                        <i class="bi bi-clipboard"></i> Copy
+                    </button>
+                </div>
+            `;
         }
 
         async function handleAiChatSubmit(event) {
@@ -560,14 +761,14 @@
             userMsgDiv.innerHTML = `<div class="msg-bubble">${escapeHtml(text)}</div>`;
             messageList.appendChild(userMsgDiv);
             input.value = '';
-            messageList.scrollTop = messageList.scrollHeight;
+            scrollChatToBottom(true);
 
             // Append Typing Indicator
             const typingDiv = document.createElement('div');
             typingDiv.className = 'chat-msg ai-msg typing-indicator-msg';
             typingDiv.innerHTML = `<div class="msg-bubble"><span class="spinner-border spinner-border-sm me-1"></span> Gemini reasoning...</div>`;
             messageList.appendChild(typingDiv);
-            messageList.scrollTop = messageList.scrollHeight;
+            scrollChatToBottom(true);
 
             if (sendBtn) sendBtn.disabled = true;
 
@@ -582,16 +783,13 @@
                 typingDiv.remove();
 
                 const aiReply = data.reply || "Unable to generate response.";
-                
-                // Format full markdown (fenced code blocks, inline code, bold, bullets)
-                const formattedReply = formatAiMarkdown(aiReply);
 
                 const aiMsgDiv = document.createElement('div');
                 aiMsgDiv.className = 'chat-msg ai-msg';
-                aiMsgDiv.innerHTML = `<div class="msg-bubble">${formattedReply}</div>`;
+                aiMsgDiv.innerHTML = createAiMessageBubbleHtml(aiReply);
                 messageList.appendChild(aiMsgDiv);
 
-                // Update history
+                // Update in-memory history
                 aiChatHistory.push({ role: 'user', text: text });
                 aiChatHistory.push({ role: 'model', text: aiReply });
 
@@ -603,7 +801,7 @@
                 messageList.appendChild(errDiv);
             } finally {
                 if (sendBtn) sendBtn.disabled = false;
-                messageList.scrollTop = messageList.scrollHeight;
+                scrollChatToBottom(true);
             }
         }
 
@@ -614,12 +812,24 @@
         function formatAiMarkdown(text) {
             if (!text) return '';
 
-            // Step 1: Temporarily extract triple-backtick code blocks to avoid breaking formatting inside code
+            // Step 1: Extract triple-backtick code blocks and wrap with code header & copy button
             const codeBlocks = [];
             let processed = text.replace(/```([a-zA-Z0-9_\-#+]*)\n?([\s\S]*?)```/g, (match, lang, code) => {
                 const placeholder = `__CODE_BLOCK_${codeBlocks.length}__`;
                 const cleanCode = escapeHtml(code.trim());
-                codeBlocks.push(`<pre class="chat-code-block" data-lang="${escapeHtml(lang)}"><code>${cleanCode}</code></pre>`);
+                const displayLang = lang ? escapeHtml(lang) : 'code';
+                const codeHtml = `
+                    <div class="code-block-wrapper">
+                        <div class="code-block-header">
+                            <span><i class="bi bi-terminal me-1"></i>${displayLang}</span>
+                            <button type="button" class="code-copy-btn" onclick="copyCodeSnippet(this)">
+                                <i class="bi bi-clipboard"></i> Copy
+                            </button>
+                        </div>
+                        <pre class="chat-code-block" data-lang="${displayLang}"><code>${cleanCode}</code></pre>
+                    </div>
+                `;
+                codeBlocks.push(codeHtml);
                 return placeholder;
             });
 
@@ -642,7 +852,7 @@
             // Convert newlines
             processed = processed.replace(/\n/g, '<br>');
 
-            // Step 3: Re-insert isolated code blocks
+            // Step 3: Re-insert formatted code blocks
             codeBlocks.forEach((block, idx) => {
                 processed = processed.replace(`__CODE_BLOCK_${idx}__`, block);
             });

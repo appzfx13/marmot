@@ -8,7 +8,7 @@ from django.utils import timezone
 from django.conf import settings    
 from django.contrib.auth.models import AbstractUser, UserManager
 
-from apps.common.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices
+from apps.common.choices import BrokerChoices, MemberRoleChoices, PLStatusChoices, AIChatRoleChoices
 
 # --- Soft Delete Model & Manager setup ---
 
@@ -134,4 +134,28 @@ class SiteSettings(BaseModel):
     @classmethod
     def load(cls):
         obj, _ = cls.objects.get_or_create(pk=1)
-        return obj
+        return obj
+
+
+class AIChatMessage(BaseModel):
+    """Stores user queries and Gemini AI Copilot responses with multi-session history support."""
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, null=True, blank=True, related_name='ai_chats')
+    session_id = models.CharField(max_length=100, db_index=True, help_text="Session or conversation identifier")
+    role = models.CharField(max_length=20, choices=AIChatRoleChoices.choices, default=AIChatRoleChoices.USER)
+    content = models.TextField(help_text="Message text or generated markdown")
+    model_name = models.CharField(max_length=50, default='gemini-3.6-flash')
+    tokens_used = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        verbose_name = "AI Chat Message"
+        verbose_name_plural = "AI Chat Messages"
+        ordering = ['created_at']
+        indexes = [
+            models.Index(fields=['session_id', 'created_at']),
+            models.Index(fields=['user', 'session_id', 'created_at']),
+        ]
+
+    def __str__(self):
+        user_str = self.user.username if self.user else "Anonymous"
+        return f"[{self.role.upper()}] {user_str} ({self.session_id[:8]}...): {self.content[:40]}..."
+
