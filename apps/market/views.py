@@ -15,9 +15,10 @@ from apps.users.mixins import HTMXPartialMixin
 from apps.admins.permissions import AdminRequiredMixin
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 
+from datetime import date, timedelta
 from .models import MarketBackupTask
-from .forms import MarketBackupForm
-from .services import create_and_start_backup_task, send_control_command, inspect_parquet_dataset
+from .forms import MarketBackupForm, MacroBackupForm
+from .services import create_and_start_backup_task, create_and_start_macro_backup_task, send_control_command, inspect_parquet_dataset
 
 
 class MarketBackupListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
@@ -52,6 +53,13 @@ class MarketBackupListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         if status:
             queryset = queryset.filter(status=status)
 
+        # Dataset type filter (All, Market, Macro)
+        dataset_type = self.request.GET.get('dataset_type', '').strip().lower()
+        if dataset_type == 'macro':
+            queryset = queryset.filter(is_macro_assist=True)
+        elif dataset_type == 'market':
+            queryset = queryset.filter(is_macro_assist=False)
+
         # Sorting
         sort = self.request.GET.get('sort', '-created_at').strip()
         allowed_sort = ['created_at', '-created_at', 'index_name', '-index_name', 'status', '-status']
@@ -72,6 +80,7 @@ class MarketBackupListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         query_params.pop('page', None)
         query_params.pop('sort', None)
         context['current_filters'] = query_params.urlencode()
+        context['current_dataset_type'] = self.request.GET.get('dataset_type', '').strip().lower()
         
         backups = context.get('backups')
         if backups is not None:
@@ -107,6 +116,210 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
         # Add success message and redirect back to the dashboard
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
+
+
+class MacroBackupModalView(LoginRequiredMixin, View):
+    """Renders HTMX modal for initializing 1-Month AI Macro Assist backup with market dataset co-location."""
+
+    def get(self, request, *args, **kwargs):
+        today = date.today()
+        month_ago = today - timedelta(days=30)
+        form = MacroBackupForm(
+            user=request.user,
+            initial={
+                'start_date': month_ago,
+                'end_date': today,
+                'macro_timeframe': '1h',
+                'market_type': 'INDEX_FO',
+                'index_name': 'NIFTY',
+            }
+        )
+        backups_qs = MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=False)
+        if not getattr(request.user, 'is_superuser', False):
+            backups_qs = backups_qs.filter(created_by=request.user)
+
+        user_id = str(request.user.id if request.user.is_authenticated else 1)
+        backups_meta = {}
+        for b in backups_qs.order_by('-id')[:50]:
+            backups_meta[str(b.id)] = {
+                'id': b.id,
+                'market_type': b.market_type,
+                'index_name': b.index_name or '',
+                'forex_instrument': b.forex_instrument or '',
+                'symbol': b.display_symbol,
+                'asset_code': b.asset_code,
+                'start_date': b.start_date.isoformat(),
+                'end_date': b.end_date.isoformat(),
+                'folder_path': f"/app/backup/{user_id}/{b.id}/",
+                'provider': b.provider_name,
+            }
+
+        return render(request, 'market/macro_backup_modal.html', {
+            'form': form,
+            'backups_meta_json': json.dumps(backups_meta),
+            'user_id': user_id,
+        })
+
+
+class MacroBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, CreateView):
+    """Processes AI Macro Assist creation form and fires async 1-hit Gemini sync job."""
+    model = MarketBackupTask
+    form_class = MacroBackupForm
+    success_url = reverse_lazy('market:market_backup_list')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def form_valid(self, form):
+        task = create_and_start_macro_backup_task(
+            start_date=form.cleaned_data['start_date'],
+            end_date=form.cleaned_data['end_date'],
+            market_type=form.cleaned_data.get('market_type'),
+            index_name=form.cleaned_data.get('index_name'),
+            forex_instrument=form.cleaned_data.get('forex_instrument'),
+            macro_timeframe=form.cleaned_data.get('macro_timeframe') or '1h',
+            linked_backup_task=form.cleaned_data.get('linked_backup_task'),
+            user=self.request.user,
+        )
+        if self.request.headers.get('HX-Request'):
+            res = HttpResponse()
+            res['HX-Trigger'] = json.dumps({
+                'closeGlobalModal': True,
+                'showToast': {'message': f"AI Macro Backup #{task.id} started successfully! Downloading 1-month 1h data via Gemini.", 'level': 'success'},
+                'reloadBackupList': True
+            })
+            return res
+        messages.success(self.request, f"AI Macro Assist backup #{task.id} started successfully!")
+        return HttpResponseRedirect(self.get_success_url())
+
+    def form_invalid(self, form):
+        user_id = str(self.request.user.id if self.request.user.is_authenticated else 1)
+        return render(self.request, 'market/macro_backup_modal.html', {'form': form, 'user_id': user_id, 'backups_meta_json': '{}'})
+
+
+class MacroBackupCreatePageView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
+    """Dedicated full-page view for creating an AI Macro Assist backup task."""
+    model = MarketBackupTask
+    form_class = MacroBackupForm
+    template_name = 'admins/macro_backup_form.html'
+    success_url = reverse_lazy('market:market_macro_backup_list')
+    success_message = "AI Macro Assist backup job started successfully via Gemini AI."
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['user'] = self.request.user
+        return kwargs
+
+    def get_initial(self):
+        today = date.today()
+        month_ago = today - timedelta(days=30)
+        return {
+            'start_date': month_ago,
+            'end_date': today,
+            'macro_timeframe': '1h',
+            'market_type': 'INDEX_FO',
+            'index_name': 'NIFTY',
+        }
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = "Initialize AI Macro Assist Backup"
+        user_id = str(self.request.user.id if self.request.user.is_authenticated else 1)
+        backups_qs = MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=False)
+        if not getattr(self.request.user, 'is_superuser', False):
+            backups_qs = backups_qs.filter(created_by=self.request.user)
+
+        backups_meta = {}
+        for b in backups_qs.order_by('-id')[:50]:
+            backups_meta[str(b.id)] = {
+                'id': b.id,
+                'market_type': b.market_type,
+                'index_name': b.index_name or '',
+                'forex_instrument': b.forex_instrument or '',
+                'symbol': b.display_symbol,
+                'asset_code': b.asset_code,
+                'start_date': b.start_date.isoformat(),
+                'end_date': b.end_date.isoformat(),
+                'folder_path': f"/app/backup/{user_id}/{b.id}/",
+                'provider': b.provider_name,
+            }
+
+        context['user_id'] = user_id
+        context['backups_meta_json'] = json.dumps(backups_meta)
+        return context
+
+    def form_valid(self, form):
+        task = create_and_start_macro_backup_task(
+            start_date=form.cleaned_data['start_date'],
+            end_date=form.cleaned_data['end_date'],
+            market_type=form.cleaned_data.get('market_type'),
+            index_name=form.cleaned_data.get('index_name'),
+            forex_instrument=form.cleaned_data.get('forex_instrument'),
+            macro_timeframe=form.cleaned_data.get('macro_timeframe') or '1h',
+            linked_backup_task=form.cleaned_data.get('linked_backup_task'),
+            user=self.request.user,
+        )
+        self.object = task
+        messages.success(self.request, f"AI Macro Assist backup #{task.id} started successfully! Downloading 1-month 1h data via Gemini.")
+        return HttpResponseRedirect(self.get_success_url())
+
+
+class MacroBackupListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
+    """Dashboard view for AI Macro Assist datasets with live WebSocket progress updates."""
+    model = MarketBackupTask
+    template_name = 'admins/macro_backup_dashboard.html'
+    partial_template_name = 'admins/partials/macro_backup_dashboard_list_content.html'
+    table_template_name = 'admins/partials/macro_backup_dashboard_content.html'
+    context_object_name = 'backups'
+    paginate_by = settings.PAGINATION_COUNT
+
+    def get_template_names(self):
+        if self.request.headers.get('HX-Target') == 'macro-backup-dashboard-container':
+            return [self.table_template_name]
+        if self.request.headers.get('HX-Request'):
+            return [self.partial_template_name]
+        return [self.template_name]
+
+    def get_queryset(self):
+        queryset = super().get_queryset().filter(is_deleted=False, is_macro_assist=True)
+
+        q = self.request.GET.get('q', '').strip()
+        if q:
+            queryset = queryset.filter(index_name__icontains=q) | queryset.filter(id__icontains=q) | queryset.filter(forex_instrument__icontains=q)
+
+        status = self.request.GET.get('status', '').strip()
+        if status:
+            queryset = queryset.filter(status=status)
+
+        sort = self.request.GET.get('sort', '-created_at').strip()
+        allowed_sort = ['created_at', '-created_at', 'index_name', '-index_name', 'status', '-status']
+        if sort in allowed_sort:
+            queryset = queryset.order_by(sort)
+        else:
+            queryset = queryset.order_by('-created_at')
+
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['page_title'] = "AI Macro Assist Datasets"
+        context['current_sort'] = self.request.GET.get('sort', '-created_at').strip()
+        context['ws_url'] = settings.MARMOT_WS_URL
+
+        query_params = self.request.GET.copy()
+        query_params.pop('page', None)
+        query_params.pop('sort', None)
+        context['current_filters'] = query_params.urlencode()
+
+        backups = context.get('backups')
+        if backups is not None:
+            context['has_active_tasks'] = any(b.status in ['running', 'pending'] for b in backups)
+        else:
+            context['has_active_tasks'] = False
+        return context
+
 
 
 

@@ -3,12 +3,13 @@ import shutil
 from django.conf import settings
 from django.db import models
 from apps.common.models import BaseModel
-from apps.common.choices import TaskStatusChoices, IndexChoices, MarketTypeChoices, ForexInstrumentChoices, DatabentoSchemaChoices
+from apps.common.choices import TaskStatusChoices, IndexChoices, MarketTypeChoices, ForexInstrumentChoices, DatabentoSchemaChoices, MacroTimeframeChoices
 
 class MarketBackupTask(BaseModel):
     StatusChoices = TaskStatusChoices
     IndexChoices = IndexChoices
     DatabentoSchemaChoices = DatabentoSchemaChoices
+    MacroTimeframeChoices = MacroTimeframeChoices
 
     # 1. User Input Parameters
     start_date = models.DateField(help_text="Start date for options data range")
@@ -29,6 +30,11 @@ class MarketBackupTask(BaseModel):
     # FOREX / CME Micro Futures fields (NEW — nullable)
     forex_instrument = models.CharField(max_length=10, choices=ForexInstrumentChoices.choices, null=True, blank=True, help_text="CME Micro Futures instrument to back up (FOREX/FUTURES only)")
     databento_schema = models.CharField(max_length=20, choices=DatabentoSchemaChoices.choices, default=DatabentoSchemaChoices.OHLCV_1M, null=True, blank=True, help_text="Databento Order Flow schema (FOREX/FUTURES only)")
+
+    # AI Macro Assist Fields
+    is_macro_assist = models.BooleanField(default=False, help_text="Designates this dataset as an AI Macro & Fundamental sentiment backup")
+    macro_timeframe = models.CharField(max_length=10, choices=MacroTimeframeChoices.choices, default=MacroTimeframeChoices.H1, null=True, blank=True, help_text="Macro interval (default 1h)")
+    linked_backup_task = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='macro_backups', help_text="Co-located market backup task")
 
     # 2. Control & Progress State (Tracked by Go Engine & Django UI)
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.CREATED)

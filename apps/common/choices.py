@@ -141,6 +141,14 @@ class AIChatRoleChoices(models.TextChoices):
     MODEL = "model", "Model"
 
 
+# AI Macro Assist Timeframe Choices
+class MacroTimeframeChoices(models.TextChoices):
+    M15 = '15m', '15 Minutes'
+    M30 = '30m', '30 Minutes'
+    H1 = '1h', '1 Hour (Recommended)'
+    D1 = '1d', '1 Day (EOD)'
+
+
 class PermanentLogTargets:
     """Defines target tuples (app, log_type) that should never be cleaned up."""
     ALL = [

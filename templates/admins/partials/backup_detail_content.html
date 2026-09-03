@@ -90,6 +90,16 @@
     <!-- ── 1. TOP HEADER BANNER ───────────────────────────────────────────── -->
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
         <div class="page-header-top-bar d-flex align-items-center justify-content-between w-100">
+            {% if backup.is_macro_assist %}
+            <a href="{% url 'market:market_macro_backup_list' %}"
+               class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 page-header-back-btn"
+               hx-get="{% url 'market:market_macro_backup_list' %}"
+               hx-target="#app-main-container"
+               hx-push-url="true">
+                <span class="material-icons" style="font-size: 1.1rem;">arrow_back</span>
+                <span class="fw-medium">Back to AI Macro Assist</span>
+            </a>
+            {% else %}
             <a href="{% url 'market:market_backup_list' %}"
                class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 page-header-back-btn"
                hx-get="{% url 'market:market_backup_list' %}"
@@ -98,6 +108,7 @@
                 <span class="material-icons" style="font-size: 1.1rem;">arrow_back</span>
                 <span class="fw-medium">Back to Backups</span>
             </a>
+            {% endif %}
             <!-- Status Badge -->
             <div id="backup-status-badge" class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
                 {% if backup.status == 'completed' %}
@@ -135,9 +146,11 @@
         </div>
         <div class="page-header-title-wrapper">
             <div class="d-flex align-items-center justify-content-center gap-2 mb-1 flex-wrap">
-                <h1 class="page-title mb-0 theme-text-main">{{ backup.display_symbol }}</h1>
-                <span class="badge {% if backup.market_type == 'FOREX_FUTURES' %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25{% endif %} rounded-pill px-2.5 py-1 small">
-                    {% if backup.market_type == 'FOREX_FUTURES' %}FOREX / CME Futures · Provider: {{ backup.provider_name }}{% else %}INDEX / F&amp;O · Provider: {{ backup.provider_name }}{% endif %}
+                <h1 class="page-title mb-0 theme-text-main">
+                    {% if backup.is_macro_assist %}🤖 {{ backup.display_symbol }} (AI Macro Assist){% else %}{{ backup.display_symbol }}{% endif %}
+                </h1>
+                <span class="badge {% if backup.is_macro_assist %}bg-warning bg-opacity-25 text-warning border border-warning border-opacity-35{% elif backup.market_type == 'FOREX_FUTURES' %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% else %}bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25{% endif %} rounded-pill px-2.5 py-1 small">
+                    {% if backup.is_macro_assist %}AI MACRO ASSIST · Provider: Gemini AI{% elif backup.market_type == 'FOREX_FUTURES' %}FOREX / CME Futures · Provider: {{ backup.provider_name }}{% else %}INDEX / F&amp;O · Provider: {{ backup.provider_name }}{% endif %}
                 </span>
             </div>
             <p class="page-subtitle mb-0 d-flex align-items-center justify-content-center gap-2">
@@ -181,7 +194,12 @@
                         <span class="stat-value">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</span>
                     </div>
 
-                    {% if backup.market_type != 'FOREX_FUTURES' %}
+                    {% if backup.is_macro_assist %}
+                    <div class="stat-item">
+                        <span class="stat-label">Observation Interval</span>
+                        <span class="stat-value text-warning fw-bold">{{ backup.macro_timeframe|default:"1h" }} Candle Alignment</span>
+                    </div>
+                    {% elif backup.market_type != 'FOREX_FUTURES' %}
                     <div class="stat-item">
                         <span class="stat-label">Strike Spread</span>
                         <span class="stat-value">±{{ backup.strike_count }} ATM (CE &amp; PE)</span>
@@ -199,6 +217,30 @@
                         <span class="stat-label">File Size</span>
                         <span class="stat-value text-primary fw-bold" id="backup-file-size">{{ backup.file_size_mb }} MB</span>
                     </div>
+
+                    {% if backup.is_macro_assist and backup.linked_backup_task %}
+                    <div class="stat-item border-warning border-opacity-30">
+                        <span class="stat-label d-flex align-items-center gap-1">
+                            <span class="material-icons fs-6 text-warning">folder_shared</span>
+                            <span>Co-located Task</span>
+                        </span>
+                        <span class="stat-value">
+                            <a href="{% url 'market:market_backup_detail' backup.linked_backup_task.pk %}" class="badge bg-warning bg-opacity-20 text-warning text-decoration-none border border-warning border-opacity-30 rounded-pill px-2.5 py-1">
+                                Market Backup #{{ backup.linked_backup_task.id }}
+                            </a>
+                        </span>
+                    </div>
+                    {% elif backup.macro_backups.exists %}
+                    <div class="stat-item border-info border-opacity-30">
+                        <span class="stat-label d-flex align-items-center gap-1">
+                            <span class="material-icons fs-6 text-info">psychology_alt</span>
+                            <span>AI Macro Dataset</span>
+                        </span>
+                        <span class="stat-value">
+                            <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-1">Co-located in same folder</span>
+                        </span>
+                    </div>
+                    {% endif %}
                 </div>
 
                 <div class="mt-3 pt-3 border-top border-secondary border-opacity-15 d-flex align-items-center justify-content-between small">
@@ -244,7 +286,7 @@
                         </div>
                         <div class="d-flex justify-content-between align-items-center">
                             <span class="stat-label">Dataset Engine</span>
-                            <span class="stat-value">Unified Go Parquet Stream</span>
+                            <span class="stat-value">{% if backup.is_macro_assist %}Gemini AI Macro Ingestion{% else %}Unified Go Parquet Stream{% endif %}</span>
                         </div>
                     </div>
                 </div>
@@ -252,12 +294,14 @@
                 <!-- Action Controls Island -->
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 pt-3 border-top border-secondary border-opacity-15">
                     <div class="d-flex flex-wrap align-items-center gap-2">
+                        {% if not backup.is_macro_assist %}
                         <a href="{% url 'market:market_backup_chart' backup.pk %}"
                            target="_blank"
                            class="btn btn-emerald rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
                             <span class="material-icons fs-6">candlestick_chart</span>
                             <span>Interactive Chart</span>
                         </a>
+                        {% endif %}
 
                         {% if backup.file_size_mb > 0 and backup.status != 'error' %}
                         <a href="{% url 'market:market_backup_download' backup.pk %}"

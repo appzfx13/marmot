@@ -28,6 +28,18 @@
     <div class="table-responsive rounded-3 border border-secondary border-opacity-15" style="max-height: 480px; overflow-y: auto;">
         <table class="table table-dark table-hover table-borderless align-middle mb-0 text-xs">
             <thead class="sticky-top" style="background: rgba(15, 23, 42, 0.95); backdrop-filter: blur(8px); border-bottom: 1px solid var(--border-color); z-index: 10;">
+                {% if backup.is_macro_assist %}
+                <tr>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">DATETIME</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">SENTIMENT</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">SCORE</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">FII/DII FLOW</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">RATE REGIME</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">GLOBAL RISK</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-center">EVENT RISK</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">MACRO SUMMARY</th>
+                </tr>
+                {% else %}
                 <tr>
                     <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">DATETIME</th>
                     <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">SYMBOL</th>
@@ -42,12 +54,13 @@
                     <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">OI</th>
                     <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">SPOT</th>
                 </tr>
+                {% endif %}
             </thead>
             <tbody>
                 {% if parquet_inspection.is_split_view %}
                     <!-- SECTION 1: STARTING 10 K-LINES (HEAD) -->
                     <tr class="table-active" style="background: rgba(13, 110, 253, 0.12); border-bottom: 1px solid rgba(13, 110, 253, 0.25);">
-                        <td colspan="12" class="py-1.5 px-3">
+                        <td colspan="{% if backup.is_macro_assist %}8{% else %}12{% endif %}" class="py-1.5 px-3">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge bg-success bg-opacity-30 text-success border border-success border-opacity-40 rounded-pill px-2 py-0.5 text-xxs font-monospace fw-bold">
                                     🟢 STARTING 10 K-LINES (HEAD)
@@ -58,36 +71,61 @@
                     </tr>
                     {% for row in parquet_inspection.head_records %}
                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
-                        <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime }}</td>
-                        <td class="py-2 px-3 fw-bold">{{ row.index_name }}</td>
-                        <td class="py-2 px-3">
-                            <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 px-1.5 py-0.5 text-xxs">
-                                {{ row.instrument_type }}
-                            </span>
-                        </td>
-                        <td class="py-2 px-3 font-monospace">{{ row.strike }}</td>
-                        <td class="py-2 px-3">
-                            {% if row.option_type == 'CE' %}
-                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">CE</span>
-                            {% elif row.option_type == 'PE' %}
-                                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">PE</span>
-                            {% else %}
-                                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-1.5 py-0.5 text-xxs">{{ row.option_type }}</span>
-                            {% endif %}
-                        </td>
-                        <td class="py-2 px-3 font-monospace text-end">{{ row.open|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-success">{{ row.high|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-danger">{{ row.low|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end fw-bold">{{ row.close|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-warning">{{ row.volume }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.oi }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.spot_price|floatformat:2 }}</td>
+                        {% if backup.is_macro_assist %}
+                            <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime|default:row.timestamp }}</td>
+                            <td class="py-2 px-3">
+                                {% if row.macro_sentiment == 'BULLISH' %}
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🟢 BULLISH</span>
+                                {% elif row.macro_sentiment == 'BEARISH' %}
+                                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🔴 BEARISH</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-30 px-2 py-0.5 text-xxs fw-bold">⚪ NEUTRAL</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 font-monospace text-end {% if row.macro_sentiment_score >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">{{ row.macro_sentiment_score|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end {% if row.fii_dii_flow_bias >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.fii_dii_flow_bias|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.rate_regime_bias|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.global_risk_sentiment|floatformat:2 }}</td>
+                            <td class="py-2 px-3 text-center">
+                                {% if row.event_risk_flag %}
+                                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-40 px-2 py-0.5 text-xxs fw-bold">⚡ Catalyst</span>
+                                {% else %}
+                                    <span class="text-muted text-xxs">&mdash;</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 text-truncate text-muted" style="max-width: 260px;" title="{{ row.macro_summary }}">{{ row.macro_summary }}</td>
+                        {% else %}
+                            <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime }}</td>
+                            <td class="py-2 px-3 fw-bold">{{ row.index_name }}</td>
+                            <td class="py-2 px-3">
+                                <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 px-1.5 py-0.5 text-xxs">
+                                    {{ row.instrument_type }}
+                                </span>
+                            </td>
+                            <td class="py-2 px-3 font-monospace">{{ row.strike }}</td>
+                            <td class="py-2 px-3">
+                                {% if row.option_type == 'CE' %}
+                                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">CE</span>
+                                {% elif row.option_type == 'PE' %}
+                                    <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">PE</span>
+                                {% else %}
+                                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-1.5 py-0.5 text-xxs">{{ row.option_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 font-monospace text-end">{{ row.open|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-success">{{ row.high|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-danger">{{ row.low|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end fw-bold">{{ row.close|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-warning">{{ row.volume }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.oi }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.spot_price|floatformat:2 }}</td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
 
                     <!-- SEPARATOR / MIDDLE OMITTED NOTICE -->
                     <tr style="background: rgba(255, 255, 255, 0.02); border-top: 1px dashed var(--border-color); border-bottom: 1px dashed var(--border-color);">
-                        <td colspan="12" class="text-center py-2.5 theme-text-muted font-monospace text-xxs">
+                        <td colspan="{% if backup.is_macro_assist %}8{% else %}12{% endif %}" class="text-center py-2.5 theme-text-muted font-monospace text-xxs">
                             <span class="material-icons align-middle me-1 text-primary" style="font-size: 0.9rem;">unfold_more</span>
                             <strong>... {{ parquet_inspection.num_rows }} Total K-Lines in Parquet ...</strong>
                             <span class="opacity-75 ms-1">(Intermediate candles omitted for fast verification)</span>
@@ -96,7 +134,7 @@
 
                     <!-- SECTION 2: ENDING 10 K-LINES (TAIL) -->
                     <tr class="table-active" style="background: rgba(220, 53, 69, 0.12); border-bottom: 1px solid rgba(220, 53, 69, 0.25);">
-                        <td colspan="12" class="py-1.5 px-3">
+                        <td colspan="{% if backup.is_macro_assist %}8{% else %}12{% endif %}" class="py-1.5 px-3">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge bg-danger bg-opacity-30 text-danger border border-danger border-opacity-40 rounded-pill px-2 py-0.5 text-xxs font-monospace fw-bold">
                                     🔴 ENDING 10 K-LINES (TAIL)
@@ -107,30 +145,55 @@
                     </tr>
                     {% for row in parquet_inspection.tail_records %}
                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
-                        <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime }}</td>
-                        <td class="py-2 px-3 fw-bold">{{ row.index_name }}</td>
-                        <td class="py-2 px-3">
-                            <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 px-1.5 py-0.5 text-xxs">
-                                {{ row.instrument_type }}
-                            </span>
-                        </td>
-                        <td class="py-2 px-3 font-monospace">{{ row.strike }}</td>
-                        <td class="py-2 px-3">
-                            {% if row.option_type == 'CE' %}
-                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">CE</span>
-                            {% elif row.option_type == 'PE' %}
-                                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">PE</span>
-                            {% else %}
-                                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-1.5 py-0.5 text-xxs">{{ row.option_type }}</span>
-                            {% endif %}
-                        </td>
-                        <td class="py-2 px-3 font-monospace text-end">{{ row.open|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-success">{{ row.high|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-danger">{{ row.low|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end fw-bold">{{ row.close|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-warning">{{ row.volume }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.oi }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.spot_price|floatformat:2 }}</td>
+                        {% if backup.is_macro_assist %}
+                            <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime|default:row.timestamp }}</td>
+                            <td class="py-2 px-3">
+                                {% if row.macro_sentiment == 'BULLISH' %}
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🟢 BULLISH</span>
+                                {% elif row.macro_sentiment == 'BEARISH' %}
+                                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🔴 BEARISH</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-30 px-2 py-0.5 text-xxs fw-bold">⚪ NEUTRAL</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 font-monospace text-end {% if row.macro_sentiment_score >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">{{ row.macro_sentiment_score|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end {% if row.fii_dii_flow_bias >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.fii_dii_flow_bias|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.rate_regime_bias|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.global_risk_sentiment|floatformat:2 }}</td>
+                            <td class="py-2 px-3 text-center">
+                                {% if row.event_risk_flag %}
+                                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-40 px-2 py-0.5 text-xxs fw-bold">⚡ Catalyst</span>
+                                {% else %}
+                                    <span class="text-muted text-xxs">&mdash;</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 text-truncate text-muted" style="max-width: 260px;" title="{{ row.macro_summary }}">{{ row.macro_summary }}</td>
+                        {% else %}
+                            <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime }}</td>
+                            <td class="py-2 px-3 fw-bold">{{ row.index_name }}</td>
+                            <td class="py-2 px-3">
+                                <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 px-1.5 py-0.5 text-xxs">
+                                    {{ row.instrument_type }}
+                                </span>
+                            </td>
+                            <td class="py-2 px-3 font-monospace">{{ row.strike }}</td>
+                            <td class="py-2 px-3">
+                                {% if row.option_type == 'CE' %}
+                                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">CE</span>
+                                {% elif row.option_type == 'PE' %}
+                                    <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">PE</span>
+                                {% else %}
+                                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-1.5 py-0.5 text-xxs">{{ row.option_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 font-monospace text-end">{{ row.open|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-success">{{ row.high|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-danger">{{ row.low|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end fw-bold">{{ row.close|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-warning">{{ row.volume }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.oi }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.spot_price|floatformat:2 }}</td>
+                        {% endif %}
                     </tr>
                     {% endfor %}
 
@@ -138,34 +201,59 @@
                     <!-- STANDARD / FILTER SEARCH RECORDS -->
                     {% for row in parquet_inspection.records %}
                     <tr style="border-bottom: 1px solid rgba(255,255,255,0.03);">
-                        <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime }}</td>
-                        <td class="py-2 px-3 fw-bold">{{ row.index_name }}</td>
-                        <td class="py-2 px-3">
-                            <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 px-1.5 py-0.5 text-xxs">
-                                {{ row.instrument_type }}
-                            </span>
-                        </td>
-                        <td class="py-2 px-3 font-monospace">{{ row.strike }}</td>
-                        <td class="py-2 px-3">
-                            {% if row.option_type == 'CE' %}
-                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">CE</span>
-                            {% elif row.option_type == 'PE' %}
-                                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">PE</span>
-                            {% else %}
-                                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-1.5 py-0.5 text-xxs">{{ row.option_type }}</span>
-                            {% endif %}
-                        </td>
-                        <td class="py-2 px-3 font-monospace text-end">{{ row.open|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-success">{{ row.high|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-danger">{{ row.low|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end fw-bold">{{ row.close|floatformat:2 }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-warning">{{ row.volume }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.oi }}</td>
-                        <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.spot_price|floatformat:2 }}</td>
+                        {% if backup.is_macro_assist %}
+                            <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime|default:row.timestamp }}</td>
+                            <td class="py-2 px-3">
+                                {% if row.macro_sentiment == 'BULLISH' %}
+                                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🟢 BULLISH</span>
+                                {% elif row.macro_sentiment == 'BEARISH' %}
+                                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🔴 BEARISH</span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-30 px-2 py-0.5 text-xxs fw-bold">⚪ NEUTRAL</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 font-monospace text-end {% if row.macro_sentiment_score >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">{{ row.macro_sentiment_score|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end {% if row.fii_dii_flow_bias >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.fii_dii_flow_bias|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.rate_regime_bias|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.global_risk_sentiment|floatformat:2 }}</td>
+                            <td class="py-2 px-3 text-center">
+                                {% if row.event_risk_flag %}
+                                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-40 px-2 py-0.5 text-xxs fw-bold">⚡ Catalyst</span>
+                                {% else %}
+                                    <span class="text-muted text-xxs">&mdash;</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 text-truncate text-muted" style="max-width: 260px;" title="{{ row.macro_summary }}">{{ row.macro_summary }}</td>
+                        {% else %}
+                            <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime }}</td>
+                            <td class="py-2 px-3 fw-bold">{{ row.index_name }}</td>
+                            <td class="py-2 px-3">
+                                <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 px-1.5 py-0.5 text-xxs">
+                                    {{ row.instrument_type }}
+                                </span>
+                            </td>
+                            <td class="py-2 px-3 font-monospace">{{ row.strike }}</td>
+                            <td class="py-2 px-3">
+                                {% if row.option_type == 'CE' %}
+                                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">CE</span>
+                                {% elif row.option_type == 'PE' %}
+                                    <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-1.5 py-0.5 text-xxs fw-bold">PE</span>
+                                {% else %}
+                                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-1.5 py-0.5 text-xxs">{{ row.option_type }}</span>
+                                {% endif %}
+                            </td>
+                            <td class="py-2 px-3 font-monospace text-end">{{ row.open|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-success">{{ row.high|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-danger">{{ row.low|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end fw-bold">{{ row.close|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-warning">{{ row.volume }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.oi }}</td>
+                            <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.spot_price|floatformat:2 }}</td>
+                        {% endif %}
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="12" class="text-center py-4 text-muted">
+                        <td colspan="{% if backup.is_macro_assist %}8{% else %}12{% endif %}" class="text-center py-4 text-muted">
                             <span class="material-icons fs-4 d-block mb-1 opacity-50">search_off</span>
                             No matching candle records found in Parquet dataset.
                         </td>

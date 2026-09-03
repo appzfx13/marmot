@@ -124,6 +124,12 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
         if 'strike_selection' in form.cleaned_data and form.cleaned_data['strike_selection']:
             params["strike_selection"] = form.cleaned_data['strike_selection']
 
+        use_macro = bool(form.cleaned_data.get('use_macro_assist', False))
+        macro_tf = form.cleaned_data.get('macro_timeframe') or '1h'
+        macro_backup_task = form.cleaned_data.get('macro_backup_task')
+        params["use_macro_assist"] = use_macro
+        params["macro_timeframe"] = macro_tf
+
         backup_task = form.cleaned_data.get('backup_task')
         self.object = create_and_start_backtest_task(
             strategy_name=form.cleaned_data['strategy_name'],
@@ -133,7 +139,10 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
             initial_capital=form.cleaned_data['initial_capital'],
             parameters=params,
             user=self.request.user,
-            backup_task=backup_task
+            backup_task=backup_task,
+            use_macro_assist=use_macro,
+            macro_timeframe=macro_tf,
+            macro_backup_task=macro_backup_task
         )
         self.object.market_type = market_type
         self.object.save(update_fields=['market_type'])
@@ -565,6 +574,156 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
                         p_val = rule_item.get('preventive_prompt') or rule_item.get('preventative_prompt') or ''
                         rule_item['preventive_prompt'] = p_val
                         rule_item['preventative_prompt'] = p_val
+
+        # Build Calendar Data strictly matching Journal calendar format
+        calendar_year = self.object.start_date.year if self.object.start_date else 2024
+        import calendar as cal
+        daily_trades_map = {}
+        for t in all_trades:
+            raw_ts = t.get('exit_timestamp') or t.get('timestamp') or ''
+            d_key = str(raw_ts)[:10] if len(str(raw_ts)) >= 10 else ''
+            if not d_key:
+                continue
+            if d_key not in daily_trades_map:
+                daily_trades_map[d_key] = {
+                    'net_pnl': 0.0,
+                    'gross_pnl': 0.0,
+                    'trades': 0,
+                    'has_event': False,
+                    'macro_sentiment': '',
+                    'trades_list': []
+                }
+            net_p = float(t.get('net_pnl', t.get('pnl', 0.0)))
+            daily_trades_map[d_key]['net_pnl'] = round(daily_trades_map[d_key]['net_pnl'] + net_p, 2)
+            daily_trades_map[d_key]['gross_pnl'] = round(daily_trades_map[d_key]['gross_pnl'] + float(t.get('gross_pnl', net_p)), 2)
+            daily_trades_map[d_key]['trades'] += 1
+            daily_trades_map[d_key]['trades_list'].append(t)
+            if t.get('event_risk_flag') == 1:
+                daily_trades_map[d_key]['has_event'] = True
+            if t.get('macro_sentiment'):
+                daily_trades_map[d_key]['macro_sentiment'] = t.get('macro_sentiment')
+
+        horizon_years = sorted(list({int(d[:4]) for d in daily_trades_map.keys()} or [calendar_year]))
+        calendar_months = []
+        month_names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+
+        for y in horizon_years:
+            for m_idx in range(1, 13):
+                has_month_trades = any(d.startswith(f"{y}-{m_idx:02d}") for d in daily_trades_map.keys())
+                in_horizon = False
+                if self.object.start_date and self.object.end_date:
+                    start_ym = (self.object.start_date.year, self.object.start_date.month)
+                    end_ym = (self.object.end_date.year, self.object.end_date.month)
+                    cur_ym = (y, m_idx)
+                    in_horizon = (start_ym <= cur_ym <= end_ym)
+
+                if not (has_month_trades or in_horizon):
+                    continue
+
+                cal_obj = cal.Calendar(firstweekday=0)
+                month_days = []
+                monthly_pnl = 0.0
+                profit_days = 0
+                loss_days = 0
+
+                for day_date in cal_obj.itermonthdates(y, m_idx):
+                    is_current_month = (day_date.month == m_idx)
+                    d_str = day_date.strftime('%Y-%m-%d')
+                    if is_current_month and d_str in daily_trades_map:
+                        d_info = daily_trades_map[d_str]
+                        pnl_v = d_info['net_pnl']
+                        trades_cnt = d_info['trades']
+                        status_str = 'profit' if pnl_v >= 0 else 'loss'
+                        if pnl_v >= 0:
+                            profit_days += 1
+                        else:
+                            loss_days += 1
+                        monthly_pnl += pnl_v
+                        has_tr = True
+                        ev = d_info['has_event']
+                        m_sent = d_info['macro_sentiment']
+                    else:
+                        pnl_v = 0.0
+                        trades_cnt = 0
+                        status_str = 'neutral'
+                        has_tr = False
+                        ev = False
+                        m_sent = ''
+
+                    abs_pnl = abs(pnl_v)
+                    if abs_pnl >= 2000.0:
+                        intensity = 'high'
+                    elif abs_pnl >= 500.0:
+                        intensity = 'med'
+                    elif abs_pnl > 0.0:
+                        intensity = 'low'
+                    else:
+                        intensity = 'none'
+
+                    month_days.append({
+                        'day_num': day_date.day,
+                        'date_str': d_str,
+                        'is_current_month': is_current_month,
+                        'trades_count': trades_cnt,
+                        'pnl': pnl_v,
+                        'status': status_str,
+                        'intensity': intensity,
+                        'has_trades': has_tr,
+                        'has_event': ev,
+                        'macro_sentiment': m_sent,
+                    })
+
+                calendar_months.append({
+                    'year': y,
+                    'month_name': month_names[m_idx - 1],
+                    'month_idx': m_idx,
+                    'monthly_pnl': round(monthly_pnl, 2),
+                    'profit_days': profit_days,
+                    'loss_days': loss_days,
+                    'days': month_days,
+                })
+
+        context['calendar_months'] = calendar_months
+        context['daily_trades_json'] = json.dumps({d: {'net_pnl': v['net_pnl'], 'trades': v['trades'], 'has_event': v['has_event']} for d, v in daily_trades_map.items()})
+
+        # 3-Mode Chart Data Series matching Trading Journal UI
+        trade_pnl_data = []
+        cum_equity_data = []
+        balance_data = []
+        categories = []
+
+        for p in equity_curve_points:
+            t_pnl = p['pnl']
+            categories.append(p['label'])
+            trade_pnl_data.append({
+                'x': p['label'],
+                'y': t_pnl,
+                'fillColor': '#10b981' if t_pnl >= 0 else '#ef4444',
+                'strike': p.get('strike', ''),
+                'type': p.get('type', ''),
+                'exit_reason': p.get('exit_reason', '')
+            })
+            cum_equity_data.append({
+                'x': p['label'],
+                'y': p['equity'],
+                'drawdown': p['drawdown']
+            })
+            balance_data.append({
+                'x': p['label'],
+                'y': p['equity']
+            })
+
+        context['journal_chart_data'] = {
+            'trade_pnl': trade_pnl_data,
+            'cumulative': cum_equity_data,
+            'balance': balance_data,
+            'categories': categories,
+            'initial_capital': init_cap,
+            'ending_equity': round(init_cap + net_pnl, 2),
+            'peak_equity': round(peak_equity, 2),
+            'max_drawdown': round(max_dd_pct, 2),
+        }
+        context['journal_chart_json'] = json.dumps(context['journal_chart_data'])
 
         FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
         context['is_forex'] = (self.object.market_type == 'FOREX_FUTURES' or (self.object.index_name and self.object.index_name.upper() in FOREX_SYMBOLS))

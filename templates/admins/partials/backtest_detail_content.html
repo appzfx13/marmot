@@ -284,7 +284,7 @@
         </div>
         <div class="col-6 col-md-4 col-xl-2">
             <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Stop Loss & Target</span>
-            <span class="text-danger fw-semibold font-monospace">{{ backtest.parameters.stop_loss_points|default:backtest.parameters.sl_pts|default:30 }} pts</span> / <span class="text-success fw-semibold font-monospace">{{ backtest.parameters.rr_ratio|default:2.0 }}x RR</span>
+            <span class="text-danger fw-semibold font-monospace">{{ backtest.parameters.stop_loss_points|default:30 }} pts</span> / <span class="text-success fw-semibold font-monospace">{{ backtest.parameters.rr_ratio|default:2.0 }}x RR</span>
         </div>
     </div>
 
@@ -378,6 +378,389 @@
         <div class="col-6 col-md-4 col-xl-2">
             <div class="theme-text-muted" style="font-size: 0.72rem;">6. (=) Final In-Hand Cash:</div>
             <div class="{% if analytics.ending_equity >= backtest.initial_capital %}text-success{% else %}text-danger{% endif %} fw-bold font-monospace">₹{{ analytics.ending_equity|floatformat:2 }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================== -->
+<!-- 1. TOP 3x3 (9 CARDS) TRADE-WISE SUMMARY CONTAINER (STRICT JOURNAL PARITY) -->
+<!-- ========================================================== -->
+<div id="journal-stats-container" class="mb-4">
+    <div class="row g-3">
+        <!-- Card 1: Total Net P/L -->
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Total Net P/L</span>
+                    {% if analytics.net_pnl >= 0 %}
+                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">+{{ analytics.roi_on_capital|floatformat:1 }}%</span>
+                    {% else %}
+                    <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">{{ analytics.roi_on_capital|floatformat:1 }}%</span>
+                    {% endif %}
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    {% if analytics.net_pnl >= 0 %}
+                    <h3 class="fw-extrabold text-success mb-0" style="font-size: 1.55rem;">+₹{{ analytics.net_pnl|floatformat:2 }}</h3>
+                    {% else %}
+                    <h3 class="fw-extrabold text-danger mb-0" style="font-size: 1.55rem;">-₹{{ analytics.net_pnl|stringformat:".2f"|cut:"-" }}</h3>
+                    {% endif %}
+                </div>
+                <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                    <span>Account P/L Growth</span>
+                    <span class="{% if analytics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">{% if analytics.net_pnl >= 0 %}Net Profit{% else %}Net Loss{% endif %}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 2: Win Rate -->
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Win Rate %</span>
+                    <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Win Metric</span>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-extrabold theme-text-main mb-0" style="font-size: 1.55rem;">{{ analytics.win_rate }}%</h3>
+                </div>
+                <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                    <span>Win / Loss Breakdown</span>
+                    <span class="theme-text-main fw-bold">{{ analytics.winning_trades_count }}W / {{ analytics.losing_trades_count }}L</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 3: Total Trades -->
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Total Trades</span>
+                    <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Executed</span>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-extrabold theme-text-main mb-0" style="font-size: 1.55rem;">{{ analytics.total_trades }}</h3>
+                    <span class="theme-text-muted small fw-semibold">Orders</span>
+                </div>
+                <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                    <span>Directional Bias</span>
+                    <span class="text-info fw-bold">{{ analytics.ce_trades_count }} CE / {{ analytics.pe_trades_count }} PE</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 4: Max Drawdown -->
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Max Drawdown</span>
+                    <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Controlled Risk</span>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-extrabold text-warning mb-0" style="font-size: 1.55rem;">{{ analytics.max_drawdown }}%</h3>
+                </div>
+                <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                    <span>Max Peak DD</span>
+                    <span class="text-danger fw-bold">₹{{ analytics.max_drawdown_amount|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 5: Gross Profit / Loss Breakdown -->
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Gross PnL Breakdown</span>
+                    <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Wins vs Losses</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">GROSS PROFIT</div>
+                        <span class="fw-extrabold text-success" style="font-size: 1.08rem;">+₹{{ analytics.gross_profit|floatformat:2 }}</span>
+                    </div>
+                    <div class="text-end">
+                        <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">GROSS LOSS</div>
+                        <span class="fw-extrabold text-danger" style="font-size: 1.08rem;">-₹{{ analytics.total_loss|stringformat:".2f"|cut:"-" }}</span>
+                    </div>
+                </div>
+                <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                    <span>Realized Gross</span>
+                    <span class="{% if analytics.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">{% if analytics.gross_pnl >= 0 %}+{% endif %}₹{{ analytics.gross_pnl|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 6: Profit Factor & Payoff Ratio -->
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Profit Factor &amp; Expectancy</span>
+                    <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Sharpe {{ analytics.sharpe_ratio }}</span>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-extrabold theme-text-main mb-0" style="font-size: 1.55rem;">{{ analytics.profit_factor|default:1.00 }}</h3>
+                    <span class="theme-text-muted small fw-semibold">PF Ratio</span>
+                </div>
+                <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                    <span>Win / Loss Payoff</span>
+                    <span class="text-info fw-bold">{{ analytics.win_loss_ratio|floatformat:2 }}x</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 7: Average Win & Loss -->
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Avg Win vs Avg Loss</span>
+                    <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Trade Size</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between">
+                    <div>
+                        <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">AVG WIN TRADE</div>
+                        <span class="fw-bold text-success font-monospace" style="font-size: 1.05rem;">+₹{{ analytics.avg_win_pnl|floatformat:2 }}</span>
+                    </div>
+                    <div class="text-end">
+                        <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">AVG LOSS TRADE</div>
+                        <span class="fw-bold text-danger font-monospace" style="font-size: 1.05rem;">-₹{{ analytics.avg_loss_pnl|stringformat:".2f"|cut:"-" }}</span>
+                    </div>
+                </div>
+                <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                    <span>Trade Expectancy</span>
+                    <span class="text-success fw-bold font-monospace">+₹{{ analytics.avg_win_pnl|default:0|floatformat:0 }}/Trade</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 8: Capital Utilization & Margin -->
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Capital Utilization</span>
+                    <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Margin Ratio</span>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-extrabold text-info mb-0" style="font-size: 1.55rem;">{{ analytics.capital_utilization_pct|floatformat:1 }}%</h3>
+                </div>
+                <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                    <span>Max Utilized Margin</span>
+                    <span class="text-info fw-bold font-monospace">₹{{ analytics.max_utilized_capital|floatformat:2 }}</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Card 9: Total Charges & Friction -->
+        <div class="col-12 col-md-4">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm" 
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Statutory Charges</span>
+                    <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Friction</span>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-extrabold text-warning mb-0" style="font-size: 1.55rem;">₹{{ analytics.total_charges|floatformat:2 }}</h3>
+                </div>
+                <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                    <span>Brokerage + STT/Govt</span>
+                    <span class="text-warning fw-bold font-monospace">₹{{ analytics.total_brokerage|floatformat:0 }} + ₹{{ analytics.total_tax_govt|floatformat:0 }}</span>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================== -->
+<!-- 2. ACCOUNT CUMULATIVE EQUITY CURVE, OPENING BALANCE & TRADE P&L CARD (3 MODES) -->
+<!-- ========================================================== -->
+<div class="card glass-card border shadow-lg overflow-hidden mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 16px;">
+    <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-lg-row justify-content-between align-items-start align-items-lg-center gap-3">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-warning fs-5" id="backtestChartIcon">bar_chart</span>
+            <h5 class="card-title theme-text-main fw-bold mb-0" id="backtestChartTitle" style="font-size: 1.05rem;">Trade-wise &amp; Daily P&amp;L Win/Loss Trajectory</h5>
+        </div>
+        
+        <!-- Interactive Graph Switcher Inline Toggle (Right Aligned) -->
+        <div class="d-flex align-items-center gap-2 ms-lg-auto flex-wrap">
+            <div class="btn-group p-1 rounded-pill glass-card border shadow-sm" role="group" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color) !important;">
+                <button type="button" 
+                        id="btnModePnl"
+                        onclick="switchBacktestChartMode(this, 'pnl', 'Trade-wise & Daily P&L Win/Loss Trajectory', 'bar_chart', 'text-warning')"
+                        class="btn btn-sm rounded-pill px-3 py-1 fw-bold backtest-chart-mode-btn btn-primary active text-white">
+                    <span class="material-icons fs-6 me-1 align-middle" style="font-size: 0.85rem !important;">bar_chart</span>
+                    <span>Trade P&amp;L</span>
+                </button>
+                <button type="button" 
+                        id="btnModeCumulative"
+                        onclick="switchBacktestChartMode(this, 'cumulative', 'Account Cumulative Equity Curve & Drawdown', 'insights', 'text-info')"
+                        class="btn btn-sm rounded-pill px-3 py-1 fw-bold backtest-chart-mode-btn theme-text-muted">
+                    <span class="material-icons fs-6 me-1 align-middle" style="font-size: 0.85rem !important;">insights</span>
+                    <span>Cumulative Equity</span>
+                </button>
+                <button type="button" 
+                        id="btnModeBalance"
+                        onclick="switchBacktestChartMode(this, 'balance', 'Daily Opening Balance & Ledger Progression', 'account_balance_wallet', 'text-primary')"
+                        class="btn btn-sm rounded-pill px-3 py-1 fw-bold backtest-chart-mode-btn theme-text-muted">
+                    <span class="material-icons fs-6 me-1 align-middle" style="font-size: 0.85rem !important;">account_balance_wallet</span>
+                    <span>Opening Balance</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <div class="card-body p-3 p-md-4">
+        <!-- Metric Highlights Banner Above Chart -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 pb-2 border-bottom border-secondary border-opacity-10 font-monospace">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <div>
+                    <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.68rem; letter-spacing: 0.05em;">Initial Principal</span>
+                    <div class="fw-bold theme-text-main" style="font-size: 0.95rem;">₹{{ backtest.initial_capital|floatformat:2 }}</div>
+                </div>
+                <div class="border-start border-secondary border-opacity-20 ps-3">
+                    <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.68rem; letter-spacing: 0.05em;">Peak Equity</span>
+                    <div class="fw-bold text-success" style="font-size: 0.95rem;">₹{{ analytics.peak_equity|floatformat:2 }}</div>
+                </div>
+                <div class="border-start border-secondary border-opacity-20 ps-3">
+                    <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.68rem; letter-spacing: 0.05em;">Ending Equity</span>
+                    <div class="fw-bold text-info" style="font-size: 0.95rem;">₹{{ analytics.ending_equity|floatformat:2 }}</div>
+                </div>
+                <div class="border-start border-secondary border-opacity-20 ps-3">
+                    <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.68rem; letter-spacing: 0.05em;">Net Trading P&amp;L</span>
+                    <div class="fw-bold {% if analytics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 0.95rem;">
+                        {% if analytics.net_pnl >= 0 %}+{% endif %}₹{{ analytics.net_pnl|floatformat:2 }}
+                    </div>
+                </div>
+            </div>
+            
+            <div class="d-flex align-items-center gap-2">
+                {% if backtest.use_macro_assist %}
+                <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold smaller d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6" style="font-size: 0.85rem !important;">psychology_alt</span>
+                    <span>Gemini AI Macro Ingested ({{ backtest.macro_timeframe|default:'1h' }})</span>
+                </span>
+                {% else %}
+                <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold smaller d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6" style="font-size: 0.85rem !important;">verified</span>
+                    <span>TensorTrade RL Validated</span>
+                </span>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Chart Canvas (420px height) -->
+        <div style="height: 420px; width: 100%; position: relative;">
+            <canvas id="backtestJournalChartCanvas"></canvas>
+        </div>
+    </div>
+</div>
+
+<!-- ========================================================== -->
+<!-- 3. ANNUAL / PERIOD P/L CALENDAR GRID & HEATMAP CARD -->
+<!-- ========================================================== -->
+<div class="card glass-card border shadow-lg overflow-hidden mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 16px;">
+    <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-wrap justify-content-between align-items-center gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons text-warning fs-5">calendar_month</span>
+            <h5 class="card-title theme-text-main fw-bold mb-0" style="font-size: 1.05rem;">Annual P/L Calendar Grid &amp; Heatmap</h5>
+        </div>
+        
+        <div class="d-flex align-items-center gap-3 small fw-semibold ms-auto">
+            <span class="d-flex align-items-center gap-1"><span class="rounded-circle" style="width: 10px; height: 10px; background: rgba(16, 185, 129, 0.8);"></span> Profit</span>
+            <span class="d-flex align-items-center gap-1"><span class="rounded-circle" style="width: 10px; height: 10px; background: rgba(239, 68, 68, 0.8);"></span> Loss</span>
+            <span class="d-flex align-items-center gap-1"><span class="rounded-circle" style="width: 10px; height: 10px; background: rgba(148, 163, 184, 0.2);"></span> Neutral</span>
+            {% if backtest.use_macro_assist %}
+            <span class="d-flex align-items-center gap-1 text-warning"><span class="material-icons" style="font-size: 0.85rem;">bolt</span> Macro Catalyst</span>
+            {% endif %}
+        </div>
+    </div>
+    
+    <div class="card-body p-3 p-md-4">
+        <div class="row g-2 g-xl-3">
+            {% for month in calendar_months %}
+            <div class="col-12 col-md-4 col-lg-4 col-xl-2">
+                <div class="glass-card p-2 p-md-2.5 rounded-3 border h-100 d-flex flex-column justify-content-between shadow-sm"
+                     style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+                    
+                    <!-- Month Header -->
+                    <div class="d-flex justify-content-between align-items-center mb-2 pb-1.5 border-bottom border-secondary border-opacity-20 flex-wrap gap-1">
+                        <h6 class="fw-bold theme-text-main mb-0 text-truncate" style="font-size: 0.82rem;">{{ month.month_name }} {{ month.year }}</h6>
+                        {% if month.monthly_pnl >= 0 %}
+                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-1.5 py-0.5 fw-bold" style="font-size: 0.65rem;">
+                            +₹{{ month.monthly_pnl|floatformat:0 }}
+                        </span>
+                        {% else %}
+                        <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-1.5 py-0.5 fw-bold" style="font-size: 0.65rem;">
+                            -₹{{ month.monthly_pnl|stringformat:".0f"|cut:"-" }}
+                        </span>
+                        {% endif %}
+                    </div>
+
+                    <!-- Weekdays Row -->
+                    <div class="row g-1 text-center mb-1 text-muted fw-bold" style="font-size: 0.65rem;">
+                        <div class="col">M</div>
+                        <div class="col">T</div>
+                        <div class="col">W</div>
+                        <div class="col">T</div>
+                        <div class="col">F</div>
+                        <div class="col text-secondary opacity-50">S</div>
+                        <div class="col text-secondary opacity-50">S</div>
+                    </div>
+
+                    <!-- Month Days Grid -->
+                    <div class="row g-1 text-center">
+                        {% for day in month.days %}
+                        <div class="col-1-7 col" style="flex: 0 0 14.285%; max-width: 14.285%;">
+                            {% if day.is_current_month %}
+                                {% if day.status == 'profit' %}
+                                <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm journal-day-cell journal-day-clickable position-relative"
+                                     style="{% if day.intensity == 'high' %}background: rgba(16, 185, 129, 0.45); border: 1px solid rgba(16, 185, 129, 0.78);{% elif day.intensity == 'med' %}background: rgba(16, 185, 129, 0.28); border: 1px solid rgba(16, 185, 129, 0.55);{% else %}background: rgba(16, 185, 129, 0.14); border: 1px solid rgba(16, 185, 129, 0.32);{% endif %} min-height: 28px; cursor: pointer;"
+                                     onclick="filterBacktestTradesByDate('{{ day.date_str }}')"
+                                     data-bs-toggle="tooltip"
+                                     data-bs-html="true"
+                                     title="<div class='fw-bold border-bottom pb-1 mb-1.5 text-white' style='border-color: var(--border-color) !important; font-size: 0.82rem;'>{{ day.date_str }}</div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Net P/L:</span><span class='text-success fw-bold'>+₹{{ day.pnl|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-1 small'><span class='theme-text-muted'>Trades:</span><span class='fw-bold text-primary'>{{ day.trades_count }}</span></div>{% if day.macro_sentiment %}<div class='d-flex justify-content-between gap-3 mb-1 small'><span class='theme-text-muted'>Macro AI:</span><span class='fw-bold text-warning'>{{ day.macro_sentiment }}</span></div>{% endif %}<div class='text-center border-top pt-1 text-success fw-bold' style='border-color: var(--border-color) !important; font-size: 0.68rem;'>Click to filter trade log</div>">
+                                    <span class="fw-bold text-success" style="font-size: 0.78rem; line-height: 1;">{{ day.day_num }}</span>
+                                    {% if day.has_event %}<span class="position-absolute top-0 end-0 text-warning" style="font-size: 0.55rem; line-height: 1; transform: translate(2px, -2px);">⚡</span>{% endif %}
+                                </div>
+                                {% elif day.status == 'loss' %}
+                                <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm journal-day-cell journal-day-clickable position-relative"
+                                     style="{% if day.intensity == 'high' %}background: rgba(239, 68, 68, 0.45); border: 1px solid rgba(239, 68, 68, 0.78);{% elif day.intensity == 'med' %}background: rgba(239, 68, 68, 0.28); border: 1px solid rgba(239, 68, 68, 0.55);{% else %}background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(239, 68, 68, 0.32);{% endif %} min-height: 28px; cursor: pointer;"
+                                     onclick="filterBacktestTradesByDate('{{ day.date_str }}')"
+                                     data-bs-toggle="tooltip"
+                                     data-bs-html="true"
+                                     title="<div class='fw-bold border-bottom pb-1 mb-1.5 text-white' style='border-color: var(--border-color) !important; font-size: 0.82rem;'>{{ day.date_str }}</div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Net P/L:</span><span class='text-danger fw-bold'>-₹{{ day.pnl|stringformat:'.2f'|cut:'-' }}</span></div><div class='d-flex justify-content-between gap-3 mb-1 small'><span class='theme-text-muted'>Trades:</span><span class='fw-bold text-primary'>{{ day.trades_count }}</span></div>{% if day.macro_sentiment %}<div class='d-flex justify-content-between gap-3 mb-1 small'><span class='theme-text-muted'>Macro AI:</span><span class='fw-bold text-warning'>{{ day.macro_sentiment }}</span></div>{% endif %}<div class='text-center border-top pt-1 text-danger fw-bold' style='border-color: var(--border-color) !important; font-size: 0.68rem;'>Click to filter trade log</div>">
+                                    <span class="fw-bold text-danger" style="font-size: 0.78rem; line-height: 1;">{{ day.day_num }}</span>
+                                    {% if day.has_event %}<span class="position-absolute top-0 end-0 text-warning" style="font-size: 0.55rem; line-height: 1; transform: translate(2px, -2px);">⚡</span>{% endif %}
+                                </div>
+                                {% else %}
+                                <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center opacity-60 journal-day-cell"
+                                     style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color) !important; min-height: 28px;"
+                                     data-bs-toggle="tooltip"
+                                     title="{{ day.date_str }} - No trades">
+                                    <span class="theme-text-muted fw-semibold" style="font-size: 0.74rem; line-height: 1;">{{ day.day_num }}</span>
+                                </div>
+                                {% endif %}
+                            {% else %}
+                            <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center opacity-15" style="min-height: 28px;">
+                                <span class="theme-text-muted fw-medium" style="font-size: 0.65rem;">{{ day.day_num }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <!-- Month Footer -->
+                    <div class="theme-text-muted mt-2 pt-1.5 border-top border-secondary border-opacity-10 d-flex justify-content-between align-items-center" style="font-size: 0.68rem;">
+                        <span>W: <strong class="text-success fw-bold">{{ month.profit_days }}</strong></span>
+                        <span>L: <strong class="text-danger fw-bold">{{ month.loss_days }}</strong></span>
+                    </div>
+                </div>
+            </div>
+            {% endfor %}
         </div>
     </div>
 </div>
@@ -1116,313 +1499,98 @@
 
 <script>
 (function() {
-    let currentZoom = 1;
-    let isExpanded = true;
+    let journalChartInstance = null;
+    let currentJournalMode = 'pnl';
+    const journalData = {{ journal_chart_json|default:'{}'|safe }};
 
-    function initEquityCurveChart() {
-        const ctx = document.getElementById('equityCurveChart');
-        if (!ctx) return;
+    function renderBacktestJournalChart(mode) {
+        currentJournalMode = mode;
+        const canvas = document.getElementById('backtestJournalChartCanvas');
+        if (!canvas) return;
 
         if (typeof Chart === 'undefined') {
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js';
-            script.onload = initEquityCurveChart;
+            script.onload = function() { renderBacktestJournalChart(mode); };
             document.head.appendChild(script);
             return;
         }
 
-        if (window.marmotEquityChart) {
-            try { window.marmotEquityChart.destroy(); } catch (e) {}
-            window.marmotEquityChart = null;
+        if (journalChartInstance) {
+            try { journalChartInstance.destroy(); } catch(e) {}
+            journalChartInstance = null;
         }
 
-        const initialCapital = {{ backtest.initial_capital|default:100000 }};
-        const rawPoints = {{ equity_curve_json|default:'[]'|safe }};
-        const labels = [];
-        const dataPoints = [];
-        const rawTradeData = [];
+        const ctx = canvas.getContext('2d');
+        const isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
+        const textColor = isDark ? '#94a3b8' : '#475569';
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.06)';
+        const fontMono = "'Google Sans Code', 'JetBrains Mono', monospace";
 
-        if (Array.isArray(rawPoints) && rawPoints.length > 0) {
-            rawPoints.forEach(function(pt) {
-                labels.push(pt.label || '');
-                dataPoints.push(pt.equity !== undefined ? pt.equity : initialCapital);
-                rawTradeData.push(pt);
-            });
-        } else {
-            labels.push('Start');
-            dataPoints.push(initialCapital);
+        const labels = journalData.categories || [];
+        let chartType = 'bar';
+        let datasets = [];
+
+        if (mode === 'pnl') {
+            chartType = 'bar';
+            const rawPnl = journalData.trade_pnl || [];
+            const backgroundColors = rawPnl.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.78)' : 'rgba(239, 68, 68, 0.78)');
+            const borderColors = rawPnl.map(v => v >= 0 ? '#10b981' : '#ef4444');
+
+            datasets = [{
+                label: 'Realized Trade P&L (₹)',
+                data: rawPnl,
+                backgroundColor: backgroundColors,
+                borderColor: borderColors,
+                borderWidth: 1.5,
+                borderRadius: 4,
+                maxBarThickness: 36
+            }];
+        } else if (mode === 'cumulative') {
+            chartType = 'line';
+            const rawCum = journalData.cumulative || [];
+            const gradient = ctx.createLinearGradient(0, 0, 0, 420);
+            gradient.addColorStop(0, 'rgba(56, 189, 248, 0.38)');
+            gradient.addColorStop(1, 'rgba(56, 189, 248, 0.00)');
+
+            datasets = [{
+                label: 'Cumulative Account Equity (₹)',
+                data: rawCum,
+                borderColor: '#0284c7',
+                backgroundColor: gradient,
+                fill: true,
+                tension: 0.28,
+                borderWidth: 2.5,
+                pointRadius: rawCum.length < 50 ? 3 : 0,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#38bdf8'
+            }];
+        } else if (mode === 'balance') {
+            chartType = 'line';
+            const rawBal = journalData.balance || [];
+            const gradient = ctx.createLinearGradient(0, 0, 0, 420);
+            gradient.addColorStop(0, 'rgba(99, 102, 241, 0.32)');
+            gradient.addColorStop(1, 'rgba(99, 102, 241, 0.00)');
+
+            datasets = [{
+                label: 'Starting Capital Balance (₹)',
+                data: rawBal,
+                borderColor: '#6366f1',
+                backgroundColor: gradient,
+                fill: true,
+                stepped: true,
+                borderWidth: 2.2,
+                pointRadius: rawBal.length < 50 ? 3 : 0,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#818cf8'
+            }];
         }
 
-        const isProfitable = (dataPoints[dataPoints.length - 1] >= initialCapital);
-        const lineColor = isProfitable ? '#10b981' : '#ef4444';
-        const fillColor = isProfitable ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)';
-
-        // HUD elements
-        const hudTradeNum = document.getElementById('hudTradeNum');
-        const hudTradeDate = document.getElementById('hudTradeDate');
-        const hudTradeContract = document.getElementById('hudTradeContract');
-        const hudTradePnl = document.getElementById('hudTradePnl');
-        const hudTradeEquity = document.getElementById('hudTradeEquity');
-        const hudTradeDrawdown = document.getElementById('hudTradeDrawdown');
-
-        let selectedTradeIndex = null;
-
-        function updateHUD(idx) {
-            const pt = rawTradeData[idx];
-            if (!pt) return;
-            if (hudTradeNum) hudTradeNum.textContent = pt.trade_num ? ('Trade #' + pt.trade_num) : 'Initial Principal';
-            if (hudTradeDate) hudTradeDate.textContent = pt.label ? ('Date: ' + pt.label) : '';
-            if (hudTradeContract) hudTradeContract.textContent = (pt.strike ? pt.strike : '{{ backtest.index_name }}') + (pt.type ? (' (' + pt.type + ')') : '');
-            if (hudTradePnl) {
-                if (pt.trade_num > 0 && pt.pnl !== undefined) {
-                    hudTradePnl.textContent = 'Trade PnL: ' + (pt.pnl >= 0 ? '+₹' : '₹') + Number(pt.pnl).toLocaleString('en-IN', {minimumFractionDigits: 2});
-                    hudTradePnl.className = 'fw-bold ' + (pt.pnl >= 0 ? 'text-success' : 'text-danger');
-                } else {
-                    hudTradePnl.textContent = 'Trade PnL: ₹0.00';
-                    hudTradePnl.className = 'fw-bold theme-text-muted';
-                }
-            }
-            if (hudTradeEquity) {
-                hudTradeEquity.textContent = 'Portfolio: ₹' + Number(pt.equity).toLocaleString('en-IN', {minimumFractionDigits: 2});
-            }
-            if (hudTradeDrawdown) {
-                hudTradeDrawdown.textContent = 'Drawdown: -' + (pt.drawdown || 0) + '%';
-            }
-        }
-
-        let isServerFiltered = false;
-
-        function filterTableForTrade(tradeNum, pt) {
-            const banner = document.getElementById('chart-trade-filter-banner');
-            const bannerTitle = document.getElementById('chart-filtered-trade-title');
-            if (banner && bannerTitle) {
-                const formattedPnl = (pt.pnl !== undefined) ? ((pt.pnl >= 0 ? '+₹' : '₹') + Number(pt.pnl).toLocaleString('en-IN', {minimumFractionDigits: 2})) : '';
-                bannerTitle.innerHTML = `<strong>Trade #${tradeNum}</strong> &mdash; <span class="font-monospace">${pt.strike || ''}</span> (${pt.label || ''}) &bull; Realized PnL: <span class="${pt.pnl >= 0 ? 'text-success' : 'text-danger'} fw-bold">${formattedPnl}</span>`;
-                banner.classList.remove('d-none');
-                banner.classList.add('d-flex');
-            }
-
-            const existingRow = document.getElementById('trade-row-' + tradeNum);
-            const existingCard = document.getElementById('trade-card-' + tradeNum);
-
-            if (existingRow || existingCard) {
-                const rows = document.querySelectorAll('.trade-table-row');
-                let targetRow = null;
-                rows.forEach(function(row) {
-                    const serial = row.getAttribute('data-trade-serial');
-                    const drawer = document.getElementById('trade-exp-' + serial);
-                    if (String(serial) === String(tradeNum)) {
-                        row.style.display = '';
-                        row.classList.add('table-primary');
-                        row.style.boxShadow = '0 0 16px rgba(56, 189, 248, 0.4)';
-                        targetRow = row;
-                        if (drawer) {
-                            drawer.style.display = '';
-                            if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
-                                bootstrap.Collapse.getOrCreateInstance(drawer, { toggle: false }).show();
-                            } else {
-                                drawer.classList.add('show');
-                            }
-                        }
-                    } else {
-                        row.style.display = 'none';
-                        row.classList.remove('table-primary');
-                        row.style.boxShadow = 'none';
-                        if (drawer) {
-                            drawer.style.display = 'none';
-                            drawer.classList.remove('show');
-                        }
-                    }
-                });
-
-                const cards = document.querySelectorAll('.trade-card-item');
-                let targetCard = null;
-                cards.forEach(function(card) {
-                    const serial = card.getAttribute('data-trade-serial');
-                    const drawer = document.getElementById('trade-mb-exp-' + serial);
-                    if (String(serial) === String(tradeNum)) {
-                        card.style.display = '';
-                        card.style.borderColor = 'var(--primary)';
-                        card.style.boxShadow = '0 0 16px rgba(56, 189, 248, 0.4)';
-                        targetCard = card;
-                        if (drawer) {
-                            if (typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
-                                bootstrap.Collapse.getOrCreateInstance(drawer, { toggle: false }).show();
-                            } else {
-                                drawer.classList.add('show');
-                            }
-                        }
-                    } else {
-                        card.style.display = 'none';
-                        card.style.borderColor = '';
-                        card.style.boxShadow = 'none';
-                        if (drawer) {
-                            drawer.classList.remove('show');
-                        }
-                    }
-                });
-
-                const targetEl = targetRow || targetCard || document.getElementById('backtest-orders-container');
-                if (targetEl) {
-                    targetEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-            } else {
-                isServerFiltered = true;
-                const urlRows = `{% url 'backtest:backtest_trades_scroll' backtest.pk %}?trade_num=${tradeNum}&scroll_type=rows`;
-                const urlCards = `{% url 'backtest:backtest_trades_scroll' backtest.pk %}?trade_num=${tradeNum}&scroll_type=cards`;
-
-                const tableBody = document.getElementById('trades-table-body');
-                const cardsContainer = document.getElementById('trades-mobile-container');
-
-                if (tableBody) {
-                    fetch(urlRows)
-                        .then(res => res.text())
-                        .then(html => {
-                            tableBody.innerHTML = html;
-                            const newRow = document.getElementById('trade-row-' + tradeNum);
-                            const newDrawer = document.getElementById('trade-exp-' + tradeNum);
-                            if (newRow) {
-                                newRow.classList.add('table-primary');
-                                newRow.style.boxShadow = '0 0 16px rgba(56, 189, 248, 0.4)';
-                            }
-                            if (newDrawer && typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
-                                bootstrap.Collapse.getOrCreateInstance(newDrawer, { toggle: false }).show();
-                            }
-                            if (window.htmx) window.htmx.process(tableBody);
-                        });
-                }
-
-                if (cardsContainer) {
-                    fetch(urlCards)
-                        .then(res => res.text())
-                        .then(html => {
-                            cardsContainer.innerHTML = html;
-                            const newCard = document.getElementById('trade-card-' + tradeNum);
-                            const newDrawer = document.getElementById('trade-mb-exp-' + tradeNum);
-                            if (newCard) {
-                                newCard.style.borderColor = 'var(--primary)';
-                                newCard.style.boxShadow = '0 0 16px rgba(56, 189, 248, 0.4)';
-                            }
-                            if (newDrawer && typeof bootstrap !== 'undefined' && bootstrap.Collapse) {
-                                bootstrap.Collapse.getOrCreateInstance(newDrawer, { toggle: false }).show();
-                            }
-                            if (window.htmx) window.htmx.process(cardsContainer);
-                        });
-                }
-
-                const containerEl = document.getElementById('backtest-orders-container');
-                if (containerEl) {
-                    containerEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-                }
-            }
-        }
-
-        window.clearTradeChartFilter = function() {
-            selectedTradeIndex = null;
-            const banner = document.getElementById('chart-trade-filter-banner');
-            if (banner) {
-                banner.classList.add('d-none');
-                banner.classList.remove('d-flex');
-            }
-
-            if (isServerFiltered) {
-                isServerFiltered = false;
-                const urlResetRows = `{% url 'backtest:backtest_trades_scroll' backtest.pk %}?trade_status={{ current_filters.trade_status }}&trade_type={{ current_filters.trade_type }}&date_from={{ current_filters.date_from }}&date_to={{ current_filters.date_to }}&q={{ current_filters.q }}&scroll_type=rows`;
-                const urlResetCards = `{% url 'backtest:backtest_trades_scroll' backtest.pk %}?trade_status={{ current_filters.trade_status }}&trade_type={{ current_filters.trade_type }}&date_from={{ current_filters.date_from }}&date_to={{ current_filters.date_to }}&q={{ current_filters.q }}&scroll_type=cards`;
-
-                const tableBody = document.getElementById('trades-table-body');
-                const cardsContainer = document.getElementById('trades-mobile-container');
-
-                if (tableBody) {
-                    fetch(urlResetRows)
-                        .then(res => res.text())
-                        .then(html => {
-                            tableBody.innerHTML = html;
-                            if (window.htmx) window.htmx.process(tableBody);
-                        });
-                }
-
-                if (cardsContainer) {
-                    fetch(urlResetCards)
-                        .then(res => res.text())
-                        .then(html => {
-                            cardsContainer.innerHTML = html;
-                            if (window.htmx) window.htmx.process(cardsContainer);
-                        });
-                }
-            } else {
-                const rows = document.querySelectorAll('.trade-table-row');
-                rows.forEach(function(row) {
-                    row.style.display = '';
-                    row.classList.remove('table-primary');
-                    row.style.boxShadow = 'none';
-                });
-
-                const drawers = document.querySelectorAll('.trade-drawer-row');
-                drawers.forEach(function(d) {
-                    d.style.display = '';
-                });
-
-                const cards = document.querySelectorAll('.trade-card-item');
-                cards.forEach(function(card) {
-                    card.style.display = '';
-                    card.style.borderColor = '';
-                    card.style.boxShadow = 'none';
-                });
-            }
-
-            if (window.marmotEquityChart) {
-                window.marmotEquityChart.update();
-            }
-        };
-
-        const isDarkTheme = (document.documentElement.getAttribute('data-theme') === 'dark');
-        const chartTextColor = isDarkTheme ? '#94a3b8' : '#475569';
-        const chartGridColor = isDarkTheme ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.06)';
-        // Read font tokens from Antigravity CSS variables
-        const _cs = getComputedStyle(document.documentElement);
-        const chartFontMono = _cs.getPropertyValue('--font-mono').trim() || "'Google Sans Code', 'JetBrains Mono', monospace";
-        const chartFontSans = _cs.getPropertyValue('--font-sans').trim() || "'Google Sans Flex', 'Inter', sans-serif";
-
-        window.marmotEquityChart = new Chart(ctx, {
-            type: 'line',
+        journalChartInstance = new Chart(ctx, {
+            type: chartType,
             data: {
                 labels: labels,
-                datasets: [{
-                    label: 'Account Equity (INR)',
-                    data: dataPoints,
-                    borderColor: lineColor,
-                    backgroundColor: fillColor,
-                    fill: true,
-                    tension: 0.25,
-                    borderWidth: 2.2,
-                    pointRadius: function(context) {
-                        if (selectedTradeIndex !== null && context.dataIndex === selectedTradeIndex) {
-                            return 7.5;
-                        }
-                        return currentZoom > 1 ? (currentZoom >= 4 ? 4.5 : 3) : (dataPoints.length < 60 ? 3 : 0);
-                    },
-                    pointHoverRadius: 7,
-                    pointBackgroundColor: function(context) {
-                        if (selectedTradeIndex !== null && context.dataIndex === selectedTradeIndex) {
-                            return '#38bdf8';
-                        }
-                        return lineColor;
-                    },
-                    pointHoverBackgroundColor: '#ffffff',
-                    pointBorderColor: function(context) {
-                        if (selectedTradeIndex !== null && context.dataIndex === selectedTradeIndex) {
-                            return '#ffffff';
-                        }
-                        return '#0f172a';
-                    },
-                    pointBorderWidth: function(context) {
-                        if (selectedTradeIndex !== null && context.dataIndex === selectedTradeIndex) {
-                            return 2.5;
-                        }
-                        return 1.5;
-                    }
-                }]
+                datasets: datasets
             },
             options: {
                 responsive: true,
@@ -1431,206 +1599,253 @@
                     mode: 'index',
                     intersect: false
                 },
-                onClick: function(event, activeElements) {
-                    if (activeElements && activeElements.length > 0) {
-                        const idx = activeElements[0].index;
-                        const pt = rawTradeData[idx];
-                        if (pt && pt.trade_num) {
-                            selectedTradeIndex = idx;
-                            updateHUD(idx);
-                            filterTableForTrade(pt.trade_num, pt);
-                            if (window.marmotEquityChart) window.marmotEquityChart.update();
-                        } else {
-                            window.clearTradeChartFilter();
-                        }
-                    } else {
-                        window.clearTradeChartFilter();
-                    }
-                },
-                onHover: function(event, activeElements) {
-                    if (activeElements && activeElements.length > 0) {
-                        const idx = activeElements[0].index;
-                        updateHUD(idx);
-                    }
-                },
                 plugins: {
                     legend: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        backgroundColor: 'rgba(15, 23, 42, 0.94)',
                         titleColor: '#f8fafc',
                         bodyColor: '#e2e8f0',
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderColor: 'rgba(255, 255, 255, 0.14)',
                         borderWidth: 1,
                         padding: 10,
-                        titleFont: { family: chartFontMono, size: 12, weight: 'bold' },
-                        bodyFont: { family: chartFontMono, size: 12 },
+                        titleFont: { family: fontMono, size: 12, weight: 'bold' },
+                        bodyFont: { family: fontMono, size: 12 },
                         callbacks: {
-                            title: function(items) {
-                                if (!items || !items.length) return '';
-                                const idx = items[0].dataIndex;
-                                const pt = rawTradeData[idx];
-                                if (pt && pt.trade_num) {
-                                    return 'Trade #' + pt.trade_num + ' (' + pt.label + ')';
-                                }
-                                return items[0].label || 'Starting Portfolio';
-                            },
                             label: function(ctx) {
-                                return ' Portfolio Equity: ₹' + Number(ctx.parsed.y).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-                            },
-                            afterLabel: function(ctx) {
-                                const idx = ctx.dataIndex;
-                                const pt = rawTradeData[idx];
-                                if (!pt) return '';
-                                const lines = [];
-                                if (pt.strike) {
-                                    lines.push(' Contract: ' + pt.strike + (pt.type ? (' (' + pt.type + ')') : ''));
-                                }
-                                if (pt.pnl !== undefined && pt.trade_num > 0) {
-                                    const formattedPnl = (pt.pnl >= 0 ? '+₹' : '₹') + Number(pt.pnl).toLocaleString('en-IN', {minimumFractionDigits: 2});
-                                    lines.push(' Realized PnL: ' + formattedPnl);
-                                }
-                                if (pt.drawdown !== undefined && pt.drawdown > 0) {
-                                    lines.push(' Peak Drawdown: -' + pt.drawdown + '%');
-                                }
-                                if (pt.exit_reason) {
-                                    lines.push(' Exit: ' + pt.exit_reason);
-                                }
-                                return lines;
+                                const val = ctx.parsed.y;
+                                const prefix = val >= 0 ? '+₹' : '-₹';
+                                return ` ${ctx.dataset.label}: ${prefix}${Math.abs(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
                             }
                         }
                     }
                 },
                 scales: {
                     x: {
-                        grid: { color: chartGridColor },
-                        ticks: { 
-                            color: chartTextColor, 
-                            font: { family: chartFontMono, size: 10 },
-                            maxTicksLimit: currentZoom > 1 ? (12 * currentZoom) : 12
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: textColor,
+                            font: { family: fontMono, size: 10 },
+                            maxTicksLimit: 14
                         }
                     },
                     y: {
-                        grid: { color: chartGridColor },
-                        ticks: { 
-                            color: chartTextColor, 
-                            font: { family: chartFontMono, size: 11 },
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: textColor,
+                            font: { family: fontMono, size: 11 },
                             callback: function(v) { return '₹' + Number(v).toLocaleString('en-IN'); }
                         }
                     }
                 }
             }
         });
-
-        // Initialize Zoom Buttons
-        const zoomGroup = document.getElementById('equityZoomBtnGroup');
-        if (zoomGroup) {
-            const buttons = zoomGroup.querySelectorAll('button[data-zoom]');
-            buttons.forEach(function(btn) {
-                btn.onclick = function() {
-                    buttons.forEach(b => b.classList.remove('active'));
-                    this.classList.add('active');
-
-                    const zoomVal = parseInt(this.getAttribute('data-zoom'), 10) || 1;
-                    applyEquityZoom(zoomVal);
-                };
-            });
-        }
-
-        // Initialize Drag-to-Pan on Scroll Wrapper
-        setupEquityChartPan();
-
-        // Initialize Expand / Collapse View Button
-        const btnExpand = document.getElementById('btnToggleEquityExpand');
-        if (btnExpand) {
-            btnExpand.onclick = toggleEquityExpand;
-        }
     }
 
-    function applyEquityZoom(zoom) {
-        currentZoom = zoom;
-        const canvasWrapper = document.getElementById('equityChartCanvasWrapper');
-        const scrollWrapper = document.getElementById('equityChartScrollWrapper');
-        if (!canvasWrapper || !scrollWrapper) return;
+    window.switchBacktestChartMode = function(btn, mode, title, iconName, iconColor) {
+        document.querySelectorAll('.backtest-chart-mode-btn').forEach(b => {
+            b.classList.remove('active', 'btn-primary', 'text-white');
+            b.classList.add('theme-text-muted');
+        });
+        btn.classList.add('active', 'btn-primary', 'text-white');
+        btn.classList.remove('theme-text-muted');
 
-        canvasWrapper.style.width = (zoom * 100) + '%';
-        if (window.marmotEquityChart) {
-            const ds = window.marmotEquityChart.data.datasets[0];
-            if (ds) {
-                ds.pointRadius = zoom > 1 ? (zoom >= 4 ? 4.5 : 3) : (window.marmotEquityChart.data.labels.length < 60 ? 3 : 0);
-            }
-            window.marmotEquityChart.options.scales.x.ticks.maxTicksLimit = zoom > 1 ? (12 * zoom) : 12;
-            window.marmotEquityChart.resize();
+        const titleEl = document.getElementById('backtestChartTitle');
+        const iconEl = document.getElementById('backtestChartIcon');
+        if (titleEl) titleEl.innerText = title;
+        if (iconEl) {
+            iconEl.innerText = iconName;
+            iconEl.className = 'material-icons fs-5 ' + iconColor;
         }
-    }
+        renderBacktestJournalChart(mode);
+    };
 
-    function toggleEquityExpand() {
-        isExpanded = !isExpanded;
-        const scrollWrapper = document.getElementById('equityChartScrollWrapper');
-        const expandIcon = document.getElementById('expandIcon');
-        const expandLabel = document.getElementById('expandLabel');
+    window.filterBacktestTradesByDate = function(dateStr) {
+        const fromInput = document.querySelector('input[name="date_from"]');
+        const toInput = document.querySelector('input[name="date_to"]');
+        if (fromInput) fromInput.value = dateStr;
+        if (toInput) toInput.value = dateStr;
 
-        if (scrollWrapper) {
-            if (isExpanded) {
-                scrollWrapper.style.height = '520px';
-                if (expandIcon) expandIcon.textContent = 'unfold_less';
-                if (expandLabel) expandLabel.textContent = 'Collapse Height';
-            } else {
-                scrollWrapper.style.height = '360px';
-                if (expandIcon) expandIcon.textContent = 'unfold_more';
-                if (expandLabel) expandLabel.textContent = 'Expand Height';
-            }
+        const banner = document.getElementById('chart-trade-filter-banner');
+        const bannerTitle = document.getElementById('chart-filtered-trade-title');
+        if (banner && bannerTitle) {
+            banner.classList.remove('d-none');
+            banner.classList.add('d-flex');
+            bannerTitle.innerHTML = `Date: <span class="text-info font-monospace">${dateStr}</span>`;
         }
 
-        setTimeout(function() {
-            if (window.marmotEquityChart) window.marmotEquityChart.resize();
-        }, 150);
-    }
+        const form = document.getElementById('trades-filter-form');
+        if (form) {
+            htmx.trigger(form, 'submit');
+        }
 
-    function setupEquityChartPan() {
-        const slider = document.getElementById('equityChartScrollWrapper');
-        if (!slider) return;
+        const tableCard = document.getElementById('backtest-orders-container');
+        if (tableCard) {
+            tableCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+    };
 
-        let isDown = false;
-        let startX;
-        let scrollLeft;
+    window.clearBacktestDateFilter = function() {
+        const fromInput = document.querySelector('input[name="date_from"]');
+        const toInput = document.querySelector('input[name="date_to"]');
+        if (fromInput) fromInput.value = "";
+        if (toInput) toInput.value = "";
 
-        slider.addEventListener('mousedown', function(e) {
-            isDown = true;
-            slider.style.cursor = 'grabbing';
-            startX = e.pageX - slider.offsetLeft;
-            scrollLeft = slider.scrollLeft;
-        });
+        const banner = document.getElementById('chart-trade-filter-banner');
+        if (banner) {
+            banner.classList.add('d-none');
+            banner.classList.remove('d-flex');
+        }
 
-        slider.addEventListener('mouseleave', function() {
-            isDown = false;
-            slider.style.cursor = 'grab';
-        });
+        const form = document.getElementById('trades-filter-form');
+        if (form) {
+            htmx.trigger(form, 'submit');
+        }
+    };
 
-        slider.addEventListener('mouseup', function() {
-            isDown = false;
-            slider.style.cursor = 'grab';
-        });
-
-        slider.addEventListener('mousemove', function(e) {
-            if (!isDown) return;
-            e.preventDefault();
-            const x = e.pageX - slider.offsetLeft;
-            const walk = (x - startX) * 1.5;
-            slider.scrollLeft = scrollLeft - walk;
-        });
-
-        slider.addEventListener('wheel', function(e) {
-            if (e.deltaY !== 0 && currentZoom > 1) {
-                slider.scrollLeft += e.deltaY;
-            }
-        }, { passive: true });
-    }
-
+    // Auto-mount on load
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initEquityCurveChart);
+        document.addEventListener('DOMContentLoaded', () => renderBacktestJournalChart('pnl'));
     } else {
-        setTimeout(initEquityCurveChart, 50);
+})();
+</script>
+
+<!-- Real-Time WebSocket Progress Updates & Auto-Reload for RL Backtest Engine -->
+<script>
+(function() {
+    const taskId = "{{ backtest.id }}";
+    const taskStatus = "{{ backtest.status }}";
+    let isFinished = (taskStatus === 'completed' || taskStatus === 'error' || taskStatus === 'cancelled');
+
+    function applyBacktestProgressUpdate(data) {
+        if (!data) return;
+        const progress = data.progress !== undefined ? data.progress : 0;
+        const status = data.status || '';
+        const stepInfo = data.step_info || '';
+        const tradesCount = data.total_trades !== undefined ? data.total_trades : null;
+        const netPnL = data.net_pnl !== undefined ? data.net_pnl : null;
+
+        if (status === 'running' || status === 'pending' || (progress > 0 && progress < 100)) {
+            isFinished = false;
+        }
+
+        const liveCard = document.getElementById('backtest-live-progress-card');
+        const progressBar = document.getElementById('backtest-live-progress-bar') || document.getElementById('backtest-progress-bar');
+        const progressPercent = document.getElementById('backtest-live-progress-pct') || document.getElementById('backtest-progress-percent');
+        const stepStatus = document.getElementById('backtest-step-status');
+        const liveTrades = document.getElementById('backtest-live-trades');
+        const livePnL = document.getElementById('backtest-live-pnl');
+
+        if (liveCard && (status === 'running' || status === 'pending' || (progress > 0 && progress < 100))) {
+            liveCard.classList.remove('d-none');
+        }
+
+        if (progressBar) {
+            progressBar.style.width = Math.max(5, progress) + '%';
+            progressBar.setAttribute('aria-valuenow', progress);
+            if (status === 'running') {
+                progressBar.classList.add('progress-bar-animated');
+            } else {
+                progressBar.classList.remove('progress-bar-animated');
+            }
+        }
+        if (progressPercent) {
+            progressPercent.textContent = progress + '%';
+        }
+        if (stepStatus && stepInfo) {
+            stepStatus.textContent = stepInfo;
+        }
+        if (liveTrades && tradesCount !== null) {
+            liveTrades.textContent = tradesCount;
+        }
+        if (livePnL && netPnL !== null) {
+            const formatted = (netPnL >= 0 ? '+₹' : '₹') + Number(netPnL).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+            livePnL.textContent = formatted;
+            livePnL.className = 'fw-bold font-monospace ' + (netPnL >= 0 ? 'text-success' : 'text-danger');
+        }
+
+        if ((progress >= 100 || status === 'completed' || status === 'error') && !isFinished) {
+            isFinished = true;
+
+            const actionsContainer = document.getElementById('backtest-control-actions');
+            if (actionsContainer) {
+                actionsContainer.innerHTML = `<button type="button" 
+                        hx-get="/backtest/${taskId}/control/?action=start" 
+                        hx-target="#globalHtmxModalDialog" 
+                        hx-swap="innerHTML" 
+                        class="btn btn-outline-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 px-3 shadow-sm">
+                    <span class="material-icons fs-5">replay</span>
+                    <span>Re-run Backtest</span>
+                </button>`;
+                if (window.htmx) {
+                    window.htmx.process(actionsContainer);
+                }
+            }
+
+            const badgeContainer = document.getElementById('backtest-status-badge-container');
+            if (badgeContainer) {
+                badgeContainer.innerHTML = status === 'error' 
+                    ? '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Failed</span>'
+                    : '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Completed</span>';
+            }
+
+            if (stepStatus) {
+                stepStatus.textContent = '✨ Backtest Execution Completed! Rendering full trade analytics...';
+                stepStatus.className = 'mt-2 text-success font-monospace fw-semibold';
+            }
+
+            setTimeout(function() {
+                const container = document.getElementById('backtest-detail-container') || document.getElementById('mainContentBody');
+                if (container && window.htmx) {
+                    window.htmx.ajax('GET', window.location.pathname + window.location.search, {
+                        target: container.id === 'backtest-detail-container' ? '#backtest-detail-container' : '#mainContentBody',
+                        swap: 'innerHTML'
+                    });
+                } else {
+                    window.location.reload();
+                }
+            }, 600);
+        }
     }
+
+    if (window.MarmotWS) {
+        window.MarmotWS.unsubscribe(taskId);
+        window.MarmotWS.subscribe(taskId, applyBacktestProgressUpdate);
+    }
+
+    if (!isFinished || taskStatus === 'running' || taskStatus === 'pending') {
+        const pollTimer = setInterval(function() {
+            if (isFinished) {
+                clearInterval(pollTimer);
+                return;
+            }
+            fetch('/backtest/' + taskId + '/status/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function(res) { return res.ok ? res.json() : null; })
+            .then(function(data) {
+                if (data) {
+                    applyBacktestProgressUpdate(data);
+                    if (data.status === 'completed' || data.status === 'error' || data.status === 'cancelled') {
+                        clearInterval(pollTimer);
+                    }
+                }
+            })
+            .catch(function(e) {});
+        }, 1200);
+    }
+
+    document.body.addEventListener('reloadBacktestDetail', function() {
+        isFinished = false;
+        const container = document.getElementById('backtest-detail-container') || document.getElementById('mainContentBody');
+        if (container && window.htmx) {
+            window.htmx.ajax('GET', window.location.pathname + window.location.search, {
+                target: container.id === 'backtest-detail-container' ? '#backtest-detail-container' : '#mainContentBody',
+                swap: 'innerHTML'
+            });
+        } else {
+            window.location.reload();
+        }
+    });
 })();
 </script>
 

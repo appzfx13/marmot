@@ -2,7 +2,7 @@ from django import forms
 import json
 from .models import BacktestTask, BacktestRule
 from apps.market.models import MarketBackupTask
-from apps.common.choices import StrikeSelectionChoices, IndexChoices, ForexInstrumentChoices, MarketTypeChoices
+from apps.common.choices import StrikeSelectionChoices, IndexChoices, ForexInstrumentChoices, MarketTypeChoices, MacroTimeframeChoices
 
 
 class BacktestRuleForm(forms.ModelForm):
@@ -114,10 +114,13 @@ class IndexBacktestTaskForm(forms.ModelForm):
     risk_reward_ratio = forms.FloatField(initial=2.0, required=False, help_text="Risk to Reward Ratio (e.g. 2.0)")
     stop_loss_points = forms.FloatField(initial=30.0, required=False, help_text="Stop Loss in Index/Option Points (e.g. 30 pts)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_stop_loss_points', 'step': '0.5'}))
     lots_count = forms.IntegerField(initial=1, min_value=1, required=False, help_text="Number of option lots (e.g. 1, 2, 5)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'min': '1'}))
+    use_macro_assist = forms.BooleanField(required=False, initial=False, label="USE AI MACRO ASSIST", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_index_use_macro_assist'}))
+    macro_timeframe = forms.ChoiceField(choices=MacroTimeframeChoices.choices, initial=MacroTimeframeChoices.H1, required=False, widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_macro_timeframe'}))
+    macro_backup_task = MarketBackupTaskChoiceField(queryset=MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=True).order_by('-id'), required=False, empty_label="-- Auto-Detect / Select Macro Parquet Dataset (Optional) --", widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_macro_backup_task'}))
 
     class Meta:
         model = BacktestTask
-        fields = ['market_type', 'backup_task', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
+        fields = ['market_type', 'backup_task', 'macro_backup_task', 'use_macro_assist', 'macro_timeframe', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
         widgets = {
             'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_index_name'}),
@@ -156,10 +159,13 @@ class ForexBacktestTaskForm(forms.ModelForm):
     risk_reward_ratio = forms.FloatField(initial=2.0, required=False, help_text="Risk to Reward Ratio (e.g. 2.0)")
     stop_loss_points = forms.FloatField(initial=25.0, required=False, help_text="Stop Loss in Pips or Ticks (e.g. 25 pips)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_stop_loss_points', 'step': '0.1'}))
     lots_count = forms.IntegerField(initial=1, min_value=1, required=False, help_text="Number of CME Micro Contracts / Lots (e.g. 1, 2, 5)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'min': '1'}))
+    use_macro_assist = forms.BooleanField(required=False, initial=False, label="USE AI MACRO ASSIST", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_forex_use_macro_assist'}))
+    macro_timeframe = forms.ChoiceField(choices=MacroTimeframeChoices.choices, initial=MacroTimeframeChoices.H1, required=False, widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_macro_timeframe'}))
+    macro_backup_task = MarketBackupTaskChoiceField(queryset=MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=True).order_by('-id'), required=False, empty_label="-- Auto-Detect / Select Macro Parquet Dataset (Optional) --", widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_macro_backup_task'}))
 
     class Meta:
         model = BacktestTask
-        fields = ['market_type', 'backup_task', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
+        fields = ['market_type', 'backup_task', 'macro_backup_task', 'use_macro_assist', 'macro_timeframe', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
         widgets = {
             'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_index_name'}),

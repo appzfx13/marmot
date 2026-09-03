@@ -1,11 +1,16 @@
 {% load static %}
 <div class="d-flex flex-column gap-4">
 
-    <!-- START: Spark Page Header -->
+    <!-- START: Header -->
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
         <div>
-            <h1 class="page-title">{{ page_title }}</h1>
-            <p class="page-subtitle">Manage, monitor, and execute automated market data backups and date-partitioned Parquet datasets.</p>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge rounded-pill px-2.5 py-1 fw-bold font-monospace" style="background: rgba(234,179,8,0.18); color: #facc15; border: 1px solid rgba(234,179,8,0.35); font-size: 0.72rem;">
+                    🤖 AI MACRO ENGINE
+                </span>
+            </div>
+            <h1 class="page-title">{{ page_title|default:"AI Macro Assist Datasets" }}</h1>
+            <p class="page-subtitle">Manage, monitor, and synchronize 1-month date-partitioned AI Macro Assist Parquet datasets via Gemini AI.</p>
         </div>
         
         <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
@@ -31,42 +36,37 @@
                 </ul>
             </div>
 
-            <a href="{% url 'trade_core:dhan-admin-login' %}" class="btn btn-outline-secondary rounded-pill fw-semibold d-inline-flex align-items-center justify-content-center gap-2 px-3 py-1.5 shadow-sm" title="Authenticate with DhanHQ to generate 24h master token for market data backup">
-                <i class="bi bi-key-fill"></i>
-                <span>Auth DhanHQ</span>
+            <a href="{% url 'market:market_backup_list' %}" class="btn btn-outline-secondary rounded-pill fw-semibold d-inline-flex align-items-center justify-content-center gap-2 px-3.5 py-2 shadow-sm" title="View historical index and forex tick data backups">
+                <i class="bi bi-cloud-arrow-down-fill"></i>
+                <span>Market Backups</span>
             </a>
 
-            <a href="{% url 'market:market_macro_backup_create_page' %}" class="btn btn-warning rounded-pill fw-bold text-dark d-inline-flex align-items-center justify-content-center gap-1.5 px-3.5 py-2 shadow-sm" style="background-color: var(--brand-lime, #B4F105); border: 1px solid var(--brand-lime, #B4F105);">
+            <a href="{% url 'market:market_macro_backup_create_page' %}" class="btn btn-warning rounded-pill fw-bold text-dark d-inline-flex align-items-center justify-content-center gap-1.5 px-4 py-2 shadow-sm" style="background-color: var(--brand-lime, #B4F105); border: 1px solid var(--brand-lime, #B4F105);">
                 <span class="material-icons fs-5">psychology_alt</span>
-                <span>AI Macro Backup</span>
-            </a>
-
-            <a href="{% url 'market:market_backup_create' %}" class="btn btn-primary rounded-pill fw-semibold text-white d-inline-flex align-items-center justify-content-center gap-2 px-4 py-2 shadow-sm">
-                <i class="bi bi-cloud-arrow-up-fill"></i>
-                <span>Run Backup Now</span>
+                <span>Initialize Macro Backup</span>
             </a>
         </div>
     </div>
-    <!-- END: Spark Page Header -->
+    <!-- END: Header -->
 
     <!-- Search & Filter Controls -->
     <div class="card card-filter mb-0">
         <div class="card-body p-2 px-3">
             <form method="GET" action="{{ request.path }}" class="row g-2 align-items-center">
                 
-                <!-- Search by Backup Name or Query -->
-                <div class="col-12 col-md-4">
+                <!-- Search -->
+                <div class="col-12 col-md-6">
                     <div class="filter-search-wrapper">
                         <input type="text" 
-                                name="q" 
-                                value="{{ request.GET.q|default:'' }}" 
-                                class="form-control" 
-                                placeholder="Search backups..."
-                                hx-get="{{ request.path }}"
-                                hx-target="#backup-dashboard-container"
-                                hx-trigger="input changed delay:400ms, search"
-                                hx-include="[name='status'], [name='dataset_type']"
-                                hx-push-url="true">
+                               name="q" 
+                               value="{{ request.GET.q|default:'' }}" 
+                               class="form-control" 
+                               placeholder="Search macro datasets (e.g. NIFTY, MGC, #0012)..."
+                               hx-get="{{ request.path }}"
+                               hx-target="#macro-backup-dashboard-container"
+                               hx-trigger="input changed delay:400ms, search"
+                               hx-include="[name='status']"
+                               hx-push-url="true">
                         <span class="search-icon">
                             <i class="bi bi-search"></i>
                         </span>
@@ -74,13 +74,13 @@
                 </div>
 
                 <!-- Filter by Status -->
-                <div class="col-6 col-md-3">
+                <div class="col-6 col-md-4">
                     <select name="status" 
                             class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
                             hx-get="{{ request.path }}"
-                            hx-target="#backup-dashboard-container"
+                            hx-target="#macro-backup-dashboard-container"
                             hx-trigger="change"
-                            hx-include="[name='q'], [name='dataset_type']"
+                            hx-include="[name='q']"
                             hx-push-url="true">
                         <option value="">All Statuses</option>
                         <option value="completed" {% if request.GET.status == 'completed' %}selected{% endif %}>Completed</option>
@@ -91,27 +91,12 @@
                     </select>
                 </div>
 
-                <!-- Filter by Dataset Type -->
-                <div class="col-6 col-md-3">
-                    <select name="dataset_type" 
-                            class="form-select bg-transparent theme-text-main border-secondary border-opacity-25"
-                            hx-get="{{ request.path }}"
-                            hx-target="#backup-dashboard-container"
-                            hx-trigger="change"
-                            hx-include="[name='q'], [name='status']"
-                            hx-push-url="true">
-                        <option value="">All Dataset Types</option>
-                        <option value="market" {% if request.GET.dataset_type == 'market' %}selected{% endif %}>Options &amp; Futures</option>
-                        <option value="macro" {% if request.GET.dataset_type == 'macro' %}selected{% endif %}>🤖 AI Macro Assist</option>
-                    </select>
-                </div>
-
                 <!-- Reset Button -->
-                <div class="col-12 col-md-2 ms-auto">
+                <div class="col-6 col-md-2 ms-auto">
                     <a href="{{ request.path }}" 
                        class="btn btn-outline-secondary rounded-pill theme-text-muted border-secondary border-opacity-25 w-100 d-inline-flex align-items-center justify-content-center gap-1.5"
                        hx-get="{{ request.path }}"
-                       hx-target="#backup-dashboard-container"
+                       hx-target="#macro-backup-dashboard-container"
                        hx-push-url="true">
                         <i class="bi bi-arrow-counterclockwise"></i>
                         <span>Reset</span>
@@ -123,12 +108,12 @@
     </div>
 
     <!-- FIXED CONTAINER: HTMX target container that holds the table partial -->
-    <div id="backup-dashboard-container" class="w-100"
+    <div id="macro-backup-dashboard-container" class="w-100"
          hx-get="{{ request.get_full_path }}" 
-         hx-trigger="reloadBackupTable from:body" 
-         hx-target="#backup-dashboard-container"
+         hx-trigger="reloadMacroBackupTable from:body" 
+         hx-target="#macro-backup-dashboard-container"
          hx-swap="innerHTML">
-        {% include 'admins/partials/backup_dashboard_content.html' %}
+        {% include 'admins/partials/macro_backup_dashboard_content.html' %}
     </div>
 
 </div>

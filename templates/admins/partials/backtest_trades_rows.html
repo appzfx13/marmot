@@ -21,6 +21,16 @@
             {% if trade.moneyness %}
             <span class="badge rounded-pill px-1.5 py-0 fw-semibold" style="font-size: 0.65rem; background: var(--bg-elevated) !important; color: var(--text-secondary) !important; border: 1px solid var(--border-default) !important;">{{ trade.moneyness }}</span>
             {% endif %}
+            {% if trade.macro_sentiment %}
+            <span class="badge rounded-pill px-1.5 py-0 fw-bold" style="font-size: 0.65rem; {% if trade.macro_sentiment == 'BULLISH' %}background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;{% elif trade.macro_sentiment == 'BEARISH' %}background: rgba(239, 68, 68, 0.18) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;{% else %}background: rgba(148, 163, 184, 0.18) !important; color: #94a3b8 !important; border: 1px solid rgba(148, 163, 184, 0.35) !important;{% endif %}" title="Gemini Macro Sentiment: {{ trade.macro_sentiment }} (Score: {{ trade.macro_sentiment_score }})">
+                🤖 {{ trade.macro_sentiment }}
+            </span>
+            {% endif %}
+            {% if trade.event_risk_flag == 1 %}
+            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-35 rounded-pill px-1.5 py-0 fw-bold" style="font-size: 0.65rem;" title="High Impact Macro / Policy Catalyst Window">
+                ⚡ Catalyst
+            </span>
+            {% endif %}
         </div>
     </td>
 

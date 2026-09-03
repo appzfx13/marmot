@@ -1,0 +1,301 @@
+<style>
+    .custom-glass-table > :not(caption) > * > * {
+        background-color: transparent !important;
+        box-shadow: none !important;
+    }
+    .custom-glass-table.table-hover tbody tr:hover > * {
+        background-color: var(--nav-hover) !important;
+    }
+</style>
+
+<!-- Main Card Container -->
+<div class="card overflow-hidden d-flex flex-column mb-0 w-100" style="min-height: 550px;" 
+     id="macro-backup-table-card"
+     hx-get="{{ request.get_full_path }}" 
+     hx-trigger="reloadMacroBackupTable from:body" 
+     hx-target="#macro-backup-dashboard-container">
+    
+    <!-- Bulk Action Toolbar -->
+    <div class="bulk-action-bar px-4 py-2 border-bottom d-none align-items-center justify-content-between" style="background: rgba(220, 53, 69, 0.12); border-color: rgba(220, 53, 69, 0.25) !important;">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-check-circle-fill text-danger"></i>
+            <span class="fw-bold theme-text-main small"><span class="bulk-selected-count">0</span> datasets marked</span>
+        </div>
+        <button type="button" 
+                class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                onclick="triggerBulkDelete(this, '{% url 'market:market_backup_bulk_delete' %}')">
+            <i class="bi bi-trash"></i>
+            <span>Bulk Delete</span>
+        </button>
+    </div>
+
+    <!-- DESKTOP TABLE VIEW -->
+    <div class="table-responsive flex-grow-1 overflow-auto d-none d-lg-block">
+        <table class="table table-custom align-middle mb-0 text-nowrap">
+            <thead>
+                <tr>
+                    <th scope="col" class="ps-4 py-3" style="width: 40px;">
+                        <input class="form-check-input bulk-select-all" type="checkbox" title="Select All">
+                    </th>
+                    <th scope="col" class="py-3">Dataset ID / Symbol</th>
+                    <th scope="col" class="py-3">Date Horizon</th>
+                    <th scope="col" class="py-3">Interval &amp; Co-location</th>
+                    <th scope="col" class="py-3">Progress</th>
+                    <th scope="col" class="py-3 text-center">Status</th>
+                    <th scope="col" class="text-end pe-4 py-3">Controls &amp; Actions</th>
+                </tr>
+            </thead>
+            <tbody id="macro-backup-table-body">
+                {% if backups %}
+                    {% for backup in backups %}
+                    <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-color) !important;">
+                        <td class="ps-4 py-3 bg-transparent" style="width: 40px;">
+                            <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backup.id }}">
+                        </td>
+                        <td class="py-3 bg-transparent">
+                            <div class="fw-bold theme-text-main d-flex align-items-center gap-2">
+                                <a href="{% url 'market:market_macro_backup_detail' backup.pk %}" class="theme-text-main text-decoration-none fw-bold">
+                                    #{{ backup.id|stringformat:"04d" }}
+                                </a>
+                                <span class="badge" style="background:rgba(234,179,8,0.18);color:#facc15;border:1px solid rgba(234,179,8,0.4);font-size:0.68rem;padding:2px 6px;">🤖 MACRO</span>
+                            </div>
+                            <div class="small fw-semibold text-warning">
+                                {{ backup.display_symbol }}
+                            </div>
+                            <div class="small theme-text-muted" style="font-size: 0.7rem;">
+                                Provider: <strong class="theme-text-main">Gemini AI</strong>
+                            </div>
+                        </td>
+
+                        <td class="py-3 bg-transparent">
+                            <div class="small theme-text-main font-monospace">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</div>
+                        </td>
+
+                        <td class="py-3 bg-transparent">
+                            <div class="small text-warning fw-semibold">{{ backup.macro_timeframe|default:"1h" }} Interval</div>
+                            {% if backup.linked_backup_task %}
+                                <div class="small" style="font-size: 0.72rem;">
+                                    <a href="{% url 'market:market_backup_detail' backup.linked_backup_task.pk %}" class="text-info text-decoration-none">
+                                        <i class="bi bi-folder-symlink"></i> Co-located #{{ backup.linked_backup_task.id }}
+                                    </a>
+                                </div>
+                            {% else %}
+                                <div class="small theme-text-muted" style="font-size: 0.72rem;">Standalone Dataset</div>
+                            {% endif %}
+                            <div class="small theme-text-main font-monospace">{{ backup.file_size_mb }} MB</div>
+                        </td>
+
+                        <!-- Real-Time Progress Bar -->
+                        <td class="py-3 bg-transparent" style="min-width: 160px;">
+                            <div class="d-flex align-items-center justify-content-between mb-1">
+                                <small class="theme-text-muted backup-progress-text" style="font-size: 0.7rem;" id="backup-progress-text-{{ backup.pk }}">{{ backup.progress }}%</small>
+                                <small class="text-warning fw-semibold backup-eta-text" style="font-size: 0.68rem;" id="backup-eta-{{ backup.pk }}"></small>
+                            </div>
+                            <div class="progress" style="height: 6px; background-color: var(--border-color);">
+                                <div class="progress-bar gradient-progress-bar progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %} backup-progress-bar" 
+                                     id="backup-progress-{{ backup.pk }}"
+                                     role="progressbar" 
+                                     style="width: {{ backup.progress }}%; background-color: var(--brand-lime, #B4F105);" 
+                                     aria-valuenow="{{ backup.progress }}" aria-valuemin="0" aria-valuemax="100">
+                                </div>
+                            </div>
+                        </td>
+
+                        <td class="py-3 bg-transparent text-center">
+                            <span id="backup-status-{{ backup.pk }}" class="backup-status-badge">
+                            {% if backup.status == 'completed' %}
+                                <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(16,185,129,0.18);color:#10b981;border:1.5px solid rgba(16,185,129,0.4);font-size:0.75rem;">Completed</span>
+                            {% elif backup.status == 'running' %}
+                                <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(59,130,246,0.18);color:#3b82f6;border:1.5px solid rgba(59,130,246,0.4);font-size:0.75rem;">Running</span>
+                            {% elif backup.status == 'created' %}
+                                <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(14,165,233,0.18);color:#0ea5e9;border:1.5px solid rgba(14,165,233,0.4);font-size:0.75rem;">Created</span>
+                            {% elif backup.status == 'paused' %}
+                                <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1.5px solid rgba(245,158,11,0.4);font-size:0.75rem;">Paused</span>
+                            {% elif backup.status == 'cancelled' or backup.status == 'error' %}
+                                <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(239,68,68,0.18);color:#ef4444;border:1.5px solid rgba(239,68,68,0.4);font-size:0.75rem;">{{ backup.get_status_display }}</span>
+                            {% else %}
+                                <span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(100,116,139,0.18);color:#94a3b8;border:1.5px solid rgba(100,116,139,0.4);font-size:0.75rem;">Pending</span>
+                            {% endif %}
+                            </span>
+                        </td>
+
+                        <td class="text-end pe-4 py-3 bg-transparent">
+                            <div class="d-flex align-items-center justify-content-end gap-1.5">
+                                <a href="{% url 'market:market_macro_backup_detail' backup.pk %}" 
+                                   class="glass-icon-btn rounded-circle d-flex align-items-center justify-content-center text-decoration-none" 
+                                   style="width: 34px; height: 34px;" 
+                                   title="View Parquet Inspection &amp; Sentiment Records">
+                                    <span class="material-icons fs-6">visibility</span>
+                                </a>
+
+                                {% if backup.file_size_mb > 0 and backup.status != 'error' %}
+                                <a href="{% url 'market:market_backup_download' backup.pk %}" 
+                                   class="glass-icon-btn rounded-circle d-flex align-items-center justify-content-center text-decoration-none text-success" 
+                                   style="width: 34px; height: 34px;" 
+                                   title="Download Parquet File">
+                                    <span class="material-icons fs-6">download</span>
+                                </a>
+                                {% endif %}
+
+                                <button type="button" 
+                                        hx-get="{% url 'market:market_backup_delete' backup.pk %}" 
+                                        hx-target="#globalHtmxModalDialog"
+                                        hx-swap="innerHTML"
+                                        class="glass-icon-btn text-danger rounded-circle d-flex align-items-center justify-content-center border-0 bg-transparent" 
+                                        style="width: 34px; height: 34px;" 
+                                        title="Delete Macro Dataset">
+                                    <span class="material-icons fs-6">delete_outline</span>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                {% else %}
+                <tr class="border-0">
+                    <td colspan="7" class="text-center py-5 theme-text-muted border-0 bg-transparent">
+                        <i class="bi bi-cpu fs-1 mb-2 opacity-50 d-block" style="color: #facc15;"></i>
+                        <p class="mb-0 fw-medium">No AI Macro Assist datasets found.</p>
+                        <small class="opacity-75">Click "Initialize Macro Backup" to download 1-month structured fundamental and FII/DII data.</small>
+                    </td>
+                </tr>
+                {% endif %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- MOBILE VIEW CARDS -->
+    <div class="flex-grow-1 overflow-auto p-3 d-block d-lg-none" id="macro-backup-mobile-list-container">
+        {% if backups %}
+            {% for backup in backups %}
+            <div class="p-3 mb-2 rounded-3 border shadow-sm" style="border-color: var(--border-color) !important; background-color: var(--nav-hover);">
+                <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backup.id }}">
+                        <div>
+                            <div class="fw-bold theme-text-main font-monospace d-flex align-items-center gap-1">
+                                <span>#{{ backup.id|stringformat:"04d" }}</span>
+                                <span class="badge" style="background:rgba(234,179,8,0.18);color:#facc15;border:1px solid rgba(234,179,8,0.35);font-size:0.65rem;">🤖 MACRO</span>
+                            </div>
+                            <div class="small fw-semibold text-warning">{{ backup.display_symbol }}</div>
+                            <div class="small theme-text-muted" style="font-size:0.68rem;">Gemini AI</div>
+                        </div>
+                    </div>
+                    <span id="backup-status-mb-{{ backup.pk }}" class="backup-status-badge">
+                        {% if backup.status == 'completed' %}
+                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0 fw-bold" style="font-size: 0.7rem;">Completed</span>
+                        {% elif backup.status == 'running' %}
+                            <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0 fw-bold" style="font-size: 0.7rem;">Running</span>
+                        {% else %}
+                            <span class="badge bg-secondary bg-opacity-25 text-secondary rounded-pill px-2 py-0 fw-bold" style="font-size: 0.7rem;">{{ backup.get_status_display }}</span>
+                        {% endif %}
+                    </span>
+                </div>
+
+                <!-- Progress Bar -->
+                <div class="progress rounded-pill mb-2" style="height: 5px; background: rgba(255, 255, 255, 0.08);">
+                    <div id="backup-progress-mb-{{ backup.pk }}" 
+                         class="progress-bar progress-bar-striped {% if backup.status == 'running' %}progress-bar-animated{% endif %} gradient-progress-bar rounded-pill backup-progress-bar" 
+                         role="progressbar" 
+                         style="width: {{ backup.progress }}%; background-color: var(--brand-lime, #B4F105);" 
+                         aria-valuenow="{{ backup.progress }}" aria-valuemin="0" aria-valuemax="100">
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-between align-items-center small mb-2 theme-text-muted">
+                    <span>{{ backup.start_date|date:"d M" }} → {{ backup.end_date|date:"d M Y" }}</span>
+                    <span>{{ backup.macro_timeframe|default:"1h" }} | {{ backup.file_size_mb }} MB</span>
+                </div>
+
+                <div class="d-flex justify-content-end gap-2 pt-2 border-top border-secondary border-opacity-10">
+                    <a href="{% url 'market:market_macro_backup_detail' backup.pk %}" 
+                       class="btn btn-sm btn-outline-secondary rounded-pill px-3 d-flex align-items-center gap-1"
+                       style="font-size: 0.75rem;">
+                        <span class="material-icons fs-6">visibility</span> Details
+                    </a>
+                </div>
+            </div>
+            {% endfor %}
+        {% else %}
+        <div class="text-center py-5 theme-text-muted">
+            <i class="bi bi-cpu fs-1 mb-2 opacity-50 d-block" style="color: #facc15;"></i>
+            <p class="mb-0 fw-medium">No AI Macro Assist datasets found.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- FOOTER -->
+    <div class="card-footer py-2 px-3 px-md-4 mt-auto border-top d-flex justify-content-between align-items-center small theme-text-muted">
+        <span>Showing {{ paginator.count|default:backups|length }} macro datasets</span>
+        <span class="trend-badge trend-up py-0.5 px-2 font-monospace fs-xs" style="color: #facc15;">WebSocket Sync Active</span>
+    </div>
+
+    <!-- WEBSOCKET PROGRESS UPDATER SCRIPT -->
+    <script>
+    (function() {
+        const STATUS_MAP = {
+            'completed': '<span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(16,185,129,0.18);color:#10b981;border:1.5px solid rgba(16,185,129,0.4);font-size:0.75rem;">Completed</span>',
+            'running':   '<span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(59,130,246,0.18);color:#3b82f6;border:1.5px solid rgba(59,130,246,0.4);font-size:0.75rem;">Running</span>',
+            'created':   '<span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(14,165,233,0.18);color:#0ea5e9;border:1.5px solid rgba(14,165,233,0.4);font-size:0.75rem;">Created</span>',
+            'paused':    '<span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(245,158,11,0.18);color:#f59e0b;border:1.5px solid rgba(245,158,11,0.4);font-size:0.75rem;">Paused</span>',
+            'cancelled': '<span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(239,68,68,0.18);color:#ef4444;border:1.5px solid rgba(239,68,68,0.4);font-size:0.75rem;">Cancelled</span>',
+            'error':     '<span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(239,68,68,0.18);color:#ef4444;border:1.5px solid rgba(239,68,68,0.4);font-size:0.75rem;">Error</span>',
+            'pending':   '<span class="d-inline-flex align-items-center gap-1 rounded-pill px-2 py-1 fw-semibold" style="background:rgba(100,116,139,0.18);color:#94a3b8;border:1.5px solid rgba(100,116,139,0.4);font-size:0.75rem;">Pending</span>'
+        };
+
+        function applyListUpdate(data) {
+            const rawId = String(data.task_id || data.id || '');
+            const progressBar  = document.getElementById('backup-progress-' + rawId) || document.getElementById('backup-progress-mb-' + rawId);
+            const progressText = document.getElementById('backup-progress-text-' + rawId);
+            const etaText      = document.getElementById('backup-eta-' + rawId);
+            const statusBadge  = document.getElementById('backup-status-' + rawId);
+
+            if (progressBar) {
+                progressBar.style.width = data.progress + '%';
+                progressBar.setAttribute('aria-valuenow', data.progress);
+                progressBar.classList.toggle('progress-bar-animated', data.status === 'running');
+            }
+            if (progressText) progressText.textContent = data.progress + '%';
+            if (etaText) etaText.textContent = (data.status === 'running' && data.eta) ? data.eta : '';
+            if (statusBadge) statusBadge.innerHTML = STATUS_MAP[data.status] || STATUS_MAP['pending'];
+        }
+
+        function fetchInitialStatus(taskId) {
+            const cleanId = String(taskId).replace(/^mb-/, '');
+            fetch('/market/backup/' + cleanId + '/status/', {
+                headers: { 'X-Requested-With': 'XMLHttpRequest' }
+            })
+            .then(function(r) { return r.ok ? r.json() : null; })
+            .then(function(data) { if (data) applyListUpdate(data); })
+            .catch(function() { /* silent */ });
+        }
+
+        function initListSubscriptions() {
+            const processed = new Set();
+            document.querySelectorAll('.backup-progress-bar').forEach(function(el) {
+                const taskId = el.id.replace('backup-progress-', '').replace(/^mb-/, '');
+                if (!taskId || processed.has(taskId)) return;
+                processed.add(taskId);
+
+                fetchInitialStatus(taskId);
+
+                if (window.MarmotWS && window.MarmotWS.url) {
+                    window.MarmotWS.unsubscribe(taskId);
+                    window.MarmotWS.subscribe(taskId, applyListUpdate);
+                }
+            });
+        }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', initListSubscriptions);
+        } else {
+            initListSubscriptions();
+        }
+
+        document.body.addEventListener('htmx:afterSwap', function(evt) {
+            if (evt.detail.target.id === 'macro-backup-dashboard-container') {
+                initListSubscriptions();
+            }
+        });
+    })();
+    </script>
+</div>

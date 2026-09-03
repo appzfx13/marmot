@@ -39,6 +39,125 @@ def create_and_start_backup_task(start_date, end_date, index_name=None, strike_c
 
     return task
 
+
+def run_macro_sync_worker(task_id):
+    """Executes single-hit Gemini macro dataset generation and saves Apache Parquet dataset."""
+    import pandas as pd
+    from apps.common.services.gemini_service import GeminiAIService
+
+    try:
+        task = MarketBackupTask.objects.get(id=task_id)
+        task.status = MarketBackupTask.StatusChoices.RUNNING
+        task.progress = 20
+        task.save(update_fields=['status', 'progress'])
+
+        symbol = task.forex_instrument if task.market_type == MarketBackupTask.MarketTypeChoices.FOREX_FUTURES else task.index_name
+        symbol = symbol or "NIFTY"
+
+        # Broadcast progress via Redis
+        redis_client.publish(REDIS_CHANNEL, json.dumps({
+            "type": "progress",
+            "task_id": str(task.id),
+            "progress": 35,
+            "status": "running"
+        }))
+
+        records = GeminiAIService.fetch_macro_month_dataset(
+            symbol=symbol,
+            start_date=task.start_date.isoformat(),
+            end_date=task.end_date.isoformat(),
+            timeframe=task.macro_timeframe or "1h",
+            market_type=task.market_type
+        )
+
+        df = pd.DataFrame(records)
+        user_id = str(task.created_by.id if task.created_by else 1)
+        
+        # Save to macro task directory, and co-locate in linked market backup folder if specified
+        out_dirs = [
+            f"/app/backup/{user_id}/{task.id}",
+            os.path.join(settings.BASE_DIR, 'backup', user_id, str(task.id))
+        ]
+        if task.linked_backup_task:
+            linked_id = str(task.linked_backup_task.id)
+            out_dirs.extend([
+                f"/app/backup/{user_id}/{linked_id}",
+                os.path.join(settings.BASE_DIR, 'backup', user_id, linked_id)
+            ])
+        
+        saved_path = None
+        for out_dir in out_dirs:
+            try:
+                os.makedirs(out_dir, exist_ok=True)
+                macro_named_file = os.path.join(out_dir, f"macro_{task.macro_timeframe or '1h'}_{symbol}.parquet")
+                df.to_parquet(macro_named_file, index=False)
+                # Only write dataset.parquet into task's own directory (avoid overwriting market dataset.parquet)
+                if str(task.id) in out_dir:
+                    parquet_file = os.path.join(out_dir, "dataset.parquet")
+                    df.to_parquet(parquet_file, index=False)
+                if not saved_path:
+                    saved_path = macro_named_file
+            except Exception as e:
+                logger.warning(f"Could not write to {out_dir}: {e}")
+
+        file_size_mb = 0.0
+        if saved_path and os.path.exists(saved_path):
+            file_size_mb = round(os.path.getsize(saved_path) / (1024 * 1024), 3)
+
+        task.status = MarketBackupTask.StatusChoices.COMPLETED
+        task.progress = 100
+        task.file_size_mb = max(0.01, file_size_mb)
+        if saved_path:
+            task.parquet_file_path = saved_path
+        task.save(update_fields=['status', 'progress', 'file_size_mb', 'parquet_file_path'])
+
+        redis_client.publish(REDIS_CHANNEL, json.dumps({
+            "type": "progress",
+            "task_id": str(task.id),
+            "progress": 100,
+            "status": "completed"
+        }))
+        logger.info(f"AI Macro Parquet backup task #{task.id} completed successfully ({len(df)} rows).")
+
+    except Exception as e:
+        logger.error(f"Error in macro backup worker for task #{task_id}: {e}", exc_info=True)
+        try:
+            task = MarketBackupTask.objects.get(id=task_id)
+            task.status = MarketBackupTask.StatusChoices.ERROR
+            task.error_logs = str(e)
+            task.save(update_fields=['status', 'error_logs'])
+        except Exception:
+            pass
+
+
+def create_and_start_macro_backup_task(start_date, end_date, market_type='INDEX_FO', index_name=None, forex_instrument=None, macro_timeframe='1h', linked_backup_task=None, user=None):
+    """Initializes AI Macro Assist backup task and triggers async sync worker with co-location."""
+    import threading
+
+    task = MarketBackupTask.objects.create(
+        market_type=market_type or MarketBackupTask.MarketTypeChoices.INDEX_FO,
+        start_date=start_date,
+        end_date=end_date,
+        index_name=index_name,
+        forex_instrument=forex_instrument,
+        is_macro_assist=True,
+        macro_timeframe=macro_timeframe or '1h',
+        linked_backup_task=linked_backup_task,
+        status=MarketBackupTask.StatusChoices.RUNNING,
+        created_by=user
+    )
+    user_id = str(user.id if user else 1)
+    if linked_backup_task:
+        task.parquet_file_path = f"/app/backup/{user_id}/{linked_backup_task.id}/macro_{task.macro_timeframe or '1h'}_{task.asset_code}.parquet"
+    else:
+        task.parquet_file_path = f"/app/backup/{user_id}/{task.id}"
+    task.save(update_fields=['parquet_file_path'])
+
+    worker_thread = threading.Thread(target=run_macro_sync_worker, args=(task.id,), daemon=True)
+    worker_thread.start()
+
+    return task
+
 def send_control_command(task_id, command, dhan_access_token=None):
     """
     Sends a PAUSE, RESUME, or CANCEL command to the Go Engine for a specific task.

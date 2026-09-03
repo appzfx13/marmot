@@ -6,27 +6,36 @@
     <td class="py-3 bg-transparent">
         <div class="fw-bold theme-text-main d-flex align-items-center gap-2">
             <span>#{{ backup.id|stringformat:"04d" }}</span>
-            {% if backup.market_type == 'FOREX_FUTURES' %}
+            {% if backup.is_macro_assist %}
+                <span class="badge" style="background:rgba(234,179,8,0.18);color:#facc15;border:1px solid rgba(234,179,8,0.4);font-size:0.68rem;padding:2px 6px;">🤖 MACRO</span>
+            {% elif backup.market_type == 'FOREX_FUTURES' %}
                 <span class="badge" style="background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);font-size:0.68rem;padding:2px 6px;">FOREX</span>
             {% else %}
                 <span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-size:0.68rem;padding:2px 6px;">INDEX</span>
             {% endif %}
         </div>
-        <div class="small fw-semibold {% if backup.market_type == 'FOREX_FUTURES' %}text-success{% else %}text-primary{% endif %}">
+        <div class="small fw-semibold {% if backup.is_macro_assist %}text-warning{% elif backup.market_type == 'FOREX_FUTURES' %}text-success{% else %}text-primary{% endif %}">
             {{ backup.display_symbol }}
         </div>
         <div class="small theme-text-muted" style="font-size: 0.7rem;">
-            Provider: <strong class="theme-text-main">{{ backup.provider_name }}</strong>
+            Provider: <strong class="theme-text-main">{% if backup.is_macro_assist %}Gemini AI{% else %}{{ backup.provider_name }}{% endif %}</strong>
         </div>
     </td>
 
     <td class="py-3 bg-transparent">
-        <div class="small theme-text-main">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</div>
+        <div class="small theme-text-main font-monospace">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</div>
     </td>
 
     <td class="py-3 bg-transparent">
-        <div class="small theme-text-muted">±{{ backup.strike_count }} ATM</div>
-        <div class="small theme-text-main">{{ backup.file_size_mb }} MB</div>
+        {% if backup.is_macro_assist %}
+            <div class="small text-warning fw-semibold">{{ backup.macro_timeframe|default:"1h" }} Interval</div>
+            {% if backup.linked_backup_task %}
+                <div class="small text-info" style="font-size: 0.72rem;">Co-located #{{ backup.linked_backup_task.id }}</div>
+            {% endif %}
+        {% else %}
+            <div class="small theme-text-muted">±{{ backup.strike_count }} ATM</div>
+        {% endif %}
+        <div class="small theme-text-main font-monospace">{{ backup.file_size_mb }} MB</div>
     </td>
 
     <!-- Real-Time Progress Bar -->

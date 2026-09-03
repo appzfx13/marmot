@@ -211,6 +211,43 @@ class TensorTradeRLEngine:
             })
         return pd.DataFrame(vix_records)
 
+    @classmethod
+    def load_macro_assist_data(cls, backup_dir: str = "", macro_dir: str = "", start_date: str = None, end_date: str = None, timeframe: str = "1h", index_name: str = "NIFTY") -> pd.DataFrame:
+        """Loads and date-aligns Gemini 1h AI Macro Assist Parquet dataset or generates grounded series."""
+        macro_files = []
+        search_dirs = [macro_dir, backup_dir]
+        for s_dir in search_dirs:
+            if s_dir and os.path.exists(s_dir):
+                found = glob.glob(os.path.join(s_dir, "**", "*.parquet"), recursive=True)
+                for f in found:
+                    if "MACRO" in os.path.basename(f).upper():
+                        macro_files.append(f)
+
+        for f in set(macro_files):
+            try:
+                m_df = pd.read_parquet(f)
+                if not m_df.empty and "macro_sentiment_score" in m_df.columns:
+                    time_col = "timestamp" if "timestamp" in m_df.columns else "datetime"
+                    if time_col in m_df.columns:
+                        m_df["dt_parsed"] = pd.to_datetime(m_df[time_col], errors="coerce")
+                        m_df["session_date"] = m_df["dt_parsed"].dt.date
+                        return m_df.sort_values("dt_parsed").reset_index(drop=True)
+            except Exception as e:
+                logger.warning(f"Failed to read macro parquet {f}: {e}")
+
+        from apps.common.services.gemini_service import GeminiAIService
+        records = GeminiAIService.fetch_macro_month_dataset(
+            symbol=index_name,
+            start_date=start_date,
+            end_date=end_date,
+            timeframe=timeframe
+        )
+        fallback_df = pd.DataFrame(records)
+        if not fallback_df.empty:
+            fallback_df["dt_parsed"] = pd.to_datetime(fallback_df["timestamp"], errors="coerce")
+            fallback_df["session_date"] = fallback_df["dt_parsed"].dt.date
+        return fallback_df
+
     @staticmethod
     def analyze_loss_root_cause(trade_context: dict) -> dict:
         """Performs multi-factor Root Cause Analysis (RCA) on a losing trade hitting Stop-Loss."""
@@ -219,6 +256,11 @@ class TensorTradeRLEngine:
         vix_val = float(trade_context.get("vix_val", 14.5))
         price_change = float(trade_context.get("price_change", 0.0))
         index_name = str(trade_context.get("index_name", "NIFTY"))
+
+        macro_score = float(trade_context.get("macro_sentiment_score", 0.0) or 0.0)
+        fii_flow = float(trade_context.get("fii_dii_flow_bias", 0.0) or 0.0)
+        event_flag = int(trade_context.get("event_risk_flag", 0) or 0)
+        macro_divergence = (is_ce and (macro_score < -0.20 or fii_flow < -0.25)) or (not is_ce and (macro_score > 0.20 or fii_flow > 0.25))
 
         # 1. 200 EMA Macro Trend Violation
         # Estimate 200 EMA baseline around entry spot
@@ -234,7 +276,19 @@ class TensorTradeRLEngine:
         # 4. Premature Breakout / Fakeout Reversal
         false_breakout = abs(price_change) < 15.0 and not low_vix_trap
 
-        if counter_ema and fii_divergence:
+        if event_flag == 1 and abs(price_change) > 18.0:
+            primary_rca = "High-Impact Macro Event Volatility Shock"
+            severity = "HIGH"
+            explanation = f"Trade entered during an active high-impact macro / policy catalyst window (event_risk_flag=1). Severe news whipsaw triggered the stop-loss before directional stability resumed."
+            suggested_rule = "Add Rule: Invalidate new positions 30 minutes before and after high-impact Macro / RBI / Fed policy events."
+            rule_params = {"filter_high_impact_events": True}
+        elif macro_divergence:
+            primary_rca = "AI Macro Sentiment & Institutional Flow Divergence"
+            severity = "HIGH"
+            explanation = f"Position entered counter to Gemini Macro Regime (Sentiment: {macro_score:+.2f}, Institutional FII Bias: {fii_flow:+.2f}). Adverse macro backdrop absorbed momentum, triggering stop-loss."
+            suggested_rule = f"Add Rule: Enforce AI Macro Alignment (require Macro Sentiment and Institutional Flow to agree with {'CE' if is_ce else 'PE'} positions)."
+            rule_params = {"require_macro_alignment": True, "min_macro_sentiment": 0.10}
+        elif counter_ema and fii_divergence:
             primary_rca = "200 EMA Macro Regime & Institutional FII Net Flow Divergence"
             severity = "HIGH"
             explanation = f"Position entered counter to dominant 200 EMA macro structure while institutional FII orderflow absorbed retail liquidity. Spot moved {price_change:+.1f} pts opposite to position direction."
@@ -425,7 +479,32 @@ class TensorTradeRLEngine:
             for s_date, grp in vix_df.groupby("session_date"):
                 vix_by_date[s_date] = float(grp["vix_close"].iloc[-1])
 
-        print(f"[TENSORTRADE-RL] Active Strategy Constraints: IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}", flush=True)
+        # Load date-matched Gemini AI Macro Assist dataset if requested
+        use_macro_assist = bool(params.get("use_macro_assist", False))
+        macro_timeframe = str(params.get("macro_timeframe", "1h"))
+        macro_dir = str(params.get("macro_dir", "") or "")
+
+        macro_by_date = {}
+        macro_by_hour = {}
+        if use_macro_assist:
+            macro_df = cls.load_macro_assist_data(
+                backup_dir=backup_dir,
+                macro_dir=macro_dir,
+                start_date=start_date_str,
+                end_date=end_date_str,
+                timeframe=macro_timeframe,
+                index_name=index_name
+            )
+            if not macro_df.empty:
+                for s_date, grp in macro_df.groupby("session_date"):
+                    macro_by_date[s_date] = grp.iloc[-1].to_dict()
+                for _, m_row in macro_df.iterrows():
+                    dt_val = m_row.get("dt_parsed")
+                    if pd.notnull(dt_val):
+                        key = f"{dt_val.strftime('%Y-%m-%d %H')}"
+                        macro_by_hour[key] = m_row.to_dict()
+
+        print(f"[TENSORTRADE-RL] Active Strategy Constraints: UseMacroAssist={use_macro_assist}, IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}", flush=True)
         if prompt_directives:
             print(f"[TENSORTRADE-RL] AI Prompt Directive: '{prompt_directives}'", flush=True)
 
@@ -502,6 +581,16 @@ class TensorTradeRLEngine:
                 row_entry = session_df.iloc[k]
                 t_entry = row_entry["dt_parsed"]
                 time_minutes = t_entry.hour * 60 + t_entry.minute
+
+                # AI Macro Assist State Resolution
+                current_macro = macro_by_date.get(session_date, {})
+                hour_key = f"{session_date} {t_entry.hour:02d}"
+                if hour_key in macro_by_hour:
+                    current_macro = macro_by_hour[hour_key]
+                macro_score = float(current_macro.get("macro_sentiment_score", 0.0)) if use_macro_assist else 0.0
+                macro_fii_bias = float(current_macro.get("fii_dii_flow_bias", 0.0)) if use_macro_assist else 0.0
+                event_flag = int(current_macro.get("event_risk_flag", 0)) if use_macro_assist else 0
+                macro_tag = "BULLISH" if macro_score > 0.15 else ("BEARISH" if macro_score < -0.15 else "NEUTRAL")
 
                 # ICT Indian Market Killzones (Morning: 09:15-10:30, Afternoon Macro: 13:15-14:45)
                 is_morning_killzone = (9 * 60 + 15 <= time_minutes <= 10 * 60 + 30)
@@ -793,6 +882,9 @@ class TensorTradeRLEngine:
                         "vix_val": vix_val,
                         "price_change": price_change,
                         "index_name": index_name,
+                        "macro_sentiment_score": macro_score,
+                        "fii_dii_flow_bias": macro_fii_bias,
+                        "event_risk_flag": event_flag,
                     })
 
                 trades.append({
@@ -827,6 +919,11 @@ class TensorTradeRLEngine:
                     "is_0dte": is_0dte,
                     "vix_level": vix_val,
                     "vix_regime": vix_regime,
+                    "macro_sentiment": macro_tag if use_macro_assist else "",
+                    "macro_sentiment_score": macro_score if use_macro_assist else None,
+                    "fii_dii_flow_bias": macro_fii_bias if use_macro_assist else None,
+                    "event_risk_flag": event_flag if use_macro_assist else 0,
+                    "macro_summary": current_macro.get("macro_summary", "") if use_macro_assist else "",
                     "loss_rca": loss_rca_data,
                     "loss_rca_primary": loss_rca_data.get("primary_rca", ""),
                     "loss_rca_summary": loss_rca_data.get("root_cause_explanation", ""),

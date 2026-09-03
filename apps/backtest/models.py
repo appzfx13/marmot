@@ -1,6 +1,6 @@
 from django.db import models
 from apps.common.models import BaseModel
-from apps.common.choices import TaskStatusChoices, IndexChoices, StrategyChoices, MarketTypeChoices, ForexInstrumentChoices
+from apps.common.choices import TaskStatusChoices, IndexChoices, StrategyChoices, MarketTypeChoices, ForexInstrumentChoices, MacroTimeframeChoices
 from apps.common.constants import MAX_LOG_LINES
 from .choices import BacktestRuleTypeChoices, RuleMarketTypeChoices
 
@@ -32,6 +32,7 @@ class BacktestTask(BaseModel):
     StatusChoices = TaskStatusChoices
     IndexChoices = IndexChoices
     MarketTypeChoices = MarketTypeChoices
+    MacroTimeframeChoices = MacroTimeframeChoices
 
     # Market segment selector
     market_type = models.CharField(
@@ -43,7 +44,12 @@ class BacktestTask(BaseModel):
 
     # Optional Pre-Downloaded Backup Dataset Selection
     backup_task = models.ForeignKey('market.MarketBackupTask', on_delete=models.SET_NULL, null=True, blank=True, related_name='backtests', help_text="Optional selected backup dataset")
+    macro_backup_task = models.ForeignKey('market.MarketBackupTask', on_delete=models.SET_NULL, null=True, blank=True, related_name='macro_backtests', help_text="Linked Macro Assist Parquet dataset")
     rules = models.ManyToManyField(BacktestRule, blank=True, related_name='backtests', help_text="Selected Strategy Rules for RL simulation")
+
+    # AI Macro Assist Configuration
+    use_macro_assist = models.BooleanField(default=False, help_text="Enable Gemini AI Macro Assist in RL observation space")
+    macro_timeframe = models.CharField(max_length=10, choices=MacroTimeframeChoices.choices, default=MacroTimeframeChoices.H1, null=True, blank=True, help_text="Macro timeframe (default 1h)")
 
     # Strategy Input Configuration
     strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.TENSORTRADE_RL)

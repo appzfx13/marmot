@@ -1880,11 +1880,20 @@
                 <ul class="sidebar-menu-list">
                     <li class="sidebar-menu-item">
                         <a href="{% url 'market:market_backup_list' %}"
-                            class="sidebar-menu-link {% if '/market/backup' in request.path %}active{% endif %}"
+                            class="sidebar-menu-link {% if '/market/backup' in request.path and '/market/backup/macro' not in request.path %}active{% endif %}"
                             id="admin-menu-market-backup" hx-get="{% url 'market:market_backup_list' %}"
                             hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-cloud-arrow-down-fill"></i>
                             <span>Market Backup</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="{% url 'market:market_macro_backup_list' %}"
+                            class="sidebar-menu-link {% if '/market/backup/macro' in request.path %}active{% endif %}"
+                            id="admin-menu-macro-backup" hx-get="{% url 'market:market_macro_backup_list' %}"
+                            hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
+                            <i class="bi bi-cpu-fill" style="color: #facc15;"></i>
+                            <span>AI Macro Assist</span>
                         </a>
                     </li>
                     {% if request.user.role == 'admin' or request.user.role == 'developer' or request.user.is_superuser %}

@@ -1,0 +1,234 @@
+<!-- templates/market/macro_backup_modal.html -->
+<div class="modal-dialog modal-dialog-centered modal-lg" role="document">
+    <div class="modal-content glass-card p-3 p-sm-4 border shadow-lg position-relative" style="background: var(--modal-bg, #0b1320); border: 1px solid var(--border-color) !important; border-radius: 20px;">
+        
+        <!-- Modal Header -->
+        <div class="modal-header border-0 pb-2 d-flex align-items-center justify-content-between">
+            <div class="d-flex align-items-center gap-2">
+                <div class="rounded-circle bg-warning bg-opacity-20 text-warning d-flex align-items-center justify-content-center" style="width: 38px; height: 38px; border: 1px solid rgba(234, 179, 8, 0.3);">
+                    <span class="material-icons fs-5">psychology_alt</span>
+                </div>
+                <div>
+                    <h5 class="modal-title theme-text-main fw-bold mb-0">Initialize AI Macro Assist Backup</h5>
+                    <p class="theme-text-muted smaller mb-0">Generate 1-month structured fundamental, news, and FII/DII Parquet via Gemini AI.</p>
+                </div>
+            </div>
+            <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        </div>
+
+        <form method="post" action="{% url 'market:market_macro_backup_create' %}" hx-post="{% url 'market:market_macro_backup_create' %}" hx-swap="none" id="macroBackupForm" class="pt-2">
+            {% csrf_token %}
+
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger p-2 mb-3 rounded-3 small border-0 bg-danger bg-opacity-25 text-danger">
+                    {% for err in form.non_field_errors %}
+                        <div><span class="material-icons fs-6 align-middle me-1">error_outline</span>{{ err }}</div>
+                    {% endfor %}
+                </div>
+            {% endif %}
+
+            <!-- Existing Market Backup Dataset / Co-location Card -->
+            <div class="p-3 rounded-3 mb-3 border" style="background: rgba(56, 189, 248, 0.04); border-color: rgba(56, 189, 248, 0.22) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-0" for="{{ form.linked_backup_task.id_for_label }}">
+                        <span class="material-icons fs-6 text-info align-middle me-1">folder_zip</span>
+                        Co-locate with Market Backup Parquet File
+                    </label>
+                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-0.5" style="font-size: 0.7rem;">Auto-Sync Path</span>
+                </div>
+                {{ form.linked_backup_task }}
+                <div class="mt-2 p-2 rounded-2 border bg-black bg-opacity-20 font-monospace" style="font-size: 0.74rem; border-color: rgba(255,255,255,0.08) !important;">
+                    <div class="d-flex align-items-center gap-1 text-truncate">
+                        <span class="theme-text-muted">Target Storage Path:</span>
+                        <span class="text-info text-truncate fw-semibold" id="macroTargetPathPreview">/app/backup/{{ user_id }}/[task_id]/macro_1h_NIFTY.parquet</span>
+                    </div>
+                </div>
+                <small class="theme-text-muted smaller mt-1 d-block">Selecting an existing market backup places the generated macro Parquet directly inside the same folder alongside the options/futures data.</small>
+                {% if form.linked_backup_task.errors %}<div class="text-danger small mt-1">{{ form.linked_backup_task.errors.0 }}</div>{% endif %}
+            </div>
+
+            <!-- Segment Toggle: INDEX / F&O vs FOREX / Futures -->
+            <div class="mb-3">
+                <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-2">Market Segment</label>
+                <div class="d-flex gap-2" id="macroMarketTabBtns">
+                    <button type="button" class="btn btn-outline-primary active flex-fill d-flex align-items-center justify-content-center gap-2 py-2 rounded-3 fw-semibold" id="btnMacroIndex" onclick="setMacroMarketType('INDEX_FO')">
+                        <span class="material-icons fs-5">candlestick_chart</span>
+                        <span>INDEX / F&amp;O (India)</span>
+                    </button>
+                    <button type="button" class="btn btn-outline-secondary flex-fill d-flex align-items-center justify-content-center gap-2 py-2 rounded-3 fw-semibold text-muted" id="btnMacroForex" onclick="setMacroMarketType('FOREX_FUTURES')">
+                        <span class="material-icons fs-5">currency_exchange</span>
+                        <span>FOREX / Futures (CME)</span>
+                    </button>
+                </div>
+                <div class="d-none">{{ form.market_type }}</div>
+            </div>
+
+            <!-- Target Asset Selection -->
+            <div class="row g-3 mb-3">
+                <div class="col-12" id="macroIndexGroup">
+                    <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-1" for="{{ form.index_name.id_for_label }}">
+                        Target Index (F&amp;O)<span class="text-danger ms-1">*</span>
+                    </label>
+                    {{ form.index_name }}
+                    <small class="theme-text-muted smaller mt-1 d-block">India F&amp;O index benchmark (Nifty 50, Bank Nifty, Sensex, GIFT Nifty).</small>
+                    {% if form.index_name.errors %}<div class="text-danger small mt-1">{{ form.index_name.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="col-12 d-none" id="macroForexGroup">
+                    <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-1" for="{{ form.forex_instrument.id_for_label }}">
+                        CME Micro Futures Symbol<span class="text-danger ms-1">*</span>
+                    </label>
+                    {{ form.forex_instrument }}
+                    <small class="theme-text-muted smaller mt-1 d-block">CME Micro asset (MGC Gold, M6E Euro, MNQ Nasdaq, MES S&amp;P 500).</small>
+                    {% if form.forex_instrument.errors %}<div class="text-danger small mt-1">{{ form.forex_instrument.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+
+            <!-- Date Horizon (1 Month Default) & Macro Timeframe -->
+            <div class="row g-3 mb-4">
+                <div class="col-12 col-md-4">
+                    <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-1" for="{{ form.start_date.id_for_label }}">
+                        Start Date<span class="text-danger ms-1">*</span>
+                    </label>
+                    {{ form.start_date }}
+                    {% if form.start_date.errors %}<div class="text-danger small mt-1">{{ form.start_date.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="col-12 col-md-4">
+                    <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-1" for="{{ form.end_date.id_for_label }}">
+                        End Date<span class="text-danger ms-1">*</span>
+                    </label>
+                    {{ form.end_date }}
+                    {% if form.end_date.errors %}<div class="text-danger small mt-1">{{ form.end_date.errors.0 }}</div>{% endif %}
+                </div>
+
+                <div class="col-12 col-md-4">
+                    <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-1" for="{{ form.macro_timeframe.id_for_label }}">
+                        Observation Timeframe<span class="text-danger ms-1">*</span>
+                    </label>
+                    {{ form.macro_timeframe }}
+                    <small class="theme-text-muted smaller mt-1 d-block">Default: 1h interval for macro state alignment.</small>
+                    {% if form.macro_timeframe.errors %}<div class="text-danger small mt-1">{{ form.macro_timeframe.errors.0 }}</div>{% endif %}
+                </div>
+            </div>
+
+            <!-- AI Engine Telemetry Note -->
+            <div class="p-3 rounded-3 mb-4 border" style="background: rgba(234, 179, 8, 0.05); border-color: rgba(234, 179, 8, 0.2) !important;">
+                <div class="d-flex align-items-start gap-2">
+                    <span class="material-icons text-warning fs-5 mt-0.5">stars</span>
+                    <div class="small">
+                        <strong class="text-warning d-block mb-0.5">Gemini 1-Hit Macro Synchronization</strong>
+                        <span class="theme-text-muted">A single structured Gemini API request compiles 1-month hourly sentiment tensors, FII/DII net institutional flow bias, and event risk tags serialized into binary Apache Parquet.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer Controls -->
+            <div class="modal-footer border-0 p-0 d-flex justify-content-end gap-2">
+                <button type="button" class="btn btn-outline-secondary rounded-pill px-4" data-bs-dismiss="modal">Cancel</button>
+                <button type="submit" class="btn btn-warning rounded-pill px-4 fw-bold text-dark d-inline-flex align-items-center gap-2 shadow-sm" style="background-color: var(--brand-lime, #B4F105); border: 1px solid var(--brand-lime, #B4F105);">
+                    <span class="material-icons fs-5">play_arrow</span>
+                    <span>Start Macro Backup</span>
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+<script>
+const backupsMeta = {{ backups_meta_json|default:'{}'|safe }};
+const currentUserId = "{{ user_id|default:'1' }}";
+
+function setMacroMarketType(mType) {
+    const marketTypeInput = document.getElementById('id_macro_market_type');
+    if (marketTypeInput) marketTypeInput.value = mType;
+
+    const btnIndex = document.getElementById('btnMacroIndex');
+    const btnForex = document.getElementById('btnMacroForex');
+    const indexGroup = document.getElementById('macroIndexGroup');
+    const forexGroup = document.getElementById('macroForexGroup');
+
+    if (mType === 'INDEX_FO') {
+        if (btnIndex) { btnIndex.classList.add('btn-outline-primary', 'active'); btnIndex.classList.remove('btn-outline-secondary', 'text-muted'); }
+        if (btnForex) { btnForex.classList.remove('btn-outline-primary', 'active'); btnForex.classList.add('btn-outline-secondary', 'text-muted'); }
+        if (indexGroup) indexGroup.classList.remove('d-none');
+        if (forexGroup) forexGroup.classList.add('d-none');
+    } else {
+        if (btnForex) { btnForex.classList.add('btn-outline-primary', 'active'); btnForex.classList.remove('btn-outline-secondary', 'text-muted'); }
+        if (btnIndex) { btnIndex.classList.remove('btn-outline-primary', 'active'); btnIndex.classList.add('btn-outline-secondary', 'text-muted'); }
+        if (indexGroup) indexGroup.classList.add('d-none');
+        if (forexGroup) forexGroup.classList.remove('d-none');
+    }
+    updateMacroPathPreview();
+}
+
+function updateMacroPathPreview() {
+    const selectEl = document.getElementById('id_macro_linked_backup_task');
+    const pathPreview = document.getElementById('macroTargetPathPreview');
+    const timeframe = document.getElementById('id_macro_timeframe')?.value || '1h';
+    
+    let symbol = 'ASSET';
+    const mType = document.getElementById('id_macro_market_type')?.value || 'INDEX_FO';
+    if (mType === 'INDEX_FO') {
+        symbol = document.getElementById('id_macro_index_name')?.value || 'NIFTY';
+    } else {
+        symbol = document.getElementById('id_macro_forex_instrument')?.value || 'MGC';
+    }
+
+    if (selectEl && selectEl.value && backupsMeta[selectEl.value]) {
+        const meta = backupsMeta[selectEl.value];
+        if (pathPreview) {
+            pathPreview.textContent = `${meta.folder_path}macro_${timeframe}_${meta.asset_code || symbol}.parquet`;
+        }
+    } else {
+        if (pathPreview) {
+            pathPreview.textContent = `/app/backup/${currentUserId}/[new_task_id]/macro_${timeframe}_${symbol}.parquet`;
+        }
+    }
+}
+
+function handleLinkedBackupChange() {
+    const selectEl = document.getElementById('id_macro_linked_backup_task');
+    if (!selectEl) return;
+    const backupId = selectEl.value;
+
+    if (backupId && backupsMeta[backupId]) {
+        const meta = backupsMeta[backupId];
+        // 1. Auto-switch segment
+        setMacroMarketType(meta.market_type);
+
+        // 2. Auto-select asset
+        if (meta.market_type === 'INDEX_FO') {
+            const indexSelect = document.getElementById('id_macro_index_name');
+            if (indexSelect && meta.index_name) indexSelect.value = meta.index_name;
+        } else {
+            const forexSelect = document.getElementById('id_macro_forex_instrument');
+            if (forexSelect && meta.forex_instrument) forexSelect.value = meta.forex_instrument;
+        }
+
+        // 3. Auto-populate date horizon
+        const startDateInput = document.getElementById('id_macro_start_date');
+        const endDateInput = document.getElementById('id_macro_end_date');
+        if (startDateInput && meta.start_date) startDateInput.value = meta.start_date;
+        if (endDateInput && meta.end_date) endDateInput.value = meta.end_date;
+    }
+
+    updateMacroPathPreview();
+}
+
+(function() {
+    const linkedSelect = document.getElementById('id_macro_linked_backup_task');
+    if (linkedSelect) linkedSelect.addEventListener('change', handleLinkedBackupChange);
+
+    const tfSelect = document.getElementById('id_macro_timeframe');
+    if (tfSelect) tfSelect.addEventListener('change', updateMacroPathPreview);
+
+    const idxSelect = document.getElementById('id_macro_index_name');
+    if (idxSelect) idxSelect.addEventListener('change', updateMacroPathPreview);
+
+    const fxSelect = document.getElementById('id_macro_forex_instrument');
+    if (fxSelect) fxSelect.addEventListener('change', updateMacroPathPreview);
+
+    setTimeout(updateMacroPathPreview, 80);
+})();
+</script>
