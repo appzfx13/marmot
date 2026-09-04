@@ -480,10 +480,8 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
             'squareoff_count': squareoff_count,
         }
 
-        # Active Strategy Rules Efficacy & Precision Attribution Breakdown
+        # Active Strategy Rules Efficacy & Precision Attribution Breakdown (strictly attached rules only)
         task_rules_qs = self.object.rules.filter(is_deleted=False)
-        if not task_rules_qs.exists():
-            task_rules_qs = BacktestRule.objects.filter(is_active=True, is_deleted=False)
 
         rules_performance = []
         rule_meta = {

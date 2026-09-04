@@ -110,7 +110,7 @@
             
             <!-- Month Card Header -->
             <div class="d-flex justify-content-between align-items-center mb-2 pb-1.5 border-bottom border-secondary border-opacity-20 flex-wrap gap-1">
-                <h6 class="fw-bold theme-text-main mb-0 text-truncate" style="font-size: 0.82rem;">{{ month.name }}</h6>
+                <h6 class="fw-bold theme-text-main mb-0 text-truncate" style="font-size: 0.82rem;">{{ month.name }} {{ year }}</h6>
                 {% if month.monthly_pnl >= 0 %}
                 <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-1.5 py-0.5 fw-bold" style="font-size: 0.65rem;">
                     +₹{{ month.monthly_pnl|floatformat:0 }}
@@ -122,25 +122,25 @@
                 {% endif %}
             </div>
 
-            <!-- Day Headers (Mon - Sun) -->
-            <div class="row g-0.5 text-center theme-text-muted fw-bold mb-1.5" style="font-size: 0.65rem; text-transform: uppercase;">
+            <!-- Weekdays Row -->
+            <div class="row g-1 text-center mb-1 text-muted fw-bold" style="font-size: 0.65rem;">
                 <div class="col">M</div>
                 <div class="col">T</div>
                 <div class="col">W</div>
                 <div class="col">T</div>
                 <div class="col">F</div>
-                <div class="col text-warning opacity-75">S</div>
-                <div class="col text-warning opacity-75">S</div>
+                <div class="col text-secondary opacity-50">S</div>
+                <div class="col text-secondary opacity-50">S</div>
             </div>
 
-            <!-- Calendar Days Grid (7 Columns Crisp Grid Layout) -->
-            <div class="row g-0.5 text-center" style="margin: -1px;">
+            <!-- Month Days Grid -->
+            <div class="row g-1 text-center">
                 {% for day in month.days %}
-                <div class="col-auto p-0.5" style="width: 14.285%;">
+                <div class="col-1-7 col" style="flex: 0 0 14.285%; max-width: 14.285%;">
                     {% if day.is_current_month %}
                         {% if day.status == 'profit' %}
-                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm journal-day-cell journal-day-clickable"
-                             style="{% if day.intensity == 'high' %}background: rgba(16, 185, 129, 0.42); border: 1px solid rgba(16, 185, 129, 0.75);{% elif day.intensity == 'med' %}background: rgba(16, 185, 129, 0.25); border: 1px solid rgba(16, 185, 129, 0.50);{% else %}background: rgba(16, 185, 129, 0.13); border: 1px solid rgba(16, 185, 129, 0.32);{% endif %} min-height: 28px; cursor: pointer;"
+                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm journal-day-cell journal-day-clickable position-relative"
+                             style="{% if day.intensity == 'high' %}background: rgba(16, 185, 129, 0.45); border: 1px solid rgba(16, 185, 129, 0.78);{% elif day.intensity == 'med' %}background: rgba(16, 185, 129, 0.28); border: 1px solid rgba(16, 185, 129, 0.55);{% else %}background: rgba(16, 185, 129, 0.14); border: 1px solid rgba(16, 185, 129, 0.32);{% endif %} min-height: 28px; cursor: pointer;"
                              hx-get="{% url 'admins:admin-journal-trades' %}?date={{ day.date|date:'Y-m-d' }}"
                              hx-target="#journal-orders-container"
                              hx-swap="innerHTML"
@@ -149,9 +149,10 @@
                              data-bs-html="true"
                              title="<div class='fw-bold border-bottom pb-1 mb-1.5 text-white' style='border-color: var(--border-color) !important; font-size: 0.82rem;'>{{ day.date|date:'d M Y' }}</div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Gross P/L:</span><span class='text-success fw-bold'>+₹{{ day.gross_pnl|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Net P/L:</span><span class='text-success fw-bold'>+₹{{ day.pnl|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Brokerage:</span><span class='fw-semibold text-light'>₹{{ day.brokerage|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Govt Charges:</span><span class='fw-semibold text-light'>₹{{ day.govt_charges|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-1 small'><span class='theme-text-muted'>Trades:</span><span class='fw-bold text-primary'>{{ day.trades }}</span></div><div class='text-center border-top pt-1 text-success fw-bold' style='border-color: var(--border-color) !important; font-size: 0.68rem;'>Click to view Trader Diary</div>">
                             <span class="fw-bold text-success" style="font-size: 0.78rem; line-height: 1;">{{ day.day_num }}</span>
+                            {% if day.has_event %}<span class="position-absolute top-0 end-0 text-warning" style="font-size: 0.55rem; line-height: 1; transform: translate(2px, -2px);">⚡</span>{% endif %}
                         </div>
                         {% elif day.status == 'loss' %}
-                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm journal-day-cell journal-day-clickable"
+                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm journal-day-cell journal-day-clickable position-relative"
                              style="{% if day.intensity == 'high' %}background: rgba(239, 68, 68, 0.45); border: 1px solid rgba(239, 68, 68, 0.78);{% elif day.intensity == 'med' %}background: rgba(239, 68, 68, 0.28); border: 1px solid rgba(239, 68, 68, 0.55);{% else %}background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(239, 68, 68, 0.32);{% endif %} min-height: 28px; cursor: pointer;"
                              hx-get="{% url 'admins:admin-journal-trades' %}?date={{ day.date|date:'Y-m-d' }}"
                              hx-target="#journal-orders-container"
@@ -161,6 +162,7 @@
                              data-bs-html="true"
                              title="<div class='fw-bold border-bottom pb-1 mb-1.5 text-white' style='border-color: var(--border-color) !important; font-size: 0.82rem;'>{{ day.date|date:'d M Y' }}</div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Gross P/L:</span><span class='text-danger fw-bold'>-₹{{ day.gross_pnl_abs|default:day.pnl_abs|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Net P/L:</span><span class='text-danger fw-bold'>-₹{{ day.pnl_abs|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Brokerage:</span><span class='fw-semibold text-light'>₹{{ day.brokerage|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-0.5 small'><span class='theme-text-muted'>Govt Charges:</span><span class='fw-semibold text-light'>₹{{ day.govt_charges|floatformat:2 }}</span></div><div class='d-flex justify-content-between gap-3 mb-1 small'><span class='theme-text-muted'>Trades:</span><span class='fw-bold text-primary'>{{ day.trades }}</span></div><div class='text-center border-top pt-1 text-danger fw-bold' style='border-color: var(--border-color) !important; font-size: 0.68rem;'>Click to view Trader Diary</div>">
                             <span class="fw-bold text-danger" style="font-size: 0.78rem; line-height: 1;">{{ day.day_num }}</span>
+                            {% if day.has_event %}<span class="position-absolute top-0 end-0 text-warning" style="font-size: 0.55rem; line-height: 1; transform: translate(2px, -2px);">⚡</span>{% endif %}
                         </div>
                         {% else %}
                         <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center opacity-60 journal-day-cell"
@@ -180,7 +182,7 @@
                 {% endfor %}
             </div>
 
-            <!-- Month Summary Footer -->
+            <!-- Month Footer -->
             <div class="theme-text-muted mt-2 pt-1.5 border-top border-secondary border-opacity-10 d-flex justify-content-between align-items-center" style="font-size: 0.68rem;">
                 <span>W: <strong class="text-success fw-bold">{{ month.profit_days }}</strong></span>
                 <span>L: <strong class="text-danger fw-bold">{{ month.loss_days }}</strong></span>

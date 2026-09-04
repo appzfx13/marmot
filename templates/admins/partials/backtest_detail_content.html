@@ -90,6 +90,35 @@
     .rca-subpanel .font-monospace {
         font-family: 'Google Sans Code', 'JetBrains Mono', 'Fira Code', ui-monospace, monospace !important;
     }
+
+    /* High-Contrast Glassmorphic Tooltip Styling */
+    .tooltip {
+        --bs-tooltip-bg: var(--dropdown-bg, #0B1D16) !important;
+        --bs-tooltip-color: var(--text-main, #F1F5F9) !important;
+        --bs-tooltip-border-color: var(--dropdown-border, rgba(255, 255, 255, 0.12)) !important;
+        --bs-tooltip-padding-x: 0.85rem !important;
+        --bs-tooltip-padding-y: 0.65rem !important;
+        --bs-tooltip-border-radius: 12px !important;
+        --bs-tooltip-opacity: 1 !important;
+        z-index: 1080 !important;
+    }
+    .tooltip .tooltip-inner {
+        background: var(--dropdown-bg, #0B1D16) !important;
+        color: var(--text-main, #F1F5F9) !important;
+        border: 1px solid var(--dropdown-border, rgba(255, 255, 255, 0.14)) !important;
+        box-shadow: var(--dropdown-shadow, 0 18px 40px rgba(0, 0, 0, 0.7)) !important;
+        backdrop-filter: blur(14px) !important;
+        -webkit-backdrop-filter: blur(14px) !important;
+        border-radius: 12px !important;
+        padding: 10px 14px !important;
+        font-family: inherit !important;
+        text-align: left !important;
+        line-height: 1.45 !important;
+    }
+    .tooltip .tooltip-arrow::before {
+        border-top-color: var(--dropdown-border, rgba(255, 255, 255, 0.14)) !important;
+        border-bottom-color: var(--dropdown-border, rgba(255, 255, 255, 0.14)) !important;
+    }
 </style>
 
 <!-- Top Header Navigation & Live Controls -->
@@ -1702,10 +1731,254 @@
         }
     };
 
-    // Auto-mount on load
+    let equityChartInstance = null;
+    const equityCurveData = {{ equity_curve_json|default:'[]'|safe }};
+    const initCapital = parseFloat("{{ backtest.initial_capital|default:100000 }}") || 100000.0;
+
+    function renderEquityCurveChart() {
+        const canvas = document.getElementById('equityCurveChart');
+        if (!canvas) return;
+
+        if (typeof Chart === 'undefined') {
+            const script = document.createElement('script');
+            script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js';
+            script.onload = function() { renderEquityCurveChart(); };
+            document.head.appendChild(script);
+            return;
+        }
+
+        if (equityChartInstance) {
+            try { equityChartInstance.destroy(); } catch(e) {}
+            equityChartInstance = null;
+        }
+
+        const ctx = canvas.getContext('2d');
+        const isDark = (document.documentElement.getAttribute('data-theme') === 'dark');
+        const textColor = isDark ? '#94a3b8' : '#475569';
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.06)';
+        const fontMono = "'Google Sans Code', 'JetBrains Mono', monospace";
+
+        // Build trade-by-trade progression
+        const labels = ['Start'];
+        const values = [initCapital];
+        const pointData = [{
+            tradeNum: 0,
+            label: 'Initial Capital',
+            pnl: 0,
+            equity: initCapital,
+            drawdown: 0,
+            strike: '',
+            type: '',
+            exitReason: ''
+        }];
+
+        if (equityCurveData && equityCurveData.length > 0) {
+            equityCurveData.forEach((p, i) => {
+                labels.push(p.label || ('#' + (i + 1)));
+                values.push(p.equity);
+                pointData.push({
+                    tradeNum: p.trade_num || (i + 1),
+                    label: p.label,
+                    pnl: p.pnl,
+                    equity: p.equity,
+                    drawdown: p.drawdown,
+                    strike: p.strike,
+                    type: p.type,
+                    exitReason: p.exit_reason
+                });
+            });
+        }
+
+        const endingEq = values[values.length - 1];
+        const isOverallProfit = (endingEq >= initCapital);
+        const lineColor = isOverallProfit ? '#10b981' : '#ef4444';
+        const gradient = ctx.createLinearGradient(0, 0, 0, 500);
+        if (isOverallProfit) {
+            gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+            gradient.addColorStop(1, 'rgba(16, 185, 129, 0.00)');
+        } else {
+            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
+            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.00)');
+        }
+
+        equityChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Portfolio Equity (₹)',
+                    data: values,
+                    borderColor: lineColor,
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.25,
+                    borderWidth: 2.2,
+                    pointRadius: values.length < 50 ? 3 : 1.5,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: lineColor
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        titleColor: '#f8fafc',
+                        bodyColor: '#e2e8f0',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderWidth: 1,
+                        padding: 12,
+                        titleFont: { family: fontMono, size: 12, weight: 'bold' },
+                        bodyFont: { family: fontMono, size: 11 },
+                        callbacks: {
+                            title: function(items) {
+                                if (!items.length) return '';
+                                const idx = items[0].dataIndex;
+                                const d = pointData[idx];
+                                return d.tradeNum === 0 ? 'Starting Baseline' : `Trade #${d.tradeNum} (${d.label})`;
+                            },
+                            label: function(item) {
+                                const idx = item.dataIndex;
+                                const d = pointData[idx];
+                                const eqFormatted = '₹' + Number(d.equity).toLocaleString('en-IN', {minimumFractionDigits: 2});
+                                const pnlPrefix = d.pnl >= 0 ? '+₹' : '-₹';
+                                const pnlFormatted = pnlPrefix + Math.abs(d.pnl).toLocaleString('en-IN', {minimumFractionDigits: 2});
+                                const lines = [
+                                    ` Equity: ${eqFormatted}`,
+                                ];
+                                if (d.tradeNum > 0) {
+                                    lines.push(` Trade PnL: ${pnlFormatted}`);
+                                    lines.push(` Drawdown: ${d.drawdown}%`);
+                                    if (d.strike || d.type) lines.push(` Instrument: ${d.strike} ${d.type}`);
+                                    if (d.exitReason) lines.push(` Exit: ${d.exitReason}`);
+                                }
+                                return lines;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: textColor,
+                            font: { family: fontMono, size: 10 },
+                            maxTicksLimit: 16
+                        }
+                    },
+                    y: {
+                        grid: { color: gridColor },
+                        ticks: {
+                            color: textColor,
+                            font: { family: fontMono, size: 11 },
+                            callback: function(v) { return '₹' + Number(v).toLocaleString('en-IN'); }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    function initEquityZoomAndPan() {
+        const zoomBtns = document.querySelectorAll('#equityZoomBtnGroup .equity-zoom-btn');
+        const canvasWrapper = document.getElementById('equityChartCanvasWrapper');
+        const scrollWrapper = document.getElementById('equityChartScrollWrapper');
+        const expandBtn = document.getElementById('btnToggleEquityExpand');
+        const expandLabel = document.getElementById('expandLabel');
+        const expandIcon = document.getElementById('expandIcon');
+
+        zoomBtns.forEach(btn => {
+            btn.onclick = function() {
+                zoomBtns.forEach(b => b.classList.remove('active'));
+                this.classList.add('active');
+                const zoomFactor = parseInt(this.getAttribute('data-zoom') || '1', 10);
+                if (canvasWrapper) {
+                    canvasWrapper.style.width = (zoomFactor * 100) + '%';
+                    if (equityChartInstance) {
+                        equityChartInstance.resize();
+                    }
+                }
+            };
+        });
+
+        // Drag to pan
+        if (scrollWrapper) {
+            let isDown = false;
+            let startX, scrollLeft;
+
+            scrollWrapper.onmousedown = (e) => {
+                isDown = true;
+                scrollWrapper.style.cursor = 'grabbing';
+                startX = e.pageX - scrollWrapper.offsetLeft;
+                scrollLeft = scrollWrapper.scrollLeft;
+            };
+            scrollWrapper.onmouseleave = () => {
+                isDown = false;
+                scrollWrapper.style.cursor = 'grab';
+            };
+            scrollWrapper.onmouseup = () => {
+                isDown = false;
+                scrollWrapper.style.cursor = 'grab';
+            };
+            scrollWrapper.onmousemove = (e) => {
+                if (!isDown) return;
+                e.preventDefault();
+                const x = e.pageX - scrollWrapper.offsetLeft;
+                const walk = (x - startX) * 1.5;
+                scrollWrapper.scrollLeft = scrollLeft - walk;
+            };
+        }
+
+        // Expand / Collapse height
+        if (expandBtn && scrollWrapper) {
+            expandBtn.onclick = function() {
+                const isExpanded = (scrollWrapper.style.height === '760px');
+                if (isExpanded) {
+                    scrollWrapper.style.height = '520px';
+                    if (expandLabel) expandLabel.innerText = 'Expand Height';
+                    if (expandIcon) expandIcon.innerText = 'unfold_more';
+                } else {
+                    scrollWrapper.style.height = '760px';
+                    if (expandLabel) expandLabel.innerText = 'Collapse Height';
+                    if (expandIcon) expandIcon.innerText = 'unfold_less';
+                }
+                if (equityChartInstance) equityChartInstance.resize();
+            };
+        }
+    }
+
+    function initBacktestTooltips() {
+        if (typeof bootstrap !== 'undefined' && bootstrap.Tooltip) {
+            var tooltipTriggerList = [].slice.call(document.querySelectorAll('[data-bs-toggle="tooltip"]'));
+            tooltipTriggerList.forEach(function (tooltipTriggerEl) {
+                if (!bootstrap.Tooltip.getInstance(tooltipTriggerEl)) {
+                    new bootstrap.Tooltip(tooltipTriggerEl, { html: true });
+                }
+            });
+        }
+    }
+
+    function mountBacktestAnalytics() {
+        renderBacktestJournalChart('pnl');
+        renderEquityCurveChart();
+        initEquityZoomAndPan();
+        initBacktestTooltips();
+    }
+
+    // Auto-mount on load & HTMX dynamic swaps
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', () => renderBacktestJournalChart('pnl'));
+        document.addEventListener('DOMContentLoaded', mountBacktestAnalytics);
     } else {
+        mountBacktestAnalytics();
+    }
+
+    document.addEventListener('htmx:afterSettle', mountBacktestAnalytics);
 })();
 </script>
 
