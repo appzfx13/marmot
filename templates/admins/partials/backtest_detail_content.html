@@ -43,6 +43,19 @@
         box-shadow: var(--shadow-sm) !important;
         transition: all 0.2s ease;
     }
+    .rca-header-toggle {
+        cursor: pointer;
+        user-select: none;
+    }
+    .rca-header-toggle:hover {
+        background: rgba(255, 255, 255, 0.02);
+    }
+    .rca-header-toggle .rca-chevron-icon {
+        transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .rca-header-toggle.collapsed .rca-chevron-icon {
+        transform: rotate(-90deg);
+    }
 
     /* RCA Sub-Panels */
     .rca-subpanel {
@@ -119,108 +132,129 @@
         border-top-color: var(--dropdown-border, rgba(255, 255, 255, 0.14)) !important;
         border-bottom-color: var(--dropdown-border, rgba(255, 255, 255, 0.14)) !important;
     }
+    /* Responsive Page Header Spacing */
+    @media (max-width: 991.98px) {
+        .page-header {
+            margin-top: 106px !important;
+            margin-bottom: 1rem !important;
+            gap: 0.75rem !important;
+        }
+    }
 </style>
 
 <!-- Top Header Navigation & Live Controls -->
-<div class="pt-2 pt-md-3 mb-4">
-    <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
-        <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3" style="border-color: var(--border-default) !important; background: var(--bg-surface);">
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div class="page-header-top-bar d-flex align-items-center justify-content-between w-100 flex-wrap gap-2">
+        <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 page-header-back-btn" style="border-color: var(--border-default) !important; background: var(--bg-surface);">
             <span class="material-icons" style="font-size: 1.1rem;">arrow_back</span>
             <span class="fw-medium">Back to Dashboard</span>
         </a>
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" class="btn btn-success text-white rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-2 fw-semibold" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-color: #059669;" title="Download Executive Multi-Sheet Excel Report">
-                <span class="material-icons" style="font-size: 1.15rem;">file_download</span>
-                <span>Download Excel Report</span>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap ms-auto">
+            <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" class="btn btn-success text-white rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5 fw-semibold" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-color: #059669; font-size: 0.825rem;" title="Download Executive Multi-Sheet Excel Report">
+                <span class="material-icons" style="font-size: 1.05rem;">file_download</span>
+                <span>Download Report</span>
             </a>
-            <a href="{% url 'backtest:rule_list' %}" class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3" target="_blank" title="Manage Execution Rules">
-                <span class="material-icons" style="font-size: 1.1rem;">rule</span>
-                <span class="fw-medium">Strategy Rules</span>
+            <a href="{% url 'backtest:rule_list' %}" class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" target="_blank" title="Manage Execution Rules" style="font-size: 0.825rem;">
+                <span class="material-icons" style="font-size: 1.05rem;">rule</span>
+                <span class="fw-medium">Rules</span>
             </a>
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_logs_modal' backtest.pk %}" 
+                    hx-target="#globalHtmxModalDialog" 
+                    hx-swap="innerHTML" 
+                    class="btn btn-outline-info rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5 fw-semibold" 
+                    title="View Backtest Execution Trace & Telemetry" 
+                    style="font-size: 0.825rem;">
+                <span class="material-icons" style="font-size: 1.05rem;">terminal</span>
+                <span class="fw-medium">Execution Logs</span>
+            </button>
+            <div id="backtest-control-actions" class="d-inline-flex align-items-center gap-2">
+                {% if backtest.status|lower == 'created' %}
+                <button type="button" 
+                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
+                        style="font-size: 0.825rem;">
+                    <span class="material-icons" style="font-size: 1.05rem;">play_arrow</span>
+                    <span>Start Execution</span>
+                </button>
+                {% elif backtest.status|lower == 'paused' %}
+                <button type="button" 
+                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=resume" 
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
+                        style="font-size: 0.825rem;">
+                    <span class="material-icons" style="font-size: 1.05rem;">play_arrow</span>
+                    <span>Resume</span>
+                </button>
+                <button type="button" 
+                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        class="btn btn-outline-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
+                        style="font-size: 0.825rem;">
+                    <span class="material-icons" style="font-size: 1.05rem;">stop</span>
+                    <span>Cancel</span>
+                </button>
+                {% elif backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
+                <button type="button" 
+                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        class="btn btn-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
+                        style="font-size: 0.825rem;">
+                    <span class="material-icons" style="font-size: 1.05rem;">pause</span>
+                    <span>Pause</span>
+                </button>
+                <button type="button" 
+                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        class="btn btn-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
+                        style="font-size: 0.825rem;">
+                    <span class="material-icons" style="font-size: 1.05rem;">stop</span>
+                    <span>Stop</span>
+                </button>
+                {% else %}
+                <button type="button" 
+                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        class="btn btn-outline-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
+                        style="font-size: 0.825rem;">
+                    <span class="material-icons" style="font-size: 1.05rem;">replay</span>
+                    <span>Re-run Backtest</span>
+                </button>
+                {% endif %}
+            </div>
         </div>
     </div>
 
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-        <div class="page-header-title-wrapper">
-            <h1 class="page-title d-flex align-items-center justify-content-center flex-wrap gap-2">
-                <span>Backtest Analytics #BT-{{ backtest.id|stringformat:"04d" }}</span>
-                <span class="fs-6 fw-normal text-primary">({{ backtest.get_strategy_name_display }})</span>
-                <span id="backtest-status-badge-container">
-                    {% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
-                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Running</span>
-                    {% elif backtest.status|lower == 'completed' or backtest.status|lower == 'success' %}
-                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Completed</span>
-                    {% elif backtest.status|lower == 'paused' %}
-                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Paused</span>
-                    {% elif backtest.status|lower == 'error' or backtest.status|lower == 'failed' %}
-                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Failed</span>
-                    {% else %}
-                        <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Ready</span>
-                    {% endif %}
-                </span>
-            </h1>
-            <p class="page-subtitle mb-0">
-                Index: <strong class="theme-text-main">{{ backtest.index_name }}</strong> &nbsp;|&nbsp; 
-                Period: <span class="theme-font-mono">{{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</span> &nbsp;|&nbsp; 
-                Initial Capital: <strong class="theme-font-mono text-success">₹{{ backtest.initial_capital|floatformat:0 }}</strong>
-            </p>
-        </div>
-
-        <div id="backtest-control-actions" class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
-            {% if backtest.status|lower == 'created' %}
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
-                    hx-target="#globalHtmxModalDialog"
-                    hx-swap="innerHTML"
-                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3">
-                <span class="material-icons" style="font-size: 1.1rem;">play_arrow</span>
-                <span>Start Execution</span>
-            </button>
-            {% elif backtest.status|lower == 'paused' %}
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=resume" 
-                    hx-target="#globalHtmxModalDialog"
-                    hx-swap="innerHTML"
-                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3">
-                <span class="material-icons" style="font-size: 1.1rem;">play_arrow</span>
-                <span>Resume</span>
-            </button>
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
-                    hx-target="#globalHtmxModalDialog"
-                    hx-swap="innerHTML"
-                    class="btn btn-outline-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3">
-                <span class="material-icons" style="font-size: 1.1rem;">stop</span>
-                <span>Cancel</span>
-            </button>
-            {% elif backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
-                    hx-target="#globalHtmxModalDialog"
-                    hx-swap="innerHTML"
-                    class="btn btn-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3">
-                <span class="material-icons" style="font-size: 1.1rem;">pause</span>
-                <span>Pause</span>
-            </button>
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
-                    hx-target="#globalHtmxModalDialog"
-                    hx-swap="innerHTML"
-                    class="btn btn-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3">
-                <span class="material-icons" style="font-size: 1.1rem;">stop</span>
-                <span>Stop</span>
-            </button>
-            {% else %}
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
-                    hx-target="#globalHtmxModalDialog"
-                    hx-swap="innerHTML"
-                    class="btn btn-outline-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3">
-                <span class="material-icons" style="font-size: 1.1rem;">replay</span>
-                <span>Re-run Backtest</span>
-            </button>
-            {% endif %}
-        </div>
+    <div class="page-header-title-wrapper text-center w-100">
+        <h1 class="page-title d-flex align-items-center justify-content-center flex-wrap gap-2">
+            <span>Backtest Analytics #BT-{{ backtest.id|stringformat:"04d" }}</span>
+            <span class="fs-6 fw-normal text-primary">({{ backtest.get_strategy_name_display }})</span>
+            <span id="backtest-status-badge-container">
+                {% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
+                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Running</span>
+                {% elif backtest.status|lower == 'completed' or backtest.status|lower == 'success' %}
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Completed</span>
+                {% elif backtest.status|lower == 'paused' %}
+                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Paused</span>
+                {% elif backtest.status|lower == 'error' or backtest.status|lower == 'failed' %}
+                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Failed</span>
+                {% else %}
+                    <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Ready</span>
+                {% endif %}
+            </span>
+        </h1>
+        <p class="page-subtitle mb-0">
+            Index: <strong class="theme-text-main">{{ backtest.index_name }}</strong> &nbsp;|&nbsp; 
+            Period: <span class="theme-font-mono">{{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</span> &nbsp;|&nbsp; 
+            Initial Capital: <strong class="theme-font-mono text-success">₹{{ backtest.initial_capital|floatformat:0 }}</strong>
+        </p>
     </div>
 </div>
 
@@ -1121,7 +1155,13 @@
 <!-- AI Stop-Loss Root Cause Analysis (Loss RCA) & Future Rule Synthesis Card -->
 {% if backtest.results.loss_rca_breakdown or backtest.results.ai_suggested_future_rules %}
 <div class="glass-card p-0 overflow-hidden mb-4 border-0 rca-container-card">
-    <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2">
+    <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2 rca-header-toggle"
+         data-bs-toggle="collapse"
+         data-bs-target="#lossRcaCollapseBody"
+         aria-expanded="true"
+         aria-controls="lossRcaCollapseBody"
+         role="button"
+         title="Click to expand or collapse Stop-Loss Root Cause Analysis">
         <div class="d-flex align-items-center gap-2">
             <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: rgba(239, 68, 68, 0.18); color: var(--danger); border: 1px solid rgba(239, 68, 68, 0.35);">
                 <span class="material-icons" style="font-size: 1.25rem;">troubleshoot</span>
@@ -1131,12 +1171,19 @@
                 <small class="theme-text-muted">TensorTrade AI failure mode decomposition & automated future rule guardrail synthesis.</small>
             </div>
         </div>
-        <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-3 py-1 font-monospace fw-bold" style="font-size: 0.72rem;">
-            {{ analytics.sl_hit_count }} Stop Losses Diagnosed
-        </span>
+        <div class="d-flex align-items-center gap-2">
+            <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-3 py-1 font-monospace fw-bold" style="font-size: 0.72rem;">
+                {{ analytics.sl_hit_count }} Stop Losses Diagnosed
+            </span>
+            <span class="badge bg-primary bg-opacity-15 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-1 small fw-bold d-inline-flex align-items-center gap-1">
+                <span>Toggle Engine</span>
+                <span class="material-icons rca-chevron-icon fs-6" style="font-size: 1rem !important;">expand_more</span>
+            </span>
+        </div>
     </div>
 
-    <div class="p-3 p-md-4">
+    <div class="collapse show" id="lossRcaCollapseBody">
+        <div class="p-3 p-md-4">
         <div class="row g-3 g-lg-4">
             <!-- 1. Primary Failure Mechanisms (Left Column) -->
             <div class="col-12 col-lg-5">
@@ -1196,14 +1243,19 @@
                                     <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-1 font-monospace fw-bold" style="font-size: 0.74rem;">
                                         🛡️ Prevents ~{{ future_rule.impact_loss_count }} Losses
                                     </span>
-                                    <button type="button" 
-                                            class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
-                                            hx-get="{% url 'backtest:backtest_edit_modal' backtest.pk %}?add_rule_type={{ future_rule.rule_type|default:'liquidity_sweep' }}"
-                                            hx-target="#globalHtmxModalDialog"
-                                            style="font-size: 0.75rem;">
-                                        <span class="material-icons" style="font-size: 0.88rem;">add_circle</span>
-                                        <span>+ Add This Rule</span>
-                                    </button>
+                                    <form hx-post="{% url 'backtest:backtest_apply_ai_rule' backtest.pk %}" hx-swap="outerHTML" class="d-inline">
+                                        {% csrf_token %}
+                                        <input type="hidden" name="rule_name" value="{{ future_rule.name }}">
+                                        <input type="hidden" name="rule_type" value="{{ future_rule.rule_type|default:'risk_management' }}">
+                                        <input type="hidden" name="prompt_directive" value="{{ future_rule.preventive_prompt }}">
+                                        <button type="submit" 
+                                                class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                                style="font-size: 0.75rem;"
+                                                title="Automatically create rule and attach to this backtest">
+                                            <span class="material-icons" style="font-size: 0.88rem;">add_circle</span>
+                                            <span>+ Add This Rule</span>
+                                        </button>
+                                    </form>
                                 </div>
                             </div>
                             <div class="theme-text-muted mt-1 ps-4" style="font-size: 0.82rem; line-height: 1.5; color: var(--success) !important; font-family: 'Google Sans Flex', 'Plus Jakarta Sans', 'Inter', sans-serif !important;">
@@ -1217,6 +1269,7 @@
                 </div>
             </div>
         </div>
+    </div>
     </div>
 </div>
 {% endif %}
@@ -1351,6 +1404,7 @@
 <!-- Advanced Trade Log Search & Filter Controls Bar -->
 <div class="glass-card p-3 mb-4">
     <form method="GET" 
+          id="trades-filter-form"
           hx-get="{% url 'backtest:backtest_detail' backtest.pk %}" 
           hx-target="#backtest-detail-container" 
           hx-push-url="true" 
@@ -1416,18 +1470,18 @@
     </div>
 
     <!-- Interactive Chart Filter Banner -->
-    <div id="chart-trade-filter-banner" class="px-3 py-2 border-bottom d-none align-items-center justify-content-between" style="background: var(--info-subdued); border-color: var(--info-border) !important;">
+    <div id="chart-trade-filter-banner" class="px-3 py-2 border-bottom {% if current_filters.date_from or current_filters.date_to or current_filters.trade_num %}d-flex{% else %}d-none{% endif %} align-items-center justify-content-between" style="background: var(--info-subdued); border-color: var(--info-border) !important;">
         <div class="d-flex align-items-center gap-2">
-            <i class="bi bi-graph-up text-info"></i>
+            <i class="bi bi-calendar-event text-info"></i>
             <span class="small fw-semibold theme-text-main">
-                Chart Filter Active: <span id="chart-filtered-trade-title" class="text-info font-monospace">Trade #1</span>
+                Filtered by Date: <span id="chart-filtered-trade-title" class="text-info font-monospace">{% if current_filters.date_from %}{{ current_filters.date_from }}{% if current_filters.date_to and current_filters.date_to != current_filters.date_from %} to {{ current_filters.date_to }}{% endif %}{% endif %}</span>
             </span>
         </div>
         <button type="button" 
                 class="btn btn-sm btn-outline-info rounded-pill px-3 py-0.5 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
-                onclick="window.clearTradeChartFilter && window.clearTradeChartFilter()">
+                onclick="window.clearBacktestDateFilter && window.clearBacktestDateFilter()">
             <i class="bi bi-x-lg"></i>
-            <span>Show All Trades</span>
+            <span>Clear Filter / Show All</span>
         </button>
     </div>
 
@@ -1563,8 +1617,9 @@
         if (mode === 'pnl') {
             chartType = 'bar';
             const rawPnl = journalData.trade_pnl || [];
-            const backgroundColors = rawPnl.map(v => v >= 0 ? 'rgba(16, 185, 129, 0.78)' : 'rgba(239, 68, 68, 0.78)');
-            const borderColors = rawPnl.map(v => v >= 0 ? '#10b981' : '#ef4444');
+            const getVal = (v) => (typeof v === 'object' && v !== null) ? Number(v.y || 0) : Number(v || 0);
+            const backgroundColors = rawPnl.map(v => getVal(v) >= 0 ? 'rgba(16, 185, 129, 0.78)' : 'rgba(239, 68, 68, 0.78)');
+            const borderColors = rawPnl.map(v => getVal(v) >= 0 ? '#10b981' : '#ef4444');
 
             datasets = [{
                 label: 'Realized Trade P&L (₹)',
@@ -1624,6 +1679,17 @@
             options: {
                 responsive: true,
                 maintainAspectRatio: false,
+                onClick: function(event, elements) {
+                    if (elements && elements.length > 0) {
+                        const idx = elements[0].index;
+                        const pnlList = journalData.trade_pnl || [];
+                        const point = pnlList[idx];
+                        let targetDate = (point && point.date) ? point.date : '';
+                        if (targetDate && window.filterBacktestTradesByDate) {
+                            window.filterBacktestTradesByDate(targetDate);
+                        }
+                    }
+                },
                 interaction: {
                     mode: 'index',
                     intersect: false
@@ -1730,6 +1796,7 @@
             htmx.trigger(form, 'submit');
         }
     };
+    window.clearTradeChartFilter = window.clearBacktestDateFilter;
 
     let equityChartInstance = null;
     const equityCurveData = {{ equity_curve_json|default:'[]'|safe }};

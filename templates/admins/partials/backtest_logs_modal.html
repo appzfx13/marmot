@@ -1,0 +1,205 @@
+<!-- templates/admins/partials/backtest_logs_modal.html -->
+<div class="modal-content glass-card p-0 shadow-2xl border" style="max-width: 980px; width: 100%; margin: 0 auto; border-radius: 16px; background: var(--bg-surface, #0f172a); border-color: var(--border-default) !important; color: var(--text-main, #f1f5f9);">
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-secondary border-opacity-20 px-4 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle bg-info bg-opacity-20 text-info d-flex align-items-center justify-content-center flex-shrink-0"
+                 style="width: 40px; height: 40px; border: 1px solid rgba(14, 165, 233, 0.35);">
+                <span class="material-icons fs-5">terminal</span>
+            </div>
+            <div>
+                <h5 class="modal-title theme-text-main fw-bold mb-0" style="font-size: 1.1rem;">
+                    Execution Logs &amp; Strategy Telemetry
+                </h5>
+                <div class="d-flex align-items-center gap-2 mt-0.5 small flex-wrap">
+                    <span class="theme-text-muted">Task #BT-{{ backtest.id|stringformat:"04d" }}</span>
+                    <span class="theme-text-muted">•</span>
+                    <span class="text-info fw-semibold">{{ backtest.get_strategy_name_display }}</span>
+                    <span class="theme-text-muted">•</span>
+                    <span class="badge rounded-pill px-2 py-0.5 font-monospace fw-bold"
+                          style="font-size: 0.68rem; {% if backtest.status|lower == 'completed' %}background: rgba(16, 185, 129, 0.18); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35);{% elif backtest.status|lower == 'running' %}background: rgba(14, 165, 233, 0.18); color: #0284c7; border: 1px solid rgba(14, 165, 233, 0.35);{% elif backtest.status|lower == 'error' %}background: rgba(239, 68, 68, 0.18); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.35);{% else %}background: rgba(148, 163, 184, 0.18); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.35);{% endif %}">
+                        {{ backtest.status.upper }}
+                    </span>
+                </div>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <!-- Filter & Action Controls Bar -->
+    <div class="px-4 py-2.5 bg-black bg-opacity-30 border-bottom border-secondary border-opacity-15 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 440px;">
+            <div class="input-group input-group-sm">
+                <span class="input-group-text bg-transparent border-secondary border-opacity-25 theme-text-muted">
+                    <span class="material-icons" style="font-size: 0.95rem;">search</span>
+                </span>
+                <input type="text" 
+                       id="terminalLogSearchInput" 
+                       oninput="filterTerminalLogs()" 
+                       placeholder="Filter logs (e.g. SL, signal, order, PnL, error)..." 
+                       class="form-control form-control-sm bg-transparent border-secondary border-opacity-25 theme-text-main font-monospace"
+                       style="font-size: 0.78rem;">
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="btn-group btn-group-sm p-0.5 rounded-pill border border-secondary border-opacity-25 bg-black bg-opacity-40" role="group">
+                <button type="button" class="btn btn-sm btn-primary rounded-pill px-2.5 py-0.5 fw-bold terminal-filter-pill active" onclick="filterLogsByTag('ALL', this)" style="font-size: 0.72rem;">All ({{ total_lines }})</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary text-info rounded-pill px-2.5 py-0.5 fw-bold terminal-filter-pill border-0" onclick="filterLogsByTag('INFO', this)" style="font-size: 0.72rem;">INFO</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary text-warning rounded-pill px-2.5 py-0.5 fw-bold terminal-filter-pill border-0" onclick="filterLogsByTag('WARN', this)" style="font-size: 0.72rem;">WARN</button>
+                <button type="button" class="btn btn-sm btn-outline-secondary text-danger rounded-pill px-2.5 py-0.5 fw-bold terminal-filter-pill border-0" onclick="filterLogsByTag('ERROR', this)" style="font-size: 0.72rem;">ERROR</button>
+            </div>
+
+            <button type="button" 
+                    onclick="copyTerminalLogsToClipboard()" 
+                    class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    style="font-size: 0.76rem;"
+                    id="btnCopyLogs">
+                <span class="material-icons" style="font-size: 0.9rem;">content_copy</span>
+                <span id="btnCopyLogsText">Copy All</span>
+            </button>
+            <button type="button" 
+                    onclick="downloadTerminalLogsFile('backtest_{{ backtest.id }}_execution.log')" 
+                    class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    style="font-size: 0.76rem;">
+                <span class="material-icons" style="font-size: 0.9rem;">download</span>
+                <span>Download</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Prior Run Logs History (if any) -->
+    {% if run_logs %}
+    <div class="px-4 py-2 bg-black bg-opacity-20 border-bottom border-secondary border-opacity-15 d-flex align-items-center gap-2 overflow-x-auto">
+        <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1 flex-shrink-0" style="font-size: 0.70rem;">
+            <span class="material-icons text-warning" style="font-size: 0.85rem;">history</span>
+            <span>Iteration History:</span>
+        </span>
+        {% for rlog in run_logs %}
+        <span class="badge rounded-pill px-2.5 py-1 font-monospace fw-semibold flex-shrink-0" 
+              style="font-size: 0.70rem; background: rgba(59, 130, 246, 0.15); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.3);">
+            Run #{{ rlog.run_number }}: PnL ₹{{ rlog.metrics.net_pnl|default:0|floatformat:1 }} ({{ rlog.metrics.win_rate|default:0|floatformat:0 }}% WR)
+        </span>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Terminal Output Area -->
+    <div class="modal-body p-3 p-md-4">
+        <div id="terminalLogContainer" 
+             class="rounded-3 p-3 font-monospace"
+             style="height: 480px; max-height: 60vh; overflow-y: auto; background: #060a12; border: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.78rem; line-height: 1.65; color: #cbd5e1; user-select: text;">
+            {% for line in trace_lines %}
+            <div class="terminal-log-line d-flex align-items-start gap-2 py-0.5" data-raw-text="{{ line|escape }}">
+                <span class="text-secondary opacity-40 user-select-none text-end" style="width: 32px; min-width: 32px; font-size: 0.72rem;">{{ forloop.counter }}</span>
+                <span class="terminal-line-content flex-grow-1 text-break">
+                    {% if '[ERROR]' in line or 'ERROR:' in line %}
+                    <span class="text-danger fw-semibold">{{ line }}</span>
+                    {% elif '[WARN]' in line or 'WARNING' in line %}
+                    <span class="text-warning">{{ line }}</span>
+                    {% elif '[INIT]' in line or '[CONFIG]' in line %}
+                    <span class="text-info fw-semibold">{{ line }}</span>
+                    {% elif '[PERFORMANCE]' in line or '[EXECUTION]' in line %}
+                    <span class="text-success fw-bold">{{ line }}</span>
+                    {% elif '[GUARDRAILS]' in line %}
+                    <span class="text-primary fw-semibold">{{ line }}</span>
+                    {% else %}
+                    <span>{{ line }}</span>
+                    {% endif %}
+                </span>
+            </div>
+            {% empty %}
+            <div class="text-center theme-text-muted py-5">
+                <span class="material-icons fs-1 mb-2 opacity-40">terminal</span>
+                <div>No execution trace logs recorded for this task.</div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="d-flex justify-content-between align-items-center mt-2 px-1 small theme-text-muted" style="font-size: 0.72rem;">
+            <span id="logFilterCounter">Showing all {{ total_lines }} log entries</span>
+            <span>Real-time Stream Active • Marmot Engine</span>
+        </div>
+    </div>
+
+    <!-- Modal Footer -->
+    <div class="modal-footer border-top border-secondary border-opacity-20 px-4 py-2.5 d-flex justify-content-between">
+        <div class="theme-text-muted small" style="font-size: 0.74rem;">
+            Backtest executed with High-Throughput streaming &amp; RL Observation space
+        </div>
+        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-4 py-1.5" data-bs-dismiss="modal">Close</button>
+    </div>
+</div>
+
+<script>
+    function filterTerminalLogs() {
+        const query = (document.getElementById('terminalLogSearchInput')?.value || '').toLowerCase().trim();
+        const lines = document.querySelectorAll('#terminalLogContainer .terminal-log-line');
+        let visibleCount = 0;
+
+        lines.forEach(line => {
+            const text = (line.getAttribute('data-raw-text') || '').toLowerCase();
+            const matchesQuery = !query || text.includes(query);
+            const activeTag = window.__terminalActiveTag || 'ALL';
+            const matchesTag = (activeTag === 'ALL') || text.includes('[' + activeTag.toLowerCase() + ']') || text.includes(activeTag.toLowerCase());
+
+            if (matchesQuery && matchesTag) {
+                line.style.setProperty('display', 'flex', 'important');
+                visibleCount++;
+            } else {
+                line.style.setProperty('display', 'none', 'important');
+            }
+        });
+
+        const counter = document.getElementById('logFilterCounter');
+        if (counter) {
+            counter.innerText = `Showing ${visibleCount} of ${lines.length} log entries`;
+        }
+    }
+
+    function filterLogsByTag(tag, btn) {
+        window.__terminalActiveTag = tag;
+        document.querySelectorAll('.terminal-filter-pill').forEach(b => {
+            b.classList.remove('btn-primary', 'active');
+            b.classList.add('btn-outline-secondary');
+        });
+        if (btn) {
+            btn.classList.add('btn-primary', 'active');
+            btn.classList.remove('btn-outline-secondary');
+        }
+        filterTerminalLogs();
+    }
+
+    function copyTerminalLogsToClipboard() {
+        const lines = [];
+        document.querySelectorAll('#terminalLogContainer .terminal-log-line').forEach(line => {
+            if (line.style.display !== 'none') {
+                lines.push(line.getAttribute('data-raw-text') || '');
+            }
+        });
+        const content = lines.join('\n');
+        navigator.clipboard.writeText(content).then(() => {
+            const btnText = document.getElementById('btnCopyLogsText');
+            if (btnText) {
+                const prev = btnText.innerText;
+                btnText.innerText = 'Copied!';
+                setTimeout(() => { btnText.innerText = prev; }, 2000);
+            }
+        });
+    }
+
+    function downloadTerminalLogsFile(filename) {
+        const lines = [];
+        document.querySelectorAll('#terminalLogContainer .terminal-log-line').forEach(line => {
+            lines.push(line.getAttribute('data-raw-text') || '');
+        });
+        const blob = new Blob([lines.join('\n')], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    }
+</script>

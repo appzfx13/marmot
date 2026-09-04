@@ -59,6 +59,18 @@ def send_backtest_control_command(task_id, command):
     cmd = command.upper()
 
     if cmd in ['START', 'START_BACKTEST', 'RESUME', 'RERUN', 'RESTART']:
+        if task.results and isinstance(task.results, dict) and task.metrics:
+            from .models import BacktestRunLog
+            run_num = task.run_logs.count() + 1
+            BacktestRunLog.objects.create(
+                task=task,
+                run_number=run_num,
+                status=task.status,
+                metrics=task.metrics,
+                applied_rules=[r.name for r in task.rules.all()],
+                notes=f"Snapshot of run #{run_num} before re-run execution.",
+                created_by=task.created_by
+            )
         task.status = BacktestTask.StatusChoices.RUNNING
         task.progress = 5
         task.error_logs = ""

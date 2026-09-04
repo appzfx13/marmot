@@ -121,3 +121,21 @@ class TradingStrategy(BaseModel):
 
     def __str__(self):
         return f"{self.name} ({self.code_name})"
+
+
+class BacktestRunLog(BaseModel):
+    task = models.ForeignKey(BacktestTask, on_delete=models.CASCADE, related_name='run_logs')
+    run_number = models.PositiveIntegerField(default=1)
+    status = models.CharField(max_length=20, default='completed')
+    metrics = models.JSONField(default=dict, blank=True)
+    applied_rules = models.JSONField(default=list, blank=True)
+    notes = models.TextField(blank=True, default="")
+    execution_duration_sec = models.FloatField(default=0.0)
+
+    class Meta:
+        ordering = ['-run_number']
+        verbose_name = "Backtest Run Log"
+        verbose_name_plural = "Backtest Run Logs"
+
+    def __str__(self):
+        return f"Run #{self.run_number} for Backtest #{self.task_id} ({self.status})"
