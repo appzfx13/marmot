@@ -30,3 +30,4 @@ class BacktestRuleTypeChoices(models.TextChoices):
     FOREX_SMC_DISPLACEMENT = 'forex_smc_displacement', 'Forex SMC Displacement & FVG Retest'
     CUSTOM_PROMPT = 'custom_prompt', 'AI Prompt Directive'
     TECHNICAL = 'technical', 'Technical / Indicator'
+    MOMENTUM_GUARDRAIL = 'momentum_guardrail', 'Professional Intraday Trend & Momentum Guardrails'

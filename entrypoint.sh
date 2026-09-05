@@ -38,5 +38,8 @@ python manage.py collectstatic --noinput
 echo "Checking/Creating Superuser and Sample Users..."
 python manage.py initadmin
 
+echo "Seeding/Verifying Backtest Strategy Rules..."
+python manage.py seed_backtest_rules
+
 # Execute main container process
 exec "$@"

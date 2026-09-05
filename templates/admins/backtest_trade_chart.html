@@ -1,0 +1,1151 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ page_title }}</title>
+
+    <!-- Bootstrap 5 CSS & Google Fonts/Icons -->
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- Official TradingView Lightweight Charts Library -->
+    <script src="https://unpkg.com/lightweight-charts@4.1.3/dist/lightweight-charts.standalone.production.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #0b0e14;
+            --header-bg: #131722;
+            --card-bg: #181c27;
+            --border-color: #242936;
+            --text-main: #d1d4dc;
+            --text-muted: #787b86;
+            --bullish: #089981;
+            --bearish: #f23645;
+            --accent: #2962ff;
+            --accent-cyan: #0284c7;
+            --warning-gold: #f59e0b;
+        }
+
+        html, body {
+            height: 100%;
+            margin: 0;
+            padding: 0;
+            background: var(--bg-color);
+            color: var(--text-main);
+            font-family: 'Google Sans', sans-serif;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .mono { font-family: 'JetBrains Mono', monospace; }
+
+        /* Top Navigation Header */
+        .chart-navbar {
+            background: var(--header-bg);
+            border-bottom: 1px solid var(--border-color);
+            height: 52px;
+            padding: 0 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            z-index: 20;
+            flex-shrink: 0;
+        }
+
+        .btn-nav-action {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            font-size: 0.78rem;
+            font-weight: 600;
+            padding: 5px 12px;
+            border-radius: 6px;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            transition: all 0.15s ease;
+        }
+        .btn-nav-action:hover {
+            background: rgba(255, 255, 255, 0.12);
+            color: #fff;
+            border-color: rgba(255, 255, 255, 0.25);
+        }
+
+        /* Timeframe Buttons */
+        .tf-group {
+            display: inline-flex;
+            background: rgba(0, 0, 0, 0.35);
+            padding: 2px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .btn-tf {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 3px 10px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-tf:hover { color: #fff; background: rgba(255, 255, 255, 0.06); }
+        .btn-tf.active {
+            color: #fff;
+            background: var(--accent);
+            box-shadow: 0 2px 6px rgba(41, 98, 255, 0.35);
+        }
+
+        /* Mode Switcher (Option vs Spot) */
+        .mode-toggle-group {
+            display: inline-flex;
+            background: rgba(0, 0, 0, 0.35);
+            padding: 2px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .btn-mode {
+            background: transparent;
+            border: none;
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            font-weight: 600;
+            padding: 4px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 5px;
+        }
+        .btn-mode:hover { color: #fff; }
+        .btn-mode.active-option {
+            background: rgba(2, 132, 199, 0.25);
+            color: #38bdf8;
+            border: 1px solid rgba(2, 132, 199, 0.5);
+            font-weight: 700;
+        }
+        .btn-mode.active-spot {
+            background: rgba(16, 185, 129, 0.25);
+            color: #34d399;
+            border: 1px solid rgba(16, 185, 129, 0.5);
+            font-weight: 700;
+        }
+
+        /* Chart Viewport Area */
+        .chart-main-layout {
+            flex: 1;
+            position: relative;
+            width: 100%;
+            height: calc(100vh - 52px);
+            overflow: hidden;
+        }
+
+        #chartContainer {
+            width: 100%;
+            height: 100%;
+            position: absolute;
+            top: 0;
+            left: 0;
+        }
+
+        /* Canvas Overlay for Position Tool & Day Dividers */
+        #positionOverlayCanvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            pointer-events: none;
+            z-index: 4;
+        }
+
+        /* Stats & Crosshair Bar */
+        .chart-crosshair-bar {
+            position: absolute;
+            top: 10px;
+            left: 16px;
+            z-index: 10;
+            pointer-events: none;
+            background: rgba(19, 23, 34, 0.85);
+            backdrop-filter: blur(8px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 6px;
+            padding: 4px 10px;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* Floating Risk Reserve HUD (Matching Reference Image) */
+        .risk-reserve-hud {
+            position: absolute;
+            top: 10px;
+            right: 80px;
+            width: 320px;
+            background: rgba(14, 18, 28, 0.92);
+            backdrop-filter: blur(16px);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            border-radius: 8px;
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+            z-index: 15;
+            overflow: hidden;
+            font-size: 0.74rem;
+            transition: all 0.2s ease;
+        }
+
+        .risk-reserve-hud.minimized .hud-body {
+            display: none;
+        }
+
+        .hud-header {
+            background: #1e2433;
+            padding: 6px 10px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .hud-tab-badge {
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: 700;
+            font-size: 0.68rem;
+            letter-spacing: 0.5px;
+        }
+        .hud-tab-left { background: #2563eb; color: #fff; }
+        .hud-tab-center { background: #0284c7; color: #fff; }
+        .hud-tab-right { background: #dc2626; color: #fff; }
+
+        .hud-table {
+            width: 100%;
+            margin: 0;
+            border-collapse: collapse;
+        }
+        .hud-table tr {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+        .hud-table tr:last-child {
+            border-bottom: none;
+        }
+        .hud-table td {
+            padding: 4px 10px;
+        }
+        .hud-label {
+            color: var(--text-muted);
+            width: 44%;
+        }
+        .hud-val-1 {
+            color: #38bdf8;
+            font-family: 'JetBrains Mono', monospace;
+            font-weight: 600;
+            width: 32%;
+        }
+        .hud-val-2 {
+            color: var(--text-main);
+            font-family: 'JetBrains Mono', monospace;
+            text-align: right;
+            width: 24%;
+        }
+
+        /* Loading & Empty States */
+        .chart-loading-overlay {
+            position: absolute;
+            inset: 0;
+            background: rgba(11, 14, 20, 0.85);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 30;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- 1. Top Navigation Toolbar -->
+    <header class="chart-navbar">
+        <!-- Left: Back & Trade Identity Badges -->
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <a href="{% url 'backtest:backtest_detail' backtest.pk %}" class="btn-nav-action" title="Return to Backtest #{{ backtest.pk }}">
+                <span class="material-icons" style="font-size: 1rem;">arrow_back</span>
+                <span>Backtest #{{ backtest.pk }}</span>
+            </a>
+
+            <div class="d-flex align-items-center gap-1">
+                <span class="badge rounded-pill px-2 py-1 font-monospace fw-bold" style="background: rgba(59, 130, 246, 0.2); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.4); font-size: 0.75rem;">
+                    Trade #{{ trade.serial_no }}
+                </span>
+
+                <span class="badge rounded-pill px-2.5 py-1 font-monospace fw-bold" style="background: rgba(2, 132, 199, 0.2); color: #38bdf8; border: 1px solid rgba(2, 132, 199, 0.4); font-size: 0.75rem;">
+                    {{ trade.strike|default:trade.symbol }}
+                </span>
+
+                <span class="badge rounded-pill px-2 py-1 fw-bold" style="{% if 'BUY' in trade.trade_type %}background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4);{% else %}background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4);{% endif %} font-size: 0.72rem;">
+                    {{ trade.trade_type }}
+                </span>
+
+                <span class="badge rounded-pill px-2 py-1 fw-bold" style="{% if trade.status == 'WIN' or trade.net_pnl > 0 %}background: rgba(16, 185, 129, 0.25); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.45);{% else %}background: rgba(239, 68, 68, 0.25); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.45);{% endif %} font-size: 0.72rem;">
+                    {{ trade.status }} (₹{{ trade.net_pnl|floatformat:2 }})
+                </span>
+
+                <span id="dateRangeBadge" class="badge rounded-pill px-2 py-1 font-monospace theme-text-muted d-none d-xl-inline-block" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); font-size: 0.7rem;">
+                    2 Days ({{ trade_date }})
+                </span>
+            </div>
+        </div>
+
+        <!-- Center: Timeframe & Chart Asset Selector -->
+        <div class="d-flex align-items-center gap-2">
+            <!-- Mode Switcher: Option vs Spot -->
+            <div class="mode-toggle-group">
+                <button type="button" id="btnModeOption" class="btn-mode active-option" title="Show Option Contract Candlesticks">
+                    <span class="material-icons" style="font-size: 0.85rem;">show_chart</span>
+                    <span>Option Chart</span>
+                </button>
+                <button type="button" id="btnModeSpot" class="btn-mode" title="Show Underlying Spot Index Candlesticks">
+                    <span class="material-icons" style="font-size: 0.85rem;">candlestick_chart</span>
+                    <span>Spot Index</span>
+                </button>
+            </div>
+
+            <!-- Timeframe Switcher -->
+            <div class="tf-group">
+                <button type="button" class="btn-tf active" data-tf="1">1m</button>
+                <button type="button" class="btn-tf" data-tf="3">3m</button>
+                <button type="button" class="btn-tf" data-tf="5">5m</button>
+                <button type="button" class="btn-tf" data-tf="15">15m</button>
+                <button type="button" class="btn-tf" data-tf="30">30m</button>
+            </div>
+        </div>
+
+        <!-- Right: Prev / Next Navigation & Tools -->
+        <div class="d-flex align-items-center gap-1.5">
+            {% if prev_trade_num %}
+            <a href="{% url 'backtest:backtest_trade_chart' backtest.pk prev_trade_num %}" class="btn-nav-action" title="View Previous Trade (#{{ prev_trade_num }})">
+                <span class="material-icons" style="font-size: 0.95rem;">chevron_left</span>
+                <span class="d-none d-md-inline">Prev</span>
+            </a>
+            {% else %}
+            <button class="btn-nav-action opacity-50" disabled>
+                <span class="material-icons" style="font-size: 0.95rem;">chevron_left</span>
+                <span class="d-none d-md-inline">Prev</span>
+            </button>
+            {% endif %}
+
+            {% if next_trade_num %}
+            <a href="{% url 'backtest:backtest_trade_chart' backtest.pk next_trade_num %}" class="btn-nav-action" title="View Next Trade (#{{ next_trade_num }})">
+                <span class="d-none d-md-inline">Next</span>
+                <span class="material-icons" style="font-size: 0.95rem;">chevron_right</span>
+            </a>
+            {% else %}
+            <button class="btn-nav-action opacity-50" disabled>
+                <span class="d-none d-md-inline">Next</span>
+                <span class="material-icons" style="font-size: 0.95rem;">chevron_right</span>
+            </button>
+            {% endif %}
+
+            <button type="button" id="btnFitChart" class="btn-nav-action" title="Fit Content / Reset Zoom">
+                <span class="material-icons" style="font-size: 0.95rem;">restart_alt</span>
+            </button>
+
+            <button type="button" id="btnToggleFullscreen" class="btn-nav-action" title="Toggle Fullscreen">
+                <span class="material-icons" style="font-size: 0.95rem;">fullscreen</span>
+            </button>
+        </div>
+    </header>
+
+    <!-- 2. Main Full-Screen Chart Area -->
+    <main class="chart-main-layout">
+        <!-- Crosshair OHLCV Stats Bar -->
+        <div id="crosshairBar" class="chart-crosshair-bar mono">
+            <span class="fw-bold text-white" id="barSymbol">{{ trade.strike|default:trade.symbol }}</span>
+            <span>O: <span id="barOpen" class="text-info">-</span></span>
+            <span>H: <span id="barHigh" class="text-success">-</span></span>
+            <span>L: <span id="barLow" class="text-danger">-</span></span>
+            <span>C: <span id="barClose" class="text-white">-</span></span>
+            <span>Vol: <span id="barVol" class="text-secondary">-</span></span>
+            <span id="barTime" class="theme-text-muted">-</span>
+        </div>
+
+        <!-- Floating Risk Reserve HUD (Styled exactly like reference screenshot) -->
+        <div id="riskReserveHud" class="risk-reserve-hud">
+            <div class="hud-header">
+                <span class="hud-tab-badge hud-tab-left">RISK RESERVE</span>
+                <span class="hud-tab-badge hud-tab-center">{% if 'BUY' in trade.trade_type %}Long{% else %}Short{% endif %}</span>
+                <span class="hud-tab-badge hud-tab-right">RISK</span>
+                <button type="button" id="btnToggleHud" class="btn btn-sm p-0 text-secondary border-0 ms-2" title="Minimize / Expand HUD">
+                    <span class="material-icons" style="font-size: 0.95rem;">unfold_less</span>
+                </button>
+            </div>
+            <div class="hud-body">
+                <table class="hud-table">
+                    <tr>
+                        <td class="hud-label">Status</td>
+                        <td class="hud-val-1">PLAN READY</td>
+                        <td class="hud-val-2 text-success fw-bold">{{ trade.status }}</td>
+                    </tr>
+                    <tr>
+                        <td class="hud-label">Entry / stop</td>
+                        <td class="hud-val-1" id="hudEntryPrice">₹{{ trade.entry_price|floatformat:2 }}</td>
+                        <td class="hud-val-2 text-danger fw-bold" id="hudStopPrice">₹{{ trade.initial_stop_loss_price|default:trade.stop_loss_price|floatformat:2 }}</td>
+                    </tr>
+                    <tr>
+                        <td class="hud-label">Reserve edge</td>
+                        <td class="hud-val-1" id="hudReserveEdge">-</td>
+                        <td class="hud-val-2" id="hudRiskReward">1:2.00</td>
+                    </tr>
+                    <tr>
+                        <td class="hud-label">Final quantity</td>
+                        <td class="hud-val-1">{{ trade.quantity }}</td>
+                        <td class="hud-val-2">{{ trade.lots_count|default:1 }} Lot</td>
+                    </tr>
+                    <tr>
+                        <td class="hud-label">Target price</td>
+                        <td class="hud-val-1 text-success fw-bold" id="hudTargetPrice">₹{{ trade.target_price|default:0|floatformat:2 }}</td>
+                        <td class="hud-val-2 text-info">🎯 Limit</td>
+                    </tr>
+                    <tr>
+                        <td class="hud-label">Utilized capital</td>
+                        <td class="hud-val-1">₹{{ trade.utilized_capital|default:0|floatformat:0 }}</td>
+                        <td class="hud-val-2">Margin</td>
+                    </tr>
+                    <tr>
+                        <td class="hud-label">Net P&L / ROI</td>
+                        <td class="hud-val-1 {% if trade.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if trade.net_pnl >= 0 %}+{% endif %}₹{{ trade.net_pnl|floatformat:2 }}
+                        </td>
+                        <td class="hud-val-2 {% if trade.trade_equity_change_pct >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if trade.trade_equity_change_pct >= 0 %}+{% endif %}{{ trade.trade_equity_change_pct }}%
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="hud-label">Index Points</td>
+                        <td class="hud-val-1 {% if trade.index_points >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if trade.index_points >= 0 %}+{% endif %}{{ trade.index_points|floatformat:1 }} pts
+                        </td>
+                        <td class="hud-val-2">{{ trade.symbol }}</td>
+                    </tr>
+                    <tr>
+                        <td class="hud-label">Exit Reason</td>
+                        <td colspan="2" class="theme-text-muted" style="font-size: 0.68rem; padding: 4px 10px;">
+                            {{ trade.exit_reason|default:trade.reason|truncatechars:36 }}
+                        </td>
+                    </tr>
+                </table>
+            </div>
+        </div>
+
+        <!-- LightweightCharts Canvas Container -->
+        <div id="chartContainer"></div>
+
+        <!-- Transparent Overlay Canvas for Position Drawing Tool -->
+        <canvas id="positionOverlayCanvas"></canvas>
+
+        <!-- Loading Overlay -->
+        <div id="loadingOverlay" class="chart-loading-overlay">
+            <div class="spinner-border text-primary mb-2" role="status"></div>
+            <div class="fw-bold text-white font-monospace small">Loading 2-Day 1m Candlestick Data...</div>
+            <div class="theme-text-muted small mt-1">Previous Day & Trade Day Intraday History</div>
+        </div>
+    </main>
+
+    <!-- Chart Logic Script -->
+    <script>
+    (function() {
+        const candlesApiUrl = "{% url 'backtest:backtest_trade_candles' backtest.pk trade.serial_no %}";
+        const container = document.getElementById('chartContainer');
+        const overlayCanvas = document.getElementById('positionOverlayCanvas');
+        const overlayCtx = overlayCanvas.getContext('2d');
+        const loadingOverlay = document.getElementById('loadingOverlay');
+
+        let chart = null;
+        let candleSeries = null;
+        let volumeSeries = null;
+
+        let rawTradeData = null;
+        let currentMode = 'option'; // 'option' or 'spot'
+        let currentTimeframe = '1';  // '1', '3', '5', '15', '30'
+        let activeCandles = [];
+
+        // Initialize LightweightCharts
+        function initTradingViewChart() {
+            container.innerHTML = '';
+
+            chart = LightweightCharts.createChart(container, {
+                width: container.clientWidth,
+                height: container.clientHeight,
+                layout: {
+                    background: { type: 'solid', color: '#0b0e14' },
+                    textColor: '#94a3b8',
+                    fontSize: 12,
+                    fontFamily: 'JetBrains Mono, monospace'
+                },
+                grid: {
+                    vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
+                    horzLines: { color: 'rgba(255, 255, 255, 0.04)' }
+                },
+                crosshair: {
+                    mode: LightweightCharts.CrosshairMode.Normal,
+                    vertLine: { color: 'rgba(56, 189, 248, 0.45)', width: 1, style: 3, labelBackgroundColor: '#0284c7' },
+                    horzLine: { color: 'rgba(56, 189, 248, 0.45)', width: 1, style: 3, labelBackgroundColor: '#0284c7' }
+                },
+                rightPriceScale: {
+                    borderColor: '#242936',
+                    scaleMargins: { top: 0.12, bottom: 0.22 }
+                },
+                localization: {
+                    locale: 'en-IN',
+                    dateFormat: 'yyyy-MM-dd',
+                    timeFormatter: (timestamp) => {
+                        const d = new Date(timestamp * 1000);
+                        const hours = String(d.getUTCHours()).padStart(2, '0');
+                        const mins = String(d.getUTCMinutes()).padStart(2, '0');
+                        return `${hours}:${mins}`;
+                    }
+                },
+                timeScale: {
+                    borderColor: '#242936',
+                    timeVisible: true,
+                    secondsVisible: false,
+                    rightOffset: 12,
+                    barSpacing: 6,
+                    tickMarkFormatter: (time, tickMarkType, locale) => {
+                        const d = new Date(time * 1000);
+                        if (tickMarkType === 0 || tickMarkType === 1 || tickMarkType === 2) {
+                            const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+                            const day = String(d.getUTCDate()).padStart(2, '0');
+                            const mon = months[d.getUTCMonth()];
+                            return `${day} ${mon}`;
+                        }
+                        const hours = String(d.getUTCHours()).padStart(2, '0');
+                        const mins = String(d.getUTCMinutes()).padStart(2, '0');
+                        return `${hours}:${mins}`;
+                    }
+                },
+                watermark: {
+                    visible: true,
+                    fontSize: 48,
+                    fontFamily: 'Google Sans, sans-serif',
+                    color: 'rgba(255, 255, 255, 0.03)',
+                    text: '{{ trade.strike|default:trade.symbol }} · 2 DAYS',
+                    horzAlign: 'center',
+                    vertAlign: 'center',
+                }
+            });
+
+            candleSeries = chart.addCandlestickSeries({
+                upColor: '#089981',
+                downColor: '#f23645',
+                borderVisible: false,
+                wickUpColor: '#089981',
+                wickDownColor: '#f23645',
+            });
+
+            volumeSeries = chart.addHistogramSeries({
+                priceFormat: { type: 'volume' },
+                priceScaleId: 'volumeScale',
+            });
+            chart.priceScale('volumeScale').applyOptions({
+                scaleMargins: { top: 0.82, bottom: 0 },
+                visible: false,
+            });
+
+            // Live Crosshair stats update on top-left bar
+            chart.subscribeCrosshairMove(param => {
+                if (!param || !param.time || !param.seriesData) {
+                    if (activeCandles && activeCandles.length > 0) {
+                        updateCrosshairBar(activeCandles[activeCandles.length - 1]);
+                    }
+                    return;
+                }
+                const cData = param.seriesData.get(candleSeries);
+                if (cData) {
+                    const vData = param.seriesData.get(volumeSeries);
+                    const d = new Date(param.time * 1000);
+                    const yr = d.getUTCFullYear();
+                    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
+                    const da = String(d.getUTCDate()).padStart(2, '0');
+                    const ho = String(d.getUTCHours()).padStart(2, '0');
+                    const mi = String(d.getUTCMinutes()).padStart(2, '0');
+                    updateCrosshairBar({
+                        open: cData.open,
+                        high: cData.high,
+                        low: cData.low,
+                        close: cData.close,
+                        volume: vData ? vData.value : 0,
+                        datetime: `${yr}-${mo}-${da} ${ho}:${mi}:00`
+                    });
+                }
+            });
+
+            // 60FPS Continuous Drag & Scroll Synchronization Loop
+            let isInteracting = false;
+            let dragRafId = null;
+
+            function startContinuousDragSync() {
+                isInteracting = true;
+                if (dragRafId) cancelAnimationFrame(dragRafId);
+                function dragLoop() {
+                    renderPositionOverlay();
+                    if (isInteracting) {
+                        dragRafId = requestAnimationFrame(dragLoop);
+                    }
+                }
+                dragRafId = requestAnimationFrame(dragLoop);
+            }
+
+            function stopContinuousDragSync() {
+                isInteracting = false;
+                if (dragRafId) cancelAnimationFrame(dragRafId);
+                scheduleOverlaySync();
+            }
+
+            container.addEventListener('mousedown', startContinuousDragSync);
+            window.addEventListener('mouseup', stopContinuousDragSync);
+            container.addEventListener('touchstart', startContinuousDragSync, { passive: true });
+            window.addEventListener('touchend', stopContinuousDragSync);
+
+            container.addEventListener('wheel', () => {
+                scheduleOverlaySync();
+                let inertiaFrames = 15;
+                function inertia() {
+                    renderPositionOverlay();
+                    inertiaFrames--;
+                    if (inertiaFrames > 0) requestAnimationFrame(inertia);
+                }
+                requestAnimationFrame(inertia);
+            }, { passive: true });
+
+            // Sync Overlay Canvas whenever chart scrolls or zooms
+            chart.timeScale().subscribeVisibleTimeRangeChange(scheduleOverlaySync);
+            chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleOverlaySync);
+
+            // Crosshair move handler
+            chart.subscribeCrosshairMove(param => {
+                if (!param || !param.time || !param.seriesData || param.seriesData.size === 0) {
+                    if (activeCandles.length > 0) updateCrosshairBar(activeCandles[activeCandles.length - 1]);
+                    return;
+                }
+                const cData = param.seriesData.get(candleSeries);
+                if (cData) {
+                    const full = activeCandles.find(c => c.time === param.time) || cData;
+                    updateCrosshairBar(full);
+                }
+            });
+
+            window.addEventListener('resize', handleResize);
+            handleResize();
+        }
+
+        function handleResize() {
+            if (!chart) return;
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            chart.applyOptions({ width: w, height: h });
+
+            const dpr = window.devicePixelRatio || 1;
+            overlayCanvas.width = w * dpr;
+            overlayCanvas.height = h * dpr;
+            overlayCanvas.style.width = w + 'px';
+            overlayCanvas.style.height = h + 'px';
+            overlayCtx.resetTransform();
+            overlayCtx.scale(dpr, dpr);
+
+            renderPositionOverlay();
+        }
+
+        let activePriceLines = [];
+
+        function clearNativePriceLines() {
+            if (!candleSeries) return;
+            activePriceLines.forEach(pl => {
+                try { candleSeries.removePriceLine(pl); } catch (e) {}
+            });
+            activePriceLines = [];
+        }
+
+        function updateNativePriceLines() {
+            clearNativePriceLines();
+            if (!candleSeries || !rawTradeData) return;
+
+            const isSpot = (currentMode === 'spot');
+            const entryP = isSpot ? Number(rawTradeData.entry.index_price || rawTradeData.entry.price) : Number(rawTradeData.entry.price);
+            let targetP = isSpot ? (entryP + (Number(rawTradeData.index_points || 0) * 1.5)) : Number(rawTradeData.target_price);
+            let stopP = isSpot ? (entryP - (Math.abs(Number(rawTradeData.index_points || 30)) * 0.8)) : Number(rawTradeData.initial_stop_loss_price || rawTradeData.stop_loss_price);
+            const isBuy = !rawTradeData.trade_type || rawTradeData.trade_type.includes('BUY');
+            if (!isSpot && isBuy && stopP >= entryP) {
+                stopP = Number((entryP - 15.0).toFixed(2));
+                if (stopP <= 0) stopP = Number((entryP * 0.85).toFixed(2));
+            } else if (!isSpot && !isBuy && stopP <= entryP) {
+                stopP = Number((entryP + 15.0).toFixed(2));
+            }
+            let reserveEdgeP = isSpot ? (stopP - 15.0) : Number(rawTradeData.reserve_edge_price || (isBuy ? stopP * 0.98 : stopP * 1.02));
+
+            if (!targetP || targetP <= 0) targetP = isBuy ? (entryP * 1.15) : (entryP * 0.85);
+            if (!stopP || stopP <= 0) stopP = isBuy ? (entryP * 0.90) : (entryP * 1.10);
+
+            // Sync Floating HUD Table with sanitized metrics
+            const hudStop = document.getElementById('hudStopPrice');
+            if (hudStop) hudStop.textContent = '₹' + stopP.toFixed(2);
+            const hudTarget = document.getElementById('hudTargetPrice');
+            if (hudTarget) hudTarget.textContent = '₹' + targetP.toFixed(2);
+            const hudReserve = document.getElementById('hudReserveEdge');
+            if (hudReserve) hudReserve.textContent = '₹' + reserveEdgeP.toFixed(2);
+            const hudRR = document.getElementById('hudRiskReward');
+            if (hudRR && Math.abs(entryP - stopP) > 0.01) {
+                const calculatedRR = Math.abs(targetP - entryP) / Math.abs(entryP - stopP);
+                hudRR.textContent = '1:' + calculatedRR.toFixed(2);
+            }
+
+            // Target Price Line (Green)
+            const targetLine = candleSeries.createPriceLine({
+                price: targetP,
+                color: '#10b981',
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Solid,
+                axisLabelVisible: true,
+                title: 'TARGET ' + targetP.toFixed(2),
+            });
+            activePriceLines.push(targetLine);
+
+            // Entry Price Line (Cyan / Blue)
+            const entryLine = candleSeries.createPriceLine({
+                price: entryP,
+                color: '#0284c7',
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true,
+                title: 'ENTRY ' + entryP.toFixed(2),
+            });
+            activePriceLines.push(entryLine);
+
+            // Stop Loss Price Line (Red)
+            const stopLine = candleSeries.createPriceLine({
+                price: stopP,
+                color: '#ef4444',
+                lineWidth: 2,
+                lineStyle: LightweightCharts.LineStyle.Solid,
+                axisLabelVisible: true,
+                title: 'STOP ' + stopP.toFixed(2),
+            });
+            activePriceLines.push(stopLine);
+
+            // Reserve Edge Buffer Line (Amber / Gold)
+            if (reserveEdgeP && reserveEdgeP > 0) {
+                const reserveLine = candleSeries.createPriceLine({
+                    price: reserveEdgeP,
+                    color: '#f59e0b',
+                    lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: true,
+                    title: 'RESERVE EDGE ' + reserveEdgeP.toFixed(2),
+                });
+                activePriceLines.push(reserveLine);
+            }
+        }
+
+        // Resample 1m candles into higher timeframe bars
+        function resampleCandles(candles, tfMinutes) {
+            if (!candles || candles.length === 0) return [];
+            if (tfMinutes === '1') return candles;
+
+            const intervalSec = parseInt(tfMinutes, 10) * 60;
+            const resampled = [];
+            let currentBucket = null;
+
+            candles.forEach(c => {
+                const bucketTime = Math.floor(c.time / intervalSec) * intervalSec;
+                if (!currentBucket || currentBucket.time !== bucketTime) {
+                    if (currentBucket) resampled.push(currentBucket);
+                    currentBucket = {
+                        time: bucketTime,
+                        open: c.open,
+                        high: c.high,
+                        low: c.low,
+                        close: c.close,
+                        volume: c.volume,
+                        date: c.date,
+                        time_str: c.time_str,
+                        datetime: c.datetime,
+                    };
+                } else {
+                    currentBucket.high = Math.max(currentBucket.high, c.high);
+                    currentBucket.low = Math.min(currentBucket.low, c.low);
+                    currentBucket.close = c.close;
+                    currentBucket.volume += c.volume;
+                }
+            });
+            if (currentBucket) resampled.push(currentBucket);
+            return resampled;
+        }
+
+        // Apply Candle Data & Timeframe to Chart
+        function applyDataToChart() {
+            if (!rawTradeData) return;
+
+            const baseList = (currentMode === 'spot') ? (rawTradeData.spot_candles || []) : (rawTradeData.candles || []);
+            activeCandles = resampleCandles(baseList, currentTimeframe);
+
+            candleSeries.setData(activeCandles);
+
+            const volData = activeCandles.map(c => ({
+                time: c.time,
+                value: c.volume,
+                color: (c.close >= c.open) ? 'rgba(8, 153, 129, 0.28)' : 'rgba(242, 54, 69, 0.28)'
+            }));
+            volumeSeries.setData(volData);
+
+            if (activeCandles && activeCandles.length > 0) {
+                updateCrosshairBar(activeCandles[activeCandles.length - 1]);
+            }
+
+            // Native LightweightCharts Markers on Entry & Exit
+            applyMarkers();
+
+            // Native PriceLines on Price Scale
+            updateNativePriceLines();
+
+            // Fit content
+            chart.timeScale().fitContent();
+
+            // Trigger Overlay Render
+            scheduleOverlaySync();
+        }
+
+        // Add visual markers on entry & exit candles
+        function applyMarkers() {
+            if (!rawTradeData || !rawTradeData.entry) return;
+
+            const entryEpoch = rawTradeData.entry.epoch;
+            const exitEpoch = rawTradeData.exit.epoch;
+            const isSpot = (currentMode === 'spot');
+            const entryP = isSpot ? (rawTradeData.entry.index_price || rawTradeData.entry.price) : rawTradeData.entry.price;
+            const exitP = isSpot ? (rawTradeData.exit.index_price || rawTradeData.exit.price) : rawTradeData.exit.price;
+
+            function findNearestTime(targetTime) {
+                if (!activeCandles || activeCandles.length === 0) return targetTime;
+                let closest = activeCandles[0].time;
+                let minDiff = Math.abs(activeCandles[0].time - targetTime);
+                for (let i = 1; i < activeCandles.length; i++) {
+                    const diff = Math.abs(activeCandles[i].time - targetTime);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closest = activeCandles[i].time;
+                    }
+                }
+                return closest;
+            }
+
+            const markers = [];
+            if (entryEpoch) {
+                markers.push({
+                    time: findNearestTime(entryEpoch),
+                    position: 'belowBar',
+                    color: '#10b981',
+                    shape: 'arrowUp',
+                    text: `▲ ENTRY ₹${Number(entryP).toFixed(2)} (${rawTradeData.entry.time})`,
+                    size: 2,
+                });
+            }
+
+            if (exitEpoch) {
+                const exitColor = (rawTradeData.pnl >= 0) ? '#10b981' : '#ef4444';
+                markers.push({
+                    time: findNearestTime(exitEpoch),
+                    position: 'aboveBar',
+                    color: exitColor,
+                    shape: 'arrowDown',
+                    text: `▼ EXIT ₹${Number(exitP).toFixed(2)} (${rawTradeData.exit.time})`,
+                    size: 2,
+                });
+            }
+
+            candleSeries.setMarkers(markers);
+        }
+
+        // Draw TradingView Position Boxes, Day Dividers, and Price Lines
+        function renderPositionOverlay() {
+            if (!chart || !candleSeries || !rawTradeData || activeCandles.length === 0) return;
+
+            const w = container.clientWidth;
+            const h = container.clientHeight;
+            overlayCtx.clearRect(0, 0, w, h);
+
+            const isSpot = (currentMode === 'spot');
+            const entryP = isSpot ? Number(rawTradeData.entry.index_price || rawTradeData.entry.price) : Number(rawTradeData.entry.price);
+            let targetP = isSpot ? (entryP + (Number(rawTradeData.index_points || 0) * 1.5)) : Number(rawTradeData.target_price);
+            let stopP = isSpot ? (entryP - (Math.abs(Number(rawTradeData.index_points || 30)) * 0.8)) : Number(rawTradeData.initial_stop_loss_price || rawTradeData.stop_loss_price);
+            const isBuy = !rawTradeData.trade_type || rawTradeData.trade_type.includes('BUY');
+            if (!isSpot && isBuy && stopP >= entryP) {
+                stopP = Number((entryP - 15.0).toFixed(2));
+                if (stopP <= 0) stopP = Number((entryP * 0.85).toFixed(2));
+            } else if (!isSpot && !isBuy && stopP <= entryP) {
+                stopP = Number((entryP + 15.0).toFixed(2));
+            }
+
+            if (!targetP || targetP <= 0) targetP = isBuy ? (entryP * 1.15) : (entryP * 0.85);
+            if (!stopP || stopP <= 0) stopP = isBuy ? (entryP * 0.90) : (entryP * 1.10);
+
+            const entryEpoch = rawTradeData.entry.epoch;
+            const exitEpoch = rawTradeData.exit.epoch;
+            const dayBoundaryEpoch = rawTradeData.day_boundary_epoch;
+
+            // 1. Locate candle indices for Entry, Exit, and Day Boundary
+            let enIdx = -1;
+            let exIdx = -1;
+            let dayIdx = -1;
+            let minEnDiff = Infinity;
+            let minExDiff = Infinity;
+            let minDayDiff = Infinity;
+
+            for (let i = 0; i < activeCandles.length; i++) {
+                const t = activeCandles[i].time;
+                const enDiff = Math.abs(t - entryEpoch);
+                if (enDiff < minEnDiff) {
+                    minEnDiff = enDiff;
+                    enIdx = i;
+                }
+                const exDiff = Math.abs(t - exitEpoch);
+                if (exDiff < minExDiff) {
+                    minExDiff = exDiff;
+                    exIdx = i;
+                }
+                if (dayBoundaryEpoch) {
+                    const dDiff = Math.abs(t - dayBoundaryEpoch);
+                    if (dDiff < minDayDiff) {
+                        minDayDiff = dDiff;
+                        dayIdx = i;
+                    }
+                }
+            }
+
+            // 2. Draw Day Boundary Line (separating Previous Day from Trade Day)
+            let dayX = (dayIdx >= 0) ? chart.timeScale().logicalToCoordinate(dayIdx) : null;
+            if (dayX === null && dayBoundaryEpoch) {
+                dayX = chart.timeScale().timeToCoordinate(dayBoundaryEpoch);
+            }
+            if (dayX !== null && dayX >= -100 && dayX <= w + 100) {
+                overlayCtx.save();
+                overlayCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+                overlayCtx.lineWidth = 1.2;
+                overlayCtx.setLineDash([5, 5]);
+                overlayCtx.beginPath();
+                overlayCtx.moveTo(dayX, 0);
+                overlayCtx.lineTo(dayX, h);
+                overlayCtx.stroke();
+                overlayCtx.setLineDash([]);
+
+                // Day Divider Header Tag
+                overlayCtx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+                overlayCtx.fillRect(dayX - 95, 12, 190, 20);
+                overlayCtx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+                overlayCtx.strokeRect(dayX - 95, 12, 190, 20);
+
+                overlayCtx.fillStyle = '#38bdf8';
+                overlayCtx.font = 'bold 10px JetBrains Mono, monospace';
+                overlayCtx.textAlign = 'center';
+                overlayCtx.textBaseline = 'middle';
+                overlayCtx.fillText(`◂ YESTERDAY | TODAY (${rawTradeData.date})`, dayX, 22);
+                overlayCtx.restore();
+            }
+
+            // 3. High-Precision Coordinate Math for Position Box (Anchored to Bars)
+            let enX = (enIdx >= 0) ? chart.timeScale().logicalToCoordinate(enIdx) : null;
+            let exX = (exIdx >= 0) ? chart.timeScale().logicalToCoordinate(exIdx) : null;
+
+            if (enX === null) enX = chart.timeScale().timeToCoordinate(entryEpoch);
+            if (exX === null) exX = chart.timeScale().timeToCoordinate(exitEpoch);
+
+            // Handle offscreen extrapolation with logical range
+            const visibleLogicalRange = chart.timeScale().getVisibleLogicalRange();
+            if (visibleLogicalRange) {
+                const barSpacing = chart.timeScale().options().barSpacing || 6;
+                if (enX === null && enIdx >= 0) {
+                    enX = (enIdx - visibleLogicalRange.from) * barSpacing;
+                }
+                if (exX === null && exIdx >= 0) {
+                    exX = (exIdx - visibleLogicalRange.from) * barSpacing;
+                }
+            }
+
+            if (enX === null || isNaN(enX)) return;
+            if (exX === null || isNaN(exX) || exX <= enX) {
+                const defaultBars = Math.max(12, (exIdx >= 0 && enIdx >= 0) ? (exIdx - enIdx + 1) : 25);
+                const barSpacing = chart.timeScale().options().barSpacing || 6;
+                exX = enX + (defaultBars * barSpacing);
+            }
+
+            const boxWidth = Math.max(12, exX - enX);
+
+            const enY = candleSeries.priceToCoordinate(entryP);
+            const tgY = candleSeries.priceToCoordinate(targetP);
+            const slY = candleSeries.priceToCoordinate(stopP);
+
+            if (enY !== null) {
+                // A. Target Profit Box (Green Shaded Zone)
+                if (tgY !== null) {
+                    const topY = Math.min(enY, tgY);
+                    const boxH = Math.max(1, Math.abs(tgY - enY));
+
+                    overlayCtx.fillStyle = 'rgba(8, 153, 129, 0.18)';
+                    overlayCtx.fillRect(enX, topY, boxWidth, boxH);
+
+                    overlayCtx.strokeStyle = 'rgba(8, 153, 129, 0.75)';
+                    overlayCtx.lineWidth = 1.2;
+                    overlayCtx.strokeRect(enX, topY, boxWidth, boxH);
+                }
+
+                // B. Stop Loss Risk Box (Red Shaded Zone)
+                if (slY !== null) {
+                    const topY = Math.min(enY, slY);
+                    const boxH = Math.max(1, Math.abs(slY - enY));
+
+                    overlayCtx.fillStyle = 'rgba(242, 54, 69, 0.18)';
+                    overlayCtx.fillRect(enX, topY, boxWidth, boxH);
+
+                    overlayCtx.strokeStyle = 'rgba(242, 54, 69, 0.75)';
+                    overlayCtx.lineWidth = 1.2;
+                    overlayCtx.strokeRect(enX, topY, boxWidth, boxH);
+                }
+
+                // C. Entry Middle Divider Line across Position Box
+                overlayCtx.strokeStyle = 'rgba(2, 132, 199, 0.9)';
+                overlayCtx.lineWidth = 1.5;
+                overlayCtx.beginPath();
+                overlayCtx.moveTo(enX, enY);
+                overlayCtx.lineTo(exX, enY);
+                overlayCtx.stroke();
+            }
+        }
+
+        let syncScheduled = false;
+        function scheduleOverlaySync() {
+            if (!syncScheduled) {
+                syncScheduled = true;
+                requestAnimationFrame(() => {
+                    syncScheduled = false;
+                    renderPositionOverlay();
+                });
+            }
+        }
+
+        function updateCrosshairBar(candle) {
+            if (!candle) return;
+            document.getElementById('barOpen').innerText = Number(candle.open).toFixed(2);
+            document.getElementById('barHigh').innerText = Number(candle.high).toFixed(2);
+            document.getElementById('barLow').innerText = Number(candle.low).toFixed(2);
+            document.getElementById('barClose').innerText = Number(candle.close).toFixed(2);
+            document.getElementById('barVol').innerText = (candle.volume || 0).toLocaleString();
+            document.getElementById('barTime').innerText = candle.datetime || (candle.date + ' ' + candle.time_str);
+        }
+
+        // Fetch Data from Server
+        function loadTradeChartData() {
+            fetch(candlesApiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then(res => res.json())
+                .then(data => {
+                    if (loadingOverlay) loadingOverlay.style.display = 'none';
+                    if (!data.success) {
+                        alert('Could not load candle data for this trade');
+                        return;
+                    }
+
+                    rawTradeData = data;
+
+                    // Update HUD with live values
+                    if (data.reserve_edge_price) {
+                        document.getElementById('hudReserveEdge').innerText = `₹${Number(data.reserve_edge_price).toFixed(2)}`;
+                    }
+                    if (data.risk_reward) {
+                        document.getElementById('hudRiskReward').innerText = data.risk_reward;
+                    }
+                    if (data.prev_date) {
+                        document.getElementById('dateRangeBadge').innerText = `2 Days (${data.prev_date} → ${data.date})`;
+                    }
+
+                    applyDataToChart();
+                })
+                .catch(err => {
+                    if (loadingOverlay) {
+                        loadingOverlay.innerHTML = `
+                            <div class="text-danger fw-bold mb-2">Error loading candle data</div>
+                            <button onclick="location.reload()" class="btn btn-sm btn-outline-light">Retry</button>
+                        `;
+                    }
+                });
+        }
+
+        // Attach UI Event Listeners
+        function setupEventListeners() {
+            // Timeframe switcher buttons
+            document.querySelectorAll('.btn-tf').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    document.querySelectorAll('.btn-tf').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentTimeframe = this.getAttribute('data-tf');
+                    applyDataToChart();
+                });
+            });
+
+            // Asset selector: Option vs Spot
+            const btnOption = document.getElementById('btnModeOption');
+            const btnSpot = document.getElementById('btnModeSpot');
+
+            btnOption.addEventListener('click', function() {
+                currentMode = 'option';
+                btnOption.classList.add('active-option');
+                btnSpot.classList.remove('active-spot');
+                document.getElementById('barSymbol').innerText = "{{ trade.strike|default:trade.symbol }}";
+                applyDataToChart();
+            });
+
+            btnSpot.addEventListener('click', function() {
+                currentMode = 'spot';
+                btnSpot.classList.add('active-spot');
+                btnOption.classList.remove('active-option');
+                document.getElementById('barSymbol').innerText = "{{ trade.symbol }} SPOT";
+                applyDataToChart();
+            });
+
+            // Reset zoom button
+            document.getElementById('btnFitChart').addEventListener('click', () => {
+                if (chart) chart.timeScale().fitContent();
+            });
+
+            // Toggle Fullscreen
+            document.getElementById('btnToggleFullscreen').addEventListener('click', () => {
+                if (!document.fullscreenElement) {
+                    document.documentElement.requestFullscreen().catch(() => {});
+                } else {
+                    document.exitFullscreen().catch(() => {});
+                }
+            });
+
+            // Toggle HUD minimize/expand
+            const hud = document.getElementById('riskReserveHud');
+            const btnToggleHud = document.getElementById('btnToggleHud');
+            btnToggleHud.addEventListener('click', () => {
+                hud.classList.toggle('minimized');
+                btnToggleHud.querySelector('.material-icons').innerText = hud.classList.contains('minimized') ? 'unfold_more' : 'unfold_less';
+            });
+        }
+
+        // Initialize Everything
+        initTradingViewChart();
+        setupEventListeners();
+        loadTradeChartData();
+    })();
+    </script>
+</body>
+</html>

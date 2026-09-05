@@ -4,7 +4,7 @@ import datetime
 from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
-from django.http import HttpResponse, HttpResponseRedirect, JsonResponse
+from django.http import HttpResponse, HttpResponseRedirect, JsonResponse, Http404
 from django.shortcuts import render, get_object_or_404, redirect
 from django.urls import reverse_lazy, reverse
 from django.db.models import Q
@@ -761,7 +761,8 @@ class BacktestTradesScrollView(LoginRequiredMixin, AdminRequiredMixin, View):
 
 
 class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """Returns 1m OHLC candles for strictly the trade's day with overlay levels."""
+    """Returns 2-day 1m OHLC candles (previous trading day + trade day) with overlay coordinates."""
+
     def get(self, request, pk, trade_num, *args, **kwargs):
         backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
         trade_data = get_backtest_trades_context(backtest, request)
@@ -785,18 +786,40 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
         entry_price = float(target_trade.get('entry_price', 0.0))
         exit_price = float(target_trade.get('exit_price', 0.0))
         target_price = float(target_trade.get('target_price', 0.0))
-        stop_loss_price = float(target_trade.get('stop_loss_price', 0.0))
+        trade_type = str(target_trade.get('trade_type', 'BUY CE')).upper()
+
+        initial_sl = float(target_trade.get('initial_stop_loss_price') or target_trade.get('stop_loss_price', 0.0))
+        # Protect against legacy inverted SL where trailing breakeven was saved as stop_loss_price
+        if 'BUY' in trade_type and initial_sl >= entry_price and entry_price > 0:
+            initial_sl = round(entry_price - 15.0, 2) if entry_price > 15.0 else round(entry_price * 0.85, 2)
+        elif 'SELL' in trade_type and initial_sl <= entry_price and entry_price > 0:
+            initial_sl = round(entry_price + 15.0, 2)
+        stop_loss_price = initial_sl
+        trailing_sl_price = float(target_trade.get('trailing_stop_loss_price') or target_trade.get('stop_loss_price', stop_loss_price))
+
         index_entry = float(target_trade.get('index_entry_price', entry_price))
         index_exit = float(target_trade.get('index_exit_price', exit_price))
-        trade_type = str(target_trade.get('trade_type', 'BUY CE')).upper()
         pnl = float(target_trade.get('net_pnl', target_trade.get('pnl', 0.0)))
         strike = target_trade.get('strike', target_trade.get('symbol', ''))
         symbol = target_trade.get('symbol', 'NIFTY')
         status = target_trade.get('status', 'WIN' if pnl >= 0 else 'LOSS')
         exit_reason = target_trade.get('exit_reason', target_trade.get('reason', 'Target / SL'))
+        quantity = int(target_trade.get('quantity', 25))
+        lots_count = int(target_trade.get('lots_count', 1))
+        utilized_capital = float(target_trade.get('utilized_capital', 0.0))
+        trade_equity_change_pct = float(target_trade.get('trade_equity_change_pct', 0.0))
+        index_points = float(target_trade.get('index_points', 0.0))
+
+        risk_dist = abs(entry_price - stop_loss_price) if stop_loss_price > 0 else (entry_price * 0.05)
+        if target_price <= 0:
+            target_price = round(entry_price + (risk_dist * 2.0), 2) if 'BUY' in trade_type else round(entry_price - (risk_dist * 2.0), 2)
+        if stop_loss_price <= 0:
+            stop_loss_price = round(entry_price - risk_dist, 2) if 'BUY' in trade_type else round(entry_price + risk_dist, 2)
+        reserve_edge_price = round(stop_loss_price - (risk_dist * 0.15), 2) if 'BUY' in trade_type else round(stop_loss_price + (risk_dist * 0.15), 2)
 
         candles = []
         spot_candles = []
+        prev_date = ""
 
         candidate_paths = []
         if backtest.backup_task and backtest.backup_task.parquet_file_path:
@@ -810,14 +833,31 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
             if p_path and os.path.exists(p_path):
                 try:
                     import pandas as pd
+                    import datetime as dt
                     df = pd.read_parquet(p_path)
-                    day_df = df[df['datetime'].astype(str).str.startswith(trade_date)]
-                    if not day_df.empty:
-                        s_df = day_df[day_df['strike'] == 'SPOT']
+                    all_dates = sorted(list(set(df['datetime'].astype(str).str[:10])))
+                    if trade_date in all_dates:
+                        t_idx = all_dates.index(trade_date)
+                        selected_dates = [all_dates[t_idx - 1], trade_date] if t_idx > 0 else [trade_date]
+                        prev_date = all_dates[t_idx - 1] if t_idx > 0 else trade_date
+                    else:
+                        selected_dates = [trade_date]
+                        prev_date = trade_date
+
+                    sub_df = df[df['datetime'].astype(str).str[:10].isin(selected_dates)]
+                    if not sub_df.empty:
+                        s_df = sub_df[sub_df['strike'] == 'SPOT']
+                        if s_df.empty:
+                            s_df = sub_df[sub_df['option_type'] == 'INDEX']
                         for _, row in s_df.iterrows():
-                            t_str = str(row['datetime'])[11:16]
+                            dt_str = str(row['datetime'])[:19]
+                            dt_val = dt.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
+                            epoch_sec = int(dt_val.timestamp())
                             spot_candles.append({
-                                'time': t_str,
+                                'time': epoch_sec,
+                                'datetime': dt_str,
+                                'date': dt_str[:10],
+                                'time_str': dt_str[11:16],
                                 'open': round(float(row['open']), 2),
                                 'high': round(float(row['high']), 2),
                                 'low': round(float(row['low']), 2),
@@ -826,14 +866,83 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                             })
 
                         opt_type = 'PUT' if ('PE' in trade_type or 'PUT' in trade_type) else 'CALL'
-                        opt_df = day_df[day_df['option_type'] == opt_type]
+                        opt_df = sub_df[sub_df['option_type'] == opt_type]
                         if not opt_df.empty:
-                            best_s = min(opt_df['strike'].unique(), key=lambda s: abs(float(opt_df[opt_df['strike'] == s].iloc[0]['open']) - entry_price))
-                            best_df = opt_df[opt_df['strike'] == best_s]
+                            import re
+                            import numpy as np
+
+                            trade_strike_raw = str(target_trade.get('strike', ''))
+                            is_ce = ('CE' in trade_type or 'CALL' in trade_type)
+                            index_name = str(backtest.index_name or target_trade.get('symbol') or '').upper()
+                            strike_step = 100 if ('BANK' in index_name or 'SENSEX' in index_name) else (25 if 'MIDCP' in index_name else 50)
+
+                            best_df = None
+
+                            # Lock onto the trade's specific fixed contract strike to avoid dynamic rolling ATM jumps
+                            has_relative_strikes = opt_df['strike'].isin(['ATM', 'ATM+1', 'ATM-1']).any()
+                            if has_relative_strikes and 'spot_price' in opt_df.columns and opt_df['spot_price'].notnull().any():
+                                target_strike = None
+                                m_num = re.search(r'(\d{4,6})', trade_strike_raw)
+                                if m_num:
+                                    target_strike = int(m_num.group(1))
+                                else:
+                                    entry_spot = float(target_trade.get('index_entry_price') or 0.0)
+                                    if entry_spot > 0:
+                                        base_s = round(entry_spot / strike_step) * strike_step
+                                        offset = 0
+                                        if '(ITM1)' in trade_strike_raw: offset = -1 if is_ce else 1
+                                        elif '(ITM2)' in trade_strike_raw: offset = -2 if is_ce else 2
+                                        elif '(ITM3)' in trade_strike_raw: offset = -3 if is_ce else 3
+                                        elif '(OTM1)' in trade_strike_raw: offset = 1 if is_ce else -1
+                                        elif '(OTM2)' in trade_strike_raw: offset = 2 if is_ce else -2
+                                        elif '(OTM3)' in trade_strike_raw: offset = 3 if is_ce else -3
+                                        target_strike = int(base_s + (offset * strike_step))
+
+                                if target_strike:
+                                    candle_atm = (opt_df['spot_price'] / strike_step).round() * strike_step
+                                    diff = ((target_strike - candle_atm) / strike_step).round().astype(int).clip(-5, 5)
+                                    conditions = [diff > 0, diff < 0]
+                                    choices = ['ATM+' + diff.astype(str), 'ATM' + diff.astype(str)]
+                                    opt_df = opt_df.copy()
+                                    opt_df['needed_strike'] = np.select(conditions, choices, default='ATM')
+                                    matched_df = opt_df[opt_df['strike'] == opt_df['needed_strike']].sort_values('datetime').drop_duplicates('datetime')
+                                    if not matched_df.empty:
+                                        best_df = matched_df
+
+                            # Fallback: Static relative or exact strike match
+                            if best_df is None or best_df.empty:
+                                if '(ATM)' in trade_strike_raw and 'ATM' in opt_df['strike'].values:
+                                    best_s = 'ATM'
+                                elif '(ITM1)' in trade_strike_raw:
+                                    best_s = 'ATM-1' if is_ce else 'ATM+1'
+                                elif '(ITM2)' in trade_strike_raw:
+                                    best_s = 'ATM-2' if is_ce else 'ATM+2'
+                                elif '(ITM3)' in trade_strike_raw:
+                                    best_s = 'ATM-3' if is_ce else 'ATM+3'
+                                elif '(OTM1)' in trade_strike_raw:
+                                    best_s = 'ATM+1' if is_ce else 'ATM-1'
+                                elif '(OTM2)' in trade_strike_raw:
+                                    best_s = 'ATM+2' if is_ce else 'ATM-2'
+                                elif '(OTM3)' in trade_strike_raw:
+                                    best_s = 'ATM+3' if is_ce else 'ATM-3'
+                                elif trade_strike_raw in opt_df['strike'].values:
+                                    best_s = trade_strike_raw
+                                else:
+                                    td_opts = opt_df[opt_df['datetime'].astype(str).str[:10] == trade_date]
+                                    if not td_opts.empty:
+                                        best_s = min(td_opts['strike'].unique(), key=lambda s: abs(float(td_opts[td_opts['strike'] == s].iloc[0]['open']) - entry_price))
+                                    else:
+                                        best_s = opt_df['strike'].iloc[0]
+                                best_df = opt_df[opt_df['strike'] == best_s]
                             for _, row in best_df.iterrows():
-                                t_str = str(row['datetime'])[11:16]
+                                dt_str = str(row['datetime'])[:19]
+                                dt_val = dt.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
+                                epoch_sec = int(dt_val.timestamp())
                                 candles.append({
-                                    'time': t_str,
+                                    'time': epoch_sec,
+                                    'datetime': dt_str,
+                                    'date': dt_str[:10],
+                                    'time_str': dt_str[11:16],
                                     'open': round(float(row['open']), 2),
                                     'high': round(float(row['high']), 2),
                                     'low': round(float(row['low']), 2),
@@ -842,41 +951,91 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                                 })
                         if candles or spot_candles:
                             break
-                except Exception:
-                    pass
+                except Exception as e:
+                    logger.error(f"Error loading Parquet candles for trade {trade_num}: {e}")
 
         if not candles:
             import datetime as dt
             import random
-            start_dt = dt.datetime.strptime(f"{trade_date} 09:15:00", "%Y-%m-%d %H:%M:%S")
-            curr_p = entry_price if entry_price > 0 else 100.0
-            t_min = 0
-            while t_min <= 375:
-                bar_dt = start_dt + dt.timedelta(minutes=t_min)
-                t_str = bar_dt.strftime("%H:%M")
-                drift = (exit_price - entry_price) / 375.0
-                step = random.uniform(-1.5, 1.5) + drift
-                b_open = curr_p
-                b_close = max(1.0, curr_p + step)
-                b_high = max(b_open, b_close) + random.uniform(0.1, 1.2)
-                b_low = min(b_open, b_close) - random.uniform(0.1, 1.2)
-                candles.append({
-                    'time': t_str,
-                    'open': round(b_open, 2),
-                    'high': round(b_high, 2),
-                    'low': round(max(0.1, b_low), 2),
-                    'close': round(b_close, 2),
-                    'volume': random.randint(500, 8000),
-                })
-                curr_p = b_close
-                t_min += 1
+            try:
+                base_dt = dt.datetime.strptime(trade_date, "%Y-%m-%d")
+            except Exception:
+                base_dt = dt.datetime.now()
+            p_dt = base_dt - dt.timedelta(days=3 if base_dt.weekday() == 0 else 1)
+            prev_date = p_dt.strftime("%Y-%m-%d")
+
+            for sim_date in [prev_date, trade_date]:
+                s_dt = dt.datetime.strptime(f"{sim_date} 09:15:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
+                curr_p = entry_price if entry_price > 0 else 100.0
+                curr_s = index_entry if index_entry > 0 else 24500.0
+                t_min = 0
+                while t_min <= 375:
+                    bar_dt = s_dt + dt.timedelta(minutes=t_min)
+                    bar_epoch = int(bar_dt.timestamp())
+                    t_str = bar_dt.strftime("%H:%M")
+                    step = random.uniform(-1.5, 1.5)
+                    b_open = curr_p
+                    b_close = max(1.0, curr_p + step)
+                    b_high = max(b_open, b_close) + random.uniform(0.1, 1.2)
+                    b_low = min(b_open, b_close) - random.uniform(0.1, 1.2)
+                    candles.append({
+                        'time': bar_epoch,
+                        'datetime': bar_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                        'date': sim_date,
+                        'time_str': t_str,
+                        'open': round(b_open, 2),
+                        'high': round(b_high, 2),
+                        'low': round(max(0.1, b_low), 2),
+                        'close': round(b_close, 2),
+                        'volume': random.randint(500, 8000),
+                    })
+                    curr_p = b_close
+
+                    s_step = random.uniform(-6.0, 6.0)
+                    s_open = curr_s
+                    s_close = curr_s + s_step
+                    s_high = max(s_open, s_close) + random.uniform(1.0, 8.0)
+                    s_low = min(s_open, s_close) - random.uniform(1.0, 8.0)
+                    spot_candles.append({
+                        'time': bar_epoch,
+                        'datetime': bar_dt.strftime("%Y-%m-%d %H:%M:%S"),
+                        'date': sim_date,
+                        'time_str': t_str,
+                        'open': round(s_open, 2),
+                        'high': round(s_high, 2),
+                        'low': round(s_low, 2),
+                        'close': round(s_close, 2),
+                        'volume': random.randint(1500, 25000),
+                    })
+                    curr_s = s_close
+                    t_min += 1
 
         entry_time_str = raw_ts[11:16] if len(raw_ts) >= 16 else "09:15"
         exit_time_str = exit_ts[11:16] if len(exit_ts) >= 16 else "15:15"
 
+        import datetime as dt
+        try:
+            entry_epoch = int(dt.datetime.strptime(f"{trade_date} {entry_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
+        except Exception:
+            entry_epoch = candles[0]['time'] if candles else 0
+
+        try:
+            exit_epoch = int(dt.datetime.strptime(f"{trade_date} {exit_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
+        except Exception:
+            exit_epoch = candles[-1]['time'] if candles else 0
+
+        try:
+            day_boundary_epoch = int(dt.datetime.strptime(f"{trade_date} 09:15:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
+        except Exception:
+            day_boundary_epoch = entry_epoch
+
+        rr_num = abs(target_price - entry_price) / max(0.01, abs(entry_price - stop_loss_price))
+        risk_reward_str = f"1:{rr_num:.2f}"
+
         return JsonResponse({
             'success': True,
             'date': trade_date,
+            'prev_date': prev_date,
             'timeframe': '1m',
             'symbol': symbol,
             'strike': strike,
@@ -884,23 +1043,76 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
             'trade_type': trade_type,
             'status': status,
             'pnl': round(pnl, 2),
+            'quantity': quantity,
+            'lots_count': lots_count,
+            'utilized_capital': utilized_capital,
+            'trade_equity_change_pct': trade_equity_change_pct,
+            'index_points': index_points,
+            'risk_reward': risk_reward_str,
             'entry': {
                 'time': entry_time_str,
+                'epoch': entry_epoch,
                 'price': entry_price,
                 'index_price': index_entry,
             },
             'exit': {
                 'time': exit_time_str,
+                'epoch': exit_epoch,
                 'price': exit_price,
                 'index_price': index_exit,
                 'reason': exit_reason,
             },
             'target_price': target_price,
             'stop_loss_price': stop_loss_price,
+            'initial_stop_loss_price': stop_loss_price,
+            'trailing_stop_loss_price': trailing_sl_price,
+            'reserve_edge_price': reserve_edge_price,
+            'day_boundary_epoch': day_boundary_epoch,
             'candles': candles,
             'spot_candles': spot_candles,
             'candles_count': len(candles),
         })
+
+
+class BacktestTradeChartView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Renders dedicated full-screen TradingView chart for a backtest trade."""
+
+    def get(self, request, pk, trade_num, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        trade_data = get_backtest_trades_context(backtest, request)
+        all_trades = trade_data['all_trades']
+
+        target_trade = None
+        current_index = -1
+        for idx, t in enumerate(all_trades):
+            if t.get('serial_no') == trade_num:
+                target_trade = t
+                current_index = idx
+                break
+        if not target_trade and 1 <= trade_num <= len(all_trades):
+            current_index = trade_num - 1
+            target_trade = all_trades[current_index]
+
+        if not target_trade:
+            raise Http404("Trade order not found")
+
+        prev_trade_num = all_trades[current_index - 1]['serial_no'] if current_index > 0 else None
+        next_trade_num = all_trades[current_index + 1]['serial_no'] if current_index < len(all_trades) - 1 else None
+
+        raw_ts = str(target_trade.get('timestamp') or target_trade.get('entry_time') or '')
+        trade_date = raw_ts.replace('T', ' ')[:10]
+
+        context = {
+            'backtest': backtest,
+            'trade': target_trade,
+            'trade_num': trade_num,
+            'trade_date': trade_date,
+            'prev_trade_num': prev_trade_num,
+            'next_trade_num': next_trade_num,
+            'total_trades': len(all_trades),
+            'page_title': f"Trade #{target_trade.get('serial_no', trade_num)} Chart · {target_trade.get('strike') or target_trade.get('symbol')} · Backtest #{backtest.pk}",
+        }
+        return render(request, 'admins/backtest_trade_chart.html', context)
 
 
 class BacktestLogsModalView(LoginRequiredMixin, AdminRequiredMixin, View):

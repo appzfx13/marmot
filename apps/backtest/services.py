@@ -143,6 +143,13 @@ def execute_python_rl_backtest(task_id):
             m_user_id = str(task.macro_backup_task.created_by_id or 1)
             macro_dir = os.path.join(str(settings.BASE_DIR), "backup", m_user_id, str(task.macro_backup_task.id))
 
+        task_rules = list(task.rules.all().values("name", "rule_type", "parameters"))
+        task_params = dict(task.parameters or {})
+        if task_rules:
+            task_params["rules"] = task_rules
+        elif "rules" not in task_params:
+            task_params["rules"] = []
+
         results = TensorTradeRLEngine.run_rl_backtest(
             backup_dir=backup_dir,
             params={
@@ -153,7 +160,7 @@ def execute_python_rl_backtest(task_id):
                 "use_macro_assist": task.use_macro_assist,
                 "macro_timeframe": task.macro_timeframe or "1h",
                 "macro_dir": macro_dir,
-                **(task.parameters or {})
+                **task_params
             },
             progress_callback=on_rl_progress
         )

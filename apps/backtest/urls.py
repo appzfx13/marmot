@@ -23,6 +23,7 @@ from .views import (
     RLTrainingForexView,
     BacktestExportExcelView,
     BacktestTradeCandlesView,
+    BacktestTradeChartView,
     BacktestLogsModalView,
     BacktestApplyAiRuleView,
 )
@@ -41,6 +42,7 @@ urlpatterns = [
     path('<int:pk>/export-excel/', BacktestExportExcelView.as_view(), name='backtest_export_excel'),
     path('<int:pk>/trades-scroll/', BacktestTradesScrollView.as_view(), name='backtest_trades_scroll'),
     path('<int:pk>/trade/<int:trade_num>/candles/', BacktestTradeCandlesView.as_view(), name='backtest_trade_candles'),
+    path('<int:pk>/trade/<int:trade_num>/chart/', BacktestTradeChartView.as_view(), name='backtest_trade_chart'),
     path('<int:pk>/logs/', BacktestLogsModalView.as_view(), name='backtest_logs_modal'),
     path('<int:pk>/apply-ai-rule/', BacktestApplyAiRuleView.as_view(), name='backtest_apply_ai_rule'),
     path('<int:pk>/status/', BacktestStatusView.as_view(), name='backtest_status'),

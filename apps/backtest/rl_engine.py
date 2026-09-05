@@ -33,12 +33,12 @@ class TensorTradeRLEngine:
         return sorted(partitioned)
 
     @classmethod
-    def load_marmot_parquet(cls, backup_dir: str, index_name: str = "NIFTY", start_date: str = None, end_date: str = None) -> pd.DataFrame:
+    def load_marmot_parquet(cls, backup_dir: str, index_name: str = "NIFTY", start_date: str = None, end_date: str = None, return_options: bool = False):
         """Ingests Marmot Parquet datasets into clean Pandas DataFrame for TensorTrade RL filtered by date."""
         files = cls.find_parquet_files(backup_dir)
         if not files:
             logger.warning(f"No Parquet backup files found under path: {backup_dir}")
-            return pd.DataFrame()
+            return (pd.DataFrame(), pd.DataFrame()) if return_options else pd.DataFrame()
 
         start_dt = None
         end_dt = None
@@ -54,6 +54,7 @@ class TensorTradeRLEngine:
                 pass
 
         dfs = []
+        opt_dfs = []
         for f in files:
             base = os.path.basename(f)
             file_date_str = base.replace(".parquet", "")
@@ -77,13 +78,22 @@ class TensorTradeRLEngine:
                         time_col = c
                         break
 
-                # Symbol filtering for Index or Forex Futures (e.g. MGC, M6E, MNQ)
                 sym_col = "symbol" if "symbol" in temp_df.columns else ("index_name" if "index_name" in temp_df.columns else None)
                 if sym_col and index_name:
                     temp_df = temp_df[temp_df[sym_col].astype(str).str.upper() == index_name.upper()]
 
+                if return_options and ("option_type" in temp_df.columns or "instrument_type" in temp_df.columns):
+                    is_opt = temp_df["option_type"].isin(["CALL", "PUT"]) if "option_type" in temp_df.columns else temp_df["instrument_type"].isin(["OPTION", "PE", "CE"])
+                    o_df = temp_df[is_opt].copy()
+                    if not o_df.empty:
+                        opt_dfs.append(o_df)
+
                 if "instrument_type" in temp_df.columns:
                     spot_temp = temp_df[temp_df["instrument_type"] == "INDEX"].copy()
+                    if not spot_temp.empty:
+                        temp_df = spot_temp
+                elif "strike" in temp_df.columns:
+                    spot_temp = temp_df[temp_df["strike"] == "SPOT"].copy()
                     if not spot_temp.empty:
                         temp_df = spot_temp
 
@@ -116,7 +126,7 @@ class TensorTradeRLEngine:
                 logger.error(f"Error reading Parquet file {f}: {e}")
 
         if not dfs:
-            return pd.DataFrame()
+            return (pd.DataFrame(), pd.DataFrame()) if return_options else pd.DataFrame()
 
         df = pd.concat(dfs, ignore_index=True)
 
@@ -148,7 +158,29 @@ class TensorTradeRLEngine:
             df.sort_values("dt_parsed", inplace=True)
             df.reset_index(drop=True, inplace=True)
 
-        return df
+        if not return_options:
+            return df
+
+        if not opt_dfs:
+            return df, pd.DataFrame()
+
+        options_df = pd.concat(opt_dfs, ignore_index=True)
+        opt_time_col = None
+        for c in ["datetime", "timestamp", "ts_event"]:
+            if c in options_df.columns:
+                opt_time_col = c
+                break
+        if opt_time_col:
+            options_df["dt_parsed"] = pd.to_datetime(options_df[opt_time_col], errors="coerce")
+            options_df["session_date"] = options_df["dt_parsed"].dt.date
+            if start_dt:
+                options_df = options_df[options_df["session_date"] >= start_dt]
+            if end_dt:
+                options_df = options_df[options_df["session_date"] <= end_dt]
+            options_df.sort_values("dt_parsed", inplace=True)
+            options_df.reset_index(drop=True, inplace=True)
+
+        return df, options_df
 
     @classmethod
     def load_india_vix_data(cls, backup_dir: str = "", start_date: str = None, end_date: str = None) -> pd.DataFrame:
@@ -368,7 +400,14 @@ class TensorTradeRLEngine:
 
         print(f"[TENSORTRADE-RL] Initializing RL Environment: Strategy={algorithm}, Index={index_name}, OrderEntry={order_entry_style}, AutoSL={is_auto_sl}, Timesteps={total_timesteps}, Capital=₹{initial_capital:,.0f}, Period={start_date_str} → {end_date_str}", flush=True)
 
-        df = cls.load_marmot_parquet(backup_dir, index_name=index_name, start_date=start_date_str, end_date=end_date_str)
+        df, options_df = cls.load_marmot_parquet(backup_dir, index_name=index_name, start_date=start_date_str, end_date=end_date_str, return_options=True)
+        options_lookup = {}
+        if isinstance(options_df, pd.DataFrame) and not options_df.empty:
+            for (s_date, opt_type, s_strike), grp in options_df.groupby(["session_date", "option_type", "strike"]):
+                norm_type = "CALL" if str(opt_type).upper() in ["CALL", "CE"] else "PUT"
+                s_key = str(s_strike).upper().strip()
+                options_lookup[(s_date, norm_type, s_key)] = grp.sort_values("dt_parsed").reset_index(drop=True)
+
         if df.empty or len(df) < 10:
             print(f"[TENSORTRADE-RL] Parquet dataset not found or empty for period {start_date_str} to {end_date_str}. Synthesizing realistic historical {index_name} option market series...", flush=True)
             
@@ -447,6 +486,13 @@ class TensorTradeRLEngine:
                     rule_types.add(r)
 
         prompt_lower = prompt_directives.lower()
+        FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
+        is_forex = (index_name.upper() in FOREX_SYMBOLS) or (params.get("market_type") == "FOREX_FUTURES")
+        from apps.common.constants import FOREX_INSTRUMENT_SPECS
+        forex_spec = FOREX_INSTRUMENT_SPECS.get(index_name.upper(), {"point_value": 1.0, "tick_size": 0.1, "tick_value": 1.0}) if is_forex else {}
+        point_multiplier = forex_spec.get("point_value", 1.0) if is_forex else 1.0
+
+        has_momentum_guardrail = ("momentum_guardrail" in rule_types) or ("guardrail" in prompt_lower) or ("momentum" in prompt_lower) or (not rule_types and not is_forex)
         has_intraday = ("intraday" in rule_types) or ("15:15" in prompt_lower) or ("square off" in prompt_lower)
         has_gamma = ("gamma_blast" in rule_types) or ("gamma" in prompt_lower) or ("0dte" in prompt_lower)
         has_morning = ("morning_trend" in rule_types) or ("morning" in prompt_lower) or ("orb" in prompt_lower)
@@ -465,12 +511,6 @@ class TensorTradeRLEngine:
         has_dom_absorption = ("forex_dom_absorption" in rule_types) or ("dom" in prompt_lower) or ("absorption" in prompt_lower) or ("iceberg" in prompt_lower)
         has_killzone_delta = ("forex_killzone_delta" in rule_types) or ("killzone delta" in prompt_lower) or ("cme killzone" in prompt_lower)
         has_smc_displacement = ("forex_smc_displacement" in rule_types) or ("displacement" in prompt_lower) or ("fvg" in prompt_lower)
-
-        FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
-        is_forex = (index_name.upper() in FOREX_SYMBOLS) or (params.get("market_type") == "FOREX_FUTURES")
-        from apps.common.constants import FOREX_INSTRUMENT_SPECS
-        forex_spec = FOREX_INSTRUMENT_SPECS.get(index_name.upper(), {"point_value": 1.0, "tick_size": 0.1, "tick_value": 1.0}) if is_forex else {}
-        point_multiplier = forex_spec.get("point_value", 1.0) if is_forex else 1.0
 
         # Load date-matched India VIX series in parallel for volatility regime mapping
         vix_df = cls.load_india_vix_data(backup_dir, start_date=start_date_str, end_date=end_date_str)
@@ -504,7 +544,7 @@ class TensorTradeRLEngine:
                         key = f"{dt_val.strftime('%Y-%m-%d %H')}"
                         macro_by_hour[key] = m_row.to_dict()
 
-        print(f"[TENSORTRADE-RL] Active Strategy Constraints: UseMacroAssist={use_macro_assist}, IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}", flush=True)
+        print(f"[TENSORTRADE-RL] Active Strategy Constraints: MomentumGuardrail={has_momentum_guardrail}, UseMacroAssist={use_macro_assist}, IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}", flush=True)
         if prompt_directives:
             print(f"[TENSORTRADE-RL] AI Prompt Directive: '{prompt_directives}'", flush=True)
 
@@ -533,6 +573,13 @@ class TensorTradeRLEngine:
             date_str = session_date.strftime("%Y-%m-%d") if hasattr(session_date, "strftime") else str(session_date)
             lot_size = get_historical_lot_size(index_name, date_str)
             total_qty = lots_count * lot_size
+
+            session_df = session_df.copy()
+            session_df["ema9"] = session_df["close"].ewm(span=9, adjust=False).mean()
+            session_df["ema21"] = session_df["close"].ewm(span=21, adjust=False).mean()
+            orb_slice = session_df.iloc[:min(15, len(session_df))]
+            orb_high = float(orb_slice["high"].max() if "high" in orb_slice else orb_slice["close"].max())
+            orb_low = float(orb_slice["low"].min() if "low" in orb_slice else orb_slice["close"].min())
 
             # Evaluate date-matched India VIX volatility regime
             vix_val = round(vix_by_date.get(session_date, 14.50), 2)
@@ -601,8 +648,33 @@ class TensorTradeRLEngine:
                 rule_matched_tag = ""
                 rule_matched_reason = ""
 
+                # 0. Professional Intraday Trend & Momentum Guardrails (15m ORB + EMA 9/21 + 45m Time-Stop)
+                if has_momentum_guardrail:
+                    if time_minutes < 9 * 60 + 30:
+                        k += 1
+                        continue
+                    cand_close = float(row_entry["close"])
+                    ema9_val = float(row_entry["ema9"]) if "ema9" in row_entry else cand_close
+                    ema21_val = float(row_entry["ema21"]) if "ema21" in row_entry else cand_close
+
+                    if cand_close >= orb_high and ema9_val >= ema21_val:
+                        rule_matched_tag = "Momentum Guardrail"
+                        rule_matched_reason = f"⚡ [Momentum Guardrail] 15m ORB Breakout High ({cand_close:.1f} >= {orb_high:.1f}) + EMA 9/21 Bullish Trend"
+                        is_ce = True
+                    elif cand_close <= orb_low and ema9_val <= ema21_val:
+                        rule_matched_tag = "Momentum Guardrail"
+                        rule_matched_reason = f"⚡ [Momentum Guardrail] 15m ORB Breakdown Low ({cand_close:.1f} <= {orb_low:.1f}) + EMA 9/21 Bearish Trend"
+                        is_ce = False
+                    elif time_minutes <= 14 * 60 + 45 and (ema9_val > ema21_val * 1.0003 or ema9_val < ema21_val * 0.9997):
+                        is_ce = (ema9_val >= ema21_val)
+                        trend_label = "Bullish Continuation" if is_ce else "Bearish Continuation"
+                        rule_matched_tag = "Momentum Guardrail"
+                        rule_matched_reason = f"⚡ [Momentum Guardrail] EMA 9/21 {trend_label} ({ema9_val:.1f} vs {ema21_val:.1f})"
+                    else:
+                        k += 1
+                        continue
                 # 0. Forex Order Flow Strategy Rules (CVD Divergence, DOM Absorption, Killzone Delta, SMC Displacement)
-                if has_cvd_divergence:
+                elif has_cvd_divergence:
                     rule_matched_tag = "Forex CVD Divergence"
                     rule_matched_reason = "⚡ [CVD Orderflow Divergence] Price/CVD Cumulative Delta Divergence (1:2.5 RR)"
                 elif has_dom_absorption:
@@ -677,7 +749,7 @@ class TensorTradeRLEngine:
                 elif has_intraday and (time_minutes <= 14 * 60 + 45):
                     rule_matched_tag = "Intraday Only"
                     rule_matched_reason = "⚡ [Intraday Rule] Intraday Trend Signal"
-                elif not (has_cvd_divergence or has_dom_absorption or has_killzone_delta or has_smc_displacement or has_gamma or has_morning or has_gap or has_vix or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_morning_macd):
+                elif not (has_momentum_guardrail or has_cvd_divergence or has_dom_absorption or has_killzone_delta or has_smc_displacement or has_gamma or has_morning or has_gap or has_vix or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_morning_macd):
                     if time_minutes <= 14 * 60 + 45:
                         rule_matched_tag = "TensorTrade RL"
                         rule_matched_reason = "⚡ [TensorTrade RL] Policy Momentum Signal"
@@ -704,20 +776,26 @@ class TensorTradeRLEngine:
                         is_ce = (entry_spot >= open_val)
                 elif rule_matched_tag in ["Morning 3-Min MACD Retest", "Forex CVD Divergence", "Forex DOM Absorption", "Forex Killzone Delta"]:
                     is_ce = (entry_spot >= open_val)
+                elif rule_matched_tag == "Momentum Guardrail":
+                    pass  # is_ce resolved cleanly from ORB breakout & EMA trend
                 else:
                     is_ce = (entry_spot >= open_val)
                 trade_type = "BUY CE" if is_ce else "BUY PE"
                 option_type = "CE" if is_ce else "PE"
 
-                # Strike Selection & Delta
-                if rule_matched_tag == "Overnight Gap":
+                # Strike Selection & Delta (Respect user config if specified)
+                if strike_selection and str(strike_selection).upper() not in ["AUTO", "NONE", ""]:
+                    active_strike_sel = str(strike_selection).upper().strip()
+                elif rule_matched_tag == "Overnight Gap":
                     active_strike_sel = "OTM2"
                 elif rule_matched_tag == "Gamma Blast 0DTE":
                     active_strike_sel = "OTM1"
+                elif rule_matched_tag == "Momentum Guardrail":
+                    active_strike_sel = "ATM"
                 elif rule_matched_tag in ["ICT Smart Money Matrix", "Morning 3-Min MACD Retest", "Forex CVD Divergence", "Forex DOM Absorption"] or (has_vix and vix_val > 18.0):
                     active_strike_sel = "ITM1"
                 else:
-                    active_strike_sel = strike_selection
+                    active_strike_sel = "ATM"
 
                 offset_mult = 0
                 if active_strike_sel == "ITM1":
@@ -743,100 +821,232 @@ class TensorTradeRLEngine:
                 elif "OTM2" in active_strike_sel:
                     delta = 0.25
 
-                opt_entry_price = round(max(20.0 if rule_matched_tag in ["Overnight Gap", "Gamma Blast 0DTE"] else 35.0, min(650.0, (entry_spot * 0.0075) + 30.0 + (abs(offset_mult) * 20.0 * (-1 if offset_mult > 0 else 1)))), 2)
+                # Resolve strike key for Parquet dataset lookups ('ATM', 'ATM+1', 'ATM-1', etc.)
+                strike_key = "ATM"
+                sel_u = active_strike_sel.upper()
+                if "ATM" in sel_u and not ("+" in sel_u or "-" in sel_u or "1" in sel_u or "2" in sel_u or "3" in sel_u):
+                    strike_key = "ATM"
+                elif is_ce:
+                    if "ITM1" in sel_u: strike_key = "ATM-1"
+                    elif "ITM2" in sel_u: strike_key = "ATM-2"
+                    elif "ITM3" in sel_u: strike_key = "ATM-3"
+                    elif "OTM1" in sel_u: strike_key = "ATM+1"
+                    elif "OTM2" in sel_u: strike_key = "ATM+2"
+                    elif "OTM3" in sel_u: strike_key = "ATM+3"
+                else:
+                    if "ITM1" in sel_u: strike_key = "ATM+1"
+                    elif "ITM2" in sel_u: strike_key = "ATM+2"
+                    elif "ITM3" in sel_u: strike_key = "ATM+3"
+                    elif "OTM1" in sel_u: strike_key = "ATM-1"
+                    elif "OTM2" in sel_u: strike_key = "ATM-2"
+                    elif "OTM3" in sel_u: strike_key = "ATM-3"
 
-                # Dynamic SL & TP based on VIX Volatility Regime & ATR Volatility Buffer
-                active_sl_pts = stop_loss_pts
-                active_rr = rr_ratio
-                if has_atr_noise:
-                    atr_dynamic_pts = round(max(stop_loss_pts, (entry_spot * 0.0032 * delta)), 1)
+                cand_opts = pd.DataFrame()
+                opt_type_val = "CALL" if is_ce else "PUT"
+
+                # Reconstruct true continuous contract for strike_val to avoid rolling strike jumps
+                if isinstance(options_df, pd.DataFrame) and not options_df.empty and "spot_price" in options_df.columns:
+                    session_opts = options_df[(options_df["session_date"] == session_date) & (options_df["option_type"] == opt_type_val)]
+                    if not session_opts.empty and session_opts["spot_price"].notnull().any():
+                        candle_atm = (session_opts["spot_price"] / strike_step).round() * strike_step
+                        diff = ((strike_val - candle_atm) / strike_step).round().astype(int).clip(-5, 5)
+                        conditions = [diff > 0, diff < 0]
+                        choices = ["ATM+" + diff.astype(str), "ATM" + diff.astype(str)]
+                        session_opts = session_opts.copy()
+                        session_opts["needed_strike"] = np.select(conditions, choices, default="ATM")
+                        matched_opts = session_opts[session_opts["strike"] == session_opts["needed_strike"]].sort_values("dt_parsed").drop_duplicates("dt_parsed")
+                        if not matched_opts.empty:
+                            cand_opts = matched_opts[matched_opts["dt_parsed"] >= t_entry]
+
+                # Fallback to static relative or discrete strike lookup
+                if cand_opts.empty and options_lookup:
+                    opt_series = options_lookup.get((session_date, opt_type_val, str(strike_val)))
+                    if opt_series is None:
+                        opt_series = options_lookup.get((session_date, opt_type_val, strike_key))
+                    if opt_series is not None and not opt_series.empty:
+                        cand_opts = opt_series[opt_series["dt_parsed"] >= t_entry]
+
+                # Dynamic SL & TP based on User Config & Volatility Regime (Respect user-defined parameters)
+                active_sl_pts = stop_loss_pts if (stop_loss_pts and stop_loss_pts > 0) else 15.0
+                active_rr = rr_ratio if (rr_ratio and rr_ratio > 0) else 2.0
+                if has_atr_noise and (not stop_loss_pts or stop_loss_pts <= 0):
+                    atr_dynamic_pts = round(max(15.0, (entry_spot * 0.0032 * delta)), 1)
                     active_sl_pts = max(active_sl_pts, atr_dynamic_pts)
 
-                if rule_matched_tag in ["ICT Smart Money Matrix", "Forex DOM Absorption"]:
-                    active_rr = max(3.0, round(rr_ratio * 1.5, 1))
-                elif rule_matched_tag in ["Morning 3-Min MACD Retest", "Liquidity Sweep SMC", "Forex CVD Divergence", "Forex SMC Displacement"]:
-                    active_rr = max(2.5, round(rr_ratio * 1.25, 1))
+                if rule_matched_tag in ["ICT Smart Money Matrix", "Forex DOM Absorption"] and (not rr_ratio or rr_ratio <= 0):
+                    active_rr = 3.0
+                elif rule_matched_tag in ["Morning 3-Min MACD Retest", "Liquidity Sweep SMC", "Forex CVD Divergence", "Forex SMC Displacement"] and (not rr_ratio or rr_ratio <= 0):
+                    active_rr = 2.5
+                elif rule_matched_tag == "Momentum Guardrail":
+                    active_rr = rr_ratio if (rr_ratio and rr_ratio > 0) else 1.75
+                    active_sl_pts = stop_loss_pts if (stop_loss_pts and stop_loss_pts > 0) else 15.0
 
-                if has_vix:
+                if has_vix and (not stop_loss_pts or stop_loss_pts <= 0):
                     if vix_val < 12.0:
                         active_sl_pts = round(active_sl_pts * 0.75, 1)
-                        active_rr = max(1.5, round(rr_ratio * 0.85, 1))
+                        active_rr = max(1.5, round(active_rr * 0.85, 1))
                     elif vix_val > 18.0:
-                        active_rr = max(2.5, round(rr_ratio * 1.25, 1))
+                        active_rr = max(2.5, round(active_rr * 1.25, 1))
 
-                target_pts = active_sl_pts * active_rr
+                target_pts = round(active_sl_pts * active_rr, 2)
 
-                # Forward simulation: Overnight Holding (BTST/STBT) vs Intraday
-                if rule_matched_tag == "Overnight Gap" and (session_idx + 1 < total_sessions):
-                    exit_idx = n_candles - 1
-                    next_session_df = session_list[session_idx + 1][1]
-                    exit_row = next_session_df.iloc[0]
-                    exit_spot = float(exit_row["open"]) if "open" in exit_row else float(exit_row["close"])
-                    ts_exit = exit_row["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+                # Determine entry price & forward simulate on real option candles or synthetic fallback
+                if not cand_opts.empty:
+                    opt_entry_price = round(float(cand_opts.iloc[0]["open"]), 2)
+                    if opt_entry_price <= 0:
+                        opt_entry_price = round(float(cand_opts.iloc[0]["close"]), 2)
+                    target_price = round(opt_entry_price + target_pts, 2)
+                    initial_sl_price = round(max(0.5, opt_entry_price - active_sl_pts), 2)
+                    sl_price = initial_sl_price
+                    trailing_sl_price = initial_sl_price
 
-                    gap_pts_spot = (exit_spot - entry_spot) if is_ce else (entry_spot - exit_spot)
-                    gap_pct = round((abs(exit_spot - entry_spot) / entry_spot) * 100, 2)
-
-                    # Overnight holding: no SL triggers during the night; asymmetric profit on gap up/down
-                    if gap_pts_spot > 0:
-                        opt_pts = round(max(target_pts, gap_pts_spot * delta * 1.6), 2)
-                        exit_reason = f"🎯 Next-Day 09:16 AM Opening Gap Captured (+{round(opt_pts, 1)} pts | +{gap_pct}% Gap)"
-                    else:
-                        opt_pts = round(-min(opt_entry_price, max(active_sl_pts, abs(gap_pts_spot) * delta)), 2)
-                        exit_reason = f"🛑 Next-Day 09:16 AM Gap Reversal ({round(opt_pts, 1)} pts | Capped Premium Risk)"
-
-                    k = n_candles - 1
-                else:
                     exit_idx = n_candles - 1
                     opt_pts = 0.0
                     exit_reason = ""
+                    opt_exit_price = opt_entry_price
 
-                    for j in range(k + 1, n_candles):
-                        cand_row = session_df.iloc[j]
-                        cand_spot = float(cand_row["close"])
-                        cand_time_min = cand_row["dt_parsed"].hour * 60 + cand_row["dt_parsed"].minute
-                        cand_pts_spot = (cand_spot - entry_spot) if is_ce else (entry_spot - cand_spot)
-                        cand_opt_pts = cand_pts_spot * delta
+                    if len(cand_opts) > 1:
+                        for opt_step_idx in range(1, len(cand_opts)):
+                            cand_opt_row = cand_opts.iloc[opt_step_idx]
+                            opt_h = float(cand_opt_row["high"])
+                            opt_l = float(cand_opt_row["low"])
+                            opt_c = float(cand_opt_row["close"])
+                            cand_time_min = cand_opt_row["dt_parsed"].hour * 60 + cand_opt_row["dt_parsed"].minute
 
-                        # Target Hit
-                        if cand_opt_pts >= target_pts:
-                            opt_pts = target_pts
-                            exit_idx = j
-                            exit_reason = f"🎯 Target Achieved (+{round(target_pts, 1)} pts | 1:{active_rr} RR)"
-                            break
-                        # Stop Loss Hit
-                        elif cand_opt_pts <= -active_sl_pts:
-                            if has_candle_close and cand_opt_pts > -(active_sl_pts + 5.0) and j < n_candles - 1:
-                                # Transient sub-candle noise wick: protected by candle close invalidation filter
-                                continue
-                            opt_pts = -active_sl_pts
-                            exit_idx = j
-                            if has_candle_close:
-                                exit_reason = f"🛑 Candle Close SL Triggered (-{round(active_sl_pts, 1)} pts | Anti-Wick Confirmed)"
-                            else:
-                                exit_reason = f"🛑 Stop Loss Triggered (-{round(active_sl_pts, 1)} pts)"
-                            break
-                        # Auto Square-off at 15:15 IST
-                        elif cand_time_min >= 15 * 60 + 15:
-                            opt_pts = round(cand_opt_pts, 2)
-                            exit_idx = j
-                            exit_reason = f"⏰ 15:15 IST Auto Square-off ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
-                            break
+                            # Trailing Breakeven protection (Lock in +2 pts once up +10 pts)
+                            if has_momentum_guardrail and (opt_h - opt_entry_price) >= 10.0:
+                                sl_price = max(sl_price, opt_entry_price + 2.0)
+
+                            if opt_h >= target_price:
+                                opt_exit_price = target_price
+                                opt_pts = target_pts
+                                ts_exit = cand_opt_row["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+                                exit_spot = float(cand_opt_row["spot_price"]) if "spot_price" in cand_opt_row and pd.notnull(cand_opt_row["spot_price"]) else entry_spot
+                                exit_reason = f"🎯 Target Achieved (+{round(target_pts, 1)} pts | 1:{active_rr} RR)"
+                                break
+                            elif opt_l <= sl_price:
+                                if has_candle_close and opt_c > sl_price and opt_step_idx < len(cand_opts) - 1:
+                                    continue
+                                opt_exit_price = sl_price
+                                opt_pts = round(opt_exit_price - opt_entry_price, 2)
+                                ts_exit = cand_opt_row["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+                                exit_spot = float(cand_opt_row["spot_price"]) if "spot_price" in cand_opt_row and pd.notnull(cand_opt_row["spot_price"]) else entry_spot
+                                if sl_price >= opt_entry_price:
+                                    exit_reason = f"🛡️ Trailing Stop Loss / Breakeven Hit ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
+                                elif has_candle_close:
+                                    exit_reason = f"🛑 Candle Close SL Triggered (-{round(active_sl_pts, 1)} pts | Anti-Wick Confirmed)"
+                                else:
+                                    exit_reason = f"🛑 Stop Loss Triggered (-{round(active_sl_pts, 1)} pts)"
+                                break
+                            elif has_momentum_guardrail and (opt_step_idx >= 45 or (cand_time_min - time_minutes) >= 45):
+                                opt_exit_price = round(opt_c, 2)
+                                opt_pts = round(opt_exit_price - opt_entry_price, 2)
+                                ts_exit = cand_opt_row["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+                                exit_spot = float(cand_opt_row["spot_price"]) if "spot_price" in cand_opt_row and pd.notnull(cand_opt_row["spot_price"]) else entry_spot
+                                exit_reason = f"⏰ 45-Min Momentum Time-Stop ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts | Anti-Theta Protection)"
+                                break
+                            elif cand_time_min >= 15 * 60 + 15:
+                                opt_exit_price = round(opt_c, 2)
+                                opt_pts = round(opt_exit_price - opt_entry_price, 2)
+                                ts_exit = cand_opt_row["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+                                exit_spot = float(cand_opt_row["spot_price"]) if "spot_price" in cand_opt_row and pd.notnull(cand_opt_row["spot_price"]) else entry_spot
+                                exit_reason = f"⏰ 15:15 IST Auto Square-off ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
+                                break
 
                     if not exit_reason:
-                        last_row = session_df.iloc[-1]
-                        last_pts = (float(last_row["close"]) - entry_spot) if is_ce else (entry_spot - float(last_row["close"]))
-                        opt_pts = round(last_pts * delta, 2)
-                        exit_idx = n_candles - 1
+                        last_cand = cand_opts.iloc[-1]
+                        opt_exit_price = round(float(last_cand["close"]), 2)
+                        opt_pts = round(opt_exit_price - opt_entry_price, 2)
+                        ts_exit = last_cand["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+                        exit_spot = float(last_cand["spot_price"]) if "spot_price" in last_cand and pd.notnull(last_cand["spot_price"]) else entry_spot
                         exit_reason = f"⏰ End of Session Square-off ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
 
-                exit_spot = float(session_df.iloc[exit_idx]["close"])
-                ts_exit = session_df.iloc[exit_idx]["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+                    m_rows = session_df[session_df["dt_parsed"] >= pd.to_datetime(ts_exit)]
+                    k = session_df.index.get_loc(m_rows.index[0]) if not m_rows.empty else (n_candles - 1)
+                else:
+                    opt_entry_price = round(max(20.0 if rule_matched_tag in ["Overnight Gap", "Gamma Blast 0DTE"] else 35.0, min(650.0, (entry_spot * 0.0075) + 30.0 + (abs(offset_mult) * 20.0 * (-1 if offset_mult > 0 else 1)))), 2)
+                    target_price = round(opt_entry_price + target_pts, 2)
+                    initial_sl_price = round(max(0.5, opt_entry_price - active_sl_pts), 2)
+                    sl_price = initial_sl_price
+                    trailing_sl_price = initial_sl_price
+
+                    # Forward simulation: Overnight Holding (BTST/STBT) vs Intraday
+                    if rule_matched_tag == "Overnight Gap" and (session_idx + 1 < total_sessions):
+                        exit_idx = n_candles - 1
+                        next_session_df = session_list[session_idx + 1][1]
+                        exit_row = next_session_df.iloc[0]
+                        exit_spot = float(exit_row["open"]) if "open" in exit_row else float(exit_row["close"])
+                        ts_exit = exit_row["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+
+                        gap_pts_spot = (exit_spot - entry_spot) if is_ce else (entry_spot - exit_spot)
+                        gap_pct = round((abs(exit_spot - entry_spot) / entry_spot) * 100, 2)
+
+                        if gap_pts_spot > 0:
+                            opt_pts = round(max(target_pts, gap_pts_spot * delta * 1.6), 2)
+                            exit_reason = f"🎯 Next-Day 09:16 AM Opening Gap Captured (+{round(opt_pts, 1)} pts | +{gap_pct}% Gap)"
+                        else:
+                            opt_pts = round(-min(opt_entry_price, max(active_sl_pts, abs(gap_pts_spot) * delta)), 2)
+                            exit_reason = f"🛑 Next-Day 09:16 AM Gap Reversal ({round(opt_pts, 1)} pts | Capped Premium Risk)"
+
+                        k = n_candles - 1
+                    else:
+                        exit_idx = n_candles - 1
+                        opt_pts = 0.0
+                        exit_reason = ""
+                        running_sl_pts = -active_sl_pts
+
+                        for j in range(k + 1, n_candles):
+                            cand_row = session_df.iloc[j]
+                            cand_spot = float(cand_row["close"])
+                            cand_time_min = cand_row["dt_parsed"].hour * 60 + cand_row["dt_parsed"].minute
+                            cand_pts_spot = (cand_spot - entry_spot) if is_ce else (entry_spot - cand_spot)
+                            cand_opt_pts = cand_pts_spot * delta
+
+                            # Trailing Breakeven protection (Lock in +2 pts once up +10 pts)
+                            if has_momentum_guardrail and cand_opt_pts >= 10.0:
+                                running_sl_pts = max(running_sl_pts, 2.0)
+                                trailing_sl_price = max(trailing_sl_price, round(opt_entry_price + running_sl_pts, 2))
+
+                            if cand_opt_pts >= target_pts:
+                                opt_pts = target_pts
+                                exit_idx = j
+                                exit_reason = f"🎯 Target Achieved (+{round(target_pts, 1)} pts | 1:{active_rr} RR)"
+                                break
+                            elif cand_opt_pts <= running_sl_pts:
+                                if has_candle_close and cand_opt_pts > (running_sl_pts - 5.0) and j < n_candles - 1:
+                                    continue
+                                opt_pts = running_sl_pts
+                                exit_idx = j
+                                if running_sl_pts >= 0:
+                                    exit_reason = f"🛡️ Trailing Stop Loss / Breakeven Hit ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
+                                elif has_candle_close:
+                                    exit_reason = f"🛑 Candle Close SL Triggered (-{round(active_sl_pts, 1)} pts | Anti-Wick Confirmed)"
+                                else:
+                                    exit_reason = f"🛑 Stop Loss Triggered (-{round(active_sl_pts, 1)} pts)"
+                                break
+                            elif has_momentum_guardrail and ((j - k) >= 45 or (cand_time_min - time_minutes) >= 45):
+                                opt_pts = round(cand_opt_pts, 2)
+                                exit_idx = j
+                                exit_reason = f"⏰ 45-Min Momentum Time-Stop ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts | Anti-Theta Protection)"
+                                break
+                            elif cand_time_min >= 15 * 60 + 15:
+                                opt_pts = round(cand_opt_pts, 2)
+                                exit_idx = j
+                                exit_reason = f"⏰ 15:15 IST Auto Square-off ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
+                                break
+
+                        if not exit_reason:
+                            last_row = session_df.iloc[-1]
+                            last_pts = (float(last_row["close"]) - entry_spot) if is_ce else (entry_spot - float(last_row["close"]))
+                            opt_pts = round(last_pts * delta, 2)
+                            exit_idx = n_candles - 1
+                            exit_reason = f"⏰ End of Session Square-off ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
+
+                    exit_spot = float(session_df.iloc[exit_idx]["close"])
+                    ts_exit = session_df.iloc[exit_idx]["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+                    opt_exit_price = round(max(0.5, opt_entry_price + opt_pts), 2)
 
                 price_change = round(exit_spot - entry_spot, 2)
-                opt_exit_price = round(max(0.5, opt_entry_price + opt_pts), 2)
-                target_price = round(opt_entry_price + target_pts, 2)
-                sl_price = round(max(0.5, opt_entry_price - active_sl_pts), 2)
 
                 if is_forex:
                     charges_dict = calculate_trade_charges(opt_entry_price, opt_exit_price, lots_count, is_option=False, is_forex=True)
@@ -899,7 +1109,9 @@ class TensorTradeRLEngine:
                     "entry_price": opt_entry_price,
                     "exit_price": opt_exit_price,
                     "target_price": target_price,
-                    "stop_loss_price": sl_price,
+                    "stop_loss_price": initial_sl_price,
+                    "initial_stop_loss_price": initial_sl_price,
+                    "trailing_stop_loss_price": trailing_sl_price,
                     "quantity": total_qty,
                     "lot_size": lot_size,
                     "lots_count": lots_count,
