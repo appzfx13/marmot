@@ -1,0 +1,53 @@
+{% load static %}
+<!-- Live Exchange Clock HUD Widget (IST Real-Time Exchange Session Time) -->
+<div class="glass-card p-3 rounded-4 border border-white border-opacity-10 d-flex align-items-center justify-content-between gap-3 shadow-sm"
+     style="background: rgba(255, 255, 255, 0.03);">
+    <div class="d-flex align-items-center gap-3">
+        <div class="rounded-circle bg-primary bg-opacity-15 text-primary d-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+            <i class="bi bi-clock-history fs-4 text-warning"></i>
+        </div>
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-0.5">
+                <span class="fw-bold fs-4 font-monospace theme-text-main" id="live-exchange-clock-time">
+                    {{ market_clock.time_str|default:"09:15:00" }}
+                </span>
+                <span class="badge bg-dark bg-opacity-75 text-white-50 font-monospace smaller px-2 py-0.5 border border-white border-opacity-10">IST</span>
+            </div>
+            <div class="theme-text-muted smaller d-flex align-items-center gap-2">
+                <span id="live-exchange-clock-date">{{ market_clock.date_str }}</span>
+                <span>&bull;</span>
+                <span>NSE/BSE Exchange Zone</span>
+            </div>
+        </div>
+    </div>
+    <div class="text-end">
+        <span class="badge {{ market_clock.badge_class }} rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5" id="live-exchange-clock-status">
+            {% if market_clock.is_open %}
+                <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+            {% else %}
+                <i class="bi bi-moon-stars-fill me-1"></i>
+            {% endif %}
+            <span>{{ market_clock.label }}</span>
+        </span>
+        <div class="theme-text-muted smaller mt-1 font-monospace">Square-off: 15:15 IST</div>
+    </div>
+</div>
+
+<script>
+    (function() {
+        function updateLiveClock() {
+            const timeElem = document.getElementById('live-exchange-clock-time');
+            if (!timeElem) return;
+            const now = new Date();
+            // Calculate IST time (UTC + 5:30)
+            const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+            const istTime = new Date(utc + (3600000 * 5.5));
+            const hours = String(istTime.getHours()).padStart(2, '0');
+            const minutes = String(istTime.getMinutes()).padStart(2, '0');
+            const seconds = String(istTime.getSeconds()).padStart(2, '0');
+            timeElem.textContent = `${hours}:${minutes}:${seconds}`;
+        }
+        if (window._liveClockInterval) clearInterval(window._liveClockInterval);
+        window._liveClockInterval = setInterval(updateLiveClock, 1000);
+    })();
+</script>

@@ -1,5 +1,12 @@
 <!-- templates/admins/partials/backtest_edit_modal.html -->
 <style>
+    /* Expand modal dialog container for Edit Parameters modal */
+    #globalHtmxModal:has(.edit-backtest-modal-card) #globalHtmxModalDialog,
+    .modal-dialog:has(.edit-backtest-modal-card) {
+        max-width: 1240px !important;
+        width: 96vw !important;
+    }
+
     /* Modal Theme System (Spark Forest & Lime System) */
     :root[data-theme="dark"] .edit-backtest-modal-card {
         background: #0B1D16 !important;
@@ -200,7 +207,7 @@
     }
 </style>
 
-<div class="modal-content edit-backtest-modal-card p-0 border rounded-4 overflow-hidden" style="width: 100%; min-width: 100%; max-width: 1260px;">
+<div class="modal-content edit-backtest-modal-card p-0 border rounded-4 overflow-hidden" style="width: 100%; min-width: 100%; max-width: 1240px;">
     
     <!-- Modal Header -->
     <div class="modal-header border-bottom px-4 px-md-4.5 py-3 d-flex align-items-center justify-content-between" style="border-color: var(--border-color) !important;">
@@ -230,7 +237,7 @@
           hx-target="#globalHtmxModalDialog">
         {% csrf_token %}
 
-        <div class="modal-body px-4 px-md-4.5 py-4" style="max-height: 72vh; overflow-y: auto; overscroll-behavior: contain;">
+        <div class="modal-body px-4 px-md-4.5 py-4" data-lenis-prevent style="max-height: 74vh; overflow-y: auto; overscroll-behavior: contain;">
             
             <!-- Strategy & Index Context Summary Banner -->
             <div class="p-3.5 mb-4 rounded-3 border edit-modal-subpanel d-flex flex-wrap align-items-center justify-content-between gap-3">
@@ -346,6 +353,175 @@
             </div>
             {% endif %}
 
+            <!-- 2.4 AI Dynamic Lot Sizing & Auto Risk Management (Glassmorphic Subpanel) -->
+            <div class="mb-4 p-3.5 rounded-3 border edit-modal-subpanel">
+                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-success" style="font-size: 1.25rem;">account_balance_wallet</span>
+                        <span class="edit-modal-label small fw-bold text-uppercase" style="font-size: 0.78rem; letter-spacing: 0.5px;">
+                            AI Dynamic Lot Sizing & Auto Risk Management
+                        </span>
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 ms-1" style="font-size: 0.70rem;">
+                            Capital Utilization Guardrail
+                        </span>
+                    </div>
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <div class="form-check form-switch p-0 m-0 d-flex align-items-center gap-2">
+                            <label class="form-check-label edit-modal-label small fw-semibold cursor-pointer mb-0" for="edit_enable_ai_lot_sizing" style="font-size: 0.78rem;">
+                                AI Dynamic Sizing
+                            </label>
+                            <input type="checkbox" name="enable_ai_lot_sizing" id="edit_enable_ai_lot_sizing" 
+                                   class="form-check-input edit-rule-toggle m-0" 
+                                   role="switch" 
+                                   {% if enable_ai_lot_sizing_val %}checked{% endif %}
+                                   onchange="toggleAiLotSizingSubpanel(this.checked)">
+                        </div>
+                        <div class="form-check form-switch p-0 m-0 d-flex align-items-center gap-2 border-start ps-3" style="border-color: var(--border-color) !important;">
+                            <label class="form-check-label edit-modal-label small fw-semibold cursor-pointer mb-0" for="edit_auto_risk_management" style="font-size: 0.78rem;">
+                                Auto Risk Guardrail
+                            </label>
+                            <input type="checkbox" name="auto_risk_management" id="edit_auto_risk_management" 
+                                   class="form-check-input edit-rule-toggle m-0" 
+                                   role="switch" 
+                                   {% if auto_risk_management_val %}checked{% endif %}>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Sizing Parameters Grid -->
+                <div id="editAiLotSizingGrid" class="row g-3 transition-all" style="{% if not enable_ai_lot_sizing_val %}opacity: 0.55; pointer-events: none;{% endif %}">
+                    <div class="col-12 col-md-4">
+                        <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_max_risk_per_trade_pct" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                            <span class="material-icons align-middle me-1 text-danger" style="font-size: 0.85rem;">shield</span>
+                            Max Risk Per Trade (% Capital)
+                        </label>
+                        <div class="input-group">
+                            <input type="number" step="0.1" min="0.1" max="10.0" name="max_risk_per_trade_pct" id="edit_max_risk_per_trade_pct" 
+                                   class="form-control edit-modal-input font-monospace fw-bold text-danger" 
+                                   value="{{ max_risk_per_trade_pct_val }}" style="font-size: 0.85rem;">
+                            <span class="input-group-text edit-modal-input font-monospace small px-2.5">%</span>
+                        </div>
+                        <small class="edit-modal-muted mt-1 d-block" style="font-size: 0.70rem;">
+                            Capital loss limit per trade. Quant sizes lots so Stop Loss never exceeds this %.
+                        </small>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_max_capital_utilization_pct" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                            <span class="material-icons align-middle me-1 text-warning" style="font-size: 0.85rem;">pie_chart</span>
+                            Max Capital Utilization (% Margin)
+                        </label>
+                        <div class="input-group">
+                            <input type="number" step="1" min="10" max="100" name="max_capital_utilization_pct" id="edit_max_capital_utilization_pct" 
+                                   class="form-control edit-modal-input font-monospace fw-bold text-warning" 
+                                   value="{{ max_capital_utilization_pct_val }}" style="font-size: 0.85rem;">
+                            <span class="input-group-text edit-modal-input font-monospace small px-2.5">%</span>
+                        </div>
+                        <small class="edit-modal-muted mt-1 d-block" style="font-size: 0.70rem;">
+                            Maximum portfolio margin to allocate. Leaves cash reserves for drawdown buffers.
+                        </small>
+                    </div>
+
+                    <div class="col-12 col-md-4">
+                        <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_max_lots_cap" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                            <span class="material-icons align-middle me-1 text-info" style="font-size: 0.85rem;">vertical_align_top</span>
+                            Max Lots Hard Ceiling
+                        </label>
+                        <div class="input-group">
+                            <input type="number" step="1" min="1" max="100" name="max_lots_cap" id="edit_max_lots_cap" 
+                                   class="form-control edit-modal-input font-monospace fw-bold text-info" 
+                                   value="{{ max_lots_cap_val }}" style="font-size: 0.85rem;">
+                            <span class="input-group-text edit-modal-input font-monospace small px-2.5">Lots</span>
+                        </div>
+                        <small class="edit-modal-muted mt-1 d-block" style="font-size: 0.70rem;">
+                            Absolute maximum lots cap regardless of capital compounding growth.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 2.5 Gemini AI Macro Assist & Parquet Datasets (Glassmorphic Subpanel) -->
+            <div class="mb-4 p-3.5 rounded-3 border edit-modal-subpanel">
+                <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-info" style="font-size: 1.25rem;">psychology</span>
+                        <span class="edit-modal-label small fw-bold text-uppercase" style="font-size: 0.78rem; letter-spacing: 0.5px;">
+                            Gemini AI Macro Assist & Parquet Datasets
+                        </span>
+                        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-0.5 ms-1" style="font-size: 0.70rem;">
+                            Observation Space
+                        </span>
+                    </div>
+                    <div class="form-check form-switch p-0 m-0 d-flex align-items-center gap-2">
+                        <label class="form-check-label edit-modal-label small fw-semibold cursor-pointer mb-0" for="edit_use_macro_assist" style="font-size: 0.78rem;">
+                            Enable AI Macro Assist
+                        </label>
+                        <input type="checkbox" name="use_macro_assist" id="edit_use_macro_assist" 
+                               class="form-check-input edit-rule-toggle m-0" 
+                               role="switch" 
+                               {% if use_macro_assist_val %}checked{% endif %}
+                               onchange="toggleMacroAssistSubpanel(this.checked)">
+                    </div>
+                </div>
+
+                <!-- Macro Configuration Grid (Dimmed if toggled off) -->
+                <div id="editMacroFieldsGrid" class="row g-3 transition-all" style="{% if not use_macro_assist_val %}opacity: 0.55; pointer-events: none;{% endif %}">
+                    <div class="col-12 col-md-7">
+                        <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_macro_backup_task" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                            <span class="material-icons align-middle me-1" style="font-size: 0.85rem;">dataset</span>
+                            AI Macro Sentiment Parquet Dataset
+                        </label>
+                        <select name="macro_backup_task" id="edit_macro_backup_task" class="form-select edit-modal-input font-monospace" style="font-size: 0.82rem;">
+                            <option value="">-- Auto-Detect / Select Macro Parquet Dataset (Optional) --</option>
+                            {% for m_task in available_macro_backups %}
+                            <option value="{{ m_task.id }}" {% if m_task.id == current_macro_backup_id %}selected{% endif %}>
+                                #{{ m_task.id }} · {{ m_task.display_symbol }} ({{ m_task.start_date }} → {{ m_task.end_date }}) [{{ m_task.file_size_mb|floatformat:1 }} MB]
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="edit-modal-muted mt-1 d-block" style="font-size: 0.70rem;">
+                            Parquet file with Gemini AI sentiment scores, FII/DII flow bias, and event risk flags.
+                        </small>
+                    </div>
+
+                    <div class="col-12 col-md-5">
+                        <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_macro_timeframe" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                            <span class="material-icons align-middle me-1" style="font-size: 0.85rem;">schedule</span>
+                            Macro Timeframe
+                        </label>
+                        <select name="macro_timeframe" id="edit_macro_timeframe" class="form-select edit-modal-input fw-semibold" style="font-size: 0.82rem;">
+                            {% for tf_code, tf_label in macro_timeframe_choices %}
+                            <option value="{{ tf_code }}" {% if macro_timeframe_val == tf_code %}selected{% endif %}>
+                                {{ tf_label }}
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="edit-modal-muted mt-1 d-block" style="font-size: 0.70rem;">
+                            Observation aggregation frequency for macro sentiment.
+                        </small>
+                    </div>
+
+                    <!-- Primary Market Backup Switcher -->
+                    <div class="col-12 mt-2">
+                        <label class="form-label edit-modal-label small fw-bold text-uppercase mb-1.5" for="edit_backup_task" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                            <span class="material-icons align-middle me-1" style="font-size: 0.85rem;">inventory_2</span>
+                            Primary Market Dataset (Options / Spot Parquet Volume)
+                        </label>
+                        <select name="backup_task" id="edit_backup_task" class="form-select edit-modal-input font-monospace" style="font-size: 0.82rem;">
+                            <option value="">-- Retain Current Parquet Dataset --</option>
+                            {% for b_task in available_primary_backups %}
+                            <option value="{{ b_task.id }}" {% if b_task.id == current_backup_id %}selected{% endif %}>
+                                #{{ b_task.id }} · {{ b_task.display_symbol }} ({{ b_task.start_date }} → {{ b_task.end_date }}) [{{ b_task.file_size_mb|floatformat:1 }} MB]
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="edit-modal-muted mt-1 d-block" style="font-size: 0.70rem;">
+                            Optionally switch the underlying 1-minute historical tick/candle dataset mounted for this backtest.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
             <!-- 3. Strategy Rules Selection (Generous Height Scrollable Container with Green/Grey Toggles at Right End) -->
             <div class="mb-4 p-3.5 rounded-3 border edit-modal-subpanel">
                 <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
@@ -369,12 +545,13 @@
                 </div>
 
                 <!-- Isolated Scrollable Rules List Container with Right-Aligned Toggle Buttons -->
-                <div class="edit-rules-scroller p-2 rounded-2" 
+                <div class="edit-rules-scroller p-2.5 rounded-3" 
                      id="editModalRulesContainer"
-                     style="max-height: 285px; height: 285px; overflow-y: scroll !important; overscroll-behavior: contain !important; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color) !important;">
+                     data-lenis-prevent
+                     style="max-height: 380px; height: 360px; overflow-y: auto !important; overscroll-behavior: contain !important; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color) !important;">
                     <div class="row g-2.5">
                         {% for rule in available_rules %}
-                        <div class="col-12 col-md-6">
+                        <div class="col-12 col-md-6 col-xl-4">
                             <label class="edit-modal-rule-item w-100 d-flex align-items-center justify-content-between gap-3 p-3 rounded-3 border h-100 transition-all" 
                                    style="cursor: pointer; min-height: 62px;">
                                 <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
@@ -430,31 +607,58 @@
 </div>
 
 <script>
+function toggleMacroAssistSubpanel(isEnabled) {
+    const grid = document.getElementById('editMacroFieldsGrid');
+    if (grid) {
+        grid.style.opacity = isEnabled ? '1.0' : '0.55';
+        grid.style.pointerEvents = isEnabled ? 'auto' : 'none';
+    }
+}
+
+function toggleAiLotSizingSubpanel(isEnabled) {
+    const grid = document.getElementById('editAiLotSizingGrid');
+    if (grid) {
+        grid.style.opacity = isEnabled ? '1.0' : '0.55';
+        grid.style.pointerEvents = isEnabled ? 'auto' : 'none';
+    }
+}
+
 function selectAllEditRules(shouldCheck) {
     const checkboxes = document.querySelectorAll('.edit-rule-checkbox');
     checkboxes.forEach(cb => cb.checked = shouldCheck);
 }
 
-// Stop outer scrolling when wheeling inside the rules container
+// Expand dialog dynamically on mount and restore on close
+(function() {
+    var dialog = document.getElementById('globalHtmxModalDialog');
+    if (dialog) {
+        dialog.style.setProperty('max-width', '1240px', 'important');
+        dialog.style.setProperty('width', '96vw', 'important');
+    }
+    var modalEl = document.getElementById('globalHtmxModal');
+    if (modalEl) {
+        var onHide = function() {
+            if (dialog) {
+                dialog.style.removeProperty('max-width');
+                dialog.style.removeProperty('width');
+            }
+            modalEl.removeEventListener('hidden.bs.modal', onHide);
+        };
+        modalEl.addEventListener('hidden.bs.modal', onHide);
+    }
+})();
+
+// Enable smooth, dedicated mouse wheel scrolling inside the rules container
 (function() {
     const container = document.getElementById('editModalRulesContainer');
     if (container) {
         container.addEventListener('wheel', function(e) {
-            const scrollTop = this.scrollTop;
-            const scrollHeight = this.scrollHeight;
-            const height = this.clientHeight;
+            e.stopPropagation();
             const delta = e.deltaY;
-            const up = delta < 0;
-            if (!up && delta > scrollHeight - height - scrollTop) {
-                this.scrollTop = scrollHeight;
+            const maxScroll = this.scrollHeight - this.clientHeight;
+            if ((delta > 0 && this.scrollTop < maxScroll) || (delta < 0 && this.scrollTop > 0)) {
                 e.preventDefault();
-                e.stopPropagation();
-            } else if (up && -delta > scrollTop) {
-                this.scrollTop = 0;
-                e.preventDefault();
-                e.stopPropagation();
-            } else {
-                e.stopPropagation();
+                this.scrollTop += delta;
             }
         }, { passive: false });
     }

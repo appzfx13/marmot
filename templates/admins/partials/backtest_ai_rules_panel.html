@@ -1,0 +1,149 @@
+{% load static %}
+<div id="aiPreventiveRulesContainer" class="p-3 p-md-4 rounded-3 h-100 rca-subpanel"
+     {% if backtest.results.ai_synthesis_source != 'gemini-3.6-flash' and not is_live_gemini %}
+     hx-get="{% url 'backtest:backtest_synthesize_ai_rules' backtest.pk %}"
+     hx-trigger="load delay:400ms"
+     hx-target="#aiPreventiveRulesContainer"
+     hx-swap="outerHTML"
+     {% endif %}>
+    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary border-opacity-15 flex-wrap gap-2">
+        <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.74rem; letter-spacing: 0.5px;">
+            <span class="material-icons text-info" style="font-size: 1rem;">auto_awesome</span> 
+            AI-Synthesized Preventive Rules
+        </span>
+        <div class="d-flex align-items-center gap-2">
+            {% if backtest.results.ai_synthesis_source == 'gemini-3.6-flash' or is_live_gemini %}
+            <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold d-inline-flex align-items-center gap-1" style="font-size: 0.68rem;">
+                <span class="material-icons" style="font-size: 0.8rem;">smart_toy</span>
+                ✨ Gemini 3.6 Flash (Live AI)
+            </span>
+            {% elif gemini_error %}
+            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
+                AI Quota / Offline
+            </span>
+            {% else %}
+            <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
+                Synthesizing AI Rules...
+            </span>
+            {% endif %}
+
+            <form hx-post="{% url 'backtest:backtest_synthesize_ai_rules' backtest.pk %}" 
+                  hx-target="#aiPreventiveRulesContainer" 
+                  hx-swap="outerHTML" 
+                  hx-indicator="#aiSynthesizeSpinner"
+                  class="d-inline">
+                {% csrf_token %}
+                <button type="submit" 
+                        class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-0.5 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                        style="font-size: 0.70rem;"
+                        title="Prompt Google Gemini to analyze this backtest's losing trades and synthesize custom AI guardrails">
+                    <span id="aiSynthesizeSpinner" class="spinner-border spinner-border-sm text-info htmx-indicator" role="status" style="width: 0.75rem; height: 0.75rem;"></span>
+                    <span class="material-icons" style="font-size: 0.82rem;">psychology</span>
+                    <span>✨ Ask Gemini AI</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    {% if gemini_error %}
+    <!-- Dedicated Gemini AI Connection / Quota Warning Card (Suppresses fake fallback rules) -->
+    <div class="py-4 px-3 text-center my-3 rounded-3 border glass-card" style="background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.3) !important;">
+        <div class="d-inline-flex align-items-center justify-content-center p-3 rounded-circle mb-3" style="background: rgba(245, 158, 11, 0.15); color: #f59e0b;">
+            <span class="material-icons" style="font-size: 2.2rem;">warning</span>
+        </div>
+        <h5 class="fw-bold text-warning font-monospace mb-1" style="font-size: 1.05rem;">
+            Gemini Quantitative AI Unavailable
+        </h5>
+        <div class="text-light small font-monospace px-md-4 mb-3" style="font-size: 0.80rem; max-width: 620px; margin: 0 auto; line-height: 1.55;">
+            {{ gemini_error }}
+        </div>
+        <div class="d-flex align-items-center justify-content-center gap-3 flex-wrap">
+            <form hx-post="{% url 'backtest:backtest_synthesize_ai_rules' backtest.pk %}" 
+                  hx-target="#aiPreventiveRulesContainer" 
+                  hx-swap="outerHTML" 
+                  hx-indicator="#aiRetryCardSpinner"
+                  class="d-inline">
+                {% csrf_token %}
+                <button type="submit" 
+                        class="btn btn-sm btn-warning text-dark rounded-pill px-4 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                        style="font-size: 0.80rem;">
+                    <span id="aiRetryCardSpinner" class="spinner-border spinner-border-sm text-dark htmx-indicator" role="status" style="width: 0.85rem; height: 0.85rem;"></span>
+                    <span class="material-icons" style="font-size: 0.95rem;">refresh</span>
+                    <span>Retry Live Gemini Synthesis</span>
+                </button>
+            </form>
+        </div>
+        <div class="theme-text-muted smaller font-monospace mt-3 pt-2 border-top border-secondary border-opacity-10" style="font-size: 0.72rem;">
+            <span>🛡️ Note: Offline fallback rules suppressed to protect your strategy rulebook from unverified entries.</span>
+        </div>
+    </div>
+    {% elif backtest.results.ai_synthesis_source != 'gemini-3.6-flash' and not is_live_gemini %}
+    <!-- Active Gemini Neural Synthesis State (Hides misleading offline fallbacks) -->
+    <div class="py-4 px-3 text-center my-3 rounded-3 border" style="background: rgba(56, 189, 248, 0.04); border-color: rgba(56, 189, 248, 0.25) !important;">
+        <div class="d-inline-flex align-items-center justify-content-center p-2.5 rounded-circle mb-2.5" style="background: rgba(56, 189, 248, 0.12); color: #38bdf8;">
+            <span class="spinner-border spinner-border-sm text-info" style="width: 1.4rem; height: 1.4rem;" role="status"></span>
+        </div>
+        <div class="fw-bold text-white font-monospace mb-1" style="font-size: 0.88rem;">
+            Synthesizing Tailored Guardrails with Live Google Gemini AI...
+        </div>
+        <div class="theme-text-muted small font-monospace px-md-4" style="font-size: 0.76rem; max-width: 600px; margin: 0 auto; line-height: 1.45;">
+            Clustering loss trades, analyzing market microstructure failure modes, and calculating quantitative risk parameters. Real AI rules will render momentarily.
+        </div>
+    </div>
+    {% else %}
+
+    <div class="d-flex flex-column">
+        {% for future_rule in backtest.results.ai_suggested_future_rules %}
+        <div class="mb-3 pb-3 {% if not forloop.last %}border-bottom border-secondary border-opacity-15{% endif %}">
+            <div class="d-flex justify-content-between align-items-center mb-1.5 flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2 text-truncate">
+                    <span class="material-icons text-info flex-shrink-0" style="font-size: 1.05rem;">shield</span>
+                    <span class="theme-text-main fw-bold text-truncate" style="font-size: 0.86rem;" title="{{ future_rule.name }}">
+                        {{ future_rule.name }}
+                    </span>
+                </div>
+                <div class="d-flex align-items-center gap-2 flex-shrink-0">
+                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-1 font-monospace fw-bold" style="font-size: 0.74rem;">
+                        🛡️ Prevents ~{{ future_rule.impact_loss_count }} Losses
+                    </span>
+                    {% if future_rule.name in attached_rule_names %}
+                    <button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm" disabled style="font-size: 0.75rem; background: #059669; border-color: #059669;">
+                        <span class="material-icons" style="font-size: 0.88rem;">check_circle</span>
+                        <span>✓ Rule Added — Ready to Rerun</span>
+                    </button>
+                    {% else %}
+                    <form hx-post="{% url 'backtest:backtest_apply_ai_rule' backtest.pk %}" 
+                          hx-target="this" 
+                          hx-swap="outerHTML" 
+                          class="d-inline">
+                        {% csrf_token %}
+                        <input type="hidden" name="rule_name" value="{{ future_rule.name }}">
+                        <input type="hidden" name="rule_type" value="{{ future_rule.rule_type|default:'risk_management' }}">
+                        <input type="hidden" name="prompt_directive" value="{{ future_rule.preventive_prompt }}">
+                        <button type="submit" 
+                                class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                style="font-size: 0.75rem;"
+                                title="Automatically create rule and attach to this backtest">
+                            <span class="material-icons" style="font-size: 0.88rem;">add_circle</span>
+                            <span>+ Add This Rule</span>
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="mt-1 ps-4" style="font-size: 0.82rem; line-height: 1.5; color: var(--success, #10b981) !important; font-family: 'Google Sans Flex', 'Plus Jakarta Sans', 'Inter', sans-serif !important;">
+                {{ future_rule.preventive_prompt }}
+            </div>
+            {% if future_rule.ai_reasoning %}
+            <div class="mt-1.5 ps-4 text-info opacity-90 small d-flex align-items-start gap-1" style="font-size: 0.76rem; line-height: 1.4;">
+                <span class="material-icons text-info flex-shrink-0" style="font-size: 0.85rem; margin-top: 2px;">tips_and_updates</span>
+                <span><em>Forensic Reason:</em> {{ future_rule.ai_reasoning }}</span>
+            </div>
+            {% endif %}
+        </div>
+        {% empty %}
+        <div class="theme-text-muted small fst-italic p-4 text-center">No stop loss failure rules suggested.</div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>

@@ -1,0 +1,52 @@
+<!-- templates/admins/partials/backtest_adopt_rule_modal.html -->
+<form method="POST" 
+      action="{% url 'backtest:backtest_adopt_trade_rule' backtest.pk trade_num %}"
+      hx-post="{% url 'backtest:backtest_adopt_trade_rule' backtest.pk trade_num %}"
+      hx-target="#adoptRuleContainer-{{ trade_num }}"
+      hx-swap="innerHTML"
+      class="p-3 rounded-3 border mt-2" 
+      style="background: rgba(0, 0, 0, 0.5); border-color: rgba(180, 241, 5, 0.4) !important;">
+    {% csrf_token %}
+    <input type="hidden" name="rule_type" value="{{ rule_type }}">
+    <input type="hidden" name="market_type" value="ALL">
+
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="fw-bold small text-uppercase font-monospace" style="color: var(--brand-lime, #b4f105); font-size: 0.76rem;">
+            ⚙️ Confirm & Name Your New Guardrail Rule
+        </span>
+        <span class="badge bg-secondary bg-opacity-40 text-light px-2 py-0.5 font-monospace" style="font-size: 0.68rem;">
+            {{ rule_type }}
+        </span>
+    </div>
+
+    <!-- Rule Name Input -->
+    <div class="mb-2.5">
+        <label class="form-label text-light small fw-bold mb-1" style="font-size: 0.74rem;">Rule Name<span class="text-danger ms-0.5">*</span></label>
+        <input type="text" name="name" class="form-control form-control-sm font-monospace" 
+               value="{{ rule_name }}" required 
+               style="background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); color: #fff; font-size: 0.80rem;">
+    </div>
+
+    <!-- Prompt Directive Input -->
+    <div class="mb-2.5">
+        <label class="form-label text-light small fw-bold mb-1" style="font-size: 0.74rem;">Execution Directive (RL AI Prompt)</label>
+        <textarea name="prompt_directive" rows="2" class="form-control form-control-sm"
+                  style="background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.2); color: #fff; font-size: 0.78rem;">{{ prompt_directive }}</textarea>
+    </div>
+
+    <!-- Hidden / Text Parameters -->
+    <input type="hidden" name="description" value="{{ description }}">
+    <input type="hidden" name="parameters" value="{{ parameters }}">
+
+    <!-- Buttons -->
+    <div class="d-flex align-items-center justify-content-end gap-2 pt-1">
+        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 text-light" style="font-size: 0.74rem;" onclick="this.closest('form').remove()">
+            Cancel
+        </button>
+        <button type="submit" class="btn btn-sm rounded-pill fw-bold px-3.5 py-1 d-inline-flex align-items-center gap-1.5 shadow-sm"
+                style="background: var(--brand-lime, #b4f105); color: #0B1D16; font-size: 0.76rem;">
+            <span class="material-icons" style="font-size: 0.90rem;">check_circle</span>
+            <span>Save Rule to Engine</span>
+        </button>
+    </div>
+</form>

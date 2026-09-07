@@ -2165,6 +2165,112 @@
             }, 4000);
         });
 
+        // ── Global Bulk Action & Checkbox Selection Controller ────────────────
+        function updateBulkActionState(container) {
+            var root = container || document;
+            var itemCheckboxes = root.querySelectorAll('.bulk-item-checkbox');
+            var selectAllCheckboxes = root.querySelectorAll('.bulk-select-all');
+            var checkedBoxes = root.querySelectorAll('.bulk-item-checkbox:checked');
+            var count = checkedBoxes.length;
+
+            document.querySelectorAll('.bulk-selected-count').forEach(function (el) {
+                el.textContent = count;
+            });
+
+            document.querySelectorAll('.bulk-action-bar, .bulk-dropdown').forEach(function (el) {
+                if (count > 0) {
+                    el.classList.remove('d-none');
+                    if (el.classList.contains('bulk-action-bar')) {
+                        el.classList.add('d-flex');
+                    }
+                } else {
+                    el.classList.add('d-none');
+                    if (el.classList.contains('bulk-action-bar')) {
+                        el.classList.remove('d-flex');
+                    }
+                }
+            });
+
+            if (itemCheckboxes.length > 0) {
+                var allChecked = count === itemCheckboxes.length;
+                var indeterminate = count > 0 && count < itemCheckboxes.length;
+                selectAllCheckboxes.forEach(function (sa) {
+                    sa.checked = allChecked;
+                    sa.indeterminate = indeterminate;
+                });
+            } else {
+                selectAllCheckboxes.forEach(function (sa) {
+                    sa.checked = false;
+                    sa.indeterminate = false;
+                });
+            }
+        }
+
+        function triggerBulkDelete(btnEl, url) {
+            if (!url) return;
+            var checkedBoxes = document.querySelectorAll('.bulk-item-checkbox:checked');
+            var ids = [];
+            checkedBoxes.forEach(function (cb) {
+                if (cb.value && !ids.includes(cb.value)) {
+                    ids.push(cb.value);
+                }
+            });
+
+            if (ids.length === 0) {
+                document.body.dispatchEvent(new CustomEvent('showToast', {
+                    detail: { message: 'Please select at least one item to delete.', level: 'warning' }
+                }));
+                return;
+            }
+
+            var fullUrl = url + (url.indexOf('?') === -1 ? '?' : '&') + 'ids=' + encodeURIComponent(ids.join(','));
+            if (window.htmx) {
+                window.htmx.ajax('GET', fullUrl, {
+                    target: '#globalHtmxModalDialog',
+                    swap: 'innerHTML'
+                });
+            } else {
+                fetch(fullUrl)
+                    .then(function (res) { return res.text(); })
+                    .then(function (html) {
+                        var dialog = document.getElementById('globalHtmxModalDialog');
+                        if (dialog) {
+                            dialog.innerHTML = html;
+                            var modalEl = document.getElementById('globalHtmxModal');
+                            if (modalEl && window.bootstrap) {
+                                var modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                                modal.show();
+                            }
+                        }
+                    });
+            }
+        }
+
+        document.addEventListener('change', function (evt) {
+            var target = evt.target;
+            if (!target) return;
+
+            if (target.classList.contains('bulk-select-all')) {
+                var isChecked = target.checked;
+                var container = target.closest('.card, .table-responsive, #app-main-container, body') || document;
+                var itemCheckboxes = container.querySelectorAll('.bulk-item-checkbox');
+                itemCheckboxes.forEach(function (cb) {
+                    cb.checked = isChecked;
+                });
+                updateBulkActionState(container);
+            } else if (target.classList.contains('bulk-item-checkbox')) {
+                var container = target.closest('.card, .table-responsive, #app-main-container, body') || document;
+                updateBulkActionState(container);
+            }
+        });
+
+        document.body.addEventListener('htmx:afterSwap', function (evt) {
+            var target = (evt.detail && evt.detail.target) ? evt.detail.target : evt.target;
+            if (target && target.id !== 'globalHtmxModalDialog') {
+                updateBulkActionState();
+            }
+        });
+
         // Active Link Sync on Click & HTMX Settle with Smooth Rolling Pill Animation
         function moveSidebarPill() {
             var activeLink = document.querySelector('#userSidebarNav .sidebar-menu-link.active');

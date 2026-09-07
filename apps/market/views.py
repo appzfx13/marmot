@@ -232,7 +232,7 @@ class MacroBackupCreatePageView(HtmxMessageMixin, LoginRequiredMixin, AdminRequi
             backups_qs = backups_qs.filter(created_by=self.request.user)
 
         backups_meta = {}
-        for b in backups_qs.order_by('-id')[:50]:
+        for b in backups_qs.order_by('-id'):
             backups_meta[str(b.id)] = {
                 'id': b.id,
                 'market_type': b.market_type,
@@ -356,6 +356,126 @@ class MarketBackupPreviewView(LoginRequiredMixin, AdminRequiredMixin, View):
         })
 
 
+class MarketBackupCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """
+    JSON API serving 1-minute OHLCV candles, volume, and IV for Market Backup charts.
+    Directly reads unified dataset.parquet without cross-origin or mixed-content issues.
+    """
+    def get(self, request, pk, *args, **kwargs):
+        task = MarketBackupTask.objects.filter(pk=pk, is_deleted=False).first()
+        if not task:
+            return JsonResponse({'status': 'error', 'message': 'Market backup task not found'}, status=404)
+
+        user_id = str(task.created_by.id if getattr(task, 'created_by', None) else 1)
+        backup_id = str(task.id)
+
+        candidate_paths = [
+            task.parquet_file_path,
+            os.path.join('/app', 'backup', user_id, backup_id, 'dataset.parquet'),
+            os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id, 'dataset.parquet'),
+            os.path.join(settings.BASE_DIR, 'backup', user_id, backup_id),
+            os.path.join('/app', 'backup', user_id, backup_id),
+        ]
+
+        target_file = None
+        for p in candidate_paths:
+            if p and os.path.isfile(p):
+                target_file = p
+                break
+
+        if not target_file:
+            return JsonResponse({'status': 'error', 'message': 'Parquet dataset file not found on disk.'}, status=404)
+
+        try:
+            import pandas as pd
+            import datetime as dt
+
+            df = pd.read_parquet(target_file)
+            if df.empty:
+                return JsonResponse({'status': 'success', 'count': 0, 'candles': [], 'available_options': []})
+
+            df.columns = [str(c).lower().strip() for c in df.columns]
+
+            # Discover all available options (Index Spot, CALL/ATM, PUT/ATM, etc.)
+            available_subs = ["Index Spot"]
+            if 'option_type' in df.columns and 'strike' in df.columns:
+                opt_combos = df[df['option_type'].isin(['CALL', 'PUT'])][['option_type', 'strike']].drop_duplicates()
+                for _, row in opt_combos.iterrows():
+                    lbl = f"{row['option_type']}/{row['strike']}"
+                    if lbl not in available_subs:
+                        available_subs.append(lbl)
+
+            sub = request.GET.get('sub', '').strip()
+            selected_sub = sub or "Index Spot"
+
+            sub_df = pd.DataFrame()
+            if not sub or sub == 'Index Spot':
+                if 'strike' in df.columns and (df['strike'] == 'SPOT').any():
+                    sub_df = df[df['strike'] == 'SPOT']
+                elif 'instrument_type' in df.columns and (df['instrument_type'] == 'INDEX').any():
+                    sub_df = df[df['instrument_type'] == 'INDEX']
+                else:
+                    sub_df = df.iloc[:1000]
+            else:
+                if '/' in sub:
+                    opt_type, strike_val = sub.split('/', 1)
+                    opt_type = opt_type.upper().strip()
+                    strike_val = strike_val.strip()
+                    sub_df = df[(df['option_type'] == opt_type) & (df['strike'] == strike_val)]
+                else:
+                    sub_df = df[df['strike'] == sub]
+
+            time_col = None
+            for c in ['datetime', 'timestamp', 'ts_event', 'date']:
+                if c in sub_df.columns:
+                    time_col = c
+                    break
+
+            candles = []
+            if not sub_df.empty and time_col:
+                sub_df = sub_df.sort_values(time_col).drop_duplicates(time_col)
+                for _, row in sub_df.iterrows():
+                    raw_t = row[time_col]
+                    epoch_sec = 0
+                    dt_str = ""
+                    if isinstance(raw_t, (int, float)):
+                        epoch_sec = int(raw_t) if raw_t < 1e11 else int(raw_t / 1e9)
+                        dt_str = dt.datetime.fromtimestamp(epoch_sec, tz=dt.timezone.utc).strftime("%Y-%m-%d %H:%M:%S")
+                    else:
+                        dt_str = str(raw_t)[:19]
+                        try:
+                            dt_val = dt.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
+                            epoch_sec = int(dt_val.timestamp())
+                        except Exception:
+                            epoch_sec = int(time.time())
+
+                    candles.append({
+                        'time': epoch_sec,
+                        'datetime': dt_str,
+                        'open': round(float(row.get('open', 0.0)), 2),
+                        'high': round(float(row.get('high', 0.0)), 2),
+                        'low': round(float(row.get('low', 0.0)), 2),
+                        'close': round(float(row.get('close', 0.0)), 2),
+                        'volume': int(row.get('volume', 0)),
+                        'iv': round(float(row.get('iv', 0.0)), 2) if 'iv' in row and pd.notnull(row['iv']) else 0.0,
+                        'open_interest': int(row.get('oi', 0)) if 'oi' in row and pd.notnull(row['oi']) else 0,
+                        'spot': round(float(row.get('spot_price', 0.0)), 2) if 'spot_price' in row and pd.notnull(row['spot_price']) else 0.0,
+                    })
+
+            return JsonResponse({
+                'status': 'success',
+                'task_id': str(task.id),
+                'index_name': task.index_name,
+                'selected_sub': selected_sub,
+                'available_options': available_subs,
+                'count': len(candles),
+                'candles': candles,
+            })
+        except Exception as e:
+            logger.error(f"Error loading Parquet candles for Market Backup #{pk}: {e}")
+            return JsonResponse({'status': 'error', 'message': str(e)}, status=500)
+
+
 class MarketBackupChartView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Renders full-screen TradingView Lightweight Chart terminal for a market backup dataset."""
     def get(self, request, pk, *args, **kwargs):
@@ -363,12 +483,12 @@ class MarketBackupChartView(LoginRequiredMixin, AdminRequiredMixin, View):
         if not task:
             raise Http404("Market backup task not found.")
 
-        ws_port = getattr(settings, 'WS_PORT', '8082')
-        go_chart_api_url = f"http://localhost:{ws_port}/api/chart?task_id={task.id}"
+        chart_api_url = reverse_lazy('market:market_backup_candles', kwargs={'pk': task.id})
 
         context = {
             'backup': task,
-            'go_chart_api_url': go_chart_api_url,
+            'chart_api_url': str(chart_api_url),
+            'go_chart_api_url': str(chart_api_url),
             'page_title': f"{task.index_name} Interactive Option Chart - Backup #{task.id}",
         }
         return render(request, 'admins/market_chart.html', context)
@@ -552,7 +672,8 @@ class MarketBackupDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixi
         response['HX-Trigger'] = json.dumps({
             'closeGlobalModal': True,
             'showToast': {'message': str(self.success_message), 'level': 'success'},
-            'reloadBackupTable': True
+            'reloadBackupTable': True,
+            'reloadMacroBackupTable': True
         })
         return response
 
@@ -587,7 +708,8 @@ class MarketBackupBulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
         response['HX-Trigger'] = json.dumps({
             'closeGlobalModal': True,
             'showToast': {'message': msg, 'level': 'success' if count > 0 else 'warning'},
-            'reloadBackupTable': True
+            'reloadBackupTable': True,
+            'reloadMacroBackupTable': True
         })
         return response
 

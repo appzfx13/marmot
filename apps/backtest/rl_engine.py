@@ -252,17 +252,19 @@ class TensorTradeRLEngine:
             if s_dir and os.path.exists(s_dir):
                 found = glob.glob(os.path.join(s_dir, "**", "*.parquet"), recursive=True)
                 for f in found:
-                    if "MACRO" in os.path.basename(f).upper():
+                    if "MACRO" in os.path.basename(f).upper() or f.endswith(f"_{index_name}.parquet"):
                         macro_files.append(f)
 
         for f in set(macro_files):
             try:
                 m_df = pd.read_parquet(f)
                 if not m_df.empty and "macro_sentiment_score" in m_df.columns:
-                    time_col = "timestamp" if "timestamp" in m_df.columns else "datetime"
-                    if time_col in m_df.columns:
+                    time_col = "timestamp" if "timestamp" in m_df.columns else ("datetime" if "datetime" in m_df.columns else None)
+                    if time_col:
                         m_df["dt_parsed"] = pd.to_datetime(m_df[time_col], errors="coerce")
                         m_df["session_date"] = m_df["dt_parsed"].dt.date
+                        if "timestamp_unix" not in m_df.columns:
+                            m_df["timestamp_unix"] = m_df["dt_parsed"].astype("int64") // 10**9
                         return m_df.sort_values("dt_parsed").reset_index(drop=True)
             except Exception as e:
                 logger.warning(f"Failed to read macro parquet {f}: {e}")
@@ -503,7 +505,9 @@ class TensorTradeRLEngine:
         has_candle_close = ("candle_close_sl" in rule_types) or ("candle close" in prompt_lower) or ("wick" in prompt_lower) or ("anti-wick" in prompt_lower) or ("body close" in prompt_lower)
         has_liquidity_sweep = ("liquidity_sweep" in rule_types) or ("sweep" in prompt_lower) or ("trap" in prompt_lower) or ("false breakout" in prompt_lower)
         has_pdh_pdl = ("pdh_pdl" in rule_types) or ("pdh" in prompt_lower) or ("pdl" in prompt_lower) or ("previous day" in prompt_lower)
-        has_ict = ("ict_smc_matrix" in rule_types) or ("ict" in prompt_lower) or ("fvg" in prompt_lower) or ("killzone" in prompt_lower) or ("ote" in prompt_lower) or ("market structure" in prompt_lower) or ("smart money" in prompt_lower)
+        has_ict_v3 = ("ict_smc_v3" in rule_types) or ("ict v3" in prompt_lower) or ("displacement" in prompt_lower and "ict" in prompt_lower)
+        has_ict_v2 = (("ict_smc_v2" in rule_types) or ("ict v2" in prompt_lower) or ("ote retest" in prompt_lower) or ("mitigation" in prompt_lower) or ("zero drawdown" in prompt_lower)) and not has_ict_v3
+        has_ict = (("ict_smc_matrix" in rule_types) or ("ict" in prompt_lower) or ("fvg" in prompt_lower) or ("killzone" in prompt_lower) or ("ote" in prompt_lower) or ("market structure" in prompt_lower) or ("smart money" in prompt_lower)) and not has_ict_v2 and not has_ict_v3
         has_morning_macd = ("morning_macd_retest" in rule_types) or ("macd" in prompt_lower) or ("3 min" in prompt_lower) or ("3min" in prompt_lower) or ("sharp retest" in prompt_lower) or ("option strike retest" in prompt_lower)
 
         # Forex Order Flow Strategy Flags
@@ -523,6 +527,11 @@ class TensorTradeRLEngine:
         use_macro_assist = bool(params.get("use_macro_assist", False))
         macro_timeframe = str(params.get("macro_timeframe", "1h"))
         macro_dir = str(params.get("macro_dir", "") or "")
+        enable_ai_lot_sizing = bool(params.get("enable_ai_lot_sizing", False))
+        auto_risk_management = bool(params.get("auto_risk_management", True))
+        max_risk_pct = float(params.get("max_risk_per_trade_pct", 2.0))
+        max_capital_util_pct = float(params.get("max_capital_utilization_pct", 60.0))
+        max_lots_cap = int(params.get("max_lots_cap", 10))
 
         macro_by_date = {}
         macro_by_hour = {}
@@ -537,14 +546,14 @@ class TensorTradeRLEngine:
             )
             if not macro_df.empty:
                 for s_date, grp in macro_df.groupby("session_date"):
-                    macro_by_date[s_date] = grp.iloc[-1].to_dict()
+                    macro_by_date[s_date] = grp.iloc[0].to_dict()
                 for _, m_row in macro_df.iterrows():
                     dt_val = m_row.get("dt_parsed")
                     if pd.notnull(dt_val):
                         key = f"{dt_val.strftime('%Y-%m-%d %H')}"
                         macro_by_hour[key] = m_row.to_dict()
 
-        print(f"[TENSORTRADE-RL] Active Strategy Constraints: MomentumGuardrail={has_momentum_guardrail}, UseMacroAssist={use_macro_assist}, IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}", flush=True)
+        print(f"[TENSORTRADE-RL] Active Strategy Constraints: MomentumGuardrail={has_momentum_guardrail}, UseMacroAssist={use_macro_assist}, IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}, ICT_SMC_V2={has_ict_v2}, ICT_SMC_V3={has_ict_v3}", flush=True)
         if prompt_directives:
             print(f"[TENSORTRADE-RL] AI Prompt Directive: '{prompt_directives}'", flush=True)
 
@@ -593,7 +602,7 @@ class TensorTradeRLEngine:
                 vix_regime = "Extreme Volatility (Panic Expansion)"
 
             # If strictly India VIX regime filter is active, skip dead IV sessions (< 11.5)
-            if has_vix and vix_val < 11.5 and not (has_gamma or has_morning or has_gap or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_morning_macd):
+            if has_vix and vix_val < 11.5 and not (has_gamma or has_morning or has_gap or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_ict_v2 or has_ict_v3 or has_morning_macd):
                 continue
 
             # Evaluate expiry regime for this specific date
@@ -617,7 +626,7 @@ class TensorTradeRLEngine:
                 pdl_val = round(first_spot * 0.9935, 2)
 
             # If strictly Gamma Blast only, skip non-expiry sessions
-            if has_gamma and not (has_morning or has_gap or has_intraday or has_vix or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_morning_macd) and not is_0dte:
+            if has_gamma and not (has_morning or has_gap or has_intraday or has_vix or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_ict_v2 or has_ict_v3 or has_morning_macd) and not is_0dte:
                 continue
 
             session_trades_count = 0
@@ -691,12 +700,223 @@ class TensorTradeRLEngine:
                     cand_close = float(row_entry["close"])
                     rule_matched_tag = "Morning 3-Min MACD Retest"
                     rule_matched_reason = "⚡ [Morning MACD Retest] 3-Min HTF Momentum + 1-Min MACD Crossover Sharp Retest Entry (1:2.5 RR)"
-                # 2. ICT Institutional Smart Money Strategy (Killzone, MSS, FVG & OTE Matrix)
-                elif has_ict and in_ict_killzone:
-                    cand_close = float(row_entry["close"])
+                # 2. ICT Institutional Smart Money Strategy v3 (Displacement, HTF Trend Lock & OTE Mitigation)
+                elif has_ict_v3 and in_ict_killzone:
+                    # Enforce 15m Initial Balance price discovery: No blind entries before 09:30
+                    if time_minutes < 9 * 60 + 30:
+                        k += 1
+                        continue
+
+                    lookback_win = session_df.iloc[max(0, k - 20):k]
+                    if lookback_win.empty or len(lookback_win) < 5:
+                        k += 1
+                        continue
+
+                    sw_high = float(lookback_win["high"].max() if "high" in lookback_win else lookback_win["close"].max())
+                    sw_low = float(lookback_win["low"].min() if "low" in lookback_win else lookback_win["close"].min())
+                    cand_curr = row_entry
+                    curr_c = float(cand_curr["close"])
+                    curr_o = float(cand_curr["open"]) if "open" in cand_curr else curr_c
+                    curr_h = float(cand_curr["high"]) if "high" in cand_curr else curr_c
+                    curr_l = float(cand_curr["low"]) if "low" in cand_curr else curr_c
+
+                    cand_body = abs(curr_c - curr_o)
+                    cand_range = max(0.5, curr_h - curr_l)
+                    displacement_ratio = cand_body / cand_range
+
+                    # EMA Trend Alignment & HTF Opening Range Lock
+                    ema9_val = float(cand_curr["ema9"]) if "ema9" in cand_curr else curr_c
+                    ema21_val = float(cand_curr["ema21"]) if "ema21" in cand_curr else curr_c
+                    is_bullish_trend = (curr_c >= orb_high or ema9_val >= ema21_val)
+                    is_bearish_trend = (curr_c <= orb_low or ema9_val <= ema21_val)
+
+                    # 3-bar swing fractal for true Market Structure Shift (MSS)
+                    last3 = lookback_win.iloc[-3:]
+                    sw3_high = float(last3["high"].max() if "high" in last3 else last3["close"].max())
+                    sw3_low = float(last3["low"].min() if "low" in last3 else last3["close"].min())
+
+                    # Signal triggers with Displacement Requirement (Body >= 60% of candle range)
+                    bullish_disp = (curr_c > sw3_high and curr_c > curr_o and displacement_ratio >= 0.60)
+                    bearish_disp = (curr_c < sw3_low and curr_c < curr_o and displacement_ratio >= 0.60)
+
+                    # Liquidity Sweeps with structural rejection
+                    ssl_swept = (curr_l <= pdl_val and curr_c > pdl_val and curr_c > curr_o) or (curr_l <= sw_low and curr_c > sw_low and curr_c > curr_o)
+                    bsl_swept = (curr_h >= pdh_val and curr_c < pdh_val and curr_c < curr_o) or (curr_h >= sw_high and curr_c < sw_high and curr_c < curr_o)
+
+                    # ANTI-KNIFE GUARD: Never buy PE if Spot is above 15m ORB High; never buy CE if Spot is below 15m ORB Low
+                    valid_bullish = (ssl_swept or bullish_disp) and not is_bearish_trend and (curr_c >= orb_low)
+                    valid_bearish = (bsl_swept or bearish_disp) and not is_bullish_trend and (curr_c <= orb_high)
+
+                    if not (valid_bullish or valid_bearish):
+                        k += 1
+                        continue
+
+                    is_bullish_signal = bool(valid_bullish)
+                    impulse_high = max(sw_high, curr_h)
+                    impulse_low = min(sw_low, curr_l)
+                    impulse_range = impulse_high - impulse_low
+
+                    if impulse_range < 10.0:
+                        k += 1
+                        continue
+
+                    # Stage 2: Retest into 50% - 78.6% OTE Mitigation Zone (Strict Limit Execution)
+                    retest_found = False
+                    retest_k = -1
+
+                    for f_idx in range(k + 1, min(k + 12, n_candles)):
+                        f_row = session_df.iloc[f_idx]
+                        f_c = float(f_row["close"])
+                        f_h = float(f_row["high"]) if "high" in f_row else f_c
+                        f_l = float(f_row["low"]) if "low" in f_row else f_c
+
+                        if is_bullish_signal:
+                            if f_l < impulse_low - 3.0:
+                                break
+                            ote_entry_level = impulse_low + (0.618 * impulse_range)
+                            if f_l <= ote_entry_level:
+                                retest_found = True
+                                retest_k = f_idx
+                                break
+                        else:
+                            if f_h > impulse_high + 3.0:
+                                break
+                            ote_entry_level = impulse_high - (0.618 * impulse_range)
+                            if f_h >= ote_entry_level:
+                                retest_found = True
+                                retest_k = f_idx
+                                break
+
+                    if not retest_found or retest_k < 0:
+                        k += 1
+                        continue
+
+                    k = retest_k
+                    row_entry = session_df.iloc[k]
+                    t_entry = row_entry["dt_parsed"]
+                    time_minutes = t_entry.hour * 60 + t_entry.minute
+
+                    is_ce = is_bullish_signal
+                    rule_matched_tag = "ICT Smart Money v3 Matrix"
                     kz_label = "Morning Open Killzone" if is_morning_killzone else "Afternoon Macro Killzone"
-                    rule_matched_tag = "ICT Smart Money Matrix"
-                    rule_matched_reason = f"⚡ [ICT Matrix] {kz_label} MSS + FVG Consequent Encroachment (1:3.0 RR OTE Model)"
+                    trigger_type = "Bullish Displacement & OTE Mitigation" if is_ce else "Bearish Displacement & OTE Mitigation"
+                    rule_matched_reason = f"⚡ [ICT v3 Matrix] {kz_label} Confirmed {trigger_type} (HTF Displacement + OTE Limit 1:3.0+ RR)"
+                # 2. ICT Institutional Smart Money Strategy v2 (Confirmed OTE Retest & Mitigation - Zero Drawdown)
+                elif has_ict_v2 and in_ict_killzone:
+                    if time_minutes < 9 * 60 + 25:
+                        k += 1
+                        continue
+
+                    lookback_win = session_df.iloc[max(0, k - 15):k]
+                    if lookback_win.empty:
+                        k += 1
+                        continue
+
+                    sw_high = float(lookback_win["high"].max() if "high" in lookback_win else lookback_win["close"].max())
+                    sw_low = float(lookback_win["low"].min() if "low" in lookback_win else lookback_win["close"].min())
+                    cand_curr = row_entry
+                    curr_c = float(cand_curr["close"])
+                    curr_h = float(cand_curr["high"]) if "high" in cand_curr else curr_c
+                    curr_l = float(cand_curr["low"]) if "low" in cand_curr else curr_c
+
+                    ssl_swept = (curr_l <= pdl_val and curr_c > pdl_val) or (curr_l <= sw_low and curr_c > sw_low)
+                    bsl_swept = (curr_h >= pdh_val and curr_c < pdh_val) or (curr_h >= sw_high and curr_c < sw_high)
+                    bullish_choch = (curr_c >= sw_high)
+                    bearish_choch = (curr_c <= sw_low)
+
+                    kz_label = "Morning Open Killzone" if is_morning_killzone else "Afternoon Macro Killzone"
+
+                    if not (ssl_swept or bullish_choch or bsl_swept or bearish_choch):
+                        k += 1
+                        continue
+
+                    is_bullish_signal = bool(ssl_swept or bullish_choch)
+                    impulse_high = max(sw_high, curr_h)
+                    impulse_low = min(sw_low, curr_l)
+                    impulse_range = impulse_high - impulse_low
+
+                    if impulse_range < 8.0:
+                        k += 1
+                        continue
+
+                    retest_found = False
+                    retest_k = -1
+
+                    for f_idx in range(k + 1, min(k + 12, n_candles)):
+                        f_row = session_df.iloc[f_idx]
+                        f_c = float(f_row["close"])
+                        f_h = float(f_row["high"]) if "high" in f_row else f_c
+                        f_l = float(f_row["low"]) if "low" in f_row else f_c
+
+                        if is_bullish_signal:
+                            if f_l < impulse_low - 2.0:
+                                break
+                            ote_entry_level = impulse_low + (0.50 * impulse_range)
+                            if f_l <= ote_entry_level:
+                                retest_found = True
+                                retest_k = f_idx
+                                break
+                        else:
+                            if f_h > impulse_high + 2.0:
+                                break
+                            ote_entry_level = impulse_high - (0.50 * impulse_range)
+                            if f_h >= ote_entry_level:
+                                retest_found = True
+                                retest_k = f_idx
+                                break
+
+                    if not retest_found or retest_k < 0:
+                        k += 1
+                        continue
+
+                    k = retest_k
+                    row_entry = session_df.iloc[k]
+                    t_entry = row_entry["dt_parsed"]
+                    time_minutes = t_entry.hour * 60 + t_entry.minute
+
+                    is_ce = is_bullish_signal
+                    rule_matched_tag = "ICT Smart Money v2 Matrix"
+                    trigger_type = "Bullish OTE Retest & FVG Mitigation" if is_ce else "Bearish OTE Retest & FVG Mitigation"
+                    rule_matched_reason = f"⚡ [ICT v2 Matrix] {kz_label} Confirmed {trigger_type} (Zero Drawdown Limit 1:3.5+ RR)"
+                # 2. ICT Institutional Smart Money Strategy (Killzone, CHoCH, Liquidity Sweep & FVG Retest)
+                elif has_ict and in_ict_killzone:
+                    # Enforce price discovery: No blind entries before 09:25 (allows initial 10m structure to form)
+                    if time_minutes < 9 * 60 + 25:
+                        k += 1
+                        continue
+
+                    lookback_win = session_df.iloc[max(0, k - 15):k]
+                    if lookback_win.empty:
+                        k += 1
+                        continue
+
+                    sw_high = float(lookback_win["high"].max() if "high" in lookback_win else lookback_win["close"].max())
+                    sw_low = float(lookback_win["low"].min() if "low" in lookback_win else lookback_win["close"].min())
+                    cand_curr = row_entry
+                    curr_c = float(cand_curr["close"])
+                    curr_h = float(cand_curr["high"]) if "high" in cand_curr else curr_c
+                    curr_l = float(cand_curr["low"]) if "low" in cand_curr else curr_c
+
+                    ssl_swept = (curr_l <= pdl_val and curr_c > pdl_val) or (curr_l <= sw_low and curr_c > sw_low)
+                    bsl_swept = (curr_h >= pdh_val and curr_c < pdh_val) or (curr_h >= sw_high and curr_c < sw_high)
+                    bullish_choch = (curr_c >= sw_high)
+                    bearish_choch = (curr_c <= sw_low)
+
+                    kz_label = "Morning Open Killzone" if is_morning_killzone else "Afternoon Macro Killzone"
+
+                    if ssl_swept or bullish_choch:
+                        is_ce = True
+                        rule_matched_tag = "ICT Smart Money Matrix"
+                        trigger_type = "SSL Liquidity Sweep" if ssl_swept else "Bullish CHoCH Breakout"
+                        rule_matched_reason = f"⚡ [ICT Matrix] {kz_label} {trigger_type} + FVG Retest Limit Order (1:2.5+ RR)"
+                    elif bsl_swept or bearish_choch:
+                        is_ce = False
+                        rule_matched_tag = "ICT Smart Money Matrix"
+                        trigger_type = "BSL Liquidity Sweep" if bsl_swept else "Bearish CHoCH Breakdown"
+                        rule_matched_reason = f"⚡ [ICT Matrix] {kz_label} {trigger_type} + FVG Retest Limit Order (1:2.5+ RR)"
+                    else:
+                        k += 1
+                        continue
                 # 3. Morning Trend Capture (ORB)
                 elif (has_morning or "morning" in prompt_lower) and (9 * 60 + 15 <= time_minutes <= 10 * 60 + 15):
                     rule_matched_tag = "Morning ORB"
@@ -749,7 +969,7 @@ class TensorTradeRLEngine:
                 elif has_intraday and (time_minutes <= 14 * 60 + 45):
                     rule_matched_tag = "Intraday Only"
                     rule_matched_reason = "⚡ [Intraday Rule] Intraday Trend Signal"
-                elif not (has_momentum_guardrail or has_cvd_divergence or has_dom_absorption or has_killzone_delta or has_smc_displacement or has_gamma or has_morning or has_gap or has_vix or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_morning_macd):
+                elif not (has_momentum_guardrail or has_cvd_divergence or has_dom_absorption or has_killzone_delta or has_smc_displacement or has_gamma or has_morning or has_gap or has_vix or has_trendline or has_atr_noise or has_liquidity_sweep or has_pdh_pdl or has_ict or has_ict_v2 or has_morning_macd):
                     if time_minutes <= 14 * 60 + 45:
                         rule_matched_tag = "TensorTrade RL"
                         rule_matched_reason = "⚡ [TensorTrade RL] Policy Momentum Signal"
@@ -766,7 +986,9 @@ class TensorTradeRLEngine:
                 open_val = float(row_entry["open"]) if "open" in row_entry else entry_spot - 2.0
                 if rule_matched_tag == "Overnight Gap":
                     is_ce = (day_change_pct >= 0)
-                elif rule_matched_tag in ["Liquidity Sweep SMC", "ICT Smart Money Matrix", "Forex SMC Displacement"]:
+                elif rule_matched_tag in ["ICT Smart Money Matrix", "ICT Smart Money v2 Matrix", "ICT Smart Money v3 Matrix", "Momentum Guardrail"]:
+                    pass  # is_ce resolved directly from SMC / ORB structure analysis
+                elif rule_matched_tag in ["Liquidity Sweep SMC", "Forex SMC Displacement"]:
                     # Smart Money displacement & liquidity sweep fade
                     if entry_spot >= pdh_val:
                         is_ce = False  # BSL swept at highs -> Short PE OTE
@@ -776,8 +998,6 @@ class TensorTradeRLEngine:
                         is_ce = (entry_spot >= open_val)
                 elif rule_matched_tag in ["Morning 3-Min MACD Retest", "Forex CVD Divergence", "Forex DOM Absorption", "Forex Killzone Delta"]:
                     is_ce = (entry_spot >= open_val)
-                elif rule_matched_tag == "Momentum Guardrail":
-                    pass  # is_ce resolved cleanly from ORB breakout & EMA trend
                 else:
                     is_ce = (entry_spot >= open_val)
                 trade_type = "BUY CE" if is_ce else "BUY PE"
@@ -792,7 +1012,7 @@ class TensorTradeRLEngine:
                     active_strike_sel = "OTM1"
                 elif rule_matched_tag == "Momentum Guardrail":
                     active_strike_sel = "ATM"
-                elif rule_matched_tag in ["ICT Smart Money Matrix", "Morning 3-Min MACD Retest", "Forex CVD Divergence", "Forex DOM Absorption"] or (has_vix and vix_val > 18.0):
+                elif rule_matched_tag in ["ICT Smart Money Matrix", "ICT Smart Money v2 Matrix", "ICT Smart Money v3 Matrix", "Morning 3-Min MACD Retest", "Forex CVD Divergence", "Forex DOM Absorption"] or (has_vix and vix_val > 18.0):
                     active_strike_sel = "ITM1"
                 else:
                     active_strike_sel = "ATM"
@@ -844,8 +1064,14 @@ class TensorTradeRLEngine:
                 cand_opts = pd.DataFrame()
                 opt_type_val = "CALL" if is_ce else "PUT"
 
-                # Reconstruct true continuous contract for strike_val to avoid rolling strike jumps
-                if isinstance(options_df, pd.DataFrame) and not options_df.empty and "spot_price" in options_df.columns:
+                # 1. Direct Physical Discrete Strike Lookup (e.g. key: (session_date, 'CALL', '24600'))
+                if options_lookup:
+                    opt_series = options_lookup.get((session_date, opt_type_val, str(strike_val)))
+                    if opt_series is not None and not opt_series.empty:
+                        cand_opts = opt_series[opt_series["dt_parsed"] >= t_entry]
+
+                # 2. Reconstruct true continuous contract for strike_val on legacy rolling datasets
+                if cand_opts.empty and isinstance(options_df, pd.DataFrame) and not options_df.empty and "spot_price" in options_df.columns:
                     session_opts = options_df[(options_df["session_date"] == session_date) & (options_df["option_type"] == opt_type_val)]
                     if not session_opts.empty and session_opts["spot_price"].notnull().any():
                         candle_atm = (session_opts["spot_price"] / strike_step).round() * strike_step
@@ -858,23 +1084,23 @@ class TensorTradeRLEngine:
                         if not matched_opts.empty:
                             cand_opts = matched_opts[matched_opts["dt_parsed"] >= t_entry]
 
-                # Fallback to static relative or discrete strike lookup
+                # 3. Fallback to static relative strike lookup
                 if cand_opts.empty and options_lookup:
-                    opt_series = options_lookup.get((session_date, opt_type_val, str(strike_val)))
-                    if opt_series is None:
-                        opt_series = options_lookup.get((session_date, opt_type_val, strike_key))
+                    opt_series = options_lookup.get((session_date, opt_type_val, strike_key))
                     if opt_series is not None and not opt_series.empty:
                         cand_opts = opt_series[opt_series["dt_parsed"] >= t_entry]
 
                 # Dynamic SL & TP based on User Config & Volatility Regime (Respect user-defined parameters)
                 active_sl_pts = stop_loss_pts if (stop_loss_pts and stop_loss_pts > 0) else 15.0
                 active_rr = rr_ratio if (rr_ratio and rr_ratio > 0) else 2.0
-                if has_atr_noise and (not stop_loss_pts or stop_loss_pts <= 0):
+                if rule_matched_tag == "ICT Smart Money v2 Matrix" and (not stop_loss_pts or stop_loss_pts <= 0):
+                    active_sl_pts = 8.0
+                elif has_atr_noise and (not stop_loss_pts or stop_loss_pts <= 0):
                     atr_dynamic_pts = round(max(15.0, (entry_spot * 0.0032 * delta)), 1)
                     active_sl_pts = max(active_sl_pts, atr_dynamic_pts)
 
-                if rule_matched_tag in ["ICT Smart Money Matrix", "Forex DOM Absorption"] and (not rr_ratio or rr_ratio <= 0):
-                    active_rr = 3.0
+                if rule_matched_tag in ["ICT Smart Money Matrix", "ICT Smart Money v2 Matrix", "Forex DOM Absorption"] and (not rr_ratio or rr_ratio <= 0):
+                    active_rr = 3.5 if rule_matched_tag == "ICT Smart Money v2 Matrix" else 3.0
                 elif rule_matched_tag in ["Morning 3-Min MACD Retest", "Liquidity Sweep SMC", "Forex CVD Divergence", "Forex SMC Displacement"] and (not rr_ratio or rr_ratio <= 0):
                     active_rr = 2.5
                 elif rule_matched_tag == "Momentum Guardrail":
@@ -962,7 +1188,7 @@ class TensorTradeRLEngine:
                         exit_reason = f"⏰ End of Session Square-off ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
 
                     m_rows = session_df[session_df["dt_parsed"] >= pd.to_datetime(ts_exit)]
-                    k = session_df.index.get_loc(m_rows.index[0]) if not m_rows.empty else (n_candles - 1)
+                    exit_idx = session_df.index.get_loc(m_rows.index[0]) if not m_rows.empty else (n_candles - 1)
                 else:
                     opt_entry_price = round(max(20.0 if rule_matched_tag in ["Overnight Gap", "Gamma Blast 0DTE"] else 35.0, min(650.0, (entry_spot * 0.0075) + 30.0 + (abs(offset_mult) * 20.0 * (-1 if offset_mult > 0 else 1)))), 2)
                     target_price = round(opt_entry_price + target_pts, 2)
@@ -1048,12 +1274,52 @@ class TensorTradeRLEngine:
 
                 price_change = round(exit_spot - entry_spot, 2)
 
-                if is_forex:
-                    charges_dict = calculate_trade_charges(opt_entry_price, opt_exit_price, lots_count, is_option=False, is_forex=True)
-                    gross_trade_pnl = round((opt_exit_price - opt_entry_price) * point_multiplier * lots_count, 2)
+                if enable_ai_lot_sizing:
+                    avail_cap = max(1000.0, current_capital)
+                    max_loss_rs = avail_cap * (max_risk_pct / 100.0)
+                    max_margin_budget = avail_cap * (max_capital_util_pct / 100.0)
+
+                    if is_forex:
+                        loss_per_contract = max(1.0, active_sl_pts * point_multiplier)
+                        margin_per_contract = max(50.0, opt_entry_price * point_multiplier * 0.05)
+                    else:
+                        loss_per_contract = max(1.0, active_sl_pts * lot_size)
+                        margin_per_contract = max(100.0, opt_entry_price * lot_size)
+
+                    lots_by_risk = max_loss_rs / loss_per_contract
+                    lots_by_margin = max_margin_budget / margin_per_contract
+                    calc_lots = max(1, min(int(lots_by_risk), int(lots_by_margin)))
+
+                    # AI Macro Conviction & Volatility Multiplier
+                    macro_mult = 1.0
+                    if use_macro_assist:
+                        if (is_ce and macro_score > 0.35) or (not is_ce and macro_score < -0.35):
+                            macro_mult = 1.3
+                        elif (is_ce and macro_score < -0.2) or (not is_ce and macro_score > 0.2):
+                            macro_mult = 0.6
+                        if event_flag == 1:
+                            macro_mult = min(macro_mult, 0.5)
+
+                    if auto_risk_management:
+                        if vix_val > 22.0:
+                            macro_mult = min(macro_mult, 0.7)
+                        elif vix_val < 13.0 and is_0dte:
+                            macro_mult = min(macro_mult, 0.8)
+
+                    trade_lots = max(1, min(max_lots_cap, int(round(calc_lots * macro_mult))))
+                    trade_qty = trade_lots if is_forex else (trade_lots * lot_size)
+                    sizing_mode = "AI_DYNAMIC"
                 else:
-                    charges_dict = calculate_trade_charges(opt_entry_price, opt_exit_price, total_qty, is_option=True, is_forex=False)
-                    gross_trade_pnl = round((opt_exit_price - opt_entry_price) * total_qty, 2)
+                    trade_lots = lots_count
+                    trade_qty = trade_lots if is_forex else (trade_lots * lot_size)
+                    sizing_mode = "FIXED"
+
+                if is_forex:
+                    charges_dict = calculate_trade_charges(opt_entry_price, opt_exit_price, trade_lots, is_option=False, is_forex=True)
+                    gross_trade_pnl = round((opt_exit_price - opt_entry_price) * point_multiplier * trade_lots, 2)
+                else:
+                    charges_dict = calculate_trade_charges(opt_entry_price, opt_exit_price, trade_qty, is_option=True, is_forex=False)
+                    gross_trade_pnl = round((opt_exit_price - opt_entry_price) * trade_qty, 2)
 
                 trade_utilized_cap = charges_dict["utilized_capital"]
                 trade_brokerage = charges_dict["brokerage"]
@@ -1082,7 +1348,25 @@ class TensorTradeRLEngine:
                 if dd > max_drawdown:
                     max_drawdown = dd
 
-                entry_reason = f"{rule_matched_reason} ({'Bullish CE' if is_ce else 'Bearish PE'} | {lots_count} Lot{'s' if lots_count > 1 else ''} @ {lot_size}/lot = {total_qty} Qty)"
+                sizing_label = f"AI Dynamic Sized: {trade_lots} Lots" if sizing_mode == "AI_DYNAMIC" else f"{trade_lots} Lot{'s' if trade_lots > 1 else ''}"
+                entry_reason = f"{rule_matched_reason} ({'Bullish CE' if is_ce else 'Bearish PE'} | {sizing_label} @ {lot_size}/lot = {trade_qty} Qty)"
+
+                decision_bar_idx = max(0, k - 1)
+                decision_dt = session_df.iloc[decision_bar_idx]["dt_parsed"]
+                decision_ts = decision_dt.strftime("%Y-%m-%d %H:%M:%S")
+                decision_spot = round(float(session_df.iloc[decision_bar_idx]["close"]), 2)
+                decision_strike_ltp = opt_entry_price
+                if not cand_opts.empty:
+                    opt_full = opt_series if (opt_series is not None and not opt_series.empty) else cand_opts
+                    prev_opts = opt_full[opt_full["dt_parsed"] <= decision_dt]
+                    if not prev_opts.empty:
+                        decision_strike_ltp = round(float(prev_opts.iloc[-1]["close"]), 2)
+                    else:
+                        decision_strike_ltp = round(opt_entry_price + (2.5 if is_ce else -2.5), 2)
+                else:
+                    decision_strike_ltp = round(opt_entry_price + (2.5 if is_ce else -2.5), 2)
+                order_placed_ts = decision_ts
+                retest_delay_mins = max(1, int((t_entry - decision_dt).total_seconds() // 60))
 
                 loss_rca_data = {}
                 if status == "LOSS":
@@ -1100,6 +1384,13 @@ class TensorTradeRLEngine:
                 trades.append({
                     "timestamp": ts_entry,
                     "exit_timestamp": ts_exit,
+                    "decision_timestamp": decision_ts,
+                    "decision_spot_price": decision_spot,
+                    "decision_strike_ltp": decision_strike_ltp,
+                    "order_placed_timestamp": order_placed_ts,
+                    "limit_price": opt_entry_price,
+                    "fill_timestamp": ts_entry,
+                    "retest_duration_minutes": retest_delay_mins,
                     "strike": strike_str,
                     "symbol": index_name,
                     "trade_type": trade_type,
@@ -1112,9 +1403,10 @@ class TensorTradeRLEngine:
                     "stop_loss_price": initial_sl_price,
                     "initial_stop_loss_price": initial_sl_price,
                     "trailing_stop_loss_price": trailing_sl_price,
-                    "quantity": total_qty,
+                    "quantity": trade_qty,
                     "lot_size": lot_size,
-                    "lots_count": lots_count,
+                    "lots_count": trade_lots,
+                    "sizing_mode": sizing_mode,
                     "gross_pnl": gross_trade_pnl,
                     "brokerage": trade_brokerage,
                     "other_charges": trade_other_charges,
@@ -1207,7 +1499,28 @@ class TensorTradeRLEngine:
             }
             for cat, count in sorted(rca_counts.items(), key=lambda x: x[1], reverse=True)
         ]
-        ai_suggested_future_rules = list(future_rules_map.values())
+
+        # Dual-Layer Synthesis: Blend Layer 1 deterministic math with Gemini LLM deep-dive reasoning
+        ai_synthesis_source = "offline_math"
+        try:
+            from apps.common.services.gemini_service import GeminiAIService
+            synthesis_res = GeminiAIService.synthesize_loss_preventive_rules(
+                loss_rca_breakdown=loss_rca_breakdown,
+                sample_loss_trades=loss_trades[:10],
+                future_rules_map=future_rules_map,
+                strategy_name=f"{strategy_name} ({timeframe})",
+                symbol=index_name,
+            )
+            if isinstance(synthesis_res, dict):
+                ai_suggested_future_rules = synthesis_res.get("rules", [])
+                ai_synthesis_source = synthesis_res.get("source", "gemini-3.6-flash")
+            elif isinstance(synthesis_res, list):
+                ai_suggested_future_rules = synthesis_res
+                ai_synthesis_source = "gemini-3.6-flash"
+        except Exception as e:
+            logger.warning(f"Dual-layer AI rule synthesis fallback: {e}")
+            ai_suggested_future_rules = list(future_rules_map.values())
+            ai_synthesis_source = "offline_math"
 
         print(f"[TENSORTRADE-RL] Completed Evaluation: {total_trades} trades ({winning_trades} wins, {losing_trades} losses) | Net PnL: ₹{total_net_pnl:,.2f} | Win Rate: {win_rate}% | Profit Factor: {profit_factor} | Max DD: {max_drawdown*100:.2f}% | Max Margin: ₹{max_utilized_capital:,.2f}", flush=True)
 
@@ -1234,6 +1547,7 @@ class TensorTradeRLEngine:
             "trades": trades,
             "loss_rca_breakdown": loss_rca_breakdown,
             "ai_suggested_future_rules": ai_suggested_future_rules,
+            "ai_synthesis_source": ai_synthesis_source,
             "rules_applied": list(rule_types),
             "prompt_directives": prompt_directives,
         }

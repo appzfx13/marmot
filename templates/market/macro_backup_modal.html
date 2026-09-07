@@ -187,6 +187,16 @@ function updateMacroPathPreview() {
     }
 }
 
+function setMacroDateInputValue(inputEl, dateVal) {
+    if (!inputEl || !dateVal) return;
+    inputEl.value = dateVal;
+    if (inputEl._flatpickr) {
+        inputEl._flatpickr.setDate(dateVal, true);
+    }
+    inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+    inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+}
+
 function handleLinkedBackupChange() {
     const selectEl = document.getElementById('id_macro_linked_backup_task');
     if (!selectEl) return;
@@ -200,17 +210,23 @@ function handleLinkedBackupChange() {
         // 2. Auto-select asset
         if (meta.market_type === 'INDEX_FO') {
             const indexSelect = document.getElementById('id_macro_index_name');
-            if (indexSelect && meta.index_name) indexSelect.value = meta.index_name;
+            if (indexSelect && meta.index_name) {
+                indexSelect.value = meta.index_name;
+                indexSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         } else {
             const forexSelect = document.getElementById('id_macro_forex_instrument');
-            if (forexSelect && meta.forex_instrument) forexSelect.value = meta.forex_instrument;
+            if (forexSelect && meta.forex_instrument) {
+                forexSelect.value = meta.forex_instrument;
+                forexSelect.dispatchEvent(new Event('change', { bubbles: true }));
+            }
         }
 
         // 3. Auto-populate date horizon
         const startDateInput = document.getElementById('id_macro_start_date');
         const endDateInput = document.getElementById('id_macro_end_date');
-        if (startDateInput && meta.start_date) startDateInput.value = meta.start_date;
-        if (endDateInput && meta.end_date) endDateInput.value = meta.end_date;
+        setMacroDateInputValue(startDateInput, meta.start_date);
+        setMacroDateInputValue(endDateInput, meta.end_date);
     }
 
     updateMacroPathPreview();
@@ -218,7 +234,12 @@ function handleLinkedBackupChange() {
 
 (function() {
     const linkedSelect = document.getElementById('id_macro_linked_backup_task');
-    if (linkedSelect) linkedSelect.addEventListener('change', handleLinkedBackupChange);
+    if (linkedSelect) {
+        linkedSelect.addEventListener('change', handleLinkedBackupChange);
+        if (linkedSelect.value) {
+            setTimeout(handleLinkedBackupChange, 120);
+        }
+    }
 
     const tfSelect = document.getElementById('id_macro_timeframe');
     if (tfSelect) tfSelect.addEventListener('change', updateMacroPathPreview);

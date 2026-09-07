@@ -1,0 +1,80 @@
+{% load static %}
+<!-- Modal Content: Master Live Auto-Execution Switch Confirmation -->
+<div class="modal-content glass-card border-0 shadow-lg" style="background: var(--modal-bg, #0B1D16); color: var(--text-main, #F1F5F9); border: 1px solid var(--border-color, rgba(255,255,255,0.1)) !important; border-radius: 1.25rem;">
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-white border-opacity-10 px-4 py-3">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle p-2 {% if target_state %}bg-danger bg-opacity-20 text-danger{% else %}bg-warning bg-opacity-20 text-warning{% endif %} d-flex align-items-center justify-content-center" style="width: 44px; height: 44px;">
+                <span class="material-icons fs-5">{% if target_state %}flash_on{% else %}power_off{% endif %}</span>
+            </div>
+            <div>
+                <h5 class="modal-title fw-bold mb-0 text-white">
+                    {% if target_state %}Arm Master Live Auto-Execution{% else %}Disarm Master Live Execution{% endif %}
+                </h5>
+                <small class="text-muted">Global Algorithmic Live Order Dispatch Master Switch</small>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <!-- Form for Toggling Master Execution -->
+    <form hx-post="{% url 'admins:master-live-execution-toggle' %}"
+          hx-target="#master-live-switch-container"
+          hx-swap="innerHTML"
+          onsubmit="bootstrap.Modal.getInstance(document.getElementById('globalHtmxModal'))?.hide();">
+        {% csrf_token %}
+        <div class="modal-body px-4 py-3">
+            {% if target_state %}
+                <div class="alert border-0 rounded-3 p-3 mb-3 d-flex align-items-start gap-2.5" 
+                     style="background: rgba(239, 68, 68, 0.12); border-left: 4px solid #ef4444 !important;">
+                    <span class="material-icons text-danger fs-5 mt-0.5">crisis_alert</span>
+                    <div class="small">
+                        <strong class="text-white d-block mb-1">CRITICAL REAL-MONEY EXECUTION AUTHORIZATION:</strong>
+                        <span class="text-white text-opacity-80">
+                            Enabling the <strong>Master Live Execution Switch</strong> authorizes automated order dispatch to live brokers (Dhan / Fyers) for ALL active Live Strategies. Real trading capital and exchange margin will be committed immediately when trading rules match market conditions.
+                        </span>
+                    </div>
+                </div>
+
+                <div class="p-3 rounded-3 border border-white border-opacity-10 smaller" style="background: rgba(0,0,0,0.25);">
+                    <div class="d-flex align-items-center gap-2 mb-1.5 text-success">
+                        <i class="bi bi-shield-check fs-6"></i>
+                        <strong>Mandatory Safety Rails Enforced:</strong>
+                    </div>
+                    <ul class="text-muted mb-0 ps-3">
+                        <li>Broker risk controls and max loss limits will trigger instant auto-freeze.</li>
+                        <li>Intraday auto-squareoff strictly executed at 15:15 IST.</li>
+                        <li>Emergency Kill Switch remains accessible on the top right at all times.</li>
+                    </ul>
+                </div>
+            {% else %}
+                <div class="alert border-0 rounded-3 p-3 mb-3 d-flex align-items-start gap-2.5" 
+                     style="background: rgba(234, 179, 8, 0.12); border-left: 4px solid #eab308 !important;">
+                    <span class="material-icons text-warning fs-5 mt-0.5">pause_circle</span>
+                    <div class="small">
+                        <strong class="text-white d-block mb-1">Disarming Master Live Execution:</strong>
+                        <span class="text-white text-opacity-80">
+                            All algorithmic trading strategies will be globally paused. No new outgoing orders will be dispatched to broker accounts.
+                        </span>
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer border-top border-white border-opacity-10 px-4 py-3 d-flex align-items-center justify-content-between">
+            <button type="button" class="btn btn-secondary rounded-pill px-3 py-1.5 small" data-bs-dismiss="modal">Cancel</button>
+            {% if target_state %}
+                <button type="submit" class="btn btn-danger fw-bold rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm">
+                    <span class="material-icons fs-5">flash_on</span>
+                    <span>Confirm &amp; Enable Live Execution (ARM)</span>
+                </button>
+            {% else %}
+                <button type="submit" class="btn btn-warning text-dark fw-bold rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm">
+                    <span class="material-icons fs-5">pause</span>
+                    <span>Confirm &amp; Disarm Live Execution (SAFE)</span>
+                </button>
+            {% endif %}
+        </div>
+    </form>
+</div>

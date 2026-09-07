@@ -107,6 +107,15 @@ class SiteSettings(BaseModel):
     favicon = models.ImageField(upload_to=site_setting_logo_path, null=True, blank=True, help_text="Favicon icon (.ico, .png, .svg)")
     meta_config = models.JSONField(default=dict, blank=True, help_text="Extensible metadata & SEO configuration")
 
+    # FYERS Live Data Feed Integration Configuration
+    fyers_app_id = models.CharField(max_length=255, blank=True, default="", help_text="FYERS App ID (e.g. XC12345-100)")
+    fyers_secret_key = models.CharField(max_length=255, blank=True, default="", help_text="FYERS App Secret Key")
+    fyers_access_token = models.TextField(blank=True, default="", help_text="FYERS Valid Live Access Token")
+    fyers_redirect_uri = models.CharField(max_length=255, blank=True, default="https://trade.marmot.com/fyers/callback", help_text="FYERS OAuth Redirect URI")
+    fyers_token_generated_date = models.DateField(null=True, blank=True, help_text="Date when FYERS token was generated")
+    fyers_feed_is_active = models.BooleanField(default=False, help_text="Toggle to stream live market quotes from FYERS")
+    live_execution_master_switch = models.BooleanField(default=False, help_text="Global master toggle for live algorithmic order execution")
+
     class Meta:
         verbose_name = "Site Settings"
         verbose_name_plural = "Site Settings"

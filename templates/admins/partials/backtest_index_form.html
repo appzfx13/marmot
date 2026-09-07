@@ -255,34 +255,51 @@ document.addEventListener('DOMContentLoaded', function () {
     const backupTaskSelect = document.getElementById('id_index_backup_task');
     const indexSelect = document.getElementById('id_index_index_name');
 
-    if (backupTaskSelect) {
-        backupTaskSelect.addEventListener('change', function () {
-            const selectedOption = this.options[this.selectedIndex];
-            if (selectedOption) {
-                const indexVal = selectedOption.getAttribute('data-index');
-                const startDateVal = selectedOption.getAttribute('data-start-date');
-                const endDateVal = selectedOption.getAttribute('data-end-date');
+    function setDateVal(inputEl, val) {
+        if (!inputEl || !val) return;
+        inputEl.value = val;
+        if (inputEl._flatpickr) {
+            inputEl._flatpickr.setDate(val, true);
+        }
+        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
 
-                if (indexVal && indexSelect) {
-                    let hasOption = Array.from(indexSelect.options).some(opt => opt.value === indexVal);
-                    if (!hasOption) {
-                        const newOpt = document.createElement('option');
-                        newOpt.value = indexVal;
-                        newOpt.textContent = indexVal;
-                        indexSelect.appendChild(newOpt);
-                    }
-                    indexSelect.value = indexVal;
+    function syncIndexBackupTask() {
+        if (!backupTaskSelect) return;
+        const selectedOption = backupTaskSelect.options[backupTaskSelect.selectedIndex];
+        if (selectedOption && selectedOption.value) {
+            const indexVal = selectedOption.getAttribute('data-index');
+            const startDateVal = selectedOption.getAttribute('data-start-date');
+            const endDateVal = selectedOption.getAttribute('data-end-date');
+
+            if (indexVal && indexSelect) {
+                let hasOption = Array.from(indexSelect.options).some(opt => opt.value === indexVal);
+                if (!hasOption) {
+                    const newOpt = document.createElement('option');
+                    newOpt.value = indexVal;
+                    newOpt.textContent = indexVal;
+                    indexSelect.appendChild(newOpt);
                 }
-                if (startDateVal) {
-                    const startDateInput = document.getElementById('id_index_start_date');
-                    if (startDateInput) startDateInput.value = startDateVal;
-                }
-                if (endDateVal) {
-                    const endDateInput = document.getElementById('id_index_end_date');
-                    if (endDateInput) endDateInput.value = endDateVal;
-                }
+                indexSelect.value = indexVal;
+                indexSelect.dispatchEvent(new Event('change', { bubbles: true }));
             }
-        });
+            if (startDateVal) {
+                const startDateInput = document.getElementById('id_index_start_date');
+                setDateVal(startDateInput, startDateVal);
+            }
+            if (endDateVal) {
+                const endDateInput = document.getElementById('id_index_end_date');
+                setDateVal(endDateInput, endDateVal);
+            }
+        }
+    }
+
+    if (backupTaskSelect) {
+        backupTaskSelect.addEventListener('change', syncIndexBackupTask);
+        if (backupTaskSelect.value) {
+            setTimeout(syncIndexBackupTask, 120);
+        }
     }
 });
 </script>

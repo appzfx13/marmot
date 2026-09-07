@@ -113,19 +113,20 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <div class="page-header-top-bar d-flex align-items-center justify-content-between w-100">
-                <div class="rounded-circle bg-warning bg-opacity-20 text-warning d-flex align-items-center justify-content-center fw-bold fs-4 flex-shrink-0" style="width:48px;height:48px;border:1px solid rgba(234,179,8,0.35);">
-                    <span class="material-icons fs-3">psychology_alt</span>
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="badge rounded-pill px-2.5 py-1 fw-bold font-monospace" style="background: rgba(234,179,8,0.18); color: #facc15; border: 1px solid rgba(234,179,8,0.35); font-size: 0.72rem;">
+                        🤖 AI MACRO SYNC
+                    </span>
                 </div>
-                <div class="page-header-actions d-flex align-items-center gap-2">
-                    <a href="{% url 'market:market_macro_backup_list' %}" class="glass-icon-btn text-decoration-none page-header-back-btn" title="Back to Macro Datasets">
-                        <span class="material-icons fs-5">arrow_back</span>
-                    </a>
-                </div>
-            </div>
-            <div class="page-header-title-wrapper text-center">
-                <h1 class="page-title mb-0 theme-text-main">Initialize AI Macro Assist Backup</h1>
+                <h1 class="page-title mb-1">{{ page_title|default:"Initialize AI Macro Assist Backup" }}</h1>
                 <p class="page-subtitle mb-0">Generate 1-month structured fundamental, news, and FII/DII Parquet via Gemini AI.</p>
+            </div>
+            <div class="page-header-actions d-flex align-items-center gap-2">
+                <a href="{% url 'market:market_macro_backup_list' %}" class="btn btn-outline-secondary rounded-pill px-3.5 py-2 small fw-semibold d-inline-flex align-items-center gap-2 shadow-sm">
+                    <i class="bi bi-arrow-left"></i>
+                    <span>Back to Macro Datasets</span>
+                </a>
             </div>
         </div>
     </div>
@@ -371,6 +372,16 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    function setDateInputValue(inputEl, dateVal) {
+        if (!inputEl || !dateVal) return;
+        inputEl.value = dateVal;
+        if (inputEl._flatpickr) {
+            inputEl._flatpickr.setDate(dateVal, true);
+        }
+        inputEl.dispatchEvent(new Event('input', { bubbles: true }));
+        inputEl.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+
     function handleLinkedBackupChange() {
         if (!linkedSelect) return;
         const backupId = linkedSelect.value;
@@ -378,24 +389,35 @@ document.addEventListener('DOMContentLoaded', function () {
             const meta = backupsMeta[backupId];
             applyMarketType(meta.market_type);
             if (meta.market_type === 'INDEX_FO') {
-                if (indexSelect && meta.index_name) indexSelect.value = meta.index_name;
+                if (indexSelect && meta.index_name) {
+                    indexSelect.value = meta.index_name;
+                    indexSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             } else {
-                if (forexSelect && meta.forex_instrument) forexSelect.value = meta.forex_instrument;
+                if (forexSelect && meta.forex_instrument) {
+                    forexSelect.value = meta.forex_instrument;
+                    forexSelect.dispatchEvent(new Event('change', { bubbles: true }));
+                }
             }
             const startInput = document.getElementById('id_macro_start_date');
             const endInput   = document.getElementById('id_macro_end_date');
-            if (startInput && meta.start_date) startInput.value = meta.start_date;
-            if (endInput && meta.end_date) endInput.value = meta.end_date;
+            setDateInputValue(startInput, meta.start_date);
+            setDateInputValue(endInput, meta.end_date);
         }
         updatePathPreview();
     }
 
-    if (linkedSelect) linkedSelect.addEventListener('change', handleLinkedBackupChange);
+    if (linkedSelect) {
+        linkedSelect.addEventListener('change', handleLinkedBackupChange);
+        if (linkedSelect.value) {
+            setTimeout(handleLinkedBackupChange, 120);
+        }
+    }
     if (timeframeSelect) timeframeSelect.addEventListener('change', updatePathPreview);
     if (indexSelect) indexSelect.addEventListener('change', updatePathPreview);
     if (forexSelect) forexSelect.addEventListener('change', updatePathPreview);
 
-    setTimeout(updatePathPreview, 60);
+    setTimeout(updatePathPreview, 80);
 
     // Modal Trigger
     const btnInit = document.getElementById('initMacroBackupBtn');

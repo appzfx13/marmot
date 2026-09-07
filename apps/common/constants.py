@@ -9,19 +9,19 @@ INDEX_INSTRUMENT_MAP = {
     'BANKNIFTY':  {"security_id": "25",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
     'FINNIFTY':   {"security_id": "27",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
     'MIDCPNIFTY': {"security_id": "26",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
-    'SENSEX':     {"security_id": "51",  "exchange_segment": "BSE_IDX", "instrument": "INDEX"},
+    'SENSEX':     {"security_id": "51",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
     'GIFTNIFTY':  {"security_id": "28",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
     'INDIAVIX':   {"security_id": "17",  "exchange_segment": "IDX_I", "instrument": "INDEX"},
 }
 
-# Options Download Configuration — Instrument & Segment for NSE F&O Options
+# Options Download Configuration — Instrument & Segment for NSE/BSE F&O Options
 INDEX_OPTIONS_MAP = {
-    'NIFTY':      {"exchange_segment": "NSE_FO", "instrument": "OPTIDX"},
-    'BANKNIFTY':  {"exchange_segment": "NSE_FO", "instrument": "OPTIDX"},
-    'FINNIFTY':   {"exchange_segment": "NSE_FO", "instrument": "OPTIDX"},
-    'MIDCPNIFTY': {"exchange_segment": "NSE_FO", "instrument": "OPTIDX"},
-    'SENSEX':     {"exchange_segment": "BSE_FO", "instrument": "OPTIDX"},
-    'GIFTNIFTY':  {"exchange_segment": "NSE_FO", "instrument": "OPTIDX"},
+    'NIFTY':      {"exchange_segment": "NSE_FNO", "instrument": "OPTIDX"},
+    'BANKNIFTY':  {"exchange_segment": "NSE_FNO", "instrument": "OPTIDX"},
+    'FINNIFTY':   {"exchange_segment": "NSE_FNO", "instrument": "OPTIDX"},
+    'MIDCPNIFTY': {"exchange_segment": "NSE_FNO", "instrument": "OPTIDX"},
+    'SENSEX':     {"exchange_segment": "BSE_FNO", "instrument": "OPTIDX"},
+    'GIFTNIFTY':  {"exchange_segment": "NSE_FNO", "instrument": "OPTIDX"},
 }
 
 # Strike Price Step per Index
@@ -37,7 +37,9 @@ INDEX_STRIKE_INTERVAL = {
 # Historical Lot Size Timelines for Indian Indices (NSE & BSE Circulars 2020 to Present)
 HISTORICAL_INDEX_LOT_SIZES = {
     'NIFTY': [
-        ('2024-04-26', 25),      # May 2024 expiry onwards (NSE/FAOP/61328): 25
+        ('2025-12-30', 65),      # NSE Circular NSE/FAOP/70616 (Dec 30, 2025 onwards): 65
+        ('2024-11-20', 75),      # Nov 20, 2024 SEBI revision (min ₹15L contract): 75
+        ('2024-04-26', 25),      # May 2024 expiry to Nov 2024 (NSE/FAOP/61328): 25
         ('2021-07-01', 50),      # July 2021 expiry to April 2024 (NSE/FAOP/47786): 50
         ('2020-01-01', 75),      # 2020 to June 2021: 75
         ('1990-01-01', 75),      # Prior to 2020: 75
@@ -50,12 +52,14 @@ HISTORICAL_INDEX_LOT_SIZES = {
         ('1990-01-01', 20),      # Historical default: 20
     ],
     'FINNIFTY': [
+        ('2025-12-30', 60),      # NSE Circular NSE/FAOP/70616 (Dec 30, 2025 onwards): 60
         ('2024-11-20', 65),      # Nov 20, 2024 SEBI revision: 65
         ('2023-01-01', 25),      # Jan 2023 to Nov 2024: 25
         ('2021-01-11', 40),      # Launch Jan 2021 to Dec 2022: 40
         ('1990-01-01', 40),      # Fallback: 40
     ],
     'MIDCPNIFTY': [
+        ('2025-12-30', 120),     # NSE Circular NSE/FAOP/70616 (Dec 30, 2025 onwards): 120
         ('2024-11-20', 50),      # Nov 20, 2024 SEBI revision: 50
         ('2022-01-24', 75),      # Launch Jan 2022 to Nov 2024: 75
         ('1990-01-01', 75),      # Fallback: 75
@@ -66,6 +70,8 @@ HISTORICAL_INDEX_LOT_SIZES = {
         ('1990-01-01', 10),      # Fallback: 10
     ],
     'GIFTNIFTY': [
+        ('2025-12-30', 65),      # Dec 2025 alignment with NIFTY: 65
+        ('2024-11-20', 75),      # Nov 2024 revision: 75
         ('2024-04-26', 25),      # April 2024 revision: 25
         ('1990-01-01', 50),      # Fallback: 50
     ],
@@ -121,7 +127,7 @@ def get_historical_lot_size(index_name: str, trade_date=None) -> int:
     sym = (index_name or 'NIFTY').upper().strip()
     timeline = HISTORICAL_INDEX_LOT_SIZES.get(sym)
     if not timeline:
-        return 25 if 'BANK' in sym or 'NIFTY' in sym else 50
+        return 65 if 'NIFTY' in sym else 30
 
     if trade_date is None:
         return timeline[0][1]
@@ -394,3 +400,18 @@ class EmailSubjectConstants:
     NOTIFICATION = "[Marmot] {title}"
     KILL_SWITCH_TRIGGERED = "🚨 CRITICAL: Emergency Kill Switch Activated"
     ACCOUNT_ACTIVATION = "Activate Your Marmot Trading Account"
+
+
+# FYERS Live Data Feed & Market Timing Constants
+FYERS_DATA_SOCKET_URL = "wss://socket.fyers.in/data/v3"
+FYERS_API_BASE_URL = "https://api-t1.fyers.in/api/v3"
+FYERS_AUTH_URL = "https://api-t1.fyers.in/api/v3/generate-authcode"
+FYERS_TOKEN_URL = "https://api-t1.fyers.in/api/v3/validate-authcode"
+
+MARKET_TIMINGS = {
+    'PRE_OPEN_START': '09:00:00',
+    'PRE_OPEN_END': '09:08:00',
+    'REGULAR_OPEN': '09:15:00',
+    'INTRADAY_SQUAREOFF': '15:15:00',
+    'REGULAR_CLOSE': '15:30:00',
+}

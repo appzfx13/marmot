@@ -7,9 +7,11 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"math"
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -638,36 +640,51 @@ func generateRelativeStrikes(count int) []string {
 }
 
 func getIndexSecurityID(indexName string) string {
-	switch strings.ToUpper(indexName) {
-	case "BANKNIFTY":
+	u := strings.ToUpper(indexName)
+	if strings.Contains(u, "BANKNIFTY") {
 		return "25"
-	case "FINNIFTY":
+	} else if strings.Contains(u, "FINNIFTY") {
 		return "27"
-	case "MIDCPNIFTY":
+	} else if strings.Contains(u, "MIDCP") {
 		return "26"
-	case "SENSEX":
+	} else if strings.Contains(u, "SENSEX") {
 		return "51"
-	case "GIFTNIFTY", "GIFT NIFTY":
+	} else if strings.Contains(u, "GIFT") {
 		return "28"
-	case "INDIAVIX", "INDIA VIX":
+	} else if strings.Contains(u, "VIX") {
 		return "17"
-	default: // NIFTY
-		return "13"
 	}
+	return "13" // NIFTY default
 }
 
 func getIndexExchangeSegment(indexName string) string {
-	if strings.EqualFold(indexName, "SENSEX") {
-		return "BSE_IDX"
-	}
 	return "IDX_I"
 }
 
 func getOptionExchangeSegment(indexName string) string {
-	if strings.EqualFold(indexName, "SENSEX") {
+	if strings.Contains(strings.ToUpper(indexName), "SENSEX") {
 		return "BSE_FNO"
 	}
 	return "NSE_FNO"
+}
+
+// parseRelativeOffset extracts signed integer offset from relative strike strings e.g. "ATM" -> 0, "ATM+1" -> 1, "ATM-2" -> -2
+func parseRelativeOffset(strikeName string) int {
+	u := strings.ToUpper(strings.TrimSpace(strikeName))
+	if u == "ATM" || u == "" {
+		return 0
+	}
+	if strings.HasPrefix(u, "ATM+") {
+		if val, err := strconv.Atoi(strings.TrimPrefix(u, "ATM+")); err == nil {
+			return val
+		}
+	}
+	if strings.HasPrefix(u, "ATM-") {
+		if val, err := strconv.Atoi(strings.TrimPrefix(u, "ATM-")); err == nil {
+			return -val
+		}
+	}
+	return 0
 }
 
 // parseRollingOptionParquetRecords extracts records from /charts/rollingoption payload into MarketCandleRecord
@@ -707,11 +724,14 @@ func parseRollingOptionParquetRecords(body []byte, indexName, strikeName, drvOpt
 	ois := parseIntArray(raw["oi"])
 	ivs := parseFloatArray(raw["iv"])
 	spots := parseFloatArray(raw["spot"])
+	actualStrikes := parseFloatArray(raw["strike"])
 	timestamps := parseTimestampArray(raw["timestamp"])
 
 	ist, _ := time.LoadLocation("Asia/Kolkata")
 	count := len(opens)
 	records := make([]models.MarketCandleRecord, 0, count)
+	interval := float64(StrikeIntervalForIndex(indexName))
+	relOffset := parseRelativeOffset(strikeName)
 
 	for i := 0; i < count; i++ {
 		var tsEpoch int64 = 0
@@ -720,12 +740,22 @@ func parseRollingOptionParquetRecords(body []byte, indexName, strikeName, drvOpt
 		}
 		candleTime := time.Unix(tsEpoch, 0).In(ist)
 
+		// Prefer discrete numeric strike for 100% continuous physical contract tracking
+		var strikeValStr = strikeName
+		if i < len(actualStrikes) && actualStrikes[i] > 0 {
+			strikeValStr = fmt.Sprintf("%.0f", actualStrikes[i])
+		} else if i < len(spots) && spots[i] > 0 && interval > 0 {
+			atm := math.Round(spots[i]/interval) * interval
+			computed := atm + float64(relOffset)*interval
+			strikeValStr = fmt.Sprintf("%.0f", computed)
+		}
+
 		rec := models.MarketCandleRecord{
 			Timestamp:      tsEpoch,
 			Datetime:       candleTime.Format("2006-01-02 15:04:05"),
 			IndexName:      indexName,
 			InstrumentType: "OPTION",
-			Strike:         strikeName,
+			Strike:         strikeValStr,
 			OptionType:     strings.ToUpper(drvOptionType),
 			Open:           floatAt(opens, i),
 			High:           floatAt(highs, i),

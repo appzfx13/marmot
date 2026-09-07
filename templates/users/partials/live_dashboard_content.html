@@ -27,6 +27,8 @@
                 </span>
             {% endif %}
 
+            {% include 'admins/partials/master_live_switch_badge.html' %}
+
             <a href="{% url 'users:user-accounts' %}" 
                class="btn-date-picker text-decoration-none shadow-sm"
                style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
@@ -41,6 +43,9 @@
         </div>
     </div>
     <!-- END: Dashboard Header Banner -->
+
+    <!-- Real-Time Exchange Clock HUD -->
+    {% include 'admins/partials/live_clock_widget.html' %}
 
     {% if not has_live_account %}
     <!-- Onboarding Guide for Live Accounts -->
@@ -259,6 +264,25 @@
     </div>
     <!-- END: Top Area Metric Cards (4-Card Setup) -->
 
+    <!-- START: Real-Time Intraday Equity Curve & Current Month Calendar PnL Grid -->
+    <div class="row g-3">
+        <div class="col-xl-7 col-lg-6">
+            {% include 'admins/partials/live_intraday_graph_card.html' %}
+        </div>
+        <div class="col-xl-5 col-lg-6">
+            {% include 'admins/partials/live_calendar_pnl_card.html' %}
+        </div>
+    </div>
+    <!-- END: Real-Time Intraday Equity Curve & Current Month Calendar PnL Grid -->
+
+    <!-- START: Real-Time NIFTY Mini Option Chain Card Widget -->
+    <div class="row g-3">
+        <div class="col-12">
+            {% include 'admins/partials/live_mini_option_chain_card.html' %}
+        </div>
+    </div>
+    <!-- END: Real-Time NIFTY Mini Option Chain Card Widget -->
+
     <!-- START: Advanced Realtime Broker Telemetry Tabs (Positions, Holdings, Live Orders) -->
     <div class="row g-3">
         <div class="col-12">
@@ -348,83 +372,64 @@
     <!-- START: Active Live Strategy Controls Section -->
     <div class="row g-4">
         <div class="col-12">
-            <div class="card mb-0">
-                <div class="card-header d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2">
+            <div class="card mb-0" style="background: var(--card-bg); border: 1px solid var(--border-color); border-radius: var(--radius-xxl); overflow: hidden;">
+                <div class="card-header d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2 p-3 border-bottom" style="border-color: var(--border-color) !important;">
                     <div>
-                        <h2 class="card-title mb-0">Live Strategy Execution Controls</h2>
-                        <span class="card-subtitle theme-text-muted small">Configured automated index and options execution rules</span>
+                        <div class="d-flex align-items-center gap-2">
+                            <h2 class="card-title mb-0">Live Deployed Strategies</h2>
+                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2.5 py-0.5 smaller fw-bold">
+                                ISOLATED REGISTRY
+                            </span>
+                        </div>
+                        <span class="card-subtitle theme-text-muted small">Algorithmic execution instances cloned from Backtest Engine with frozen rule snapshots</span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1.5 small fw-bold">
-                            {{ live_strategy_configs.count }} ACTIVE RULES
+                            {{ live_strategies.count }} DEPLOYED STRATEGIES
                         </span>
+                        <a href="{% url 'users:user-backtest' %}" class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1 fw-bold"
+                           hx-get="{% url 'users:user-backtest' %}" hx-target="#user-portal-container" hx-push-url="true">
+                            <i class="bi bi-plus-lg me-1"></i> Deploy From Backtest
+                        </a>
                     </div>
                 </div>
 
                 <div class="card-body p-0">
-                    {% if live_strategy_configs %}
+                    {% if live_strategies %}
                     <div class="table-responsive">
                         <table class="table table-custom align-middle mb-0">
                             <thead>
-                                <tr>
-                                    <th>Config Title</th>
-                                    <th>Market</th>
-                                    <th>Target Account</th>
-                                    <th>Max Loss Limit</th>
-                                    <th>Max Profit Limit</th>
-                                    <th class="text-end pe-4">Status</th>
+                                <tr class="border-bottom" style="border-color: var(--border-color) !important;">
+                                    <th>Strategy Name &amp; Origin</th>
+                                    <th>Asset</th>
+                                    <th>Linked Broker Account</th>
+                                    <th>Rule Snapshot</th>
+                                    <th>Allocated Capital</th>
+                                    <th>Session P&amp;L</th>
+                                    <th class="text-end pe-4">Arm / Pause Action</th>
                                 </tr>
                             </thead>
                             <tbody>
-                                {% for cfg in live_strategy_configs %}
-                                <tr>
-                                    <td>
-                                        <div class="fw-bold theme-text-main">{{ cfg.name }}</div>
-                                        <div class="theme-text-muted smaller">ID: #{{ cfg.id }}</div>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-1 small">
-                                            {{ cfg.get_market_type_display|default:cfg.market_type }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <div class="small theme-text-main fw-semibold">{{ cfg.trading_account.account_name|default:"Primary Live" }}</div>
-                                        <div class="smaller text-success">{{ cfg.trading_account.broker.name|default:"DHAN" }}</div>
-                                    </td>
-                                    <td>
-                                        {% if cfg.max_loss_status %}
-                                            <span class="badge bg-danger bg-opacity-25 text-danger font-monospace">₹{{ cfg.max_loss_limit|default:"0.00" }}</span>
-                                        {% else %}
-                                            <span class="theme-text-muted small">Disabled</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if cfg.max_profit_status %}
-                                            <span class="badge bg-success bg-opacity-25 text-success font-monospace">₹{{ cfg.max_profit_limit|default:"0.00" }}</span>
-                                        {% else %}
-                                            <span class="theme-text-muted small">Disabled</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        {% if cfg.is_active %}
-                                            <span class="trend-badge trend-up py-1 px-2.5 fs-xs d-inline-flex align-items-center gap-1">
-                                                <i class="bi bi-lightning-charge-fill"></i> Active
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-1 small">
-                                                Standby
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
+                                {% for strat in live_strategies %}
+                                    {% include 'admins/partials/live_strategy_row.html' with strategy=strat %}
                                 {% endfor %}
                             </tbody>
                         </table>
                     </div>
                     {% else %}
                     <div class="text-center py-5 theme-text-muted">
-                        <i class="bi bi-sliders fs-1 opacity-50 mb-2 d-block"></i>
-                        <p class="mb-0">No active Live Execution Configurations found.<br>Configurations with <code>account_type='LIVE'</code> will appear here automatically.</p>
+                        <div class="rounded-circle bg-warning bg-opacity-15 text-warning d-inline-flex align-items-center justify-content-center mb-2 mx-auto" style="width: 52px; height: 52px;">
+                            <i class="bi bi-rocket-takeoff fs-3"></i>
+                        </div>
+                        <h6 class="fw-bold theme-text-main mb-1">No Deployed Live Strategies Yet</h6>
+                        <p class="small mb-3 mx-auto" style="max-width: 480px;">
+                            Open any completed backtest in the <strong>Backtest Engine</strong> and click the 
+                            <span class="badge bg-warning text-dark fw-bold px-2 py-0.5">Move to Execute</span> button to clone its parameters into an isolated Live Strategy.
+                        </p>
+                        <a href="{% url 'users:user-backtest' %}" class="btn btn-primary btn-sm rounded-pill px-3 py-1.5 fw-bold"
+                           hx-get="{% url 'users:user-backtest' %}" hx-target="#user-portal-container" hx-push-url="true">
+                            Browse Backtest Tasks
+                        </a>
                     </div>
                     {% endif %}
                 </div>

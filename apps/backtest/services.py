@@ -34,7 +34,7 @@ def broadcast_backtest_progress(task_id, progress: int, status: str, net_pnl: fl
         logger.error("Failed to broadcast backtest progress", exc=e, extra={"task_id": task_id})
 
 
-def create_and_start_backtest_task(strategy_name, index_name, start_date, end_date, initial_capital, parameters, user, backup_task=None, use_macro_assist=False, macro_timeframe='1h', macro_backup_task=None):
+def create_and_start_backtest_task(strategy_name, index_name, start_date, end_date, initial_capital, parameters, user, backup_task=None, use_macro_assist=False, macro_timeframe='1h', macro_backup_task=None, enable_ai_lot_sizing=False, auto_risk_management=True, max_risk_per_trade_pct=2.00, max_capital_utilization_pct=60.00, max_lots_cap=10):
     """Creates a BacktestTask DB entry in CREATED status without auto-starting."""
     task = BacktestTask.objects.create(
         strategy_name=strategy_name,
@@ -47,6 +47,11 @@ def create_and_start_backtest_task(strategy_name, index_name, start_date, end_da
         use_macro_assist=use_macro_assist,
         macro_timeframe=macro_timeframe or '1h',
         macro_backup_task=macro_backup_task,
+        enable_ai_lot_sizing=enable_ai_lot_sizing,
+        auto_risk_management=auto_risk_management,
+        max_risk_per_trade_pct=max_risk_per_trade_pct,
+        max_capital_utilization_pct=max_capital_utilization_pct,
+        max_lots_cap=max_lots_cap,
         status=BacktestTask.StatusChoices.CREATED,
         created_by=user
     )
@@ -160,6 +165,11 @@ def execute_python_rl_backtest(task_id):
                 "use_macro_assist": task.use_macro_assist,
                 "macro_timeframe": task.macro_timeframe or "1h",
                 "macro_dir": macro_dir,
+                "enable_ai_lot_sizing": bool(task.enable_ai_lot_sizing),
+                "auto_risk_management": bool(task.auto_risk_management),
+                "max_risk_per_trade_pct": float(task.max_risk_per_trade_pct or 2.0),
+                "max_capital_utilization_pct": float(task.max_capital_utilization_pct or 60.0),
+                "max_lots_cap": int(task.max_lots_cap or 10),
                 **task_params
             },
             progress_callback=on_rl_progress

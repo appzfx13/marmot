@@ -1,0 +1,116 @@
+{% load static %}
+<!-- Real-Time NIFTY Mini Option Chain Card Widget (7 Strikes: ATM +- 3 Strikes) -->
+<div class="card p-0 rounded-4 shadow-sm overflow-hidden" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+    <!-- Card Header -->
+    <div class="d-flex flex-column flex-sm-row align-items-sm-center justify-content-between p-3 border-bottom gap-2" style="border-color: var(--border-color) !important;">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle bg-warning bg-opacity-15 text-warning d-flex align-items-center justify-content-center" style="width: 38px; height: 38px;">
+                <i class="bi bi-diagram-3-fill fs-5"></i>
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="fw-bold theme-text-main mb-0">{{ option_chain.spot_symbol }} Mini Option Chain</h5>
+                    <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0.5 smaller fw-bold">
+                        ATM: {{ option_chain.atm_strike }}
+                    </span>
+                </div>
+                <small class="theme-text-muted">&plusmn;3 Strikes Active Window &bull; Real-time Strike Heatmap</small>
+            </div>
+        </div>
+        <div class="d-flex align-items-center gap-3">
+            <div class="text-sm-end">
+                <div class="fw-bold font-monospace fs-5 text-white">
+                    ₹{{ option_chain.spot_ltp }}
+                </div>
+                <div class="smaller font-monospace {% if option_chain.is_positive %}text-success{% else %}text-danger{% endif %} fw-bold">
+                    {{ option_chain.spot_change }} ({{ option_chain.spot_change_pct }})
+                </div>
+            </div>
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-circle p-1" 
+                    hx-get="{% url 'admins:admin-live-dashboard' %}"
+                    hx-target="#app-main-container"
+                    hx-swap="innerHTML"
+                    title="Refresh Option Chain">
+                <i class="bi bi-arrow-repeat"></i>
+            </button>
+        </div>
+    </div>
+
+    {% if option_chain.is_live %}
+    <!-- Mini Option Chain Table -->
+    <div class="table-responsive mb-0">
+        <table class="table table-custom align-middle mb-0 text-center smaller">
+            <thead>
+                <tr class="border-bottom" style="border-color: var(--border-color) !important; background: rgba(0,0,0,0.2);">
+                    <th colspan="2" class="text-success border-end" style="border-color: var(--border-color) !important; width: 40%;">
+                        <i class="bi bi-graph-up-arrow me-1"></i>CALLS (CE)
+                    </th>
+                    <th class="theme-text-main fw-bold" style="width: 20%;">STRIKE</th>
+                    <th colspan="2" class="text-danger border-start" style="border-color: var(--border-color) !important; width: 40%;">
+                        PUTS (PE)<i class="bi bi-graph-down-arrow ms-1"></i>
+                    </th>
+                </tr>
+                <tr class="smaller theme-text-muted border-bottom" style="border-color: var(--border-color) !important; font-size: 0.72rem;">
+                    <th>OI</th>
+                    <th class="border-end" style="border-color: var(--border-color) !important;">LTP &amp; Chg</th>
+                    <th>Price</th>
+                    <th class="border-start" style="border-color: var(--border-color) !important;">LTP &amp; Chg</th>
+                    <th>OI</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for row in option_chain.strikes %}
+                <tr {% if row.is_atm %}class="table-active" style="background: rgba(180, 241, 5, 0.08) !important; border-top: 2px solid #B4F105; border-bottom: 2px solid #B4F105;"{% endif %}>
+                    <!-- Call OI -->
+                    <td class="font-monospace text-muted smaller">
+                        {{ row.ce_oi }}
+                    </td>
+                    <!-- Call LTP & Chg -->
+                    <td class="font-monospace text-end pe-3 border-end" style="border-color: var(--border-color) !important;">
+                        <span class="text-white fw-bold">₹{{ row.ce_ltp|floatformat:2 }}</span>
+                        <span class="smaller {% if row.ce_chg >= 0 %}text-success{% else %}text-danger{% endif %} ms-1">
+                            {% if row.ce_chg >= 0 %}+{% endif %}{{ row.ce_chg|floatformat:1 }}
+                        </span>
+                    </td>
+                    <!-- Strike -->
+                    <td>
+                        {% if row.is_atm %}
+                            <span class="badge rounded-pill fw-bold font-monospace px-2.5 py-1 text-dark" style="background: #B4F105; font-size: 0.8rem;">
+                                {{ row.strike }} ATM
+                            </span>
+                        {% else %}
+                            <span class="font-monospace fw-bold theme-text-main" style="font-size: 0.825rem;">
+                                {{ row.strike }}
+                            </span>
+                        {% endif %}
+                    </td>
+                    <!-- Put LTP & Chg -->
+                    <td class="font-monospace text-start ps-3 border-start" style="border-color: var(--border-color) !important;">
+                        <span class="text-white fw-bold">₹{{ row.pe_ltp|floatformat:2 }}</span>
+                        <span class="smaller {% if row.pe_chg >= 0 %}text-success{% else %}text-danger{% endif %} ms-1">
+                            {% if row.pe_chg >= 0 %}+{% endif %}{{ row.pe_chg|floatformat:1 }}
+                        </span>
+                    </td>
+                    <!-- Put OI -->
+                    <td class="font-monospace text-muted smaller">
+                        {{ row.pe_oi }}
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="p-4 text-center">
+        <div class="rounded-circle bg-warning bg-opacity-15 text-warning d-inline-flex align-items-center justify-content-center mb-2" style="width: 46px; height: 46px;">
+            <i class="bi bi-broadcast fs-4"></i>
+        </div>
+        <h6 class="fw-bold theme-text-main mb-1">FYERS Live Market Feed Standby</h6>
+        <p class="theme-text-muted small mb-3" style="max-width: 480px; margin: 0 auto;">Real-time option chain streaming and ATM strike heatmaps are in standby. Authenticate daily FYERS OAuth access to stream live quotes.</p>
+        <a href="{% url 'admins:live-data-feed' %}" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" hx-get="{% url 'admins:live-data-feed' %}" hx-target="#app-main-container" hx-push-url="true">
+            <i class="bi bi-key-fill"></i>
+            <span>Authenticate FYERS Feed</span>
+        </a>
+    </div>
+    {% endif %}
+</div>

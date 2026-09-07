@@ -1,0 +1,30 @@
+<div id="backtest-active-rules-container" class="mt-3 pt-2 border-top border-secondary border-opacity-10 d-flex flex-wrap align-items-center gap-2" {% if is_oob %}hx-swap-oob="outerHTML:#backtest-active-rules-container"{% endif %}>
+    <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Active Rules:</span>
+    {% for rule in backtest.rules.all %}
+    <span class="badge rounded-pill px-3 py-1 fw-bold" 
+          style="font-size: 0.72rem;
+          {% if rule.rule_type == 'intraday' %}background: var(--danger-subdued, rgba(239, 68, 68, 0.15)); color: var(--danger, #ef4444); border: 1px solid var(--danger-border, rgba(239, 68, 68, 0.35));
+          {% elif rule.rule_type == 'risk_management' %}background: var(--info-subdued, rgba(2, 132, 199, 0.15)); color: var(--info, #0284c7); border: 1px solid var(--info-border, rgba(2, 132, 199, 0.35));
+          {% elif rule.rule_type == 'retest_limit' %}background: var(--success-subdued, rgba(5, 150, 105, 0.15)); color: var(--success, #059669); border: 1px solid var(--success-border, rgba(5, 150, 105, 0.35));
+          {% elif rule.rule_type == 'trendline_retest' %}background: var(--warning-subdued, rgba(217, 119, 6, 0.15)); color: var(--warning, #d97706); border: 1px solid var(--warning-border, rgba(217, 119, 6, 0.35));
+          {% else %}background: var(--primary-subdued, rgba(37, 99, 235, 0.15)); color: var(--primary, #2563eb); border: 1px solid var(--primary-border, rgba(37, 99, 235, 0.35));{% endif %}">
+        <span class="material-icons align-middle me-1" style="font-size: 0.75rem !important;">check_circle</span>
+        {{ rule.name }}
+    </span>
+    {% empty %}
+        {% for r in backtest.parameters.rules %}
+        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold" style="font-size: 0.72rem;">
+            {{ r.name|default:r }}
+        </span>
+        {% empty %}
+        <span class="theme-text-muted small fst-italic">Standard Execution Rules</span>
+        {% endfor %}
+    {% endfor %}
+
+    {% if backtest.backup_task %}
+    <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-1 ms-auto font-monospace" style="font-size: 0.7rem;">
+        <span class="material-icons align-middle me-1" style="font-size: 0.75rem !important;">storage</span>
+        Linked Dataset #{{ backtest.backup_task.id }} · {{ backtest.backup_task.display_symbol }} ({{ backtest.backup_task.start_date }} to {{ backtest.backup_task.end_date }})
+    </span>
+    {% endif %}
+</div>

@@ -45,6 +45,12 @@ from .views import (
     AdminAIDashboardView,
     SiteSettingsAdminView,
     SiteSettingsLogoUploadView,
+    LiveDataFeedView,
+    FyersAuthCallbackView,
+    LiveStrategyToggleModalView,
+    LiveStrategyToggleView,
+    MasterLiveExecutionToggleModalView,
+    MasterLiveExecutionToggleView,
     # Trading Journal & Analytics Views
     AdminJournalView,
     AdminJournalStatsView,
@@ -124,7 +130,16 @@ urlpatterns = [
     path('masters/brokers/<int:pk>/delete-modal/', AdminBrokerMasterDeleteModalView.as_view(), name='broker-master-delete-modal'),
     path('masters/brokers/<int:pk>/delete/', AdminBrokerMasterDeleteView.as_view(), name='broker-master-delete'),
 
-    # Site Settings Management
+    # Site Settings & Live Feed Management
     path('settings/', SiteSettingsAdminView.as_view(), name='site-settings'),
     path('settings/upload-logo/<str:field_name>/', SiteSettingsLogoUploadView.as_view(), name='site-settings-logo-upload'),
+    path('live-data-feed/', LiveDataFeedView.as_view(), name='live-data-feed'),
+    path('fyers/callback/', FyersAuthCallbackView.as_view(), name='fyers-oauth-callback'),
+    path('fyers/callback', FyersAuthCallbackView.as_view()),
+
+    # Live Strategy Execution Controls
+    path('live-strategies/<int:pk>/toggle-modal/', LiveStrategyToggleModalView.as_view(), name='live-strategy-toggle-modal'),
+    path('live-strategies/<int:pk>/toggle/', LiveStrategyToggleView.as_view(), name='live-strategy-toggle'),
+    path('live-strategies/master-switch-modal/', MasterLiveExecutionToggleModalView.as_view(), name='master-live-execution-modal'),
+    path('live-strategies/master-switch-toggle/', MasterLiveExecutionToggleView.as_view(), name='master-live-execution-toggle'),
 ]

@@ -51,6 +51,13 @@ class BacktestTask(BaseModel):
     use_macro_assist = models.BooleanField(default=False, help_text="Enable Gemini AI Macro Assist in RL observation space")
     macro_timeframe = models.CharField(max_length=10, choices=MacroTimeframeChoices.choices, default=MacroTimeframeChoices.H1, null=True, blank=True, help_text="Macro timeframe (default 1h)")
 
+    # Dynamic Position Sizing & Auto Risk Management
+    enable_ai_lot_sizing = models.BooleanField(default=False, help_text="Enable AI Macro Dynamic Position Sizing")
+    auto_risk_management = models.BooleanField(default=True, help_text="Enforce automatic risk management and capital utilization limits")
+    max_risk_per_trade_pct = models.DecimalField(default=2.00, max_digits=5, decimal_places=2, help_text="Maximum risk percentage of capital per trade")
+    max_capital_utilization_pct = models.DecimalField(default=60.00, max_digits=5, decimal_places=2, help_text="Maximum capital margin utilization percentage")
+    max_lots_cap = models.PositiveIntegerField(default=10, help_text="Hard ceiling on concurrent lots count")
+
     # Strategy Input Configuration
     strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.TENSORTRADE_RL)
     index_name = models.CharField(max_length=50, choices=IndexChoices.choices + ForexInstrumentChoices.choices, default=IndexChoices.NIFTY)

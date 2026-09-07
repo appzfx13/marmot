@@ -1,0 +1,79 @@
+{% load static %}
+<tr id="live-strategy-row-{{ strategy.pk }}">
+    <td>
+        <div class="fw-bold theme-text-main d-flex align-items-center gap-1.5">
+            {% if strategy.is_active %}
+                <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.5rem; height: 0.5rem;"></span>
+            {% else %}
+                <span class="badge rounded-circle bg-secondary bg-opacity-50 p-1" style="width: 8px; height: 8px;"></span>
+            {% endif %}
+            <span>{{ strategy.name }}</span>
+        </div>
+        <div class="theme-text-muted smaller d-flex align-items-center gap-2">
+            <span>ID: #LS-{{ strategy.id|stringformat:"04d" }}</span>
+            {% if strategy.backtest_task_id %}
+            <span>&bull;</span>
+            <a href="{% url 'backtest:backtest_detail' strategy.backtest_task_id %}" class="text-primary text-decoration-none"
+               hx-get="{% url 'backtest:backtest_detail' strategy.backtest_task_id %}"
+               hx-target="#app-main-container" hx-push-url="true">
+                Source #BT-{{ strategy.backtest_task_id|stringformat:"04d" }}
+            </a>
+            {% endif %}
+        </div>
+    </td>
+    <td>
+        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-1 small">
+            {{ strategy.index_name }}
+        </span>
+    </td>
+    <td>
+        <div class="small theme-text-main fw-semibold">{{ strategy.trading_account.account_name|default:"User Profile Broker" }}</div>
+        <div class="smaller text-success">{{ strategy.trading_account.broker.name|default:"DHAN" }} ({{ strategy.execution_mode }})</div>
+    </td>
+    <td>
+        <span class="badge bg-dark bg-opacity-50 border border-white border-opacity-10 text-white font-monospace">
+            {{ strategy.frozen_rules_snapshot|length }} Isolated Rules
+        </span>
+    </td>
+    <td>
+        <span class="font-monospace text-success fw-bold">₹{{ strategy.allocated_capital|floatformat:0 }}</span>
+    </td>
+    <td>
+        <span class="font-monospace fw-bold {% if strategy.realtime_pnl > 0 %}text-success{% elif strategy.realtime_pnl < 0 %}text-danger{% else %}text-muted{% endif %}">
+            ₹{{ strategy.realtime_pnl|floatformat:2 }}
+        </span>
+    </td>
+    <td class="text-end pe-4">
+        <div class="d-inline-flex align-items-center gap-2">
+            {% if strategy.is_active %}
+                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 fs-xs fw-bold">
+                    ARMED (ON)
+                </span>
+                <button type="button" 
+                        class="btn btn-sm btn-outline-warning rounded-pill px-2.5 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1"
+                        hx-get="{% url 'admins:live-strategy-toggle-modal' strategy.pk %}"
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        data-bs-toggle="modal"
+                        data-bs-target="#globalHtmxModal"
+                        title="Pause strategy execution">
+                    <i class="bi bi-pause-fill"></i> Pause
+                </button>
+            {% else %}
+                <span class="badge bg-secondary bg-opacity-25 text-muted border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fs-xs fw-bold">
+                    STANDBY (OFF)
+                </span>
+                <button type="button" 
+                        class="btn btn-sm btn-outline-success rounded-pill px-2.5 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1"
+                        hx-get="{% url 'admins:live-strategy-toggle-modal' strategy.pk %}"
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        data-bs-toggle="modal"
+                        data-bs-target="#globalHtmxModal"
+                        title="Arm strategy execution">
+                    <i class="bi bi-play-fill"></i> Turn ON
+                </button>
+            {% endif %}
+        </div>
+    </td>
+</tr>

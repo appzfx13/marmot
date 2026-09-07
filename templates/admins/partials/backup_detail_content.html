@@ -218,6 +218,18 @@
                         <span class="stat-value text-primary fw-bold" id="backup-file-size">{{ backup.file_size_mb }} MB</span>
                     </div>
 
+                    {% if backup.is_macro_assist %}
+                    <div class="stat-item border-primary border-opacity-30">
+                        <span class="stat-label d-flex align-items-center gap-1">
+                            <span class="material-icons fs-6 text-primary">auto_graph</span>
+                            <span>AI Dynamic Lot Sizing</span>
+                        </span>
+                        <span class="stat-value">
+                            <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-1">Continuous Telemetry Active</span>
+                        </span>
+                    </div>
+                    {% endif %}
+
                     {% if backup.is_macro_assist and backup.linked_backup_task %}
                     <div class="stat-item border-warning border-opacity-30">
                         <span class="stat-label d-flex align-items-center gap-1">
@@ -300,6 +312,12 @@
                            class="btn btn-emerald rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
                             <span class="material-icons fs-6">candlestick_chart</span>
                             <span>Interactive Chart</span>
+                        </a>
+                        {% else %}
+                        <a href="{% if backup.market_type == 'FOREX_FUTURES' %}{% url 'backtest:rl_training_forex_futures' %}{% else %}{% url 'backtest:rl_training_index_fo' %}{% endif %}"
+                           class="btn btn-emerald rounded-pill px-4 py-2 fw-semibold d-inline-flex align-items-center justify-content-center gap-2">
+                            <span class="material-icons fs-6">model_training</span>
+                            <span>Launch RL Training</span>
                         </a>
                         {% endif %}
 
@@ -453,9 +471,14 @@
 <script>
 (function() {
     const taskID = "{{ backup.pk }}";
-    const container = document.getElementById('backup-detail-container');
+    const initialStatus = "{{ backup.status }}";
+    let isFinished = (initialStatus === 'completed' || initialStatus === 'saved' || initialStatus === 'error' || initialStatus === 'cancelled');
 
     function applyDetailUpdate(data) {
+        if (!data) return;
+        const progress = Number(data.progress || 0);
+        const status = data.status || '';
+
         const progressBar = document.getElementById('backup-progress-bar');
         const progressText = document.getElementById('backup-progress-text');
         const statusBadge = document.getElementById('backup-status-badge');
@@ -464,18 +487,17 @@
         const etaText = document.getElementById('backup-eta-text');
 
         if (progressBar) {
-            progressBar.style.width = data.progress + '%';
-            progressBar.setAttribute('aria-valuenow', data.progress);
-            if (data.status === 'running') {
+            progressBar.style.width = Math.max(2, progress) + '%';
+            progressBar.setAttribute('aria-valuenow', progress);
+            if (status === 'running') {
                 progressBar.classList.add('progress-bar-animated');
             } else {
                 progressBar.classList.remove('progress-bar-animated');
             }
         }
-        if (progressText) progressText.textContent = data.progress + '%';
+        if (progressText) progressText.textContent = progress + '%';
 
         if (statusBadge) {
-            const S = 'style';
             const pill = 'd-inline-flex align-items-center gap-2 rounded-pill px-3 py-2 fw-semibold';
             const icon = (name) => `<span class="material-icons" style="font-size:1rem">${name}</span>`;
             const badge = (bg, color, border, inner) =>
@@ -483,6 +505,7 @@
 
             const statusMap = {
                 'completed':  badge('rgba(16,185,129,0.18)',  '#10b981', 'rgba(16,185,129,0.4)',  icon('check_circle') + '<span>Completed</span>'),
+                'saved':      badge('rgba(16,185,129,0.18)',  '#10b981', 'rgba(16,185,129,0.4)',  icon('check_circle') + '<span>Completed</span>'),
                 'running':    badge('rgba(59,130,246,0.18)',  '#3b82f6', 'rgba(59,130,246,0.4)',  '<span class="pulse-indicator" style="background:#3b82f6"></span><span>Running Ingestion</span>'),
                 'created':    badge('rgba(14,165,233,0.18)',  '#0ea5e9', 'rgba(14,165,233,0.4)',  icon('info') + '<span>Created</span>'),
                 'paused':     badge('rgba(245,158,11,0.18)',  '#f59e0b', 'rgba(245,158,11,0.4)',  icon('pause') + '<span>Paused</span>'),
@@ -490,7 +513,7 @@
                 'error':      badge('rgba(239,68,68,0.18)',   '#ef4444', 'rgba(239,68,68,0.4)',   icon('error_outline') + '<span>Error</span>'),
                 'pending':    badge('rgba(100,116,139,0.18)', '#94a3b8', 'rgba(100,116,139,0.4)', icon('hourglass_empty') + '<span>Pending</span>')
             };
-            statusBadge.innerHTML = statusMap[data.status] || statusMap['pending'];
+            statusBadge.innerHTML = statusMap[status] || statusMap['pending'];
         }
 
         if (fileSizeEl && data.file_size_mb !== undefined) {
@@ -502,7 +525,7 @@
         }
 
         if (etaText) {
-            if (data.status === 'running' && data.eta) {
+            if (status === 'running' && data.eta) {
                 etaText.textContent = 'ETA: ' + data.eta;
                 etaText.style.display = 'inline-block';
             } else {
@@ -510,19 +533,69 @@
             }
         }
 
-        if (data.status === 'error' || data.status === 'completed') {
-            if (container) container.dispatchEvent(new CustomEvent('reloadBackupDetail'));
+        // ── Real-Time 100% Completion Auto-Reload ────────────────────────────
+        if ((progress >= 100 || status === 'completed' || status === 'saved' || status === 'error' || status === 'cancelled') && !isFinished) {
+            isFinished = true;
+            if (window.MarmotWS) {
+                window.MarmotWS.unsubscribe(taskID);
+            }
+            setTimeout(function() {
+                const container = document.getElementById('backup-detail-container') || document.getElementById('mainContentBody');
+                if (container && window.htmx) {
+                    window.htmx.ajax('GET', window.location.pathname + window.location.search, {
+                        target: container.id === 'backup-detail-container' ? '#backup-detail-container' : '#mainContentBody',
+                        swap: 'outerHTML'
+                    });
+                } else {
+                    document.body.dispatchEvent(new CustomEvent('reloadBackupDetail'));
+                }
+            }, 600);
         }
     }
 
     function initDetailSubscription() {
+        if (isFinished || initialStatus === 'completed' || initialStatus === 'saved' || initialStatus === 'cancelled' || initialStatus === 'error') {
+            if (window.MarmotWS) {
+                window.MarmotWS.unsubscribe(taskID);
+            }
+            return;
+        }
+
+        // 1. Immediate REST status check
+        fetch('/market/backup/' + taskID + '/status/', {
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        })
+        .then(function(r) { return r.ok ? r.json() : null; })
+        .then(function(data) { if (data) applyDetailUpdate(data); })
+        .catch(function() {});
+
+        // 2. WebSocket Subscription
         if (window.MarmotWS && window.MarmotWS.url) {
             window.MarmotWS.unsubscribe(taskID);
             window.MarmotWS.subscribe(taskID, applyDetailUpdate);
-        } else {
-            setInterval(function() {
-                if (container) container.dispatchEvent(new CustomEvent('reloadBackupDetail'));
-            }, 3000);
+        }
+
+        // 3. Dual-Channel REST Polling for ngrok tunnels & mobile (5s interval for running tasks)
+        if (!isFinished && initialStatus === 'running') {
+            const pollTimer = setInterval(function() {
+                if (isFinished) {
+                    clearInterval(pollTimer);
+                    return;
+                }
+                fetch('/market/backup/' + taskID + '/status/', {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' }
+                })
+                .then(function(r) { return r.ok ? r.json() : null; })
+                .then(function(data) {
+                    if (data) {
+                        applyDetailUpdate(data);
+                        if (data.status === 'completed' || data.status === 'saved' || data.status === 'error' || data.status === 'cancelled' || Number(data.progress || 0) >= 100) {
+                            clearInterval(pollTimer);
+                        }
+                    }
+                })
+                .catch(function() {});
+            }, 5000);
         }
     }
 
@@ -531,5 +604,17 @@
     } else {
         initDetailSubscription();
     }
+
+    document.body.addEventListener('reloadBackupDetail', function() {
+        const container = document.getElementById('backup-detail-container') || document.getElementById('mainContentBody');
+        if (container && window.htmx) {
+            window.htmx.ajax('GET', window.location.pathname + window.location.search, {
+                target: container.id === 'backup-detail-container' ? '#backup-detail-container' : '#mainContentBody',
+                swap: 'outerHTML'
+            });
+        } else {
+            window.location.reload();
+        }
+    });
 })();
 </script>

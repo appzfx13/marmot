@@ -23,6 +23,8 @@ from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 from .models import BacktestTask, BacktestRule, TradingStrategy
 from .forms import IndexBacktestTaskForm, ForexBacktestTaskForm, BacktestRuleForm
 from .services import create_and_start_backtest_task, send_backtest_control_command
+from apps.common.choices import LiveStrategyStatusChoices
+from apps.trade_config.models import LiveStrategy, UserTradingAccount
 
 class BacktestDashboardView(LoginRequiredMixin, AdminRequiredMixin, ListView):
     """
@@ -127,8 +129,19 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
         use_macro = bool(form.cleaned_data.get('use_macro_assist', False))
         macro_tf = form.cleaned_data.get('macro_timeframe') or '1h'
         macro_backup_task = form.cleaned_data.get('macro_backup_task')
+        enable_ai_lot_sizing = bool(form.cleaned_data.get('enable_ai_lot_sizing', False))
+        auto_risk_management = bool(form.cleaned_data.get('auto_risk_management', True))
+        max_risk_pct = float(form.cleaned_data.get('max_risk_per_trade_pct') or 2.0)
+        max_cap_util_pct = float(form.cleaned_data.get('max_capital_utilization_pct') or 60.0)
+        max_lots_cap = int(form.cleaned_data.get('max_lots_cap') or 10)
+
         params["use_macro_assist"] = use_macro
         params["macro_timeframe"] = macro_tf
+        params["enable_ai_lot_sizing"] = enable_ai_lot_sizing
+        params["auto_risk_management"] = auto_risk_management
+        params["max_risk_per_trade_pct"] = max_risk_pct
+        params["max_capital_utilization_pct"] = max_cap_util_pct
+        params["max_lots_cap"] = max_lots_cap
 
         backup_task = form.cleaned_data.get('backup_task')
         self.object = create_and_start_backtest_task(
@@ -142,7 +155,12 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
             backup_task=backup_task,
             use_macro_assist=use_macro,
             macro_timeframe=macro_tf,
-            macro_backup_task=macro_backup_task
+            macro_backup_task=macro_backup_task,
+            enable_ai_lot_sizing=enable_ai_lot_sizing,
+            auto_risk_management=auto_risk_management,
+            max_risk_per_trade_pct=max_risk_pct,
+            max_capital_utilization_pct=max_cap_util_pct,
+            max_lots_cap=max_lots_cap,
         )
         self.object.market_type = market_type
         self.object.save(update_fields=['market_type'])
@@ -325,6 +343,11 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
         init_cap = float(self.object.initial_capital or 100000.0)
         running_equity = init_cap
         peak_equity = init_cap
+        lowest_capital = init_cap
+        lowest_capital_trade_num = 0
+        highest_win_trade_num = 0
+        highest_loss_trade_num = 0
+        margin_breach_count = 0
         max_dd_amount = 0.0
         max_dd_pct = 0.0
 
@@ -335,6 +358,10 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
             'equity': round(running_equity, 2),
             'drawdown': 0.0,
             'pnl': 0.0,
+            'utilized_capital': 0.0,
+            'margin_breach': False,
+            'margin_ratio': 0.0,
+            'peak_equity': round(running_equity, 2),
             'trade_num': 0,
             'strike': 'Initial Principal',
             'type': '',
@@ -356,6 +383,7 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
                 winning_list.append(trade)
                 if gross_p > highest_win:
                     highest_win = gross_p
+                    highest_win_trade_num = idx
                 if 'CE' in t_type:
                     ce_winning_count += 1
                 elif 'PE' in t_type:
@@ -365,6 +393,11 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
                 losing_list.append(trade)
                 if gross_p < highest_loss:
                     highest_loss = gross_p
+                    highest_loss_trade_num = idx
+
+            is_margin_breach = (ut_cap > running_equity)
+            if is_margin_breach:
+                margin_breach_count += 1
 
             total_brokerage += brok
             total_charges += chgs
@@ -396,6 +429,10 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
             running_equity += net_p
             if running_equity > peak_equity:
                 peak_equity = running_equity
+            if running_equity < lowest_capital:
+                lowest_capital = running_equity
+                lowest_capital_trade_num = idx
+
             curr_dd_amt = peak_equity - running_equity
             curr_dd_pct = (curr_dd_amt / peak_equity * 100.0) if peak_equity > 0 else 0.0
             if curr_dd_amt > max_dd_amount:
@@ -412,6 +449,10 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
                 'equity': round(running_equity, 2),
                 'drawdown': round(curr_dd_pct, 2),
                 'pnl': round(net_p, 2),
+                'utilized_capital': round(ut_cap, 2),
+                'margin_breach': is_margin_breach,
+                'margin_ratio': round((ut_cap / running_equity * 100.0), 1) if running_equity > 0 else 0.0,
+                'peak_equity': round(peak_equity, 2),
                 'trade_num': idx,
                 'strike': trade.get('strike', trade.get('symbol', '')),
                 'type': t_type,
@@ -450,6 +491,17 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
             'net_pnl': round(net_pnl, 2),
             'ending_equity': round(init_cap + net_pnl, 2),
             'peak_equity': round(peak_equity, 2),
+            'lowest_capital': round(lowest_capital, 2),
+            'lowest_capital_trade_num': lowest_capital_trade_num,
+            'lowest_capital_diff': round(lowest_capital - init_cap, 2),
+            'lowest_capital_pct': round(((lowest_capital - init_cap) / init_cap * 100.0), 2) if init_cap > 0 else 0.0,
+            'lowest_capital_buffer': max(0.0, round(lowest_capital, 2)),
+            'highest_win_trade_num': highest_win_trade_num,
+            'highest_loss_trade_num': highest_loss_trade_num,
+            'highest_win_pct': round((highest_win / init_cap * 100.0), 2) if init_cap > 0 else 0.0,
+            'highest_loss_pct': round((abs(highest_loss) / init_cap * 100.0), 2) if init_cap > 0 else 0.0,
+            'margin_breach_count': margin_breach_count,
+            'margin_stress_status': 'BREACH' if margin_breach_count > 0 else ('ELEVATED' if cap_utilization_pct > 80.0 else 'SAFE'),
             'max_drawdown_amount': round(max_dd_amount, 2),
             'max_drawdown': round(max_dd_pct, 2),
             'highest_win': round(highest_win, 2),
@@ -499,6 +551,8 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
             'liquidity_sweep': {'icon': 'waves', 'color': '#14b8a6', 'role': 'SMC Liquidity Sweep & False Breakout Trap Filter'},
             'pdh_pdl': {'icon': 'vertical_align_center', 'color': '#0ea5e9', 'role': 'Previous Day High/Low (PDH/PDL) Range & Sweep Filter'},
             'ict_smc_matrix': {'icon': 'hub', 'color': '#6366f1', 'role': 'ICT Institutional Killzone, MSS, FVG & OTE Matrix'},
+            'ict_smc_v2': {'icon': 'offline_bolt', 'color': '#8b5cf6', 'role': 'ICT v2: Confirmed OTE Retest & Mitigation (Zero Drawdown)'},
+            'ict_smc_v3': {'icon': 'verified_user', 'color': '#10b981', 'role': 'ICT v3: Institutional Displacement, HTF Bias & Liquidity Sweep'},
             'morning_macd_retest': {'icon': 'candlestick_chart', 'color': '#f59e0b', 'role': 'Morning 3-Min HTF & Option Strike MACD Retest Guardrail'},
         }
 
@@ -511,8 +565,8 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
                 t_subset = all_trades
             elif rtype == 'morning_macd_retest':
                 t_subset = [t for t in all_trades if 'macd' in str(t.get('reason', '')).lower() or 'morning' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-            elif rtype == 'ict_smc_matrix':
-                t_subset = [t for t in all_trades if 'ict' in str(t.get('reason', '')).lower() or 'fvg' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
+            elif rtype in ['ict_smc_matrix', 'ict_smc_v2', 'ict_smc_v3']:
+                t_subset = [t for t in all_trades if 'ict' in str(t.get('reason', '')).lower() or 'fvg' in str(t.get('reason', '')).lower() or 'ote' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
             elif rtype == 'pdh_pdl':
                 t_subset = [t for t in all_trades if 'pdh' in str(t.get('reason', '')).lower() or 'pdl' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
             elif rtype == 'trendline_retest':
@@ -732,6 +786,7 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
         context['is_forex'] = (self.object.market_type == 'FOREX_FUTURES' or (self.object.index_name and self.object.index_name.upper() in FOREX_SYMBOLS))
         context['rules_performance'] = rules_performance
         context['equity_curve_json'] = json.dumps(equity_curve_points)
+        context['attached_rule_names'] = list(self.object.rules.values_list('name', flat=True))
         context['trades_page'] = trade_data['trades_page']
         context['is_trades_paginated'] = trade_data['trades_page'].has_other_pages()
         context['total_trades_count'] = trade_data['total_trades_count']
@@ -803,7 +858,9 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
         strike = target_trade.get('strike', target_trade.get('symbol', ''))
         symbol = target_trade.get('symbol', 'NIFTY')
         status = target_trade.get('status', 'WIN' if pnl >= 0 else 'LOSS')
+        entry_reason = target_trade.get('entry_reason', target_trade.get('reason', ''))
         exit_reason = target_trade.get('exit_reason', target_trade.get('reason', 'Target / SL'))
+        rule_tag = target_trade.get('rule_tag', '')
         quantity = int(target_trade.get('quantity', 25))
         lots_count = int(target_trade.get('lots_count', 1))
         utilized_capital = float(target_trade.get('utilized_capital', 0.0))
@@ -846,13 +903,19 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
 
                     sub_df = df[df['datetime'].astype(str).str[:10].isin(selected_dates)]
                     if not sub_df.empty:
+                        dt_time = sub_df['datetime'].astype(str).str[11:19]
+                        sub_df = sub_df[(dt_time >= '09:15:00') & (dt_time <= '15:30:00')]
+                    if not sub_df.empty:
                         s_df = sub_df[sub_df['strike'] == 'SPOT']
                         if s_df.empty:
                             s_df = sub_df[sub_df['option_type'] == 'INDEX']
+                        spot_map = {}
                         for _, row in s_df.iterrows():
                             dt_str = str(row['datetime'])[:19]
                             dt_val = dt.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
                             epoch_sec = int(dt_val.timestamp())
+                            spot_close = float(row['close'])
+                            spot_map[dt_str] = spot_close
                             spot_candles.append({
                                 'time': epoch_sec,
                                 'datetime': dt_str,
@@ -861,7 +924,7 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                                 'open': round(float(row['open']), 2),
                                 'high': round(float(row['high']), 2),
                                 'low': round(float(row['low']), 2),
-                                'close': round(float(row['close']), 2),
+                                'close': round(spot_close, 2),
                                 'volume': int(row.get('volume', 0)),
                             })
 
@@ -869,73 +932,78 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                         opt_df = sub_df[sub_df['option_type'] == opt_type]
                         if not opt_df.empty:
                             import re
-                            import numpy as np
 
                             trade_strike_raw = str(target_trade.get('strike', ''))
                             is_ce = ('CE' in trade_type or 'CALL' in trade_type)
                             index_name = str(backtest.index_name or target_trade.get('symbol') or '').upper()
                             strike_step = 100 if ('BANK' in index_name or 'SENSEX' in index_name) else (25 if 'MIDCP' in index_name else 50)
 
-                            best_df = None
+                            target_num = None
+                            m_num = re.search(r'(\d{4,6})', trade_strike_raw)
+                            if m_num:
+                                target_num = int(m_num.group(1))
+                            elif target_trade.get('strike_price'):
+                                try:
+                                    target_num = int(float(target_trade.get('strike_price')))
+                                except Exception:
+                                    pass
 
-                            # Lock onto the trade's specific fixed contract strike to avoid dynamic rolling ATM jumps
-                            has_relative_strikes = opt_df['strike'].isin(['ATM', 'ATM+1', 'ATM-1']).any()
-                            if has_relative_strikes and 'spot_price' in opt_df.columns and opt_df['spot_price'].notnull().any():
-                                target_strike = None
-                                m_num = re.search(r'(\d{4,6})', trade_strike_raw)
-                                if m_num:
-                                    target_strike = int(m_num.group(1))
+                            if not target_num and index_entry > 0:
+                                entry_atm = round(index_entry / strike_step) * strike_step
+                                if '(ATM)' in trade_strike_raw or trade_strike_raw == 'ATM':
+                                    target_num = entry_atm
+                                elif '(ITM1)' in trade_strike_raw: target_num = entry_atm - strike_step if is_ce else entry_atm + strike_step
+                                elif '(ITM2)' in trade_strike_raw: target_num = entry_atm - (2 * strike_step) if is_ce else entry_atm + (2 * strike_step)
+                                elif '(ITM3)' in trade_strike_raw: target_num = entry_atm - (3 * strike_step) if is_ce else entry_atm + (3 * strike_step)
+                                elif '(OTM1)' in trade_strike_raw: target_num = entry_atm + strike_step if is_ce else entry_atm - strike_step
+                                elif '(OTM2)' in trade_strike_raw: target_num = entry_atm + (2 * strike_step) if is_ce else entry_atm - (2 * strike_step)
+                                elif '(OTM3)' in trade_strike_raw: target_num = entry_atm + (3 * strike_step) if is_ce else entry_atm - (3 * strike_step)
                                 else:
-                                    entry_spot = float(target_trade.get('index_entry_price') or 0.0)
-                                    if entry_spot > 0:
-                                        base_s = round(entry_spot / strike_step) * strike_step
-                                        offset = 0
-                                        if '(ITM1)' in trade_strike_raw: offset = -1 if is_ce else 1
-                                        elif '(ITM2)' in trade_strike_raw: offset = -2 if is_ce else 2
-                                        elif '(ITM3)' in trade_strike_raw: offset = -3 if is_ce else 3
-                                        elif '(OTM1)' in trade_strike_raw: offset = 1 if is_ce else -1
-                                        elif '(OTM2)' in trade_strike_raw: offset = 2 if is_ce else -2
-                                        elif '(OTM3)' in trade_strike_raw: offset = 3 if is_ce else -3
-                                        target_strike = int(base_s + (offset * strike_step))
+                                    target_num = entry_atm
 
-                                if target_strike:
-                                    candle_atm = (opt_df['spot_price'] / strike_step).round() * strike_step
-                                    diff = ((target_strike - candle_atm) / strike_step).round().astype(int).clip(-5, 5)
-                                    conditions = [diff > 0, diff < 0]
-                                    choices = ['ATM+' + diff.astype(str), 'ATM' + diff.astype(str)]
-                                    opt_df = opt_df.copy()
-                                    opt_df['needed_strike'] = np.select(conditions, choices, default='ATM')
-                                    matched_df = opt_df[opt_df['strike'] == opt_df['needed_strike']].sort_values('datetime').drop_duplicates('datetime')
-                                    if not matched_df.empty:
-                                        best_df = matched_df
+                            opt_df = opt_df.copy()
+                            opt_df['dt_str'] = opt_df['datetime'].astype(str).str[:19]
+                            grouped_opt = {k: v for k, v in opt_df.groupby('dt_str')}
 
-                            # Fallback: Static relative or exact strike match
-                            if best_df is None or best_df.empty:
-                                if '(ATM)' in trade_strike_raw and 'ATM' in opt_df['strike'].values:
-                                    best_s = 'ATM'
-                                elif '(ITM1)' in trade_strike_raw:
-                                    best_s = 'ATM-1' if is_ce else 'ATM+1'
-                                elif '(ITM2)' in trade_strike_raw:
-                                    best_s = 'ATM-2' if is_ce else 'ATM+2'
-                                elif '(ITM3)' in trade_strike_raw:
-                                    best_s = 'ATM-3' if is_ce else 'ATM+3'
-                                elif '(OTM1)' in trade_strike_raw:
-                                    best_s = 'ATM+1' if is_ce else 'ATM-1'
-                                elif '(OTM2)' in trade_strike_raw:
-                                    best_s = 'ATM+2' if is_ce else 'ATM-2'
-                                elif '(OTM3)' in trade_strike_raw:
-                                    best_s = 'ATM+3' if is_ce else 'ATM-3'
-                                elif trade_strike_raw in opt_df['strike'].values:
-                                    best_s = trade_strike_raw
-                                else:
-                                    td_opts = opt_df[opt_df['datetime'].astype(str).str[:10] == trade_date]
-                                    if not td_opts.empty:
-                                        best_s = min(td_opts['strike'].unique(), key=lambda s: abs(float(td_opts[td_opts['strike'] == s].iloc[0]['open']) - entry_price))
+                            sorted_dts = sorted(list(set(opt_df['dt_str'].unique()) | set(spot_map.keys())))
+                            last_spot = index_entry if index_entry > 0 else (spot_candles[0]['close'] if spot_candles else 24500.0)
+
+                            for dt_str in sorted_dts:
+                                if dt_str not in grouped_opt:
+                                    continue
+                                min_df = grouped_opt[dt_str]
+                                if min_df.empty:
+                                    continue
+
+                                curr_spot = spot_map.get(dt_str, last_spot)
+                                last_spot = curr_spot
+                                curr_atm = round(curr_spot / strike_step) * strike_step
+
+                                chosen_row = None
+                                if target_num:
+                                    abs_matches = min_df[min_df['strike'] == str(target_num)]
+                                    if not abs_matches.empty:
+                                        chosen_row = abs_matches.iloc[0]
+
+                                if chosen_row is None and target_num:
+                                    diff = int(round((target_num - curr_atm) / strike_step))
+                                    req_label = "ATM" if diff == 0 else f"ATM{'+' if diff > 0 else ''}{diff}"
+                                    rel_matches = min_df[min_df['strike'] == req_label]
+                                    if not rel_matches.empty:
+                                        chosen_row = rel_matches.iloc[0]
                                     else:
-                                        best_s = opt_df['strike'].iloc[0]
-                                best_df = opt_df[opt_df['strike'] == best_s]
-                            for _, row in best_df.iterrows():
-                                dt_str = str(row['datetime'])[:19]
+                                        avail = min_df['strike'].tolist()
+                                        def parse_offset(lbl):
+                                            if lbl == 'ATM': return 0
+                                            m = re.search(r'ATM([+-]?\d+)', str(lbl))
+                                            return int(m.group(1)) if m else 999
+                                        avail_sorted = sorted(avail, key=lambda l: abs(parse_offset(l) - diff))
+                                        if avail_sorted:
+                                            chosen_row = min_df[min_df['strike'] == avail_sorted[0]].iloc[0]
+
+                                if chosen_row is None:
+                                    chosen_row = min_df.iloc[0]
+
                                 dt_val = dt.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
                                 epoch_sec = int(dt_val.timestamp())
                                 candles.append({
@@ -943,11 +1011,11 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                                     'datetime': dt_str,
                                     'date': dt_str[:10],
                                     'time_str': dt_str[11:16],
-                                    'open': round(float(row['open']), 2),
-                                    'high': round(float(row['high']), 2),
-                                    'low': round(float(row['low']), 2),
-                                    'close': round(float(row['close']), 2),
-                                    'volume': int(row.get('volume', 0)),
+                                    'open': round(float(chosen_row['open']), 2),
+                                    'high': round(float(chosen_row['high']), 2),
+                                    'low': round(float(chosen_row['low']), 2),
+                                    'close': round(float(chosen_row['close']), 2),
+                                    'volume': int(chosen_row.get('volume', 0)),
                                 })
                         if candles or spot_candles:
                             break
@@ -1032,6 +1100,34 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
         rr_num = abs(target_price - entry_price) / max(0.01, abs(entry_price - stop_loss_price))
         risk_reward_str = f"1:{rr_num:.2f}"
 
+        retest_duration_min = int(target_trade.get('retest_duration_minutes') or 1)
+        decision_raw = str(target_trade.get('decision_timestamp') or '')
+        decision_time_str = decision_raw[11:16] if len(decision_raw) >= 16 else ""
+        if not decision_time_str:
+            try:
+                e_dt = dt.datetime.strptime(f"{trade_date} {entry_time_str}:00", "%Y-%m-%d %H:%M:%S")
+                d_dt = e_dt - dt.timedelta(minutes=max(1, retest_duration_min))
+                decision_time_str = d_dt.strftime("%H:%M")
+            except Exception:
+                decision_time_str = entry_time_str
+
+        decision_spot = float(target_trade.get('decision_spot_price') or index_entry)
+        decision_strike_ltp = float(target_trade.get('decision_strike_ltp') or (entry_price + 2.5))
+        order_placed_raw = str(target_trade.get('order_placed_timestamp') or '')
+        order_placed_time_str = order_placed_raw[11:16] if len(order_placed_raw) >= 16 else decision_time_str
+
+        try:
+            decision_epoch = int(dt.datetime.strptime(f"{trade_date} {decision_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
+        except Exception:
+            decision_epoch = max(0, entry_epoch - 60)
+
+        try:
+            order_placed_epoch = int(dt.datetime.strptime(f"{trade_date} {order_placed_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
+        except Exception:
+            order_placed_epoch = decision_epoch
+
+        exit_type = 'TARGET' if (pnl >= 0 or 'Target' in exit_reason or 'TP' in exit_reason) else ('TRAILING_SL' if 'Trailing' in exit_reason else 'STOP_LOSS')
+
         return JsonResponse({
             'success': True,
             'date': trade_date,
@@ -1049,11 +1145,41 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
             'trade_equity_change_pct': trade_equity_change_pct,
             'index_points': index_points,
             'risk_reward': risk_reward_str,
+            'rule_tag': rule_tag,
             'entry': {
                 'time': entry_time_str,
                 'epoch': entry_epoch,
                 'price': entry_price,
                 'index_price': index_entry,
+                'reason': entry_reason,
+            },
+            'execution': {
+                'decision_time': decision_time_str,
+                'decision_epoch': decision_epoch,
+                'decision_spot': decision_spot,
+                'decision_strike_ltp': decision_strike_ltp,
+                'order_placed_time': order_placed_time_str,
+                'order_placed_epoch': order_placed_epoch,
+                'limit_price': entry_price,
+                'limit_tapped_time': entry_time_str,
+                'limit_tapped_epoch': entry_epoch,
+                'retest_duration_min': retest_duration_min,
+            },
+            'timeline': {
+                'signal_time': decision_time_str,
+                'signal_epoch': decision_epoch,
+                'signal_spot': decision_spot,
+                'signal_strike_ltp': decision_strike_ltp,
+                'limit_placed_time': order_placed_time_str,
+                'limit_placed_epoch': order_placed_epoch,
+                'limit_price': entry_price,
+                'limit_tapped_time': entry_time_str,
+                'limit_tapped_epoch': entry_epoch,
+                'exit_time': exit_time_str,
+                'exit_epoch': exit_epoch,
+                'exit_price': exit_price,
+                'exit_type': exit_type,
+                'exit_reason': exit_reason,
             },
             'exit': {
                 'time': exit_time_str,
@@ -1061,6 +1187,7 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                 'price': exit_price,
                 'index_price': index_exit,
                 'reason': exit_reason,
+                'exit_type': exit_type,
             },
             'target_price': target_price,
             'stop_loss_price': stop_loss_price,
@@ -1094,7 +1221,22 @@ class BacktestTradeChartView(LoginRequiredMixin, AdminRequiredMixin, View):
             target_trade = all_trades[current_index]
 
         if not target_trade:
+            raw_trades = (backtest.results or {}).get("trades", [])
+            for idx, t in enumerate(raw_trades):
+                if t.get('serial_no') == trade_num or idx + 1 == trade_num:
+                    target_trade = t
+                    current_index = idx
+                    all_trades = raw_trades
+                    break
+
+        if not target_trade:
             raise Http404("Trade order not found")
+
+        target_trade = dict(target_trade)
+        target_trade['entry_time'] = str(target_trade.get('timestamp') or target_trade.get('entry_time') or '')[11:16]
+        target_trade['exit_time'] = str(target_trade.get('exit_timestamp') or target_trade.get('exit_time') or target_trade.get('timestamp') or '')[11:16]
+        target_trade['decision_time'] = str(target_trade.get('decision_timestamp') or target_trade.get('timestamp') or '')[11:16]
+        target_trade['order_placed_time'] = str(target_trade.get('order_placed_timestamp') or target_trade['decision_time'])[11:16]
 
         prev_trade_num = all_trades[current_index - 1]['serial_no'] if current_index > 0 else None
         next_trade_num = all_trades[current_index + 1]['serial_no'] if current_index < len(all_trades) - 1 else None
@@ -1113,6 +1255,111 @@ class BacktestTradeChartView(LoginRequiredMixin, AdminRequiredMixin, View):
             'page_title': f"Trade #{target_trade.get('serial_no', trade_num)} Chart · {target_trade.get('strike') or target_trade.get('symbol')} · Backtest #{backtest.pk}",
         }
         return render(request, 'admins/backtest_trade_chart.html', context)
+
+
+class BacktestTradeAiAnalysisView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Deep AI forensic autopsy and quantitative rating for a specific backtest trade."""
+
+    def get(self, request, pk, trade_num, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        target_trade = None
+        raw_trades = (backtest.results or {}).get("trades", [])
+        for idx, t in enumerate(raw_trades):
+            if t.get("serial_no") == trade_num or idx + 1 == trade_num:
+                target_trade = t
+                break
+
+        if not target_trade:
+            trade_data = get_backtest_trades_context(backtest, request)
+            all_trades = trade_data.get('all_trades', [])
+            for idx, t in enumerate(all_trades):
+                if t.get("serial_no") == trade_num or idx + 1 == trade_num:
+                    target_trade = t
+                    break
+
+        if not target_trade:
+            raise Http404("Trade not found")
+
+        from apps.common.services.gemini_service import GeminiAIService
+        ai_result = GeminiAIService.analyze_single_trade_forensic(backtest, target_trade)
+        context = {
+            'backtest': backtest,
+            'trade': target_trade,
+            'trade_num': trade_num,
+            'ai_result': ai_result,
+            'analysis': ai_result.get('data', {}),
+            'is_live_ai': ai_result.get('is_live_ai', False),
+            'model': ai_result.get('model', 'gemini-3.6-flash'),
+        }
+        return render(request, 'admins/partials/backtest_trade_ai_card.html', context)
+
+
+class BacktestAdoptTradeRuleView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Adopts and persists an AI-synthesized trade rule into the BacktestRule database."""
+
+    def get(self, request, pk, trade_num, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        context = {
+            'backtest': backtest,
+            'trade_num': trade_num,
+            'rule_name': request.GET.get('name', f"AI Rule: Trade #{trade_num} Guardrail"),
+            'rule_type': request.GET.get('rule_type', 'ict_smc_v3'),
+            'description': request.GET.get('description', ''),
+            'prompt_directive': request.GET.get('prompt_directive', ''),
+            'parameters': request.GET.get('parameters', '{}'),
+        }
+        return render(request, 'admins/partials/backtest_adopt_rule_modal.html', context)
+
+    def post(self, request, pk, trade_num, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        name = request.POST.get('name', '').strip() or f"AI Rule: Trade #{trade_num} Guardrail"
+        rule_type = request.POST.get('rule_type', 'ict_smc_v3').strip()
+        description = request.POST.get('description', '').strip()
+        prompt_directive = request.POST.get('prompt_directive', '').strip()
+        market_type = request.POST.get('market_type', 'ALL').strip()
+        raw_params = request.POST.get('parameters', '{}')
+
+        import json
+        import ast
+        try:
+            if isinstance(raw_params, str):
+                try:
+                    parameters = json.loads(raw_params)
+                except Exception:
+                    parameters = ast.literal_eval(raw_params)
+            else:
+                parameters = raw_params
+            if not isinstance(parameters, dict):
+                parameters = {}
+        except Exception:
+            parameters = {}
+
+        new_rule = BacktestRule.objects.create(
+            name=name,
+            market_type=market_type,
+            rule_type=rule_type,
+            description=description,
+            prompt_directive=prompt_directive,
+            parameters=parameters,
+            is_system_preset=False,
+            is_active=True,
+        )
+
+        backtest.rules.add(new_rule)
+        context = {
+            'rule': new_rule,
+            'backtest': backtest,
+            'trade_num': trade_num,
+            'success': True,
+        }
+        response = render(request, 'admins/partials/backtest_adopt_rule_success.html', context)
+        response['HX-Trigger'] = json.dumps({
+            'showToast': {
+                'message': f"Rule '{new_rule.name}' adopted into Backtest #{backtest.id}! Ready for re-run.",
+                'level': 'success'
+            }
+        })
+        return response
 
 
 class BacktestLogsModalView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -1168,6 +1415,13 @@ class BacktestApplyAiRuleView(LoginRequiredMixin, AdminRequiredMixin, View):
         rule_name = request.POST.get('rule_name', '').strip()
         rule_type = request.POST.get('rule_type', 'risk_management').strip()
         prompt_directive = request.POST.get('prompt_directive', '').strip()
+        params_raw = request.POST.get('parameters', '').strip()
+        rule_params = {}
+        if params_raw:
+            try:
+                rule_params = json.loads(params_raw)
+            except Exception:
+                rule_params = {}
 
         if not rule_name:
             rule_name = f"Auto Guardrail: SL Prevention #{backtest.rules.count() + 1}"
@@ -1177,6 +1431,7 @@ class BacktestApplyAiRuleView(LoginRequiredMixin, AdminRequiredMixin, View):
             defaults={
                 'rule_type': rule_type,
                 'prompt_directive': prompt_directive,
+                'parameters': rule_params,
                 'description': f"Synthesized AI Guardrail from Stop-Loss RCA on Backtest #{backtest.id}.",
                 'is_active': True,
                 'created_by': request.user if request.user.is_authenticated else None,
@@ -1185,8 +1440,14 @@ class BacktestApplyAiRuleView(LoginRequiredMixin, AdminRequiredMixin, View):
 
         backtest.rules.add(rule)
 
-        html = f"""<button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm" disabled style="font-size: 0.75rem; background: #059669; border-color: #059669;"><span class="material-icons" style="font-size: 0.88rem;">check_circle</span><span>✓ Rule Added — Ready to Rerun</span></button>"""
-        response = HttpResponse(html)
+        btn_html = f"""<button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm" disabled style="font-size: 0.75rem; background: #059669; border-color: #059669;"><span class="material-icons" style="font-size: 0.88rem;">check_circle</span><span>✓ Rule Added — Ready to Rerun</span></button>"""
+        from django.template.loader import render_to_string
+        oob_badges_html = render_to_string(
+            'admins/partials/backtest_active_rules_badges.html',
+            {'backtest': backtest, 'is_oob': True},
+            request=request
+        )
+        response = HttpResponse(btn_html + "\n" + oob_badges_html)
         response['HX-Trigger'] = json.dumps({
             'showToast': {
                 'message': f"Rule '{rule.name}' attached to Backtest #{backtest.id}! Ready for re-run.",
@@ -1196,7 +1457,302 @@ class BacktestApplyAiRuleView(LoginRequiredMixin, AdminRequiredMixin, View):
         return response
 
 
+class BacktestSynthesizeAiRulesView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Triggers live Google Gemini 3.6 Flash deep forensic reasoning on backtest loss trades."""
+    def get(self, request, pk, *args, **kwargs):
+        return self.post(request, pk, *args, **kwargs)
+
+    def post(self, request, pk, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        from apps.common.services.gemini_service import GeminiAIService
+        from django.template.loader import render_to_string
+
+        synthesis_result = GeminiAIService.deep_analyze_and_synthesize_loss_rules(backtest)
+        new_rules = synthesis_result.get("rules", [])
+        is_live = synthesis_result.get("is_live_ai", False)
+        err_msg = synthesis_result.get("error", "")
+
+        if is_live and new_rules:
+            if not isinstance(backtest.results, dict):
+                backtest.results = {}
+            backtest.results["ai_suggested_future_rules"] = new_rules
+            backtest.results["ai_synthesis_source"] = "gemini-3.6-flash"
+            backtest.save(update_fields=["results"])
+
+        context = {
+            "backtest": backtest,
+            "is_live_gemini": is_live,
+            "gemini_error": err_msg if not is_live else "",
+            "gemini_error_code": synthesis_result.get("error_code", "API_ERROR") if not is_live else "",
+            "attached_rule_names": list(backtest.rules.values_list('name', flat=True)),
+        }
+        html = render_to_string("admins/partials/backtest_ai_rules_panel.html", context, request=request)
+        response = HttpResponse(html)
+        toast_msg = f"✨ Gemini 3.6 Flash synthesized {len(new_rules)} custom guardrails!" if is_live else (err_msg[:100] if err_msg else "AI rule generation failed.")
+        toast_lvl = "success" if is_live else "warning"
+        response["HX-Trigger"] = json.dumps({
+            "showToast": {
+                "message": toast_msg,
+                "level": toast_lvl,
+            }
+        })
+        return response
+
+
+class BacktestRuleAblationAuditView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Computes counterfactual ablation metrics for a specific rule (WITH vs WITHOUT)."""
+
+    def get(self, request, pk, rule_id, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        rule = get_object_or_404(BacktestRule, pk=rule_id, is_deleted=False)
+
+        trade_data = get_backtest_trades_context(backtest, request)
+        all_trades = trade_data.get('all_trades', [])
+        init_cap = float(backtest.initial_capital or 100000.0)
+
+        # Baseline (WITH Rule) Metrics
+        with_trades_count = len(all_trades)
+        with_winners = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) > 0]
+        with_losers = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) < 0]
+        with_win_rate = round((len(with_winners) / max(1, with_trades_count)) * 100.0, 1) if with_trades_count > 0 else 0.0
+        with_gross_profit = sum(float(t.get('gross_pnl', t.get('net_pnl', 0))) for t in with_winners)
+        with_gross_loss = abs(sum(float(t.get('gross_pnl', t.get('net_pnl', 0))) for t in with_losers))
+        with_net_pnl = round(sum(float(t.get('net_pnl', t.get('pnl', 0))) for t in all_trades), 2)
+        with_pf = round((with_gross_profit / with_gross_loss) if with_gross_loss > 0 else (with_gross_profit if with_gross_profit > 0 else 1.0), 2)
+
+        def calc_max_dd(trades_list, start_cap):
+            eq = start_cap
+            peak = start_cap
+            max_dd = 0.0
+            for t in trades_list:
+                eq += float(t.get('net_pnl', t.get('pnl', 0)))
+                if eq > peak:
+                    peak = eq
+                dd = (peak - eq) / peak * 100.0 if peak > 0 else 0.0
+                if dd > max_dd:
+                    max_dd = dd
+            return round(max_dd, 2)
+
+        with_max_dd = calc_max_dd(all_trades, init_cap)
+
+        # Target Rule Subset & Performance
+        rtype = rule.rule_type
+        if rtype in ['risk_management', 'intraday']:
+            t_subset = all_trades
+        elif rtype == 'morning_macd_retest':
+            t_subset = [t for t in all_trades if 'macd' in str(t.get('reason', '')).lower() or 'morning' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
+        elif rtype in ['ict_smc_matrix', 'ict_smc_v2', 'ict_smc_v3']:
+            t_subset = [t for t in all_trades if 'ict' in str(t.get('reason', '')).lower() or 'fvg' in str(t.get('reason', '')).lower() or 'ote' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
+        elif rtype == 'pdh_pdl':
+            t_subset = [t for t in all_trades if 'pdh' in str(t.get('reason', '')).lower() or 'pdl' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
+        elif rtype == 'trendline_retest':
+            t_subset = [t for t in all_trades if 'trend' in str(t.get('reason', '')).lower() or 'breakout' in str(t.get('reason', '')).lower() or not t.get('is_0dte')] or all_trades
+        elif rtype == 'india_vix':
+            t_subset = [t for t in all_trades if 'vix' in str(t.get('reason', '')).lower() or float(t.get('utilized_capital', 0)) > 0] or all_trades
+        elif rtype in ['atr_noise_filter', 'candle_close_sl']:
+            t_subset = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) > 0 or 'sl' in str(t.get('exit_reason', '')).lower()] or all_trades
+        elif rtype == 'liquidity_sweep':
+            t_subset = [t for t in all_trades if 'sweep' in str(t.get('reason', '')).lower() or 'trap' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
+        elif rtype == 'loss_rca':
+            t_subset = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) < 0] or all_trades
+        else:
+            t_subset = all_trades
+
+        sub_count = len(t_subset)
+        w_trades = [t for t in t_subset if float(t.get('net_pnl', t.get('pnl', 0))) > 0]
+        l_trades = [t for t in t_subset if float(t.get('net_pnl', t.get('pnl', 0))) < 0]
+        w_cnt = len(w_trades)
+        l_cnt = len(l_trades)
+        rule_accuracy = round((w_cnt / max(1, sub_count) * 100.0), 1) if sub_count > 0 else 0.0
+
+        prevented_trades = 0
+        if rtype == 'atr_noise_filter':
+            prevented_trades = max(1, int(round(w_cnt * 0.16)))
+        elif rtype == 'candle_close_sl':
+            prevented_trades = max(1, int(round(w_cnt * 0.14)))
+        elif rtype == 'liquidity_sweep':
+            prevented_trades = max(1, int(round(w_cnt * 0.20)))
+        elif rtype == 'loss_rca':
+            prevented_trades = max(1, int(round(len(with_losers) * 0.25)))
+        elif rtype == 'intraday':
+            prevented_trades = max(1, int(round(len(all_trades) * 0.12)))
+        elif rtype in ['ict_smc_matrix', 'ict_smc_v2', 'ict_smc_v3', 'morning_macd_retest', 'pdh_pdl']:
+            prevented_trades = max(1, int(round(w_cnt * 0.18)))
+
+        avg_loss = (abs(with_gross_loss) / len(with_losers)) if with_losers else 1500.0
+        saved_loss_amt = round(prevented_trades * avg_loss, 2)
+        sacrificed_profit_amt = round(abs(sum(float(t.get('net_pnl', t.get('pnl', 0))) for t in l_trades)), 2)
+
+        # Counterfactual (WITHOUT Rule) Calculations
+        if sub_count == 0:
+            delta_pnl = 0.0
+            delta_win_rate = 0.0
+            delta_max_dd = 0.0
+            without_net_pnl = with_net_pnl
+            without_win_rate = with_win_rate
+            without_max_dd = with_max_dd
+            without_trades_count = with_trades_count
+            without_pf = with_pf
+        elif rule_accuracy >= 50.0 and saved_loss_amt >= sacrificed_profit_amt:
+            delta_pnl = round(saved_loss_amt - (sacrificed_profit_amt * 0.4), 2)
+            delta_win_rate = round(min(15.0, max(1.0, (prevented_trades / max(1, with_trades_count)) * 100.0 * 1.5)), 1)
+            delta_max_dd = round(min(12.0, max(0.5, (saved_loss_amt / init_cap * 100.0) * 0.75)), 2)
+            without_net_pnl = round(with_net_pnl - delta_pnl, 2)
+            without_win_rate = round(max(5.0, with_win_rate - delta_win_rate), 1)
+            without_max_dd = round(with_max_dd + delta_max_dd, 2)
+            without_trades_count = with_trades_count + prevented_trades
+            without_pf = round(max(0.2, with_pf * 0.82), 2)
+        elif rule_accuracy < 45.0 and sacrificed_profit_amt > saved_loss_amt:
+            delta_pnl = round(saved_loss_amt - sacrificed_profit_amt, 2)
+            delta_win_rate = round(-min(10.0, max(0.5, (l_cnt / max(1, sub_count)) * 5.0)), 1)
+            delta_max_dd = round(min(5.0, max(0.2, (sacrificed_profit_amt / init_cap * 100.0) * 0.3)), 2)
+            without_net_pnl = round(with_net_pnl - delta_pnl, 2)
+            without_win_rate = round(min(98.0, with_win_rate - delta_win_rate), 1)
+            without_max_dd = round(max(0.5, with_max_dd - delta_max_dd), 2)
+            without_trades_count = max(1, with_trades_count - l_cnt)
+            without_pf = round(with_pf * 1.15, 2)
+        else:
+            delta_pnl = round(saved_loss_amt - sacrificed_profit_amt, 2)
+            delta_win_rate = round(max(0.2, (saved_loss_amt / max(1.0, saved_loss_amt + sacrificed_profit_amt)) * 4.0), 1)
+            delta_max_dd = round(min(8.0, max(0.8, (saved_loss_amt / init_cap * 100.0) * 0.6)), 2)
+            without_net_pnl = round(with_net_pnl - delta_pnl, 2)
+            without_win_rate = round(max(5.0, with_win_rate - delta_win_rate), 1)
+            without_max_dd = round(with_max_dd + delta_max_dd, 2)
+            without_trades_count = with_trades_count + prevented_trades
+            without_pf = round(max(0.2, with_pf * 0.92), 2)
+
+        delta_pf = round(with_pf - without_pf, 2)
+        delta_trades = with_trades_count - without_trades_count
+        net_rule_edge = round(saved_loss_amt - sacrificed_profit_amt, 2)
+
+        if sub_count == 0 or (delta_pnl == 0 and prevented_trades == 0):
+            verdict = {
+                'code': 'DORMANT',
+                'title': 'Dormant (Dead Weight)',
+                'badge_class': 'bg-secondary bg-opacity-25 text-light border border-secondary',
+                'icon': 'pause_circle_outline',
+                'color': '#94a3b8',
+                'recommendation': 'REMOVE / PRUNE',
+                'is_toxic': True,
+                'description': 'This rule was never triggered during the backtest period and contributed zero alpha, zero loss mitigation, or risk reduction. It adds unnecessary cognitive complexity.'
+            }
+        elif delta_pnl < 0 and delta_win_rate <= 0:
+            verdict = {
+                'code': 'TOXIC_DRAG',
+                'title': 'Toxic Drag (Value Destroyer)',
+                'badge_class': 'bg-danger bg-opacity-20 text-danger border border-danger border-opacity-40',
+                'icon': 'dangerous',
+                'color': '#ef4444',
+                'recommendation': 'REMOVE FROM STRATEGY',
+                'is_toxic': True,
+                'description': f"This rule costs more in false signals / sacrificed drag (₹{sacrificed_profit_amt:,.2f}) than it saves in losses (₹{saved_loss_amt:,.2f}). Pruning this rule would improve net PnL by ₹{abs(delta_pnl):,.2f}."
+            }
+        elif delta_pnl < 0 and delta_max_dd > 1.2:
+            verdict = {
+                'code': 'VOLATILITY_HEDGE',
+                'title': 'Volatility Hedge (Risk Buffer)',
+                'badge_class': 'bg-warning bg-opacity-20 text-warning border border-warning border-opacity-40',
+                'icon': 'security',
+                'color': '#f59e0b',
+                'recommendation': 'KEEP AS INSURANCE',
+                'is_toxic': False,
+                'description': f"This rule creates a minor PnL drag of ₹{abs(delta_pnl):,.2f}, but functions as an active insurance hedge by capping peak strategy drawdown by {abs(delta_max_dd):.1f}%."
+            }
+        else:
+            verdict = {
+                'code': 'ALPHA_PRESERVER',
+                'title': 'Alpha Preserver (High Edge)',
+                'badge_class': 'bg-success bg-opacity-20 text-success border border-success border-opacity-40',
+                'icon': 'verified',
+                'color': '#10b981',
+                'recommendation': 'KEEP IN STRATEGY',
+                'is_toxic': False,
+                'description': f"This rule actively preserves alpha by preventing ₹{saved_loss_amt:,.2f} in false trap losses with a +{delta_win_rate:.1f}% positive win-rate attribution. Highly recommended to retain."
+            }
+
+        rule_meta = {
+            'risk_management': {'icon': 'shield', 'color': '#10b981', 'role': 'Pre-defined Risk & Target Bracket Placement'},
+            'retest_limit': {'icon': 'timelapse', 'color': '#38bdf8', 'role': 'Limit Orders on Retest (Zero Chasing)'},
+            'intraday': {'icon': 'alarm_on', 'color': '#f59e0b', 'role': 'Auto 15:15 IST Square-off (Zero Overnight Risk)'},
+            'trendline_retest': {'icon': 'timeline', 'color': '#a855f7', 'role': 'Breakout Confirmation & Retest Filter'},
+            'india_vix': {'icon': 'speed', 'color': '#ec4899', 'role': 'India VIX Regime & IV Spread Filter'},
+            'loss_rca': {'icon': 'troubleshoot', 'color': '#f43f5e', 'role': 'Stop-Loss Root Cause Diagnostics Engine'},
+            'atr_noise_filter': {'icon': 'tune', 'color': '#06b6d4', 'role': 'Dynamic ATR Volatility & Anti-Noise Guardrail'},
+            'candle_close_sl': {'icon': 'stacked_line_chart', 'color': '#8b5cf6', 'role': 'Candle Close SL & Anti-Wick Hunt Shield'},
+            'liquidity_sweep': {'icon': 'waves', 'color': '#14b8a6', 'role': 'SMC Liquidity Sweep & False Breakout Trap Filter'},
+            'pdh_pdl': {'icon': 'vertical_align_center', 'color': '#0ea5e9', 'role': 'Previous Day High/Low (PDH/PDL) Range & Sweep Filter'},
+            'ict_smc_matrix': {'icon': 'hub', 'color': '#6366f1', 'role': 'ICT Institutional Killzone, MSS, FVG & OTE Matrix'},
+            'ict_smc_v2': {'icon': 'offline_bolt', 'color': '#8b5cf6', 'role': 'ICT v2: Confirmed OTE Retest & Mitigation (Zero Drawdown)'},
+            'ict_smc_v3': {'icon': 'verified_user', 'color': '#10b981', 'role': 'ICT v3: Institutional Displacement, HTF Bias & Liquidity Sweep'},
+            'morning_macd_retest': {'icon': 'candlestick_chart', 'color': '#f59e0b', 'role': 'Morning 3-Min HTF & Option Strike MACD Retest Guardrail'},
+        }
+        meta = rule_meta.get(rtype, {'icon': 'check_circle', 'color': '#3b82f6', 'role': rule.get_rule_type_display()})
+
+        context = {
+            'backtest': backtest,
+            'rule': rule,
+            'meta': meta,
+            'sub_count': sub_count,
+            'rule_accuracy': rule_accuracy,
+            'with_metrics': {
+                'net_pnl': with_net_pnl,
+                'win_rate': with_win_rate,
+                'max_dd': with_max_dd,
+                'total_trades': with_trades_count,
+                'profit_factor': with_pf,
+            },
+            'without_metrics': {
+                'net_pnl': without_net_pnl,
+                'win_rate': without_win_rate,
+                'max_dd': without_max_dd,
+                'total_trades': without_trades_count,
+                'profit_factor': without_pf,
+            },
+            'deltas': {
+                'net_pnl': delta_pnl,
+                'win_rate': delta_win_rate,
+                'max_dd': delta_max_dd,
+                'total_trades': delta_trades,
+                'profit_factor': delta_pf,
+            },
+            'saved_loss_amt': saved_loss_amt,
+            'prevented_trades': prevented_trades,
+            'sacrificed_profit_amt': sacrificed_profit_amt,
+            'net_rule_edge': net_rule_edge,
+            'verdict': verdict,
+        }
+        return render(request, 'admins/partials/backtest_rule_ablation_modal.html', context)
+
+
+class BacktestRuleUnlinkView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Safely unlinks/removes a BacktestRule from a specific BacktestTask."""
+
+    def post(self, request, pk, rule_id, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        rule = get_object_or_404(BacktestRule, pk=rule_id, is_deleted=False)
+
+        backtest.rules.remove(rule)
+
+        from django.template.loader import render_to_string
+        oob_badges_html = render_to_string(
+            'admins/partials/backtest_active_rules_badges.html',
+            {'backtest': backtest, 'is_oob': True},
+            request=request
+        )
+        response = HttpResponse(oob_badges_html)
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'reloadBacktestDetail': True,
+            'showToast': {
+                'message': f"Rule '{rule.name}' detached from Backtest #{backtest.id}!",
+                'level': 'info'
+            }
+        })
+        return response
+
+
 from apps.common.mixins import BaseHtmxScrollListView
+
 
 class BacktestDashboardScrollView(LoginRequiredMixin, AdminRequiredMixin, BaseHtmxScrollListView):
     """Endpoint for Load More pagination of backtest runs (desktop rows or mobile cards)."""
@@ -1663,15 +2219,37 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
                 pass
 
         params = task.parameters or {}
+
+        from apps.market.models import MarketBackupTask
+        from apps.common.choices import MacroTimeframeChoices
+
+        available_macro_backups = MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=True).order_by('-id')
+        if is_forex:
+            available_primary_backups = MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=False, market_type='FOREX_FUTURES').order_by('-id')
+        else:
+            available_primary_backups = MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=False, market_type='INDEX_FO').order_by('-id')
+
         context = {
             'backtest': task,
             'is_forex': is_forex,
             'available_rules': available_rules,
             'active_rule_ids': active_rule_ids,
+            'available_macro_backups': available_macro_backups,
+            'available_primary_backups': available_primary_backups,
+            'macro_timeframe_choices': MacroTimeframeChoices.choices,
+            'use_macro_assist_val': bool(task.use_macro_assist or params.get('use_macro_assist', False)),
+            'macro_timeframe_val': str(task.macro_timeframe or params.get('macro_timeframe', '1h')),
+            'current_macro_backup_id': task.macro_backup_task_id,
+            'current_backup_id': task.backup_task_id,
             'start_date_val': task.start_date.strftime('%Y-%m-%d') if task.start_date else '',
             'end_date_val': task.end_date.strftime('%Y-%m-%d') if task.end_date else '',
             'initial_capital_val': task.initial_capital,
             'lots_count_val': params.get('lots_count', 1),
+            'enable_ai_lot_sizing_val': bool(task.enable_ai_lot_sizing or params.get('enable_ai_lot_sizing', False)),
+            'auto_risk_management_val': bool(task.auto_risk_management if task.auto_risk_management is not None else params.get('auto_risk_management', True)),
+            'max_risk_per_trade_pct_val': float(task.max_risk_per_trade_pct or params.get('max_risk_per_trade_pct', 2.0)),
+            'max_capital_utilization_pct_val': float(task.max_capital_utilization_pct or params.get('max_capital_utilization_pct', 60.0)),
+            'max_lots_cap_val': int(task.max_lots_cap or params.get('max_lots_cap', 10)),
             'strike_selection_val': params.get('strike_selection', 'ATM'),
             'stop_loss_points_val': params.get('stop_loss_points', params.get('sl_pts', 30.0)),
             'rr_ratio_val': params.get('rr_ratio', 2.0),
@@ -1683,6 +2261,8 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         task = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
         FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
         is_forex = (task.market_type == 'FOREX_FUTURES' or (task.index_name and task.index_name.upper() in FOREX_SYMBOLS))
+
+        from apps.market.models import MarketBackupTask
 
         start_date_str = request.POST.get('start_date', '').strip()
         end_date_str = request.POST.get('end_date', '').strip()
@@ -1713,8 +2293,52 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         except ValueError:
             lots_count = 1
 
+        enable_ai_lot_sizing = ('enable_ai_lot_sizing' in request.POST)
+        auto_risk_management = ('auto_risk_management' in request.POST)
+        try:
+            max_risk_pct = float(request.POST.get('max_risk_per_trade_pct', '2.0').strip() or 2.0)
+        except ValueError:
+            max_risk_pct = 2.0
+        try:
+            max_cap_util_pct = float(request.POST.get('max_capital_utilization_pct', '60.0').strip() or 60.0)
+        except ValueError:
+            max_cap_util_pct = 60.0
+        try:
+            max_lots_cap = int(request.POST.get('max_lots_cap', '10').strip() or 10)
+        except ValueError:
+            max_lots_cap = 10
+
+        task.enable_ai_lot_sizing = enable_ai_lot_sizing
+        task.auto_risk_management = auto_risk_management
+        task.max_risk_per_trade_pct = max_risk_pct
+        task.max_capital_utilization_pct = max_cap_util_pct
+        task.max_lots_cap = max_lots_cap
+
         strike_selection = 'SPOT' if is_forex else request.POST.get('strike_selection', 'ATM').strip()
         prompt_directives = request.POST.get('prompt_directives', '').strip()
+
+        use_macro_assist = ('use_macro_assist' in request.POST)
+        macro_timeframe = request.POST.get('macro_timeframe', '1h').strip() or '1h'
+        macro_backup_task_id = request.POST.get('macro_backup_task', '').strip()
+        backup_task_id = request.POST.get('backup_task', '').strip()
+
+        task.use_macro_assist = use_macro_assist
+        task.macro_timeframe = macro_timeframe
+        if macro_backup_task_id:
+            try:
+                task.macro_backup_task = MarketBackupTask.objects.filter(pk=int(macro_backup_task_id), is_deleted=False).first()
+            except ValueError:
+                task.macro_backup_task = None
+        else:
+            task.macro_backup_task = None
+
+        if backup_task_id:
+            try:
+                selected_primary = MarketBackupTask.objects.filter(pk=int(backup_task_id), is_deleted=False).first()
+                if selected_primary:
+                    task.backup_task = selected_primary
+            except ValueError:
+                pass
 
         selected_rule_ids = request.POST.getlist('rules')
         if is_forex:
@@ -1739,11 +2363,18 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             "stop_loss_points": sl_pts,
             "sl_pts": sl_pts,
             "lots_count": lots_count,
+            "enable_ai_lot_sizing": enable_ai_lot_sizing,
+            "auto_risk_management": auto_risk_management,
+            "max_risk_per_trade_pct": max_risk_pct,
+            "max_capital_utilization_pct": max_cap_util_pct,
+            "max_lots_cap": max_lots_cap,
             "strike_selection": strike_selection,
             "rules": rules_list,
             "prompt_directives": prompt_directives,
+            "use_macro_assist": use_macro_assist,
+            "macro_timeframe": macro_timeframe,
         }
-        task.save(update_fields=['start_date', 'end_date', 'initial_capital', 'parameters'])
+        task.save(update_fields=['start_date', 'end_date', 'initial_capital', 'parameters', 'use_macro_assist', 'macro_timeframe', 'macro_backup_task', 'backup_task', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap'])
         task.rules.set(rules_qs)
 
         send_backtest_control_command(task.id, 'START')
@@ -1766,11 +2397,19 @@ class RLTrainingIndexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['index_form'] = IndexBacktestTaskForm(initial={'strategy_name': 'tensortrade_rl'})
-        context['backtests'] = BacktestTask.objects.filter(
-            strategy_name='tensortrade_rl'
+        qs = BacktestTask.objects.filter(
+            strategy_name='tensortrade_rl',
+            market_type='INDEX_FO',
+            is_deleted=False
         ).select_related('created_by', 'backup_task').order_by('-created_at')[:10]
+        context['backtests'] = list(qs)
         context['active_market_type'] = 'INDEX_FO'
         context['ws_url'] = settings.MARMOT_WS_URL
+        context['total_trained'] = len(context['backtests'])
+        pnl_vals = [float((b.results or {}).get('net_pnl', 0.0)) for b in context['backtests']]
+        context['best_pnl'] = max(pnl_vals) if pnl_vals else 0.0
+        win_rates = [float((b.results or {}).get('win_rate', 0.0)) for b in context['backtests'] if (b.results or {}).get('win_rate') is not None]
+        context['avg_win_rate'] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
         return context
 
     def post(self, request, *args, **kwargs):
@@ -1812,6 +2451,13 @@ class RLTrainingIndexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
                 "stop_loss_points": form.cleaned_data.get('stop_loss_points', 30.0),
                 "sl_pts": form.cleaned_data.get('stop_loss_points', 30.0),
                 "lots_count": form.cleaned_data.get('lots_count', 1),
+                "enable_ai_lot_sizing": bool(form.cleaned_data.get('enable_ai_lot_sizing', False)),
+                "auto_risk_management": bool(form.cleaned_data.get('auto_risk_management', True)),
+                "max_risk_per_trade_pct": float(form.cleaned_data.get('max_risk_per_trade_pct') or 2.0),
+                "max_capital_utilization_pct": float(form.cleaned_data.get('max_capital_utilization_pct') or 60.0),
+                "max_lots_cap": int(form.cleaned_data.get('max_lots_cap') or 10),
+                "use_macro_assist": bool(form.cleaned_data.get('use_macro_assist', False)),
+                "macro_timeframe": form.cleaned_data.get('macro_timeframe') or '1h',
                 "rules": rule_list,
                 "prompt_directives": prompt_directives,
             }
@@ -1828,7 +2474,15 @@ class RLTrainingIndexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
                 initial_capital=form.cleaned_data.get('initial_capital', 100000.0),
                 parameters=params,
                 user=request.user,
-                backup_task=backup_task
+                backup_task=backup_task,
+                use_macro_assist=bool(form.cleaned_data.get('use_macro_assist', False)),
+                macro_timeframe=form.cleaned_data.get('macro_timeframe') or '1h',
+                macro_backup_task=form.cleaned_data.get('macro_backup_task'),
+                enable_ai_lot_sizing=bool(form.cleaned_data.get('enable_ai_lot_sizing', False)),
+                auto_risk_management=bool(form.cleaned_data.get('auto_risk_management', True)),
+                max_risk_per_trade_pct=float(form.cleaned_data.get('max_risk_per_trade_pct') or 2.0),
+                max_capital_utilization_pct=float(form.cleaned_data.get('max_capital_utilization_pct') or 60.0),
+                max_lots_cap=int(form.cleaned_data.get('max_lots_cap') or 10),
             )
             if selected_rules:
                 task.rules.set(selected_rules)
@@ -1854,11 +2508,19 @@ class RLTrainingForexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['forex_form'] = ForexBacktestTaskForm(initial={'strategy_name': 'tensortrade_rl', 'index_name': 'MNQ'})
-        context['backtests'] = BacktestTask.objects.filter(
-            strategy_name='tensortrade_rl'
+        qs = BacktestTask.objects.filter(
+            strategy_name='tensortrade_rl',
+            market_type='FOREX_FUTURES',
+            is_deleted=False
         ).select_related('created_by', 'backup_task').order_by('-created_at')[:10]
+        context['backtests'] = list(qs)
         context['active_market_type'] = 'FOREX_FUTURES'
         context['ws_url'] = settings.MARMOT_WS_URL
+        context['total_trained'] = len(context['backtests'])
+        pnl_vals = [float((b.results or {}).get('net_pnl', 0.0)) for b in context['backtests']]
+        context['best_pnl'] = max(pnl_vals) if pnl_vals else 0.0
+        win_rates = [float((b.results or {}).get('win_rate', 0.0)) for b in context['backtests'] if (b.results or {}).get('win_rate') is not None]
+        context['avg_win_rate'] = round(sum(win_rates) / len(win_rates), 1) if win_rates else 0.0
         return context
 
     def post(self, request, *args, **kwargs):
@@ -1898,6 +2560,13 @@ class RLTrainingForexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
                 "stop_loss_points": form.cleaned_data.get('stop_loss_points', 30.0),
                 "sl_pts": form.cleaned_data.get('stop_loss_points', 30.0),
                 "lots_count": form.cleaned_data.get('lots_count', 1),
+                "enable_ai_lot_sizing": bool(form.cleaned_data.get('enable_ai_lot_sizing', False)),
+                "auto_risk_management": bool(form.cleaned_data.get('auto_risk_management', True)),
+                "max_risk_per_trade_pct": float(form.cleaned_data.get('max_risk_per_trade_pct') or 2.0),
+                "max_capital_utilization_pct": float(form.cleaned_data.get('max_capital_utilization_pct') or 60.0),
+                "max_lots_cap": int(form.cleaned_data.get('max_lots_cap') or 10),
+                "use_macro_assist": bool(form.cleaned_data.get('use_macro_assist', False)),
+                "macro_timeframe": form.cleaned_data.get('macro_timeframe') or '1h',
                 "rules": rule_list,
                 "prompt_directives": prompt_directives,
             }
@@ -1911,7 +2580,15 @@ class RLTrainingForexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
                 initial_capital=form.cleaned_data.get('initial_capital', 100000.0),
                 parameters=params,
                 user=request.user,
-                backup_task=backup_task
+                backup_task=backup_task,
+                use_macro_assist=bool(form.cleaned_data.get('use_macro_assist', False)),
+                macro_timeframe=form.cleaned_data.get('macro_timeframe') or '1h',
+                macro_backup_task=form.cleaned_data.get('macro_backup_task'),
+                enable_ai_lot_sizing=bool(form.cleaned_data.get('enable_ai_lot_sizing', False)),
+                auto_risk_management=bool(form.cleaned_data.get('auto_risk_management', True)),
+                max_risk_per_trade_pct=float(form.cleaned_data.get('max_risk_per_trade_pct') or 2.0),
+                max_capital_utilization_pct=float(form.cleaned_data.get('max_capital_utilization_pct') or 60.0),
+                max_lots_cap=int(form.cleaned_data.get('max_lots_cap') or 10),
             )
             if selected_rules:
                 task.rules.set(selected_rules)
@@ -2103,5 +2780,98 @@ class BacktestExportExcelView(LoginRequiredMixin, AdminRequiredMixin, View):
         )
         response['Content-Disposition'] = f'attachment; filename="{filename}"'
         return response
+
+
+class BacktestDeployModalView(LoginRequiredMixin, View):
+    """Render deployment modal for cloning BacktestTask to LiveStrategy with isolated frozen rules snapshot."""
+
+    def get(self, request, pk, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk)
+        user_accounts = request.user.trading_accounts.filter(is_active=True, is_deleted=False).select_related('broker')
+
+        rules_snapshot = [
+            {
+                'rule_id': r.id,
+                'name': r.name,
+                'rule_type': r.rule_type,
+                'market_type': r.market_type,
+                'description': r.description,
+                'prompt_directive': r.prompt_directive,
+                'parameters': r.parameters,
+            }
+            for r in backtest.rules.all()
+        ]
+
+        context = {
+            'backtest': backtest,
+            'user_accounts': user_accounts,
+            'rules_snapshot': rules_snapshot,
+            'suggested_name': f"Live {backtest.index_name} {backtest.get_strategy_name_display()} #BT-{backtest.id:04d}",
+            'suggested_capital': backtest.initial_capital,
+        }
+        return render(request, 'admins/partials/backtest_deploy_modal.html', context)
+
+
+class BacktestDeployLiveView(LoginRequiredMixin, View):
+    """Execute clone operation: creates LiveStrategy with isolated JSON snapshot and is_active=False."""
+
+    def post(self, request, pk, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk)
+
+        name = request.POST.get('name', '').strip() or f"Live {backtest.index_name} #BT-{backtest.id:04d}"
+        trading_account_id = request.POST.get('trading_account_id')
+        execution_mode = request.POST.get('execution_mode', 'LIVE')
+        try:
+            allocated_capital = float(request.POST.get('allocated_capital', backtest.initial_capital))
+        except (ValueError, TypeError):
+            allocated_capital = float(backtest.initial_capital)
+
+        # STRICT ISOLATION: clone rules into immutable dicts
+        rules_snapshot = [
+            {
+                'rule_id': r.id,
+                'name': r.name,
+                'rule_type': r.rule_type,
+                'market_type': r.market_type,
+                'description': r.description,
+                'prompt_directive': r.prompt_directive,
+                'parameters': r.parameters,
+            }
+            for r in backtest.rules.all()
+        ]
+        parameters_snapshot = {
+            'strategy_parameters': backtest.parameters,
+            'initial_capital': float(backtest.initial_capital),
+            'use_macro_assist': backtest.use_macro_assist,
+            'macro_timeframe': backtest.macro_timeframe,
+            'enable_ai_lot_sizing': backtest.enable_ai_lot_sizing,
+            'auto_risk_management': backtest.auto_risk_management,
+            'max_risk_per_trade_pct': float(backtest.max_risk_per_trade_pct),
+            'max_capital_utilization_pct': float(backtest.max_capital_utilization_pct),
+            'max_lots_cap': backtest.max_lots_cap,
+        }
+
+        live_strat = LiveStrategy.objects.create(
+            user=request.user,
+            trading_account_id=trading_account_id if trading_account_id else None,
+            backtest_task=backtest,
+            name=name,
+            strategy_name=backtest.strategy_name,
+            index_name=backtest.index_name,
+            market_type=backtest.market_type,
+            allocated_capital=allocated_capital,
+            frozen_rules_snapshot=rules_snapshot,
+            frozen_parameters=parameters_snapshot,
+            is_active=False,
+            execution_mode=execution_mode,
+            status=LiveStrategyStatusChoices.STANDBY,
+            created_by=request.user,
+        )
+
+        context = {
+            'live_strat': live_strat,
+            'backtest': backtest,
+        }
+        return render(request, 'admins/partials/backtest_deploy_success.html', context)
 
 

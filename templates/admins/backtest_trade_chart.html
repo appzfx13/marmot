@@ -104,52 +104,55 @@
             box-shadow: 0 2px 6px rgba(41, 98, 255, 0.35);
         }
 
-        /* Mode Switcher (Option vs Spot) */
-        .mode-toggle-group {
-            display: inline-flex;
-            background: rgba(0, 0, 0, 0.35);
-            padding: 2px;
-            border-radius: 6px;
-            border: 1px solid var(--border-color);
-        }
-        .btn-mode {
-            background: transparent;
-            border: none;
-            color: var(--text-muted);
-            font-size: 0.76rem;
-            font-weight: 600;
-            padding: 4px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            transition: all 0.15s ease;
-            display: inline-flex;
-            align-items: center;
-            gap: 5px;
-        }
-        .btn-mode:hover { color: #fff; }
-        .btn-mode.active-option {
-            background: rgba(2, 132, 199, 0.25);
-            color: #38bdf8;
-            border: 1px solid rgba(2, 132, 199, 0.5);
-            font-weight: 700;
-        }
-        .btn-mode.active-spot {
-            background: rgba(16, 185, 129, 0.25);
-            color: #34d399;
-            border: 1px solid rgba(16, 185, 129, 0.5);
-            font-weight: 700;
-        }
-
-        /* Chart Viewport Area */
-        .chart-main-layout {
+        /* Dual Split-Screen Chart Viewport Layout */
+        .dual-chart-main-layout {
             flex: 1;
-            position: relative;
+            display: flex;
             width: 100%;
             height: calc(100vh - 52px);
             overflow: hidden;
+            position: relative;
         }
 
-        #chartContainer {
+        .chart-pane {
+            flex: 1;
+            position: relative;
+            height: 100%;
+            overflow: hidden;
+            min-width: 15%;
+        }
+
+        /* Draggable Center Splitter */
+        .pane-splitter {
+            width: 7px;
+            height: 100%;
+            background: rgba(255, 255, 255, 0.07);
+            cursor: col-resize;
+            position: relative;
+            z-index: 15;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: background 0.15s ease, box-shadow 0.15s ease;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .pane-splitter:hover, .pane-splitter.dragging {
+            background: #0284c7;
+            box-shadow: 0 0 10px rgba(2, 132, 199, 0.6);
+        }
+        .splitter-handle {
+            width: 2px;
+            height: 36px;
+            border-radius: 2px;
+            background: rgba(255, 255, 255, 0.4);
+            pointer-events: none;
+        }
+        .pane-splitter:hover .splitter-handle, .pane-splitter.dragging .splitter-handle {
+            background: #ffffff;
+        }
+
+        .chart-canvas-container {
             width: 100%;
             height: 100%;
             position: absolute;
@@ -157,8 +160,8 @@
             left: 0;
         }
 
-        /* Canvas Overlay for Position Tool & Day Dividers */
-        #positionOverlayCanvas {
+        /* Transparent Overlay Canvas for Position Drawing Tool & Day Dividers */
+        .overlay-canvas {
             position: absolute;
             top: 0;
             left: 0;
@@ -168,38 +171,47 @@
             z-index: 4;
         }
 
-        /* Stats & Crosshair Bar */
-        .chart-crosshair-bar {
+        /* Stats & Crosshair Header Bar on each pane */
+        .pane-crosshair-bar {
             position: absolute;
-            top: 10px;
-            left: 16px;
+            top: 8px;
+            left: 12px;
             z-index: 10;
             pointer-events: none;
-            background: rgba(19, 23, 34, 0.85);
+            background: rgba(19, 23, 34, 0.88);
             backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.1);
             border-radius: 6px;
             padding: 4px 10px;
-            font-size: 0.75rem;
+            font-size: 0.74rem;
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 10px;
         }
 
-        /* Floating Risk Reserve HUD (Matching Reference Image) */
+        .pane-title-badge {
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 4px;
+        }
+        .badge-index { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
+        .badge-strike { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
+
+        /* Floating Risk Reserve HUD */
         .risk-reserve-hud {
             position: absolute;
-            top: 10px;
-            right: 80px;
-            width: 320px;
-            background: rgba(14, 18, 28, 0.92);
+            top: 8px;
+            right: 16px;
+            width: 310px;
+            background: rgba(14, 18, 28, 0.94);
             backdrop-filter: blur(16px);
             border: 1px solid rgba(255, 255, 255, 0.12);
             border-radius: 8px;
-            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.65);
+            box-shadow: 0 12px 32px rgba(0, 0, 0, 0.7);
             z-index: 15;
             overflow: hidden;
-            font-size: 0.74rem;
+            font-size: 0.73rem;
             transition: all 0.2s ease;
         }
 
@@ -217,10 +229,10 @@
         }
 
         .hud-tab-badge {
-            padding: 2px 8px;
+            padding: 2px 7px;
             border-radius: 4px;
             font-weight: 700;
-            font-size: 0.68rem;
+            font-size: 0.66rem;
             letter-spacing: 0.5px;
         }
         .hud-tab-left { background: #2563eb; color: #fff; }
@@ -239,7 +251,7 @@
             border-bottom: none;
         }
         .hud-table td {
-            padding: 4px 10px;
+            padding: 4px 9px;
         }
         .hud-label {
             color: var(--text-muted);
@@ -258,16 +270,84 @@
             width: 24%;
         }
 
-        /* Loading & Empty States */
+        /* Loading Overlay */
         .chart-loading-overlay {
             position: absolute;
             inset: 0;
-            background: rgba(11, 14, 20, 0.85);
+            background: rgba(11, 14, 20, 0.9);
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             z-index: 30;
+        }
+
+        /* Per-Pane Independent Toggle Buttons */
+        .btn-pane-toggle {
+            pointer-events: auto;
+            background: rgba(255, 255, 255, 0.08);
+            border: 1px solid rgba(255, 255, 255, 0.16);
+            color: var(--text-muted);
+            border-radius: 4px;
+            padding: 2px 7px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 0.70rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .btn-pane-toggle:hover {
+            background: rgba(255, 255, 255, 0.18);
+            color: #fff;
+        }
+        .btn-pane-toggle.active {
+            background: rgba(2, 132, 199, 0.25);
+            border-color: rgba(2, 132, 199, 0.6);
+            color: #38bdf8;
+        }
+        .btn-pane-toggle.disabled-box {
+            opacity: 0.5;
+            text-decoration: line-through;
+            border-color: rgba(239, 68, 68, 0.4);
+            color: #f87171;
+        }
+
+        /* Style Modal Range & Color Pickers */
+        .color-picker-wrapper {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(0, 0, 0, 0.35);
+            padding: 3px 8px;
+            border-radius: 6px;
+            border: 1px solid var(--border-color);
+        }
+        .color-picker-input {
+            width: 24px;
+            height: 24px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            background: transparent;
+            padding: 0;
+        }
+        .preset-badge-btn {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid var(--border-color);
+            color: var(--text-main);
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 0.74rem;
+            font-weight: 600;
+            transition: all 0.15s ease;
+            cursor: pointer;
+            text-align: left;
+        }
+        .preset-badge-btn:hover {
+            background: rgba(255, 255, 255, 0.14);
+            border-color: #38bdf8;
+            color: #fff;
         }
     </style>
 </head>
@@ -305,21 +385,8 @@
             </div>
         </div>
 
-        <!-- Center: Timeframe & Chart Asset Selector -->
+        <!-- Center: Timeframe Selector (Synchronized across both charts) -->
         <div class="d-flex align-items-center gap-2">
-            <!-- Mode Switcher: Option vs Spot -->
-            <div class="mode-toggle-group">
-                <button type="button" id="btnModeOption" class="btn-mode active-option" title="Show Option Contract Candlesticks">
-                    <span class="material-icons" style="font-size: 0.85rem;">show_chart</span>
-                    <span>Option Chart</span>
-                </button>
-                <button type="button" id="btnModeSpot" class="btn-mode" title="Show Underlying Spot Index Candlesticks">
-                    <span class="material-icons" style="font-size: 0.85rem;">candlestick_chart</span>
-                    <span>Spot Index</span>
-                </button>
-            </div>
-
-            <!-- Timeframe Switcher -->
             <div class="tf-group">
                 <button type="button" class="btn-tf active" data-tf="1">1m</button>
                 <button type="button" class="btn-tf" data-tf="3">3m</button>
@@ -355,7 +422,30 @@
             </button>
             {% endif %}
 
-            <button type="button" id="btnFitChart" class="btn-nav-action" title="Fit Content / Reset Zoom">
+            <button type="button" id="btnMasterToggleBoxes" class="btn-nav-action active" title="Single-click Toggle All Box Overlays (Spot & Option)">
+                <span class="material-icons" style="font-size: 0.95rem; color: #38bdf8;">layers</span>
+                <span class="d-none d-lg-inline">Boxes (ON)</span>
+            </button>
+
+            <button type="button" id="btnOpenBoxConfigModal" class="btn-nav-action" title="Box Opacity, Borders & Custom Templates">
+                <span class="material-icons" style="font-size: 0.95rem; color: #c084fc;">palette</span>
+                <span class="d-none d-lg-inline">Styles</span>
+            </button>
+
+            <button type="button" 
+                    id="btnTradeAiAnalysis" 
+                    class="btn-nav-action" 
+                    style="background: rgba(180, 241, 5, 0.12); border-color: rgba(180, 241, 5, 0.4); color: var(--brand-lime, #b4f105);"
+                    title="Run Institutional Gemini AI Forensic Autopsy & Rate Trade"
+                    hx-get="{% url 'backtest:backtest_trade_ai_analysis' backtest.pk trade.serial_no %}"
+                    hx-target="#tradeAiAnalysisModalBody"
+                    data-bs-toggle="modal" 
+                    data-bs-target="#tradeAiAnalysisModal">
+                <span class="material-icons" style="font-size: 0.95rem; color: var(--brand-lime, #b4f105);">psychology</span>
+                <span class="d-none d-md-inline fw-bold">AI Autopsy</span>
+            </button>
+
+            <button type="button" id="btnFitChart" class="btn-nav-action" title="Fit Both Charts / Reset Zoom">
                 <span class="material-icons" style="font-size: 0.95rem;">restart_alt</span>
             </button>
 
@@ -365,24 +455,56 @@
         </div>
     </header>
 
-    <!-- 2. Main Full-Screen Chart Area -->
-    <main class="chart-main-layout">
-        <!-- Crosshair OHLCV Stats Bar -->
-        <div id="crosshairBar" class="chart-crosshair-bar mono">
-            <span class="fw-bold text-white" id="barSymbol">{{ trade.strike|default:trade.symbol }}</span>
-            <span>O: <span id="barOpen" class="text-info">-</span></span>
-            <span>H: <span id="barHigh" class="text-success">-</span></span>
-            <span>L: <span id="barLow" class="text-danger">-</span></span>
-            <span>C: <span id="barClose" class="text-white">-</span></span>
-            <span>Vol: <span id="barVol" class="text-secondary">-</span></span>
-            <span id="barTime" class="theme-text-muted">-</span>
+    <!-- 2. Dual Split-Pane Chart Area (Index on Left, Option on Right) -->
+    <main class="dual-chart-main-layout">
+        
+        <!-- LEFT PANE: Spot Index Chart (Ground Truth) -->
+        <section class="chart-pane" id="spotPane">
+            <div id="spotCrosshairBar" class="pane-crosshair-bar mono">
+                <span class="pane-title-badge badge-index">{{ trade.symbol }} SPOT</span>
+                <span>O: <span id="spotOpen" class="text-info">-</span></span>
+                <span>H: <span id="spotHigh" class="text-success">-</span></span>
+                <span>L: <span id="spotLow" class="text-danger">-</span></span>
+                <span>C: <span id="spotClose" class="text-white">-</span></span>
+                <span id="spotTime" class="theme-text-muted">-</span>
+                <button type="button" id="btnToggleSpotBoxes" class="btn-pane-toggle active ms-2" title="Toggle Spot Overlays (FVG/Position Boxes)">
+                    <span class="material-icons" style="font-size: 0.85rem;">visibility</span>
+                    <span>Boxes</span>
+                </button>
+            </div>
+            <div id="spotChartContainer" class="chart-canvas-container"></div>
+            <canvas id="spotOverlayCanvas" class="overlay-canvas"></canvas>
+        </section>
+
+        <!-- CENTER SPLITTER: Draggable Resizer -->
+        <div id="paneSplitter" class="pane-splitter" title="Drag horizontally to resize charts (Double-click to reset 50/50)">
+            <div class="splitter-handle"></div>
         </div>
 
-        <!-- Floating Risk Reserve HUD (Styled exactly like reference screenshot) -->
+        <!-- RIGHT PANE: Option Contract Chart (Traded Strike) -->
+        <section class="chart-pane" id="optionPane">
+            <div id="optionCrosshairBar" class="pane-crosshair-bar mono">
+                <span class="pane-title-badge badge-strike">{{ trade.strike|default:trade.symbol }}</span>
+                <span>O: <span id="optOpen" class="text-info">-</span></span>
+                <span>H: <span id="optHigh" class="text-success">-</span></span>
+                <span>L: <span id="optLow" class="text-danger">-</span></span>
+                <span>C: <span id="optClose" class="text-white">-</span></span>
+                <span>Vol: <span id="optVol" class="text-secondary">-</span></span>
+                <span id="optTime" class="theme-text-muted">-</span>
+                <button type="button" id="btnToggleOptionBoxes" class="btn-pane-toggle active ms-2" title="Toggle Option Overlays (FVG/Position Boxes)">
+                    <span class="material-icons" style="font-size: 0.85rem;">visibility</span>
+                    <span>Boxes</span>
+                </button>
+            </div>
+            <div id="optionChartContainer" class="chart-canvas-container"></div>
+            <canvas id="optionOverlayCanvas" class="overlay-canvas"></canvas>
+        </section>
+
+        <!-- Floating Risk Reserve HUD -->
         <div id="riskReserveHud" class="risk-reserve-hud">
             <div class="hud-header">
                 <span class="hud-tab-badge hud-tab-left">RISK RESERVE</span>
-                <span class="hud-tab-badge hud-tab-center">{% if 'BUY' in trade.trade_type %}Long{% else %}Short{% endif %}</span>
+                <span class="hud-tab-badge hud-tab-center">{% if 'PE' in trade.trade_type or 'PUT' in trade.trade_type %}Buy Put (Bearish Spot){% elif 'CE' in trade.trade_type or 'CALL' in trade.trade_type %}Buy Call (Bullish Spot){% elif 'BUY' in trade.trade_type %}Long{% else %}Short{% endif %}</span>
                 <span class="hud-tab-badge hud-tab-right">RISK</span>
                 <button type="button" id="btnToggleHud" class="btn btn-sm p-0 text-secondary border-0 ms-2" title="Minimize / Expand HUD">
                     <span class="material-icons" style="font-size: 0.95rem;">unfold_less</span>
@@ -437,58 +559,420 @@
                         <td class="hud-val-2">{{ trade.symbol }}</td>
                     </tr>
                     <tr>
+                        <td class="hud-label">Entry Reason</td>
+                        <td colspan="2" id="hudEntryReason" class="text-info" style="font-size: 0.68rem; padding: 4px 9px; line-height: 1.25;" title="{{ trade.entry_reason|default:trade.reason }}">
+                            {{ trade.entry_reason|default:trade.reason|truncatechars:38 }}
+                        </td>
+                    </tr>
+                    <tr>
+                        <td class="hud-label">Execution Path</td>
+                        <td colspan="2" id="hudExecutionTimeline" style="font-size: 0.65rem; padding: 5px 9px; line-height: 1.4;">
+                            <div class="d-flex align-items-center flex-wrap gap-1">
+                                <span class="badge rounded-pill" id="hudSignalBadge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45);" title="Signal Generation Time">
+                                    ⚡ <span id="hudDecisionTime">{{ trade.decision_timestamp|slice:"11:16"|default:trade.entry_time }}</span>
+                                </span>
+                                <span class="theme-text-muted">➔</span>
+                                <span class="badge rounded-pill" id="hudPlacedBadge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.45);" title="Limit Order Placed Time">
+                                    📝 <span id="hudPlacedTime">{{ trade.order_placed_timestamp|slice:"11:16"|default:trade.entry_time }}</span>
+                                </span>
+                                <span class="theme-text-muted">➔</span>
+                                <span class="badge rounded-pill" id="hudTappedBadge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.45);" title="Limit Tapped / Filled Time">
+                                    🎯 <span id="hudFillTime">{{ trade.timestamp|slice:"11:16" }}</span>
+                                </span>
+                                <span class="theme-text-muted">➔</span>
+                                <span class="badge rounded-pill" id="hudExitBadge" style="{% if trade.status == 'WIN' or trade.net_pnl > 0 %}background: rgba(16, 185, 129, 0.25); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.5);{% else %}background: rgba(239, 68, 68, 0.25); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.5);{% endif %}" title="Exit Time (TP/SL)">
+                                    🏁 <span id="hudExitTime">{{ trade.exit_timestamp|slice:"11:16"|default:"-" }}</span>
+                                </span>
+                            </div>
+                        </td>
+                    </tr>
+                    <tr>
                         <td class="hud-label">Exit Reason</td>
-                        <td colspan="2" class="theme-text-muted" style="font-size: 0.68rem; padding: 4px 10px;">
-                            {{ trade.exit_reason|default:trade.reason|truncatechars:36 }}
+                        <td colspan="2" id="hudExitReason" class="theme-text-muted" style="font-size: 0.68rem; padding: 4px 9px;" title="{{ trade.exit_reason|default:trade.reason }}">
+                            {{ trade.exit_reason|default:trade.reason|truncatechars:34 }}
                         </td>
                     </tr>
                 </table>
             </div>
         </div>
 
-        <!-- LightweightCharts Canvas Container -->
-        <div id="chartContainer"></div>
-
-        <!-- Transparent Overlay Canvas for Position Drawing Tool -->
-        <canvas id="positionOverlayCanvas"></canvas>
-
         <!-- Loading Overlay -->
         <div id="loadingOverlay" class="chart-loading-overlay">
             <div class="spinner-border text-primary mb-2" role="status"></div>
-            <div class="fw-bold text-white font-monospace small">Loading 2-Day 1m Candlestick Data...</div>
-            <div class="theme-text-muted small mt-1">Previous Day & Trade Day Intraday History</div>
+            <div class="fw-bold text-white font-monospace small">Loading Dual Split-Pane Candlestick Data...</div>
+            <div class="theme-text-muted small mt-1">Spot Index (Left) & Traded Option Contract (Right)</div>
         </div>
     </main>
 
-    <!-- Chart Logic Script -->
+    <!-- 3. Glassmorphic Box Styling & Template Customization Modal -->
+    <div class="modal fade" id="boxConfigModal" tabindex="-1" aria-labelledby="boxConfigModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" style="background: rgba(15, 20, 31, 0.97); backdrop-filter: blur(24px); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.85); color: var(--text-main);">
+                <div class="modal-header border-secondary border-opacity-25 pb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-info" style="font-size: 1.25rem;">palette</span>
+                        <h6 class="modal-title fw-bold text-white mb-0" id="boxConfigModalLabel">Chart Box Opacity, Borders & Templates</h6>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body pt-2 pb-3">
+                    <!-- Nav Tabs: Spot vs Option vs Presets -->
+                    <ul class="nav nav-pills nav-fill mb-3" id="styleNavTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active py-1.5 font-monospace fw-semibold" id="tab-spot-chart" data-bs-toggle="pill" data-bs-target="#pane-spot-style" type="button" role="tab" style="font-size: 0.78rem;">
+                                📈 Spot Chart (Left)
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link py-1.5 font-monospace fw-semibold" id="tab-option-chart" data-bs-toggle="pill" data-bs-target="#pane-option-style" type="button" role="tab" style="font-size: 0.78rem;">
+                                🎯 Option Chart (Right)
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link py-1.5 font-monospace fw-semibold text-warning" id="tab-presets" data-bs-toggle="pill" data-bs-target="#pane-presets-style" type="button" role="tab" style="font-size: 0.78rem;">
+                                💾 Presets & Templates
+                            </button>
+                        </li>
+                    </ul>
+
+                    <div class="tab-content" id="styleNavTabContent">
+                        <!-- Spot Chart Controls -->
+                        <div class="tab-pane fade show active" id="pane-spot-style" role="tabpanel">
+                            <div class="p-3 rounded mb-3" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
+                                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-20">
+                                    <div class="fw-bold text-white small">Spot Overlays (FVG & Position Boxes)</div>
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" id="spotVisibleSwitch" checked>
+                                        <label class="form-check-label small text-info fw-semibold" for="spotVisibleSwitch">Visible</label>
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted d-flex justify-content-between">
+                                            <span>Body Fill Opacity</span>
+                                            <span class="text-white font-monospace fw-bold" id="spotBodyVal">12%</span>
+                                        </label>
+                                        <input type="range" class="form-range" id="spotBodyOpacity" min="0" max="1" step="0.02" value="0.12">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted d-flex justify-content-between">
+                                            <span>Border Line Opacity</span>
+                                            <span class="text-white font-monospace fw-bold" id="spotBorderVal">85%</span>
+                                        </label>
+                                        <input type="range" class="form-range" id="spotBorderOpacity" min="0" max="1" step="0.05" value="0.85">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Border Width & Style</label>
+                                        <div class="input-group input-group-sm">
+                                            <select class="form-select bg-dark text-white border-secondary border-opacity-50" id="spotBorderWidth">
+                                                <option value="1.0">1.0px (Fine)</option>
+                                                <option value="1.5" selected>1.5px (Medium)</option>
+                                                <option value="2.0">2.0px (Thick)</option>
+                                            </select>
+                                            <select class="form-select bg-dark text-white border-secondary border-opacity-50" id="spotBorderStyle">
+                                                <option value="dashed" selected>Dashed</option>
+                                                <option value="solid">Solid</option>
+                                                <option value="dotted">Dotted</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Colors (Bullish / Bearish)</label>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="color-picker-wrapper flex-fill">
+                                                <input type="color" class="color-picker-input" id="spotBullishColor" value="#10b981">
+                                                <span class="small font-monospace text-success fw-bold" id="spotBullishText">#10b981</span>
+                                            </div>
+                                            <div class="color-picker-wrapper flex-fill">
+                                                <input type="color" class="color-picker-input" id="spotBearishColor" value="#ef4444">
+                                                <span class="small font-monospace text-danger fw-bold" id="spotBearishText">#ef4444</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Option Chart Controls -->
+                        <div class="tab-pane fade" id="pane-option-style" role="tabpanel">
+                            <div class="p-3 rounded mb-3" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
+                                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-20">
+                                    <div class="fw-bold text-white small">Option Overlays (FVG & Position Boxes)</div>
+                                    <div class="form-check form-switch mb-0">
+                                        <input class="form-check-input" type="checkbox" id="optVisibleSwitch" checked>
+                                        <label class="form-check-label small text-info fw-semibold" for="optVisibleSwitch">Visible</label>
+                                    </div>
+                                </div>
+                                <div class="row g-3">
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted d-flex justify-content-between">
+                                            <span>Body Fill Opacity</span>
+                                            <span class="text-white font-monospace fw-bold" id="optBodyVal">12%</span>
+                                        </label>
+                                        <input type="range" class="form-range" id="optBodyOpacity" min="0" max="1" step="0.02" value="0.12">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted d-flex justify-content-between">
+                                            <span>Border Line Opacity</span>
+                                            <span class="text-white font-monospace fw-bold" id="optBorderVal">85%</span>
+                                        </label>
+                                        <input type="range" class="form-range" id="optBorderOpacity" min="0" max="1" step="0.05" value="0.85">
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Border Width & Style</label>
+                                        <div class="input-group input-group-sm">
+                                            <select class="form-select bg-dark text-white border-secondary border-opacity-50" id="optBorderWidth">
+                                                <option value="1.0">1.0px (Fine)</option>
+                                                <option value="1.5" selected>1.5px (Medium)</option>
+                                                <option value="2.0">2.0px (Thick)</option>
+                                            </select>
+                                            <select class="form-select bg-dark text-white border-secondary border-opacity-50" id="optBorderStyle">
+                                                <option value="dashed" selected>Dashed</option>
+                                                <option value="solid">Solid</option>
+                                                <option value="dotted">Dotted</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                    <div class="col-md-6">
+                                        <label class="form-label small text-muted">Colors (Bullish / Bearish)</label>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <div class="color-picker-wrapper flex-fill">
+                                                <input type="color" class="color-picker-input" id="optBullishColor" value="#10b981">
+                                                <span class="small font-monospace text-success fw-bold" id="optBullishText">#10b981</span>
+                                            </div>
+                                            <div class="color-picker-wrapper flex-fill">
+                                                <input type="color" class="color-picker-input" id="optBearishColor" value="#ef4444">
+                                                <span class="small font-monospace text-danger fw-bold" id="optBearishText">#ef4444</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Presets & Templates Tab -->
+                        <div class="tab-pane fade" id="pane-presets-style" role="tabpanel">
+                            <div class="p-3 rounded mb-3" style="background: rgba(0,0,0,0.3); border: 1px solid var(--border-color);">
+                                <div class="fw-bold text-white small mb-2">⚡ Quick Built-in Presets</div>
+                                <div class="row g-2 mb-3">
+                                    <div class="col-sm-6">
+                                        <button type="button" class="preset-badge-btn w-100" data-preset="ghost">
+                                            <div class="fw-bold text-info">👻 Ghost / Ultra-Subtle</div>
+                                            <div class="small theme-text-muted" style="font-size: 0.68rem;">Body 5%, Border 35% · Maximum wick & price action clarity</div>
+                                        </button>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <button type="button" class="preset-badge-btn w-100" data-preset="balanced">
+                                            <div class="fw-bold text-success">⚖️ Balanced Institutional</div>
+                                            <div class="small theme-text-muted" style="font-size: 0.68rem;">Body 12%, Border 85% · Clean imbalance visibility</div>
+                                        </button>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <button type="button" class="preset-badge-btn w-100" data-preset="vibrant">
+                                            <div class="fw-bold text-warning">✨ Vibrant High-Contrast</div>
+                                            <div class="small theme-text-muted" style="font-size: 0.68rem;">Body 25%, Border 100% · Bold neon zones</div>
+                                        </button>
+                                    </div>
+                                    <div class="col-sm-6">
+                                        <button type="button" class="preset-badge-btn w-100" data-preset="hollow">
+                                            <div class="fw-bold text-light">🔲 Hollow (Border Only)</div>
+                                            <div class="small theme-text-muted" style="font-size: 0.68rem;">Body 0%, Border 90% · Zero fill, wireframe bounds</div>
+                                        </button>
+                                    </div>
+                                </div>
+
+                                <div class="border-top border-secondary border-opacity-25 pt-3">
+                                    <div class="fw-bold text-white small mb-2">💾 Save Custom Template</div>
+                                    <div class="input-group input-group-sm mb-3">
+                                        <input type="text" class="form-control bg-dark text-white border-secondary border-opacity-50" id="customTemplateName" placeholder="Template Name (e.g. My Clean Scalp Style)">
+                                        <button type="button" class="btn btn-primary fw-bold" id="btnSaveCustomTemplate">Save as Template</button>
+                                    </div>
+
+                                    <div class="fw-bold text-white small mb-1">📂 Saved Templates (Persistent Across Charts)</div>
+                                    <div class="d-flex align-items-center gap-2">
+                                        <select class="form-select form-select-sm bg-dark text-white border-secondary border-opacity-50" id="savedTemplatesSelect">
+                                            <option value="">-- Select a saved template --</option>
+                                        </select>
+                                        <button type="button" class="btn btn-sm btn-outline-info text-nowrap" id="btnApplySavedTemplate">Apply</button>
+                                        <button type="button" class="btn btn-sm btn-outline-danger text-nowrap" id="btnDeleteSavedTemplate">Delete</button>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary border-opacity-25 d-flex justify-content-between py-2">
+                    <button type="button" id="btnResetStylesDefault" class="btn btn-sm btn-outline-secondary font-monospace" style="font-size: 0.74rem;">Reset to Default</button>
+                    <button type="button" class="btn btn-sm btn-primary px-3 fw-bold font-monospace" data-bs-dismiss="modal" style="font-size: 0.78rem;">Done</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 4. Gemini AI Trade Forensic Autopsy & Rating Modal -->
+    <div class="modal fade" id="tradeAiAnalysisModal" tabindex="-1" aria-labelledby="tradeAiAnalysisModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content" style="background: rgba(11, 29, 22, 0.98); backdrop-filter: blur(28px); border: 1px solid rgba(180, 241, 5, 0.35); border-radius: 14px; box-shadow: 0 25px 60px rgba(0,0,0,0.9); color: #F1F5F9;">
+                <div class="modal-header border-bottom border-secondary border-opacity-25 px-4 py-3 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2.5">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                             style="width: 36px; height: 36px; background: rgba(180, 241, 5, 0.15); color: var(--brand-lime, #b4f105); border: 1px solid rgba(180, 241, 5, 0.3);">
+                            <span class="material-icons" style="font-size: 1.2rem;">psychology</span>
+                        </div>
+                        <div>
+                            <h6 class="modal-title fw-bold text-white mb-0" id="tradeAiAnalysisModalLabel">
+                                AI Trade Forensic Autopsy & Setup Rating
+                            </h6>
+                            <small class="text-muted" style="font-size: 0.72rem;">Quantitative diagnosis by Gemini 3.6 Flash</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4" id="tradeAiAnalysisModalBody" style="max-height: 75vh; overflow-y: auto;">
+                    <!-- Loading State Placeholder -->
+                    <div class="p-5 text-center" id="tradeAiLoadingState">
+                        <div class="spinner-border mb-3" style="width: 2.5rem; height: 2.5rem; color: var(--brand-lime, #b4f105);" role="status"></div>
+                        <div class="fw-bold text-white fs-6 mb-1">Running Deep Trade Forensic Autopsy...</div>
+                        <p class="text-muted small mb-0">
+                            Gemini 3.6 Flash is analyzing Spot momentum, OTE displacement, option Greeks, and failure root causes for Trade #{{ trade.serial_no }}.
+                        </p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Dual Chart Logic Engine -->
     <script>
     (function() {
         const candlesApiUrl = "{% url 'backtest:backtest_trade_candles' backtest.pk trade.serial_no %}";
-        const container = document.getElementById('chartContainer');
-        const overlayCanvas = document.getElementById('positionOverlayCanvas');
-        const overlayCtx = overlayCanvas.getContext('2d');
+        const spotContainer = document.getElementById('spotChartContainer');
+        const optionContainer = document.getElementById('optionChartContainer');
+        const spotOverlayCanvas = document.getElementById('spotOverlayCanvas');
+        const optionOverlayCanvas = document.getElementById('optionOverlayCanvas');
+        const spotCtx = spotOverlayCanvas.getContext('2d');
+        const optCtx = optionOverlayCanvas.getContext('2d');
         const loadingOverlay = document.getElementById('loadingOverlay');
 
-        let chart = null;
-        let candleSeries = null;
-        let volumeSeries = null;
+        let spotChart = null;
+        let spotCandleSeries = null;
+        let optionChart = null;
+        let optionCandleSeries = null;
+        let optionVolumeSeries = null;
 
         let rawTradeData = null;
-        let currentMode = 'option'; // 'option' or 'spot'
-        let currentTimeframe = '1';  // '1', '3', '5', '15', '30'
-        let activeCandles = [];
+        let currentTimeframe = '1';
+        let activeSpotCandles = [];
+        let activeOptCandles = [];
 
-        // Initialize LightweightCharts
-        function initTradingViewChart() {
-            container.innerHTML = '';
+        // Box Opacity, Colors & Template State Management
+        const DEFAULT_BOX_STYLES = {
+            spot: {
+                visible: true,
+                bodyOpacity: 0.12,
+                borderOpacity: 0.85,
+                borderWidth: 1.5,
+                borderStyle: 'dashed',
+                bullishColor: '#10b981',
+                bearishColor: '#ef4444',
+            },
+            option: {
+                visible: true,
+                bodyOpacity: 0.12,
+                borderOpacity: 0.85,
+                borderWidth: 1.5,
+                borderStyle: 'dashed',
+                bullishColor: '#10b981',
+                bearishColor: '#ef4444',
+            },
+            activePreset: 'balanced',
+        };
 
-            chart = LightweightCharts.createChart(container, {
-                width: container.clientWidth,
-                height: container.clientHeight,
+        const BUILTIN_PRESETS = {
+            ghost: {
+                name: 'Ghost (Wick Clarity)',
+                bodyOpacity: 0.05,
+                borderOpacity: 0.35,
+                borderWidth: 1.0,
+                borderStyle: 'dashed',
+                bullishColor: '#10b981',
+                bearishColor: '#ef4444',
+            },
+            balanced: {
+                name: 'Balanced Institutional',
+                bodyOpacity: 0.12,
+                borderOpacity: 0.85,
+                borderWidth: 1.5,
+                borderStyle: 'dashed',
+                bullishColor: '#10b981',
+                bearishColor: '#ef4444',
+            },
+            vibrant: {
+                name: 'Vibrant High-Contrast',
+                bodyOpacity: 0.25,
+                borderOpacity: 1.0,
+                borderWidth: 2.0,
+                borderStyle: 'solid',
+                bullishColor: '#00e676',
+                bearishColor: '#ff1744',
+            },
+            hollow: {
+                name: 'Hollow (Border Only)',
+                bodyOpacity: 0.0,
+                borderOpacity: 0.90,
+                borderWidth: 1.5,
+                borderStyle: 'solid',
+                bullishColor: '#10b981',
+                bearishColor: '#ef4444',
+            }
+        };
+
+        function hexToRgba(hex, alpha) {
+            if (!hex) return `rgba(16, 185, 129, ${alpha})`;
+            let cleanHex = hex.replace('#', '');
+            if (cleanHex.length === 3) {
+                cleanHex = cleanHex[0] + cleanHex[0] + cleanHex[1] + cleanHex[1] + cleanHex[2] + cleanHex[2];
+            }
+            const num = parseInt(cleanHex, 16);
+            if (isNaN(num)) return `rgba(16, 185, 129, ${alpha})`;
+            const r = (num >> 16) & 255;
+            const g = (num >> 8) & 255;
+            const b = num & 255;
+            return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+        }
+
+        function loadBoxStyles() {
+            try {
+                const saved = localStorage.getItem('marmot_chart_box_styles');
+                if (saved) {
+                    const parsed = JSON.parse(saved);
+                    return {
+                        spot: { ...DEFAULT_BOX_STYLES.spot, ...(parsed.spot || {}) },
+                        option: { ...DEFAULT_BOX_STYLES.option, ...(parsed.option || {}) },
+                        activePreset: parsed.activePreset || 'balanced',
+                    };
+                }
+            } catch (e) {}
+            return JSON.parse(JSON.stringify(DEFAULT_BOX_STYLES));
+        }
+
+        function saveBoxStyles(styles) {
+            try {
+                localStorage.setItem('marmot_chart_box_styles', JSON.stringify(styles));
+            } catch (e) {}
+        }
+
+        let boxStyles = loadBoxStyles();
+
+        // Common Chart Options Builder
+        function createTradingViewChart(containerEl, watermarkText) {
+            return LightweightCharts.createChart(containerEl, {
+                width: containerEl.clientWidth,
+                height: containerEl.clientHeight,
                 layout: {
                     background: { type: 'solid', color: '#0b0e14' },
                     textColor: '#94a3b8',
-                    fontSize: 12,
+                    fontSize: 11,
                     fontFamily: 'JetBrains Mono, monospace'
                 },
                 grid: {
@@ -497,12 +981,12 @@
                 },
                 crosshair: {
                     mode: LightweightCharts.CrosshairMode.Normal,
-                    vertLine: { color: 'rgba(56, 189, 248, 0.45)', width: 1, style: 3, labelBackgroundColor: '#0284c7' },
-                    horzLine: { color: 'rgba(56, 189, 248, 0.45)', width: 1, style: 3, labelBackgroundColor: '#0284c7' }
+                    vertLine: { color: 'rgba(56, 189, 248, 0.5)', width: 1, style: 3, labelBackgroundColor: '#0284c7' },
+                    horzLine: { color: 'rgba(56, 189, 248, 0.5)', width: 1, style: 3, labelBackgroundColor: '#0284c7' }
                 },
                 rightPriceScale: {
                     borderColor: '#242936',
-                    scaleMargins: { top: 0.12, bottom: 0.22 }
+                    scaleMargins: { top: 0.14, bottom: 0.16 }
                 },
                 localization: {
                     locale: 'en-IN',
@@ -518,15 +1002,13 @@
                     borderColor: '#242936',
                     timeVisible: true,
                     secondsVisible: false,
-                    rightOffset: 12,
+                    rightOffset: 8,
                     barSpacing: 6,
                     tickMarkFormatter: (time, tickMarkType, locale) => {
                         const d = new Date(time * 1000);
                         if (tickMarkType === 0 || tickMarkType === 1 || tickMarkType === 2) {
                             const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-                            const day = String(d.getUTCDate()).padStart(2, '0');
-                            const mon = months[d.getUTCMonth()];
-                            return `${day} ${mon}`;
+                            return `${String(d.getUTCDate()).padStart(2, '0')} ${months[d.getUTCMonth()]}`;
                         }
                         const hours = String(d.getUTCHours()).padStart(2, '0');
                         const mins = String(d.getUTCMinutes()).padStart(2, '0');
@@ -535,223 +1017,192 @@
                 },
                 watermark: {
                     visible: true,
-                    fontSize: 48,
+                    fontSize: 32,
                     fontFamily: 'Google Sans, sans-serif',
                     color: 'rgba(255, 255, 255, 0.03)',
-                    text: '{{ trade.strike|default:trade.symbol }} · 2 DAYS',
+                    text: watermarkText,
                     horzAlign: 'center',
                     vertAlign: 'center',
                 }
             });
+        }
 
-            candleSeries = chart.addCandlestickSeries({
-                upColor: '#089981',
-                downColor: '#f23645',
-                borderVisible: false,
-                wickUpColor: '#089981',
-                wickDownColor: '#f23645',
+        // Initialize Both Charts & Synchronize Crosshairs and TimeScale
+        function initDualCharts() {
+            spotContainer.innerHTML = '';
+            optionContainer.innerHTML = '';
+
+            spotChart = createTradingViewChart(spotContainer, '{{ trade.symbol }} SPOT');
+            spotCandleSeries = spotChart.addCandlestickSeries({
+                upColor: '#10b981',
+                downColor: '#ef4444',
+                borderVisible: true,
+                borderUpColor: '#059669',
+                borderDownColor: '#b91c1c',
+                wickUpColor: '#34d399',
+                wickDownColor: '#f87171',
+                wickVisible: true,
             });
 
-            volumeSeries = chart.addHistogramSeries({
+            optionChart = createTradingViewChart(optionContainer, '{{ trade.strike|default:trade.symbol }}');
+            optionCandleSeries = optionChart.addCandlestickSeries({
+                upColor: '#10b981',
+                downColor: '#ef4444',
+                borderVisible: true,
+                borderUpColor: '#059669',
+                borderDownColor: '#b91c1c',
+                wickUpColor: '#34d399',
+                wickDownColor: '#f87171',
+                wickVisible: true,
+            });
+
+            optionVolumeSeries = optionChart.addHistogramSeries({
                 priceFormat: { type: 'volume' },
                 priceScaleId: 'volumeScale',
             });
-            chart.priceScale('volumeScale').applyOptions({
+            optionChart.priceScale('volumeScale').applyOptions({
                 scaleMargins: { top: 0.82, bottom: 0 },
                 visible: false,
             });
 
-            // Live Crosshair stats update on top-left bar
-            chart.subscribeCrosshairMove(param => {
-                if (!param || !param.time || !param.seriesData) {
-                    if (activeCandles && activeCandles.length > 0) {
-                        updateCrosshairBar(activeCandles[activeCandles.length - 1]);
+            // Synchronize Crosshair Inspection & Header Stats between both panes
+            let isSyncingCrosshair = false;
+
+            spotChart.subscribeCrosshairMove(param => {
+                if (isSyncingCrosshair) return;
+                isSyncingCrosshair = true;
+
+                if (param && param.time) {
+                    const spotData = param.seriesData.get(spotCandleSeries);
+                    if (spotData) updateSpotHeaderBar(spotData, param.time);
+
+                    const matchOpt = activeOptCandles.find(c => c.time === param.time);
+                    if (matchOpt) updateOptionHeaderBar(matchOpt);
+
+                    if (optionCandleSeries) {
+                        try {
+                            const optPrice = matchOpt ? matchOpt.close : undefined;
+                            optionChart.setCrosshairPosition(optPrice, param.time, optionCandleSeries);
+                        } catch (e) {}
                     }
-                    return;
                 }
-                const cData = param.seriesData.get(candleSeries);
-                if (cData) {
-                    const vData = param.seriesData.get(volumeSeries);
-                    const d = new Date(param.time * 1000);
-                    const yr = d.getUTCFullYear();
-                    const mo = String(d.getUTCMonth() + 1).padStart(2, '0');
-                    const da = String(d.getUTCDate()).padStart(2, '0');
-                    const ho = String(d.getUTCHours()).padStart(2, '0');
-                    const mi = String(d.getUTCMinutes()).padStart(2, '0');
-                    updateCrosshairBar({
-                        open: cData.open,
-                        high: cData.high,
-                        low: cData.low,
-                        close: cData.close,
-                        volume: vData ? vData.value : 0,
-                        datetime: `${yr}-${mo}-${da} ${ho}:${mi}:00`
-                    });
-                }
+                isSyncingCrosshair = false;
             });
 
-            // 60FPS Continuous Drag & Scroll Synchronization Loop
-            let isInteracting = false;
-            let dragRafId = null;
+            optionChart.subscribeCrosshairMove(param => {
+                if (isSyncingCrosshair) return;
+                isSyncingCrosshair = true;
 
-            function startContinuousDragSync() {
-                isInteracting = true;
-                if (dragRafId) cancelAnimationFrame(dragRafId);
-                function dragLoop() {
-                    renderPositionOverlay();
-                    if (isInteracting) {
-                        dragRafId = requestAnimationFrame(dragLoop);
+                if (param && param.time) {
+                    const optData = param.seriesData.get(optionCandleSeries);
+                    const vData = param.seriesData.get(optionVolumeSeries);
+                    if (optData) {
+                        updateOptionHeaderBar({
+                            ...optData,
+                            volume: vData ? vData.value : 0,
+                            time: param.time
+                        });
+                    }
+
+                    const matchSpot = activeSpotCandles.find(c => c.time === param.time);
+                    if (matchSpot) updateSpotHeaderBar(matchSpot, param.time);
+
+                    if (spotCandleSeries) {
+                        try {
+                            const spotPrice = matchSpot ? matchSpot.close : undefined;
+                            spotChart.setCrosshairPosition(spotPrice, param.time, spotCandleSeries);
+                        } catch (e) {}
                     }
                 }
-                dragRafId = requestAnimationFrame(dragLoop);
+                isSyncingCrosshair = false;
+            });
+
+            // Synchronize Visible Range Zoom & Pan between both charts
+            let isSyncingRange = false;
+
+            function syncTimeScale(sourceChart, targetChart) {
+                const range = sourceChart.timeScale().getVisibleLogicalRange();
+                if (range && !isSyncingRange) {
+                    isSyncingRange = true;
+                    try { targetChart.timeScale().setVisibleLogicalRange(range); } catch (e) {}
+                    scheduleOverlaysSync();
+                    isSyncingRange = false;
+                }
             }
 
-            function stopContinuousDragSync() {
-                isInteracting = false;
-                if (dragRafId) cancelAnimationFrame(dragRafId);
-                scheduleOverlaySync();
-            }
+            spotChart.timeScale().subscribeVisibleLogicalRangeChange(() => syncTimeScale(spotChart, optionChart));
+            optionChart.timeScale().subscribeVisibleLogicalRangeChange(() => syncTimeScale(optionChart, spotChart));
 
-            container.addEventListener('mousedown', startContinuousDragSync);
+            // Continuous Drag & Scroll Sync Loop
+            [spotContainer, optionContainer].forEach(cnt => {
+                cnt.addEventListener('mousedown', startContinuousDragSync);
+                cnt.addEventListener('touchstart', startContinuousDragSync, { passive: true });
+                cnt.addEventListener('wheel', () => {
+                    scheduleOverlaysSync();
+                    let frames = 15;
+                    function inertia() {
+                        renderAllPositionOverlays();
+                        frames--;
+                        if (frames > 0) requestAnimationFrame(inertia);
+                    }
+                    requestAnimationFrame(inertia);
+                }, { passive: true });
+            });
+
             window.addEventListener('mouseup', stopContinuousDragSync);
-            container.addEventListener('touchstart', startContinuousDragSync, { passive: true });
             window.addEventListener('touchend', stopContinuousDragSync);
 
-            container.addEventListener('wheel', () => {
-                scheduleOverlaySync();
-                let inertiaFrames = 15;
-                function inertia() {
-                    renderPositionOverlay();
-                    inertiaFrames--;
-                    if (inertiaFrames > 0) requestAnimationFrame(inertia);
-                }
-                requestAnimationFrame(inertia);
-            }, { passive: true });
-
-            // Sync Overlay Canvas whenever chart scrolls or zooms
-            chart.timeScale().subscribeVisibleTimeRangeChange(scheduleOverlaySync);
-            chart.timeScale().subscribeVisibleLogicalRangeChange(scheduleOverlaySync);
-
-            // Crosshair move handler
-            chart.subscribeCrosshairMove(param => {
-                if (!param || !param.time || !param.seriesData || param.seriesData.size === 0) {
-                    if (activeCandles.length > 0) updateCrosshairBar(activeCandles[activeCandles.length - 1]);
-                    return;
-                }
-                const cData = param.seriesData.get(candleSeries);
-                if (cData) {
-                    const full = activeCandles.find(c => c.time === param.time) || cData;
-                    updateCrosshairBar(full);
-                }
-            });
-
-            window.addEventListener('resize', handleResize);
-            handleResize();
+            window.addEventListener('resize', handleDualResize);
+            handleDualResize();
         }
 
-        function handleResize() {
-            if (!chart) return;
-            const w = container.clientWidth;
-            const h = container.clientHeight;
-            chart.applyOptions({ width: w, height: h });
+        let isInteracting = false;
+        let dragRafId = null;
+
+        function startContinuousDragSync() {
+            isInteracting = true;
+            if (dragRafId) cancelAnimationFrame(dragRafId);
+            function dragLoop() {
+                renderAllPositionOverlays();
+                if (isInteracting) dragRafId = requestAnimationFrame(dragLoop);
+            }
+            dragRafId = requestAnimationFrame(dragLoop);
+        }
+
+        function stopContinuousDragSync() {
+            isInteracting = false;
+            if (dragRafId) cancelAnimationFrame(dragRafId);
+            scheduleOverlaysSync();
+        }
+
+        function handleDualResize() {
+            if (!spotChart || !optionChart) return;
+            const spotW = spotContainer.clientWidth;
+            const spotH = spotContainer.clientHeight;
+            const optW = optionContainer.clientWidth;
+            const optH = optionContainer.clientHeight;
+
+            spotChart.applyOptions({ width: spotW, height: spotH });
+            optionChart.applyOptions({ width: optW, height: optH });
 
             const dpr = window.devicePixelRatio || 1;
-            overlayCanvas.width = w * dpr;
-            overlayCanvas.height = h * dpr;
-            overlayCanvas.style.width = w + 'px';
-            overlayCanvas.style.height = h + 'px';
-            overlayCtx.resetTransform();
-            overlayCtx.scale(dpr, dpr);
 
-            renderPositionOverlay();
-        }
+            spotOverlayCanvas.width = spotW * dpr;
+            spotOverlayCanvas.height = spotH * dpr;
+            spotOverlayCanvas.style.width = spotW + 'px';
+            spotOverlayCanvas.style.height = spotH + 'px';
+            spotCtx.resetTransform();
+            spotCtx.scale(dpr, dpr);
 
-        let activePriceLines = [];
+            optionOverlayCanvas.width = optW * dpr;
+            optionOverlayCanvas.height = optH * dpr;
+            optionOverlayCanvas.style.width = optW + 'px';
+            optionOverlayCanvas.style.height = optH + 'px';
+            optCtx.resetTransform();
+            optCtx.scale(dpr, dpr);
 
-        function clearNativePriceLines() {
-            if (!candleSeries) return;
-            activePriceLines.forEach(pl => {
-                try { candleSeries.removePriceLine(pl); } catch (e) {}
-            });
-            activePriceLines = [];
-        }
-
-        function updateNativePriceLines() {
-            clearNativePriceLines();
-            if (!candleSeries || !rawTradeData) return;
-
-            const isSpot = (currentMode === 'spot');
-            const entryP = isSpot ? Number(rawTradeData.entry.index_price || rawTradeData.entry.price) : Number(rawTradeData.entry.price);
-            let targetP = isSpot ? (entryP + (Number(rawTradeData.index_points || 0) * 1.5)) : Number(rawTradeData.target_price);
-            let stopP = isSpot ? (entryP - (Math.abs(Number(rawTradeData.index_points || 30)) * 0.8)) : Number(rawTradeData.initial_stop_loss_price || rawTradeData.stop_loss_price);
-            const isBuy = !rawTradeData.trade_type || rawTradeData.trade_type.includes('BUY');
-            if (!isSpot && isBuy && stopP >= entryP) {
-                stopP = Number((entryP - 15.0).toFixed(2));
-                if (stopP <= 0) stopP = Number((entryP * 0.85).toFixed(2));
-            } else if (!isSpot && !isBuy && stopP <= entryP) {
-                stopP = Number((entryP + 15.0).toFixed(2));
-            }
-            let reserveEdgeP = isSpot ? (stopP - 15.0) : Number(rawTradeData.reserve_edge_price || (isBuy ? stopP * 0.98 : stopP * 1.02));
-
-            if (!targetP || targetP <= 0) targetP = isBuy ? (entryP * 1.15) : (entryP * 0.85);
-            if (!stopP || stopP <= 0) stopP = isBuy ? (entryP * 0.90) : (entryP * 1.10);
-
-            // Sync Floating HUD Table with sanitized metrics
-            const hudStop = document.getElementById('hudStopPrice');
-            if (hudStop) hudStop.textContent = '₹' + stopP.toFixed(2);
-            const hudTarget = document.getElementById('hudTargetPrice');
-            if (hudTarget) hudTarget.textContent = '₹' + targetP.toFixed(2);
-            const hudReserve = document.getElementById('hudReserveEdge');
-            if (hudReserve) hudReserve.textContent = '₹' + reserveEdgeP.toFixed(2);
-            const hudRR = document.getElementById('hudRiskReward');
-            if (hudRR && Math.abs(entryP - stopP) > 0.01) {
-                const calculatedRR = Math.abs(targetP - entryP) / Math.abs(entryP - stopP);
-                hudRR.textContent = '1:' + calculatedRR.toFixed(2);
-            }
-
-            // Target Price Line (Green)
-            const targetLine = candleSeries.createPriceLine({
-                price: targetP,
-                color: '#10b981',
-                lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Solid,
-                axisLabelVisible: true,
-                title: 'TARGET ' + targetP.toFixed(2),
-            });
-            activePriceLines.push(targetLine);
-
-            // Entry Price Line (Cyan / Blue)
-            const entryLine = candleSeries.createPriceLine({
-                price: entryP,
-                color: '#0284c7',
-                lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Dashed,
-                axisLabelVisible: true,
-                title: 'ENTRY ' + entryP.toFixed(2),
-            });
-            activePriceLines.push(entryLine);
-
-            // Stop Loss Price Line (Red)
-            const stopLine = candleSeries.createPriceLine({
-                price: stopP,
-                color: '#ef4444',
-                lineWidth: 2,
-                lineStyle: LightweightCharts.LineStyle.Solid,
-                axisLabelVisible: true,
-                title: 'STOP ' + stopP.toFixed(2),
-            });
-            activePriceLines.push(stopLine);
-
-            // Reserve Edge Buffer Line (Amber / Gold)
-            if (reserveEdgeP && reserveEdgeP > 0) {
-                const reserveLine = candleSeries.createPriceLine({
-                    price: reserveEdgeP,
-                    color: '#f59e0b',
-                    lineWidth: 1,
-                    lineStyle: LightweightCharts.LineStyle.Dotted,
-                    axisLabelVisible: true,
-                    title: 'RESERVE EDGE ' + reserveEdgeP.toFixed(2),
-                });
-                activePriceLines.push(reserveLine);
+            if (rawTradeData && rawTradeData.entry) {
+                renderAllPositionOverlays();
             }
         }
 
@@ -783,125 +1234,343 @@
                     currentBucket.high = Math.max(currentBucket.high, c.high);
                     currentBucket.low = Math.min(currentBucket.low, c.low);
                     currentBucket.close = c.close;
-                    currentBucket.volume += c.volume;
+                    currentBucket.volume += (c.volume || 0);
                 }
             });
             if (currentBucket) resampled.push(currentBucket);
             return resampled;
         }
 
-        // Apply Candle Data & Timeframe to Chart
-        function applyDataToChart() {
-            if (!rawTradeData) return;
+        // Price Lines Storage
+        let spotPriceLines = [];
+        let optionPriceLines = [];
 
-            const baseList = (currentMode === 'spot') ? (rawTradeData.spot_candles || []) : (rawTradeData.candles || []);
-            activeCandles = resampleCandles(baseList, currentTimeframe);
-
-            candleSeries.setData(activeCandles);
-
-            const volData = activeCandles.map(c => ({
-                time: c.time,
-                value: c.volume,
-                color: (c.close >= c.open) ? 'rgba(8, 153, 129, 0.28)' : 'rgba(242, 54, 69, 0.28)'
-            }));
-            volumeSeries.setData(volData);
-
-            if (activeCandles && activeCandles.length > 0) {
-                updateCrosshairBar(activeCandles[activeCandles.length - 1]);
-            }
-
-            // Native LightweightCharts Markers on Entry & Exit
-            applyMarkers();
-
-            // Native PriceLines on Price Scale
-            updateNativePriceLines();
-
-            // Fit content
-            chart.timeScale().fitContent();
-
-            // Trigger Overlay Render
-            scheduleOverlaySync();
+        function clearPriceLines(series, list) {
+            if (!series) return;
+            list.forEach(pl => {
+                try { series.removePriceLine(pl); } catch (e) {}
+            });
+            list.length = 0;
         }
 
-        // Add visual markers on entry & exit candles
-        function applyMarkers() {
-            if (!rawTradeData || !rawTradeData.entry) return;
+        // Resolve Option Strike Scaled Levels
+        function getResolvedOptionLevels() {
+            if (!rawTradeData || activeOptCandles.length === 0) return null;
+
+            const isBuy = !rawTradeData.trade_type || rawTradeData.trade_type.includes('BUY');
+            const origEntryP = Number(rawTradeData.entry.price);
+            const origExitP = Number(rawTradeData.exit.price);
+            let origStopP = Number(rawTradeData.initial_stop_loss_price || rawTradeData.stop_loss_price);
+            let origTargetP = Number(rawTradeData.target_price);
+
+            if (isBuy && origStopP >= origEntryP && origEntryP > 0) {
+                origStopP = origEntryP - 15.0 > 0 ? origEntryP - 15.0 : origEntryP * 0.85;
+            } else if (!isBuy && origStopP <= origEntryP && origEntryP > 0) {
+                origStopP = origEntryP + 15.0;
+            }
+            if (!origTargetP || origTargetP <= 0) origTargetP = isBuy ? (origEntryP * 1.15) : (origEntryP * 0.85);
+            if (!origStopP || origStopP <= 0) origStopP = isBuy ? (origEntryP * 0.90) : (origEntryP * 1.10);
 
             const entryEpoch = rawTradeData.entry.epoch;
             const exitEpoch = rawTradeData.exit.epoch;
-            const isSpot = (currentMode === 'spot');
-            const entryP = isSpot ? (rawTradeData.entry.index_price || rawTradeData.entry.price) : rawTradeData.entry.price;
-            const exitP = isSpot ? (rawTradeData.exit.index_price || rawTradeData.exit.price) : rawTradeData.exit.price;
+            let enCandle = null;
+            let exCandle = null;
+            let minEnDiff = Infinity;
+            let minExDiff = Infinity;
 
-            function findNearestTime(targetTime) {
-                if (!activeCandles || activeCandles.length === 0) return targetTime;
-                let closest = activeCandles[0].time;
-                let minDiff = Math.abs(activeCandles[0].time - targetTime);
-                for (let i = 1; i < activeCandles.length; i++) {
-                    const diff = Math.abs(activeCandles[i].time - targetTime);
-                    if (diff < minDiff) {
-                        minDiff = diff;
-                        closest = activeCandles[i].time;
-                    }
-                }
-                return closest;
+            for (let i = 0; i < activeOptCandles.length; i++) {
+                const c = activeOptCandles[i];
+                const dEn = Math.abs(c.time - entryEpoch);
+                if (dEn < minEnDiff) { minEnDiff = dEn; enCandle = c; }
+                const dEx = Math.abs(c.time - exitEpoch);
+                if (dEx < minExDiff) { minExDiff = dEx; exCandle = c; }
             }
 
-            const markers = [];
-            if (entryEpoch) {
-                markers.push({
-                    time: findNearestTime(entryEpoch),
-                    position: 'belowBar',
-                    color: '#10b981',
-                    shape: 'arrowUp',
-                    text: `▲ ENTRY ₹${Number(entryP).toFixed(2)} (${rawTradeData.entry.time})`,
-                    size: 2,
-                });
+            const candleEntryOpen = enCandle ? Number(enCandle.open) : origEntryP;
+            const candleExitClose = exCandle ? Number(exCandle.close) : origExitP;
+
+            let entryP = origEntryP;
+            let stopP = origStopP;
+            let targetP = origTargetP;
+            let exitP = origExitP;
+
+            if (origEntryP > 0 && candleEntryOpen > 0 && Math.abs(candleEntryOpen - origEntryP) / origEntryP > 0.08) {
+                const scale = candleEntryOpen / origEntryP;
+                entryP = Number(candleEntryOpen.toFixed(2));
+                const origRisk = Math.abs(origEntryP - origStopP);
+                const origReward = Math.abs(origTargetP - origEntryP);
+                stopP = Number((isBuy ? (entryP - (origRisk * scale)) : (entryP + (origRisk * scale))).toFixed(2));
+                targetP = Number((isBuy ? (entryP + (origReward * scale)) : (entryP - (origReward * scale))).toFixed(2));
+                exitP = Number(candleExitClose.toFixed(2));
             }
 
-            if (exitEpoch) {
-                const exitColor = (rawTradeData.pnl >= 0) ? '#10b981' : '#ef4444';
-                markers.push({
-                    time: findNearestTime(exitEpoch),
-                    position: 'aboveBar',
-                    color: exitColor,
-                    shape: 'arrowDown',
-                    text: `▼ EXIT ₹${Number(exitP).toFixed(2)} (${rawTradeData.exit.time})`,
-                    size: 2,
-                });
-            }
-
-            candleSeries.setMarkers(markers);
-        }
-
-        // Draw TradingView Position Boxes, Day Dividers, and Price Lines
-        function renderPositionOverlay() {
-            if (!chart || !candleSeries || !rawTradeData || activeCandles.length === 0) return;
-
-            const w = container.clientWidth;
-            const h = container.clientHeight;
-            overlayCtx.clearRect(0, 0, w, h);
-
-            const isSpot = (currentMode === 'spot');
-            const entryP = isSpot ? Number(rawTradeData.entry.index_price || rawTradeData.entry.price) : Number(rawTradeData.entry.price);
-            let targetP = isSpot ? (entryP + (Number(rawTradeData.index_points || 0) * 1.5)) : Number(rawTradeData.target_price);
-            let stopP = isSpot ? (entryP - (Math.abs(Number(rawTradeData.index_points || 30)) * 0.8)) : Number(rawTradeData.initial_stop_loss_price || rawTradeData.stop_loss_price);
-            const isBuy = !rawTradeData.trade_type || rawTradeData.trade_type.includes('BUY');
-            if (!isSpot && isBuy && stopP >= entryP) {
-                stopP = Number((entryP - 15.0).toFixed(2));
+            if (isBuy && stopP >= entryP) {
+                stopP = Number((entryP - 5.0).toFixed(2));
                 if (stopP <= 0) stopP = Number((entryP * 0.85).toFixed(2));
-            } else if (!isSpot && !isBuy && stopP <= entryP) {
-                stopP = Number((entryP + 15.0).toFixed(2));
+            } else if (!isBuy && stopP <= entryP) {
+                stopP = Number((entryP + 5.0).toFixed(2));
             }
 
             if (!targetP || targetP <= 0) targetP = isBuy ? (entryP * 1.15) : (entryP * 0.85);
             if (!stopP || stopP <= 0) stopP = isBuy ? (entryP * 0.90) : (entryP * 1.10);
 
+            const riskDist = Math.abs(entryP - stopP);
+            const reserveEdgeP = Number((isBuy ? (stopP - (riskDist * 0.15)) : (stopP + (riskDist * 0.15))).toFixed(2));
+
+            return { entryP, exitP, targetP, stopP, reserveEdgeP };
+        }
+
+        // Apply Data, Native PriceLines, and Markers to Both Panes
+        function applyDataToBothCharts() {
+            if (!rawTradeData) return;
+
+            activeSpotCandles = resampleCandles(rawTradeData.spot_candles || [], currentTimeframe);
+            activeOptCandles = resampleCandles(rawTradeData.candles || [], currentTimeframe);
+
+            spotCandleSeries.setData(activeSpotCandles);
+            optionCandleSeries.setData(activeOptCandles);
+
+            const volData = activeOptCandles.map(c => ({
+                time: c.time,
+                value: c.volume || 0,
+                color: (c.close >= c.open) ? 'rgba(8, 153, 129, 0.28)' : 'rgba(242, 54, 69, 0.28)'
+            }));
+            optionVolumeSeries.setData(volData);
+
+            if (activeSpotCandles.length > 0) {
+                updateSpotHeaderBar(activeSpotCandles[activeSpotCandles.length - 1]);
+            }
+            if (activeOptCandles.length > 0) {
+                updateOptionHeaderBar(activeOptCandles[activeOptCandles.length - 1]);
+            }
+
+            // A. Update Native PriceLines on Spot
+            clearPriceLines(spotCandleSeries, spotPriceLines);
+            const spotEntryP = Number(rawTradeData.entry.index_price || rawTradeData.entry.price);
+            const tradeType = (rawTradeData.trade_type || '').toUpperCase();
+            const isBearishSpot = tradeType.includes('PE') || tradeType.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL');
+            const idxPts = Math.abs(Number(rawTradeData.index_points || 30));
+            const spotTargetP = Number((isBearishSpot ? (spotEntryP - idxPts * 1.5) : (spotEntryP + idxPts * 1.5)).toFixed(2));
+            const spotStopP = Number((isBearishSpot ? (spotEntryP + idxPts * 0.8) : (spotEntryP - idxPts * 0.8)).toFixed(2));
+
+            spotPriceLines.push(spotCandleSeries.createPriceLine({
+                price: spotTargetP, color: '#10b981', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
+                axisLabelVisible: true, title: 'TARGET ' + spotTargetP.toFixed(2),
+            }));
+            spotPriceLines.push(spotCandleSeries.createPriceLine({
+                price: spotEntryP, color: '#0284c7', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true, title: 'ENTRY ' + spotEntryP.toFixed(2),
+            }));
+            spotPriceLines.push(spotCandleSeries.createPriceLine({
+                price: spotStopP, color: '#ef4444', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
+                axisLabelVisible: true, title: 'STOP ' + spotStopP.toFixed(2),
+            }));
+
+            // B. Update Native PriceLines on Option
+            clearPriceLines(optionCandleSeries, optionPriceLines);
+            const optLevels = getResolvedOptionLevels();
+            if (optLevels) {
+                optionPriceLines.push(optionCandleSeries.createPriceLine({
+                    price: optLevels.targetP, color: '#10b981', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true, title: 'TARGET ' + optLevels.targetP.toFixed(2),
+                }));
+                optionPriceLines.push(optionCandleSeries.createPriceLine({
+                    price: optLevels.entryP, color: '#0284c7', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true, title: 'ENTRY ' + optLevels.entryP.toFixed(2),
+                }));
+                optionPriceLines.push(optionCandleSeries.createPriceLine({
+                    price: optLevels.stopP, color: '#ef4444', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
+                    axisLabelVisible: true, title: 'STOP ' + optLevels.stopP.toFixed(2),
+                }));
+                if (optLevels.reserveEdgeP > 0) {
+                    optionPriceLines.push(optionCandleSeries.createPriceLine({
+                        price: optLevels.reserveEdgeP, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+                        axisLabelVisible: true, title: 'RESERVE ' + optLevels.reserveEdgeP.toFixed(2),
+                    }));
+                }
+            }
+
+            // C. Native Markers on Spot
+            applySpotMarkers(spotEntryP);
+
+            // D. Native Markers on Option
+            applyOptionMarkers(optLevels);
+
+            // Fit content
+            spotChart.timeScale().fitContent();
+            optionChart.timeScale().fitContent();
+
+            scheduleOverlaysSync();
+        }
+
+        function findNearestCandleTime(candles, targetTime) {
+            if (!candles || candles.length === 0) return targetTime;
+            let closest = candles[0].time;
+            let minDiff = Math.abs(candles[0].time - targetTime);
+            for (let i = 1; i < candles.length; i++) {
+                const diff = Math.abs(candles[i].time - targetTime);
+                if (diff < minDiff) {
+                    minDiff = diff;
+                    closest = candles[i].time;
+                }
+            }
+            return closest;
+        }
+
+        function applySpotMarkers(spotEntryP) {
+            const tl = rawTradeData.timeline || {};
+            const entryEpoch = tl.limit_tapped_epoch || rawTradeData.entry.epoch;
+            const exitEpoch = tl.exit_epoch || rawTradeData.exit.epoch;
+            const signalEpoch = tl.signal_epoch || (entryEpoch ? entryEpoch - 60 : 0);
+            const spotExitP = Number(rawTradeData.exit.index_price || rawTradeData.exit.price);
+            const tradeType = (rawTradeData.trade_type || '').toUpperCase();
+            const isBearishSpot = tradeType.includes('PE') || tradeType.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL');
+            const markers = [];
+
+            // 1. Signal Generated Marker
+            if (signalEpoch && signalEpoch !== entryEpoch) {
+                markers.push({
+                    time: findNearestCandleTime(activeSpotCandles, signalEpoch),
+                    position: isBearishSpot ? 'aboveBar' : 'belowBar',
+                    color: '#f59e0b',
+                    shape: 'circle',
+                    text: `⚡ SIGNAL (${tl.signal_time || ''}) Spot: ${tl.signal_spot ? tl.signal_spot.toFixed(1) : ''}`,
+                    size: 1,
+                });
+            }
+
+            // 2. Limit Tapped / Executed Marker
+            if (entryEpoch) {
+                markers.push({
+                    time: findNearestCandleTime(activeSpotCandles, entryEpoch),
+                    position: isBearishSpot ? 'aboveBar' : 'belowBar',
+                    color: '#0284c7',
+                    shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
+                    text: `${isBearishSpot ? '▼' : '▲'} TAPPED ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    size: 2,
+                });
+            }
+
+            // 3. Exit Marker (TP or SL Hit)
+            if (exitEpoch) {
+                const isWin = (rawTradeData.pnl >= 0);
+                const exitColor = isWin ? '#10b981' : '#ef4444';
+                const exitTag = isWin ? '🎯 TP HIT' : '🛑 SL HIT';
+                markers.push({
+                    time: findNearestCandleTime(activeSpotCandles, exitEpoch),
+                    position: isBearishSpot ? 'belowBar' : 'aboveBar',
+                    color: exitColor,
+                    shape: isBearishSpot ? 'arrowUp' : 'arrowDown',
+                    text: `${exitTag} ${spotExitP.toFixed(1)} (${tl.exit_time || rawTradeData.exit.time})`,
+                    size: 2,
+                });
+            }
+
+            markers.sort((a, b) => a.time - b.time);
+            spotCandleSeries.setMarkers(markers);
+        }
+
+        function applyOptionMarkers(optLevels) {
+            if (!optLevels) return;
+            const tl = rawTradeData.timeline || {};
+            const entryEpoch = tl.limit_tapped_epoch || rawTradeData.entry.epoch;
+            const exitEpoch = tl.exit_epoch || rawTradeData.exit.epoch;
+            const signalEpoch = tl.signal_epoch;
+            const placedEpoch = tl.limit_placed_epoch;
+            const markers = [];
+
+            // 1. Signal Time Marker
+            if (signalEpoch && signalEpoch !== entryEpoch) {
+                const cmpStr = tl.signal_strike_ltp ? ` CMP: ₹${Number(tl.signal_strike_ltp).toFixed(1)}` : '';
+                markers.push({
+                    time: findNearestCandleTime(activeOptCandles, signalEpoch),
+                    position: 'belowBar',
+                    color: '#f59e0b',
+                    shape: 'circle',
+                    text: `⚡ SIGNAL (${tl.signal_time || ''})${cmpStr}`,
+                    size: 1,
+                });
+            }
+
+            // 2. Limit Placed Marker (if distinct from signal and tapped)
+            if (placedEpoch && placedEpoch !== entryEpoch && placedEpoch !== signalEpoch) {
+                markers.push({
+                    time: findNearestCandleTime(activeOptCandles, placedEpoch),
+                    position: 'belowBar',
+                    color: '#38bdf8',
+                    shape: 'square',
+                    text: `📝 LIMIT PLACED (${tl.limit_placed_time || ''}) @ ₹${optLevels.entryP.toFixed(1)}`,
+                    size: 1,
+                });
+            }
+
+            // 3. Limit Tapped / Filled Marker
+            if (entryEpoch) {
+                markers.push({
+                    time: findNearestCandleTime(activeOptCandles, entryEpoch),
+                    position: 'belowBar',
+                    color: '#10b981',
+                    shape: 'arrowUp',
+                    text: `🎯 TAPPED / FILLED ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    size: 2,
+                });
+            }
+
+            // 4. Exit Marker (TP or SL Hit)
+            if (exitEpoch) {
+                const isWin = (rawTradeData.pnl >= 0);
+                const exitColor = isWin ? '#10b981' : '#ef4444';
+                const diffPts = Math.abs(optLevels.exitP - optLevels.entryP).toFixed(1);
+                const exitLabel = isWin ? `🎯 TP HIT (+₹${diffPts})` : `🛑 SL HIT (-₹${diffPts})`;
+                markers.push({
+                    time: findNearestCandleTime(activeOptCandles, exitEpoch),
+                    position: 'aboveBar',
+                    color: exitColor,
+                    shape: 'arrowDown',
+                    text: `${exitLabel} @ ₹${optLevels.exitP.toFixed(2)} (${tl.exit_time || rawTradeData.exit.time})`,
+                    size: 2,
+                });
+            }
+
+            markers.sort((a, b) => a.time - b.time);
+            optionCandleSeries.setMarkers(markers);
+        }
+
+        // Render Position Boxes & Day Boundaries on Both Overlays
+        function renderAllPositionOverlays() {
+            if (!rawTradeData || !rawTradeData.entry) return;
+            const spotEntryP = Number(rawTradeData.entry.index_price || rawTradeData.entry.price);
+            const tradeType = (rawTradeData.trade_type || '').toUpperCase();
+            const isBearishSpot = tradeType.includes('PE') || tradeType.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL');
+            const idxPts = Math.abs(Number(rawTradeData.index_points || 30));
+            const spotTargetP = Number((isBearishSpot ? (spotEntryP - idxPts * 1.5) : (spotEntryP + idxPts * 1.5)).toFixed(2));
+            const spotStopP = Number((isBearishSpot ? (spotEntryP + idxPts * 0.8) : (spotEntryP - idxPts * 0.8)).toFixed(2));
+
+            renderPaneOverlay(
+                spotChart, spotCandleSeries, spotOverlayCanvas, spotCtx, activeSpotCandles,
+                spotEntryP, spotTargetP, spotStopP, 'SPOT'
+            );
+
+            const optLevels = getResolvedOptionLevels();
+            if (optLevels) {
+                renderPaneOverlay(
+                    optionChart, optionCandleSeries, optionOverlayCanvas, optCtx, activeOptCandles,
+                    optLevels.entryP, optLevels.targetP, optLevels.stopP, 'OPTION'
+                );
+            }
+        }
+
+        function renderPaneOverlay(chartInst, seriesInst, canvasEl, ctx, candlesList, entryP, targetP, stopP, paneType) {
+            if (!chartInst || !seriesInst || !rawTradeData || candlesList.length === 0) return;
+
+            const w = canvasEl.clientWidth;
+            const h = canvasEl.clientHeight;
+            ctx.clearRect(0, 0, w, h);
+
             const entryEpoch = rawTradeData.entry.epoch;
             const exitEpoch = rawTradeData.exit.epoch;
             const dayBoundaryEpoch = rawTradeData.day_boundary_epoch;
 
-            // 1. Locate candle indices for Entry, Exit, and Day Boundary
             let enIdx = -1;
             let exIdx = -1;
             let dayIdx = -1;
@@ -909,161 +1578,399 @@
             let minExDiff = Infinity;
             let minDayDiff = Infinity;
 
-            for (let i = 0; i < activeCandles.length; i++) {
-                const t = activeCandles[i].time;
+            for (let i = 0; i < candlesList.length; i++) {
+                const t = candlesList[i].time;
                 const enDiff = Math.abs(t - entryEpoch);
-                if (enDiff < minEnDiff) {
-                    minEnDiff = enDiff;
-                    enIdx = i;
-                }
+                if (enDiff < minEnDiff) { minEnDiff = enDiff; enIdx = i; }
                 const exDiff = Math.abs(t - exitEpoch);
-                if (exDiff < minExDiff) {
-                    minExDiff = exDiff;
-                    exIdx = i;
-                }
+                if (exDiff < minExDiff) { minExDiff = exDiff; exIdx = i; }
                 if (dayBoundaryEpoch) {
                     const dDiff = Math.abs(t - dayBoundaryEpoch);
-                    if (dDiff < minDayDiff) {
-                        minDayDiff = dDiff;
-                        dayIdx = i;
-                    }
+                    if (dDiff < minDayDiff) { minDayDiff = dDiff; dayIdx = i; }
                 }
             }
 
-            // 2. Draw Day Boundary Line (separating Previous Day from Trade Day)
-            let dayX = (dayIdx >= 0) ? chart.timeScale().logicalToCoordinate(dayIdx) : null;
-            if (dayX === null && dayBoundaryEpoch) {
-                dayX = chart.timeScale().timeToCoordinate(dayBoundaryEpoch);
-            }
+            // 1. Day Boundary Divider
+            let dayX = (dayIdx >= 0) ? chartInst.timeScale().logicalToCoordinate(dayIdx) : null;
+            if (dayX === null && dayBoundaryEpoch) dayX = chartInst.timeScale().timeToCoordinate(dayBoundaryEpoch);
+
             if (dayX !== null && dayX >= -100 && dayX <= w + 100) {
-                overlayCtx.save();
-                overlayCtx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-                overlayCtx.lineWidth = 1.2;
-                overlayCtx.setLineDash([5, 5]);
-                overlayCtx.beginPath();
-                overlayCtx.moveTo(dayX, 0);
-                overlayCtx.lineTo(dayX, h);
-                overlayCtx.stroke();
-                overlayCtx.setLineDash([]);
+                ctx.save();
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+                ctx.lineWidth = 1.2;
+                ctx.setLineDash([5, 5]);
+                ctx.beginPath();
+                ctx.moveTo(dayX, 0);
+                ctx.lineTo(dayX, h);
+                ctx.stroke();
+                ctx.setLineDash([]);
 
-                // Day Divider Header Tag
-                overlayCtx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-                overlayCtx.fillRect(dayX - 95, 12, 190, 20);
-                overlayCtx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
-                overlayCtx.strokeRect(dayX - 95, 12, 190, 20);
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
+                ctx.fillRect(dayX - 75, 10, 150, 18);
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
+                ctx.strokeRect(dayX - 75, 10, 150, 18);
 
-                overlayCtx.fillStyle = '#38bdf8';
-                overlayCtx.font = 'bold 10px JetBrains Mono, monospace';
-                overlayCtx.textAlign = 'center';
-                overlayCtx.textBaseline = 'middle';
-                overlayCtx.fillText(`◂ YESTERDAY | TODAY (${rawTradeData.date})`, dayX, 22);
-                overlayCtx.restore();
+                ctx.fillStyle = '#38bdf8';
+                ctx.font = 'bold 9.5px JetBrains Mono, monospace';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`◂ PREV | TODAY`, dayX, 19);
+                ctx.restore();
             }
 
-            // 3. High-Precision Coordinate Math for Position Box (Anchored to Bars)
-            let enX = (enIdx >= 0) ? chart.timeScale().logicalToCoordinate(enIdx) : null;
-            let exX = (exIdx >= 0) ? chart.timeScale().logicalToCoordinate(exIdx) : null;
+            // 2. Position Box Anchoring
+            const cfg = (paneType === 'SPOT') ? boxStyles.spot : boxStyles.option;
+            if (!cfg || !cfg.visible) {
+                // If boxes hidden on this chart, return immediately after drawing day divider
+                return;
+            }
 
-            if (enX === null) enX = chart.timeScale().timeToCoordinate(entryEpoch);
-            if (exX === null) exX = chart.timeScale().timeToCoordinate(exitEpoch);
+            let enX = (enIdx >= 0) ? chartInst.timeScale().logicalToCoordinate(enIdx) : null;
+            let exX = (exIdx >= 0) ? chartInst.timeScale().logicalToCoordinate(exIdx) : null;
 
-            // Handle offscreen extrapolation with logical range
-            const visibleLogicalRange = chart.timeScale().getVisibleLogicalRange();
+            if (enX === null) enX = chartInst.timeScale().timeToCoordinate(entryEpoch);
+            if (exX === null) exX = chartInst.timeScale().timeToCoordinate(exitEpoch);
+
+            const visibleLogicalRange = chartInst.timeScale().getVisibleLogicalRange();
             if (visibleLogicalRange) {
-                const barSpacing = chart.timeScale().options().barSpacing || 6;
-                if (enX === null && enIdx >= 0) {
-                    enX = (enIdx - visibleLogicalRange.from) * barSpacing;
-                }
-                if (exX === null && exIdx >= 0) {
-                    exX = (exIdx - visibleLogicalRange.from) * barSpacing;
-                }
+                const barSpacing = chartInst.timeScale().options().barSpacing || 6;
+                if (enX === null && enIdx >= 0) enX = (enIdx - visibleLogicalRange.from) * barSpacing;
+                if (exX === null && exIdx >= 0) exX = (exIdx - visibleLogicalRange.from) * barSpacing;
             }
 
             if (enX === null || isNaN(enX)) return;
             if (exX === null || isNaN(exX) || exX <= enX) {
                 const defaultBars = Math.max(12, (exIdx >= 0 && enIdx >= 0) ? (exIdx - enIdx + 1) : 25);
-                const barSpacing = chart.timeScale().options().barSpacing || 6;
+                const barSpacing = chartInst.timeScale().options().barSpacing || 6;
                 exX = enX + (defaultBars * barSpacing);
             }
 
-            const boxWidth = Math.max(12, exX - enX);
+            const boxWidth = Math.max(10, exX - enX);
+            const enY = seriesInst.priceToCoordinate(entryP);
+            const tgY = seriesInst.priceToCoordinate(targetP);
+            const slY = seriesInst.priceToCoordinate(stopP);
 
-            const enY = candleSeries.priceToCoordinate(entryP);
-            const tgY = candleSeries.priceToCoordinate(targetP);
-            const slY = candleSeries.priceToCoordinate(stopP);
+            const targetFill = hexToRgba(cfg.bullishColor, cfg.bodyOpacity);
+            const targetStroke = hexToRgba(cfg.bullishColor, cfg.borderOpacity);
+            const stopFill = hexToRgba(cfg.bearishColor, cfg.bodyOpacity);
+            const stopStroke = hexToRgba(cfg.bearishColor, cfg.borderOpacity);
 
             if (enY !== null) {
-                // A. Target Profit Box (Green Shaded Zone)
+                // Target Green Box
                 if (tgY !== null) {
                     const topY = Math.min(enY, tgY);
                     const boxH = Math.max(1, Math.abs(tgY - enY));
-
-                    overlayCtx.fillStyle = 'rgba(8, 153, 129, 0.18)';
-                    overlayCtx.fillRect(enX, topY, boxWidth, boxH);
-
-                    overlayCtx.strokeStyle = 'rgba(8, 153, 129, 0.75)';
-                    overlayCtx.lineWidth = 1.2;
-                    overlayCtx.strokeRect(enX, topY, boxWidth, boxH);
+                    ctx.fillStyle = targetFill;
+                    ctx.fillRect(enX, topY, boxWidth, boxH);
+                    ctx.strokeStyle = targetStroke;
+                    ctx.lineWidth = cfg.borderWidth;
+                    ctx.strokeRect(enX, topY, boxWidth, boxH);
                 }
 
-                // B. Stop Loss Risk Box (Red Shaded Zone)
+                // Stop Loss Red Box
                 if (slY !== null) {
                     const topY = Math.min(enY, slY);
                     const boxH = Math.max(1, Math.abs(slY - enY));
-
-                    overlayCtx.fillStyle = 'rgba(242, 54, 69, 0.18)';
-                    overlayCtx.fillRect(enX, topY, boxWidth, boxH);
-
-                    overlayCtx.strokeStyle = 'rgba(242, 54, 69, 0.75)';
-                    overlayCtx.lineWidth = 1.2;
-                    overlayCtx.strokeRect(enX, topY, boxWidth, boxH);
+                    ctx.fillStyle = stopFill;
+                    ctx.fillRect(enX, topY, boxWidth, boxH);
+                    ctx.strokeStyle = stopStroke;
+                    ctx.lineWidth = cfg.borderWidth;
+                    ctx.strokeRect(enX, topY, boxWidth, boxH);
                 }
 
-                // C. Entry Middle Divider Line across Position Box
-                overlayCtx.strokeStyle = 'rgba(2, 132, 199, 0.9)';
-                overlayCtx.lineWidth = 1.5;
-                overlayCtx.beginPath();
-                overlayCtx.moveTo(enX, enY);
-                overlayCtx.lineTo(exX, enY);
-                overlayCtx.stroke();
+                // Entry Horizontal Divider
+                ctx.strokeStyle = 'rgba(2, 132, 199, 0.9)';
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                ctx.moveTo(enX, enY);
+                ctx.lineTo(exX, enY);
+                ctx.stroke();
             }
+
+            // 3. SMC Overlays (Fair Value Gaps, Liquidity Sweeps, CHoCH)
+            renderSMCOverlayZones(chartInst, seriesInst, ctx, candlesList, paneType);
+        }
+
+        let showSMCOverlays = true;
+
+        // SMC Detection: Fair Value Gaps (FVGs) - Scans full trading day
+        function detectFairValueGaps(candles) {
+            if (!candles || candles.length < 3) return [];
+            const fvgs = [];
+            for (let i = 2; i < candles.length; i++) {
+                const c1 = candles[i - 2];
+                const c2 = candles[i - 1];
+                const c3 = candles[i];
+                
+                // Bullish FVG: Candle 1 High < Candle 3 Low (Gap up imbalance)
+                if (c3.low > c1.high && (c3.low - c1.high) >= 0.4) {
+                    fvgs.push({
+                        type: 'BULLISH',
+                        top: c3.low,
+                        bottom: c1.high,
+                        startIdx: i - 2,
+                        endIdx: Math.min(candles.length - 1, i + 8),
+                        mid: (c3.low + c1.high) / 2
+                    });
+                }
+                // Bearish FVG: Candle 1 Low > Candle 3 High (Gap down imbalance)
+                else if (c1.low > c3.high && (c1.low - c3.high) >= 0.4) {
+                    fvgs.push({
+                        type: 'BEARISH',
+                        top: c1.low,
+                        bottom: c3.high,
+                        startIdx: i - 2,
+                        endIdx: Math.min(candles.length - 1, i + 8),
+                        mid: (c1.low + c3.high) / 2
+                    });
+                }
+            }
+            return fvgs;
+        }
+
+        // SMC Detection: Liquidity Sweeps - Scans full trading day
+        function detectLiquiditySweeps(candles) {
+            if (!candles || candles.length < 10) return [];
+            const sweeps = [];
+            const windowLen = 8;
+
+            for (let i = windowLen; i < candles.length; i++) {
+                const curr = candles[i];
+                let maxH = -Infinity;
+                let maxHIdx = -1;
+                let minL = Infinity;
+                let minLIdx = -1;
+
+                for (let j = i - windowLen; j < i; j++) {
+                    if (candles[j].high > maxH) { maxH = candles[j].high; maxHIdx = j; }
+                    if (candles[j].low < minL) { minL = candles[j].low; minLIdx = j; }
+                }
+
+                // Buy-Side Liquidity (BSL) Sweep: Wick penetrates swing high, but close closes inside
+                if (curr.high > maxH && curr.close < maxH && (curr.high - maxH) >= 0.5) {
+                    sweeps.push({
+                        type: 'BSL_SWEEP',
+                        level: maxH,
+                        sweepHigh: curr.high,
+                        idx: i,
+                        prevIdx: maxHIdx,
+                    });
+                }
+
+                // Sell-Side Liquidity (SSL) Sweep: Wick penetrates swing low, but close closes inside
+                if (curr.low < minL && curr.close > minL && (minL - curr.low) >= 0.5) {
+                    sweeps.push({
+                        type: 'SSL_SWEEP',
+                        level: minL,
+                        sweepLow: curr.low,
+                        idx: i,
+                        prevIdx: minLIdx,
+                    });
+                }
+            }
+            return sweeps;
+        }
+
+        // SMC Detection: Change of Character (CHoCH) Breakouts - Scans full trading day
+        function detectCHoCHBreakouts(candles) {
+            if (!candles || candles.length < 12) return [];
+            const chochs = [];
+            const windowLen = 10;
+
+            for (let i = windowLen; i < candles.length; i++) {
+                const curr = candles[i];
+                let maxH = -Infinity;
+                let minL = Infinity;
+                let maxHIdx = -1;
+                let minLIdx = -1;
+
+                for (let j = i - windowLen; j < i; j++) {
+                    if (candles[j].high > maxH) { maxH = candles[j].high; maxHIdx = j; }
+                    if (candles[j].low < minL) { minL = candles[j].low; minLIdx = j; }
+                }
+
+                // Bullish CHoCH: Close breaks above swing high
+                if (curr.close > maxH && candles[i - 1].close <= maxH) {
+                    chochs.push({
+                        type: 'BULLISH_CHOCH',
+                        level: maxH,
+                        idx: i,
+                        prevIdx: maxHIdx,
+                    });
+                }
+                // Bearish CHoCH: Close breaks below swing low
+                else if (curr.close < minL && candles[i - 1].close >= minL) {
+                    chochs.push({
+                        type: 'BEARISH_CHOCH',
+                        level: minL,
+                        idx: i,
+                        prevIdx: minLIdx,
+                    });
+                }
+            }
+            return chochs;
+        }
+
+        // Render SMC Zones & Markers on Canvas
+        function renderSMCOverlayZones(chartInst, seriesInst, ctx, candlesList, paneType) {
+            const cfg = (paneType === 'SPOT') ? boxStyles.spot : boxStyles.option;
+            if (!cfg || !cfg.visible) return;
+
+            const fvgs = detectFairValueGaps(candlesList);
+            const sweeps = detectLiquiditySweeps(candlesList);
+            const chochs = detectCHoCHBreakouts(candlesList);
+
+            const dashPattern = (cfg.borderStyle === 'solid') ? [] : ((cfg.borderStyle === 'dotted') ? [2, 2] : [4, 2]);
+
+            // A. Draw Fair Value Gap (FVG) Boxes
+            fvgs.forEach(fvg => {
+                let startX = chartInst.timeScale().logicalToCoordinate(fvg.startIdx);
+                let endX = chartInst.timeScale().logicalToCoordinate(fvg.endIdx);
+                if (startX === null || isNaN(startX)) return;
+                if (endX === null || isNaN(endX) || endX <= startX) endX = startX + 45;
+
+                const yTop = seriesInst.priceToCoordinate(fvg.top);
+                const yBottom = seriesInst.priceToCoordinate(fvg.bottom);
+                if (yTop === null || yBottom === null) return;
+
+                const topY = Math.min(yTop, yBottom);
+                const boxH = Math.max(2, Math.abs(yBottom - yTop));
+                const boxW = Math.max(10, endX - startX);
+
+                ctx.save();
+                if (fvg.type === 'BULLISH') {
+                    ctx.fillStyle = hexToRgba(cfg.bullishColor, cfg.bodyOpacity);
+                    ctx.fillRect(startX, topY, boxW, boxH);
+                    ctx.strokeStyle = hexToRgba(cfg.bullishColor, cfg.borderOpacity);
+                    ctx.lineWidth = cfg.borderWidth;
+                    ctx.setLineDash(dashPattern);
+                    ctx.strokeRect(startX, topY, boxW, boxH);
+
+                    ctx.fillStyle = cfg.bullishColor;
+                    ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('+FVG [1m Imbalance]', startX + 4, topY + (boxH / 2));
+                } else {
+                    ctx.fillStyle = hexToRgba(cfg.bearishColor, cfg.bodyOpacity);
+                    ctx.fillRect(startX, topY, boxW, boxH);
+                    ctx.strokeStyle = hexToRgba(cfg.bearishColor, cfg.borderOpacity);
+                    ctx.lineWidth = cfg.borderWidth;
+                    ctx.setLineDash(dashPattern);
+                    ctx.strokeRect(startX, topY, boxW, boxH);
+
+                    ctx.fillStyle = cfg.bearishColor;
+                    ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText('-FVG [1m Imbalance]', startX + 4, topY + (boxH / 2));
+                }
+                ctx.restore();
+            });
+
+            // B. Draw Liquidity Sweeps
+            sweeps.forEach(sw => {
+                let startX = chartInst.timeScale().logicalToCoordinate(sw.prevIdx);
+                let sweepX = chartInst.timeScale().logicalToCoordinate(sw.idx);
+                if (startX === null || sweepX === null || isNaN(startX) || isNaN(sweepX)) return;
+
+                const yLevel = seriesInst.priceToCoordinate(sw.level);
+                if (yLevel === null) return;
+
+                ctx.save();
+                ctx.strokeStyle = sw.type === 'BSL_SWEEP' ? '#f59e0b' : '#38bdf8';
+                ctx.lineWidth = 1.3;
+                ctx.setLineDash([4, 4]);
+                ctx.beginPath();
+                ctx.moveTo(startX, yLevel);
+                ctx.lineTo(sweepX + 25, yLevel);
+                ctx.stroke();
+
+                // Lightning Sweep Tag
+                ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
+                ctx.fillRect(sweepX - 2, yLevel - 9, 72, 16);
+                ctx.strokeStyle = sw.type === 'BSL_SWEEP' ? '#f59e0b' : '#38bdf8';
+                ctx.setLineDash([]);
+                ctx.strokeRect(sweepX - 2, yLevel - 9, 72, 16);
+
+                ctx.fillStyle = sw.type === 'BSL_SWEEP' ? '#fbbf24' : '#38bdf8';
+                ctx.font = 'bold 8px JetBrains Mono, monospace';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(`⚡ SWEEP ${sw.level.toFixed(1)}`, sweepX + 2, yLevel);
+                ctx.restore();
+            });
+
+            // C. Draw CHoCH Breakouts
+            chochs.forEach(ch => {
+                let startX = chartInst.timeScale().logicalToCoordinate(ch.prevIdx);
+                let breakX = chartInst.timeScale().logicalToCoordinate(ch.idx);
+                if (startX === null || breakX === null || isNaN(startX) || isNaN(breakX)) return;
+
+                const yLevel = seriesInst.priceToCoordinate(ch.level);
+                if (yLevel === null) return;
+
+                ctx.save();
+                ctx.strokeStyle = ch.type === 'BULLISH_CHOCH' ? '#10b981' : '#ef4444';
+                ctx.lineWidth = 1.4;
+                ctx.setLineDash([5, 3]);
+                ctx.beginPath();
+                ctx.moveTo(startX, yLevel);
+                ctx.lineTo(breakX + 30, yLevel);
+                ctx.stroke();
+
+                ctx.fillStyle = ch.type === 'BULLISH_CHOCH' ? '#10b981' : '#ef4444';
+                ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                ctx.textAlign = 'left';
+                ctx.textBaseline = 'bottom';
+                ctx.fillText(`CHoCH Breakout ⚡`, breakX + 4, yLevel - 2);
+                ctx.restore();
+            });
         }
 
         let syncScheduled = false;
-        function scheduleOverlaySync() {
+        function scheduleOverlaysSync() {
             if (!syncScheduled) {
                 syncScheduled = true;
                 requestAnimationFrame(() => {
                     syncScheduled = false;
-                    renderPositionOverlay();
+                    renderAllPositionOverlays();
                 });
             }
         }
 
-        function updateCrosshairBar(candle) {
+        function updateSpotHeaderBar(candle, customTime) {
             if (!candle) return;
-            document.getElementById('barOpen').innerText = Number(candle.open).toFixed(2);
-            document.getElementById('barHigh').innerText = Number(candle.high).toFixed(2);
-            document.getElementById('barLow').innerText = Number(candle.low).toFixed(2);
-            document.getElementById('barClose').innerText = Number(candle.close).toFixed(2);
-            document.getElementById('barVol').innerText = (candle.volume || 0).toLocaleString();
-            document.getElementById('barTime').innerText = candle.datetime || (candle.date + ' ' + candle.time_str);
+            document.getElementById('spotOpen').innerText = Number(candle.open).toFixed(2);
+            document.getElementById('spotHigh').innerText = Number(candle.high).toFixed(2);
+            document.getElementById('spotLow').innerText = Number(candle.low).toFixed(2);
+            document.getElementById('spotClose').innerText = Number(candle.close).toFixed(2);
+            document.getElementById('spotTime').innerText = candle.datetime ? candle.datetime.slice(11, 16) : (candle.time_str || '');
         }
 
-        // Fetch Data from Server
+        function updateOptionHeaderBar(candle) {
+            if (!candle) return;
+            document.getElementById('optOpen').innerText = Number(candle.open).toFixed(2);
+            document.getElementById('optHigh').innerText = Number(candle.high).toFixed(2);
+            document.getElementById('optLow').innerText = Number(candle.low).toFixed(2);
+            document.getElementById('optClose').innerText = Number(candle.close).toFixed(2);
+            document.getElementById('optVol').innerText = (candle.volume || 0).toLocaleString();
+            document.getElementById('optTime').innerText = candle.datetime ? candle.datetime.slice(11, 16) : (candle.time_str || '');
+        }
+
+        // Fetch Data from Backend
         function loadTradeChartData() {
             fetch(candlesApiUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                 .then(res => res.json())
                 .then(data => {
                     if (loadingOverlay) loadingOverlay.style.display = 'none';
                     if (!data.success) {
-                        alert('Could not load candle data for this trade');
+                        alert('Could not load candlestick data for this trade');
                         return;
                     }
 
                     rawTradeData = data;
 
-                    // Update HUD with live values
                     if (data.reserve_edge_price) {
                         document.getElementById('hudReserveEdge').innerText = `₹${Number(data.reserve_edge_price).toFixed(2)}`;
                     }
@@ -1073,8 +1980,50 @@
                     if (data.prev_date) {
                         document.getElementById('dateRangeBadge').innerText = `2 Days (${data.prev_date} → ${data.date})`;
                     }
+                    if (data.entry && data.entry.reason) {
+                        const elEntryReason = document.getElementById('hudEntryReason');
+                        if (elEntryReason) {
+                            elEntryReason.innerText = data.entry.reason.length > 38 ? data.entry.reason.slice(0, 36) + '...' : data.entry.reason;
+                            elEntryReason.title = data.entry.reason;
+                        }
+                    }
+                    const tl = data.timeline || {};
+                    const decEl = document.getElementById('hudDecisionTime');
+                    const placedEl = document.getElementById('hudPlacedTime');
+                    const fillEl = document.getElementById('hudFillTime');
+                    const exitEl = document.getElementById('hudExitTime');
+                    const sigBadge = document.getElementById('hudSignalBadge');
+                    const placedBadge = document.getElementById('hudPlacedBadge');
+                    const tapBadge = document.getElementById('hudTappedBadge');
+                    const exitBadge = document.getElementById('hudExitBadge');
 
-                    applyDataToChart();
+                    if (decEl && (tl.signal_time || (data.execution && data.execution.decision_time))) {
+                        decEl.innerText = tl.signal_time || data.execution.decision_time;
+                    }
+                    if (placedEl && (tl.limit_placed_time || (data.execution && data.execution.order_placed_time))) {
+                        placedEl.innerText = tl.limit_placed_time || data.execution.order_placed_time;
+                    }
+                    if (fillEl && (tl.limit_tapped_time || (data.entry && data.entry.time))) {
+                        fillEl.innerText = tl.limit_tapped_time || data.entry.time;
+                    }
+                    if (exitEl && (tl.exit_time || (data.exit && data.exit.time))) {
+                        exitEl.innerText = tl.exit_time || data.exit.time;
+                    }
+                    if (sigBadge && (tl.signal_strike_ltp || (data.execution && data.execution.decision_strike_ltp))) {
+                        const cmpVal = tl.signal_strike_ltp || data.execution.decision_strike_ltp;
+                        sigBadge.title = `1. Signal Triggered @ ${decEl.innerText} | Spot: ${tl.signal_spot || ''} | Strike CMP: ₹${Number(cmpVal).toFixed(2)}`;
+                    }
+                    if (placedBadge) {
+                        placedBadge.title = `2. Limit Order Placed @ ${placedEl ? placedEl.innerText : ''} | Limit Price: ₹${Number(tl.limit_price || (data.entry && data.entry.price) || 0).toFixed(2)}`;
+                    }
+                    if (tapBadge) {
+                        tapBadge.title = `3. Limit Tapped & Filled @ ${fillEl.innerText} | Entry Price: ₹${Number(data.entry ? data.entry.price : 0).toFixed(2)}`;
+                    }
+                    if (exitBadge && data.exit) {
+                        exitBadge.title = `4. ${data.exit.exit_type || 'Exit'} Hit @ ${exitEl ? exitEl.innerText : ''} | Exit Price: ₹${Number(data.exit.price || 0).toFixed(2)} (${data.exit.reason || ''})`;
+                    }
+
+                    applyDataToBothCharts();
                 })
                 .catch(err => {
                     if (loadingOverlay) {
@@ -1086,44 +2035,31 @@
                 });
         }
 
-        // Attach UI Event Listeners
+        // Event Listeners
         function setupEventListeners() {
-            // Timeframe switcher buttons
             document.querySelectorAll('.btn-tf').forEach(btn => {
                 btn.addEventListener('click', function() {
                     document.querySelectorAll('.btn-tf').forEach(b => b.classList.remove('active'));
                     this.classList.add('active');
                     currentTimeframe = this.getAttribute('data-tf');
-                    applyDataToChart();
+                    applyDataToBothCharts();
                 });
             });
 
-            // Asset selector: Option vs Spot
-            const btnOption = document.getElementById('btnModeOption');
-            const btnSpot = document.getElementById('btnModeSpot');
+            const btnSMC = document.getElementById('btnToggleSMC');
+            if (btnSMC) {
+                btnSMC.addEventListener('click', function() {
+                    showSMCOverlays = !showSMCOverlays;
+                    this.classList.toggle('active', showSMCOverlays);
+                    renderAllPositionOverlays();
+                });
+            }
 
-            btnOption.addEventListener('click', function() {
-                currentMode = 'option';
-                btnOption.classList.add('active-option');
-                btnSpot.classList.remove('active-spot');
-                document.getElementById('barSymbol').innerText = "{{ trade.strike|default:trade.symbol }}";
-                applyDataToChart();
-            });
-
-            btnSpot.addEventListener('click', function() {
-                currentMode = 'spot';
-                btnSpot.classList.add('active-spot');
-                btnOption.classList.remove('active-option');
-                document.getElementById('barSymbol').innerText = "{{ trade.symbol }} SPOT";
-                applyDataToChart();
-            });
-
-            // Reset zoom button
             document.getElementById('btnFitChart').addEventListener('click', () => {
-                if (chart) chart.timeScale().fitContent();
+                if (spotChart) spotChart.timeScale().fitContent();
+                if (optionChart) optionChart.timeScale().fitContent();
             });
 
-            // Toggle Fullscreen
             document.getElementById('btnToggleFullscreen').addEventListener('click', () => {
                 if (!document.fullscreenElement) {
                     document.documentElement.requestFullscreen().catch(() => {});
@@ -1132,17 +2068,496 @@
                 }
             });
 
-            // Toggle HUD minimize/expand
             const hud = document.getElementById('riskReserveHud');
             const btnToggleHud = document.getElementById('btnToggleHud');
             btnToggleHud.addEventListener('click', () => {
                 hud.classList.toggle('minimized');
                 btnToggleHud.querySelector('.material-icons').innerText = hud.classList.contains('minimized') ? 'unfold_more' : 'unfold_less';
             });
+
+            initBoxConfigUI();
+            setupPaneSplitter();
         }
 
-        // Initialize Everything
-        initTradingViewChart();
+        function initBoxConfigUI() {
+            const masterBtn = document.getElementById('btnMasterToggleBoxes');
+            const spotToggleBtn = document.getElementById('btnToggleSpotBoxes');
+            const optToggleBtn = document.getElementById('btnToggleOptionBoxes');
+            const openModalBtn = document.getElementById('btnOpenBoxConfigModal');
+            const boxModalEl = document.getElementById('boxConfigModal');
+
+            // Spot inputs
+            const spotVis = document.getElementById('spotVisibleSwitch');
+            const spotBody = document.getElementById('spotBodyOpacity');
+            const spotBodyVal = document.getElementById('spotBodyVal');
+            const spotBorder = document.getElementById('spotBorderOpacity');
+            const spotBorderVal = document.getElementById('spotBorderVal');
+            const spotWidth = document.getElementById('spotBorderWidth');
+            const spotStyle = document.getElementById('spotBorderStyle');
+            const spotBull = document.getElementById('spotBullishColor');
+            const spotBullTxt = document.getElementById('spotBullishText');
+            const spotBear = document.getElementById('spotBearishColor');
+            const spotBearTxt = document.getElementById('spotBearishText');
+
+            // Option inputs
+            const optVis = document.getElementById('optVisibleSwitch');
+            const optBody = document.getElementById('optBodyOpacity');
+            const optBodyVal = document.getElementById('optBodyVal');
+            const optBorder = document.getElementById('optBorderOpacity');
+            const optBorderVal = document.getElementById('optBorderVal');
+            const optWidth = document.getElementById('optBorderWidth');
+            const optStyle = document.getElementById('optBorderStyle');
+            const optBull = document.getElementById('optBullishColor');
+            const optBullTxt = document.getElementById('optBullishText');
+            const optBear = document.getElementById('optBearishColor');
+            const optBearTxt = document.getElementById('optBearishText');
+
+            // Template controls
+            const tplNameInput = document.getElementById('customTemplateName');
+            const btnSaveTpl = document.getElementById('btnSaveCustomTemplate');
+            const tplSelect = document.getElementById('savedTemplatesSelect');
+            const btnApplyTpl = document.getElementById('btnApplySavedTemplate');
+            const btnDeleteTpl = document.getElementById('btnDeleteSavedTemplate');
+            const btnResetDefault = document.getElementById('btnResetStylesDefault');
+
+            function syncInputsFromState() {
+                if (spotVis) spotVis.checked = !!boxStyles.spot.visible;
+                if (spotBody) {
+                    spotBody.value = boxStyles.spot.bodyOpacity;
+                    if (spotBodyVal) spotBodyVal.innerText = `${Math.round(boxStyles.spot.bodyOpacity * 100)}%`;
+                }
+                if (spotBorder) {
+                    spotBorder.value = boxStyles.spot.borderOpacity;
+                    if (spotBorderVal) spotBorderVal.innerText = `${Math.round(boxStyles.spot.borderOpacity * 100)}%`;
+                }
+                if (spotWidth) spotWidth.value = String(Number(boxStyles.spot.borderWidth).toFixed(1));
+                if (spotStyle) spotStyle.value = boxStyles.spot.borderStyle || 'dashed';
+                if (spotBull) spotBull.value = boxStyles.spot.bullishColor || '#10b981';
+                if (spotBullTxt) spotBullTxt.innerText = boxStyles.spot.bullishColor || '#10b981';
+                if (spotBear) spotBear.value = boxStyles.spot.bearishColor || '#ef4444';
+                if (spotBearTxt) spotBearTxt.innerText = boxStyles.spot.bearishColor || '#ef4444';
+
+                if (optVis) optVis.checked = !!boxStyles.option.visible;
+                if (optBody) {
+                    optBody.value = boxStyles.option.bodyOpacity;
+                    if (optBodyVal) optBodyVal.innerText = `${Math.round(boxStyles.option.bodyOpacity * 100)}%`;
+                }
+                if (optBorder) {
+                    optBorder.value = boxStyles.option.borderOpacity;
+                    if (optBorderVal) optBorderVal.innerText = `${Math.round(boxStyles.option.borderOpacity * 100)}%`;
+                }
+                if (optWidth) optWidth.value = String(Number(boxStyles.option.borderWidth).toFixed(1));
+                if (optStyle) optStyle.value = boxStyles.option.borderStyle || 'dashed';
+                if (optBull) optBull.value = boxStyles.option.bullishColor || '#10b981';
+                if (optBullTxt) optBullTxt.innerText = boxStyles.option.bullishColor || '#10b981';
+                if (optBear) optBear.value = boxStyles.option.bearishColor || '#ef4444';
+                if (optBearTxt) optBearTxt.innerText = boxStyles.option.bearishColor || '#ef4444';
+
+                // Highlight active preset button if applicable
+                document.querySelectorAll('.preset-badge-btn').forEach(btn => {
+                    btn.classList.toggle('active', btn.getAttribute('data-preset') === boxStyles.activePreset);
+                });
+            }
+
+            function updateToggleButtonsUI() {
+                const spotOn = !!boxStyles.spot.visible;
+                const optOn = !!boxStyles.option.visible;
+
+                if (spotToggleBtn) {
+                    spotToggleBtn.classList.toggle('active', spotOn);
+                    const icon = spotToggleBtn.querySelector('.material-icons');
+                    if (icon) icon.innerText = spotOn ? 'visibility' : 'visibility_off';
+                }
+
+                if (optToggleBtn) {
+                    optToggleBtn.classList.toggle('active', optOn);
+                    const icon = optToggleBtn.querySelector('.material-icons');
+                    if (icon) icon.innerText = optOn ? 'visibility' : 'visibility_off';
+                }
+
+                if (masterBtn) {
+                    const anyOn = spotOn || optOn;
+                    masterBtn.classList.toggle('active', anyOn);
+                    const label = masterBtn.querySelector('span:not(.material-icons)');
+                    if (label) label.innerText = anyOn ? 'Boxes (ON)' : 'Boxes (OFF)';
+                    const icon = masterBtn.querySelector('.material-icons');
+                    if (icon) icon.style.color = anyOn ? '#38bdf8' : '#94a3b8';
+                }
+            }
+
+            // Template Storage Helpers
+            function getSavedTemplates() {
+                try {
+                    return JSON.parse(localStorage.getItem('marmot_chart_box_templates') || '{}');
+                } catch (e) {
+                    return {};
+                }
+            }
+
+            function setSavedTemplates(templates) {
+                try {
+                    localStorage.setItem('marmot_chart_box_templates', JSON.stringify(templates));
+                } catch (e) {}
+            }
+
+            function refreshTemplatesDropdown(selectedKey) {
+                if (!tplSelect) return;
+                const templates = getSavedTemplates();
+                tplSelect.innerHTML = '<option value="">-- Select a saved template --</option>';
+                Object.keys(templates).forEach(name => {
+                    const opt = document.createElement('option');
+                    opt.value = name;
+                    opt.innerText = name;
+                    if (selectedKey && selectedKey === name) opt.selected = true;
+                    tplSelect.appendChild(opt);
+                });
+            }
+
+            // Event Bindings - Spot Inputs
+            if (spotVis) {
+                spotVis.addEventListener('change', function() {
+                    boxStyles.spot.visible = this.checked;
+                    saveBoxStyles(boxStyles);
+                    updateToggleButtonsUI();
+                    renderAllPositionOverlays();
+                });
+            }
+            if (spotBody) {
+                spotBody.addEventListener('input', function() {
+                    boxStyles.spot.bodyOpacity = parseFloat(this.value);
+                    if (spotBodyVal) spotBodyVal.innerText = `${Math.round(boxStyles.spot.bodyOpacity * 100)}%`;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (spotBorder) {
+                spotBorder.addEventListener('input', function() {
+                    boxStyles.spot.borderOpacity = parseFloat(this.value);
+                    if (spotBorderVal) spotBorderVal.innerText = `${Math.round(boxStyles.spot.borderOpacity * 100)}%`;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (spotWidth) {
+                spotWidth.addEventListener('change', function() {
+                    boxStyles.spot.borderWidth = parseFloat(this.value);
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (spotStyle) {
+                spotStyle.addEventListener('change', function() {
+                    boxStyles.spot.borderStyle = this.value;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (spotBull) {
+                spotBull.addEventListener('input', function() {
+                    boxStyles.spot.bullishColor = this.value;
+                    if (spotBullTxt) spotBullTxt.innerText = this.value;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (spotBear) {
+                spotBear.addEventListener('input', function() {
+                    boxStyles.spot.bearishColor = this.value;
+                    if (spotBearTxt) spotBearTxt.innerText = this.value;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+
+            // Event Bindings - Option Inputs
+            if (optVis) {
+                optVis.addEventListener('change', function() {
+                    boxStyles.option.visible = this.checked;
+                    saveBoxStyles(boxStyles);
+                    updateToggleButtonsUI();
+                    renderAllPositionOverlays();
+                });
+            }
+            if (optBody) {
+                optBody.addEventListener('input', function() {
+                    boxStyles.option.bodyOpacity = parseFloat(this.value);
+                    if (optBodyVal) optBodyVal.innerText = `${Math.round(boxStyles.option.bodyOpacity * 100)}%`;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (optBorder) {
+                optBorder.addEventListener('input', function() {
+                    boxStyles.option.borderOpacity = parseFloat(this.value);
+                    if (optBorderVal) optBorderVal.innerText = `${Math.round(boxStyles.option.borderOpacity * 100)}%`;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (optWidth) {
+                optWidth.addEventListener('change', function() {
+                    boxStyles.option.borderWidth = parseFloat(this.value);
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (optStyle) {
+                optStyle.addEventListener('change', function() {
+                    boxStyles.option.borderStyle = this.value;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (optBull) {
+                optBull.addEventListener('input', function() {
+                    boxStyles.option.bullishColor = this.value;
+                    if (optBullTxt) optBullTxt.innerText = this.value;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+            if (optBear) {
+                optBear.addEventListener('input', function() {
+                    boxStyles.option.bearishColor = this.value;
+                    if (optBearTxt) optBearTxt.innerText = this.value;
+                    boxStyles.activePreset = 'custom';
+                    saveBoxStyles(boxStyles);
+                    renderAllPositionOverlays();
+                });
+            }
+
+            // Master & Pane Toggle Buttons
+            if (masterBtn) {
+                masterBtn.addEventListener('click', function() {
+                    const anyOn = boxStyles.spot.visible || boxStyles.option.visible;
+                    const nextState = !anyOn;
+                    boxStyles.spot.visible = nextState;
+                    boxStyles.option.visible = nextState;
+                    saveBoxStyles(boxStyles);
+                    syncInputsFromState();
+                    updateToggleButtonsUI();
+                    renderAllPositionOverlays();
+                });
+            }
+
+            if (spotToggleBtn) {
+                spotToggleBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    boxStyles.spot.visible = !boxStyles.spot.visible;
+                    saveBoxStyles(boxStyles);
+                    syncInputsFromState();
+                    updateToggleButtonsUI();
+                    renderAllPositionOverlays();
+                });
+            }
+
+            if (optToggleBtn) {
+                optToggleBtn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    boxStyles.option.visible = !boxStyles.option.visible;
+                    saveBoxStyles(boxStyles);
+                    syncInputsFromState();
+                    updateToggleButtonsUI();
+                    renderAllPositionOverlays();
+                });
+            }
+
+            // Open Modal
+            if (openModalBtn && boxModalEl && window.bootstrap) {
+                openModalBtn.addEventListener('click', function() {
+                    const modal = bootstrap.Modal.getOrCreateInstance(boxModalEl);
+                    syncInputsFromState();
+                    refreshTemplatesDropdown();
+                    modal.show();
+                });
+            }
+
+            // Preset Buttons
+            document.querySelectorAll('.preset-badge-btn').forEach(btn => {
+                btn.addEventListener('click', function() {
+                    const key = this.getAttribute('data-preset');
+                    const preset = BUILTIN_PRESETS[key];
+                    if (!preset) return;
+
+                    ['bodyOpacity', 'borderOpacity', 'borderWidth', 'borderStyle', 'bullishColor', 'bearishColor'].forEach(prop => {
+                        boxStyles.spot[prop] = preset[prop];
+                        boxStyles.option[prop] = preset[prop];
+                    });
+                    boxStyles.activePreset = key;
+                    saveBoxStyles(boxStyles);
+                    syncInputsFromState();
+                    renderAllPositionOverlays();
+                });
+            });
+
+            // Save Custom Template
+            if (btnSaveTpl && tplNameInput) {
+                btnSaveTpl.addEventListener('click', function() {
+                    const name = tplNameInput.value.trim();
+                    if (!name) {
+                        alert('Please enter a template name.');
+                        tplNameInput.focus();
+                        return;
+                    }
+                    const templates = getSavedTemplates();
+                    templates[name] = {
+                        spot: JSON.parse(JSON.stringify(boxStyles.spot)),
+                        option: JSON.parse(JSON.stringify(boxStyles.option)),
+                        savedAt: new Date().toISOString()
+                    };
+                    setSavedTemplates(templates);
+                    tplNameInput.value = '';
+                    refreshTemplatesDropdown(name);
+                    alert(`Template "${name}" saved successfully! It is now available across all trades.`);
+                });
+            }
+
+            // Apply Saved Template
+            if (btnApplyTpl && tplSelect) {
+                btnApplyTpl.addEventListener('click', function() {
+                    const selected = tplSelect.value;
+                    if (!selected) {
+                        alert('Please select a saved template from the list.');
+                        return;
+                    }
+                    const templates = getSavedTemplates();
+                    const tpl = templates[selected];
+                    if (!tpl) return;
+
+                    if (tpl.spot) boxStyles.spot = { ...boxStyles.spot, ...tpl.spot };
+                    if (tpl.option) boxStyles.option = { ...boxStyles.option, ...tpl.option };
+                    boxStyles.activePreset = selected;
+                    saveBoxStyles(boxStyles);
+                    syncInputsFromState();
+                    updateToggleButtonsUI();
+                    renderAllPositionOverlays();
+                });
+            }
+
+            // Delete Saved Template
+            if (btnDeleteTpl && tplSelect) {
+                btnDeleteTpl.addEventListener('click', function() {
+                    const selected = tplSelect.value;
+                    if (!selected) return;
+                    if (confirm(`Are you sure you want to delete template "${selected}"?`)) {
+                        const templates = getSavedTemplates();
+                        delete templates[selected];
+                        setSavedTemplates(templates);
+                        refreshTemplatesDropdown();
+                    }
+                });
+            }
+
+            // Reset to Default
+            if (btnResetDefault) {
+                btnResetDefault.addEventListener('click', function() {
+                    boxStyles = JSON.parse(JSON.stringify(DEFAULT_BOX_STYLES));
+                    saveBoxStyles(boxStyles);
+                    syncInputsFromState();
+                    updateToggleButtonsUI();
+                    renderAllPositionOverlays();
+                });
+            }
+
+            // Initial UI Sync
+            syncInputsFromState();
+            updateToggleButtonsUI();
+            refreshTemplatesDropdown();
+        }
+
+        function setupPaneSplitter() {
+            const splitter = document.getElementById('paneSplitter');
+            const spotPane = document.getElementById('spotPane');
+            const optionPane = document.getElementById('optionPane');
+            const layout = document.querySelector('.dual-chart-main-layout');
+            if (!splitter || !spotPane || !optionPane || !layout) return;
+
+            let isDragging = false;
+
+            function updateSplit(clientX) {
+                const rect = layout.getBoundingClientRect();
+                const totalW = rect.width;
+                if (totalW <= 0) return;
+                const offsetX = clientX - rect.left;
+                let leftPct = (offsetX / totalW) * 100;
+                leftPct = Math.max(15, Math.min(85, leftPct));
+                const rightPct = 100 - leftPct;
+
+                spotPane.style.flex = `0 0 ${leftPct}%`;
+                optionPane.style.flex = `0 0 ${rightPct}%`;
+
+                handleDualResize();
+            }
+
+            function onMouseMove(e) {
+                if (!isDragging) return;
+                e.preventDefault();
+                requestAnimationFrame(() => updateSplit(e.clientX));
+            }
+
+            function onTouchMove(e) {
+                if (!isDragging || !e.touches || e.touches.length === 0) return;
+                e.preventDefault();
+                requestAnimationFrame(() => updateSplit(e.touches[0].clientX));
+            }
+
+            function onMouseUp() {
+                if (!isDragging) return;
+                isDragging = false;
+                splitter.classList.remove('dragging');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                window.removeEventListener('mousemove', onMouseMove);
+                window.removeEventListener('mouseup', onMouseUp);
+                handleDualResize();
+            }
+
+            function onTouchEnd() {
+                if (!isDragging) return;
+                isDragging = false;
+                splitter.classList.remove('dragging');
+                window.removeEventListener('touchmove', onTouchMove);
+                window.removeEventListener('touchend', onTouchEnd);
+                handleDualResize();
+            }
+
+            splitter.addEventListener('mousedown', (e) => {
+                isDragging = true;
+                splitter.classList.add('dragging');
+                document.body.style.cursor = 'col-resize';
+                document.body.style.userSelect = 'none';
+                window.addEventListener('mousemove', onMouseMove);
+                window.addEventListener('mouseup', onMouseUp);
+            });
+
+            splitter.addEventListener('touchstart', (e) => {
+                isDragging = true;
+                splitter.classList.add('dragging');
+                window.addEventListener('touchmove', onTouchMove, { passive: false });
+                window.addEventListener('touchend', onTouchEnd);
+            }, { passive: true });
+
+            // Double click to reset 50/50
+            splitter.addEventListener('dblclick', () => {
+                spotPane.style.flex = '1 1 50%';
+                optionPane.style.flex = '1 1 50%';
+                handleDualResize();
+            });
+        }
+
+        // Start Everything
+        initDualCharts();
         setupEventListeners();
         loadTradeChartData();
     })();

@@ -3,8 +3,8 @@ from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import render, redirect
 from django.contrib import messages
 from django.views.generic import DeleteView
-from django.urls import reverse_lazy
 import json
+import urllib.parse
 
 
 
@@ -32,15 +32,22 @@ from django_filters.views import FilterView
 import logging
 
 from apps.backtest.models import BacktestTask
-from apps.common.choices import AccountTypeChoices
-from apps.common.constants import Messages
+from apps.common.choices import AccountTypeChoices, LiveStrategyStatusChoices
+from apps.common.constants import Messages, FYERS_DATA_SOCKET_URL, FYERS_API_BASE_URL, FYERS_AUTH_URL, FYERS_TOKEN_URL
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 from apps.common.models import SiteSettings
-from apps.trade_config.models import BrokerMaster, TradeExecConfig, UserTradingAccount
+from apps.common.services.live_feed_service import (
+    get_ist_market_clock,
+    get_current_month_calendar_pnl,
+    get_today_intraday_equity_curve,
+    get_nifty_mini_option_chain,
+)
+from apps.trade_config.models import BrokerMaster, TradeExecConfig, UserTradingAccount, LiveStrategy
 from apps.trade_core.brokers import BrokerFactory
 from apps.users.mixins import HTMXPartialMixin
 from apps.users.models import BrokerChoices, MemberRoleChoices, PLStatusChoices, User
 from apps.users.services import get_user_profile
+from django.utils import timezone
 from .filters import TradeExecConfigFilter
 from .forms import AdminTraderPasswordResetForm, BrokerMasterForm, TradeExecConfigForm, UserForm
 from .permissions import AdminRequiredMixin
@@ -115,12 +122,18 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context = super().get_context_data(**kwargs)
         user = self.request.user
 
-        live_accounts = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name')
-        live_account = live_accounts.filter(is_default=True).first() or live_accounts.first()
+        live_accounts = list(user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name'))
+        live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
+        if not live_account:
+            dhan_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+            if dhan_account:
+                live_account = dhan_account
+                if dhan_account not in live_accounts:
+                    live_accounts.append(dhan_account)
 
         context['active_tab'] = 'live-dashboard'
         context['live_account'] = live_account
-        context['live_accounts'] = list(live_accounts)
+        context['live_accounts'] = live_accounts
         context['has_live_account'] = bool(live_account)
         context['marmot_profile'] = get_user_profile(user.username)
 
@@ -224,6 +237,24 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context['holdings_pnl'] = holdings_pnl
         context['holdings_pnl_pct'] = holdings_pnl_pct
         context['holdings_count'] = holdings_count
+
+        # Enhanced Live Execution Telemetry & Isolated Strategies
+        site_settings = SiteSettings.load()
+        context['site_settings'] = site_settings
+        context['master_live_switch'] = site_settings.live_execution_master_switch
+        context['live_strategies'] = user.live_strategies.filter(is_deleted=False).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
+        context['market_clock'] = get_ist_market_clock()
+        context['calendar_pnl'] = get_current_month_calendar_pnl(live_account or user)
+        context['intraday_graph'] = get_today_intraday_equity_curve(live_account or user)
+        context['option_chain'] = get_nifty_mini_option_chain()
+        today = timezone.localdate()
+        is_fyers_token_valid = bool(site_settings.fyers_access_token and site_settings.fyers_token_generated_date == today)
+        context['fyers_telemetry'] = {
+            'feed_active': site_settings.fyers_feed_is_active,
+            'is_token_valid': is_fyers_token_valid,
+            'app_id': site_settings.fyers_app_id,
+            'status': 'ONLINE' if (site_settings.fyers_feed_is_active and is_fyers_token_valid) else ('AUTH_REQUIRED' if not is_fyers_token_valid else 'STANDBY'),
+        }
         return context
 
 
@@ -231,7 +262,7 @@ class AdminLivePositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View
     """HTMX partial view returning live positions table and PnL metrics with pagination."""
     def get(self, request, *args, **kwargs):
         user = request.user
-        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first()
+        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first() or UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
         positions_res = {'positions': [], 'net_pnl': 0.00, 'realized_pnl': 0.00, 'unrealized_pnl': 0.00, 'open_positions_count': 0, 'closed_positions_count': 0}
         
         if live_account:
@@ -278,7 +309,7 @@ class AdminLiveHoldingsPartialView(LoginRequiredMixin, AdminRequiredMixin, View)
     """HTMX partial view returning long-term equity holdings and portfolio statistics."""
     def get(self, request, *args, **kwargs):
         user = request.user
-        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first()
+        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first() or UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
         holdings_res = {'holdings': [], 'total_invested': 0.00, 'current_value': 0.00, 'total_pnl': 0.00, 'pnl_pct': 0.00, 'holdings_count': 0}
         
         if live_account:
@@ -315,7 +346,7 @@ class AdminLiveOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
     """HTMX partial view returning live order updates stream and filter tabs with pagination."""
     def get(self, request, *args, **kwargs):
         user = request.user
-        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first()
+        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first() or UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
         orders_res = {'orders': [], 'orders_count': 0, 'open_orders_count': 0, 'traded_orders_count': 0}
         
         if live_account:
@@ -1161,7 +1192,7 @@ class AdminBrokerMasterDeleteView(AdminRequiredMixin, View):
         response['HX-Trigger'] = json.dumps({
             'closeGlobalModal': True,
             'showToast': {'message': msg, 'level': 'success'},
-            'reloadPage': True
+            'reloadBrokerMasterTable': True
         })
         return response
 
@@ -1371,6 +1402,176 @@ class SiteSettingsLogoUploadView(AdminRequiredMixin, View):
             'image_url': image_url,
         }
         return render(request, 'admins/partials/_logo_preview.html', context)
+
+
+class LiveDataFeedView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, View):
+    """Manage FYERS Live Market Data Feed credentials, OAuth auth lifecycle, and socket telemetry."""
+    template_name = 'admins/live_data_feed.html'
+    partial_template_name = 'admins/partials/live_data_feed_content.html'
+
+    def get(self, request, *args, **kwargs):
+        settings_obj = SiteSettings.load()
+        today = timezone.localdate()
+        is_token_valid = bool(settings_obj.fyers_access_token and settings_obj.fyers_token_generated_date == today)
+
+        auth_url = ""
+        if settings_obj.fyers_app_id and settings_obj.fyers_redirect_uri:
+            encoded_redirect = urllib.parse.quote(settings_obj.fyers_redirect_uri.strip(), safe='')
+            auth_url = f"{FYERS_AUTH_URL}?client_id={settings_obj.fyers_app_id}&redirect_uri={encoded_redirect}&response_type=code&state=marmot_live_feed"
+
+        telemetry = {
+            'socket_url': FYERS_DATA_SOCKET_URL,
+            'api_url': FYERS_API_BASE_URL,
+            'feed_active': settings_obj.fyers_feed_is_active,
+            'status': 'ONLINE' if (settings_obj.fyers_feed_is_active and is_token_valid) else ('AUTH_REQUIRED' if not is_token_valid else 'STANDBY'),
+            'subscribed_indices': ['NSE:NIFTY50-INDEX', 'NSE:NIFTYBANK-INDEX'],
+            'option_chain_active': True,
+            'sampling_interval': '1-Second Normalized OHLCV',
+            'direct_go_ingestion': True,
+        }
+
+        context = {
+            'settings_obj': settings_obj,
+            'is_token_valid': is_token_valid,
+            'auth_url': auth_url,
+            'telemetry': telemetry,
+            'today': today,
+        }
+        if request.headers.get('HX-Request'):
+            return render(request, self.partial_template_name, context)
+        return render(request, self.template_name, context)
+
+    def post(self, request, *args, **kwargs):
+        settings_obj = SiteSettings.load()
+        settings_obj.fyers_app_id = request.POST.get('fyers_app_id', '').strip()
+        secret_key = request.POST.get('fyers_secret_key', '').strip()
+        if secret_key:
+            settings_obj.fyers_secret_key = secret_key
+        settings_obj.fyers_redirect_uri = request.POST.get('fyers_redirect_uri', '').strip() or 'https://trade.marmot.com/fyers/callback'
+        new_token = request.POST.get('fyers_access_token', '').strip()
+
+        if new_token:
+            settings_obj.fyers_access_token = new_token
+            settings_obj.fyers_token_generated_date = timezone.localdate()
+
+        settings_obj.fyers_feed_is_active = request.POST.get('fyers_feed_is_active') in ['true', 'True', '1', 'on']
+        settings_obj.save()
+        messages.success(request, "FYERS Live Market Data Feed configuration updated successfully.")
+
+        if request.headers.get('HX-Request'):
+            return self.get(request, *args, **kwargs)
+        return redirect('admins:live-data-feed')
+
+
+class FyersAuthCallbackView(View):
+    """Automated OAuth Callback: exchanges FYERS auth_code for live JWT access_token."""
+
+    def get(self, request, *args, **kwargs):
+        import hashlib
+        import requests
+
+        auth_code = request.GET.get('auth_code') or request.GET.get('code')
+        error_msg = request.GET.get('message') or request.GET.get('error_description')
+        if not auth_code:
+            messages.error(request, f"FYERS OAuth Login failed: {error_msg or 'No authorization code received in callback.'}")
+            return redirect('admins:live-data-feed')
+
+        settings_obj = SiteSettings.load()
+        app_id = (settings_obj.fyers_app_id or '').strip()
+        secret_key = (settings_obj.fyers_secret_key or '').strip()
+
+        if not app_id or not secret_key:
+            messages.error(request, "FYERS App ID or Secret Key missing in Site Settings. Please configure them first.")
+            return redirect('admins:live-data-feed')
+
+        logger.info("Received FYERS OAuth callback. Exchanging auth code with FYERS API...")
+        hash_input = f"{app_id}:{secret_key}".encode('utf-8')
+        app_id_hash = hashlib.sha256(hash_input).hexdigest()
+
+        payload = {
+            "grant_type": "authorization_code",
+            "appIdHash": app_id_hash,
+            "code": auth_code,
+        }
+
+        try:
+            resp = requests.post(FYERS_TOKEN_URL, json=payload, timeout=15)
+            data = resp.json() if resp.headers.get('content-type', '').startswith('application/json') else {}
+        except Exception as e:
+            logger.error("FYERS token validation network error: %s", e)
+            messages.error(request, f"Error communicating with FYERS API: {e}")
+            return redirect('admins:live-data-feed')
+
+        if resp.status_code == 200 and data.get('s') == 'ok' and data.get('access_token'):
+            settings_obj.fyers_access_token = data['access_token']
+            settings_obj.fyers_token_generated_date = timezone.localdate()
+            settings_obj.fyers_feed_is_active = True
+            settings_obj.save()
+            logger.info("FYERS OAuth token exchange successful. Feed activated in SiteSettings.")
+            messages.success(request, "FYERS OAuth authentication successful! Live market streaming access token saved and feed activated.")
+        else:
+            err = data.get('message') or f"HTTP {resp.status_code}: {resp.text[:120]}"
+            logger.warning("FYERS Token Exchange failed: %s", err)
+            messages.error(request, f"FYERS Token Exchange failed: {err}")
+
+        return redirect('admins:live-data-feed')
+
+
+class LiveStrategyToggleModalView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Render interactive confirmation modal before activating/deactivating a deployed Live Strategy."""
+
+    def get(self, request, pk, *args, **kwargs):
+        strategy = get_object_or_404(LiveStrategy, pk=pk, user=request.user)
+        context = {
+            'strategy': strategy,
+            'will_activate': not strategy.is_active,
+        }
+        return render(request, 'admins/partials/live_strategy_toggle_modal.html', context)
+
+
+class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Toggle is_active flag for a LiveStrategy with audit telemetry."""
+
+    def post(self, request, pk, *args, **kwargs):
+        strategy = get_object_or_404(LiveStrategy, pk=pk, user=request.user)
+        strategy.is_active = not strategy.is_active
+        strategy.status = LiveStrategyStatusChoices.ACTIVE if strategy.is_active else LiveStrategyStatusChoices.PAUSED
+        strategy.save(update_fields=['is_active', 'status', 'updated_at'])
+
+        status_msg = "ACTIVATED & ARMED" if strategy.is_active else "PAUSED / STANDBY"
+        messages.success(request, f"Live Strategy '{strategy.name}' is now {status_msg}.")
+        context = {
+            'strategy': strategy,
+        }
+        return render(request, 'admins/partials/live_strategy_row.html', context)
+
+
+class MasterLiveExecutionToggleModalView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Render modal confirming Master Live Execution switch change."""
+
+    def get(self, request, *args, **kwargs):
+        site_settings = SiteSettings.load()
+        context = {
+            'current_state': site_settings.live_execution_master_switch,
+            'target_state': not site_settings.live_execution_master_switch,
+        }
+        return render(request, 'admins/partials/master_live_switch_modal.html', context)
+
+
+class MasterLiveExecutionToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Update global master live execution switch."""
+
+    def post(self, request, *args, **kwargs):
+        site_settings = SiteSettings.load()
+        site_settings.live_execution_master_switch = not site_settings.live_execution_master_switch
+        site_settings.save(update_fields=['live_execution_master_switch', 'updated_at'])
+
+        status_text = "ENABLED & LIVE ARMED" if site_settings.live_execution_master_switch else "DISABLED & SAFE"
+        messages.warning(request, f"Master Live Auto-Execution has been {status_text}.")
+        context = {
+            'master_live_switch': site_settings.live_execution_master_switch,
+        }
+        return render(request, 'admins/partials/master_live_switch_badge.html', context)
 
 
 # ==========================================

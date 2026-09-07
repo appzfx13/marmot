@@ -1,0 +1,308 @@
+<!-- templates/admins/partials/backtest_rule_ablation_modal.html -->
+<style>
+    /* Responsive Modal Container Sizing */
+    #globalHtmxModal:has(.rule-ablation-modal-card) #globalHtmxModalDialog,
+    .modal-dialog:has(.rule-ablation-modal-card) {
+        max-width: 840px !important;
+        width: 95vw !important;
+    }
+
+    /* Card & Theme Support */
+    :root[data-theme="dark"] .rule-ablation-modal-card {
+        background: #0b1727 !important;
+        border-color: rgba(255, 255, 255, 0.1) !important;
+        color: #f1f5f9 !important;
+        box-shadow: 0 25px 60px -15px rgba(0, 0, 0, 0.9) !important;
+    }
+    :root[data-theme="light"] .rule-ablation-modal-card {
+        background: #ffffff !important;
+        border-color: #e2e8f0 !important;
+        color: #0f172a !important;
+        box-shadow: 0 20px 45px -10px rgba(0, 0, 0, 0.12) !important;
+    }
+
+    .ablation-stat-pill {
+        background: var(--bg-elevated, rgba(255, 255, 255, 0.05));
+        border: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+        border-radius: 10px;
+        padding: 10px 14px;
+    }
+
+    .ablation-table th {
+        font-size: 0.72rem;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+        border-bottom: 1px solid var(--border-default, rgba(255, 255, 255, 0.1));
+    }
+    .ablation-table td {
+        padding: 9px 14px;
+        font-size: 0.82rem;
+        border-bottom: 1px solid var(--border-default, rgba(255, 255, 255, 0.06));
+    }
+</style>
+
+<div class="modal-content glass-card p-0 rule-ablation-modal-card border rounded-4 overflow-hidden">
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-secondary border-opacity-20 px-4 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                 style="width: 42px; height: 42px; background: rgba(56, 189, 248, 0.16); color: {{ meta.color }}; border: 1px solid rgba(56, 189, 248, 0.3);">
+                <span class="material-icons fs-5">{{ meta.icon }}</span>
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h5 class="modal-title fw-bold theme-text-main mb-0" style="font-size: 1.08rem;">
+                        {{ rule.name }}
+                    </h5>
+                    <span class="badge rounded-pill px-2.5 py-0.5 font-monospace fw-semibold"
+                          style="font-size: 0.68rem; background: rgba(56, 189, 248, 0.15); color: #0284c7; border: 1px solid rgba(56, 189, 248, 0.3);">
+                        {{ rule.get_rule_type_display }}
+                    </span>
+                    {% if rule.is_active %}
+                    <span class="badge rounded-pill px-2 py-0.5 font-monospace fw-bold"
+                          style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.15); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.3);">
+                        ACTIVE
+                    </span>
+                    {% else %}
+                    <span class="badge rounded-pill px-2 py-0.5 font-monospace fw-bold"
+                          style="font-size: 0.65rem; background: rgba(148, 163, 184, 0.15); color: #94a3b8; border: 1px solid rgba(148, 163, 184, 0.3);">
+                        INACTIVE
+                    </span>
+                    {% endif %}
+                </div>
+                <small class="theme-text-muted d-block mt-0.5" style="font-size: 0.76rem;">
+                    {{ meta.role }} • Backtest #BT-{{ backtest.id|stringformat:"04d" }}
+                </small>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <!-- Modal Body -->
+    <div class="modal-body p-4">
+        <!-- Explanatory Sub-banner -->
+        <div class="p-2.5 rounded-3 mb-3.5 d-flex align-items-center gap-2" 
+             style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25);">
+            <span class="material-icons text-info flex-shrink-0" style="font-size: 1.15rem;">science</span>
+            <div class="small theme-text-main" style="font-size: 0.77rem; line-height: 1.35;">
+                <strong>Counterfactual Ablation Model:</strong> Compares strategy performance <em>WITH</em> this rule against a simulated counterfactual <em>WITHOUT</em> it. Alpha Delta (<strong>Δ</strong>) isolates whether this rule adds real mathematical edge or creates silent drag.
+            </div>
+        </div>
+
+        <!-- Side-by-Side Performance Comparison Table -->
+        <div class="table-responsive rounded-3 border border-secondary border-opacity-20 mb-3.5" style="background: var(--bg-surface);">
+            <table class="table table-hover custom-glass-table align-middle mb-0 ablation-table w-100">
+                <thead>
+                    <tr style="background-color: var(--nav-hover);">
+                        <th scope="col" class="theme-text-muted ps-3 py-2 fw-semibold" style="width: 34%;">Strategy Metric</th>
+                        <th scope="col" class="theme-text-muted py-2 px-2 text-center fw-semibold" style="width: 22%;">WITH Rule (Current)</th>
+                        <th scope="col" class="theme-text-muted py-2 px-2 text-center fw-semibold" style="width: 22%;">WITHOUT Rule</th>
+                        <th scope="col" class="theme-text-muted py-2 px-2 text-center fw-bold text-info" style="width: 22%;">Alpha Delta (Δ)</th>
+                    </tr>
+                </thead>
+                <tbody class="font-monospace">
+                    <!-- Net PnL -->
+                    <tr>
+                        <td class="ps-3 fw-medium font-sans">
+                            <span class="d-inline-flex align-items-center gap-1.5">
+                                <span class="material-icons text-info" style="font-size: 0.95rem;">payments</span>
+                                <span>Net Portfolio PnL</span>
+                            </span>
+                        </td>
+                        <td class="text-center fw-bold {% if with_metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if with_metrics.net_pnl >= 0 %}+{% endif %}₹{{ with_metrics.net_pnl|floatformat:2 }}
+                        </td>
+                        <td class="text-center theme-text-muted">
+                            {% if without_metrics.net_pnl >= 0 %}+{% endif %}₹{{ without_metrics.net_pnl|floatformat:2 }}
+                        </td>
+                        <td class="text-center fw-bold">
+                            <span class="badge rounded-pill px-2.5 py-0.5" 
+                                  style="font-size: 0.74rem; {% if deltas.net_pnl > 0 %}background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4);{% elif deltas.net_pnl < 0 %}background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4);{% else %}background: rgba(148, 163, 184, 0.2); color: #94a3b8;{% endif %}">
+                                {% if deltas.net_pnl > 0 %}+{% endif %}₹{{ deltas.net_pnl|floatformat:2 }}
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Win Rate % -->
+                    <tr>
+                        <td class="ps-3 fw-medium font-sans">
+                            <span class="d-inline-flex align-items-center gap-1.5">
+                                <span class="material-icons text-info" style="font-size: 0.95rem;">military_tech</span>
+                                <span>Win Rate</span>
+                            </span>
+                        </td>
+                        <td class="text-center fw-bold {% if with_metrics.win_rate >= 50 %}text-success{% else %}text-warning{% endif %}">
+                            {{ with_metrics.win_rate }}%
+                        </td>
+                        <td class="text-center theme-text-muted">
+                            {{ without_metrics.win_rate }}%
+                        </td>
+                        <td class="text-center fw-bold">
+                            <span class="badge rounded-pill px-2.5 py-0.5"
+                                  style="font-size: 0.74rem; {% if deltas.win_rate > 0 %}background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4);{% elif deltas.win_rate < 0 %}background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4);{% else %}background: rgba(148, 163, 184, 0.2); color: #94a3b8;{% endif %}">
+                                {% if deltas.win_rate > 0 %}+{% endif %}{{ deltas.win_rate }}%
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Max Drawdown % -->
+                    <tr>
+                        <td class="ps-3 fw-medium font-sans">
+                            <span class="d-inline-flex align-items-center gap-1.5">
+                                <span class="material-icons text-info" style="font-size: 0.95rem;">trending_down</span>
+                                <span>Max Peak Drawdown</span>
+                            </span>
+                        </td>
+                        <td class="text-center fw-bold text-danger">
+                            -{{ with_metrics.max_dd }}%
+                        </td>
+                        <td class="text-center theme-text-muted">
+                            -{{ without_metrics.max_dd }}%
+                        </td>
+                        <td class="text-center fw-bold">
+                            <span class="badge rounded-pill px-2.5 py-0.5"
+                                  style="font-size: 0.74rem; {% if deltas.max_dd > 0 %}background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4);{% elif deltas.max_dd < 0 %}background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4);{% else %}background: rgba(148, 163, 184, 0.2); color: #94a3b8;{% endif %}"
+                                  title="{% if deltas.max_dd > 0 %}Rule reduced drawdown by {{ deltas.max_dd }}% (Good){% else %}Rule increased drawdown{% endif %}">
+                                {% if deltas.max_dd > 0 %}▼ {{ deltas.max_dd }}% Buffer{% elif deltas.max_dd < 0 %}▲ {{ deltas.max_dd|stringformat:".2f"|slice:"1:" }}% Drag{% else %}0.0%{% endif %}
+                            </span>
+                        </td>
+                    </tr>
+
+                    <!-- Total Executed Trades -->
+                    <tr>
+                        <td class="ps-3 fw-medium font-sans">
+                            <span class="d-inline-flex align-items-center gap-1.5">
+                                <span class="material-icons text-info" style="font-size: 0.95rem;">swap_horiz</span>
+                                <span>Executed Trades</span>
+                            </span>
+                        </td>
+                        <td class="text-center fw-bold theme-text-main">
+                            {{ with_metrics.total_trades }}
+                        </td>
+                        <td class="text-center theme-text-muted">
+                            {{ without_metrics.total_trades }}
+                        </td>
+                        <td class="text-center theme-text-muted small">
+                            {% if deltas.total_trades != 0 %}{{ deltas.total_trades }} Filtered{% else %}0 Filtered{% endif %}
+                        </td>
+                    </tr>
+
+                    <!-- Profit Factor -->
+                    <tr>
+                        <td class="ps-3 fw-medium font-sans">
+                            <span class="d-inline-flex align-items-center gap-1.5">
+                                <span class="material-icons text-info" style="font-size: 0.95rem;">auto_graph</span>
+                                <span>Profit Factor</span>
+                            </span>
+                        </td>
+                        <td class="text-center fw-bold theme-text-main">
+                            {{ with_metrics.profit_factor }}
+                        </td>
+                        <td class="text-center theme-text-muted">
+                            {{ without_metrics.profit_factor }}
+                        </td>
+                        <td class="text-center fw-bold">
+                            <span class="badge rounded-pill px-2.5 py-0.5"
+                                  style="font-size: 0.74rem; {% if deltas.profit_factor > 0 %}background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.4);{% elif deltas.profit_factor < 0 %}background: rgba(239, 68, 68, 0.2); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.4);{% else %}background: rgba(148, 163, 184, 0.2); color: #94a3b8;{% endif %}">
+                                {% if deltas.profit_factor > 0 %}+{% endif %}{{ deltas.profit_factor }}
+                            </span>
+                        </td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+
+        <!-- 2-Card Mitigation vs Drag Factor Breakdown -->
+        <div class="row g-2.5 mb-3.5">
+            <div class="col-12 col-md-6">
+                <div class="ablation-stat-pill h-100 d-flex flex-column justify-content-between">
+                    <div class="d-flex align-items-center justify-content-between mb-1.5">
+                        <span class="theme-text-muted small fw-semibold">Shielded / Prevented Losses</span>
+                        <span class="material-icons text-success fs-5">shield</span>
+                    </div>
+                    <div class="d-flex align-items-baseline gap-2">
+                        <h4 class="fw-bold text-success mb-0 font-monospace">₹{{ saved_loss_amt|floatformat:2 }}</h4>
+                        <small class="theme-text-muted">({{ prevented_trades }} Traps Filtered)</small>
+                    </div>
+                    <small class="theme-text-muted mt-1.5" style="font-size: 0.72rem;">
+                        Simulated false breakouts, noise whipsaws, and catastrophic loss trades blocked.
+                    </small>
+                </div>
+            </div>
+
+            <div class="col-12 col-md-6">
+                <div class="ablation-stat-pill h-100 d-flex flex-column justify-content-between">
+                    <div class="d-flex align-items-center justify-content-between mb-1.5">
+                        <span class="theme-text-muted small fw-semibold">False Drag / Sacrificed Edge</span>
+                        <span class="material-icons text-danger fs-5">filter_alt_off</span>
+                    </div>
+                    <div class="d-flex align-items-baseline gap-2">
+                        <h4 class="fw-bold {% if sacrificed_profit_amt > 0 %}text-danger{% else %}theme-text-muted{% endif %} mb-0 font-monospace">
+                            ₹{{ sacrificed_profit_amt|floatformat:2 }}
+                        </h4>
+                        <small class="theme-text-muted">(Rule Loss Attribution)</small>
+                    </div>
+                    <small class="theme-text-muted mt-1.5" style="font-size: 0.72rem;">
+                        Realized losses and opportunity drag incurred when this rule granted false permissions.
+                    </small>
+                </div>
+            </div>
+        </div>
+
+        <!-- Institutional Verdict Banner -->
+        <div class="p-3 rounded-3 border d-flex align-items-start gap-3" 
+             style="background: var(--bg-elevated); border-color: {{ verdict.color }}50 !important;">
+            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 mt-0.5"
+                 style="width: 38px; height: 38px; background: {{ verdict.color }}20; color: {{ verdict.color }};">
+                <span class="material-icons fs-5">{{ verdict.icon }}</span>
+            </div>
+            <div class="flex-grow-1">
+                <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-1">
+                    <div class="d-flex align-items-center gap-2">
+                        <h6 class="fw-bold mb-0" style="color: {{ verdict.color }};">
+                            {{ verdict.title }}
+                        </h6>
+                        <span class="badge {{ verdict.badge_class }} rounded-pill px-2.5 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
+                            {{ verdict.code }}
+                        </span>
+                    </div>
+                    <span class="badge rounded-pill px-2.5 py-1 fw-bold font-monospace" 
+                          style="font-size: 0.72rem; background: {{ verdict.color }}20; color: {{ verdict.color }}; border: 1px solid {{ verdict.color }}40;">
+                        Recommendation: {{ verdict.recommendation }}
+                    </span>
+                </div>
+                <p class="theme-text-main mb-0 small" style="font-size: 0.79rem; line-height: 1.4;">
+                    {{ verdict.description }}
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal Footer & Action Bar -->
+    <div class="modal-footer border-top border-secondary border-opacity-20 px-4 py-3 d-flex align-items-center justify-content-between flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <span class="material-icons theme-text-muted" style="font-size: 0.9rem;">info</span>
+            <small class="theme-text-muted" style="font-size: 0.72rem;">
+                Detaching a rule excludes it from subsequent strategy runs and backtest re-runs.
+            </small>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 fw-semibold" data-bs-dismiss="modal" style="font-size: 0.76rem;">
+                Keep in Strategy
+            </button>
+
+            <!-- 1-Click Prune / Remove Rule Button -->
+            <button type="button" 
+                    class="btn btn-sm {% if verdict.is_toxic %}btn-danger{% else %}btn-outline-danger{% endif %} rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    style="font-size: 0.76rem;"
+                    hx-post="{% url 'backtest:backtest_rule_unlink' backtest.id rule.id %}"
+                    hx-target="#globalHtmxModalDialog"
+                    hx-indicator="#ablation-unlink-spinner">
+                <span class="material-icons" style="font-size: 0.92rem;">delete_sweep</span>
+                <span>1-Click Remove from Strategy</span>
+                <span class="spinner-border spinner-border-sm htmx-indicator" id="ablation-unlink-spinner" role="status" aria-hidden="true" style="width: 0.8rem; height: 0.8rem;"></span>
+            </button>
+        </div>
+    </div>
+</div>

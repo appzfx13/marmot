@@ -1,0 +1,106 @@
+<!-- templates/admins/partials/backtest_trade_ai_card.html -->
+<div class="p-3.5 rounded-3" style="background: rgba(11, 29, 22, 0.95); border: 1px solid rgba(255, 255, 255, 0.12); color: #F1F5F9;">
+    
+    <!-- Header: Scorecard, Grade & Model -->
+    <div class="d-flex align-items-center justify-content-between pb-3 mb-3 border-bottom border-secondary border-opacity-25 flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                 style="width: 44px; height: 44px; 
+                        {% if analysis.rating >= 7.0 %}background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.45);
+                        {% elif analysis.rating >= 5.0 %}background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45);
+                        {% else %}background: rgba(239, 68, 68, 0.2); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.45);{% endif %}">
+                <span class="fw-bold font-monospace" style="font-size: 1.15rem;">{{ analysis.rating|floatformat:1 }}</span>
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <span class="badge rounded-pill px-2.5 py-0.5 fw-bold font-monospace" 
+                          style="{% if analysis.rating >= 7.0 %}background: rgba(16, 185, 129, 0.25); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4);
+                                 {% elif analysis.rating >= 5.0 %}background: rgba(245, 158, 11, 0.25); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.4);
+                                 {% else %}background: rgba(239, 68, 68, 0.25); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.4);{% endif %} font-size: 0.76rem;">
+                        GRADE {{ analysis.rating_grade|default:"D" }}
+                    </span>
+                    <span class="fw-bold text-white fs-6">{{ analysis.strategic_verdict|default:"Forensic Diagnosis" }}</span>
+                </div>
+                <small class="text-muted" style="font-size: 0.74rem;">Trade #{{ trade.serial_no|default:trade_num }} · {{ trade.strike|default:trade.symbol }} · {{ trade.trade_type }}</small>
+            </div>
+        </div>
+
+        <div>
+            <span class="badge rounded-pill px-3 py-1 font-monospace fw-bold" 
+                  style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.35); font-size: 0.74rem;">
+                ✨ {{ model|default:"gemini-3.6-flash" }} (Live AI)
+            </span>
+        </div>
+    </div>
+
+    <!-- 1. Forensic Root Cause Explanation -->
+    <div class="mb-3 p-3 rounded-2" style="background: rgba(0, 0, 0, 0.3); border-left: 3px solid #f59e0b;">
+        <div class="d-flex align-items-center gap-1.5 mb-1 text-warning fw-bold small text-uppercase font-monospace" style="letter-spacing: 0.5px; font-size: 0.72rem;">
+            <span class="material-icons" style="font-size: 0.85rem;">troubleshoot</span>
+            <span>Forensic Autopsy & Why Entry Placed</span>
+        </div>
+        <p class="mb-0 text-light" style="font-size: 0.82rem; line-height: 1.5;">
+            {{ analysis.root_cause_explanation }}
+        </p>
+    </div>
+
+    <!-- 2. Micro Chart Observations -->
+    {% if analysis.chart_observations %}
+    <div class="mb-3">
+        <div class="fw-bold text-uppercase small text-muted font-monospace mb-2" style="font-size: 0.70rem; letter-spacing: 0.5px;">
+            Micro-Structure & Order Flow Observations:
+        </div>
+        <div class="d-flex flex-column gap-1.5">
+            {% for obs in analysis.chart_observations %}
+            <div class="d-flex align-items-start gap-2 small" style="font-size: 0.78rem; line-height: 1.4;">
+                <span class="material-icons text-info flex-shrink-0" style="font-size: 0.90rem; margin-top: 1px;">arrow_right</span>
+                <span style="color: #cbd5e1;">{{ obs }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% endif %}
+
+    <!-- 3. Machine-Actionable Strategy Rule Recommendation -->
+    {% if analysis.suggested_rule %}
+    <div class="p-3 rounded-3 mb-3" style="background: rgba(180, 241, 5, 0.06); border: 1px solid rgba(180, 241, 5, 0.3);">
+        <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons" style="font-size: 1.1rem; color: var(--brand-lime, #b4f105);">verified_user</span>
+                <span class="fw-bold font-monospace" style="color: var(--brand-lime, #b4f105); font-size: 0.82rem;">
+                    {{ analysis.suggested_rule.name }}
+                </span>
+            </div>
+            <span class="badge rounded-pill px-2.5 py-0.5 font-monospace text-uppercase" 
+                  style="background: rgba(180, 241, 5, 0.15); color: var(--brand-lime, #b4f105); border: 1px solid rgba(180, 241, 5, 0.3); font-size: 0.68rem;">
+                {{ analysis.suggested_rule.rule_type|default:"ict_smc_v3" }}
+            </span>
+        </div>
+
+        <p class="small mb-2" style="font-size: 0.78rem; line-height: 1.45; color: #e2e8f0;">
+            {{ analysis.suggested_rule.prompt_directive }}
+        </p>
+
+        <!-- Parameters Capsule -->
+        {% if analysis.suggested_rule.parameters %}
+        <div class="p-2 rounded font-monospace small mb-3" style="background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.72rem; color: #a5f3fc;">
+            <code>{{ analysis.suggested_rule.parameters }}</code>
+        </div>
+        {% endif %}
+
+        <!-- Adopt Rule Action Form / Target Area -->
+        <div id="adoptRuleContainer-{{ trade.serial_no|default:trade_num }}">
+            <button type="button" 
+                    class="btn btn-sm rounded-pill fw-bold d-inline-flex align-items-center gap-1.5 px-3 py-1.5 shadow-sm"
+                    style="background: var(--brand-lime, #b4f105); color: #0B1D16; font-size: 0.78rem;"
+                    hx-get="{% url 'backtest:backtest_adopt_trade_rule' backtest.pk trade.serial_no|default:trade_num %}?name={{ analysis.suggested_rule.name|urlencode }}&rule_type={{ analysis.suggested_rule.rule_type|default:'ict_smc_v3'|urlencode }}&prompt_directive={{ analysis.suggested_rule.prompt_directive|urlencode }}&description={{ analysis.suggested_rule.description|default:analysis.suggested_rule.prompt_directive|urlencode }}&parameters={{ analysis.suggested_rule.parameters|escapejs }}"
+                    hx-target="#adoptRuleContainer-{{ trade.serial_no|default:trade_num }}"
+                    hx-swap="innerHTML">
+                <span class="material-icons" style="font-size: 0.95rem;">add_moderator</span>
+                <span>Adopt this Guardrail into Strategy</span>
+            </button>
+        </div>
+    </div>
+    {% endif %}
+
+</div>

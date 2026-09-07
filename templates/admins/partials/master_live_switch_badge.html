@@ -1,0 +1,30 @@
+{% load static %}
+<div id="master-live-switch-container" class="d-inline-flex align-items-center gap-2">
+    {% if master_live_switch %}
+        <button type="button" 
+                class="btn btn-sm btn-danger rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-2 shadow-sm pulse-danger"
+                hx-get="{% url 'admins:master-live-execution-modal' %}"
+                hx-target="#globalHtmxModalDialog"
+                hx-swap="innerHTML"
+                data-bs-toggle="modal"
+                data-bs-target="#globalHtmxModal"
+                title="Master Live Execution is ACTIVE & ARMED. Click to Disarm.">
+            <span class="spinner-grow spinner-grow-sm text-white" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+            <span>LIVE AUTO-EXECUTION: ARMED</span>
+            <i class="bi bi-toggle-on fs-5 ms-1"></i>
+        </button>
+    {% else %}
+        <button type="button" 
+                class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-2 shadow-sm text-white-50"
+                hx-get="{% url 'admins:master-live-execution-modal' %}"
+                hx-target="#globalHtmxModalDialog"
+                hx-swap="innerHTML"
+                data-bs-toggle="modal"
+                data-bs-target="#globalHtmxModal"
+                title="Master Live Execution is STANDBY. Click to Arm.">
+            <i class="bi bi-shield-lock-fill text-muted"></i>
+            <span>LIVE AUTO-EXECUTION: SAFE (OFF)</span>
+            <i class="bi bi-toggle-off fs-5 ms-1 text-muted"></i>
+        </button>
+    {% endif %}
+</div>

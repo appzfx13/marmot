@@ -159,3 +159,11 @@ class PermanentLogTargets:
         ("postback", "webhook_audit"),
     ]
 
+
+# Live Strategy Execution Status Choices
+class LiveStrategyStatusChoices(models.TextChoices):
+    STANDBY = "STANDBY", "Standby"
+    ACTIVE = "ACTIVE", "Active / Running"
+    PAUSED = "PAUSED", "Paused"
+    STOPPED = "STOPPED", "Stopped"
+

@@ -36,6 +36,7 @@
                     <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">FII/DII FLOW</th>
                     <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">RATE REGIME</th>
                     <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">GLOBAL RISK</th>
+                    <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-end">VOL BIAS</th>
                     <th class="py-2.5 px-3 font-monospace text-muted fw-semibold text-center">EVENT RISK</th>
                     <th class="py-2.5 px-3 font-monospace text-muted fw-semibold">MACRO SUMMARY</th>
                 </tr>
@@ -60,7 +61,7 @@
                 {% if parquet_inspection.is_split_view %}
                     <!-- SECTION 1: STARTING 10 K-LINES (HEAD) -->
                     <tr class="table-active" style="background: rgba(13, 110, 253, 0.12); border-bottom: 1px solid rgba(13, 110, 253, 0.25);">
-                        <td colspan="{% if backup.is_macro_assist %}8{% else %}12{% endif %}" class="py-1.5 px-3">
+                        <td colspan="{% if backup.is_macro_assist %}9{% else %}12{% endif %}" class="py-1.5 px-3">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge bg-success bg-opacity-30 text-success border border-success border-opacity-40 rounded-pill px-2 py-0.5 text-xxs font-monospace fw-bold">
                                     🟢 STARTING 10 K-LINES (HEAD)
@@ -74,9 +75,9 @@
                         {% if backup.is_macro_assist %}
                             <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime|default:row.timestamp }}</td>
                             <td class="py-2 px-3">
-                                {% if row.macro_sentiment == 'BULLISH' %}
+                                {% if row.macro_sentiment == 'BULLISH' or row.macro_sentiment_score >= 0.15 %}
                                     <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🟢 BULLISH</span>
-                                {% elif row.macro_sentiment == 'BEARISH' %}
+                                {% elif row.macro_sentiment == 'BEARISH' or row.macro_sentiment_score <= -0.15 %}
                                     <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🔴 BEARISH</span>
                                 {% else %}
                                     <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-30 px-2 py-0.5 text-xxs fw-bold">⚪ NEUTRAL</span>
@@ -86,6 +87,7 @@
                             <td class="py-2 px-3 font-monospace text-end {% if row.fii_dii_flow_bias >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.fii_dii_flow_bias|floatformat:2 }}</td>
                             <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.rate_regime_bias|floatformat:2 }}</td>
                             <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.global_risk_sentiment|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end {% if row.volatility_regime_bias > 0 %}text-warning{% else %}text-info{% endif %}">{{ row.volatility_regime_bias|floatformat:2 }}</td>
                             <td class="py-2 px-3 text-center">
                                 {% if row.event_risk_flag %}
                                     <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-40 px-2 py-0.5 text-xxs fw-bold">⚡ Catalyst</span>
@@ -125,7 +127,7 @@
 
                     <!-- SEPARATOR / MIDDLE OMITTED NOTICE -->
                     <tr style="background: rgba(255, 255, 255, 0.02); border-top: 1px dashed var(--border-color); border-bottom: 1px dashed var(--border-color);">
-                        <td colspan="{% if backup.is_macro_assist %}8{% else %}12{% endif %}" class="text-center py-2.5 theme-text-muted font-monospace text-xxs">
+                        <td colspan="{% if backup.is_macro_assist %}9{% else %}12{% endif %}" class="text-center py-2.5 theme-text-muted font-monospace text-xxs">
                             <span class="material-icons align-middle me-1 text-primary" style="font-size: 0.9rem;">unfold_more</span>
                             <strong>... {{ parquet_inspection.num_rows }} Total K-Lines in Parquet ...</strong>
                             <span class="opacity-75 ms-1">(Intermediate candles omitted for fast verification)</span>
@@ -134,7 +136,7 @@
 
                     <!-- SECTION 2: ENDING 10 K-LINES (TAIL) -->
                     <tr class="table-active" style="background: rgba(220, 53, 69, 0.12); border-bottom: 1px solid rgba(220, 53, 69, 0.25);">
-                        <td colspan="{% if backup.is_macro_assist %}8{% else %}12{% endif %}" class="py-1.5 px-3">
+                        <td colspan="{% if backup.is_macro_assist %}9{% else %}12{% endif %}" class="py-1.5 px-3">
                             <div class="d-flex align-items-center gap-2">
                                 <span class="badge bg-danger bg-opacity-30 text-danger border border-danger border-opacity-40 rounded-pill px-2 py-0.5 text-xxs font-monospace fw-bold">
                                     🔴 ENDING 10 K-LINES (TAIL)
@@ -148,9 +150,9 @@
                         {% if backup.is_macro_assist %}
                             <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime|default:row.timestamp }}</td>
                             <td class="py-2 px-3">
-                                {% if row.macro_sentiment == 'BULLISH' %}
+                                {% if row.macro_sentiment == 'BULLISH' or row.macro_sentiment_score >= 0.15 %}
                                     <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🟢 BULLISH</span>
-                                {% elif row.macro_sentiment == 'BEARISH' %}
+                                {% elif row.macro_sentiment == 'BEARISH' or row.macro_sentiment_score <= -0.15 %}
                                     <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🔴 BEARISH</span>
                                 {% else %}
                                     <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-30 px-2 py-0.5 text-xxs fw-bold">⚪ NEUTRAL</span>
@@ -160,6 +162,7 @@
                             <td class="py-2 px-3 font-monospace text-end {% if row.fii_dii_flow_bias >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.fii_dii_flow_bias|floatformat:2 }}</td>
                             <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.rate_regime_bias|floatformat:2 }}</td>
                             <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.global_risk_sentiment|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end {% if row.volatility_regime_bias > 0 %}text-warning{% else %}text-info{% endif %}">{{ row.volatility_regime_bias|floatformat:2 }}</td>
                             <td class="py-2 px-3 text-center">
                                 {% if row.event_risk_flag %}
                                     <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-40 px-2 py-0.5 text-xxs fw-bold">⚡ Catalyst</span>
@@ -204,9 +207,9 @@
                         {% if backup.is_macro_assist %}
                             <td class="py-2 px-3 font-monospace text-info fw-medium">{{ row.datetime|default:row.timestamp }}</td>
                             <td class="py-2 px-3">
-                                {% if row.macro_sentiment == 'BULLISH' %}
+                                {% if row.macro_sentiment == 'BULLISH' or row.macro_sentiment_score >= 0.15 %}
                                     <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🟢 BULLISH</span>
-                                {% elif row.macro_sentiment == 'BEARISH' %}
+                                {% elif row.macro_sentiment == 'BEARISH' or row.macro_sentiment_score <= -0.15 %}
                                     <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-30 px-2 py-0.5 text-xxs fw-bold">🔴 BEARISH</span>
                                 {% else %}
                                     <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-30 px-2 py-0.5 text-xxs fw-bold">⚪ NEUTRAL</span>
@@ -216,6 +219,7 @@
                             <td class="py-2 px-3 font-monospace text-end {% if row.fii_dii_flow_bias >= 0 %}text-success{% else %}text-danger{% endif %}">{{ row.fii_dii_flow_bias|floatformat:2 }}</td>
                             <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.rate_regime_bias|floatformat:2 }}</td>
                             <td class="py-2 px-3 font-monospace text-end text-muted">{{ row.global_risk_sentiment|floatformat:2 }}</td>
+                            <td class="py-2 px-3 font-monospace text-end {% if row.volatility_regime_bias > 0 %}text-warning{% else %}text-info{% endif %}">{{ row.volatility_regime_bias|floatformat:2 }}</td>
                             <td class="py-2 px-3 text-center">
                                 {% if row.event_risk_flag %}
                                     <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-40 px-2 py-0.5 text-xxs fw-bold">⚡ Catalyst</span>

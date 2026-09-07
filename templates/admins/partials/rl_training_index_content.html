@@ -45,18 +45,19 @@
                     <!-- Target Asset Cards -->
                     <div class="mb-4">
                         <label class="form-label theme-text-muted small fw-bold text-uppercase mb-2">Target Index Asset</label>
-                        <div class="row g-2 align-items-stretch">
+                        <div class="d-flex flex-wrap gap-2.5 align-items-stretch">
                             {% for index_val, index_label in index_form.fields.index_name.choices %}
-                            <div class="col-6 col-sm-4 col-md-2">
+                            <div style="flex: 1 1 125px; min-width: 105px;">
                                 <input type="radio" class="btn-check" name="index_name" id="index_{{ index_val }}" value="{{ index_val }}" {% if forloop.first %}checked{% endif %}>
-                                <label class="btn btn-outline-primary theme-text-main border-secondary border-opacity-25 w-100 h-100 py-2.5 rounded-3 text-center d-flex flex-column align-items-center justify-content-center shadow-xs" for="index_{{ index_val }}">
+                                <label class="btn btn-outline-primary theme-text-main border-secondary border-opacity-25 w-100 h-100 py-2.5 px-2 rounded-3 text-center d-flex flex-column align-items-center justify-content-center shadow-xs" for="index_{{ index_val }}">
                                     <span class="fw-bold fs-6 mb-0">{{ index_val }}</span>
                                     <span class="theme-text-muted text-xs opacity-75 mt-1" style="font-size: 0.7rem;">
-                                        {% if index_val == 'NIFTY' %}Lot 25
+                                        {% if index_val == 'NIFTY' %}Lot 65
                                         {% elif index_val == 'BANKNIFTY' %}Lot 30
-                                        {% elif index_val == 'FINNIFTY' %}Lot 65
-                                        {% elif index_val == 'MIDCPNIFTY' %}Lot 50
+                                        {% elif index_val == 'FINNIFTY' %}Lot 60
+                                        {% elif index_val == 'MIDCPNIFTY' %}Lot 120
                                         {% elif index_val == 'SENSEX' %}Lot 20
+                                        {% elif index_val == 'INDIAVIX' %}Macro Regime
                                         {% else %}Lot 30{% endif %}
                                     </span>
                                 </label>
@@ -120,6 +121,40 @@
                                 <input type="number" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 shadow-sm py-2" name="lots_count" value="1" min="1" max="100">
                             </div>
                         </div>
+
+                        <!-- AI Dynamic Sizing & Auto Risk Management -->
+                        <div class="p-3 mt-3 rounded-3 border border-secondary border-opacity-25" style="background: rgba(16, 185, 129, 0.04);">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5">
+                                <div class="d-flex align-items-center gap-2">
+                                    <i class="bi bi-wallet2 text-success"></i>
+                                    <span class="theme-text-main small fw-bold text-uppercase" style="font-size: 0.78rem;">AI Dynamic Sizing & Auto Risk Guardrail</span>
+                                </div>
+                                <div class="d-flex align-items-center gap-3">
+                                    <div class="form-check form-switch m-0 p-0 d-flex align-items-center gap-2">
+                                        <label class="form-check-label small fw-semibold theme-text-muted" for="idx_enable_ai_lot_sizing">AI Dynamic Sizing</label>
+                                        <input type="checkbox" name="enable_ai_lot_sizing" id="idx_enable_ai_lot_sizing" class="form-check-input m-0" role="switch">
+                                    </div>
+                                    <div class="form-check form-switch m-0 p-0 d-flex align-items-center gap-2 border-start border-secondary border-opacity-25 ps-3">
+                                        <label class="form-check-label small fw-semibold theme-text-muted" for="idx_auto_risk">Auto Risk</label>
+                                        <input type="checkbox" name="auto_risk_management" id="idx_auto_risk" class="form-check-input m-0" role="switch" checked>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="row g-2">
+                                <div class="col-4">
+                                    <label class="theme-text-muted text-uppercase" style="font-size: 0.65rem;">Max Risk %</label>
+                                    <input type="number" step="0.1" min="0.1" max="10" name="max_risk_per_trade_pct" value="2.0" class="form-control form-control-sm bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace">
+                                </div>
+                                <div class="col-4">
+                                    <label class="theme-text-muted text-uppercase" style="font-size: 0.65rem;">Max Margin %</label>
+                                    <input type="number" step="1" min="10" max="100" name="max_capital_utilization_pct" value="60" class="form-control form-control-sm bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace">
+                                </div>
+                                <div class="col-4">
+                                    <label class="theme-text-muted text-uppercase" style="font-size: 0.65rem;">Max Lots Cap</label>
+                                    <input type="number" step="1" min="1" max="100" name="max_lots_cap" value="10" class="form-control form-control-sm bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace">
+                                </div>
+                            </div>
+                        </div>
                     </div>
 
                     <!-- RL Policy Hyperparameters -->
@@ -181,28 +216,60 @@
 
         <!-- Telemetry & Recent Runs Column -->
         <div class="col-12 col-xl-4">
-            <div class="glass-card p-4 rounded-4 border border-secondary border-opacity-25 shadow-sm h-100">
-                <h4 class="fw-bold theme-text-main mb-3 d-flex align-items-center gap-2 pb-2 border-bottom border-secondary border-opacity-25">
-                    <i class="bi bi-activity text-info"></i> Active Telemetry & Trained Agents
-                </h4>
+            <div class="glass-card p-4 rounded-4 border border-secondary border-opacity-25 shadow-sm h-100 d-flex flex-column gap-3">
+                <div class="d-flex align-items-center justify-content-between pb-2 border-bottom border-secondary border-opacity-25">
+                    <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2" style="font-size: 0.95rem;">
+                        <i class="bi bi-activity text-info"></i> Active Telemetry & Trained Agents
+                    </h5>
+                    <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-25 rounded-pill font-monospace" style="font-size: 0.70rem;">
+                        {{ total_trained }} Models
+                    </span>
+                </div>
 
+                <!-- 3-Stat Summary HUD -->
+                <div class="row g-2">
+                    <div class="col-4">
+                        <div class="p-2 rounded-3 border border-secondary border-opacity-25 text-center" style="background: rgba(255, 255, 255, 0.02);">
+                            <div class="theme-text-muted text-uppercase fw-bold" style="font-size: 0.65rem;">Trained</div>
+                            <div class="fw-bold fs-6 theme-text-main font-monospace">{{ total_trained }}</div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 rounded-3 border border-secondary border-opacity-25 text-center" style="background: rgba(255, 255, 255, 0.02);">
+                            <div class="theme-text-muted text-uppercase fw-bold" style="font-size: 0.65rem;">Top PnL</div>
+                            <div class="fw-bold fs-6 font-monospace {% if best_pnl > 0 %}text-success{% elif best_pnl < 0 %}text-danger{% else %}theme-text-main{% endif %}" style="font-size: 0.85rem !important;">
+                                ₹{{ best_pnl|floatformat:0 }}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-4">
+                        <div class="p-2 rounded-3 border border-secondary border-opacity-25 text-center" style="background: rgba(255, 255, 255, 0.02);">
+                            <div class="theme-text-muted text-uppercase fw-bold" style="font-size: 0.65rem;">Avg Win %</div>
+                            <div class="fw-bold fs-6 text-info font-monospace">{{ avg_win_rate }}%</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Model Cards List -->
                 {% if backtests %}
-                <div class="list-group list-group-flush gap-2">
+                <div class="list-group list-group-flush gap-2.5 overflow-auto pe-1" style="max-height: 520px;">
                     {% for b in backtests %}
-                    <div class="glass-card p-3 rounded-3 border border-secondary border-opacity-25 mb-2 shadow-xs">
+                    <div class="glass-card p-3 rounded-3 border border-secondary border-opacity-25 shadow-xs" style="background: rgba(255, 255, 255, 0.02);">
                         <div class="d-flex align-items-center justify-content-between mb-2">
-                            <span class="fw-bold theme-text-main">#BT-{{ b.id|stringformat:"04d" }} ({{ b.index_name }})</span>
-                            <span class="badge {% if b.status == 'COMPLETED' %}bg-success{% elif b.status == 'RUNNING' %}bg-primary{% else %}bg-secondary{% endif %} rounded-pill">
+                            <span class="fw-bold theme-text-main font-monospace" style="font-size: 0.86rem;">
+                                #BT-{{ b.id|stringformat:"04d" }} ({{ b.index_name }})
+                            </span>
+                            <span class="badge {% if b.status == 'completed' or b.status == 'COMPLETED' %}bg-success bg-opacity-25 text-success border border-success border-opacity-35{% elif b.status == 'running' or b.status == 'RUNNING' %}bg-primary bg-opacity-25 text-primary border border-primary border-opacity-35{% else %}bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-35{% endif %} rounded-pill px-2.5 py-0.5 font-monospace text-uppercase" style="font-size: 0.68rem;">
                                 {{ b.status }}
                             </span>
                         </div>
-                        <div class="progress mb-2 bg-transparent border border-secondary border-opacity-25" style="height: 6px;">
-                            <div class="progress-bar progress-bar-striped progress-bar-animated bg-primary" role="progressbar" style="width: {{ b.progress }}%;"></div>
+                        <div class="progress mb-2 bg-transparent border border-secondary border-opacity-25" style="height: 5px;">
+                            <div class="progress-bar {% if b.status == 'completed' or b.status == 'COMPLETED' %}bg-success{% elif b.status == 'running' or b.status == 'RUNNING' %}progress-bar-striped progress-bar-animated bg-primary{% else %}bg-secondary{% endif %}" role="progressbar" style="width: {{ b.progress }}%;"></div>
                         </div>
-                        <div class="d-flex align-items-center justify-content-between text-xs theme-text-muted" style="font-size: 0.75rem;">
-                            <span>Net PnL: <strong class="{% if b.results.net_pnl > 0 %}text-success{% elif b.results.net_pnl < 0 %}text-danger{% else %}theme-text-main{% endif %}">₹{{ b.results.net_pnl|default:0|floatformat:2 }}</strong></span>
-                            <span>Trades: {{ b.results.total_trades|default:0 }}</span>
-                            <a href="{% url 'backtest:backtest_detail' pk=b.id %}" class="btn btn-xs btn-outline-primary rounded-pill px-2 py-0">View</a>
+                        <div class="d-flex align-items-center justify-content-between text-xs theme-text-muted" style="font-size: 0.76rem;">
+                            <span>Net PnL: <strong class="font-monospace {% if b.results.net_pnl > 0 %}text-success{% elif b.results.net_pnl < 0 %}text-danger{% else %}theme-text-main{% endif %}">₹{{ b.results.net_pnl|default:0|floatformat:2 }}</strong></span>
+                            <span>Trades: <strong class="font-monospace theme-text-main">{{ b.results.total_trades|default:0 }}</strong></span>
+                            <a href="{% url 'backtest:backtest_detail' pk=b.id %}" class="btn btn-xs btn-outline-primary rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">View</a>
                         </div>
                     </div>
                     {% endfor %}
@@ -213,6 +280,16 @@
                     <p class="mb-0">No trained Index Options RL models found.<br>Configure parameters and click <strong>Start RL Policy Training</strong>.</p>
                 </div>
                 {% endif %}
+
+                <!-- Institutional Deployment Note -->
+                <div class="mt-auto p-3 rounded-3 border border-secondary border-opacity-20" style="background: rgba(56, 189, 248, 0.03);">
+                    <div class="d-flex align-items-center gap-1.5 text-info small fw-bold font-monospace mb-1" style="font-size: 0.72rem;">
+                        <i class="bi bi-shield-check"></i> Index Options RL Execution Guardrails
+                    </div>
+                    <div class="theme-text-muted small" style="font-size: 0.72rem; line-height: 1.45;">
+                        PPO policies execute limit retest entries on 1-minute bars with dynamic ATR stop-loss brackets and India VIX regime awareness.
+                    </div>
+                </div>
             </div>
         </div>
     </div>

@@ -228,6 +228,18 @@
                     <span>Re-run Backtest</span>
                 </button>
                 {% endif %}
+                <button type="button" 
+                        hx-get="{% url 'backtest:backtest_deploy_modal' backtest.pk %}" 
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        data-bs-toggle="modal"
+                        data-bs-target="#globalHtmxModal"
+                        class="btn btn-outline-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5"
+                        style="font-size: 0.825rem;"
+                        title="Clone configuration to isolated Live Strategy registry">
+                    <span class="material-icons text-warning" style="font-size: 1.05rem;">rocket_launch</span>
+                    <span>Move to Execute</span>
+                </button>
             </div>
         </div>
     </div>
@@ -352,36 +364,7 @@
     </div>
 
     <!-- Active Strategy Rules Badges -->
-    <div class="mt-3 pt-2 border-top border-secondary border-opacity-10 d-flex flex-wrap align-items-center gap-2">
-        <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.7rem;">Active Rules:</span>
-        {% for rule in backtest.rules.all %}
-        <span class="badge rounded-pill px-3 py-1 fw-bold" 
-              style="font-size: 0.72rem;
-              {% if rule.rule_type == 'intraday' %}background: var(--danger-subdued, rgba(239, 68, 68, 0.15)); color: var(--danger, #ef4444); border: 1px solid var(--danger-border, rgba(239, 68, 68, 0.35));
-              {% elif rule.rule_type == 'risk_management' %}background: var(--info-subdued, rgba(2, 132, 199, 0.15)); color: var(--info, #0284c7); border: 1px solid var(--info-border, rgba(2, 132, 199, 0.35));
-              {% elif rule.rule_type == 'retest_limit' %}background: var(--success-subdued, rgba(5, 150, 105, 0.15)); color: var(--success, #059669); border: 1px solid var(--success-border, rgba(5, 150, 105, 0.35));
-              {% elif rule.rule_type == 'trendline_retest' %}background: var(--warning-subdued, rgba(217, 119, 6, 0.15)); color: var(--warning, #d97706); border: 1px solid var(--warning-border, rgba(217, 119, 6, 0.35));
-              {% else %}background: var(--primary-subdued, rgba(37, 99, 235, 0.15)); color: var(--primary, #2563eb); border: 1px solid var(--primary-border, rgba(37, 99, 235, 0.35));{% endif %}">
-            <span class="material-icons align-middle me-1" style="font-size: 0.75rem !important;">check_circle</span>
-            {{ rule.name }}
-        </span>
-        {% empty %}
-            {% for r in backtest.parameters.rules %}
-            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold" style="font-size: 0.72rem;">
-                {{ r.name|default:r }}
-            </span>
-            {% empty %}
-            <span class="theme-text-muted small fst-italic">Standard Execution Rules</span>
-            {% endfor %}
-        {% endfor %}
-
-        {% if backtest.backup_task %}
-        <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-1 ms-auto font-monospace" style="font-size: 0.7rem;">
-            <span class="material-icons align-middle me-1" style="font-size: 0.75rem !important;">storage</span>
-            Linked Dataset #{{ backtest.backup_task.id }} · {{ backtest.backup_task.display_symbol }} ({{ backtest.backup_task.start_date }} to {{ backtest.backup_task.end_date }})
-        </span>
-        {% endif %}
-    </div>
+    {% include 'admins/partials/backtest_active_rules_badges.html' %}
 
     {% if backtest.parameters.prompt_directives %}
     <div class="mt-2 pt-2 border-top border-secondary border-opacity-10 small d-flex align-items-start gap-2">
@@ -1008,31 +991,162 @@
     </div>
 </div>
 
-<!-- Primary Visualizer Suite Row (Full-Width Interactive Equity Curve) -->
+<!-- ========================================================== -->
+<!-- CAPITAL CAPACITY STRESS-TESTING & OUTLIER TAIL RISK CARDS (4 CARDS) -->
+<!-- ========================================================== -->
+<div class="row g-3 mb-4" id="capitalCapacityStressRow">
+    <!-- Card 1: Max Single-Trade Loss (Tail Risk) -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Max Single-Trade Loss</span>
+                <span class="badge bg-danger bg-opacity-20 text-danger rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">Tail Risk</span>
+            </div>
+            <div>
+                <h4 class="fw-extrabold text-danger mb-0 font-monospace" style="font-size: 1.45rem;">
+                    -₹{{ analytics.highest_loss|stringformat:".2f"|cut:"-" }}
+                </h4>
+                <div class="text-danger small mt-1 font-monospace" style="font-size: 0.75rem;">
+                    {{ analytics.highest_loss_pct|floatformat:2 }}% of initial capital
+                </div>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Worst Trade</span>
+                <span class="text-danger fw-bold font-monospace">Trade #{{ analytics.highest_loss_trade_num|default:"-" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Max Single-Trade Win (Peak Gain) -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Max Single-Trade Win</span>
+                <span class="badge bg-success bg-opacity-20 text-success rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">Peak Gain</span>
+            </div>
+            <div>
+                <h4 class="fw-extrabold text-success mb-0 font-monospace" style="font-size: 1.45rem;">
+                    +₹{{ analytics.highest_win|floatformat:2 }}
+                </h4>
+                <div class="text-success small mt-1 font-monospace" style="font-size: 0.75rem;">
+                    +{{ analytics.highest_win_pct|floatformat:2 }}% of initial capital
+                </div>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Best Windfall</span>
+                <span class="text-success fw-bold font-monospace">Trade #{{ analytics.highest_win_trade_num|default:"-" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Lowest Capital Trough (Max Drawdown Point) -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Lowest Capital Point</span>
+                <span class="badge bg-warning bg-opacity-20 text-warning rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">Trough Low</span>
+            </div>
+            <div>
+                <h4 class="fw-extrabold text-warning mb-0 font-monospace" style="font-size: 1.45rem;">
+                    ₹{{ analytics.lowest_capital|floatformat:2 }}
+                </h4>
+                <div class="{% if analytics.lowest_capital_diff < 0 %}text-danger{% else %}text-muted{% endif %} small mt-1 font-monospace" style="font-size: 0.75rem;">
+                    {% if analytics.lowest_capital_diff < 0 %}{{ analytics.lowest_capital_pct|floatformat:1 }}% from start{% else %}Never breached initial balance{% endif %}
+                </div>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Trough Session</span>
+                <span class="text-warning fw-bold font-monospace">Trade #{{ analytics.lowest_capital_trade_num|default:"0 (Start)" }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Margin Capacity & Stress Breach Status -->
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Margin Capacity Stress</span>
+                {% if analytics.margin_breach_count > 0 %}
+                <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">
+                    <i class="bi bi-exclamation-triangle-fill me-1"></i>{{ analytics.margin_breach_count }} Breach{% if analytics.margin_breach_count > 1 %}es{% endif %}
+                </span>
+                {% elif analytics.capital_utilization_pct > 80 %}
+                <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">Elevated Load</span>
+                {% else %}
+                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">Capital Safe</span>
+                {% endif %}
+            </div>
+            <div>
+                <h4 class="fw-extrabold text-info mb-0 font-monospace" style="font-size: 1.45rem;">
+                    ₹{{ analytics.max_utilized_capital|floatformat:2 }}
+                </h4>
+                <div class="theme-text-muted small mt-1 font-monospace" style="font-size: 0.75rem;">
+                    Peak {{ analytics.capital_utilization_pct|floatformat:1 }}% margin deployment
+                </div>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Position Sizing</span>
+                {% if analytics.margin_breach_count > 0 %}
+                <span class="text-danger fw-bold font-monospace">Reduce Max Lots Cap!</span>
+                {% else %}
+                <span class="text-success fw-bold font-monospace">Within Capital Limits</span>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Primary Visualizer Suite Row (Full-Width Interactive Multi-Mode Visualizer) -->
 <div class="row g-3 mb-4" id="equityVisualizerRow">
     <div class="col-12" id="equityCurveCol">
         <div class="glass-card p-3 p-md-4 h-100 d-flex flex-column justify-content-between position-relative">
             <div>
-                <!-- Header & Key Stats Badges -->
-                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-2">
+                <!-- Header & Mode Switcher Bar -->
+                <div class="d-flex flex-column flex-xl-row align-items-start align-items-xl-center justify-content-between gap-3 mb-3 pb-2 border-bottom border-secondary border-opacity-15">
                     <div>
                         <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2">
-                            <span class="material-icons text-primary fs-5">show_chart</span>
-                            <span>Strategy Performance Equity Curve</span>
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.7rem;">Live Time Series</span>
+                            <span class="material-icons text-primary fs-5" id="equityChartIcon">show_chart</span>
+                            <span id="equityChartTitle">Strategy Performance Equity Curve</span>
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-0.5" id="equityChartBadge" style="font-size: 0.7rem;">Live Time Series</span>
                         </h5>
-                        <small class="theme-text-muted">Interactive trade-by-trade portfolio equity progression & high-watermark trajectory (100% of {{ total_trades_count }} trades plotted).</small>
+                        <small class="theme-text-muted" id="equityChartSubtitle">Interactive trade-by-trade portfolio equity progression & high-watermark trajectory (100% of {{ total_trades_count }} trades plotted).</small>
                     </div>
-                    <div class="d-flex align-items-center gap-1 flex-wrap font-monospace">
-                        <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.7rem;">
-                            Start: ₹{{ backtest.initial_capital|floatformat:0 }}
-                        </span>
-                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.7rem;">
-                            Peak: ₹{{ analytics.peak_equity|floatformat:0 }}
-                        </span>
-                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.7rem;">
-                            Final: ₹{{ analytics.ending_equity|floatformat:0 }}
-                        </span>
+
+                    <div class="d-flex align-items-center gap-3 flex-wrap ms-xl-auto">
+                        <!-- Dedicated 2-Mode Graph Switcher for 2nd Chart -->
+                        <div class="btn-group p-1 rounded-pill glass-card border shadow-sm" role="group" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color) !important;">
+                            <button type="button" 
+                                    id="btnEquityModeEquity"
+                                    onclick="switchEquityCurveMode(this, 'equity', 'Strategy Performance Equity Curve', 'show_chart', 'text-primary', 'Live Time Series', 'Interactive trade-by-trade portfolio equity progression & high-watermark trajectory (100% of {{ total_trades_count }} trades plotted).')"
+                                    class="btn btn-sm rounded-pill px-3 py-1 fw-bold equity-chart-mode-btn btn-primary active text-white">
+                                <span class="material-icons fs-6 me-1 align-middle" style="font-size: 0.85rem !important;">show_chart</span>
+                                <span>Equity Curve &amp; HWM</span>
+                            </button>
+                            <button type="button" 
+                                    id="btnEquityModeMargin"
+                                    onclick="switchEquityCurveMode(this, 'margin', 'Capital vs Required Position Margin (Capacity Stress Test)', 'account_balance', 'text-warning', 'Stress Test Mode', 'Compare available capital vs required trade margin to identify over-leveraged trades and margin breaches.')"
+                                    class="btn btn-sm rounded-pill px-3 py-1 fw-bold equity-chart-mode-btn theme-text-muted">
+                                <span class="material-icons fs-6 me-1 align-middle" style="font-size: 0.85rem !important;">account_balance</span>
+                                <span>Capital vs Required Margin</span>
+                            </button>
+                        </div>
+
+                        <!-- Key Stats Badges (Start, Peak, Final) -->
+                        <div class="d-flex align-items-center gap-1 flex-wrap font-monospace">
+                            <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.7rem;">
+                                Start: ₹{{ backtest.initial_capital|floatformat:0 }}
+                            </span>
+                            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.7rem;">
+                                Peak: ₹{{ analytics.peak_equity|floatformat:0 }}
+                            </span>
+                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-1" style="font-size: 0.7rem;">
+                                Final: ₹{{ analytics.ending_equity|floatformat:0 }}
+                            </span>
+                        </div>
                     </div>
                 </div>
 
@@ -1219,54 +1333,7 @@
 
             <!-- 2. AI-Synthesized Preventive Rules (Right Column) -->
             <div class="col-12 col-lg-7">
-                <div class="p-3 p-md-4 rounded-3 h-100 rca-subpanel">
-                    <div class="d-flex justify-content-between align-items-center mb-3 pb-2 border-bottom border-secondary border-opacity-15">
-                        <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.74rem; letter-spacing: 0.5px;">
-                            <span class="material-icons text-info" style="font-size: 1rem;">auto_awesome</span> 
-                            AI-Synthesized Preventive Rules
-                        </span>
-                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
-                            Adaptive Guardrails
-                        </span>
-                    </div>
-                    <div class="d-flex flex-column">
-                        {% for future_rule in backtest.results.ai_suggested_future_rules %}
-                        <div class="mb-3 pb-3 {% if not forloop.last %}border-bottom border-secondary border-opacity-15{% endif %}">
-                            <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-                                <div class="d-flex align-items-center gap-2 text-truncate">
-                                    <span class="material-icons text-info flex-shrink-0" style="font-size: 1.05rem;">shield</span>
-                                    <span class="theme-text-main fw-bold text-truncate" style="font-size: 0.86rem;" title="{{ future_rule.name }}">
-                                        {{ future_rule.name }}
-                                    </span>
-                                </div>
-                                <div class="d-flex align-items-center gap-2 flex-shrink-0">
-                                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-1 font-monospace fw-bold" style="font-size: 0.74rem;">
-                                        🛡️ Prevents ~{{ future_rule.impact_loss_count }} Losses
-                                    </span>
-                                    <form hx-post="{% url 'backtest:backtest_apply_ai_rule' backtest.pk %}" hx-swap="outerHTML" class="d-inline">
-                                        {% csrf_token %}
-                                        <input type="hidden" name="rule_name" value="{{ future_rule.name }}">
-                                        <input type="hidden" name="rule_type" value="{{ future_rule.rule_type|default:'risk_management' }}">
-                                        <input type="hidden" name="prompt_directive" value="{{ future_rule.preventive_prompt }}">
-                                        <button type="submit" 
-                                                class="btn btn-sm btn-outline-success rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
-                                                style="font-size: 0.75rem;"
-                                                title="Automatically create rule and attach to this backtest">
-                                            <span class="material-icons" style="font-size: 0.88rem;">add_circle</span>
-                                            <span>+ Add This Rule</span>
-                                        </button>
-                                    </form>
-                                </div>
-                            </div>
-                            <div class="theme-text-muted mt-1 ps-4" style="font-size: 0.82rem; line-height: 1.5; color: var(--success) !important; font-family: 'Google Sans Flex', 'Plus Jakarta Sans', 'Inter', sans-serif !important;">
-                                {{ future_rule.preventive_prompt }}
-                            </div>
-                        </div>
-                        {% empty %}
-                        <div class="theme-text-muted small fst-italic p-4 text-center">All trades satisfied active rule criteria cleanly.</div>
-                        {% endfor %}
-                    </div>
-                </div>
+                {% include 'admins/partials/backtest_ai_rules_panel.html' %}
             </div>
         </div>
     </div>
@@ -1283,8 +1350,13 @@
                 <span class="material-icons" style="font-size: 1.25rem;">fact_check</span>
             </div>
             <div>
-                <h5 class="fw-bold theme-text-main mb-0">Active Strategy Rules Efficacy & Precision Attribution</h5>
-                <small class="theme-text-muted">Factor decomposition: execution hit rate, win precision %, net alpha PnL, and false-signal mitigation per rule.</small>
+                <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2 flex-wrap">
+                    <span>Active Strategy Rules Efficacy & Precision Attribution</span>
+                    <span class="badge bg-secondary bg-opacity-25 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.68rem;" title="Attribution is computed via trade log factor decomposition and keyword clustering models.">
+                        <span class="material-icons align-middle" style="font-size: 0.72rem;">info</span> Heuristic Factor Model
+                    </span>
+                </h5>
+                <small class="theme-text-muted">Statistical factor attribution: execution hit rate, win precision %, net alpha PnL, and simulated false-signal mitigation per rule.</small>
             </div>
         </div>
         <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-3 py-1 font-monospace fw-bold" style="font-size: 0.72rem;">
@@ -1297,12 +1369,13 @@
         <table class="table table-hover custom-glass-table align-middle mb-0 border-0 w-100" style="width: 100%; table-layout: fixed; --bs-table-bg: transparent; color: var(--text-main);">
             <thead>
                 <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-default) !important;">
-                    <th scope="col" class="ps-3 py-2.5 theme-text-muted text-uppercase small fw-semibold" style="width: 34%; font-size: 0.72rem;">Rule Name & Guardrail Role</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 12%; font-size: 0.72rem;">Invocations</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 16%; font-size: 0.72rem;">Accuracy / Win Rate</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 12%; font-size: 0.72rem;">Win / Loss Split</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 14%; font-size: 0.72rem;">Net Alpha PnL</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 12%; font-size: 0.72rem;">Precision Status</th>
+                    <th scope="col" class="ps-3 py-2.5 theme-text-muted text-uppercase small fw-semibold" style="width: 29%; font-size: 0.72rem;">Rule Name & Guardrail Role</th>
+                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 10%; font-size: 0.72rem;">Invocations</th>
+                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 15%; font-size: 0.72rem;">Accuracy / Win Rate</th>
+                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 11%; font-size: 0.72rem;">Win / Loss Split</th>
+                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 13%; font-size: 0.72rem;">Net Alpha PnL</th>
+                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 11%; font-size: 0.72rem;">Precision Status</th>
+                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 11%; font-size: 0.72rem;">Audit &amp; Actions</th>
                 </tr>
             </thead>
             <tbody>
@@ -1365,6 +1438,20 @@
                             </span>
                         {% endif %}
                     </td>
+
+                    <td class="py-2 px-1 bg-transparent text-center">
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                style="font-size: 0.7rem; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.08);"
+                                hx-get="{% url 'backtest:backtest_rule_ablation_audit' backtest.id r.id %}"
+                                hx-target="#globalHtmxModalDialog"
+                                data-bs-toggle="modal"
+                                data-bs-target="#globalHtmxModal"
+                                title="1-Click Rule Counterfactual Ablation Audit">
+                            <span class="material-icons" style="font-size: 0.88rem;">offline_bolt</span>
+                            <span>Audit Alpha</span>
+                        </button>
+                    </td>
                 </tr>
                 {% endfor %}
             </tbody>
@@ -1390,14 +1477,28 @@
                         <span class="theme-text-muted" style="font-size: 0.7rem;">Invocations: <strong>{{ r.triggered_count }}</strong> ({{ r.winning_count }}W/{{ r.losing_count }}L)</span>
                         <span class="fw-bold {% if r.accuracy_pct >= 60 %}text-success{% else %}text-info{% endif %}" style="font-size: 0.72rem;">{{ r.accuracy_pct }}% Win</span>
                     </div>
-                    <div class="progress rounded-pill" style="height: 4px; background: rgba(255, 255, 255, 0.08);">
+                    <div class="progress rounded-pill mb-2" style="height: 4px; background: rgba(255, 255, 255, 0.08);">
                         <div class="progress-bar {% if r.accuracy_pct >= 60 %}bg-success{% else %}bg-info{% endif %} rounded-pill" style="width: {{ r.accuracy_pct }}%;"></div>
+                    </div>
+                    <div class="pt-1.5 border-top border-secondary border-opacity-10 d-flex justify-content-between align-items-center">
+                        <span class="theme-text-muted" style="font-size: 0.68rem;">Attribution Model</span>
+                        <button type="button" 
+                                class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-0.5 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                style="font-size: 0.68rem; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.08);"
+                                hx-get="{% url 'backtest:backtest_rule_ablation_audit' backtest.id r.id %}"
+                                hx-target="#globalHtmxModalDialog"
+                                data-bs-toggle="modal"
+                                data-bs-target="#globalHtmxModal">
+                            <span class="material-icons" style="font-size: 0.78rem;">offline_bolt</span>
+                            <span>Audit Alpha</span>
+                        </button>
                     </div>
                 </div>
             </div>
             {% endfor %}
         </div>
     </div>
+
 </div>
 {% endif %}
 
@@ -1799,17 +1900,19 @@
     window.clearTradeChartFilter = window.clearBacktestDateFilter;
 
     let equityChartInstance = null;
+    let currentEquityMode = 'equity';
     const equityCurveData = {{ equity_curve_json|default:'[]'|safe }};
     const initCapital = parseFloat("{{ backtest.initial_capital|default:100000 }}") || 100000.0;
 
-    function renderEquityCurveChart() {
+    function renderEquityCurveChart(mode = 'equity') {
+        currentEquityMode = mode;
         const canvas = document.getElementById('equityCurveChart');
         if (!canvas) return;
 
         if (typeof Chart === 'undefined') {
             const script = document.createElement('script');
             script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js';
-            script.onload = function() { renderEquityCurveChart(); };
+            script.onload = function() { renderEquityCurveChart(mode); };
             document.head.appendChild(script);
             return;
         }
@@ -1825,30 +1928,59 @@
         const gridColor = isDark ? 'rgba(255, 255, 255, 0.05)' : 'rgba(15, 23, 42, 0.06)';
         const fontMono = "'Google Sans Code', 'JetBrains Mono', monospace";
 
-        // Build trade-by-trade progression
+        // Build trade-by-trade progression datasets
         const labels = ['Start'];
         const values = [initCapital];
+        const hwmValues = [initCapital];
+        const marginValues = [0];
+        const drawdownValues = [0];
+        const pnlValues = [0];
+        const pnlColors = ['#10b981'];
+
         const pointData = [{
             tradeNum: 0,
             label: 'Initial Capital',
             pnl: 0,
             equity: initCapital,
+            peakEquity: initCapital,
+            utilizedCapital: 0,
+            marginRatio: 0,
+            marginBreach: false,
             drawdown: 0,
             strike: '',
             type: '',
             exitReason: ''
         }];
 
+        let peakSoFar = initCapital;
         if (equityCurveData && equityCurveData.length > 0) {
             equityCurveData.forEach((p, i) => {
+                const eq = Number(p.equity || 0);
+                const ut = Number(p.utilized_capital || 0);
+                const dd = Number(p.drawdown || 0);
+                const pnl = Number(p.pnl || 0);
+                const breach = Boolean(p.margin_breach);
+
+                if (eq > peakSoFar) peakSoFar = eq;
+
                 labels.push(p.label || ('#' + (i + 1)));
-                values.push(p.equity);
+                values.push(eq);
+                hwmValues.push(peakSoFar);
+                marginValues.push(ut);
+                drawdownValues.push(-Math.abs(dd));
+                pnlValues.push(pnl);
+                pnlColors.push(pnl >= 0 ? '#10b981' : '#ef4444');
+
                 pointData.push({
                     tradeNum: p.trade_num || (i + 1),
                     label: p.label,
-                    pnl: p.pnl,
-                    equity: p.equity,
-                    drawdown: p.drawdown,
+                    pnl: pnl,
+                    equity: eq,
+                    peakEquity: peakSoFar,
+                    utilizedCapital: ut,
+                    marginRatio: p.margin_ratio || (eq > 0 ? ((ut / eq) * 100).toFixed(1) : 0),
+                    marginBreach: breach,
+                    drawdown: dd,
                     strike: p.strike,
                     type: p.type,
                     exitReason: p.exit_reason
@@ -1856,34 +1988,97 @@
             });
         }
 
-        const endingEq = values[values.length - 1];
-        const isOverallProfit = (endingEq >= initCapital);
-        const lineColor = isOverallProfit ? '#10b981' : '#ef4444';
-        const gradient = ctx.createLinearGradient(0, 0, 0, 500);
-        if (isOverallProfit) {
-            gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
-            gradient.addColorStop(1, 'rgba(16, 185, 129, 0.00)');
-        } else {
-            gradient.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
-            gradient.addColorStop(1, 'rgba(239, 68, 68, 0.00)');
-        }
+        let chartType = 'line';
+        let datasets = [];
 
-        equityChartInstance = new Chart(ctx, {
-            type: 'line',
-            data: {
-                labels: labels,
-                datasets: [{
+        if (mode === 'equity') {
+            chartType = 'line';
+            const endingEq = values[values.length - 1];
+            const isOverallProfit = (endingEq >= initCapital);
+            const lineColor = isOverallProfit ? '#10b981' : '#ef4444';
+            const gradient = ctx.createLinearGradient(0, 0, 0, 500);
+            if (isOverallProfit) {
+                gradient.addColorStop(0, 'rgba(16, 185, 129, 0.35)');
+                gradient.addColorStop(1, 'rgba(16, 185, 129, 0.00)');
+            } else {
+                gradient.addColorStop(0, 'rgba(239, 68, 68, 0.35)');
+                gradient.addColorStop(1, 'rgba(239, 68, 68, 0.00)');
+            }
+
+            datasets = [
+                {
                     label: 'Portfolio Equity (₹)',
                     data: values,
                     borderColor: lineColor,
                     backgroundColor: gradient,
                     fill: true,
                     tension: 0.25,
-                    borderWidth: 2.2,
+                    borderWidth: 2.4,
                     pointRadius: values.length < 50 ? 3 : 1.5,
                     pointHoverRadius: 6,
-                    pointBackgroundColor: lineColor
-                }]
+                    pointBackgroundColor: lineColor,
+                    order: 2
+                },
+                {
+                    label: 'Peak High-Watermark (₹)',
+                    data: hwmValues,
+                    borderColor: '#38bdf8',
+                    borderWidth: 1.6,
+                    borderDash: [5, 5],
+                    fill: false,
+                    tension: 0.1,
+                    pointRadius: 0,
+                    pointHoverRadius: 4,
+                    pointBackgroundColor: '#38bdf8',
+                    order: 1
+                }
+            ];
+        } else if (mode === 'margin') {
+            chartType = 'line';
+            const capGradient = ctx.createLinearGradient(0, 0, 0, 500);
+            capGradient.addColorStop(0, 'rgba(2, 132, 199, 0.35)');
+            capGradient.addColorStop(1, 'rgba(2, 132, 199, 0.02)');
+
+            // Breach point highlights
+            const marginPointColors = pointData.map(d => d.marginBreach ? '#ef4444' : '#f59e0b');
+            const marginPointRadius = pointData.map(d => d.marginBreach ? 6 : (values.length < 50 ? 3 : 1.5));
+
+            datasets = [
+                {
+                    label: 'Available Portfolio Capital (₹)',
+                    data: values,
+                    borderColor: '#0284c7',
+                    backgroundColor: capGradient,
+                    fill: true,
+                    tension: 0.2,
+                    borderWidth: 2.2,
+                    pointRadius: values.length < 50 ? 3 : 1.5,
+                    pointHoverRadius: 5,
+                    pointBackgroundColor: '#0284c7',
+                    order: 2
+                },
+                {
+                    label: 'Required Trade Margin (₹)',
+                    data: marginValues,
+                    borderColor: '#f59e0b',
+                    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+                    fill: false,
+                    tension: 0.2,
+                    borderWidth: 2.0,
+                    pointRadius: marginPointRadius,
+                    pointBackgroundColor: marginPointColors,
+                    pointBorderColor: marginPointColors,
+                    pointHoverRadius: 7,
+                    order: 1
+                }
+            ];
+        }
+
+        equityChartInstance = new Chart(ctx, {
+            type: chartType,
+            data: {
+                labels: labels,
+                datasets: datasets
             },
             options: {
                 responsive: true,
@@ -1893,12 +2088,22 @@
                     intersect: false
                 },
                 plugins: {
-                    legend: { display: false },
+                    legend: {
+                        display: true,
+                        position: 'top',
+                        align: 'end',
+                        labels: {
+                            color: textColor,
+                            font: { family: fontMono, size: 11 },
+                            boxWidth: 14,
+                            boxHeight: 8
+                        }
+                    },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                        backgroundColor: 'rgba(15, 23, 42, 0.96)',
                         titleColor: '#f8fafc',
                         bodyColor: '#e2e8f0',
-                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderColor: 'rgba(255, 255, 255, 0.16)',
                         borderWidth: 1,
                         padding: 12,
                         titleFont: { family: fontMono, size: 12, weight: 'bold' },
@@ -1913,17 +2118,26 @@
                             label: function(item) {
                                 const idx = item.dataIndex;
                                 const d = pointData[idx];
-                                const eqFormatted = '₹' + Number(d.equity).toLocaleString('en-IN', {minimumFractionDigits: 2});
-                                const pnlPrefix = d.pnl >= 0 ? '+₹' : '-₹';
-                                const pnlFormatted = pnlPrefix + Math.abs(d.pnl).toLocaleString('en-IN', {minimumFractionDigits: 2});
-                                const lines = [
-                                    ` Equity: ${eqFormatted}`,
-                                ];
-                                if (d.tradeNum > 0) {
-                                    lines.push(` Trade PnL: ${pnlFormatted}`);
-                                    lines.push(` Drawdown: ${d.drawdown}%`);
-                                    if (d.strike || d.type) lines.push(` Instrument: ${d.strike} ${d.type}`);
-                                    if (d.exitReason) lines.push(` Exit: ${d.exitReason}`);
+                                const lines = [];
+
+                                if (mode === 'margin') {
+                                    lines.push(` Available Capital: ₹${Number(d.equity).toLocaleString('en-IN', {minimumFractionDigits: 2})}`);
+                                    lines.push(` Required Margin: ₹${Number(d.utilizedCapital).toLocaleString('en-IN', {minimumFractionDigits: 2})} (${d.marginRatio}% load)`);
+                                    if (d.marginBreach) {
+                                        lines.push(` ⚠️ MARGIN BREACH: Required margin exceeded available capital!`);
+                                    }
+                                } else {
+                                    lines.push(` Equity: ₹${Number(d.equity).toLocaleString('en-IN', {minimumFractionDigits: 2})}`);
+                                    lines.push(` Peak HWM: ₹${Number(d.peakEquity).toLocaleString('en-IN', {minimumFractionDigits: 2})}`);
+                                    if (d.tradeNum > 0) {
+                                        const pnlPrefix = d.pnl >= 0 ? '+₹' : '-₹';
+                                        lines.push(` Trade PnL: ${pnlPrefix}${Math.abs(d.pnl).toLocaleString('en-IN', {minimumFractionDigits: 2})}`);
+                                        lines.push(` Drawdown: ${d.drawdown}%`);
+                                    }
+                                }
+
+                                if (d.tradeNum > 0 && d.strike) {
+                                    lines.push(` Instrument: ${d.strike} ${d.type}`);
                                 }
                                 return lines;
                             }
@@ -1944,13 +2158,38 @@
                         ticks: {
                             color: textColor,
                             font: { family: fontMono, size: 11 },
-                            callback: function(v) { return '₹' + Number(v).toLocaleString('en-IN'); }
+                            callback: function(v) {
+                                return '₹' + Number(v).toLocaleString('en-IN');
+                            }
                         }
                     }
                 }
             }
         });
     }
+
+    window.switchEquityCurveMode = function(btn, mode, title, iconName, iconColor, badgeText, subtitleText) {
+        document.querySelectorAll('.equity-chart-mode-btn').forEach(b => {
+            b.classList.remove('active', 'btn-primary', 'text-white');
+            b.classList.add('theme-text-muted');
+        });
+        btn.classList.add('active', 'btn-primary', 'text-white');
+        btn.classList.remove('theme-text-muted');
+
+        const titleEl = document.getElementById('equityChartTitle');
+        const iconEl = document.getElementById('equityChartIcon');
+        const badgeEl = document.getElementById('equityChartBadge');
+        const subEl = document.getElementById('equityChartSubtitle');
+        if (titleEl) titleEl.innerText = title;
+        if (iconEl) {
+            iconEl.innerText = iconName;
+            iconEl.className = `material-icons fs-5 ${iconColor}`;
+        }
+        if (badgeEl) badgeEl.innerText = badgeText;
+        if (subEl) subEl.innerText = subtitleText;
+
+        renderEquityCurveChart(mode);
+    };
 
     function initEquityZoomAndPan() {
         const zoomBtns = document.querySelectorAll('#equityZoomBtnGroup .equity-zoom-btn');

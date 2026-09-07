@@ -125,9 +125,9 @@ Every trade executed or simulated on Marmot adheres to Indian exchange regulatio
 
 ### Dynamic Date-Aware Lot Sizes
 Implemented in `get_historical_lot_size(index_name, date)`:
-- **NIFTY:** 75 (pre-2021) $\rightarrow$ 50 (2021–2024) $\rightarrow$ 25 (post-Nov 2024)
+- **NIFTY:** 75 (pre-2021) $\rightarrow$ 50 (2021–Apr 2024) $\rightarrow$ 25 (May–Nov 2024) $\rightarrow$ 75 (Nov 2024–Dec 2025) $\rightarrow$ 65 (Jan 2026+)
 - **BANKNIFTY:** 25 (pre-2023) $\rightarrow$ 15 (2023–2024) $\rightarrow$ 30 (post-Nov 2024)
-- **FINNIFTY / SENSEX / BANKEX:** Dynamically resolved per historical regulatory mandate.
+- **FINNIFTY / MIDCPNIFTY / SENSEX / BANKEX:** Dynamically resolved per historical regulatory mandate.
 
 ### Indian Statutory Tax Matrix (`calculate_trade_charges`)
 - **Brokerage:** ₹20 flat per executed order.

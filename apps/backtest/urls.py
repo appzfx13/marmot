@@ -26,6 +26,13 @@ from .views import (
     BacktestTradeChartView,
     BacktestLogsModalView,
     BacktestApplyAiRuleView,
+    BacktestSynthesizeAiRulesView,
+    BacktestTradeAiAnalysisView,
+    BacktestAdoptTradeRuleView,
+    BacktestRuleAblationAuditView,
+    BacktestRuleUnlinkView,
+    BacktestDeployModalView,
+    BacktestDeployLiveView,
 )
 
 app_name = 'backtest'
@@ -43,10 +50,17 @@ urlpatterns = [
     path('<int:pk>/trades-scroll/', BacktestTradesScrollView.as_view(), name='backtest_trades_scroll'),
     path('<int:pk>/trade/<int:trade_num>/candles/', BacktestTradeCandlesView.as_view(), name='backtest_trade_candles'),
     path('<int:pk>/trade/<int:trade_num>/chart/', BacktestTradeChartView.as_view(), name='backtest_trade_chart'),
+    path('<int:pk>/trade/<int:trade_num>/ai-analysis/', BacktestTradeAiAnalysisView.as_view(), name='backtest_trade_ai_analysis'),
+    path('<int:pk>/trade/<int:trade_num>/adopt-rule/', BacktestAdoptTradeRuleView.as_view(), name='backtest_adopt_trade_rule'),
     path('<int:pk>/logs/', BacktestLogsModalView.as_view(), name='backtest_logs_modal'),
     path('<int:pk>/apply-ai-rule/', BacktestApplyAiRuleView.as_view(), name='backtest_apply_ai_rule'),
+    path('<int:pk>/synthesize-ai-rules/', BacktestSynthesizeAiRulesView.as_view(), name='backtest_synthesize_ai_rules'),
+    path('<int:pk>/rule/<int:rule_id>/ablation-audit/', BacktestRuleAblationAuditView.as_view(), name='backtest_rule_ablation_audit'),
+    path('<int:pk>/rule/<int:rule_id>/unlink/', BacktestRuleUnlinkView.as_view(), name='backtest_rule_unlink'),
     path('<int:pk>/status/', BacktestStatusView.as_view(), name='backtest_status'),
     path('<int:pk>/control/', BacktestControlView.as_view(), name='backtest_control'),
+    path('<int:pk>/deploy-modal/', BacktestDeployModalView.as_view(), name='backtest_deploy_modal'),
+    path('<int:pk>/deploy-live/', BacktestDeployLiveView.as_view(), name='backtest_deploy_live'),
     path('<int:pk>/edit-modal/', BacktestEditModalView.as_view(), name='backtest_edit_modal'),
     path('<int:pk>/delete/', BacktestDeleteView.as_view(), name='backtest_delete'),
     

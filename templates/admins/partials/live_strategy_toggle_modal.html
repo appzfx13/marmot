@@ -1,0 +1,95 @@
+{% load static %}
+<!-- Modal Content: Confirm Live Strategy Activation / Standby -->
+<div class="modal-content glass-card border-0 shadow-lg" style="background: var(--modal-bg, #0B1D16); color: var(--text-main, #F1F5F9); border: 1px solid var(--border-color, rgba(255,255,255,0.1)) !important; border-radius: 1.25rem;">
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-white border-opacity-10 px-4 py-3">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle p-2 {% if will_activate %}bg-success bg-opacity-20 text-success{% else %}bg-warning bg-opacity-20 text-warning{% endif %} d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                <span class="material-icons fs-5">{% if will_activate %}power_settings_new{% else %}pause_circle{% endif %}</span>
+            </div>
+            <div>
+                <h5 class="modal-title fw-bold mb-0 text-white">
+                    {% if will_activate %}Confirm Strategy Activation{% else %}Confirm Strategy Standby{% endif %}
+                </h5>
+                <small class="text-muted">Live Strategy #{{ strategy.id }} &bull; {{ strategy.index_name }}</small>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <!-- Form for Toggling State -->
+    <form hx-post="{% url 'admins:live-strategy-toggle' strategy.pk %}"
+          hx-target="#live-strategy-row-{{ strategy.pk }}"
+          hx-swap="outerHTML"
+          id="toggleLiveStrategyForm"
+          onsubmit="bootstrap.Modal.getInstance(document.getElementById('globalHtmxModal'))?.hide();">
+        {% csrf_token %}
+        <div class="modal-body px-4 py-3">
+            {% if will_activate %}
+                <div class="alert border-0 rounded-3 p-3 mb-3 d-flex align-items-start gap-2.5" 
+                     style="background: rgba(180, 241, 5, 0.08); border-left: 4px solid #B4F105 !important;">
+                    <span class="material-icons text-warning fs-5 mt-0.5">warning</span>
+                    <div class="small">
+                        <strong class="text-white d-block mb-1">Live Order Execution Warning:</strong>
+                        <span class="text-muted">
+                            Activating <strong>{{ strategy.name }}</strong> will arm the automated trade loop. When the TensorTrade model detects rule-compliant signals, live orders will be placed immediately via <strong>{{ strategy.trading_account.account_name|default:"Configured Broker" }}</strong>.
+                        </span>
+                    </div>
+                </div>
+            {% else %}
+                <div class="alert border-0 rounded-3 p-3 mb-3 d-flex align-items-start gap-2.5" 
+                     style="background: rgba(239, 68, 68, 0.08); border-left: 4px solid #ef4444 !important;">
+                    <span class="material-icons text-danger fs-5 mt-0.5">pause</span>
+                    <div class="small">
+                        <strong class="text-white d-block mb-1">Pausing Strategy Signal Generation:</strong>
+                        <span class="text-muted">
+                            Setting <strong>{{ strategy.name }}</strong> to Standby will prevent any new order signals from executing. Existing open broker positions will remain subject to stop-loss rules.
+                        </span>
+                    </div>
+                </div>
+            {% endif %}
+
+            <!-- Strategy Snapshot Details Card -->
+            <div class="p-3 rounded-3 border border-white border-opacity-10 smaller" style="background: rgba(0,0,0,0.2);">
+                <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5">
+                    <span class="text-muted">Strategy Title:</span>
+                    <strong class="text-white">{{ strategy.name }}</strong>
+                </div>
+                <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5">
+                    <span class="text-muted">Target Asset:</span>
+                    <span class="badge bg-primary bg-opacity-25 text-primary">{{ strategy.index_name }} ({{ strategy.market_type }})</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5">
+                    <span class="text-muted">Allocated Capital:</span>
+                    <strong class="text-success font-monospace">₹{{ strategy.allocated_capital|floatformat:0 }}</strong>
+                </div>
+                <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5">
+                    <span class="text-muted">Isolated Rules Snapshot:</span>
+                    <span class="text-white font-monospace">{{ strategy.frozen_rules_snapshot|length }} Active Rules</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between py-1">
+                    <span class="text-muted">Execution Mode:</span>
+                    <span class="badge {% if strategy.execution_mode == 'LIVE' %}bg-danger{% else %}bg-info{% endif %} bg-opacity-25 text-white font-monospace">
+                        {{ strategy.execution_mode }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer border-top border-white border-opacity-10 px-4 py-3 d-flex align-items-center justify-content-between">
+            <button type="button" class="btn btn-secondary rounded-pill px-3 py-1.5 small" data-bs-dismiss="modal">Cancel</button>
+            {% if will_activate %}
+                <button type="submit" class="btn btn-success fw-bold rounded-pill px-4 py-1.5 d-inline-flex align-items-center gap-1.5 shadow-sm">
+                    <span class="material-icons fs-5">play_arrow</span>
+                    <span>Confirm &amp; Arm Strategy (ON)</span>
+                </button>
+            {% else %}
+                <button type="submit" class="btn btn-warning text-dark fw-bold rounded-pill px-4 py-1.5 d-inline-flex align-items-center gap-1.5 shadow-sm">
+                    <span class="material-icons fs-5">pause</span>
+                    <span>Confirm &amp; Pause Strategy (OFF)</span>
+                </button>
+            {% endif %}
+        </div>
+    </form>
+</div>

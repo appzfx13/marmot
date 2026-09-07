@@ -4,8 +4,10 @@ from django.db import models
 from apps.common.choices import (
     AccountTypeChoices,
     ForexInstrumentChoices,
+    LiveStrategyStatusChoices,
     MarketTypeChoices,
     RiskTypeChoices,
+    StrategyChoices,
     TaskStatusChoices,
 )
 from apps.common.models import BaseModel
@@ -135,3 +137,32 @@ class TradeExecConfig(BaseModel):
 
     def __str__(self):
         return f"{self.name} - Exec Config: {self.admins_user.username} (Active: {self.is_active})"
+
+
+# --- Deployed Live Strategy Table (Immutable Snapshot of Backtested Configuration) ---
+class LiveStrategy(BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='live_strategies', verbose_name="Trader")
+    trading_account = models.ForeignKey(UserTradingAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='live_strategies', verbose_name="Target Trading Account")
+    backtest_task = models.ForeignKey('backtest.BacktestTask', on_delete=models.SET_NULL, null=True, blank=True, related_name='live_deployments', verbose_name="Source Backtest")
+    name = models.CharField(max_length=255, help_text="Live Strategy Deployment Name")
+    strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.TENSORTRADE_RL)
+    index_name = models.CharField(max_length=50, default='NIFTY', help_text="Target trading asset (e.g. NIFTY, BANKNIFTY)")
+    market_type = models.CharField(max_length=20, choices=MarketTypeChoices.choices, default=MarketTypeChoices.INDEX_FO, help_text="Market segment")
+    allocated_capital = models.DecimalField(max_digits=12, decimal_places=2, default=100000.00, help_text="Allocated capital in INR")
+    # FROZEN RULE & PARAMETER SNAPSHOTS (strictly isolated JSONB to prevent mutations from rulebook edits)
+    frozen_rules_snapshot = models.JSONField(default=list, blank=True, help_text="Immutable snapshot of rules at deployment")
+    frozen_parameters = models.JSONField(default=dict, blank=True, help_text="Immutable snapshot of parameters at deployment")
+    is_active = models.BooleanField(default=False, help_text="Live execution enabled toggle (initially False)")
+    execution_mode = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.LIVE)
+    status = models.CharField(max_length=20, choices=LiveStrategyStatusChoices.choices, default=LiveStrategyStatusChoices.STANDBY)
+    realtime_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Realtime session PnL")
+    total_trades = models.PositiveIntegerField(default=0, help_text="Total live trades executed")
+    last_signal_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp of last signal")
+
+    class Meta:
+        verbose_name = "Live Strategy"
+        verbose_name_plural = "Live Strategies"
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.name} [{self.index_name}] - @{self.user.username} (Active: {self.is_active})"

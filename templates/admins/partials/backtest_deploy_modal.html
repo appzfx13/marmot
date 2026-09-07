@@ -1,0 +1,125 @@
+{% load static %}
+<!-- Modal Content: Move to Execute / Deploy to Live Strategy -->
+<div class="modal-content glass-card border-0 shadow-lg" style="background: var(--modal-bg, #0B1D16); color: var(--text-main, #F1F5F9); border: 1px solid var(--border-color, rgba(255,255,255,0.1)) !important; border-radius: 1.25rem;">
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-white border-opacity-10 px-4 py-3">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle p-2 bg-warning bg-opacity-15 text-warning d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+                <span class="material-icons fs-5">rocket_launch</span>
+            </div>
+            <div>
+                <h5 class="modal-title fw-bold mb-0 text-white">Deploy to Live Strategy Engine</h5>
+                <small class="text-muted">Clone Backtest #BT-{{ backtest.id|stringformat:"04d" }} into isolated Live Execution Strategy</small>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <!-- Form for Deploying to LiveStrategy -->
+    <form hx-post="{% url 'backtest:backtest_deploy_live' backtest.pk %}"
+          hx-target="#globalHtmxModalDialog"
+          hx-swap="innerHTML"
+          id="deployLiveStrategyForm">
+        {% csrf_token %}
+        <div class="modal-body px-4 py-3">
+            <!-- Critical Isolation Guarantee Notice -->
+            <div class="alert border-0 rounded-3 p-3 mb-3 d-flex align-items-start gap-2.5" 
+                 style="background: rgba(180, 241, 5, 0.08); border-left: 4px solid #B4F105 !important;">
+                <span class="material-icons text-warning fs-5 mt-0.5">shield</span>
+                <div class="small">
+                    <strong class="text-white d-block mb-1">Strict Rulebook Isolation Guarantee:</strong>
+                    <span class="text-muted">
+                        All <strong>{{ rules_snapshot|length }} attached strategy rules</strong> and RL hyperparameters will be cloned into an <strong>immutable JSON snapshot</strong> in the <code>LiveStrategy</code> table. Any future edits, tuning, or deletions in the general Strategy Rulebook will <strong>NEVER</strong> alter this live execution strategy.
+                    </span>
+                </div>
+            </div>
+
+            <div class="row g-3">
+                <!-- Strategy Deployment Name -->
+                <div class="col-12">
+                    <label class="form-label small fw-semibold text-white mb-1">Live Strategy Deployment Name</label>
+                    <input type="text" name="name" class="form-control" 
+                           style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;"
+                           value="{{ suggested_name }}" required>
+                </div>
+
+                <!-- Target Trading Account -->
+                <div class="col-md-7">
+                    <label class="form-label small fw-semibold text-white mb-1">Target Trading Account (Broker API)</label>
+                    <select name="trading_account_id" class="form-select"
+                            style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
+                        {% if user_accounts %}
+                            {% for acc in user_accounts %}
+                            <option value="{{ acc.id }}" {% if acc.is_default %}selected{% endif %}>
+                                {{ acc.account_name }} ({{ acc.broker.name }} - {{ acc.account_type }})
+                            </option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="">No Active Account Configured (Standby Mode)</option>
+                        {% endif %}
+                    </select>
+                </div>
+
+                <!-- Execution Mode -->
+                <div class="col-md-5">
+                    <label class="form-label small fw-semibold text-white mb-1">Execution Mode</label>
+                    <select name="execution_mode" class="form-select"
+                            style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
+                        <option value="LIVE" selected>LIVE Real Market Execution</option>
+                        <option value="SANDBOX">SANDBOX Paper Trading</option>
+                    </select>
+                </div>
+
+                <!-- Allocated Capital -->
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold text-white mb-1">Allocated Capital (INR ₹)</label>
+                    <div class="input-group">
+                        <span class="input-group-text border-0" style="background: rgba(255,255,255,0.1); color: #B4F105;">₹</span>
+                        <input type="number" step="1000" name="allocated_capital" class="form-control" 
+                               style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;"
+                               value="{{ suggested_capital|floatformat:0 }}" required>
+                    </div>
+                </div>
+
+                <!-- Initial State Info -->
+                <div class="col-md-6">
+                    <label class="form-label small fw-semibold text-white mb-1">Initial Deployment Status</label>
+                    <div class="form-control d-flex align-items-center justify-content-between"
+                         style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-muted);">
+                        <span class="small"><i class="bi bi-pause-circle me-1 text-warning"></i> Inactive (is_active = False)</span>
+                        <span class="badge bg-secondary bg-opacity-25 text-white-50 px-2 py-0.5 smaller">STANDBY</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Frozen Rules Preview Accordion -->
+            <div class="mt-3">
+                <div class="d-flex align-items-center justify-content-between mb-1.5">
+                    <span class="small fw-semibold text-white">Frozen Strategy Rules ({{ rules_snapshot|length }})</span>
+                    <span class="badge bg-success bg-opacity-15 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Snapshot Ready</span>
+                </div>
+                <div class="p-2.5 rounded-3 border border-white border-opacity-10 overflow-auto" style="max-height: 140px; background: rgba(0,0,0,0.25);">
+                    {% if rules_snapshot %}
+                        {% for r in rules_snapshot %}
+                        <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5 smaller">
+                            <span class="text-white fw-semibold"><i class="bi bi-shield-check text-primary me-1"></i>{{ r.name }}</span>
+                            <span class="badge bg-primary bg-opacity-20 text-primary font-monospace">{{ r.rule_type }}</span>
+                        </div>
+                        {% endfor %}
+                    {% else %}
+                        <div class="text-muted smaller py-2 text-center">No explicit rules attached. Baseline TensorTrade RL model policy will be frozen.</div>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer border-top border-white border-opacity-10 px-4 py-3 d-flex align-items-center justify-content-between">
+            <button type="button" class="btn btn-secondary rounded-pill px-3 py-1.5 small" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn btn-warning text-dark fw-bold rounded-pill px-4 py-1.5 d-inline-flex align-items-center gap-1.5 shadow-sm" id="btnConfirmDeployLive">
+                <span class="material-icons fs-5">bolt</span>
+                <span>Confirm &amp; Deploy to Live Table</span>
+            </button>
+        </div>
+    </form>
+</div>
