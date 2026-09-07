@@ -1,40 +1,65 @@
 {% load static %}
 <!-- Modal Content: Deployment Success -->
 <div class="modal-content glass-card border-0 shadow-lg text-center p-4" style="background: var(--modal-bg, #0B1D16); color: var(--text-main, #F1F5F9); border: 1px solid var(--border-color, rgba(255,255,255,0.1)) !important; border-radius: 1.25rem;">
-    <div class="rounded-circle p-3 bg-success bg-opacity-20 text-success d-inline-flex align-items-center justify-content-center mx-auto mb-3" style="width: 68px; height: 68px;">
-        <span class="material-icons fs-1 text-success">task_alt</span>
+    <!-- Glowing Success Icon Circle -->
+    <div class="rounded-circle d-inline-flex align-items-center justify-content-center mx-auto mb-3" 
+         style="width: 72px; height: 72px; background: rgba(180, 241, 5, 0.15); border: 2px solid rgba(180, 241, 5, 0.4); box-shadow: 0 0 20px rgba(180, 241, 5, 0.2);">
+        <i class="bi bi-check-circle-fill" style="font-size: 2.25rem; color: var(--brand-lime, #B4F105);"></i>
     </div>
     
-    <h4 class="fw-bold text-white mb-2">Live Strategy Deployed Successfully!</h4>
-    <p class="text-muted small mx-auto mb-3" style="max-width: 440px;">
-        <strong>{{ live_strat.name }}</strong> has been added to the <code>LiveStrategy</code> execution registry. 
-        As requested, its status is set to <span class="badge bg-secondary bg-opacity-25 text-white-50 px-2 py-0.5">STANDBY (is_active = False)</span>.
+    <h4 class="fw-bold text-white mb-2">
+        {% if live_strat.execution_mode == 'SANDBOX' %}
+            Sandbox Strategy Deployed Successfully!
+        {% else %}
+            Live Strategy Deployed Successfully!
+        {% endif %}
+    </h4>
+    <p class="small mx-auto mb-3" style="max-width: 460px; color: rgba(241, 245, 249, 0.85); line-height: 1.6;">
+        <strong class="text-white">{{ live_strat.name }}</strong> has been added to the 
+        <span class="text-white font-monospace fw-semibold px-1.5 py-0.5 rounded" style="background: rgba(255,255,255,0.08);">LiveStrategy</span> registry. 
+        As requested, its status is set to <span class="badge bg-secondary bg-opacity-35 text-white px-2 py-0.5 font-monospace">STANDBY (is_active = False)</span>.
     </p>
 
     <!-- Isolation Confirmation Badge -->
-    <div class="p-2.5 rounded-3 bg-dark bg-opacity-50 border border-success border-opacity-20 mb-4 text-start mx-auto w-100" style="max-width: 480px;">
-        <div class="d-flex align-items-center gap-2 mb-1">
-            <span class="badge bg-success text-dark fw-bold px-2 py-0.5 smaller">ISOLATED SNAPSHOT</span>
+    <div class="p-3 rounded-3 mb-4 text-start mx-auto w-100" 
+         style="max-width: 480px; background: rgba(255, 255, 255, 0.04); border: 1px solid rgba(180, 241, 5, 0.25);">
+        <div class="d-flex align-items-center gap-2 mb-1.5">
+            <span class="badge px-2 py-1 fw-bold text-dark" style="background: var(--brand-lime, #B4F105); font-size: 0.72rem; letter-spacing: 0.03em;">ISOLATED SNAPSHOT</span>
             <span class="small text-white fw-semibold">{{ live_strat.frozen_rules_snapshot|length }} Rules &bull; ₹{{ live_strat.allocated_capital|floatformat:0 }} Capital</span>
         </div>
-        <div class="smaller text-muted">
-            All rule directives and parameters are permanently isolated in JSONB. Mutations to the global rulebook will not affect this live strategy.
+        <div class="small" style="color: rgba(241, 245, 249, 0.75); font-size: 0.8rem; line-height: 1.45;">
+            All rule directives and parameters are permanently isolated in JSONB. Mutations to the global rulebook will not affect this execution strategy.
         </div>
     </div>
 
+    <!-- Actions -->
     <div class="d-flex align-items-center justify-content-center gap-3">
-        <button type="button" class="btn btn-secondary rounded-pill px-4 py-2" data-bs-dismiss="modal">
+        <button type="button" class="btn btn-outline-secondary rounded-pill px-4 py-2 text-white border-white border-opacity-25" data-bs-dismiss="modal">
             Close
         </button>
+        {% if live_strat.execution_mode == 'SANDBOX' %}
+        <a href="{% url 'admins:admin-sandbox-dashboard' %}" 
+           class="btn btn-warning text-dark rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+           hx-get="{% url 'admins:admin-sandbox-dashboard' %}"
+           hx-target="#app-main-container"
+           hx-swap="innerHTML"
+           hx-push-url="true"
+           onclick="bootstrap.Modal.getInstance(document.getElementById('globalHtmxModal'))?.hide();">
+            <i class="bi bi-box-seam fs-5"></i>
+            <span>Open Sandbox Dashboard</span>
+        </a>
+        {% else %}
         <a href="{% url 'admins:admin-live-dashboard' %}" 
-           class="btn btn-primary rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+           class="btn rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm"
+           style="background: var(--brand-lime, #B4F105); color: #0B1D16;"
            hx-get="{% url 'admins:admin-live-dashboard' %}"
            hx-target="#app-main-container"
            hx-swap="innerHTML"
            hx-push-url="true"
            onclick="bootstrap.Modal.getInstance(document.getElementById('globalHtmxModal'))?.hide();">
-            <span class="material-icons fs-5">activity</span>
+            <i class="bi bi-activity fs-5"></i>
             <span>Open Live Dashboard</span>
         </a>
+        {% endif %}
     </div>
 </div>

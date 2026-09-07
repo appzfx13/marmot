@@ -4,12 +4,13 @@
     <!-- Modal Header -->
     <div class="modal-header border-bottom border-white border-opacity-10 px-4 py-3">
         <div class="d-flex align-items-center gap-2.5">
-            <div class="rounded-circle p-2 bg-warning bg-opacity-15 text-warning d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
-                <span class="material-icons fs-5">rocket_launch</span>
+            <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" 
+                 style="width: 42px; height: 42px; background: rgba(180, 241, 5, 0.15); border: 1px solid rgba(180, 241, 5, 0.3);">
+                <i class="bi bi-rocket-takeoff" style="color: var(--brand-lime, #B4F105); font-size: 1.25rem;"></i>
             </div>
             <div>
-                <h5 class="modal-title fw-bold mb-0 text-white">Deploy to Live Strategy Engine</h5>
-                <small class="text-muted">Clone Backtest #BT-{{ backtest.id|stringformat:"04d" }} into isolated Live Execution Strategy</small>
+                <h5 class="modal-title fw-bold mb-0 text-white">Deploy to Execution Strategy</h5>
+                <small style="color: rgba(241, 245, 249, 0.7);">Clone Backtest #BT-{{ backtest.id|stringformat:"04d" }} into isolated Execution Strategy</small>
             </div>
         </div>
         <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -25,11 +26,11 @@
             <!-- Critical Isolation Guarantee Notice -->
             <div class="alert border-0 rounded-3 p-3 mb-3 d-flex align-items-start gap-2.5" 
                  style="background: rgba(180, 241, 5, 0.08); border-left: 4px solid #B4F105 !important;">
-                <span class="material-icons text-warning fs-5 mt-0.5">shield</span>
+                <i class="bi bi-shield-check mt-0.5 fs-5" style="color: var(--brand-lime, #B4F105);"></i>
                 <div class="small">
                     <strong class="text-white d-block mb-1">Strict Rulebook Isolation Guarantee:</strong>
-                    <span class="text-muted">
-                        All <strong>{{ rules_snapshot|length }} attached strategy rules</strong> and RL hyperparameters will be cloned into an <strong>immutable JSON snapshot</strong> in the <code>LiveStrategy</code> table. Any future edits, tuning, or deletions in the general Strategy Rulebook will <strong>NEVER</strong> alter this live execution strategy.
+                    <span style="color: rgba(241, 245, 249, 0.85); line-height: 1.5;">
+                        All <strong>{{ rules_snapshot|length }} attached strategy rules</strong> and RL hyperparameters will be cloned into an <strong class="text-white">immutable JSON snapshot</strong> in the <code class="text-white px-1 py-0.5 rounded" style="background: rgba(255,255,255,0.08);">LiveStrategy</code> table. Any future edits, tuning, or deletions in the general Strategy Rulebook will <strong>NEVER</strong> alter this execution strategy.
                     </span>
                 </div>
             </div>
@@ -37,7 +38,7 @@
             <div class="row g-3">
                 <!-- Strategy Deployment Name -->
                 <div class="col-12">
-                    <label class="form-label small fw-semibold text-white mb-1">Live Strategy Deployment Name</label>
+                    <label class="form-label small fw-semibold text-white mb-1">Execution Strategy Name</label>
                     <input type="text" name="name" class="form-control" 
                            style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;"
                            value="{{ suggested_name }}" required>
@@ -76,8 +77,8 @@
                     <div class="input-group">
                         <span class="input-group-text border-0" style="background: rgba(255,255,255,0.1); color: #B4F105;">₹</span>
                         <input type="number" step="1000" name="allocated_capital" class="form-control" 
-                               style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;"
-                               value="{{ suggested_capital|floatformat:0 }}" required>
+                                style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;"
+                                value="{{ suggested_capital|floatformat:0 }}" required>
                     </div>
                 </div>
 
@@ -85,9 +86,9 @@
                 <div class="col-md-6">
                     <label class="form-label small fw-semibold text-white mb-1">Initial Deployment Status</label>
                     <div class="form-control d-flex align-items-center justify-content-between"
-                         style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: var(--text-muted);">
+                         style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: rgba(241, 245, 249, 0.7);">
                         <span class="small"><i class="bi bi-pause-circle me-1 text-warning"></i> Inactive (is_active = False)</span>
-                        <span class="badge bg-secondary bg-opacity-25 text-white-50 px-2 py-0.5 smaller">STANDBY</span>
+                        <span class="badge bg-secondary bg-opacity-35 text-white px-2 py-0.5 smaller font-monospace">STANDBY</span>
                     </div>
                 </div>
             </div>
@@ -96,7 +97,7 @@
             <div class="mt-3">
                 <div class="d-flex align-items-center justify-content-between mb-1.5">
                     <span class="small fw-semibold text-white">Frozen Strategy Rules ({{ rules_snapshot|length }})</span>
-                    <span class="badge bg-success bg-opacity-15 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Snapshot Ready</span>
+                    <span class="badge bg-success bg-opacity-20 text-success rounded-pill px-2 py-0.5 smaller fw-bold border border-success border-opacity-25">Snapshot Ready</span>
                 </div>
                 <div class="p-2.5 rounded-3 border border-white border-opacity-10 overflow-auto" style="max-height: 140px; background: rgba(0,0,0,0.25);">
                     {% if rules_snapshot %}
@@ -107,7 +108,7 @@
                         </div>
                         {% endfor %}
                     {% else %}
-                        <div class="text-muted smaller py-2 text-center">No explicit rules attached. Baseline TensorTrade RL model policy will be frozen.</div>
+                        <div class="smaller py-2 text-center" style="color: rgba(241, 245, 249, 0.6);">No explicit rules attached. Baseline TensorTrade RL model policy will be frozen.</div>
                     {% endif %}
                 </div>
             </div>
@@ -115,10 +116,11 @@
 
         <!-- Modal Footer -->
         <div class="modal-footer border-top border-white border-opacity-10 px-4 py-3 d-flex align-items-center justify-content-between">
-            <button type="button" class="btn btn-secondary rounded-pill px-3 py-1.5 small" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn btn-warning text-dark fw-bold rounded-pill px-4 py-1.5 d-inline-flex align-items-center gap-1.5 shadow-sm" id="btnConfirmDeployLive">
-                <span class="material-icons fs-5">bolt</span>
-                <span>Confirm &amp; Deploy to Live Table</span>
+            <button type="button" class="btn btn-outline-secondary rounded-pill px-3 py-1.5 small text-white border-white border-opacity-25" data-bs-dismiss="modal">Cancel</button>
+            <button type="submit" class="btn text-dark fw-bold rounded-pill px-4 py-2 d-inline-flex align-items-center gap-1.5 shadow-sm" 
+                    style="background: var(--brand-lime, #B4F105);" id="btnConfirmDeployLive">
+                <i class="bi bi-lightning-charge-fill fs-5"></i>
+                <span>Confirm &amp; Deploy Strategy</span>
             </button>
         </div>
     </form>
