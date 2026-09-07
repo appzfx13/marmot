@@ -266,7 +266,7 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         site_settings = SiteSettings.load()
         context['site_settings'] = site_settings
         context['master_live_switch'] = site_settings.live_execution_master_switch
-        context['live_strategies'] = user.live_strategies.filter(is_deleted=False).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
+        context['live_strategies'] = user.live_strategies.filter(is_deleted=False, execution_mode=AccountTypeChoices.LIVE).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
         context['market_clock'] = get_ist_market_clock()
         context['calendar_pnl'] = get_current_month_calendar_pnl(live_account or user)
         context['intraday_graph'] = get_today_intraday_equity_curve(live_account or user)
@@ -562,23 +562,6 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
             .select_related('trading_account__broker', 'backtest_task')
             .order_by('-created_at')
         )
-        if not sandbox_strategies:
-            demo_strat = LiveStrategy.objects.create(
-                user=user,
-                trading_account=sandbox_account,
-                name='TensorTrade RL Paper Demo Strategy',
-                strategy_name='tensortrade_rl',
-                index_name='NIFTY',
-                execution_mode='SANDBOX',
-                market_type='OPTIONS',
-                allocated_capital=100000.00,
-                is_active=False,
-                frozen_rules_snapshot=[
-                    {'rule': 'RSI 14 Oversold Entry'},
-                    {'rule': 'Supertrend Bullish Flip'},
-                ],
-            )
-            sandbox_strategies.append(demo_strat)
 
         raw_pos = get_sandbox_simulated_positions(user_id=user.id)
         raw_ord = get_sandbox_simulated_orders(user_id=user.id)

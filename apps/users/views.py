@@ -22,7 +22,7 @@ from django.views import View
 from django.views.generic import FormView, TemplateView, UpdateView
 
 from apps.backtest.models import BacktestTask
-from apps.common.choices import BrokerChoices
+from apps.common.choices import BrokerChoices, AccountTypeChoices
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 from apps.common.models import SiteSettings
 from apps.common.services.live_feed_service import (
@@ -400,7 +400,7 @@ class UserLiveDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateV
         site_settings = SiteSettings.load()
         context['site_settings'] = site_settings
         context['master_live_switch'] = site_settings.live_execution_master_switch
-        context['live_strategies'] = user.live_strategies.filter(is_deleted=False).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
+        context['live_strategies'] = user.live_strategies.filter(is_deleted=False, execution_mode=AccountTypeChoices.LIVE).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
         context['market_clock'] = get_ist_market_clock()
         context['calendar_pnl'] = get_current_month_calendar_pnl(user)
         context['intraday_graph'] = get_today_intraday_equity_curve(user)
@@ -441,6 +441,9 @@ class UserSandboxDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, Templa
             account_type='SANDBOX',
             is_deleted=False
         ).select_related('trading_account')
+        context['live_strategies'] = user.live_strategies.filter(
+            is_deleted=False, execution_mode=AccountTypeChoices.SANDBOX
+        ).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
 
         context['virtual_capital'] = telemetry_summary.get('cash', "10,00,000.00")
         context['virtual_available_margin'] = telemetry_summary.get('available_margin', "10,00,000.00")

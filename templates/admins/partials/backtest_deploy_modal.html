@@ -47,16 +47,16 @@
                 <!-- Target Trading Account -->
                 <div class="col-md-7">
                     <label class="form-label small fw-semibold text-white mb-1">Target Trading Account (Broker API)</label>
-                    <select name="trading_account_id" class="form-select"
+                    <select name="trading_account_id" id="deployTradingAccountSelect" class="form-select"
                             style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
                         {% if user_accounts %}
                             {% for acc in user_accounts %}
-                            <option value="{{ acc.id }}" {% if acc.is_default %}selected{% endif %}>
+                            <option value="{{ acc.id }}" data-account-type="{{ acc.account_type }}" {% if acc.is_default %}selected{% endif %}>
                                 {{ acc.account_name }} ({{ acc.broker.name }} - {{ acc.account_type }})
                             </option>
                             {% endfor %}
                         {% else %}
-                            <option value="">No Active Account Configured (Standby Mode)</option>
+                            <option value="" data-account-type="STANDBY">No Active Account Configured (Standby Mode)</option>
                         {% endif %}
                     </select>
                 </div>
@@ -64,7 +64,7 @@
                 <!-- Execution Mode -->
                 <div class="col-md-5">
                     <label class="form-label small fw-semibold text-white mb-1">Execution Mode</label>
-                    <select name="execution_mode" class="form-select"
+                    <select name="execution_mode" id="deployExecutionModeSelect" class="form-select"
                             style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
                         <option value="LIVE" selected>LIVE Real Market Execution</option>
                         <option value="SANDBOX">SANDBOX Paper Trading</option>
@@ -124,4 +124,42 @@
             </button>
         </div>
     </form>
+
+    <script>
+    (function() {
+        var accSelect = document.getElementById('deployTradingAccountSelect');
+        var modeSelect = document.getElementById('deployExecutionModeSelect');
+        if (!accSelect || !modeSelect) return;
+
+        function syncFromAccount() {
+            var opt = accSelect.options[accSelect.selectedIndex];
+            if (opt && opt.getAttribute('data-account-type')) {
+                var accType = opt.getAttribute('data-account-type').toUpperCase();
+                if (accType === 'SANDBOX') {
+                    modeSelect.value = 'SANDBOX';
+                } else if (accType === 'LIVE') {
+                    modeSelect.value = 'LIVE';
+                }
+            }
+        }
+
+        function syncFromMode() {
+            var mode = modeSelect.value;
+            var currentOpt = accSelect.options[accSelect.selectedIndex];
+            if (currentOpt && currentOpt.getAttribute('data-account-type') !== mode) {
+                for (var i = 0; i < accSelect.options.length; i++) {
+                    if (accSelect.options[i].getAttribute('data-account-type') === mode) {
+                        accSelect.selectedIndex = i;
+                        break;
+                    }
+                }
+            }
+        }
+
+        accSelect.addEventListener('change', syncFromAccount);
+        modeSelect.addEventListener('change', syncFromMode);
+
+        syncFromAccount();
+    })();
+    </script>
 </div>

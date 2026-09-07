@@ -23,7 +23,7 @@ from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 from .models import BacktestTask, BacktestRule, TradingStrategy
 from .forms import IndexBacktestTaskForm, ForexBacktestTaskForm, BacktestRuleForm
 from .services import create_and_start_backtest_task, send_backtest_control_command
-from apps.common.choices import LiveStrategyStatusChoices
+from apps.common.choices import LiveStrategyStatusChoices, AccountTypeChoices
 from apps.trade_config.models import LiveStrategy, UserTradingAccount
 
 class BacktestDashboardView(LoginRequiredMixin, AdminRequiredMixin, ListView):
@@ -2820,7 +2820,14 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
 
         name = request.POST.get('name', '').strip() or f"Live {backtest.index_name} #BT-{backtest.id:04d}"
         trading_account_id = request.POST.get('trading_account_id')
-        execution_mode = request.POST.get('execution_mode', 'LIVE')
+        raw_mode = request.POST.get('execution_mode', 'LIVE').strip().upper()
+        execution_mode = AccountTypeChoices.SANDBOX if raw_mode == 'SANDBOX' else AccountTypeChoices.LIVE
+        
+        target_account = None
+        if trading_account_id:
+            target_account = request.user.trading_accounts.filter(id=trading_account_id, is_active=True).first()
+            if target_account and target_account.account_type in [AccountTypeChoices.LIVE, AccountTypeChoices.SANDBOX]:
+                execution_mode = target_account.account_type
         try:
             allocated_capital = float(request.POST.get('allocated_capital', backtest.initial_capital))
         except (ValueError, TypeError):
