@@ -163,7 +163,16 @@ CLOUDINARY_STORAGE = {
     'CLOUD_NAME': os.getenv('CLOUDINARY_CLOUD_NAME'),
     'API_KEY': os.getenv('CLOUDINARY_API_KEY'),
     'API_SECRET': os.getenv('CLOUDINARY_API_SECRET'),
+    'SECURE': True,
 }
+
+import cloudinary
+cloudinary.config(
+    cloud_name=os.getenv('CLOUDINARY_CLOUD_NAME'),
+    api_key=os.getenv('CLOUDINARY_API_KEY'),
+    api_secret=os.getenv('CLOUDINARY_API_SECRET'),
+    secure=True,
+)
 
 # Storage backends depending on DEBUG mode
 if DEBUG:
@@ -194,6 +203,13 @@ APSCHEDULER_TIMEZONE = 'Asia/Kolkata'
 # Pagination and Caching
 PAGINATION_COUNT = int(os.getenv('PAGINATION_COUNT'))
 REDIS_URL = os.getenv('REDIS_URL')
+
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.redis.RedisCache',
+        'LOCATION': REDIS_URL,
+    }
+}
 
 # Master Admin Dhan API credentials — used exclusively for market backup/ingestion (Admin only).
 # User trading credentials are stored per-user in UserTradingAccount.

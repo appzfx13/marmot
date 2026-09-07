@@ -234,69 +234,487 @@ def get_today_intraday_equity_curve(target, base_capital=100000.0):
     }
 
 
-def get_nifty_mini_option_chain():
-    """Retrieve dynamic 7-strike ATM +-3 mini option chain widget if live stream is active."""
+def get_live_index_option_chain(index_name: str = 'NIFTY') -> dict:
+    """Retrieve genuine real-time option chain and quotes directly from FYERS API with zero simulated fallbacks."""
+    import requests
     from apps.common.models import SiteSettings
+    from apps.common.constants import INDEX_STRIKE_INTERVAL, FYERS_INDEX_SYMBOLS, get_option_expiry_analysis
+
+    idx_clean = (index_name or 'NIFTY').upper().strip()
+    cache_key = f"marmot:fyers:option_chain:{idx_clean}"
+    from django.core.cache import cache
+    cached_payload = cache.get(cache_key)
+    if cached_payload and cached_payload.get('is_live'):
+        return cached_payload
+
+    strike_step = INDEX_STRIKE_INTERVAL.get(idx_clean, 50)
+    fyers_sym = FYERS_INDEX_SYMBOLS.get(idx_clean, f"NSE:{idx_clean}50-INDEX")
+
+    display_names = {
+        'NIFTY': 'NIFTY 50',
+        'BANKNIFTY': 'BANK NIFTY',
+        'FINNIFTY': 'FIN NIFTY',
+        'MIDCPNIFTY': 'MIDCP NIFTY',
+        'SENSEX': 'BSE SENSEX',
+        'GIFTNIFTY': 'GIFT NIFTY',
+        'INDIAVIX': 'INDIA VIX',
+    }
+    spot_symbol = display_names.get(idx_clean, idx_clean)
 
     settings_obj = SiteSettings.load()
     today = timezone.localdate()
-    is_live = bool(settings_obj.fyers_feed_is_active and settings_obj.fyers_access_token and settings_obj.fyers_token_generated_date == today)
+    token_valid = bool(settings_obj.fyers_access_token and settings_obj.fyers_token_generated_date == today)
+    app_id = (settings_obj.fyers_app_id or '').strip()
 
-    if not is_live:
+    # If FYERS credentials or daily token are not active, return clean unauthenticated state (Strictly NO fake data)
+    if not (token_valid and app_id and settings_obj.fyers_access_token):
         return {
             'is_live': False,
-            'spot_symbol': 'NIFTY 50',
+            'is_fyers_live': False,
+            'feed_status': 'AUTH_REQUIRED',
+            'index_name': idx_clean,
+            'spot_symbol': spot_symbol,
+            'fyers_symbol': fyers_sym,
             'spot_ltp': '0.00',
+            'raw_spot_ltp': 0.0,
             'spot_change': '0.00',
             'spot_change_pct': '0.00%',
             'is_positive': True,
+            'open_price': '0.00',
+            'high_price': '0.00',
+            'low_price': '0.00',
+            'prev_close': '0.00',
             'atm_strike': '-',
+            'strike_step': strike_step,
+            'pcr': 0.0,
+            'india_vix': 0.0,
+            'expiry_info': get_option_expiry_analysis(idx_clean, today),
             'strikes': [],
+            'error_message': 'FYERS daily session unauthenticated. Please authorize live feed in Site Settings.',
             'last_updated': timezone.now().strftime('%H:%M:%S IST'),
         }
 
-    spot_ltp = 24785.40
-    spot_change = 124.80
-    spot_change_pct = 0.51
-    strike_step = 50
-    atm_strike = int(round(spot_ltp / strike_step) * strike_step)
+    auth_header = f"{app_id}:{settings_obj.fyers_access_token}"
+    headers = {'Authorization': auth_header}
 
+    spot_ltp = 0.0
+    spot_change = 0.0
+    spot_change_pct = 0.0
+    open_px = 0.0
+    high_px = 0.0
+    low_px = 0.0
+    prev_close = 0.0
+    india_vix = 0.0
+    pcr = 0.0
+    expiry_tag = ''
     strikes_data = []
-    for offset in range(-3, 4):
-        strike = atm_strike + (offset * strike_step)
-        is_atm = (strike == atm_strike)
-        distance = (strike - spot_ltp)
-        ce_base = max(15.0, 185.0 - (distance * 0.55))
-        pe_base = max(15.0, 170.0 + (distance * 0.52))
+    is_fyers_live = False
 
-        ce_ltp = round(ce_base, 2)
-        pe_ltp = round(pe_base, 2)
-        ce_chg = round((15.0 - (offset * 8.5)), 2)
-        pe_chg = round((-12.5 + (offset * 7.2)), 2)
-        ce_oi = int(85000 + (abs(offset) * 45000) + (12500 * (offset < 0)))
-        pe_oi = int(92000 + (abs(offset) * 42000) + (14000 * (offset > 0)))
+    # 1. Fetch real-time option chain contracts from FYERS API
+    try:
+        oc_url = f"https://api-t1.fyers.in/data/options-chain-v3?symbol={fyers_sym}&strikecount=3"
+        oc_resp = requests.get(oc_url, headers=headers, timeout=3.5)
+        if oc_resp.status_code == 200:
+            oc_json = oc_resp.json()
+            if oc_json.get('s') == 'ok' and oc_json.get('data'):
+                oc_data = oc_json['data']
+                raw_chain = oc_data.get('optionsChain', [])
 
-        strikes_data.append({
-            'strike': strike,
-            'is_atm': is_atm,
-            'ce_ltp': ce_ltp,
-            'ce_chg': ce_chg,
-            'ce_chg_pct': round((ce_chg / (ce_ltp - ce_chg or 1.0)) * 100, 1),
-            'ce_oi': f"{ce_oi:,}",
-            'pe_ltp': pe_ltp,
-            'pe_chg': pe_chg,
-            'pe_chg_pct': round((pe_chg / (pe_ltp - pe_chg or 1.0)) * 100, 1),
-            'pe_oi': f"{pe_oi:,}",
-        })
+                # Extract spot quote object (strike_price == -1)
+                spot_item = next((x for x in raw_chain if x.get('strike_price') == -1), None)
+                if spot_item:
+                    spot_ltp = float(spot_item.get('ltp', 0.0))
+                    spot_change = float(spot_item.get('ltpch', 0.0))
+                    spot_change_pct = float(spot_item.get('ltpchp', 0.0))
 
-    return {
+                # Extract India VIX & PCR
+                vix_data = oc_data.get('indiavixData', {})
+                india_vix = float(vix_data.get('ltp', 0.0))
+                call_oi = int(oc_data.get('callOi', 0))
+                put_oi = int(oc_data.get('putOi', 0))
+                pcr = round(put_oi / call_oi, 2) if call_oi > 0 else 0.0
+
+                # Extract upcoming expiry date
+                exp_list = oc_data.get('expiryData', [])
+                if exp_list and isinstance(exp_list, list):
+                    expiry_tag = exp_list[0].get('date', '')
+
+                # Parse and group strike contracts (CE & PE)
+                strikes_map = {}
+                for item in raw_chain:
+                    sp = item.get('strike_price')
+                    if not sp or sp == -1:
+                        continue
+                    if sp not in strikes_map:
+                        strikes_map[sp] = {
+                            'strike': sp,
+                            'is_atm': False,
+                            'ce_ltp': 0.0,
+                            'ce_chg': 0.0,
+                            'ce_chg_pct': 0.0,
+                            'ce_oi': '0',
+                            'pe_ltp': 0.0,
+                            'pe_chg': 0.0,
+                            'pe_chg_pct': 0.0,
+                            'pe_oi': '0',
+                        }
+                    opt_type = (item.get('option_type') or '').upper()
+                    ltp_val = float(item.get('ltp', 0.0))
+                    chg_val = float(item.get('ltpch', 0.0))
+                    chgp_val = float(item.get('ltpchp', 0.0))
+                    oi_val = int(item.get('oi', 0))
+
+                    if opt_type == 'CE':
+                        strikes_map[sp]['ce_ltp'] = ltp_val
+                        strikes_map[sp]['ce_chg'] = chg_val
+                        strikes_map[sp]['ce_chg_pct'] = chgp_val
+                        strikes_map[sp]['ce_oi'] = f"{oi_val:,}"
+                    elif opt_type == 'PE':
+                        strikes_map[sp]['pe_ltp'] = ltp_val
+                        strikes_map[sp]['pe_chg'] = chg_val
+                        strikes_map[sp]['pe_chg_pct'] = chgp_val
+                        strikes_map[sp]['pe_oi'] = f"{oi_val:,}"
+
+                sorted_strikes = sorted(strikes_map.values(), key=lambda x: x['strike'])
+                if sorted_strikes and spot_ltp > 0:
+                    closest = min(sorted_strikes, key=lambda x: abs(x['strike'] - spot_ltp))
+                    closest['is_atm'] = True
+                    atm_strike_val = closest['strike']
+                else:
+                    atm_strike_val = int(round(spot_ltp / strike_step) * strike_step) if spot_ltp > 0 else '-'
+
+                strikes_data = sorted_strikes
+                is_fyers_live = True
+    except Exception:
+        pass
+
+    # 2. Fetch session metrics (Day Open, High, Low, Prev Close) from FYERS Quotes API
+    try:
+        q_url = f"https://api-t1.fyers.in/data/quotes?symbols={fyers_sym}"
+        q_resp = requests.get(q_url, headers=headers, timeout=2.5)
+        if q_resp.status_code == 200:
+            q_json = q_resp.json()
+            if q_json.get('s') == 'ok' and q_json.get('d'):
+                qv = q_json['d'][0].get('v', {})
+                open_px = float(qv.get('open_price', 0.0))
+                high_px = float(qv.get('high_price', 0.0))
+                low_px = float(qv.get('low_price', 0.0))
+                prev_close = float(qv.get('prev_close_price', 0.0))
+                if spot_ltp == 0.0 and qv.get('lp'):
+                    spot_ltp = float(qv.get('lp', 0.0))
+                    spot_change = float(qv.get('ch', 0.0))
+                    spot_change_pct = float(qv.get('chp', 0.0))
+                is_fyers_live = True
+    except Exception:
+        pass
+
+    # If FYERS live call failed, strictly return offline state without any fabricated data
+    if not is_fyers_live or not strikes_data:
+        return {
+            'is_live': False,
+            'is_fyers_live': False,
+            'feed_status': 'FEED_OFFLINE',
+            'index_name': idx_clean,
+            'spot_symbol': spot_symbol,
+            'fyers_symbol': fyers_sym,
+            'spot_ltp': '0.00',
+            'raw_spot_ltp': 0.0,
+            'spot_change': '0.00',
+            'spot_change_pct': '0.00%',
+            'is_positive': True,
+            'open_price': '0.00',
+            'high_price': '0.00',
+            'low_price': '0.00',
+            'prev_close': '0.00',
+            'atm_strike': '-',
+            'strike_step': strike_step,
+            'pcr': 0.0,
+            'india_vix': 0.0,
+            'expiry_info': get_option_expiry_analysis(idx_clean, today),
+            'strikes': [],
+            'error_message': 'FYERS live market feed offline or session timed out.',
+            'last_updated': timezone.now().strftime('%H:%M:%S IST'),
+        }
+
+    expiry_info = get_option_expiry_analysis(idx_clean, today, spot_ltp, spot_ltp, 'CE')
+    if expiry_tag:
+        expiry_info['expiry_date'] = expiry_tag
+        expiry_info['expiry_tag'] = f"Expiry ({expiry_tag})"
+
+    res = {
         'is_live': True,
-        'spot_symbol': 'NIFTY 50',
+        'is_fyers_live': True,
+        'feed_status': 'ONLINE',
+        'index_name': idx_clean,
+        'spot_symbol': spot_symbol,
+        'fyers_symbol': fyers_sym,
         'spot_ltp': f"{spot_ltp:,.2f}",
+        'raw_spot_ltp': spot_ltp,
         'spot_change': f"{'+' if spot_change >= 0 else ''}{spot_change:.2f}",
         'spot_change_pct': f"{'+' if spot_change_pct >= 0 else ''}{spot_change_pct:.2f}%",
         'is_positive': spot_change >= 0,
-        'atm_strike': atm_strike,
+        'open_price': f"{open_px:,.2f}",
+        'high_price': f"{high_px:,.2f}",
+        'low_price': f"{low_px:,.2f}",
+        'prev_close': f"{prev_close:,.2f}",
+        'atm_strike': atm_strike_val,
+        'strike_step': strike_step,
+        'pcr': pcr,
+        'india_vix': f"{india_vix:.2f}" if india_vix else "-",
+        'expiry_info': expiry_info,
         'strikes': strikes_data,
         'last_updated': timezone.now().strftime('%H:%M:%S IST'),
     }
+    cache.set(cache_key, res, timeout=1)
+    try:
+        from apps.market.services import redis_client
+        import json
+        redis_client.set(f"marmot:fyers:option_chain:{idx_clean}", json.dumps(res), ex=5)
+    except Exception:
+        pass
+    return res
+
+
+def get_nifty_mini_option_chain():
+    """Backward-compatible wrapper returning live NIFTY option chain widget."""
+    return get_live_index_option_chain('NIFTY')
+
+
+def get_live_macro_market_cards():
+    """Fetch real-time macro indices (NIFTY, BANKNIFTY, FINNIFTY, INDIA VIX, SENSEX) from FYERS quotes API."""
+    import requests
+    from apps.common.models import SiteSettings
+
+    macro_configs = [
+        {'name': 'NIFTY 50', 'fyers_sym': 'NSE:NIFTY50-INDEX', 'exchange': 'NSE', 'type': 'INDEX'},
+        {'name': 'BANK NIFTY', 'fyers_sym': 'NSE:NIFTYBANK-INDEX', 'exchange': 'NSE', 'type': 'INDEX'},
+        {'name': 'FIN NIFTY', 'fyers_sym': 'NSE:FINNIFTY-INDEX', 'exchange': 'NSE', 'type': 'INDEX'},
+        {'name': 'INDIA VIX', 'fyers_sym': 'NSE:INDIAVIX-INDEX', 'exchange': 'NSE', 'type': 'VOLATILITY'},
+        {'name': 'SENSEX', 'fyers_sym': 'BSE:SENSEX-INDEX', 'exchange': 'BSE', 'type': 'INDEX'},
+    ]
+
+    site_settings = SiteSettings.load()
+    today = timezone.localdate()
+    is_fyers_token_valid = bool(
+        site_settings.fyers_access_token and
+        site_settings.fyers_token_generated_date == today and
+        site_settings.fyers_feed_is_active
+    )
+
+    if not is_fyers_token_valid:
+        return [
+            {
+                'name': m['name'],
+                'fyers_sym': m['fyers_sym'],
+                'exchange': m['exchange'],
+                'type': m['type'],
+                'ltp': '-',
+                'change': '-',
+                'change_pct': '-',
+                'high': '-',
+                'low': '-',
+                'is_positive': True,
+                'is_live': False,
+            }
+            for m in macro_configs
+        ]
+
+    headers = {'Authorization': f"{site_settings.fyers_app_id}:{site_settings.fyers_access_token}"}
+    symbols_query = ','.join([m['fyers_sym'] for m in macro_configs])
+
+    quotes_by_sym = {}
+    try:
+        url = f"https://api-t1.fyers.in/data/quotes?symbols={symbols_query}"
+        resp = requests.get(url, headers=headers, timeout=3.5)
+        if resp.status_code == 200:
+            res_json = resp.json()
+            if res_json.get('s') == 'ok' and res_json.get('d'):
+                for item in res_json['d']:
+                    sym = item.get('n')
+                    val = item.get('v', {})
+                    if sym and val:
+                        quotes_by_sym[sym] = val
+    except Exception:
+        pass
+
+    cards = []
+    for m in macro_configs:
+        sym = m['fyers_sym']
+        q = quotes_by_sym.get(sym)
+        if q and q.get('lp') is not None:
+            lp = float(q.get('lp', 0.0))
+            ch = float(q.get('ch', 0.0))
+            chp = float(q.get('chp', 0.0))
+            hp = float(q.get('high_price', 0.0))
+            low_p = float(q.get('low_price', 0.0))
+            cards.append({
+                'name': m['name'],
+                'fyers_sym': sym,
+                'exchange': m['exchange'],
+                'type': m['type'],
+                'ltp': f"{lp:,.2f}" if lp >= 100 else f"{lp:.2f}",
+                'change': f"{'+' if ch >= 0 else ''}{ch:.2f}",
+                'change_pct': f"{'+' if chp >= 0 else ''}{chp:.2f}%",
+                'high': f"{hp:,.2f}" if hp >= 100 else f"{hp:.2f}",
+                'low': f"{low_p:,.2f}" if low_p >= 100 else f"{low_p:.2f}",
+                'is_positive': ch >= 0,
+                'is_live': True,
+            })
+        else:
+            cards.append({
+                'name': m['name'],
+                'fyers_sym': sym,
+                'exchange': m['exchange'],
+                'type': m['type'],
+                'ltp': '-',
+                'change': '-',
+                'change_pct': '-',
+                'high': '-',
+                'low': '-',
+                'is_positive': True,
+                'is_live': False,
+            })
+
+    return cards
+
+
+def get_live_macro_ribbon_data(selected_index: str = 'NIFTY') -> dict:
+    """Returns real-time selected index quote and hourly Gemini Macro AI intelligence."""
+    import requests
+    from django.core.cache import cache
+    from apps.common.models import SiteSettings
+    from apps.trade_core.scheduler import get_cached_macro_ai_intel
+
+    idx_upper = (selected_index or 'NIFTY').upper().strip()
+    index_map = {
+        'NIFTY': {'name': 'NIFTY 50', 'fyers_sym': 'NSE:NIFTY50-INDEX', 'exchange': 'NSE'},
+        'NIFTY50': {'name': 'NIFTY 50', 'fyers_sym': 'NSE:NIFTY50-INDEX', 'exchange': 'NSE'},
+        'NIFTY 50': {'name': 'NIFTY 50', 'fyers_sym': 'NSE:NIFTY50-INDEX', 'exchange': 'NSE'},
+        'BANKNIFTY': {'name': 'BANK NIFTY', 'fyers_sym': 'NSE:NIFTYBANK-INDEX', 'exchange': 'NSE'},
+        'BANK NIFTY': {'name': 'BANK NIFTY', 'fyers_sym': 'NSE:NIFTYBANK-INDEX', 'exchange': 'NSE'},
+        'FINNIFTY': {'name': 'FIN NIFTY', 'fyers_sym': 'NSE:FINNIFTY-INDEX', 'exchange': 'NSE'},
+        'FIN NIFTY': {'name': 'FIN NIFTY', 'fyers_sym': 'NSE:FINNIFTY-INDEX', 'exchange': 'NSE'},
+        'MIDCPNIFTY': {'name': 'MIDCP NIFTY', 'fyers_sym': 'NSE:MIDCPNIFTY-INDEX', 'exchange': 'NSE'},
+        'SENSEX': {'name': 'SENSEX', 'fyers_sym': 'BSE:SENSEX-INDEX', 'exchange': 'BSE'},
+    }
+    cfg = index_map.get(idx_upper, index_map['NIFTY'])
+
+    cache_key = f"marmot:fyers_quote:{cfg['fyers_sym']}"
+    quote_data = cache.get(cache_key)
+
+    if not quote_data:
+        site_settings = SiteSettings.load()
+        today = timezone.localdate()
+        is_token_valid = bool(
+            site_settings.fyers_access_token and
+            site_settings.fyers_token_generated_date == today and
+            site_settings.fyers_feed_is_active
+        )
+        if is_token_valid:
+            try:
+                headers = {'Authorization': f"{site_settings.fyers_app_id}:{site_settings.fyers_access_token}"}
+                url = f"https://api-t1.fyers.in/data/quotes?symbols={cfg['fyers_sym']}"
+                resp = requests.get(url, headers=headers, timeout=2.5)
+                if resp.status_code == 200:
+                    r_json = resp.json()
+                    if r_json.get('s') == 'ok' and r_json.get('d'):
+                        quote_data = r_json['d'][0].get('v', {})
+                        cache.set(cache_key, quote_data, timeout=2)
+            except Exception:
+                pass
+
+    now_time_str = timezone.localtime().strftime("%I:%M %p")
+    if quote_data and quote_data.get('lp') is not None:
+        lp = float(quote_data.get('lp', 0.0))
+        ch = float(quote_data.get('ch', 0.0))
+        chp = float(quote_data.get('chp', 0.0))
+        hp = float(quote_data.get('high_price', 0.0))
+        low_p = float(quote_data.get('low_price', 0.0))
+        formatted_high = f"{hp:,.2f}" if hp >= 100 else f"{hp:.2f}"
+        formatted_low = f"{low_p:,.2f}" if low_p >= 100 else f"{low_p:.2f}"
+        selected_card = {
+            'name': cfg['name'],
+            'fyers_sym': cfg['fyers_sym'],
+            'exchange': cfg['exchange'],
+            'ltp': f"{lp:,.2f}" if lp >= 100 else f"{lp:.2f}",
+            'change': f"{'+' if ch >= 0 else ''}{ch:.2f}",
+            'change_pct': f"{'+' if chp >= 0 else ''}{chp:.2f}%",
+            'high': formatted_high,
+            'low': formatted_low,
+            'summary': f"Range: ₹{formatted_low} – ₹{formatted_high}",
+            'formatted_time': now_time_str,
+            'is_positive': ch >= 0,
+            'is_live': True,
+        }
+    else:
+        selected_card = {
+            'name': cfg['name'],
+            'fyers_sym': cfg['fyers_sym'],
+            'exchange': cfg['exchange'],
+            'ltp': '-',
+            'change': '-',
+            'change_pct': '-',
+            'high': '-',
+            'low': '-',
+            'summary': 'Live exchange feed standby',
+            'formatted_time': now_time_str,
+            'is_positive': True,
+            'is_live': False,
+        }
+
+    ai_intel = get_cached_macro_ai_intel(selected_index=cfg['name']) or {}
+    model_name = ai_intel.get('model', 'gemini-3.6-flash')
+    sync_time = ai_intel.get('formatted_time', '')
+
+    event_risk_lvl = ai_intel.get('event_risk_level', 'LOW EVENT RISK')
+    global_snt = ai_intel.get('global_sentiment', 'MILD RISK-ON')
+    global_summary = ai_intel.get('global_summary', 'Positive global cues')
+    event_summary = ai_intel.get('event_risk_summary', 'Normal regime volatility')
+
+    macro_cards = [
+        {
+            'card_type': 'REGIME',
+            'title': 'Macro AI Regime',
+            'badge': f"✨ {model_name}",
+            'badge_cls': 'bg-primary bg-opacity-25 text-primary',
+            'value': ai_intel.get('regime_stance', 'BULLISH ACCUMULATION'),
+            'score': f"Conviction: {float(ai_intel.get('regime_conviction', 0.68)):+.2f}",
+            'summary': ai_intel.get('regime_summary', 'Sub-13 VIX indicates stable premium environment'),
+            'icon': 'bi-stars text-primary',
+            'is_positive': float(ai_intel.get('regime_conviction', 0.5)) >= 0,
+            'time': sync_time,
+        },
+        {
+            'card_type': 'INSTITUTIONAL',
+            'title': 'Institutional Flow Bias',
+            'badge': 'FII / DII Flow',
+            'badge_cls': 'bg-success bg-opacity-25 text-success',
+            'value': ai_intel.get('fii_dii_stance', 'NET INSTITUTIONAL ACCUMULATION'),
+            'score': f"Bias Score: {float(ai_intel.get('fii_dii_score', 0.55)):+.2f}",
+            'summary': ai_intel.get('fii_dii_summary', 'Institutional carryover positive with steady DII support'),
+            'icon': 'bi-buildings-fill text-success',
+            'is_positive': float(ai_intel.get('fii_dii_score', 0.5)) >= 0,
+            'time': sync_time,
+        },
+        {
+            'card_type': 'GLOBAL_RISK_GUARD',
+            'title': 'Global & Event Risk',
+            'badge': event_risk_lvl,
+            'badge_cls': 'bg-info bg-opacity-25 text-info',
+            'value': global_snt,
+            'score': f"Score: {float(ai_intel.get('global_score', 0.45)):+.2f} • Guard Active",
+            'summary': f"{global_summary} • {event_summary}",
+            'icon': 'bi-shield-check text-info',
+            'is_positive': float(ai_intel.get('global_score', 0.4)) >= 0,
+            'time': sync_time,
+        },
+    ]
+
+    return {
+        'selected_card': selected_card,
+        'macro_cards': macro_cards,
+        'ai_intel': ai_intel,
+        'selected_index': cfg['name'],
+        'selected_code': idx_upper,
+    }
+

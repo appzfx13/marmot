@@ -15,7 +15,7 @@ from django.contrib import messages
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import redirect, render, get_object_or_404
-from django.urls import reverse_lazy
+from django.urls import reverse, reverse_lazy
 from django.views import View
 from django.views.generic import (
     CreateView,
@@ -41,6 +41,9 @@ from apps.common.services.live_feed_service import (
     get_current_month_calendar_pnl,
     get_today_intraday_equity_curve,
     get_nifty_mini_option_chain,
+    get_live_index_option_chain,
+    get_live_macro_market_cards,
+    get_live_macro_ribbon_data,
 )
 from apps.trade_config.models import BrokerMaster, TradeExecConfig, UserTradingAccount, LiveStrategy
 from apps.trade_core.brokers import BrokerFactory
@@ -111,6 +114,27 @@ class AdminDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
         context['active_configs_count'] = TradeExecConfig.objects.filter(is_active=True, is_deleted=False).count()
         context['broker_masters_count'] = BrokerMaster.objects.filter(is_active=True).count()
         return context
+
+
+def get_available_backup_indexes():
+    """Retrieve distinct indexes available in system backup datasets or standard fallbacks."""
+    from apps.market.models import MarketBackupTask
+    from apps.common.choices import IndexChoices
+
+    labels = dict(IndexChoices.choices)
+    raw_indexes = list(
+        MarketBackupTask.objects.filter(is_deleted=False)
+        .exclude(index_name__isnull=True)
+        .exclude(index_name='')
+        .values_list('index_name', flat=True)
+        .distinct()
+    )
+    if not raw_indexes:
+        raw_indexes = ['NIFTY', 'BANKNIFTY', 'FINNIFTY', 'MIDCPNIFTY', 'SENSEX']
+    elif 'NIFTY' not in raw_indexes:
+        raw_indexes.insert(0, 'NIFTY')
+
+    return [{'code': idx, 'name': labels.get(idx, idx)} for idx in raw_indexes]
 
 
 class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
@@ -246,7 +270,11 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context['market_clock'] = get_ist_market_clock()
         context['calendar_pnl'] = get_current_month_calendar_pnl(live_account or user)
         context['intraday_graph'] = get_today_intraday_equity_curve(live_account or user)
-        context['option_chain'] = get_nifty_mini_option_chain()
+        selected_index = self.request.GET.get('index', 'NIFTY').upper().strip()
+        available_indexes = get_available_backup_indexes()
+        context['available_backup_indexes'] = available_indexes
+        context['selected_index'] = selected_index
+        context['option_chain'] = get_live_index_option_chain(selected_index)
         today = timezone.localdate()
         is_fyers_token_valid = bool(site_settings.fyers_access_token and site_settings.fyers_token_generated_date == today)
         context['fyers_telemetry'] = {
@@ -255,7 +283,47 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
             'app_id': site_settings.fyers_app_id,
             'status': 'ONLINE' if (site_settings.fyers_feed_is_active and is_fyers_token_valid) else ('AUTH_REQUIRED' if not is_fyers_token_valid else 'STANDBY'),
         }
+        macro_ribbon = get_live_macro_ribbon_data(selected_index)
+        context['macro_ribbon'] = macro_ribbon
+        context['selected_macro_card'] = macro_ribbon.get('selected_card')
+        context['macro_ai_cards'] = macro_ribbon.get('macro_cards')
+        context['macro_market_cards'] = get_live_macro_market_cards()
+        context['is_sandbox'] = False
+        context['positions_partial_url'] = reverse('admins:admin-live-positions-partial')
+        context['orders_partial_url'] = reverse('admins:admin-live-orders-partial')
         return context
+
+
+class AdminLiveOptionChainPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial view returning dynamic live option chain and real-time FYERS index quote HUD."""
+    template_name = 'admins/partials/live_mini_option_chain_card.html'
+
+    def get(self, request, *args, **kwargs):
+        index_name = request.GET.get('index', 'NIFTY').upper().strip()
+        available_indexes = get_available_backup_indexes()
+        option_chain = get_live_index_option_chain(index_name)
+        context = {
+            'selected_index': index_name,
+            'available_backup_indexes': available_indexes,
+            'option_chain': option_chain,
+        }
+        return render(request, self.template_name, context)
+
+
+class AdminLiveMacroRibbonView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Ultra-low-latency HTMX partial view returning live selected index and hourly Gemini Macro AI cards."""
+    template_name = 'admins/partials/live_macro_cards_ribbon.html'
+
+    def get(self, request, *args, **kwargs):
+        selected_index = request.GET.get('index', 'NIFTY').upper().strip()
+        macro_ribbon = get_live_macro_ribbon_data(selected_index)
+        context = {
+            'macro_ribbon': macro_ribbon,
+            'selected_macro_card': macro_ribbon.get('selected_card'),
+            'macro_ai_cards': macro_ribbon.get('macro_cards'),
+            'selected_index': selected_index,
+        }
+        return render(request, self.template_name, context)
 
 
 class AdminLivePositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -433,8 +501,194 @@ class AdminLivePositionSquareOffView(LoginRequiredMixin, AdminRequiredMixin, Vie
         return response
 
 
+def get_sandbox_simulated_positions(user_id=None):
+    """Return realistic simulated intraday and closed options positions for Sandbox paper trading."""
+    if user_id:
+        try:
+            from apps.market.services import redis_client
+            import json
+            telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user_id}")
+            if telemetry_raw:
+                data = json.loads(telemetry_raw)
+                if data.get("positions"):
+                    return data["positions"]
+        except Exception:
+            pass
+    return [
+        {
+            'trading_symbol': 'NIFTY 24500 CE',
+            'exchange_segment': 'NSE_FNO',
+            'status': 'OPEN',
+            'product_type': 'INTRADAY',
+            'net_qty': 50,
+            'buy_qty': 50,
+            'buy_avg': 142.50,
+            'sell_qty': 0,
+            'sell_avg': 0.00,
+            'realized_profit': 0.00,
+            'unrealized_profit': 2635.00,
+            'total_pnl': 2635.00,
+        },
+        {
+            'trading_symbol': 'BANKNIFTY 52000 PE',
+            'exchange_segment': 'NSE_FNO',
+            'status': 'OPEN',
+            'product_type': 'INTRADAY',
+            'net_qty': 30,
+            'buy_qty': 30,
+            'buy_avg': 285.00,
+            'sell_qty': 0,
+            'sell_avg': 0.00,
+            'realized_profit': 0.00,
+            'unrealized_profit': 3665.00,
+            'total_pnl': 3665.00,
+        },
+        {
+            'trading_symbol': 'NIFTY 24400 PE',
+            'exchange_segment': 'NSE_FNO',
+            'status': 'CLOSED',
+            'product_type': 'INTRADAY',
+            'net_qty': 0,
+            'buy_qty': 50,
+            'buy_avg': 110.00,
+            'sell_qty': 50,
+            'sell_avg': 165.00,
+            'realized_profit': 2750.00,
+            'unrealized_profit': 0.00,
+            'total_pnl': 2750.00,
+        },
+        {
+            'trading_symbol': 'BANKNIFTY 51800 CE',
+            'exchange_segment': 'NSE_FNO',
+            'status': 'CLOSED',
+            'product_type': 'INTRADAY',
+            'net_qty': 0,
+            'buy_qty': 30,
+            'buy_avg': 320.00,
+            'sell_qty': 30,
+            'sell_avg': 430.00,
+            'realized_profit': 5500.00,
+            'unrealized_profit': 0.00,
+            'total_pnl': 5500.00,
+        },
+    ]
+
+
+def get_sandbox_simulated_orders(user_id=None):
+    """Return realistic simulated broker order execution book entries for Sandbox paper trading."""
+    if user_id:
+        try:
+            from apps.market.services import redis_client
+            import json
+            telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user_id}")
+            if telemetry_raw:
+                data = json.loads(telemetry_raw)
+                if data.get("orders"):
+                    return data["orders"]
+        except Exception:
+            pass
+    return [
+        {
+            'order_id': 'SBX-90811',
+            'create_time': 'Today 10:15 AM',
+            'trading_symbol': 'NIFTY 24500 CE',
+            'exchange_segment': 'NSE_FNO',
+            'transaction_type': 'BUY',
+            'order_type': 'LIMIT',
+            'product_type': 'INTRADAY',
+            'validity': 'DAY',
+            'quantity': 50,
+            'filled_qty': 50,
+            'price': 142.50,
+            'trigger_price': 0.0,
+            'order_status': 'TRADED',
+            'oms_error_desc': '',
+        },
+        {
+            'order_id': 'SBX-90812',
+            'create_time': 'Today 10:45 AM',
+            'trading_symbol': 'BANKNIFTY 52000 PE',
+            'exchange_segment': 'NSE_FNO',
+            'transaction_type': 'BUY',
+            'order_type': 'LIMIT',
+            'product_type': 'INTRADAY',
+            'validity': 'DAY',
+            'quantity': 30,
+            'filled_qty': 30,
+            'price': 285.00,
+            'trigger_price': 0.0,
+            'order_status': 'TRADED',
+            'oms_error_desc': '',
+        },
+        {
+            'order_id': 'SBX-90813',
+            'create_time': 'Today 11:20 AM',
+            'trading_symbol': 'NIFTY 24400 PE',
+            'exchange_segment': 'NSE_FNO',
+            'transaction_type': 'BUY',
+            'order_type': 'MARKET',
+            'product_type': 'INTRADAY',
+            'validity': 'DAY',
+            'quantity': 50,
+            'filled_qty': 50,
+            'price': 110.00,
+            'trigger_price': 0.0,
+            'order_status': 'TRADED',
+            'oms_error_desc': '',
+        },
+        {
+            'order_id': 'SBX-90814',
+            'create_time': 'Today 12:05 PM',
+            'trading_symbol': 'NIFTY 24400 PE',
+            'exchange_segment': 'NSE_FNO',
+            'transaction_type': 'SELL',
+            'order_type': 'LIMIT',
+            'product_type': 'INTRADAY',
+            'validity': 'DAY',
+            'quantity': 50,
+            'filled_qty': 50,
+            'price': 165.00,
+            'trigger_price': 0.0,
+            'order_status': 'TRADED',
+            'oms_error_desc': '',
+        },
+        {
+            'order_id': 'SBX-90815',
+            'create_time': 'Today 01:30 PM',
+            'trading_symbol': 'BANKNIFTY 51800 CE',
+            'exchange_segment': 'NSE_FNO',
+            'transaction_type': 'BUY',
+            'order_type': 'LIMIT',
+            'product_type': 'INTRADAY',
+            'validity': 'DAY',
+            'quantity': 30,
+            'filled_qty': 30,
+            'price': 320.00,
+            'trigger_price': 0.0,
+            'order_status': 'TRADED',
+            'oms_error_desc': '',
+        },
+        {
+            'order_id': 'SBX-90816',
+            'create_time': 'Today 02:15 PM',
+            'trading_symbol': 'NIFTY 24600 CE',
+            'exchange_segment': 'NSE_FNO',
+            'transaction_type': 'BUY',
+            'order_type': 'LIMIT',
+            'product_type': 'INTRADAY',
+            'validity': 'DAY',
+            'quantity': 50,
+            'filled_qty': 0,
+            'price': 85.00,
+            'trigger_price': 0.0,
+            'order_status': 'PENDING',
+            'oms_error_desc': '',
+        },
+    ]
+
+
 class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
-    """Standalone Admin Sandbox Paper-Trading Dashboard running on local simulated ledger."""
+    """Standalone Admin Sandbox Paper-Trading Dashboard mirroring Live UI with zero financial risk."""
     template_name = 'admins/sandbox_dashboard.html'
     partial_template_name = 'admins/partials/sandbox_dashboard_content.html'
 
@@ -442,26 +696,233 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         context = super().get_context_data(**kwargs)
         user = self.request.user
 
-        sandbox_accounts = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name')
-        sandbox_account = sandbox_accounts.filter(is_default=True).first() or sandbox_accounts.first()
+        sandbox_accounts = list(user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name'))
+        sandbox_account = next((a for a in sandbox_accounts if a.is_default), None) or (sandbox_accounts[0] if sandbox_accounts else None)
+        if not sandbox_account:
+            sandbox_broker, _ = BrokerMaster.objects.get_or_create(code='sandbox', defaults={'name': 'SANDBOX', 'description': 'Default Paper Trading Broker Platform'})
+            sandbox_account = UserTradingAccount.objects.create(
+                user=user,
+                account_name='Default Sandbox Account',
+                account_type='SANDBOX',
+                broker=sandbox_broker,
+                broker_client_id=f"SBX-{user.username[:6].upper()}",
+                is_default=True,
+                is_active=True,
+            )
+            sandbox_accounts.append(sandbox_account)
 
+        sandbox_strategies = list(
+            user.live_strategies.filter(is_deleted=False, execution_mode='SANDBOX')
+            .select_related('trading_account__broker', 'backtest_task')
+            .order_by('-created_at')
+        )
+        if not sandbox_strategies:
+            demo_strat = LiveStrategy.objects.create(
+                user=user,
+                trading_account=sandbox_account,
+                name='TensorTrade RL Paper Demo Strategy',
+                strategy_name='tensortrade_rl',
+                index_name='NIFTY',
+                execution_mode='SANDBOX',
+                market_type='OPTIONS',
+                allocated_capital=100000.00,
+                is_active=False,
+                frozen_rules_snapshot=[
+                    {'rule': 'RSI 14 Oversold Entry'},
+                    {'rule': 'Supertrend Bullish Flip'},
+                ],
+            )
+            sandbox_strategies.append(demo_strat)
+
+        context['is_sandbox'] = True
         context['active_tab'] = 'sandbox-dashboard'
+        context['live_account'] = sandbox_account
         context['sandbox_account'] = sandbox_account
-        context['sandbox_accounts'] = list(sandbox_accounts)
+        context['sandbox_accounts'] = sandbox_accounts
+        context['has_live_account'] = True
         context['marmot_profile'] = get_user_profile(user.username)
 
-        context['sandbox_strategy_configs'] = TradeExecConfig.objects.filter(
-            admins_user=user,
-            account_type='SANDBOX',
-            is_deleted=False
-        ).select_related('trading_account')
+        context['broker_name'] = 'SANDBOX PAPER BROKER'
+        context['is_token_active'] = True
+        context['needs_consent'] = False
+        context['available_margin'] = "9,85,450.00"
+        context['cash_balance'] = "10,00,000.00"
+        context['collateral'] = "0.00"
+        context['margin_utilized'] = "14,550.00"
+        context['live_net_pnl'] = 14550.00
+        context['realized_pnl'] = 8250.00
+        context['unrealized_pnl'] = 6300.00
+        context['open_positions_count'] = 2
+        context['closed_positions_count'] = 4
+        context['todays_orders_count'] = 6
+        context['open_orders_count'] = 1
+        context['traded_orders_count'] = 5
+        context['total_invested'] = 14550.00
+        context['current_value'] = 20850.00
+        context['holdings_pnl'] = 6300.00
+        context['holdings_pnl_pct'] = 43.30
+        context['holdings_count'] = 2
 
-        context['virtual_capital'] = "10,00,000.00"
-        context['virtual_available_margin'] = "9,85,450.00"
-        context['simulated_pnl'] = "+14,550.00"
-        context['simulated_win_rate'] = "72.5%"
-        context['simulated_trades_count'] = 18
+        raw_pos = get_sandbox_simulated_positions(user_id=user.id)
+        context['all_positions_count'] = len(raw_pos)
+        pos_paginator = Paginator(raw_pos, 10)
+        context['live_positions'] = pos_paginator.page(1).object_list
+        context['page_obj'] = pos_paginator.page(1)
+        context['is_paginated'] = pos_paginator.num_pages > 1
+
+        raw_ord = get_sandbox_simulated_orders(user_id=user.id)
+        context['orders_count'] = len(raw_ord)
+        ord_paginator = Paginator(raw_ord, 10)
+        context['live_orders'] = ord_paginator.page(1).object_list
+
+        site_settings = SiteSettings.load()
+        context['site_settings'] = site_settings
+        context['master_live_switch'] = site_settings.live_execution_master_switch
+        context['live_strategies'] = sandbox_strategies
+        context['market_clock'] = get_ist_market_clock()
+        context['calendar_pnl'] = get_current_month_calendar_pnl(sandbox_account or user)
+        context['intraday_graph'] = get_today_intraday_equity_curve(sandbox_account or user)
+
+        selected_index = self.request.GET.get('index', 'NIFTY').upper().strip()
+        available_indexes = get_available_backup_indexes()
+        context['available_backup_indexes'] = available_indexes
+        context['selected_index'] = selected_index
+        context['option_chain'] = get_live_index_option_chain(selected_index)
+
+        today = timezone.localdate()
+        is_fyers_token_valid = bool(site_settings.fyers_access_token and site_settings.fyers_token_generated_date == today)
+        context['fyers_telemetry'] = {
+            'feed_active': site_settings.fyers_feed_is_active,
+            'is_token_valid': is_fyers_token_valid,
+            'app_id': site_settings.fyers_app_id,
+            'status': 'ONLINE' if (site_settings.fyers_feed_is_active and is_fyers_token_valid) else ('AUTH_REQUIRED' if not is_fyers_token_valid else 'STANDBY'),
+        }
+        macro_ribbon = get_live_macro_ribbon_data(selected_index)
+        context['macro_ribbon'] = macro_ribbon
+        context['selected_macro_card'] = macro_ribbon.get('selected_card')
+        context['macro_ai_cards'] = macro_ribbon.get('macro_cards')
+        context['macro_market_cards'] = get_live_macro_market_cards()
+
+        context['positions_partial_url'] = reverse('admins:admin-sandbox-positions-partial')
+        context['orders_partial_url'] = reverse('admins:admin-sandbox-orders-partial')
         return context
+
+
+class AdminSandboxPositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial view returning Sandbox simulated positions table with filtering and pagination."""
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+        raw_positions = get_sandbox_simulated_positions(user_id=user.id)
+
+        filter_status = request.GET.get('status', 'ALL').upper()
+        if filter_status == 'OPEN':
+            filtered_positions = [p for p in raw_positions if p.get('status') == 'OPEN']
+        elif filter_status == 'CLOSED':
+            filtered_positions = [p for p in raw_positions if p.get('status') == 'CLOSED']
+        else:
+            filtered_positions = raw_positions
+
+        page_num = request.GET.get('page', 1)
+        paginator = Paginator(filtered_positions, 10)
+        try:
+            page_obj = paginator.page(page_num)
+        except (PageNotAnInteger, EmptyPage):
+            page_obj = paginator.page(1)
+
+        open_cnt = sum(1 for p in raw_positions if p.get('status') == 'OPEN')
+        closed_cnt = sum(1 for p in raw_positions if p.get('status') == 'CLOSED')
+        realized_pnl = sum(p.get('realized_profit', 0.0) for p in raw_positions)
+        unrealized_pnl = sum(p.get('unrealized_profit', 0.0) for p in raw_positions)
+
+        context = {
+            'is_sandbox': True,
+            'positions_partial_url': reverse('admins:admin-sandbox-positions-partial'),
+            'live_positions': page_obj.object_list,
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': paginator.num_pages > 1,
+            'all_positions_count': len(raw_positions),
+            'open_positions_count': open_cnt,
+            'closed_positions_count': closed_cnt,
+            'live_net_pnl': realized_pnl + unrealized_pnl,
+            'realized_pnl': realized_pnl,
+            'unrealized_pnl': unrealized_pnl,
+            'filter_status': filter_status,
+            'live_account': sandbox_account,
+        }
+        return render(request, 'admins/partials/live_positions_table.html', context)
+
+
+class AdminSandboxPositionSquareOffView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Squares off a simulated position in Sandbox mode."""
+
+    def post(self, request, *args, **kwargs):
+        symbol = request.POST.get('symbol', 'Active Position').strip()
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'showToast': {'message': f'[SANDBOX PAPER] Position for {symbol} squared off successfully.', 'level': 'success'},
+            'reloadLivePositions': True,
+            'closeGlobalModal': True,
+        })
+        return response
+
+
+class AdminSandboxOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial view returning Sandbox simulated orders stream with filtering and pagination."""
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+
+        filter_status = request.GET.get('status', 'ALL').upper()
+        if filter_status == 'OPEN':
+            filtered_orders = [o for o in raw_orders if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM']]
+        elif filter_status == 'TRADED':
+            filtered_orders = [o for o in raw_orders if str(o.get('order_status', '')).upper() == 'TRADED']
+        elif filter_status == 'CANCELLED':
+            filtered_orders = [o for o in raw_orders if str(o.get('order_status', '')).upper() in ['CANCELLED', 'REJECTED', 'EXPIRED']]
+        else:
+            filtered_orders = raw_orders
+
+        page_num = request.GET.get('page', 1)
+        paginator = Paginator(filtered_orders, 10)
+        try:
+            page_obj = paginator.page(page_num)
+        except (PageNotAnInteger, EmptyPage):
+            page_obj = paginator.page(1)
+
+        open_orders_cnt = sum(1 for o in raw_orders if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM'])
+        traded_orders_cnt = sum(1 for o in raw_orders if str(o.get('order_status', '')).upper() == 'TRADED')
+
+        context = {
+            'is_sandbox': True,
+            'orders_partial_url': reverse('admins:admin-sandbox-orders-partial'),
+            'live_orders': page_obj.object_list,
+            'page_obj': page_obj,
+            'paginator': paginator,
+            'is_paginated': paginator.num_pages > 1,
+            'orders_count': len(raw_orders),
+            'open_orders_count': open_orders_cnt,
+            'traded_orders_count': traded_orders_cnt,
+            'filter_status': filter_status,
+            'live_account': sandbox_account,
+        }
+        return render(request, 'admins/partials/live_orders_table.html', context)
+
+
+class AdminSandboxOrderCancelView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Cancels a simulated order in Sandbox mode."""
+
+    def post(self, request, order_id, *args, **kwargs):
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'showToast': {'message': f'[SANDBOX PAPER] Order #{order_id} cancelled.', 'level': 'success'},
+            'reloadLiveOrders': True,
+        })
+        return response
 
 
 class AdminAIDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
@@ -1533,10 +1994,34 @@ class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Toggle is_active flag for a LiveStrategy with audit telemetry."""
 
     def post(self, request, pk, *args, **kwargs):
+        import json as _json
         strategy = get_object_or_404(LiveStrategy, pk=pk, user=request.user)
         strategy.is_active = not strategy.is_active
         strategy.status = LiveStrategyStatusChoices.ACTIVE if strategy.is_active else LiveStrategyStatusChoices.PAUSED
         strategy.save(update_fields=['is_active', 'status', 'updated_at'])
+
+        # Publish Redis IPC command to Go strategy worker for SANDBOX paper trading
+        try:
+            from apps.market.services import redis_client
+            from apps.common.constants import REDIS_CHANNEL
+            task_id = f"strategy_{strategy.pk}"
+            command = 'START_STRATEGY' if strategy.is_active else 'PAUSE_STRATEGY'
+            ipc_payload = {
+                'task_id': task_id,
+                'command': command,
+                'params': {
+                    'strategy_name': strategy.strategy_name,
+                    'strategy_id': strategy.pk,
+                    'execution_mode': strategy.execution_mode,
+                    'user_id': str(request.user.id),
+                    'index_name': strategy.index_name or 'NIFTY',
+                    'initial_capital': float(strategy.allocated_capital or 1000000.00),
+                },
+            }
+            redis_client.publish(REDIS_CHANNEL, _json.dumps(ipc_payload))
+        except Exception as exc:
+            import logging
+            logging.getLogger(__name__).warning("Failed to publish strategy IPC command: %s", exc)
 
         status_msg = "ACTIVATED & ARMED" if strategy.is_active else "PAUSED / STANDBY"
         messages.success(request, f"Live Strategy '{strategy.name}' is now {status_msg}.")

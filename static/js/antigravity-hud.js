@@ -65,6 +65,10 @@
     }
   };
 
+  window.openCommandPalette = function() {
+    window.toggleCommandPalette(true);
+  };
+
   document.addEventListener('keydown', function(e) {
     // Open/Close on Cmd+K or Ctrl+K
     if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
@@ -153,8 +157,5 @@
       window.closeGlobalSidebar();
     }
   });
-
-    } catch (err) {}
-  }
 
 })();

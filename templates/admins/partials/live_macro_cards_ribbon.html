@@ -1,0 +1,100 @@
+<!-- templates/admins/partials/live_macro_cards_ribbon.html -->
+<div class="row g-3" 
+     id="live-macro-cards-container"
+     hx-get="{% url 'admins:admin-live-macro-ribbon' %}?index={{ selected_index|default:'NIFTY' }}"
+     hx-trigger="every 2s"
+     hx-swap="outerHTML">
+
+    <!-- CARD 1: Selected Index Real-Time Live Ticker Card -->
+    <div class="col-12 col-sm-6 col-xl-3" style="min-width: 0;">
+        <div class="glass-card p-3 rounded-4 h-100 d-flex flex-column justify-content-between shadow-sm position-relative overflow-hidden" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 14px !important;">
+            
+            <!-- Top Header: Title & Live Badge -->
+            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                <div class="d-flex align-items-center gap-1.5 text-truncate">
+                    <span class="theme-text-muted small fw-bold text-uppercase text-truncate" style="font-size: 0.74rem;" title="{{ selected_macro_card.name }} • {{ selected_macro_card.exchange }}">
+                        <i class="bi bi-graph-up-arrow text-primary me-1"></i>{{ selected_macro_card.name|default:"NIFTY 50" }} &bull; {{ selected_macro_card.exchange|default:"NSE" }}
+                    </span>
+                </div>
+                {% if selected_macro_card.is_live %}
+                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
+                        <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.38rem; height: 0.38rem; animation-duration: 0.75s;"></span>
+                        <span>LIVE TICK</span>
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary bg-opacity-20 text-muted px-2 py-0.5 rounded-pill" style="font-size: 0.62rem;">Offline</span>
+                {% endif %}
+            </div>
+
+            <!-- Main Metric Stance (LTP & Day Range Summary) -->
+            <div class="my-0.5">
+                <div class="d-flex align-items-baseline gap-2">
+                    <h5 class="fw-extrabold theme-text-main mb-0 font-monospace text-truncate" style="font-size: 1.05rem; letter-spacing: -0.01em;">
+                        {% if selected_macro_card.is_live %}₹{{ selected_macro_card.ltp }}{% else %}-{% endif %}
+                    </h5>
+                    <span class="badge {% if selected_macro_card.is_positive %}bg-success bg-opacity-20 text-success{% else %}bg-danger bg-opacity-20 text-danger{% endif %} rounded-pill px-1.5 py-0.5 font-monospace fw-bold" style="font-size: 0.64rem;">
+                        {{ selected_macro_card.change_pct }}
+                    </span>
+                </div>
+                <small class="theme-text-muted text-truncate d-block mt-0.5 font-monospace" style="font-size: 0.72rem;" title="{{ selected_macro_card.summary }}">
+                    {{ selected_macro_card.summary|default:"Day Range: -" }}
+                </small>
+            </div>
+
+            <!-- Score / Change & Real-Time Sync Timestamp Footer -->
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex align-items-center justify-content-between gap-1 flex-wrap" style="font-size: 0.74rem;">
+                <span class="badge {% if selected_macro_card.is_positive %}bg-success bg-opacity-15 text-success border border-success border-opacity-20{% else %}bg-danger bg-opacity-15 text-danger border border-danger border-opacity-20{% endif %} px-2 py-0.5 rounded-pill font-monospace" style="font-size: 0.66rem;">
+                    <i class="bi {% if selected_macro_card.is_positive %}bi-caret-up-fill{% else %}bi-caret-down-fill{% endif %} me-0.5"></i>{{ selected_macro_card.change }} ({{ selected_macro_card.change_pct }})
+                </span>
+                <span class="font-monospace text-white-50 ms-auto" style="font-size: 0.68rem;" title="Live Exchange Tick Stream">
+                    <i class="bi bi-clock me-0.5"></i>{{ selected_macro_card.formatted_time|default:"Live Tick" }}
+                </span>
+            </div>
+
+        </div>
+    </div>
+
+    <!-- CARDS 2 to 4: Latest Macro AI Intelligence Cards (Hourly Gemini Sync via APScheduler) -->
+    {% for card in macro_ai_cards %}
+    <div class="col-12 col-sm-6 col-xl-3" style="min-width: 0;">
+        <div class="glass-card p-3 rounded-4 h-100 d-flex flex-column justify-content-between shadow-sm position-relative overflow-hidden" 
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 14px !important;">
+            
+            <!-- Top Header: Title & AI Badge -->
+            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                <div class="d-flex align-items-center gap-1.5 text-truncate">
+                    <span class="theme-text-muted small fw-bold text-uppercase text-truncate" style="font-size: 0.74rem;" title="{{ card.title }}">
+                        <i class="bi {{ card.icon }} me-1"></i>{{ card.title }}
+                    </span>
+                </div>
+                <span class="badge {{ card.badge_cls }} px-2 py-0.5 rounded-pill fw-bold" style="font-size: 0.62rem;">
+                    {{ card.badge }}
+                </span>
+            </div>
+
+            <!-- Main Metric Stance -->
+            <div class="my-0.5">
+                <h5 class="fw-extrabold {% if card.is_positive %}text-success{% else %}text-warning{% endif %} mb-0 text-truncate" style="font-size: 1.02rem; letter-spacing: -0.01em;" title="{{ card.value }}">
+                    {{ card.value }}
+                </h5>
+                <small class="theme-text-muted text-truncate d-block mt-0.5" style="font-size: 0.72rem;" title="{{ card.summary }}">
+                    {{ card.summary }}
+                </small>
+            </div>
+
+            <!-- Score & Hourly Sync Timestamp Footer -->
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex align-items-center justify-content-between gap-1 flex-wrap" style="font-size: 0.74rem;">
+                <span class="badge bg-dark bg-opacity-50 text-white-50 border border-white border-opacity-10 px-2 py-0.5 rounded-pill font-monospace" style="font-size: 0.66rem;">
+                    {{ card.score }}
+                </span>
+                <span class="font-monospace text-white-50 ms-auto" style="font-size: 0.68rem;" title="Synchronized via APScheduler Hourly Gemini Job">
+                    <i class="bi bi-clock me-0.5"></i>{{ card.time|default:"1h Sync" }}
+                </span>
+            </div>
+
+        </div>
+    </div>
+    {% endfor %}
+
+</div>

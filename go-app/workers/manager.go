@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"log"
+	"strings"
 	"sync"
 
 	"go-app/config"
@@ -14,20 +15,22 @@ import (
 
 // TaskManager handles the lifecycle of backup tasks and listens for IPC commands
 type TaskManager struct {
-	dbService *services.DBService
-	config    *config.Config
-	hub       *ws.Hub
-	activeCtx map[string]context.CancelFunc
-	mu        sync.Mutex
+	dbService    *services.DBService
+	config       *config.Config
+	hub          *ws.Hub
+	redisService *services.RedisService
+	activeCtx    map[string]context.CancelFunc
+	mu           sync.Mutex
 }
 
 // NewTaskManager creates a new instance of TaskManager
-func NewTaskManager(dbService *services.DBService, cfg *config.Config, hub *ws.Hub) *TaskManager {
+func NewTaskManager(dbService *services.DBService, cfg *config.Config, hub *ws.Hub, redisService *services.RedisService) *TaskManager {
 	return &TaskManager{
-		dbService: dbService,
-		config:    cfg,
-		hub:       hub,
-		activeCtx: make(map[string]context.CancelFunc),
+		dbService:    dbService,
+		config:       cfg,
+		hub:          hub,
+		redisService: redisService,
+		activeCtx:    make(map[string]context.CancelFunc),
 	}
 }
 
@@ -82,11 +85,11 @@ func (m *TaskManager) handleMessage(parentCtx context.Context, payloadStr string
 	log.Printf("📩 Received Command: [%s] for Task ID: %s\n", payload.Command, payload.TaskID)
 
 	switch payload.Command {
-	case "START", "RESUME", "START_BACKTEST":
+	case "START", "RESUME", "START_BACKTEST", "START_STRATEGY":
 		m.startOrResumeTask(parentCtx, payload)
-	case "PAUSE":
+	case "PAUSE", "PAUSE_STRATEGY":
 		m.pauseTask(payload.TaskID)
-	case "CANCEL", "STOP":
+	case "CANCEL", "STOP", "STOP_STRATEGY":
 		m.cancelTask(payload.TaskID)
 	default:
 		log.Printf("⚠️ Unknown command: %s\n", payload.Command)
@@ -123,7 +126,10 @@ func (m *TaskManager) pauseTask(taskID string) {
 	}
 	m.mu.Unlock()
 
-	_ = m.dbService.UpdateTaskStatus(context.Background(), taskID, "paused") 
+	// Only update DB for numeric backup tasks (strategy tasks use string IDs)
+	if !strings.HasPrefix(taskID, "strategy_") {
+		_ = m.dbService.UpdateTaskStatus(context.Background(), taskID, "paused")
+	}
 }
 
 // cancelTask cancels the task's context, cleans up map, and updates DB state
@@ -147,8 +153,11 @@ func (m *TaskManager) runWorkerWrapper(ctx context.Context, payload models.Comma
 		m.mu.Unlock()
 	}()
 
-	// Dispatch BacktestJob or BackupJob based on command / params
-	if payload.Command == "START_BACKTEST" || payload.Params.StrategyName != "" {
+	// Dispatch StrategySignalJob, BacktestJob, or BackupJob based on command / params
+	if payload.Command == "START_STRATEGY" {
+		job := NewStrategySignalJob(m.dbService, m.config, payload, m.hub, m.redisService)
+		job.Run(ctx)
+	} else if payload.Command == "START_BACKTEST" || payload.Params.StrategyName != "" {
 		job := NewBacktestJob(m.dbService, m.config, payload, m.hub)
 		job.Run(ctx)
 	} else {

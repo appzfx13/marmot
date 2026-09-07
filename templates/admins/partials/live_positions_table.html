@@ -9,10 +9,10 @@
                 <span>Filter Positions:</span>
             </span>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                <button type="button" 
+                    <button type="button" 
                         class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'ALL' or not filter_status %}border-primary text-primary fw-bold{% endif %}"
                         style="{% if filter_status == 'ALL' or not filter_status %}background: rgba(var(--brand-primary-rgb, 13, 110, 253), 0.12); border-color: var(--brand-primary, #0d6efd) !important; color: #fff !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
-                        hx-get="{% url 'admins:admin-live-positions-partial' %}?status=ALL"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=ALL"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-layers {% if filter_status == 'ALL' or not filter_status %}text-primary{% else %}opacity-75{% endif %}"></i>
@@ -23,7 +23,7 @@
                 <button type="button" 
                         class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'OPEN' %}border-success text-success fw-bold{% endif %}"
                         style="{% if filter_status == 'OPEN' %}background: rgba(25, 135, 84, 0.15); border-color: #198754 !important; color: #198754 !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
-                        hx-get="{% url 'admins:admin-live-positions-partial' %}?status=OPEN"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=OPEN"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-play-circle-fill {% if filter_status == 'OPEN' %}text-success{% else %}opacity-75{% endif %}"></i>
@@ -34,7 +34,7 @@
                 <button type="button" 
                         class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'CLOSED' %}border-secondary text-white-50 fw-bold{% endif %}"
                         style="{% if filter_status == 'CLOSED' %}background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.25) !important; color: #fff !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
-                        hx-get="{% url 'admins:admin-live-positions-partial' %}?status=CLOSED"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=CLOSED"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-check2-circle opacity-75"></i>
@@ -60,7 +60,7 @@
             <button type="button" 
                     class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1.5"
                     style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
-                    hx-get="{% url 'admins:admin-live-positions-partial' %}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.number|default:1 }}"
+                    hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.number|default:1 }}"
                     hx-target="#live-positions-container"
                     hx-swap="outerHTML"
                     title="Refresh Positions">
@@ -139,7 +139,7 @@
                     </td>
                     <td class="text-end pe-3">
                         {% if pos.net_qty != 0 %}
-                            <form hx-post="{% url 'admins:admin-live-position-square-off' %}"
+                            <form hx-post="{% if is_sandbox %}{% url 'admins:admin-sandbox-position-square-off' %}{% else %}{% url 'admins:admin-live-position-square-off' %}{% endif %}"
                                   hx-confirm="Are you sure you want to SQUARE OFF {{ pos.trading_symbol }} (Qty: {{ pos.net_qty }}) at Market Price?"
                                   class="d-inline">
                                 {% csrf_token %}
@@ -172,7 +172,7 @@
                 <button type="button"
                         class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1"
                         style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
-                        hx-get="{% url 'admins:admin-live-positions-partial' %}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.previous_page_number }}"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.previous_page_number }}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML"
                         aria-label="Previous Page">
@@ -190,7 +190,7 @@
                     <button type="button"
                             class="btn-date-picker text-decoration-none shadow-sm px-3 py-1"
                             style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
-                            hx-get="{% url 'admins:admin-live-positions-partial' %}?status={{ filter_status|default:'ALL' }}&page={{ num }}"
+                            hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ num }}"
                             hx-target="#live-positions-container"
                             hx-swap="outerHTML">
                         {{ num }}
@@ -202,7 +202,7 @@
                 <button type="button"
                         class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1"
                         style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
-                        hx-get="{% url 'admins:admin-live-positions-partial' %}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.next_page_number }}"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.next_page_number }}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML"
                         aria-label="Next Page">

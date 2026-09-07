@@ -1,226 +1,442 @@
 <!-- templates/admins/partials/sandbox_dashboard_content.html -->
 <div class="d-flex flex-column gap-4">
 
-    <!-- START: Spark Dashboard Header Banner -->
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <!-- START: Sandbox Dashboard Header Banner -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-1">
         <div>
             <h1 class="page-title">Sandbox Dashboard</h1>
-            <p class="page-subtitle">Risk-free strategy testing environment using simulated virtual capital and zero broker friction.</p>
+            <p class="page-subtitle mb-0">Risk-free strategy testing environment using simulated virtual capital and zero broker friction.</p>
         </div>
-        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap ms-md-auto">
             <span class="trend-badge trend-up py-1.5 px-3">
                 <i class="bi bi-shield-check"></i>
                 <span>Zero Financial Risk</span>
             </span>
 
-            <a href="{% url 'admins:admin-terminal' %}" 
-               class="btn-date-picker text-decoration-none"
-               hx-get="{% url 'admins:admin-terminal' %}"
-               hx-target="#user-portal-container"
+            <span class="trend-badge trend-up py-1.5 px-3 bg-info bg-opacity-20 text-info border border-info border-opacity-30">
+                <i class="bi bi-cpu-fill"></i>
+                <span>Paper Simulation</span>
+            </span>
+
+            <span class="trend-badge trend-up py-1.5 px-3 bg-success bg-opacity-15 text-success border border-success border-opacity-30 font-monospace d-inline-flex align-items-center gap-1.5">
+                <span class="spinner-grow spinner-grow-sm" style="width: 0.45rem; height: 0.45rem;" role="status"></span>
+                <span>SANDBOX ENGINE: ONLINE</span>
+            </span>
+
+            <a href="{% url 'users:user-accounts' %}" 
+               class="btn-date-picker text-decoration-none shadow-sm"
+               style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
+               hx-get="{% url 'users:user-accounts' %}"
+               hx-target="#app-main-container"
                hx-swap="innerHTML"
                hx-push-url="true">
-                <i class="bi bi-terminal-fill"></i>
-                <span>Open Terminal</span>
-                <i class="bi bi-chevron-right ms-1"></i>
+                <i class="bi bi-wallet2 text-primary"></i>
+                <span class="fw-semibold">Paper Accounts</span>
+                <i class="bi bi-chevron-right ms-1 opacity-75"></i>
             </a>
         </div>
     </div>
     <!-- END: Dashboard Header Banner -->
 
-    <!-- START: Top Area Metric Cards (4-Card Setup) -->
-    <div class="row g-3">
-        <!-- Stat Card 1: Green Alert Banner -->
-        <div class="col-xl-3 col-md-6">
-            <div class="card alert-green-card">
-                <div class="position-relative z-index-2">
-                    <span class="alert-green-badge">Paper Simulation</span>
-                    <div class="alert-green-date">Local Sandbox Engine &bull; Zero Risk</div>
-                    <div class="alert-green-text">Simulated ticks &amp; orders active</div>
-                </div>
-                <div class="metric-card-footer border-dark border-opacity-10 z-index-2">
-                    <a href="{% url 'admins:backtest_dashboard' %}" 
-                       class="alert-green-link"
-                       hx-get="{% url 'admins:backtest_dashboard' %}"
-                       hx-target="#user-portal-container"
-                       hx-swap="innerHTML"
-                       hx-push-url="true">
-                        <span>Backtest Hub</span>
-                        <i class="bi bi-arrow-right"></i>
-                    </a>
-                    <span class="badge bg-dark bg-opacity-25 text-white smaller px-2 py-0.5">Mock Mode</span>
-                </div>
+    <!-- Real-Time Exchange Clock HUD -->
+    {% include 'admins/partials/live_clock_widget.html' %}
 
-                <!-- Inline SVG geometric decoration -->
-                <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
-                    <g transform="translate(50,50)">
-                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" />
-                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(60)" />
-                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(120)" />
-                    </g>
-                </svg>
-            </div>
-        </div>
+    <!-- Top Latest Macro Market Benchmark Cards Ribbon -->
+    {% include 'admins/partials/live_macro_cards_ribbon.html' %}
 
-        <!-- Stat Card 2: Virtual Capital -->
-        <div class="col-xl-3 col-md-6">
-            <div class="card theme-metric-card">
-                <div>
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="metric-card-badge">
-                            <i class="bi bi-wallet2 text-info"></i>
-                            <span>Virtual Capital</span>
-                        </span>
-                        <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0.5 smaller fw-bold">Paper Pool</span>
+    <!-- START: Top 8 Portfolio Telemetry Cards (4 Inline x 2 Rows, Spark Design Standard) -->
+    <div class="d-flex flex-column gap-3">
+        <!-- ROW 1: Core Execution & Risk Telemetry -->
+        <div class="row g-3">
+            <!-- Stat Card 1: Broker Session Stream (Alert Green Banner) -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card alert-green-card">
+                    <div class="position-relative z-index-2">
+                        <span class="alert-green-badge">Paper Simulation Online</span>
+                        <div class="alert-green-date">{{ broker_name }} &bull; ID: {{ sandbox_account.broker_client_id|default:"SBX-DEMO" }}</div>
+                        <div class="alert-green-text">
+                            Realtime Stream &bull; {{ open_positions_count }} Open
+                        </div>
                     </div>
-                    <div class="metric-card-date">Simulated Balance Allocation</div>
-                    <div class="metric-card-value text-info">
-                        ₹{{ virtual_capital|default:"10,00,000.00" }}
+                    <div class="metric-card-footer border-dark border-opacity-10 z-index-2">
+                        <a href="{% url 'users:user-accounts' %}" 
+                           class="alert-green-link"
+                           hx-get="{% url 'users:user-accounts' %}"
+                           hx-target="#app-main-container"
+                           hx-swap="innerHTML"
+                           hx-push-url="true">
+                            <span>Accounts</span>
+                            <i class="bi bi-arrow-right"></i>
+                        </a>
+                        <span class="badge bg-dark bg-opacity-25 text-white smaller px-2 py-0.5">Mock Ledger</span>
                     </div>
-                </div>
-                <div class="metric-card-footer">
-                    <span>Margin: ₹{{ virtual_available_margin|default:"9,85,450.00" }}</span>
-                    <span class="text-success fw-bold smaller">Order Ready</span>
+
+                    <!-- Inline SVG geometric decoration -->
+                    <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                        <g transform="translate(50,50)">
+                            <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" />
+                            <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(60)" />
+                            <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="#B4F105" transform="rotate(120)" />
+                        </g>
+                    </svg>
                 </div>
             </div>
-        </div>
 
-        <!-- Stat Card 3: Simulated P&L -->
-        <div class="col-xl-3 col-md-6">
-            <div class="card theme-metric-card">
-                <div>
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="metric-card-badge">
-                            <i class="bi bi-graph-up-arrow text-success"></i>
-                            <span>Simulated P&amp;L</span>
-                        </span>
-                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Win: {{ simulated_win_rate|default:"72.5%" }}</span>
-                    </div>
-                    <div class="metric-card-date">Mock Ledger Returns</div>
-                    <div class="metric-card-value text-success">
-                        {{ simulated_pnl|default:"+14,550.00" }}
-                    </div>
-                </div>
-                <div class="metric-card-footer">
-                    <span>
-                        <i class="bi bi-graph-up-arrow text-success me-1"></i>Performance
-                    </span>
-                    <span>{{ simulated_trades_count|default:"18" }} Trades</span>
-                </div>
-            </div>
-        </div>
-
-        <!-- Stat Card 4: Sandbox Active Rules -->
-        <div class="col-xl-3 col-md-6">
-            <div class="card theme-metric-card">
-                <div>
-                    <div class="d-flex align-items-center justify-content-between mb-2">
-                        <span class="metric-card-badge">
-                            <i class="bi bi-cpu text-primary"></i>
-                            <span>Sandbox Rules</span>
-                        </span>
-                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller fw-bold">Paper Sync</span>
-                    </div>
-                    <div class="metric-card-date">Active Sandbox Ledger</div>
-                    <div class="metric-card-value text-primary">
-                        {{ sandbox_strategy_configs.count }}
-                    </div>
-                </div>
-                <div class="metric-card-footer">
-                    <span>Engine Status</span>
-                    <span class="text-success fw-bold smaller">Mock Ticks Live</span>
-                </div>
-            </div>
-        </div>
-    </div>
-    <!-- END: Top Area Metric Cards (4-Card Setup) -->
-
-    <!-- START: Active Sandbox Strategy Configurations Section -->
-    <div class="row g-4">
-        <div class="col-12">
-            <div class="card mb-0">
-                <div class="card-header d-flex flex-column flex-sm-row align-items-sm-center justify-content-between gap-2">
+            <!-- Stat Card 2: Live Net P&L -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card theme-metric-card">
                     <div>
-                        <h2 class="card-title mb-0">Sandbox Strategy Configurations</h2>
-                        <span class="card-subtitle theme-text-muted small">Configured virtual execution rules running on simulated paper accounts</span>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="metric-card-badge">
+                                <i class="bi bi-graph-up-arrow text-primary"></i>
+                                <span>Simulated Net P&amp;L</span>
+                            </span>
+                            <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Paper Synced</span>
+                        </div>
+                        <div class="metric-card-date">Intraday Simulated Return</div>
+                        <div class="metric-card-value font-monospace {% if live_net_pnl > 0 %}text-success{% elif live_net_pnl < 0 %}text-danger{% endif %}">
+                            {% if live_net_pnl > 0 %}+{% endif %}₹{{ live_net_pnl|floatformat:2 }}
+                        </div>
                     </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-3 py-1.5 small fw-bold">
-                            {{ sandbox_strategy_configs.count }} SANDBOX RULES
-                        </span>
+                    <div class="metric-card-footer">
+                        <div class="trend-badge {% if live_net_pnl >= 0 %}trend-up{% else %}trend-down{% endif %} py-0 px-0 fs-xs">
+                            <i class="bi {% if live_net_pnl >= 0 %}bi-arrow-up-right text-success{% else %}bi-arrow-down-left text-danger{% endif %}"></i>
+                            <span>{{ open_positions_count }} Active Pos</span>
+                        </div>
+                        <span>{{ todays_orders_count }} Orders</span>
                     </div>
                 </div>
+            </div>
 
-                <div class="card-body p-0">
-                    {% if sandbox_strategy_configs %}
-                    <div class="table-responsive">
-                        <table class="table table-custom align-middle mb-0">
-                            <thead>
-                                <tr>
-                                    <th>Config Title</th>
-                                    <th>Market Segment</th>
-                                    <th>Simulation Mode</th>
-                                    <th>Max Loss Rule</th>
-                                    <th>Max Profit Rule</th>
-                                    <th class="text-end pe-4">Execution Status</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {% for cfg in sandbox_strategy_configs %}
-                                <tr>
-                                    <td>
-                                        <div class="fw-bold theme-text-main">{{ cfg.name }}</div>
-                                        <div class="theme-text-muted smaller">ID: #{{ cfg.id }}</div>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2.5 py-1 small">
-                                            {{ cfg.get_market_type_display|default:cfg.market_type }}
-                                        </span>
-                                    </td>
-                                    <td>
-                                        <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-1 small">
-                                            Virtual Paper
-                                        </span>
-                                    </td>
-                                    <td>
-                                        {% if cfg.max_loss_status %}
-                                            <span class="badge bg-danger bg-opacity-25 text-danger font-monospace">₹{{ cfg.max_loss_limit|default:"0.00" }}</span>
-                                        {% else %}
-                                            <span class="theme-text-muted small">Disabled</span>
-                                        {% endif %}
-                                    </td>
-                                    <td>
-                                        {% if cfg.max_profit_status %}
-                                            <span class="badge bg-success bg-opacity-25 text-success font-monospace">₹{{ cfg.max_profit_limit|default:"0.00" }}</span>
-                                        {% else %}
-                                            <span class="theme-text-muted small">Disabled</span>
-                                        {% endif %}
-                                    </td>
-                                    <td class="text-end pe-4">
-                                        {% if cfg.is_active %}
-                                            <span class="trend-badge trend-up py-1 px-2.5 fs-xs d-inline-flex align-items-center gap-1">
-                                                <i class="bi bi-play-circle-fill"></i> Simulating
-                                            </span>
-                                        {% else %}
-                                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-1 small">
-                                                Standby
-                                            </span>
-                                        {% endif %}
-                                    </td>
-                                </tr>
-                                {% endfor %}
-                            </tbody>
-                        </table>
+            <!-- Stat Card 3: Available Margin -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card theme-metric-card">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="metric-card-badge">
+                                <i class="bi bi-wallet2 text-success"></i>
+                                <span>Available Margin</span>
+                            </span>
+                            <a href="{% url 'admins:admin-sandbox-dashboard' %}" 
+                               class="btn btn-sm btn-link theme-text-muted p-0 text-decoration-none smaller"
+                               hx-get="{% url 'admins:admin-sandbox-dashboard' %}"
+                               hx-target="#app-main-container"
+                               hx-swap="innerHTML"
+                               title="Refresh Margin">
+                                <i class="bi bi-arrow-repeat text-primary"></i>
+                            </a>
+                        </div>
+                        <div class="metric-card-date">Virtual Balance: ₹{{ cash_balance }}</div>
+                        <div class="metric-card-value font-monospace text-primary">
+                            ₹{{ available_margin }}
+                        </div>
                     </div>
-                    {% else %}
-                    <div class="text-center py-5 theme-text-muted">
-                        <i class="bi bi-cpu fs-1 opacity-50 mb-2 d-block"></i>
-                        <p class="mb-0">No Sandbox Configurations active.<br>Configurations with <code>account_type='SANDBOX'</code> will execute in paper-trading simulation here.</p>
+                    <div class="metric-card-footer">
+                        <span>
+                            <i class="bi bi-check2-circle text-success me-1"></i>Armed &amp; Synced
+                        </span>
+                        <span class="text-success fw-bold smaller">Paper Power</span>
                     </div>
-                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Stat Card 4: Risk Shield & Kill Switch -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card theme-metric-card">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="metric-card-badge">
+                                <i class="bi bi-shield-lock-fill text-danger"></i>
+                                <span>Risk Shield</span>
+                            </span>
+                            {% if request.user.primary_freeze or request.user.final_freeze %}
+                                <span class="badge bg-danger text-white rounded-pill px-2 py-0.5 smaller fw-bold">Frozen</span>
+                            {% else %}
+                                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Active</span>
+                            {% endif %}
+                        </div>
+                        <div class="metric-card-date">Gate: {% if request.user.trade_eligibility and not request.user.is_blocked %}<strong class="text-success">Enabled</strong>{% else %}<strong class="text-danger">Blocked</strong>{% endif %}</div>
+                        <div class="metric-card-value d-flex align-items-center justify-content-between">
+                            <span class="{% if request.user.primary_freeze or request.user.final_freeze %}text-danger{% endif %}">
+                                {% if request.user.primary_freeze or request.user.final_freeze %}Paused{% else %}Normal Arm{% endif %}
+                            </span>
+                            <button type="button" 
+                                    class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm text-white"
+                                    hx-get="{% url 'users:user-kill-switch' %}"
+                                    hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#globalHtmxModal"
+                                    title="Kill Switch">
+                                <i class="bi bi-lightning-fill"></i>
+                                <span>Kill</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="metric-card-footer">
+                        <span>Circuit Gate Protected</span>
+                        <span class="text-danger fw-bold smaller">Instant Freeze</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ROW 2: Detailed Performance & Capital Telemetry -->
+        <div class="row g-3">
+            <!-- Stat Card 5: Realized P&L -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card theme-metric-card">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="metric-card-badge">
+                                <i class="bi bi-check-circle-fill text-success"></i>
+                                <span>Realized P&amp;L</span>
+                            </span>
+                            <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 smaller fw-bold">{{ closed_positions_count }} Closed</span>
+                        </div>
+                        <div class="metric-card-date">Booked &amp; Settled Performance</div>
+                        <div class="metric-card-value font-monospace {% if realized_pnl > 0 %}text-success{% elif realized_pnl < 0 %}text-danger{% endif %}">
+                            {% if realized_pnl > 0 %}+{% endif %}₹{{ realized_pnl|floatformat:2 }}
+                        </div>
+                    </div>
+                    <div class="metric-card-footer">
+                        <span>
+                            <i class="bi bi-receipt-cutoff text-success me-1"></i>Settled
+                        </span>
+                        <span class="{% if realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold smaller">Confirmed</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stat Card 6: Unrealized P&L (Floating MTM) -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card theme-metric-card">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="metric-card-badge">
+                                <i class="bi bi-water text-info"></i>
+                                <span>Unrealized P&amp;L</span>
+                            </span>
+                            <span class="badge {% if open_positions_count > 0 %}bg-primary bg-opacity-25 text-primary{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 smaller fw-bold">{{ open_positions_count }} Open</span>
+                        </div>
+                        <div class="metric-card-date">Mark-to-Market Realtime Float</div>
+                        <div class="metric-card-value font-monospace {% if unrealized_pnl > 0 %}text-success{% elif unrealized_pnl < 0 %}text-danger{% endif %}">
+                            {% if unrealized_pnl > 0 %}+{% endif %}₹{{ unrealized_pnl|floatformat:2 }}
+                        </div>
+                    </div>
+                    <div class="metric-card-footer">
+                        <span>
+                            <i class="bi bi-activity text-info me-1"></i>MTM Float
+                        </span>
+                        <span class="text-info fw-bold smaller">{{ open_positions_count }} Running</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stat Card 7: Margin Utilized / Exposure -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card theme-metric-card">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="metric-card-badge">
+                                <i class="bi bi-pie-chart-fill text-warning"></i>
+                                <span>Margin Utilized</span>
+                            </span>
+                            <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0.5 smaller fw-bold">Active Exposure</span>
+                        </div>
+                        <div class="metric-card-date">Collateral: ₹{{ collateral|floatformat:2 }}</div>
+                        <div class="metric-card-value font-monospace text-warning">
+                            ₹{{ margin_utilized|floatformat:2 }}
+                        </div>
+                    </div>
+                    <div class="metric-card-footer">
+                        <span>
+                            <i class="bi bi-layers text-warning me-1"></i>Capital in Use
+                        </span>
+                        <span class="text-warning fw-bold smaller">Exposure Ratio</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Stat Card 8: Day Orders & Fills -->
+            <div class="col-12 col-sm-6 col-xl-3">
+                <div class="card theme-metric-card">
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="metric-card-badge">
+                                <i class="bi bi-receipt text-primary"></i>
+                                <span>Day Orders</span>
+                            </span>
+                            <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller fw-bold">{{ traded_orders_count }} Fills</span>
+                        </div>
+                        <div class="metric-card-date">Pending: {{ open_orders_count }}</div>
+                        <div class="metric-card-value font-monospace text-primary">
+                            {{ todays_orders_count }} <span class="fs-6 fw-normal text-muted">Orders</span>
+                        </div>
+                    </div>
+                    <div class="metric-card-footer">
+                        <span>
+                            <i class="bi bi-check2-all text-primary me-1"></i>Traded: {{ traded_orders_count }}
+                        </span>
+                        <span class="text-primary fw-bold smaller">Pending: {{ open_orders_count }}</span>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
-    <!-- END: Active Sandbox Strategy Configurations Section -->
+    <!-- END: Top 8 Portfolio Telemetry Cards -->
+
+    <!-- START: Open / Running Positions (Top Side Priority, Spark Design Standard) -->
+    <div class="card shadow-sm overflow-hidden mb-0 p-0">
+        <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
+                     style="width: 38px; height: 38px; background: rgba(34, 197, 94, 0.12) !important; color: #22c55e !important; border: 1px solid rgba(34, 197, 94, 0.25) !important;">
+                    <i class="bi bi-layers-half fs-5"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Open &amp; Running Positions</h5>
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5">
+                            <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                            <span>{{ open_positions_count }} ACTIVE POSITIONS</span>
+                        </span>
+                    </div>
+                    <small class="theme-text-muted" style="font-size: 0.74rem;">Real-time MTM telemetry, live contract prices, and instant risk exit controls</small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 ms-md-auto">
+                <span class="badge bg-secondary bg-opacity-25 text-white-50 px-3 py-1.5 rounded-pill font-monospace small">
+                    {{ all_positions_count|default:open_positions_count }} Total Contracts
+                </span>
+            </div>
+        </div>
+        <div class="card-body p-3.5">
+            {% include 'admins/partials/live_positions_table.html' %}
+        </div>
+    </div>
+    <!-- END: Open / Running Positions -->
+
+    <!-- START: Chart & Option Chain Row (col-4 Chart Left, col-8 Option Chain Right) -->
+    <div class="row g-3 align-items-stretch">
+        <!-- Col 4: Today's Intraday Equity Curve Chart -->
+        <div class="col-xl-4 col-12 d-flex flex-column">
+            {% include 'admins/partials/live_intraday_graph_card.html' %}
+        </div>
+
+        <!-- Col 8: Real-Time Dynamic Option Chain & Live Pricing Telemetry Widget -->
+        <div class="col-xl-8 col-12 d-flex flex-column" id="live-option-chain-container">
+            {% include 'admins/partials/live_mini_option_chain_card.html' %}
+        </div>
+    </div>
+    <!-- END: Chart & Option Chain Row (col-4 + col-8) -->
+
+    <!-- START: Deployed Algorithmic Strategy Orchestrator (Spark Design Standard) -->
+    <div class="card shadow-sm overflow-hidden mb-0 p-0">
+        <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-primary bg-opacity-15 text-primary d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                    <i class="bi bi-cpu-fill fs-5"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Deployed Algorithmic Strategies</h5>
+                        <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold">
+                            {{ live_strategies|length }} ACTIVE DEPLOYMENTS
+                        </span>
+                        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 fs-xs fw-bold">
+                            PAPER SIMULATION
+                        </span>
+                    </div>
+                    <small class="theme-text-muted" style="font-size: 0.74rem;">TensorTrade RL &amp; quantitative strategy execution registry with isolated rulebook snapshots</small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 ms-md-auto">
+                <a href="{% url 'admins:backtest_dashboard' %}" 
+                   class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none"
+                   hx-get="{% url 'admins:backtest_dashboard' %}" 
+                   hx-target="#app-main-container" 
+                   hx-push-url="true">
+                    <i class="bi bi-plus-lg"></i>
+                    <span>Deploy From Backtest</span>
+                </a>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if live_strategies %}
+            <div class="table-responsive">
+                <table class="table table-custom align-middle mb-0">
+                    <thead>
+                        <tr class="border-bottom" style="border-color: var(--border-color) !important;">
+                            <th>Strategy Name &amp; Origin</th>
+                            <th>Asset</th>
+                            <th>Linked Broker Account</th>
+                            <th>Rule Snapshot</th>
+                            <th>Allocated Capital</th>
+                            <th>Session P&amp;L</th>
+                            <th class="text-end pe-4">Arm / Pause Action</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for strat in live_strategies %}
+                            {% include 'admins/partials/live_strategy_row.html' with strategy=strat %}
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <div class="text-center py-5 theme-text-muted">
+                <div class="rounded-circle bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-2 mx-auto" style="width: 52px; height: 52px;">
+                    <i class="bi bi-rocket-takeoff fs-3 text-primary"></i>
+                </div>
+                <h6 class="fw-bold theme-text-main mb-1">No Deployed Strategies Yet</h6>
+                <p class="small mb-3 mx-auto" style="max-width: 480px;">
+                    Select any completed RL model in the <strong>Backtest Engine</strong> and click 
+                    <span class="badge bg-warning text-dark fw-bold px-2 py-0.5">Move to Execute</span> to deploy it with frozen hyperparameter snapshots.
+                </p>
+                <a href="{% url 'admins:backtest_dashboard' %}" 
+                   class="btn btn-primary btn-sm rounded-pill px-3.5 py-1.5 fw-bold shadow-sm"
+                   hx-get="{% url 'admins:backtest_dashboard' %}" 
+                   hx-target="#app-main-container" 
+                   hx-push-url="true">
+                    Browse Backtest Engine
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <!-- END: Deployed Algorithmic Strategy Orchestrator -->
+
+    <!-- START: Broker Orders & Execution Book (At the Bottom, Spark Design Standard) -->
+    <div class="card shadow-sm overflow-hidden mb-0 p-0">
+        <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-warning bg-opacity-15 text-warning d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                    <i class="bi bi-broadcast fs-5"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Sandbox Orders &amp; Execution Book</h5>
+                        <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold">
+                            {{ todays_orders_count }} TOTAL ORDERS TODAY
+                        </span>
+                    </div>
+                    <small class="theme-text-muted" style="font-size: 0.74rem;">Real-time broker order audit trail, pending triggers, and filled execution logs</small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 ms-md-auto">
+                <span class="badge bg-success bg-opacity-20 text-success rounded-pill px-3 py-1.5 smaller fw-bold font-monospace">
+                    {{ traded_orders_count }} Executed
+                </span>
+                <span class="badge bg-warning bg-opacity-20 text-warning rounded-pill px-3 py-1.5 smaller fw-bold font-monospace">
+                    {{ open_orders_count }} Pending
+                </span>
+            </div>
+        </div>
+        <div class="card-body p-3.5">
+            {% include 'admins/partials/live_orders_table.html' %}
+        </div>
+    </div>
+    <!-- END: Broker Orders & Execution Book -->
 
 </div>

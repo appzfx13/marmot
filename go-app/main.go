@@ -51,7 +51,7 @@ func main() {
 	go hub.Run()
 
 	// 6. Initialize Task Manager
-	taskManager := workers.NewTaskManager(dbService, cfg, hub)
+	taskManager := workers.NewTaskManager(dbService, cfg, hub, redisService)
 
 	// 7. Start Listening for Django IPC Commands on Redis Channel
 	redisChannel := "market_backup_commands"

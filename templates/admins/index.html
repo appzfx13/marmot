@@ -42,7 +42,14 @@
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
     <!-- Antigravity HUD Controller -->
-    <script src="{% static 'js/antigravity-hud.js' %}"></script>
+    <script src="{% static 'js/antigravity-hud.js' %}?v=1.3"></script>
+    <script>
+        window.openCommandPalette = window.openCommandPalette || function() {
+            if (typeof window.toggleCommandPalette === 'function') {
+                window.toggleCommandPalette(true);
+            }
+        };
+    </script>
 
     <!-- Chart.js Library -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.2/dist/chart.umd.min.js"></script>
@@ -2012,7 +2019,7 @@
             <div class="navbar-search-wrapper">
                 <input type="text" class="navbar-search-input"
                     placeholder="Search admin console, users, configs (Ctrl+K)..." id="main-search"
-                    onclick="openCommandPalette && openCommandPalette()">
+                    onclick="if (typeof window.openCommandPalette === 'function') { window.openCommandPalette(); } else if (typeof window.toggleCommandPalette === 'function') { window.toggleCommandPalette(true); }">
                 <button class="navbar-search-btn" aria-label="Search">
                     <i class="bi bi-search"></i>
                 </button>
@@ -2434,9 +2441,16 @@
 
         (function () {
             let wsUrl = "{{ ws_url|default:'' }}";
-            if (!wsUrl && window.location.host) {
-                const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-                wsUrl = proto + '//' + window.location.hostname + ':8082/ws';
+            const host = window.location.hostname || '';
+            const isTunnel = host.includes('ngrok') || host.includes('loca.lt') || host.includes('trycloudflare');
+
+            if (!wsUrl && host) {
+                if (isTunnel) {
+                    wsUrl = null;
+                } else {
+                    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    wsUrl = proto + '//' + host + ':8082/ws';
+                }
             }
 
             window.MarmotWS = {
@@ -2444,12 +2458,18 @@
                 url: wsUrl,
                 subscribers: {},
                 callbacks: {},
-                reconnectDelay: 2500,
-                useFallback: false,
+                reconnectDelay: 5000,
+                maxReconnectAttempts: 3,
+                reconnectAttempts: 0,
+                useFallback: isTunnel,
                 fallbackIntervals: {},
 
                 connect: function () {
-                    if (!this.url) return;
+                    if (!this.url || this.useFallback) return;
+                    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                        this.enableFallback();
+                        return;
+                    }
                     if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
                         return;
                     }
@@ -2458,45 +2478,40 @@
                         this.ws.onopen = function () {
                             console.log('✅ [WS] Connected to WebSocket Hub:', window.MarmotWS.url);
                             window.MarmotWS.useFallback = false;
+                            window.MarmotWS.reconnectAttempts = 0;
                             const activeSubTasks = Object.keys(window.MarmotWS.subscribers);
-                            console.log('📡 [WS] Registering active subscriptions for tasks:', activeSubTasks);
                             activeSubTasks.forEach(function (taskId) {
                                 if (window.MarmotWS.ws && window.MarmotWS.ws.readyState === WebSocket.OPEN) {
                                     window.MarmotWS.ws.send(JSON.stringify({ type: 'subscribe', task_id: String(taskId) }));
-                                    console.log('📤 [WS Sent subscribe]: task_id =', String(taskId));
                                 }
                             });
                         };
                         this.ws.onmessage = function (event) {
                             try {
                                 const data = JSON.parse(event.data);
-                                console.log('📥 [WS Message Received]:', data);
                                 if (data.type !== 'progress' && data.type !== 'backtest_progress') return;
                                 const taskIdStr = String(data.task_id);
                                 const cbs = window.MarmotWS.callbacks[taskIdStr];
                                 if (cbs && cbs.length > 0) {
-                                    console.log('⚡ [WS Triggering ' + cbs.length + ' callback(s) for task #' + taskIdStr + ']: ' + data.progress + '% (' + data.status + ') | ' + (data.step_info || ''));
                                     cbs.forEach(function (cb) {
-                                        try { cb(data); } catch (err) { console.error('[WS Callback Error]', err); }
+                                        try { cb(data); } catch (err) {}
                                     });
-                                } else {
-                                    console.warn('⚠️ [WS] Received progress for task #' + taskIdStr + ' but no callbacks registered in MarmotWS.callbacks!');
                                 }
-                            } catch (e) {
-                                console.error('❌ [WS Parse Error]:', e, event.data);
-                            }
+                            } catch (e) {}
                         };
                         this.ws.onclose = function () {
-                            console.log('🔌 [WS] Disconnected. Reconnecting in', window.MarmotWS.reconnectDelay, 'ms');
                             window.MarmotWS.ws = null;
-                            setTimeout(function () { window.MarmotWS.connect(); }, window.MarmotWS.reconnectDelay);
+                            if (!window.MarmotWS.useFallback && window.MarmotWS.reconnectAttempts < window.MarmotWS.maxReconnectAttempts) {
+                                window.MarmotWS.reconnectAttempts++;
+                                setTimeout(function () { window.MarmotWS.connect(); }, window.MarmotWS.reconnectDelay);
+                            } else {
+                                window.MarmotWS.enableFallback();
+                            }
                         };
                         this.ws.onerror = function (err) {
-                            console.error('❌ [WS Error]:', err);
                             window.MarmotWS.enableFallback();
                         };
                     } catch (e) {
-                        console.error('❌ [WS Connect Exception]:', e);
                         window.MarmotWS.enableFallback();
                     }
                 },

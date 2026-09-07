@@ -34,6 +34,17 @@ INDEX_STRIKE_INTERVAL = {
     'GIFTNIFTY':  50,
 }
 
+# FYERS Broker Real-Time Streaming Symbols
+FYERS_INDEX_SYMBOLS = {
+    'NIFTY':      'NSE:NIFTY50-INDEX',
+    'BANKNIFTY':  'NSE:NIFTYBANK-INDEX',
+    'FINNIFTY':   'NSE:FINNIFTY-INDEX',
+    'MIDCPNIFTY': 'NSE:MIDCPNIFTY-INDEX',
+    'SENSEX':     'BSE:SENSEX-INDEX',
+    'GIFTNIFTY':  'NSE:GIFTNIFTY-INDEX',
+    'INDIAVIX':   'NSE:INDIAVIX-INDEX',
+}
+
 # Historical Lot Size Timelines for Indian Indices (NSE & BSE Circulars 2020 to Present)
 HISTORICAL_INDEX_LOT_SIZES = {
     'NIFTY': [

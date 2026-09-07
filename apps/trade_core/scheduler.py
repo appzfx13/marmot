@@ -54,6 +54,33 @@ def renew_keep_alive_tokens_job():
     logger.info("🏁 [APScheduler] Token Renewal Finished. Renewed: %d, Failed: %d", total_renewed, total_failed)
 
 
+def fetch_macro_ai_data_job():
+    """Periodic job running every 1 hour to synthesize live macro intelligence via Gemini AI."""
+    from django.core.cache import cache
+    from apps.common.services.gemini_service import GeminiAIService
+
+    logger.info("🤖 [APScheduler] Starting 1-hour Gemini Macro AI Ingestion Job...")
+    try:
+        intel = GeminiAIService.fetch_current_macro_ai_intel(selected_index="NIFTY")
+        if intel:
+            cache.set("marmot:macro_ai:latest_intel", intel, timeout=7200)
+            logger.info("✅ [APScheduler] Gemini Macro AI Ingestion Succeeded (Model: %s, Stance: %s)",
+                        intel.get("model"), intel.get("regime_stance"))
+            return intel
+    except Exception as e:
+        logger.error("❌ [APScheduler] Gemini Macro AI Ingestion Failed: %s", e)
+    return None
+
+
+def get_cached_macro_ai_intel(selected_index="NIFTY"):
+    """Returns cached Gemini Macro AI intel or triggers on-demand computation if cold."""
+    from django.core.cache import cache
+    cached = cache.get("marmot:macro_ai:latest_intel")
+    if not cached:
+        cached = fetch_macro_ai_data_job()
+    return cached
+
+
 def start_scheduler():
     """Initialize and start the background APScheduler instance safely."""
     global _scheduler
@@ -76,8 +103,20 @@ def start_scheduler():
         coalesce=True,
     )
 
+    # Register 1-hour Gemini Macro AI Ingestion job
+    _scheduler.add_job(
+        fetch_macro_ai_data_job,
+        trigger=IntervalTrigger(hours=1),
+        id='gemini_macro_ai_sync_1h',
+        name='Gemini AI Hourly Macro Intelligence Sync',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         _scheduler.start()
-        logger.info("🚀 [APScheduler] BackgroundScheduler started successfully with 8h Dhan Token Renewal Job.")
+        logger.info("🚀 [APScheduler] BackgroundScheduler started with 8h Dhan Renewal & 1h Gemini AI Macro Jobs.")
     except Exception as e:
         logger.error("Failed to start BackgroundScheduler: %s", e)
+
