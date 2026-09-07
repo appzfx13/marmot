@@ -416,26 +416,37 @@ class UserSandboxDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, Templa
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        
+
         sandbox_accounts = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name')
         sandbox_account = sandbox_accounts.filter(is_default=True).first() or sandbox_accounts.first()
-        
+
+        telemetry_summary = {}
+        try:
+            from apps.market.services import redis_client
+            import json
+            telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user.id}")
+            if telemetry_raw:
+                t_data = json.loads(telemetry_raw)
+                telemetry_summary = t_data.get("summary", {})
+        except Exception:
+            pass
+
         context['active_tab'] = 'sandbox-dashboard'
         context['sandbox_account'] = sandbox_account
         context['sandbox_accounts'] = list(sandbox_accounts)
         context['marmot_profile'] = get_user_profile(user.username)
-        
+
         context['sandbox_strategy_configs'] = TradeExecConfig.objects.filter(
             admins_user=user,
             account_type='SANDBOX',
             is_deleted=False
         ).select_related('trading_account')
-        
-        context['virtual_capital'] = "10,00,000.00"
-        context['virtual_available_margin'] = "9,85,450.00"
-        context['simulated_pnl'] = "+14,550.00"
-        context['simulated_win_rate'] = "72.5%"
-        context['simulated_trades_count'] = 18
+
+        context['virtual_capital'] = telemetry_summary.get('cash', "10,00,000.00")
+        context['virtual_available_margin'] = telemetry_summary.get('available_margin', "10,00,000.00")
+        context['simulated_pnl'] = telemetry_summary.get('live_net_pnl', 0.00)
+        context['simulated_win_rate'] = telemetry_summary.get('win_rate', "0.0%")
+        context['simulated_trades_count'] = telemetry_summary.get('trades_count', 0)
         return context
 
 

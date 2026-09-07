@@ -11,10 +11,22 @@ class AdminRequiredMixin(UserPassesTestMixin):
         user = self.request.user
         if not user.is_authenticated:
             return False
-            
+
         user_role = getattr(user, 'role', None)
         allowed_admin_roles = ['admin', 'developer', 'staff']
         return user.is_superuser or user.is_staff or user_role in allowed_admin_roles
+
+    def handle_no_permission(self):
+        from django.urls import reverse
+        from django.http import HttpResponse
+        from django.shortcuts import redirect
+
+        login_url = reverse('admins:admin-login')
+        if self.request.headers.get('HX-Request'):
+            response = HttpResponse(status=200)
+            response['HX-Redirect'] = login_url
+            return response
+        return redirect(login_url)
 
 
 class DeveloperOrAdminRequiredMixin(UserPassesTestMixin):

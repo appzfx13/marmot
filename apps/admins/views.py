@@ -502,7 +502,7 @@ class AdminLivePositionSquareOffView(LoginRequiredMixin, AdminRequiredMixin, Vie
 
 
 def get_sandbox_simulated_positions(user_id=None):
-    """Return realistic simulated intraday and closed options positions for Sandbox paper trading."""
+    """Return simulated intraday and closed options positions from live Redis telemetry."""
     if user_id:
         try:
             from apps.market.services import redis_client
@@ -514,68 +514,11 @@ def get_sandbox_simulated_positions(user_id=None):
                     return data["positions"]
         except Exception:
             pass
-    return [
-        {
-            'trading_symbol': 'NIFTY 24500 CE',
-            'exchange_segment': 'NSE_FNO',
-            'status': 'OPEN',
-            'product_type': 'INTRADAY',
-            'net_qty': 50,
-            'buy_qty': 50,
-            'buy_avg': 142.50,
-            'sell_qty': 0,
-            'sell_avg': 0.00,
-            'realized_profit': 0.00,
-            'unrealized_profit': 2635.00,
-            'total_pnl': 2635.00,
-        },
-        {
-            'trading_symbol': 'BANKNIFTY 52000 PE',
-            'exchange_segment': 'NSE_FNO',
-            'status': 'OPEN',
-            'product_type': 'INTRADAY',
-            'net_qty': 30,
-            'buy_qty': 30,
-            'buy_avg': 285.00,
-            'sell_qty': 0,
-            'sell_avg': 0.00,
-            'realized_profit': 0.00,
-            'unrealized_profit': 3665.00,
-            'total_pnl': 3665.00,
-        },
-        {
-            'trading_symbol': 'NIFTY 24400 PE',
-            'exchange_segment': 'NSE_FNO',
-            'status': 'CLOSED',
-            'product_type': 'INTRADAY',
-            'net_qty': 0,
-            'buy_qty': 50,
-            'buy_avg': 110.00,
-            'sell_qty': 50,
-            'sell_avg': 165.00,
-            'realized_profit': 2750.00,
-            'unrealized_profit': 0.00,
-            'total_pnl': 2750.00,
-        },
-        {
-            'trading_symbol': 'BANKNIFTY 51800 CE',
-            'exchange_segment': 'NSE_FNO',
-            'status': 'CLOSED',
-            'product_type': 'INTRADAY',
-            'net_qty': 0,
-            'buy_qty': 30,
-            'buy_avg': 320.00,
-            'sell_qty': 30,
-            'sell_avg': 430.00,
-            'realized_profit': 5500.00,
-            'unrealized_profit': 0.00,
-            'total_pnl': 5500.00,
-        },
-    ]
+    return []
 
 
 def get_sandbox_simulated_orders(user_id=None):
-    """Return realistic simulated broker order execution book entries for Sandbox paper trading."""
+    """Return simulated broker order execution book entries from live Redis telemetry."""
     if user_id:
         try:
             from apps.market.services import redis_client
@@ -587,104 +530,7 @@ def get_sandbox_simulated_orders(user_id=None):
                     return data["orders"]
         except Exception:
             pass
-    return [
-        {
-            'order_id': 'SBX-90811',
-            'create_time': 'Today 10:15 AM',
-            'trading_symbol': 'NIFTY 24500 CE',
-            'exchange_segment': 'NSE_FNO',
-            'transaction_type': 'BUY',
-            'order_type': 'LIMIT',
-            'product_type': 'INTRADAY',
-            'validity': 'DAY',
-            'quantity': 50,
-            'filled_qty': 50,
-            'price': 142.50,
-            'trigger_price': 0.0,
-            'order_status': 'TRADED',
-            'oms_error_desc': '',
-        },
-        {
-            'order_id': 'SBX-90812',
-            'create_time': 'Today 10:45 AM',
-            'trading_symbol': 'BANKNIFTY 52000 PE',
-            'exchange_segment': 'NSE_FNO',
-            'transaction_type': 'BUY',
-            'order_type': 'LIMIT',
-            'product_type': 'INTRADAY',
-            'validity': 'DAY',
-            'quantity': 30,
-            'filled_qty': 30,
-            'price': 285.00,
-            'trigger_price': 0.0,
-            'order_status': 'TRADED',
-            'oms_error_desc': '',
-        },
-        {
-            'order_id': 'SBX-90813',
-            'create_time': 'Today 11:20 AM',
-            'trading_symbol': 'NIFTY 24400 PE',
-            'exchange_segment': 'NSE_FNO',
-            'transaction_type': 'BUY',
-            'order_type': 'MARKET',
-            'product_type': 'INTRADAY',
-            'validity': 'DAY',
-            'quantity': 50,
-            'filled_qty': 50,
-            'price': 110.00,
-            'trigger_price': 0.0,
-            'order_status': 'TRADED',
-            'oms_error_desc': '',
-        },
-        {
-            'order_id': 'SBX-90814',
-            'create_time': 'Today 12:05 PM',
-            'trading_symbol': 'NIFTY 24400 PE',
-            'exchange_segment': 'NSE_FNO',
-            'transaction_type': 'SELL',
-            'order_type': 'LIMIT',
-            'product_type': 'INTRADAY',
-            'validity': 'DAY',
-            'quantity': 50,
-            'filled_qty': 50,
-            'price': 165.00,
-            'trigger_price': 0.0,
-            'order_status': 'TRADED',
-            'oms_error_desc': '',
-        },
-        {
-            'order_id': 'SBX-90815',
-            'create_time': 'Today 01:30 PM',
-            'trading_symbol': 'BANKNIFTY 51800 CE',
-            'exchange_segment': 'NSE_FNO',
-            'transaction_type': 'BUY',
-            'order_type': 'LIMIT',
-            'product_type': 'INTRADAY',
-            'validity': 'DAY',
-            'quantity': 30,
-            'filled_qty': 30,
-            'price': 320.00,
-            'trigger_price': 0.0,
-            'order_status': 'TRADED',
-            'oms_error_desc': '',
-        },
-        {
-            'order_id': 'SBX-90816',
-            'create_time': 'Today 02:15 PM',
-            'trading_symbol': 'NIFTY 24600 CE',
-            'exchange_segment': 'NSE_FNO',
-            'transaction_type': 'BUY',
-            'order_type': 'LIMIT',
-            'product_type': 'INTRADAY',
-            'validity': 'DAY',
-            'quantity': 50,
-            'filled_qty': 0,
-            'price': 85.00,
-            'trigger_price': 0.0,
-            'order_status': 'PENDING',
-            'oms_error_desc': '',
-        },
-    ]
+    return []
 
 
 class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
@@ -734,6 +580,32 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
             )
             sandbox_strategies.append(demo_strat)
 
+        raw_pos = get_sandbox_simulated_positions(user_id=user.id)
+        raw_ord = get_sandbox_simulated_orders(user_id=user.id)
+
+        telemetry_summary = {}
+        try:
+            from apps.market.services import redis_client
+            telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user.id}")
+            if telemetry_raw:
+                t_data = json.loads(telemetry_raw)
+                telemetry_summary = t_data.get("summary", {})
+        except Exception:
+            pass
+
+        open_cnt = sum(1 for p in raw_pos if p.get('status') == 'OPEN')
+        closed_cnt = sum(1 for p in raw_pos if p.get('status') == 'CLOSED')
+        realized_pnl = sum(float(p.get('realized_profit', 0.0)) for p in raw_pos)
+        unrealized_pnl = sum(float(p.get('unrealized_profit', 0.0)) for p in raw_pos)
+        net_pnl = realized_pnl + unrealized_pnl
+
+        open_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM'])
+        traded_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() == 'TRADED')
+
+        base_capital = 1000000.00
+        margin_used = sum(float(p.get('buy_avg', 0.0)) * int(p.get('net_qty', 0)) for p in raw_pos if p.get('status') == 'OPEN')
+        avail_margin = base_capital - margin_used + realized_pnl
+
         context['is_sandbox'] = True
         context['active_tab'] = 'sandbox-dashboard'
         context['live_account'] = sandbox_account
@@ -745,32 +617,30 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         context['broker_name'] = 'SANDBOX PAPER BROKER'
         context['is_token_active'] = True
         context['needs_consent'] = False
-        context['available_margin'] = "9,85,450.00"
-        context['cash_balance'] = "10,00,000.00"
+        context['available_margin'] = telemetry_summary.get('available_margin', f"{avail_margin:,.2f}")
+        context['cash_balance'] = telemetry_summary.get('cash', f"{base_capital:,.2f}")
         context['collateral'] = "0.00"
-        context['margin_utilized'] = "14,550.00"
-        context['live_net_pnl'] = 14550.00
-        context['realized_pnl'] = 8250.00
-        context['unrealized_pnl'] = 6300.00
-        context['open_positions_count'] = 2
-        context['closed_positions_count'] = 4
-        context['todays_orders_count'] = 6
-        context['open_orders_count'] = 1
-        context['traded_orders_count'] = 5
-        context['total_invested'] = 14550.00
-        context['current_value'] = 20850.00
-        context['holdings_pnl'] = 6300.00
-        context['holdings_pnl_pct'] = 43.30
-        context['holdings_count'] = 2
+        context['margin_utilized'] = telemetry_summary.get('margin_utilized', f"{margin_used:,.2f}")
+        context['live_net_pnl'] = telemetry_summary.get('live_net_pnl', net_pnl)
+        context['realized_pnl'] = telemetry_summary.get('realized_pnl', realized_pnl)
+        context['unrealized_pnl'] = telemetry_summary.get('unrealized_pnl', unrealized_pnl)
+        context['open_positions_count'] = open_cnt
+        context['closed_positions_count'] = closed_cnt
+        context['todays_orders_count'] = len(raw_ord)
+        context['open_orders_count'] = open_ord_cnt
+        context['traded_orders_count'] = traded_ord_cnt
+        context['total_invested'] = margin_used
+        context['current_value'] = margin_used + unrealized_pnl
+        context['holdings_pnl'] = unrealized_pnl
+        context['holdings_pnl_pct'] = (unrealized_pnl / margin_used * 100.0) if margin_used > 0 else 0.00
+        context['holdings_count'] = open_cnt
 
-        raw_pos = get_sandbox_simulated_positions(user_id=user.id)
         context['all_positions_count'] = len(raw_pos)
         pos_paginator = Paginator(raw_pos, 10)
         context['live_positions'] = pos_paginator.page(1).object_list
         context['page_obj'] = pos_paginator.page(1)
         context['is_paginated'] = pos_paginator.num_pages > 1
 
-        raw_ord = get_sandbox_simulated_orders(user_id=user.id)
         context['orders_count'] = len(raw_ord)
         ord_paginator = Paginator(raw_ord, 10)
         context['live_orders'] = ord_paginator.page(1).object_list
@@ -971,7 +841,7 @@ class AdminLogoutView(View):
         login_url = str(reverse_lazy('admins:admin-login'))
 
         if request.headers.get('HX-Request'):
-            response = HttpResponse(status=204)
+            response = HttpResponse(status=200)
             response['HX-Redirect'] = login_url
             return response
 
