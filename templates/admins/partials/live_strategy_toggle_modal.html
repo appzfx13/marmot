@@ -1,20 +1,23 @@
 {% load static %}
 <!-- Modal Content: Confirm Live Strategy Activation / Standby -->
-<div class="modal-content glass-card border-0 shadow-lg" style="background: var(--modal-bg, #0B1D16); color: var(--text-main, #F1F5F9); border: 1px solid var(--border-color, rgba(255,255,255,0.1)) !important; border-radius: 1.25rem;">
+<div class="modal-content glass-card border-0 shadow-2xl overflow-hidden" 
+     style="background: var(--glass-bg, rgba(11, 29, 22, 0.92)) !important; backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); color: var(--text-main, #F1F5F9); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)) !important; border-radius: 1.25rem; font-family: var(--font-sans, inherit);">
+    
     <!-- Modal Header -->
-    <div class="modal-header border-bottom border-white border-opacity-10 px-4 py-3">
-        <div class="d-flex align-items-center gap-2.5">
-            <div class="rounded-circle p-2 {% if will_activate %}bg-success bg-opacity-20 text-success{% else %}bg-warning bg-opacity-20 text-warning{% endif %} d-flex align-items-center justify-content-center" style="width: 42px; height: 42px;">
+    <div class="modal-header border-bottom border-white border-opacity-10 px-4 py-3.5 d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.02);">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" 
+                 style="width: 44px; height: 44px; {% if will_activate %}background: rgba(180, 241, 5, 0.12); border: 1px solid rgba(180, 241, 5, 0.35); color: #B4F105;{% else %}background: rgba(245, 158, 11, 0.12); border: 1px solid rgba(245, 158, 11, 0.35); color: #fbbf24;{% endif %}">
                 <span class="material-icons fs-5">{% if will_activate %}power_settings_new{% else %}pause_circle{% endif %}</span>
             </div>
             <div>
-                <h5 class="modal-title fw-bold mb-0 text-white">
+                <h5 class="modal-title fw-bold mb-0 text-white" style="font-size: 1.1rem; letter-spacing: -0.01em;">
                     {% if will_activate %}Confirm Strategy Activation{% else %}Confirm Strategy Standby{% endif %}
                 </h5>
-                <small class="text-muted">Live Strategy #{{ strategy.id }} &bull; {{ strategy.index_name }}</small>
+                <small class="theme-text-muted opacity-85 fw-medium" style="font-size: 0.78rem;">Live Strategy #{{ strategy.id }} &bull; {{ strategy.index_name }}</small>
             </div>
         </div>
-        <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close btn-close-white opacity-75 shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
 
     <!-- Form for Toggling State -->
@@ -24,52 +27,56 @@
           id="toggleLiveStrategyForm"
           onsubmit="bootstrap.Modal.getInstance(document.getElementById('globalHtmxModal'))?.hide();">
         {% csrf_token %}
-        <div class="modal-body px-4 py-3">
+        <div class="modal-body px-4 py-4">
             {% if will_activate %}
-                <div class="alert border-0 rounded-3 p-3 mb-3 d-flex align-items-start gap-2.5" 
-                     style="background: rgba(180, 241, 5, 0.08); border-left: 4px solid #B4F105 !important;">
-                    <span class="material-icons text-warning fs-5 mt-0.5">warning</span>
-                    <div class="small">
-                        <strong class="text-white d-block mb-1">Live Order Execution Warning:</strong>
-                        <span class="text-muted">
-                            Activating <strong>{{ strategy.name }}</strong> will arm the automated trade loop. When the TensorTrade model detects rule-compliant signals, live orders will be placed immediately via <strong>{{ strategy.trading_account.account_name|default:"Configured Broker" }}</strong>.
+                <div class="rounded-3 p-3 mb-3 d-flex align-items-start gap-3 shadow-xs" 
+                     style="background: rgba(180, 241, 5, 0.08); border: 1px solid rgba(180, 241, 5, 0.25); border-left: 4px solid #B4F105 !important;">
+                    <span class="material-icons text-warning fs-5 mt-0.5 flex-shrink-0" style="color: #B4F105 !important;">warning_amber</span>
+                    <div style="font-size: 0.84rem; line-height: 1.45;">
+                        <strong class="text-white d-block mb-1 fw-bold" style="font-size: 0.88rem;">Live Order Execution Warning</strong>
+                        <span style="color: rgba(241, 245, 249, 0.88);">
+                            Activating <strong class="text-white">{{ strategy.name }}</strong> will arm the automated trade loop. When the model detects rule-compliant signals, live orders will be executed via <strong class="text-white">{{ strategy.trading_account.account_name|default:"Configured Broker" }}</strong>.
                         </span>
                     </div>
                 </div>
             {% else %}
-                <div class="alert border-0 rounded-3 p-3 mb-3 d-flex align-items-start gap-2.5" 
-                     style="background: rgba(239, 68, 68, 0.08); border-left: 4px solid #ef4444 !important;">
-                    <span class="material-icons text-danger fs-5 mt-0.5">pause</span>
-                    <div class="small">
-                        <strong class="text-white d-block mb-1">Pausing Strategy Signal Generation:</strong>
-                        <span class="text-muted">
-                            Setting <strong>{{ strategy.name }}</strong> to Standby will prevent any new order signals from executing. Existing open broker positions will remain subject to stop-loss rules.
+                <div class="rounded-3 p-3 mb-3 d-flex align-items-start gap-3 shadow-xs" 
+                     style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-left: 4px solid #ef4444 !important;">
+                    <span class="material-icons text-danger fs-5 mt-0.5 flex-shrink-0">pause_circle_outline</span>
+                    <div style="font-size: 0.84rem; line-height: 1.45;">
+                        <strong class="text-white d-block mb-1 fw-bold" style="font-size: 0.88rem;">Pausing Strategy Signal Generation</strong>
+                        <span style="color: rgba(241, 245, 249, 0.88);">
+                            Setting <strong class="text-white">{{ strategy.name }}</strong> to Standby will prevent new order signals from executing. Existing open positions remain subject to auto stop-loss rules.
                         </span>
                     </div>
                 </div>
             {% endif %}
 
             <!-- Strategy Snapshot Details Card -->
-            <div class="p-3 rounded-3 border border-white border-opacity-10 smaller" style="background: rgba(0,0,0,0.2);">
-                <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5">
-                    <span class="text-muted">Strategy Title:</span>
-                    <strong class="text-white">{{ strategy.name }}</strong>
+            <div class="p-3.5 rounded-3 border shadow-xs" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important; font-size: 0.84rem;">
+                <div class="d-flex align-items-center justify-content-between py-2 border-bottom border-white border-opacity-10">
+                    <span class="theme-text-muted fw-medium">Strategy Title:</span>
+                    <strong class="text-white text-end">{{ strategy.name }}</strong>
                 </div>
-                <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5">
-                    <span class="text-muted">Target Asset:</span>
-                    <span class="badge bg-primary bg-opacity-25 text-primary">{{ strategy.index_name }} ({{ strategy.market_type }})</span>
+                <div class="d-flex align-items-center justify-content-between py-2 border-bottom border-white border-opacity-10">
+                    <span class="theme-text-muted fw-medium">Target Asset:</span>
+                    <span class="badge rounded-pill px-2.5 py-1 fw-bold" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.3); color: #38bdf8;">
+                        {{ strategy.index_name }} &bull; {{ strategy.market_type }}
+                    </span>
                 </div>
-                <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5">
-                    <span class="text-muted">Allocated Capital:</span>
-                    <strong class="text-success font-monospace">₹{{ strategy.allocated_capital|floatformat:0 }}</strong>
+                <div class="d-flex align-items-center justify-content-between py-2 border-bottom border-white border-opacity-10">
+                    <span class="theme-text-muted fw-medium">Allocated Capital:</span>
+                    <strong class="text-success fw-bold" style="color: #B4F105 !important; font-size: 0.92rem;">₹{{ strategy.allocated_capital|floatformat:2 }}</strong>
                 </div>
-                <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5">
-                    <span class="text-muted">Isolated Rules Snapshot:</span>
-                    <span class="text-white font-monospace">{{ strategy.frozen_rules_snapshot|length }} Active Rules</span>
+                <div class="d-flex align-items-center justify-content-between py-2 border-bottom border-white border-opacity-10">
+                    <span class="theme-text-muted fw-medium">Isolated Rules Snapshot:</span>
+                    <span class="badge bg-secondary bg-opacity-25 rounded-pill px-2.5 py-1 theme-text-main fw-semibold border border-white border-opacity-10">
+                        {{ strategy.frozen_rules_snapshot|length }} Active Rules
+                    </span>
                 </div>
-                <div class="d-flex align-items-center justify-content-between py-1">
-                    <span class="text-muted">Execution Mode:</span>
-                    <span class="badge {% if strategy.execution_mode == 'LIVE' %}bg-danger{% else %}bg-info{% endif %} bg-opacity-25 text-white font-monospace">
+                <div class="d-flex align-items-center justify-content-between py-2">
+                    <span class="theme-text-muted fw-medium">Execution Mode:</span>
+                    <span class="badge rounded-pill px-3 py-1 fw-bold {% if strategy.execution_mode == 'LIVE' %}bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30{% else %}bg-info bg-opacity-20 text-info border border-info border-opacity-30{% endif %}">
                         {{ strategy.execution_mode }}
                     </span>
                 </div>
@@ -77,15 +84,24 @@
         </div>
 
         <!-- Modal Footer -->
-        <div class="modal-footer border-top border-white border-opacity-10 px-4 py-3 d-flex align-items-center justify-content-between">
-            <button type="button" class="btn btn-secondary rounded-pill px-3 py-1.5 small" data-bs-dismiss="modal">Cancel</button>
+        <div class="modal-footer border-top border-white border-opacity-10 px-4 py-3.5 d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.02);">
+            <button type="button" 
+                    class="btn rounded-pill px-4 py-2 fw-semibold shadow-sm transition-all" 
+                    style="background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); color: var(--text-main, #F1F5F9); font-size: 0.84rem;"
+                    data-bs-dismiss="modal">
+                Cancel
+            </button>
             {% if will_activate %}
-                <button type="submit" class="btn btn-success fw-bold rounded-pill px-4 py-1.5 d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <button type="submit" 
+                        class="btn rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm transition-all text-dark"
+                        style="background: #B4F105; border: 1px solid #B4F105; box-shadow: 0 4px 14px rgba(180, 241, 5, 0.35); font-size: 0.86rem;">
                     <span class="material-icons fs-5">play_arrow</span>
                     <span>Confirm &amp; Arm Strategy (ON)</span>
                 </button>
             {% else %}
-                <button type="submit" class="btn btn-warning text-dark fw-bold rounded-pill px-4 py-1.5 d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <button type="submit" 
+                        class="btn rounded-pill px-4 py-2 fw-bold d-inline-flex align-items-center gap-2 shadow-sm transition-all text-white"
+                        style="background: rgba(239, 68, 68, 0.9); border: 1px solid rgba(239, 68, 68, 1); box-shadow: 0 4px 14px rgba(239, 68, 68, 0.35); font-size: 0.86rem;">
                     <span class="material-icons fs-5">pause</span>
                     <span>Confirm &amp; Pause Strategy (OFF)</span>
                 </button>
@@ -93,3 +109,4 @@
         </div>
     </form>
 </div>
+

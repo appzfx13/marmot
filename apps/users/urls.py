@@ -15,6 +15,8 @@ from .views import (
     UserAIDashboardView,
     UserTerminalView,
     UserJournalView,
+    UserJournalCalendarView,
+    UserJournalTradesView,
     UserBacktestView,
     UserBacktestCreateView,
     UserBacktestDetailView,
@@ -64,6 +66,8 @@ urlpatterns = [
     path('dashboard/ai/', UserAIDashboardView.as_view(), name='user-ai-dashboard'),
 
     path('journal/', UserJournalView.as_view(), name='user-journal'),
+    path('journal/calendar/', UserJournalCalendarView.as_view(), name='user-journal-calendar'),
+    path('journal/trades/', UserJournalTradesView.as_view(), name='user-journal-trades'),
     path('backtest/', UserBacktestView.as_view(), name='user-backtest'),
     path('backtest/create/', UserBacktestCreateView.as_view(), name='user-backtest-create'),
     path('backtest/<int:pk>/', UserBacktestDetailView.as_view(), name='user-backtest-detail'),

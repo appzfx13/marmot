@@ -227,7 +227,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 		case <-ctx.Done():
 			log.Printf("⏸️ [StrategyWorker #%s] Pausing Autonomous Signal Loop for User #%s\n", taskID, userID)
 			j.saveTelemetry(context.Background(), userID, params.StrategyID, strategyName, false, "PAUSED",
-				23760.0, cashBalance, positions, orders)
+				23760.0, cashBalance, cashBalance, positions, orders)
 			return
 
 		case <-ticker.C:
@@ -294,7 +294,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			}
 
 			j.saveTelemetry(ctx, userID, params.StrategyID, strategyName, true, "STREAMING",
-				spotPrice, cashBalance-marginUtilized, positions, orders)
+				spotPrice, cashBalance, cashBalance-marginUtilized, positions, orders)
 		}
 	}
 }
@@ -339,6 +339,7 @@ func (j *StrategySignalJob) saveTelemetry(
 	isActive bool,
 	status string,
 	spotPrice float64,
+	cashBalance float64,
 	availableMargin float64,
 	positions []SimulatedPosition,
 	orders []SimulatedOrder,
@@ -371,7 +372,7 @@ func (j *StrategySignalJob) saveTelemetry(
 		"spot_price":             spotPrice,
 		"last_eval_time":         time.Now().Format("15:04:05 IST"),
 		"available_margin":       fmt.Sprintf("%.2f", availableMargin),
-		"cash_balance":           "10,00,000.00",
+		"cash_balance":           fmt.Sprintf("%.2f", cashBalance),
 		"margin_utilized":        fmt.Sprintf("%.2f", marginUtilized),
 		"live_net_pnl":           realizedTotal + unrealizedTotal,
 		"realized_pnl":           realizedTotal,

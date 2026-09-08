@@ -1,62 +1,105 @@
 <!-- templates/users/partials/journal_content.html -->
 <div class="d-flex flex-column gap-4">
 
-    <!-- START: Spark Page Header -->
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+    <!-- START: Spark Page Header with Mode Pill & Year Switcher -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-2">
         <div>
-            <h1 class="page-title">Trader Execution Journal</h1>
-            <p class="page-subtitle">Record trade logs, execution notes, strategy tags, and daily performance metrics.</p>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <h1 class="page-title mb-0">Trading Execution Journal</h1>
+                <span class="badge {% if account_type == 'SANDBOX' %}bg-info bg-opacity-25 text-info border border-info border-opacity-25{% else %}bg-success bg-opacity-25 text-success border border-success border-opacity-25{% endif %} rounded-pill px-3 py-1 fw-bold smaller">
+                    {{ account_type }} MODE
+                </span>
+            </div>
+            <p class="page-subtitle mb-0">Daily portfolio ledger, P/L calendar heatmap, trade execution breakdown, and capital progression.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+            <div id="user-journal-year-controls">
+                {% include "users/partials/journal_calendar_partial.html" with months=months year=year prev_year=prev_year next_year=next_year can_go_next=can_go_next only_controls=True %}
+            </div>
         </div>
     </div>
     <!-- END: Spark Page Header -->
 
-    <!-- Journal Overview Cards -->
-    <div class="row g-4">
+    <!-- 1. Top Performance KPI Stat Cards (Spark Design Standard) -->
+    <div class="row g-3">
+        <!-- Stat Card 1: Total Net P/L -->
         <div class="col-12 col-md-4">
-            <div class="card card-stat h-100 mb-0">
-                <span class="stat-label">Total Journal Entries</span>
-                <div class="stat-value text-primary">0</div>
-                <div class="trend-badge trend-up">
-                    <i class="bi bi-journal-check"></i>
-                    <span>Logged executions</span>
+            <div class="card card-stat h-100 mb-0 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="stat-label">Total Net P/L</span>
+                    {% if stats.total_pnl >= 0 %}
+                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 fw-bold smaller">+{{ stats.pnl_pct }}%</span>
+                    {% else %}
+                    <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-2 py-0.5 fw-bold smaller">{{ stats.pnl_pct }}%</span>
+                    {% endif %}
                 </div>
-            </div>
-        </div>
-        <div class="col-12 col-md-4">
-            <div class="card card-stat h-100 mb-0">
-                <span class="stat-label">Win Rate</span>
-                <div class="stat-value text-success">0.00%</div>
-                <div class="trend-badge trend-up">
+                <div class="stat-value {% if stats.total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {% if stats.total_pnl >= 0 %}+₹{{ stats.total_pnl|floatformat:2 }}{% else %}-₹{{ stats.total_pnl_abs|floatformat:2 }}{% endif %}
+                </div>
+                <div class="trend-badge {% if stats.total_pnl >= 0 %}trend-up{% else %}trend-down{% endif %}">
                     <i class="bi bi-graph-up-arrow"></i>
-                    <span>Win accuracy</span>
+                    <span>{{ stats.account_type }} Account Equity Growth</span>
                 </div>
             </div>
         </div>
+
+        <!-- Stat Card 2: Win Rate -->
         <div class="col-12 col-md-4">
-            <div class="card card-stat h-100 mb-0">
-                <span class="stat-label">Avg Risk / Reward</span>
-                <div class="stat-value text-info">1 : 2.5</div>
+            <div class="card card-stat h-100 mb-0 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="stat-label">Win Rate %</span>
+                    <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 fw-bold smaller">Accuracy</span>
+                </div>
+                <div class="stat-value theme-text-main">
+                    {{ stats.win_rate }}%
+                </div>
                 <div class="trend-badge trend-up">
-                    <i class="bi bi-shield-check"></i>
-                    <span>Risk model</span>
+                    <i class="bi bi-check-circle-fill"></i>
+                    <span>{{ stats.wins_count }} Profit Days &bull; {{ stats.losses_count }} Loss Days</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stat Card 3: Total Executions & Profit Factor -->
+        <div class="col-12 col-md-4">
+            <div class="card card-stat h-100 mb-0 shadow-sm">
+                <div class="d-flex justify-content-between align-items-center mb-1">
+                    <span class="stat-label">Profit Factor &amp; Trades</span>
+                    <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2 py-0.5 fw-bold smaller">R:R {{ stats.risk_reward_ratio }}</span>
+                </div>
+                <div class="stat-value text-info">
+                    {{ stats.profit_factor }}
+                </div>
+                <div class="trend-badge trend-up">
+                    <i class="bi bi-receipt"></i>
+                    <span>{{ stats.total_trades }} Executions &bull; ₹{{ stats.total_charges|floatformat:2 }} Charges</span>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Journal Table Container -->
-    <div class="card mb-0">
-        <div class="card-header px-4 py-3.5 border-bottom border-secondary border-opacity-10 d-flex justify-content-between align-items-center mb-0">
-            <div>
-                <h5 class="card-title mb-1 fw-bold theme-text-main fs-5">Trade Execution History</h5>
-                <span class="card-subtitle theme-text-muted small">Daily logs and journal notes for your account</span>
+    <!-- 2. Annual P/L Calendar Grid Card -->
+    <div class="card border shadow-lg overflow-hidden mb-0" style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 16px;">
+        <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons text-warning fs-5">calendar_month</span>
+                <h5 class="card-title theme-text-main fw-bold mb-0" style="font-size: 1.05rem;">Annual P/L Calendar Heatmap</h5>
+            </div>
+            
+            <div class="d-flex align-items-center gap-3 small fw-semibold ms-auto">
+                <span class="d-flex align-items-center gap-1"><span class="rounded-circle" style="width: 10px; height: 10px; background: rgba(16, 185, 129, 0.8);"></span> Profit</span>
+                <span class="d-flex align-items-center gap-1"><span class="rounded-circle" style="width: 10px; height: 10px; background: rgba(239, 68, 68, 0.8);"></span> Loss</span>
+                <span class="d-flex align-items-center gap-1"><span class="rounded-circle" style="width: 10px; height: 10px; background: rgba(148, 163, 184, 0.2);"></span> Neutral</span>
             </div>
         </div>
-        <div class="card-body p-0">
-            <div class="text-center py-5 theme-text-muted">
-                <i class="bi bi-journal-text fs-1 mb-2 d-block opacity-50"></i>
-                <p class="mb-0">No journal logs recorded yet for trader @{{ request.user.username }}.</p>
-            </div>
+
+        <div class="card-body p-3 p-md-4" id="user-journal-calendar-container">
+            {% include "users/partials/journal_calendar_partial.html" with months=months year=year prev_year=prev_year next_year=next_year can_go_next=can_go_next stats=stats %}
+        </div>
+
+        <!-- 3. Day-level Trade & Order Log Container -->
+        <div id="user-journal-orders-container">
+            {% include "users/partials/journal_trades_partial.html" with trades=trades day_summary=day_summary filter_date="" total_trades_count=0 account_type=account_type %}
         </div>
     </div>
 

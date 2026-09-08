@@ -1859,6 +1859,17 @@ class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
             from apps.common.constants import REDIS_CHANNEL
             task_id = f"strategy_{strategy.pk}"
             command = 'START_STRATEGY' if strategy.is_active else 'PAUSE_STRATEGY'
+
+            # Dynamically resolve capital from UserTradingAccount instead of isolated strategy setting
+            target_acc = strategy.trading_account or request.user.get_active_trading_account(request)
+            acc_summary = target_acc.account_summary if target_acc else {}
+            resolved_capital = float(
+                acc_summary.get('balance')
+                or acc_summary.get('initial_capital')
+                or strategy.allocated_capital
+                or 100000.00
+            )
+
             ipc_payload = {
                 'task_id': task_id,
                 'command': command,
@@ -1867,8 +1878,9 @@ class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
                     'strategy_id': strategy.pk,
                     'execution_mode': strategy.execution_mode,
                     'user_id': str(request.user.id),
+                    'trading_account_id': str(target_acc.id) if target_acc else '',
                     'index_name': strategy.index_name or 'NIFTY',
-                    'initial_capital': float(strategy.allocated_capital or 1000000.00),
+                    'initial_capital': resolved_capital,
                 },
             }
             redis_client.publish(REDIS_CHANNEL, _json.dumps(ipc_payload))

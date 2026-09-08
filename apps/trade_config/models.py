@@ -166,3 +166,34 @@ class LiveStrategy(BaseModel):
 
     def __str__(self):
         return f"{self.name} [{self.index_name}] - @{self.user.username} (Active: {self.is_active})"
+
+
+# --- Daily Portfolio Snapshot (Database Ledger for Analytics & Journals) ---
+class DailyPortfolioSnapshot(BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_portfolio_snapshots', verbose_name="Trader")
+    trading_account = models.ForeignKey(UserTradingAccount, on_delete=models.CASCADE, related_name='portfolio_snapshots', verbose_name="Trading Account")
+    account_type = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.SANDBOX, help_text="Execution Mode")
+    date = models.DateField(db_index=True, help_text="Calendar trading date")
+    opening_balance = models.DecimalField(max_digits=12, decimal_places=2, default=100000.00, help_text="Starting day balance")
+    closing_balance = models.DecimalField(max_digits=12, decimal_places=2, default=100000.00, help_text="Ending day balance")
+    gross_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Gross trading PnL")
+    net_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Net PnL after charges")
+    realized_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Realized PnL")
+    unrealized_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Open positions PnL")
+    total_charges = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Brokerage and regulatory charges")
+    margin_utilized = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Peak margin utilized during day")
+    total_trades = models.PositiveIntegerField(default=0, help_text="Total trades executed")
+    winning_trades = models.PositiveIntegerField(default=0, help_text="Winning trade count")
+    losing_trades = models.PositiveIntegerField(default=0, help_text="Losing trade count")
+    telemetry_snapshot = models.JSONField(default=dict, blank=True, help_text="Full day-end telemetry JSON snapshot")
+
+    class Meta:
+        verbose_name = "Daily Portfolio Snapshot"
+        verbose_name_plural = "Daily Portfolio Snapshots"
+        ordering = ['-date', '-id']
+        constraints = [
+            models.UniqueConstraint(fields=['user', 'trading_account', 'date'], name='unique_user_account_daily_snapshot')
+        ]
+
+    def __str__(self):
+        return f"{self.user.username} - {self.trading_account.account_name} ({self.date}): PnL ₹{self.net_pnl}"
