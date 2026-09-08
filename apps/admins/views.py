@@ -778,7 +778,315 @@ class AdminSandboxOrderCancelView(LoginRequiredMixin, AdminRequiredMixin, View):
         return response
 
 
+class AdminSandboxOrderRcaView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Render interactive glassmorphic RCA modal verifying order execution against strategy rulebook."""
+
+    def get(self, request, order_id, *args, **kwargs):
+        user = request.user
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+        target_order = next((o for o in raw_orders if str(o.get('order_id')) == str(order_id)), None)
+
+        if not target_order:
+            target_order = {
+                'order_id': order_id,
+                'create_time': timezone.now().strftime("%I:%M:%S %p"),
+                'trading_symbol': 'NIFTY ATM CE',
+                'transaction_type': 'BUY',
+                'order_type': 'MARKET',
+                'product_type': 'INTRADAY',
+                'validity': 'DAY',
+                'quantity': 50,
+                'filled_qty': 50,
+                'price': 105.00,
+                'order_status': 'TRADED',
+                'slippage_pts': 0.00,
+                'rule_id': 20,
+                'rule_name': 'Momentum Guardrails & EMA 9/21 Trend',
+                'trigger_reason': 'Bullish EMA 9 > 21 crossover with 15m ORB breakout confirmation',
+            }
+
+        strategy = LiveStrategy.objects.filter(user=user, is_active=True).first() or LiveStrategy.objects.filter(user=user).first()
+
+        context = {
+            'order': target_order,
+            'strategy': strategy,
+            'slippage_pts': target_order.get('slippage_pts', 0.00),
+            'indicators': target_order.get('indicators', {}),
+        }
+        return render(request, 'admins/partials/sandbox_order_rca_modal.html', context)
+
+
+def _build_sandbox_journal_stats(orders: list) -> dict:
+    """Compute paper-trading journal stats from simulated orders list."""
+    total_pnl, gross_profit, gross_loss = 0.0, 0.0, 0.0
+    wins, losses = 0, 0
+    open_count, closed_count = 0, 0
+    win_streak, loss_streak, max_win_streak, max_loss_streak = 0, 0, 0, 0
+    pnl_list = []
+
+    for o in orders:
+        status = str(o.get('order_status', '')).upper()
+        if status in ['OPEN', 'PENDING', 'TRANSIT']:
+            open_count += 1
+        else:
+            closed_count += 1
+
+        pnl = float(o.get('realized_profit', 0.0) or 0.0)
+        pnl_list.append(pnl)
+        total_pnl = round(total_pnl + pnl, 2)
+        if pnl >= 0:
+            gross_profit = round(gross_profit + pnl, 2)
+        else:
+            gross_loss = round(gross_loss + pnl, 2)
+
+    for pnl in pnl_list:
+        if pnl >= 0:
+            wins += 1
+            win_streak += 1
+            loss_streak = 0
+            max_win_streak = max(max_win_streak, win_streak)
+        else:
+            losses += 1
+            loss_streak += 1
+            win_streak = 0
+            max_loss_streak = max(max_loss_streak, loss_streak)
+
+    total_trades = len(orders)
+    win_rate = round((wins / total_trades * 100), 1) if total_trades else 0.0
+    avg_win = round(gross_profit / wins, 2) if wins else 0.0
+    avg_loss = round(abs(gross_loss) / losses, 2) if losses else 0.0
+    profit_factor = round(gross_profit / abs(gross_loss), 2) if gross_loss else 'N/A'
+    risk_reward = round(avg_win / avg_loss, 2) if avg_loss else 0.0
+    expectancy = round(total_pnl / total_trades, 2) if total_trades else 0.0
+    base_capital = 1000000.0
+    margin_used = sum(float(o.get('price', 0.0)) * int(o.get('quantity', 0) or 0) for o in orders if str(o.get('order_status', '')).upper() == 'TRADED')
+    avail_capital = max(0.0, base_capital - margin_used + total_pnl)
+    max_drawdown_pct = 0.0
+    if pnl_list:
+        peak = 0.0
+        trough_drawdown = 0.0
+        running = 0.0
+        for p in pnl_list:
+            running += p
+            peak = max(peak, running)
+            dd = (peak - running) / base_capital * 100 if peak > 0 else 0.0
+            trough_drawdown = max(trough_drawdown, dd)
+        max_drawdown_pct = round(trough_drawdown, 2)
+
+    last_streak = ''
+    if pnl_list:
+        if pnl_list[-1] >= 0:
+            last_streak = f"{win_streak} Wins"
+        else:
+            last_streak = f"{loss_streak} Losses"
+
+    return {
+        'total_pnl': total_pnl,
+        'total_pnl_abs': abs(total_pnl),
+        'pnl_pct': round(total_pnl / base_capital * 100, 2),
+        'win_rate': win_rate,
+        'wins_count': wins,
+        'losses_count': losses,
+        'total_trades': total_trades,
+        'open_count': open_count,
+        'closed_count': closed_count,
+        'gross_profit': gross_profit,
+        'gross_loss': gross_loss,
+        'gross_loss_abs': abs(gross_loss),
+        'profit_factor': profit_factor,
+        'risk_reward_ratio': risk_reward,
+        'expectancy': expectancy,
+        'avg_win': avg_win,
+        'avg_loss_abs': avg_loss,
+        'max_win_streak': max_win_streak,
+        'max_loss_streak': max_loss_streak,
+        'current_streak': last_streak,
+        'max_drawdown': max_drawdown_pct,
+        'base_capital': base_capital,
+        'margin_used': round(margin_used, 2),
+        'avail_capital': round(avail_capital, 2),
+    }
+
+
+def _build_sandbox_journal_calendar(orders: list, year: str):
+    """Build 12-month calendar data structure with per-day simulated PnL from paper orders."""
+    import calendar as cal_mod
+    from datetime import date as date_cls, datetime
+
+    today = date_cls.today()
+    daily_pnl = {}
+    for o in orders:
+        raw_ts = str(o.get('create_time') or o.get('signal_time') or '')
+        if not raw_ts:
+            continue
+        try:
+            dt = datetime.strptime(raw_ts[:10], '%Y-%m-%d').date()
+        except (ValueError, TypeError):
+            continue
+        if year not in ('all', 'overall', '') and not str(dt.year) == str(year):
+            continue
+        ymd = dt.strftime('%Y-%m-%d')
+        pnl = float(o.get('realized_profit', 0.0) or 0.0)
+        daily_pnl[ymd] = round(daily_pnl.get(ymd, 0.0) + pnl, 2)
+
+    calendar_months = []
+    years_to_show = list(range(2024, today.year + 1)) if year in ('all', 'overall', '') else [int(year)]
+    for yr in years_to_show:
+        for month_num in range(1, 13):
+            if yr == today.year and month_num > today.month:
+                continue
+            month_name = date_cls(yr, month_num, 1).strftime('%B %Y')
+            first_weekday, num_days = cal_mod.monthrange(yr, month_num)
+            # Make Sunday = 0 (calendar starts Sunday)
+            leading_blanks = (first_weekday + 1) % 7
+            days_data = []
+            month_total = 0.0
+            for day_num in range(1, num_days + 1):
+                d = date_cls(yr, month_num, day_num)
+                ymd = d.strftime('%Y-%m-%d')
+                pnl = daily_pnl.get(ymd, None)
+                has_trades = pnl is not None
+                month_total = round(month_total + (pnl or 0.0), 2)
+                abs_pnl = abs(pnl) if pnl is not None else 0
+                intensity = min(0.85, 0.25 + (abs_pnl / 2000)) if abs_pnl else 0.25
+                days_data.append({
+                    'day_num': day_num,
+                    'date': d,
+                    'pnl': pnl or 0.0,
+                    'has_trades': has_trades,
+                    'is_today': (d == today),
+                    'intensity': round(intensity, 2),
+                })
+            calendar_months.append({
+                'month_name': month_name,
+                'leading_blanks': range(leading_blanks),
+                'days': days_data,
+                'month_total': month_total,
+            })
+    return calendar_months
+
+
+class AdminSandboxJournalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Sandbox Paper Trading Journal — mirrors real Journal page using simulated Redis telemetry."""
+    template_name = 'admins/sandbox_journal.html'
+    partial_template_name = 'admins/partials/sandbox_journal_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['active_year'] = self.request.GET.get('year', '2026')
+        context['active_tab'] = 'sandbox-journal'
+        return context
+
+
+class AdminSandboxJournalStatsView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial: 9-card stats grid + optional Chart.js canvas for Sandbox Journal."""
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        year = request.GET.get('year', '2026')
+        chart_mode = request.GET.get('chart', '')
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+
+        if year not in ('all', 'overall', ''):
+            raw_orders = [
+                o for o in raw_orders
+                if str(o.get('create_time', '') or o.get('signal_time', '') or '')[:4] == str(year)
+            ]
+
+        stats = _build_sandbox_journal_stats(raw_orders)
+
+        chart_labels, daily_pnl_data, cum_pnl_data, colors = [], [], [], []
+        if chart_mode:
+            from datetime import datetime as dt_mod
+            dated = {}
+            for o in raw_orders:
+                ts = str(o.get('create_time', '') or o.get('signal_time', '') or '')
+                try:
+                    d = dt_mod.strptime(ts[:10], '%Y-%m-%d').strftime('%d %b')
+                except (ValueError, TypeError):
+                    continue
+                pnl = float(o.get('realized_profit', 0.0) or 0.0)
+                dated[d] = round(dated.get(d, 0.0) + pnl, 2)
+            running = 0.0
+            for label, pnl in sorted(dated.items()):
+                chart_labels.append(label)
+                daily_pnl_data.append(pnl)
+                running = round(running + pnl, 2)
+                cum_pnl_data.append(running)
+                colors.append('rgba(16,185,129,0.75)' if pnl >= 0 else 'rgba(239,68,68,0.75)')
+
+        import json as json_mod
+        context = {
+            'stats': stats,
+            'chart_mode': chart_mode,
+            'chart_labels_json': json_mod.dumps(chart_labels),
+            'daily_pnl_data_json': json_mod.dumps(daily_pnl_data),
+            'cum_pnl_data_json': json_mod.dumps(cum_pnl_data),
+            'pnl_bar_colors_json': json_mod.dumps(colors),
+        }
+        return render(request, 'admins/partials/sandbox_journal_stats_partial.html', context)
+
+
+class AdminSandboxJournalCalendarView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial: 12-month P/L calendar heatmap for Sandbox Journal."""
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        year = request.GET.get('year', '2026')
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+        calendar_months = _build_sandbox_journal_calendar(raw_orders, year)
+        return render(request, 'admins/partials/sandbox_journal_calendar_partial.html', {
+            'calendar_months': calendar_months,
+            'year': year,
+        })
+
+
+class AdminSandboxJournalOrdersView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial: Paper order execution log table for Sandbox Journal."""
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        year = request.GET.get('year', '2026')
+        filter_date = request.GET.get('date', '')
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+
+        if filter_date:
+            filtered = [
+                o for o in raw_orders
+                if str(o.get('create_time', '') or o.get('signal_time', '') or '')[:10] == filter_date
+            ]
+        elif year not in ('all', 'overall', ''):
+            filtered = [
+                o for o in raw_orders
+                if str(o.get('create_time', '') or o.get('signal_time', '') or '')[:4] == str(year)
+            ]
+        else:
+            filtered = raw_orders
+
+        day_summary = None
+        if filter_date and filtered:
+            total_pnl = round(sum(float(o.get('realized_profit', 0.0) or 0.0) for o in filtered), 2)
+            day_summary = {
+                'gross_pnl': total_pnl,
+                'gross_pnl_abs': abs(total_pnl),
+                'net_pnl': total_pnl,
+                'net_pnl_abs': abs(total_pnl),
+                'trades': len(filtered),
+                'strategy_name': (filtered[0].get('strategy_name') or 'TensorTrade RL') if filtered else 'TensorTrade RL',
+            }
+
+        context = {
+            'orders': filtered,
+            'total_count': len(filtered),
+            'filter_date': filter_date,
+            'filter_year': year,
+            'day_summary': day_summary,
+        }
+        return render(request, 'admins/partials/sandbox_journal_orders_partial.html', context)
+
+
 class AdminAIDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+
     """Protected Admin View for AI Intelligence Dashboard and Gemini Copilot."""
     template_name = 'admins/dashboard.html'
     partial_template_name = 'admins/partials/ai_dashboard_content.html'
@@ -1894,6 +2202,24 @@ class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
             'strategy': strategy,
         }
         return render(request, 'admins/partials/live_strategy_row.html', context)
+
+
+class LiveStrategyDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Safely delete an inactive / standby deployed LiveStrategy."""
+
+    def post(self, request, pk, *args, **kwargs):
+        strategy = get_object_or_404(LiveStrategy, pk=pk, user=request.user)
+        if strategy.is_active:
+            messages.error(request, f"Cannot delete '{strategy.name}' while it is actively trading. Please pause it first.")
+            return render(request, 'admins/partials/live_strategy_row.html', {'strategy': strategy})
+
+        strat_name = strategy.name
+        strategy.delete()
+        response = HttpResponse("")
+        response['HX-Trigger'] = json.dumps({
+            'showToast': {'message': f"Deployed strategy '{strat_name}' removed successfully.", 'level': 'success'},
+        })
+        return response
 
 
 class MasterLiveExecutionToggleModalView(LoginRequiredMixin, AdminRequiredMixin, View):

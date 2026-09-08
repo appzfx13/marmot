@@ -1,0 +1,76 @@
+<!-- Sandbox Journal: 12-Month P/L Calendar Heatmap -->
+<style>
+    .sbx-journal-day-cell { margin: 2px 0 !important; }
+    .sbx-journal-day-clickable { transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important; position: relative; cursor: pointer; }
+    .sbx-journal-day-clickable:hover { transform: scale(1.08) !important; z-index: 2; }
+</style>
+
+<div class="row g-3">
+    {% for month_data in calendar_months %}
+    <div class="col-12 col-md-6 col-xl-4">
+        <div class="rounded-3 p-2" style="background: rgba(255,255,255,0.02); border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+            <!-- Month Header -->
+            <div class="d-flex align-items-center justify-content-between mb-2 px-1">
+                <span class="fw-bold theme-text-main small">{{ month_data.month_name }}</span>
+                <span class="fw-bold small {% if month_data.month_total >= 0 %}text-success{% else %}text-danger{% endif %}"
+                      style="font-size: 0.80rem;">
+                    {% if month_data.month_total >= 0 %}+{% endif %}₹{{ month_data.month_total|floatformat:0 }}
+                </span>
+            </div>
+            <!-- Day Labels -->
+            <div class="row g-0 mb-1">
+                {% for lbl in "SMTWTFS" %}
+                <div class="col text-center theme-text-muted" style="font-size: 0.60rem; font-weight: 700; letter-spacing: 0.03em;">{{ lbl }}</div>
+                {% endfor %}
+            </div>
+            <!-- Day Grid -->
+            <div class="row g-0">
+                {% for blank in month_data.leading_blanks %}<div class="col"></div>{% endfor %}
+                {% for day in month_data.days %}
+                <div class="col sbx-journal-day-cell"
+                     {% if day.has_trades %}
+                     onclick="loadSbxJournalDayOrders('{{ day.date|date:'Y-m-d' }}')"
+                     title="{{ day.date|date:'d M' }}: ₹{{ day.pnl|floatformat:0 }}"
+                     {% endif %}>
+                    <div class="rounded-2 sbx-journal-day-clickable d-flex flex-column align-items-center justify-content-center mx-auto"
+                         style="width: 28px; height: 28px; font-size: 0.65rem; font-weight: {% if day.is_today %}800{% else %}600{% endif %};
+                         {% if day.has_trades %}
+                             {% if day.pnl > 0 %}
+                                 background: rgba(16, 185, 129, {{ day.intensity|default:'0.4' }}); color: #fff; border: 1px solid rgba(16,185,129,0.5);
+                             {% elif day.pnl < 0 %}
+                                 background: rgba(239, 68, 68, {{ day.intensity|default:'0.4' }}); color: #fff; border: 1px solid rgba(239,68,68,0.5);
+                             {% else %}
+                                 background: rgba(148,163,184,0.12); color: var(--text-muted); border: 1px solid rgba(148,163,184,0.2);
+                             {% endif %}
+                         {% elif day.is_today %}
+                             background: rgba(180,241,5,0.18); color: #B4F105; border: 1px solid rgba(180,241,5,0.45);
+                         {% else %}
+                             background: rgba(255,255,255,0.02); color: var(--text-muted); border: 1px solid transparent;
+                         {% endif %}">
+                        {{ day.day_num }}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+    {% empty %}
+    <div class="col-12 text-center py-4 theme-text-muted small">
+        <i class="bi bi-calendar3 fs-3 opacity-50 mb-2 d-block"></i>
+        No simulation data available for this period.
+    </div>
+    {% endfor %}
+</div>
+
+<script>
+    function loadSbxJournalDayOrders(date) {
+        htmx.ajax('GET', "{% url 'admins:admin-sandbox-journal-orders' %}?date=" + date, {
+            target: '#sbx-journal-orders-container',
+            swap: 'innerHTML'
+        });
+        var container = document.getElementById('sbx-journal-orders-container');
+        if (container) {
+            container.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+    }
+</script>

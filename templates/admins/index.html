@@ -1769,11 +1769,20 @@
                     </li>
                     <li class="sidebar-menu-item">
                         <a href="{% url 'admins:admin-sandbox-dashboard' %}"
-                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-sandbox-dashboard' or '/admins/dashboard/sandbox/' in request.path %}active{% endif %}"
+                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-sandbox-dashboard' or '/admins/dashboard/sandbox/' in request.path and 'journal' not in request.path %}active{% endif %}"
                             id="admin-menu-sandbox-dashboard" hx-get="{% url 'admins:admin-sandbox-dashboard' %}"
                             hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-cpu-fill text-info"></i>
                             <span>Sandbox Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="{% url 'admins:admin-sandbox-journal' %}"
+                            class="sidebar-menu-link {% if 'admin-sandbox-journal' in request.resolver_match.url_name or '/admins/dashboard/sandbox/journal/' in request.path %}active{% endif %}"
+                            id="admin-menu-sandbox-journal" hx-get="{% url 'admins:admin-sandbox-journal' %}"
+                            hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
+                            <i class="bi bi-journal-code" style="color: #38bdf8;"></i>
+                            <span>Sandbox Journal</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">

@@ -36,6 +36,7 @@ type SimulatedPosition struct {
 	BuyAvg           float64 `json:"buy_avg"`
 	SellQty          int     `json:"sell_qty"`
 	SellAvg          float64 `json:"sell_avg"`
+	CurrentLTP       float64 `json:"current_ltp"`
 	RealizedProfit   float64 `json:"realized_profit"`
 	UnrealizedProfit float64 `json:"unrealized_profit"`
 	TotalPnL         float64 `json:"total_pnl"`
@@ -44,20 +45,32 @@ type SimulatedPosition struct {
 
 // SimulatedOrder represents an executed or pending paper order.
 type SimulatedOrder struct {
-	OrderID         string  `json:"order_id"`
-	CreateTime      string  `json:"create_time"`
-	TradingSymbol   string  `json:"trading_symbol"`
-	ExchangeSegment string  `json:"exchange_segment"`
-	TransactionType string  `json:"transaction_type"`
-	OrderType       string  `json:"order_type"`
-	ProductType     string  `json:"product_type"`
-	Validity        string  `json:"validity"`
-	Quantity        int     `json:"quantity"`
-	FilledQty       int     `json:"filled_qty"`
-	Price           float64 `json:"price"`
-	TriggerPrice    float64 `json:"trigger_price"`
-	OrderStatus     string  `json:"order_status"`
-	OMSErrorDesc    string  `json:"oms_error_desc"`
+	OrderID         string                 `json:"order_id"`
+	CreateTime      string                 `json:"create_time"`
+	TradingSymbol   string                 `json:"trading_symbol"`
+	ExchangeSegment string                 `json:"exchange_segment"`
+	TransactionType string                 `json:"transaction_type"`
+	OrderType       string                 `json:"order_type"`
+	ProductType     string                 `json:"product_type"`
+	Validity        string                 `json:"validity"`
+	Quantity        int                    `json:"quantity"`
+	FilledQty       int                    `json:"filled_qty"`
+	Price           float64                `json:"price"`
+	TriggerPrice    float64                `json:"trigger_price"`
+	OrderStatus     string                 `json:"order_status"`
+	OMSErrorDesc    string                 `json:"oms_error_desc"`
+	SignalTime      string                 `json:"signal_time,omitempty"`
+	ExecutionTime   string                 `json:"execution_time,omitempty"`
+	LimitEntryPrice float64                `json:"limit_entry_price,omitempty"`
+	LimitTappedTime string                 `json:"limit_tapped_time,omitempty"`
+	TargetPrice     float64                `json:"target_price,omitempty"`
+	StopLossPrice   float64                `json:"stop_loss_price,omitempty"`
+	CurrentLTP      float64                `json:"current_ltp,omitempty"`
+	RuleID          int                    `json:"rule_id,omitempty"`
+	RuleName        string                 `json:"rule_name,omitempty"`
+	TriggerReason   string                 `json:"trigger_reason,omitempty"`
+	Indicators      map[string]interface{} `json:"indicators,omitempty"`
+	SlippagePts     float64                `json:"slippage_pts"`
 }
 
 // NewStrategySignalJob instantiates a new background strategy worker.
@@ -239,15 +252,12 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			for i := range positions {
 				if positions[i].Status == "OPEN" {
 					marginUtilized += float64(positions[i].NetQty) * positions[i].BuyAvg
-					// Dynamic delta simulation
-					delta := 0.45
-					if rand.Float32() > 0.5 {
-						delta = 0.55
-					}
+					delta := 0.50
 					spotDiff := spotPrice - positions[i].EntrySpot
-					// Micro tick fluctuation
-					jitter := (rand.Float64() - 0.48) * 12.0
-					posPnl := math.Round(((spotDiff * delta) + jitter) * float64(positions[i].NetQty))
+					// Zero slippage theoretical option LTP
+					currentLTP := math.Max(0.50, math.Round((positions[i].BuyAvg+(spotDiff*delta))*100)/100)
+					positions[i].CurrentLTP = currentLTP
+					posPnl := math.Round((currentLTP - positions[i].BuyAvg) * float64(positions[i].NetQty))
 					positions[i].UnrealizedProfit = posPnl
 					positions[i].TotalPnL = posPnl
 					unrealizedTotal += posPnl
@@ -256,40 +266,90 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				}
 			}
 
-			// Periodically evaluate strategy for new simulated trade signals (every 6th tick = ~12s)
+			// Periodically evaluate strategy for new simulated trade signals
 			if tickCounter%6 == 0 {
 				candle := map[string]interface{}{
 					"close":  spotPrice,
-					"open":   spotPrice - 4.5,
-					"high":   spotPrice + 8.2,
-					"low":    spotPrice - 6.1,
+					"open":   spotPrice - 3.5,
+					"high":   spotPrice + 6.0,
+					"low":    spotPrice - 4.5,
 					"volume": 125000,
 				}
 				sig := strat.EvaluateLiveSignal(candle, nil, indexName, params.Params)
-				if sig != nil && len(positions) < 8 {
-					newSymbol := fmt.Sprintf("%s %d CE", indexName, atmStrike)
-					newOrderID := fmt.Sprintf("SBX-%d%02d", time.Now().Unix()%100000, rand.Intn(90)+10)
-					fillPrice := math.Round((95.0+(rand.Float64()*10.0))*100) / 100
-
-					newOrder := SimulatedOrder{
-						OrderID:         newOrderID,
-						CreateTime:      time.Now().Format("03:04:05 PM"),
-						TradingSymbol:   newSymbol,
-						ExchangeSegment: "NSE_FNO",
-						TransactionType: "BUY",
-						OrderType:       "MARKET",
-						ProductType:     "INTRADAY",
-						Validity:        "DAY",
-						Quantity:        sig.Quantity,
-						FilledQty:       sig.Quantity,
-						Price:           fillPrice,
-						OrderStatus:     "TRADED",
+				if sig != nil {
+					// Check if an open position already exists in this contract symbol
+					alreadyOpen := false
+					for _, pos := range positions {
+						if pos.Status == "OPEN" && pos.TradingSymbol == sig.TradingSymbol {
+							alreadyOpen = true
+							break
+						}
 					}
-					// Prepend order
-					orders = append([]SimulatedOrder{newOrder}, orders...)
 
-					log.Printf("⚡ [StrategyWorker #%s] Paper Order Executed: %s %s @ ₹%.2f\n",
-						taskID, sig.Transaction, newSymbol, fillPrice)
+					if !alreadyOpen && len(positions) < 6 {
+						newOrderID := fmt.Sprintf("SBX-%d%02d", time.Now().Unix()%100000, rand.Intn(90)+10)
+						// Zero-slippage execution: exact option price based on ATM strike theoretical pricing
+						fillPrice := 95.00
+						if atmStrike > 0 && spotPrice > 0 {
+							intrinsic := math.Max(0, spotPrice-float64(atmStrike))
+							fillPrice = math.Round((intrinsic+85.00)*100) / 100
+						}
+
+						nowStr := time.Now().Format("03:04:05 PM")
+						signalTime := sig.Timestamp
+						if signalTime == "" {
+							signalTime = nowStr
+						}
+
+						newOrder := SimulatedOrder{
+							OrderID:         newOrderID,
+							CreateTime:      nowStr,
+							SignalTime:      signalTime,
+							ExecutionTime:   nowStr,
+							TradingSymbol:   sig.TradingSymbol,
+							ExchangeSegment: "NSE_FNO",
+							TransactionType: sig.Transaction,
+							OrderType:       sig.OrderType,
+							ProductType:     "INTRADAY",
+							Validity:        "DAY",
+							Quantity:        sig.Quantity,
+							FilledQty:       sig.Quantity,
+							Price:           fillPrice,
+							LimitEntryPrice: fillPrice,
+							LimitTappedTime: nowStr,
+							TargetPrice:     sig.TargetPrice,
+							StopLossPrice:   sig.StopLossPrice,
+							CurrentLTP:      fillPrice,
+							OrderStatus:     "TRADED",
+							RuleID:          sig.RuleID,
+							RuleName:        sig.RuleName,
+							TriggerReason:   sig.TriggerReason,
+							Indicators:      sig.Indicators,
+							SlippagePts:     0.00,
+						}
+						// Prepend order
+						orders = append([]SimulatedOrder{newOrder}, orders...)
+
+						// Create corresponding simulated open position
+						newPos := SimulatedPosition{
+							TradingSymbol:    sig.TradingSymbol,
+							ExchangeSegment:  "NSE_FNO",
+							Status:           "OPEN",
+							ProductType:      "INTRADAY",
+							NetQty:           sig.Quantity,
+							BuyQty:           sig.Quantity,
+							BuyAvg:           fillPrice,
+							CurrentLTP:       fillPrice,
+							RealizedProfit:   0.0,
+							UnrealizedProfit: 0.0,
+							TotalPnL:         0.0,
+							EntrySpot:        spotPrice,
+						}
+						positions = append([]SimulatedPosition{newPos}, positions...)
+
+						log.Printf("⚡ [StrategyWorker #%s] Paper Order Executed (Zero Slippage): %s %s @ ₹%.2f | Rule #%d: %s\n",
+							taskID, sig.Transaction, sig.TradingSymbol, fillPrice, sig.RuleID, sig.RuleName)
+					}
 				}
 			}
 
@@ -397,12 +457,17 @@ func (j *StrategySignalJob) saveTelemetry(
 	stratKey := fmt.Sprintf("marmot:sandbox:telemetry:strategy:%d", strategyID)
 	_ = j.redisService.Client.Set(ctx, stratKey, bytes, 30*time.Minute).Err()
 
-	// 3. WS Broadcast to active subscribers
+	// 3. WS Broadcast to active subscribers & general hub
 	if j.hub != nil {
 		wsPayload, _ := json.Marshal(map[string]interface{}{
-			"type": "sandbox_telemetry",
-			"data": telemetry,
+			"type":    "sandbox_telemetry",
+			"task_id": j.payload.TaskID,
+			"data":    telemetry,
 		})
 		j.hub.BroadcastToTask(j.payload.TaskID, wsPayload)
+		select {
+		case j.hub.Broadcast <- wsPayload:
+		default:
+		}
 	}
 }

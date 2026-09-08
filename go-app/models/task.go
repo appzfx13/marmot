@@ -27,8 +27,10 @@ type TaskParams struct {
 	ForexInstrument string                 `json:"forex_instrument"`
 	ProviderName    string                 `json:"provider_name"`
 	DatabentoAPIKey string                 `json:"databento_api_key"`
-	DatabentoSchema string                 `json:"databento_schema"`
-	Params          map[string]interface{} `json:"params"`
+	DatabentoSchema     string                    `json:"databento_schema"`
+	FrozenRulesSnapshot []map[string]interface{}  `json:"frozen_rules_snapshot,omitempty"`
+	FrozenParameters    map[string]interface{}    `json:"frozen_parameters,omitempty"`
+	Params              map[string]interface{}    `json:"params"`
 }
 
 // CommandPayload represents the JSON IPC command sent over Redis channel

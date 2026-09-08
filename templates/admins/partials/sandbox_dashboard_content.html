@@ -97,14 +97,14 @@
                             <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Paper Synced</span>
                         </div>
                         <div class="metric-card-date">Intraday Simulated Return</div>
-                        <div class="metric-card-value font-monospace {% if live_net_pnl > 0 %}text-success{% elif live_net_pnl < 0 %}text-danger{% endif %}">
+                        <div id="sandbox-live-net-pnl" class="metric-card-value font-monospace {% if live_net_pnl > 0 %}text-success{% elif live_net_pnl < 0 %}text-danger{% endif %}">
                             {% if live_net_pnl > 0 %}+{% endif %}₹{{ live_net_pnl|floatformat:2 }}
                         </div>
                     </div>
                     <div class="metric-card-footer">
                         <div class="trend-badge {% if live_net_pnl >= 0 %}trend-up{% else %}trend-down{% endif %} py-0 px-0 fs-xs">
                             <i class="bi {% if live_net_pnl >= 0 %}bi-arrow-up-right text-success{% else %}bi-arrow-down-left text-danger{% endif %}"></i>
-                            <span>{{ open_positions_count }} Active Pos</span>
+                            <span id="sandbox-open-positions-badge">{{ open_positions_count }} Active Pos</span>
                         </div>
                         <span>{{ todays_orders_count }} Orders</span>
                     </div>
@@ -130,7 +130,7 @@
                             </a>
                         </div>
                         <div class="metric-card-date">Virtual Balance: ₹{{ cash_balance }}</div>
-                        <div class="metric-card-value font-monospace text-primary">
+                        <div id="sandbox-available-margin" class="metric-card-value font-monospace text-primary">
                             ₹{{ available_margin }}
                         </div>
                     </div>
@@ -198,7 +198,7 @@
                             <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 smaller fw-bold">{{ closed_positions_count }} Closed</span>
                         </div>
                         <div class="metric-card-date">Booked &amp; Settled Performance</div>
-                        <div class="metric-card-value font-monospace {% if realized_pnl > 0 %}text-success{% elif realized_pnl < 0 %}text-danger{% endif %}">
+                        <div id="sandbox-realized-pnl" class="metric-card-value font-monospace {% if realized_pnl > 0 %}text-success{% elif realized_pnl < 0 %}text-danger{% endif %}">
                             {% if realized_pnl > 0 %}+{% endif %}₹{{ realized_pnl|floatformat:2 }}
                         </div>
                     </div>
@@ -223,7 +223,7 @@
                             <span class="badge {% if open_positions_count > 0 %}bg-primary bg-opacity-25 text-primary{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 smaller fw-bold">{{ open_positions_count }} Open</span>
                         </div>
                         <div class="metric-card-date">Mark-to-Market Realtime Float</div>
-                        <div class="metric-card-value font-monospace {% if unrealized_pnl > 0 %}text-success{% elif unrealized_pnl < 0 %}text-danger{% endif %}">
+                        <div id="sandbox-unrealized-pnl" class="metric-card-value font-monospace {% if unrealized_pnl > 0 %}text-success{% elif unrealized_pnl < 0 %}text-danger{% endif %}">
                             {% if unrealized_pnl > 0 %}+{% endif %}₹{{ unrealized_pnl|floatformat:2 }}
                         </div>
                     </div>
@@ -248,7 +248,7 @@
                             <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0.5 smaller fw-bold">Active Exposure</span>
                         </div>
                         <div class="metric-card-date">Collateral: ₹{{ collateral|floatformat:2 }}</div>
-                        <div class="metric-card-value font-monospace text-warning">
+                        <div id="sandbox-margin-utilized" class="metric-card-value font-monospace text-warning">
                             ₹{{ margin_utilized|floatformat:2 }}
                         </div>
                     </div>
@@ -443,3 +443,54 @@
     <!-- END: Broker Orders & Execution Book -->
 
 </div>
+
+<!-- Real-time WebSocket Telemetry Sync for Sandbox Portfolio -->
+<script>
+(function() {
+    function updateMetric(elId, val, prefix) {
+        const el = document.getElementById(elId);
+        if (!el) return;
+        const num = parseFloat(val) || 0;
+        const formatted = '₹' + Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+        const displayText = (num > 0 && prefix === '+') ? '+' + formatted : (num < 0 ? '-' + formatted : formatted);
+        if (el.textContent.trim() !== displayText) {
+            el.textContent = displayText;
+            if (num > 0) {
+                el.classList.add('text-success');
+                el.classList.remove('text-danger');
+            } else if (num < 0) {
+                el.classList.add('text-danger');
+                el.classList.remove('text-success');
+            }
+            el.style.transition = 'opacity 0.2s ease';
+            el.style.opacity = '0.5';
+            setTimeout(function() { el.style.opacity = '1'; }, 200);
+        }
+    }
+
+    function handleSandboxTelemetry(data) {
+        const payload = data.data || data;
+        if (!payload) return;
+        if (payload.live_net_pnl !== undefined) updateMetric('sandbox-live-net-pnl', payload.live_net_pnl, '+');
+        if (payload.unrealized_pnl !== undefined) updateMetric('sandbox-unrealized-pnl', payload.unrealized_pnl, '+');
+        if (payload.realized_pnl !== undefined) updateMetric('sandbox-realized-pnl', payload.realized_pnl, '+');
+        if (payload.available_margin !== undefined) updateMetric('sandbox-available-margin', payload.available_margin, '');
+        if (payload.margin_utilized !== undefined) updateMetric('sandbox-margin-utilized', payload.margin_utilized, '');
+        if (payload.open_positions_count !== undefined) {
+            const posBadge = document.getElementById('sandbox-open-positions-badge');
+            if (posBadge) posBadge.textContent = payload.open_positions_count + ' Active Pos';
+        }
+    }
+
+    window.addEventListener('marmot:sandbox-telemetry', function(e) {
+        handleSandboxTelemetry(e.detail);
+    });
+
+    if (window.MarmotWS) {
+        {% for strat in live_strategies %}
+            window.MarmotWS.subscribe("strategy_{{ strat.id }}", handleSandboxTelemetry);
+        {% endfor %}
+        window.MarmotWS.connect();
+    }
+})();
+</script>

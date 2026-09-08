@@ -1,0 +1,176 @@
+<!-- Sandbox Journal: Paper Order Execution Log -->
+<div class="border-top border-secondary border-opacity-20 py-3 px-4 bg-transparent d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <i class="bi bi-receipt-cutoff text-info fs-5"></i>
+        <h5 class="card-title theme-text-main fw-bold mb-0" style="font-size: 1.05rem;">Paper Order Execution Log</h5>
+        <div class="d-inline-flex align-items-center gap-2">
+            {% if filter_date %}
+                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold smaller d-inline-flex align-items-center gap-1">
+                    <i class="bi bi-calendar3" style="font-size: 0.80rem;"></i>
+                    <span>Date: {{ filter_date }} ({{ total_count }} Records)</span>
+                </span>
+                <button type="button"
+                        hx-get="{% url 'admins:admin-sandbox-journal-orders' %}?year={{ filter_year }}"
+                        hx-target="#sbx-journal-orders-container"
+                        hx-swap="innerHTML"
+                        class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-0.5 smaller text-decoration-none d-inline-flex align-items-center gap-1 fw-semibold">
+                    <i class="bi bi-x" style="font-size: 0.80rem;"></i> Reset Filter
+                </button>
+            {% elif filter_year %}
+                <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fw-bold smaller">
+                    {% if filter_year == 'all' or filter_year == 'overall' %}All Time / Overall{% else %}Year: {{ filter_year }}{% endif %} ({{ total_count }} Records)
+                </span>
+            {% endif %}
+        </div>
+    </div>
+    <span class="badge bg-info bg-opacity-15 text-info border border-info border-opacity-25 rounded-pill px-3 py-1 small fw-bold d-inline-flex align-items-center gap-1.5">
+        <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.40rem; height: 0.40rem; color: #38bdf8;"></span>
+        Paper Simulation Engine
+    </span>
+</div>
+
+{% if day_summary %}
+<div class="px-4 py-3 border-top border-secondary border-opacity-15" style="background: rgba(56, 189, 248, 0.03);">
+    <div class="row g-3 text-center align-items-center">
+        <div class="col-6 col-md">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Sim. Gross P&L</div>
+            <div class="fw-extrabold mt-1 {% if day_summary.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 1.15rem;">
+                {% if day_summary.gross_pnl >= 0 %}+{% endif %}₹{{ day_summary.gross_pnl|floatformat:2 }}
+            </div>
+        </div>
+        <div class="col-6 col-md border-start border-secondary border-opacity-20">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Net P&L (Sim)</div>
+            <div class="fw-extrabold mt-1 {% if day_summary.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 1.15rem;">
+                {% if day_summary.net_pnl >= 0 %}+{% endif %}₹{{ day_summary.net_pnl|floatformat:2 }}
+            </div>
+        </div>
+        <div class="col-4 col-md border-start border-secondary border-opacity-20">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Slippage</div>
+            <div class="fw-bold mt-1 text-success" style="font-size: 1.05rem;">₹0.00</div>
+        </div>
+        <div class="col-4 col-md border-start border-secondary border-opacity-20">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Strategy</div>
+            <div class="fw-bold mt-1 text-info" style="font-size: 0.88rem;">{{ day_summary.strategy_name|default:"TensorTrade RL" }}</div>
+        </div>
+        <div class="col-4 col-md border-start border-secondary border-opacity-20">
+            <div class="small theme-text-muted text-uppercase fw-semibold" style="font-size: 0.70rem; letter-spacing: 0.04em;">Total Orders</div>
+            <div class="fw-extrabold mt-1 text-primary" style="font-size: 1.15rem;">{{ day_summary.trades }}</div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<div class="table-responsive flex-grow-1 overflow-auto">
+    <table class="table table-custom align-middle mb-0 text-nowrap" style="border-color: var(--border-color) !important;">
+        <thead>
+            <tr class="theme-text-muted border-bottom" style="border-color: var(--border-color) !important; font-size: 0.74rem; letter-spacing: 0.05em; text-transform: uppercase;">
+                <th scope="col" class="ps-4 py-3">Signal Time</th>
+                <th scope="col" class="py-3">Instrument</th>
+                <th scope="col" class="py-3">Order Type</th>
+                <th scope="col" class="py-3 text-center">Side</th>
+                <th scope="col" class="py-3 text-end">Qty / Lots</th>
+                <th scope="col" class="py-3 text-end">Fill Price</th>
+                <th scope="col" class="py-3 text-end">P&L</th>
+                <th scope="col" class="py-3 text-end">SL / TP</th>
+                <th scope="col" class="pe-4 py-3 text-end">Status</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for ord in orders %}
+            <tr style="border-color: var(--border-color) !important;">
+                <td class="ps-4 py-3 bg-transparent">
+                    <div class="theme-text-main fw-bold" style="font-size: 0.84rem;">{{ ord.signal_time|default:ord.create_time|default:"09:15:00" }}</div>
+                    <div class="theme-text-muted opacity-85 fw-medium" style="font-size: 0.70rem;">{{ ord.exec_time|default:ord.create_time|default:"—" }}</div>
+                </td>
+                <td class="py-3 bg-transparent">
+                    <div class="d-flex align-items-center gap-3 ms-1">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm"
+                             style="width: 36px; height: 36px; background: rgba(180, 241, 5, 0.12); border: 1px solid rgba(180, 241, 5, 0.35);">
+                            <span class="material-icons" style="color: #b4f105; font-size: 1.10rem !important;">candlestick_chart</span>
+                        </div>
+                        <div>
+                            <div class="fw-bold theme-text-main" style="font-size: 0.88rem;">{{ ord.trading_symbol|default:ord.symbol|default:"NIFTY ATM CE" }}</div>
+                            <div class="d-flex align-items-center gap-1.5 mt-1">
+                                <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2 py-0.5 fw-semibold" style="font-size: 0.65rem;">{{ ord.product_type|default:"INTRADAY" }}</span>
+                                <span class="badge bg-info bg-opacity-15 text-info border border-info border-opacity-25 rounded-pill px-2 py-0.5 fw-semibold" style="font-size: 0.63rem;">PAPER</span>
+                            </div>
+                        </div>
+                    </div>
+                </td>
+                <td class="py-3 bg-transparent">
+                    <span class="badge bg-secondary bg-opacity-20 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fw-bold" style="font-size: 0.70rem;">
+                        {{ ord.order_type|default:"MARKET" }}
+                    </span>
+                </td>
+                <td class="py-3 text-center bg-transparent">
+                    {% if ord.transaction_type == "BUY" or ord.side == "BUY" %}
+                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-extrabold" style="font-size: 0.74rem;">BUY</span>
+                    {% else %}
+                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 fw-extrabold" style="font-size: 0.74rem;">SELL</span>
+                    {% endif %}
+                </td>
+                <td class="py-3 text-end bg-transparent">
+                    <div class="theme-text-main fw-bold" style="font-size: 0.88rem;">{{ ord.quantity|default:ord.qty|default:"—" }}</div>
+                    {% if ord.lot_size %}
+                    <div class="theme-text-muted" style="font-size: 0.70rem;">Lot: {{ ord.lot_size }}</div>
+                    {% endif %}
+                </td>
+                <td class="py-3 text-end bg-transparent">
+                    <div class="theme-text-main fw-bold font-monospace" style="font-size: 0.88rem;">₹{{ ord.price|floatformat:2|default:"0.00" }}</div>
+                    <div class="theme-text-muted" style="font-size: 0.68rem;">0.00 pts slip</div>
+                </td>
+                <td class="py-3 text-end bg-transparent">
+                    {% if ord.realized_profit is not None %}
+                        {% if ord.realized_profit >= 0 %}
+                        <span class="fw-extrabold text-success font-monospace" style="font-size: 0.88rem;">+₹{{ ord.realized_profit|floatformat:2 }}</span>
+                        {% else %}
+                        <span class="fw-extrabold text-danger font-monospace" style="font-size: 0.88rem;">-₹{{ ord.realized_profit|floatformat:2|slice:"1:" }}</span>
+                        {% endif %}
+                    {% else %}
+                    <span class="theme-text-muted" style="font-size: 0.82rem;">—</span>
+                    {% endif %}
+                </td>
+                <td class="py-3 text-end bg-transparent">
+                    <div class="d-flex flex-column align-items-end gap-0.5">
+                        {% if ord.stop_loss_price %}
+                        <span class="badge bg-danger bg-opacity-15 text-danger border border-danger border-opacity-20 rounded-pill px-2 py-0.5 fw-semibold font-monospace" style="font-size: 0.65rem;">SL ₹{{ ord.stop_loss_price|floatformat:2 }}</span>
+                        {% endif %}
+                        {% if ord.target_price %}
+                        <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-20 rounded-pill px-2 py-0.5 fw-semibold font-monospace" style="font-size: 0.65rem;">TP ₹{{ ord.target_price|floatformat:2 }}</span>
+                        {% endif %}
+                        {% if not ord.stop_loss_price and not ord.target_price %}
+                        <span class="theme-text-muted" style="font-size: 0.75rem;">—</span>
+                        {% endif %}
+                    </div>
+                </td>
+                <td class="pe-4 py-3 text-end bg-transparent">
+                    {% if ord.order_status == "TRADED" %}
+                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">FILLED</span>
+                    {% elif ord.order_status == "PENDING" or ord.order_status == "TRANSIT" %}
+                    <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">PENDING</span>
+                    {% elif ord.order_status == "CANCELLED" or ord.order_status == "REJECTED" %}
+                    <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">CANCELLED</span>
+                    {% else %}
+                    <span class="badge bg-secondary bg-opacity-20 theme-text-muted rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.70rem;">{{ ord.order_status|default:"—" }}</span>
+                    {% endif %}
+                </td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="9" class="text-center py-5 theme-text-muted">
+                    <div class="d-flex flex-column align-items-center gap-2">
+                        <i class="bi bi-inbox fs-2 opacity-50"></i>
+                        <span class="small">No simulated paper orders found for this period.</span>
+                        <span class="smaller opacity-75">Start a strategy in Sandbox Dashboard to see execution logs here.</span>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+
+<div class="card-footer py-2 px-3 px-md-4 mt-auto border-top border-secondary border-opacity-20 d-flex justify-content-between align-items-center small theme-text-muted">
+    <span>Showing {{ total_count }} paper records total</span>
+    <span class="badge bg-info bg-opacity-15 text-info border border-info border-opacity-20 rounded-pill px-2.5 py-0.5 fw-semibold" style="font-size: 0.70rem;">Zero Slippage • Paper Engine</span>
+</div>

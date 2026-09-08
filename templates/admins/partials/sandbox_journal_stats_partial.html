@@ -1,0 +1,277 @@
+<!-- Sandbox Journal: 3x3 Stats Cards (Paper Simulation Stats) -->
+<div class="row g-3">
+
+    <!-- Card 1: Total Simulated Net P/L -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Net Simulated P/L</span>
+                {% if stats.total_pnl >= 0 %}
+                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">+{{ stats.pnl_pct }}%</span>
+                {% else %}
+                <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">{{ stats.pnl_pct }}%</span>
+                {% endif %}
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                {% if stats.total_pnl >= 0 %}
+                <h3 class="fw-extrabold text-success mb-0" style="font-size: 1.55rem;">+₹{{ stats.total_pnl|floatformat:2 }}</h3>
+                {% else %}
+                <h3 class="fw-extrabold text-danger mb-0" style="font-size: 1.55rem;">-₹{{ stats.total_pnl_abs|floatformat:2 }}</h3>
+                {% endif %}
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Paper Capital P/L Growth</span>
+                <span class="badge rounded-pill px-2 py-0.5 fw-semibold" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 0.66rem;">PAPER</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 2: Win Rate -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Strategy Win Rate</span>
+                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Win Metric</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold theme-text-main mb-0" style="font-size: 1.55rem;">{{ stats.win_rate }}%</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Win / Loss Ratio</span>
+                <span class="theme-text-main fw-bold">{{ stats.wins_count }}W / {{ stats.losses_count }}L</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 3: Total Paper Trades -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Simulated Trades</span>
+                <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Executed</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold theme-text-main mb-0" style="font-size: 1.55rem;">{{ stats.total_trades }}</h3>
+                <span class="theme-text-muted small fw-semibold">Orders</span>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Open / Closed</span>
+                <span class="text-info fw-bold">{{ stats.open_count }} Open / {{ stats.closed_count }} Closed</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 4: Max Drawdown -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Max Drawdown</span>
+                <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Risk Metric</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold text-warning mb-0" style="font-size: 1.55rem;">{{ stats.max_drawdown|floatformat:2 }}%</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Simulated Capital Risk</span>
+                <span class="text-warning fw-bold">Zero Real Loss</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 5: Gross Profit vs Loss -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Gross PnL Breakdown</span>
+                <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Sim. Profit vs Loss</span>
+            </div>
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">GROSS PROFIT</div>
+                    <span class="fw-extrabold text-success" style="font-size: 1.08rem;">+₹{{ stats.gross_profit|floatformat:2 }}</span>
+                </div>
+                <div class="text-end">
+                    <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">GROSS LOSS</div>
+                    <span class="fw-extrabold text-danger" style="font-size: 1.08rem;">-₹{{ stats.gross_loss_abs|floatformat:2 }}</span>
+                </div>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Profit Factor</span>
+                <span class="theme-text-main fw-bold">{{ stats.profit_factor }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 6: Risk-Reward Ratio -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Risk / Reward Ratio</span>
+                <span class="badge {% if stats.expectancy >= 0 %}bg-success bg-opacity-25 text-success{% else %}bg-danger bg-opacity-25 text-danger{% endif %} rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">
+                    {% if stats.expectancy >= 0 %}+{% endif %}₹{{ stats.expectancy }}/trade Edge
+                </span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold theme-text-main mb-0" style="font-size: 1.55rem;">1 : {{ stats.risk_reward_ratio }}</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Avg Win / Avg Loss</span>
+                <span class="theme-text-main fw-bold">Avg Win: ₹{{ stats.avg_win|floatformat:0 }} | Avg Loss: ₹{{ stats.avg_loss_abs|floatformat:0 }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 7: Win / Loss Streaks -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Trade Streaks</span>
+                <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Consistency</span>
+            </div>
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">MAX WIN STREAK</div>
+                    <span class="fw-extrabold text-success" style="font-size: 1.15rem;">{{ stats.max_win_streak }} Wins</span>
+                </div>
+                <div class="text-end">
+                    <div class="theme-text-muted small fw-semibold" style="font-size: 0.70rem;">MAX LOSS STREAK</div>
+                    <span class="fw-extrabold text-danger" style="font-size: 1.15rem;">{{ stats.max_loss_streak }} Losses</span>
+                </div>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Current Streak</span>
+                <span class="text-success fw-bold">{{ stats.current_streak }}</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 8: Zero Slippage Brokerage (Simulated) -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Simulated Charges</span>
+                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Zero Slippage</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold text-success mb-0" style="font-size: 1.55rem;">₹0.00</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Brokerage / STT / GST</span>
+                <span class="text-success fw-bold">Paper Waived</span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Card 9: Paper Capital Utilization -->
+    <div class="col-12 col-md-4">
+        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <span class="theme-text-muted small fw-bold text-uppercase" style="font-size: 0.74rem;">Paper Capital</span>
+                <span class="badge bg-info bg-opacity-25 text-info rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.72rem;">Virtual Funds</span>
+            </div>
+            <div class="d-flex align-items-baseline gap-2">
+                <h3 class="fw-extrabold text-info mb-0" style="font-size: 1.55rem;">₹{{ stats.base_capital|floatformat:2 }}</h3>
+            </div>
+            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex justify-content-between" style="font-size: 0.74rem;">
+                <span>Utilized: <strong class="text-warning fw-bold">₹{{ stats.margin_used|floatformat:0 }}</strong></span>
+                <span>Available: <strong class="theme-text-main fw-bold">₹{{ stats.avail_capital|floatformat:0 }}</strong></span>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+<!-- Sandbox Chart Canvas (same as journal_chart_partial style) -->
+{% if chart_mode %}
+<div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 mt-1 pb-2 border-bottom border-secondary border-opacity-10">
+    <div class="d-flex align-items-center gap-3 flex-wrap">
+        <div>
+            <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.68rem; letter-spacing: 0.05em;">Paper Capital</span>
+            <div class="fw-bold theme-text-main" style="font-size: 0.95rem;">₹{{ stats.base_capital|floatformat:0 }}</div>
+        </div>
+        <div class="border-start border-secondary border-opacity-20 ps-3">
+            <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.68rem; letter-spacing: 0.05em;">Net Simulated P&L</span>
+            <div class="fw-bold {% if stats.total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" style="font-size: 0.95rem;">
+                {% if stats.total_pnl >= 0 %}+{% endif %}₹{{ stats.total_pnl|floatformat:2 }}
+            </div>
+        </div>
+    </div>
+    <span class="badge bg-info bg-opacity-15 text-info border border-info border-opacity-25 rounded-pill px-3 py-1 fw-bold smaller d-inline-flex align-items-center gap-1">
+        <i class="bi bi-cpu-fill"></i>
+        <span>Paper Simulation Verified</span>
+    </span>
+</div>
+<div style="height: 380px; width: 100%; position: relative;">
+    <canvas id="sbxJournalChartCanvas"></canvas>
+</div>
+<script>
+(function() {
+    var ctx = document.getElementById('sbxJournalChartCanvas');
+    if (!ctx) return;
+    var labels   = {{ chart_labels_json|safe }};
+    var pnlData  = {{ daily_pnl_data_json|safe }};
+    var cumData  = {{ cum_pnl_data_json|safe }};
+    var colors   = {{ pnl_bar_colors_json|safe }};
+    var isDark   = document.documentElement.getAttribute('data-theme') === 'dark';
+    var gridColor = isDark ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.06)';
+    var textColor = isDark ? '#94a3b8' : '#64748b';
+
+    var pnlDataset = {
+        label: 'Trade P&L', data: pnlData, backgroundColor: colors,
+        borderRadius: 4, borderSkipped: false, barThickness: 'flex', maxBarThickness: 22,
+    };
+    var cumDataset = {
+        label: 'Cumulative P&L', data: cumData, type: 'line',
+        borderColor: '#38bdf8', backgroundColor: 'rgba(56,189,248,0.10)',
+        tension: 0.42, fill: true, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2,
+    };
+
+    window.sbxChartDatasetsStore = { labels: labels, pnlDataset: pnlDataset, cumDataset: cumDataset };
+
+    function buildDatasets(mode) {
+        if (mode === 'cumulative') return [cumDataset];
+        return [pnlDataset];
+    }
+
+    var chart = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: labels, datasets: buildDatasets('pnl') },
+        options: {
+            responsive: true, maintainAspectRatio: false, animation: { duration: 500 },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        label: function(ctx) { return ' ₹' + ctx.parsed.y.toFixed(2); }
+                    }
+                }
+            },
+            scales: {
+                x: { grid: { color: gridColor }, ticks: { color: textColor, maxRotation: 45, font: { size: 10 } } },
+                y: {
+                    grid: { color: gridColor },
+                    ticks: {
+                        color: textColor, font: { size: 10 },
+                        callback: function(v) { return '₹' + v.toLocaleString('en-IN'); }
+                    }
+                }
+            }
+        }
+    });
+
+    window.renderSbxJournalChart = function(mode) {
+        chart.data.datasets = buildDatasets(mode);
+        chart.update();
+    };
+})();
+</script>
+{% endif %}

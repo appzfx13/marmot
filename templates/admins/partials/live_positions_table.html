@@ -9,36 +9,36 @@
                 <span>Filter Positions:</span>
             </span>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <button type="button" 
-                        class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'ALL' or not filter_status %}border-primary text-primary fw-bold{% endif %}"
-                        style="{% if filter_status == 'ALL' or not filter_status %}background: rgba(var(--brand-primary-rgb, 13, 110, 253), 0.12); border-color: var(--brand-primary, #0d6efd) !important; color: #fff !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                <button type="button" 
+                        class="rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none border transition-all"
+                        style="font-size: 0.82rem; {% if filter_status == 'ALL' or not filter_status %}background: rgba(180, 241, 5, 0.12); border-color: rgba(180, 241, 5, 0.35) !important; color: #B4F105 !important;{% else %}background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
                         hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=ALL"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
-                    <i class="bi bi-layers {% if filter_status == 'ALL' or not filter_status %}text-primary{% else %}opacity-75{% endif %}"></i>
-                    <span class="fw-semibold">All</span>
-                    <span class="badge {% if filter_status == 'ALL' or not filter_status %}bg-primary text-white{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 ms-1 smaller">{{ all_positions_count|default:live_positions|length }}</span>
+                    <i class="bi bi-layers {% if filter_status == 'ALL' or not filter_status %}text-success{% else %}opacity-75{% endif %}"></i>
+                    <span>All</span>
+                    <span class="badge {% if filter_status == 'ALL' or not filter_status %}bg-success text-white{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 ms-1 smaller">{{ all_positions_count|default:live_positions|length }}</span>
                 </button>
 
                 <button type="button" 
-                        class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'OPEN' %}border-success text-success fw-bold{% endif %}"
-                        style="{% if filter_status == 'OPEN' %}background: rgba(25, 135, 84, 0.15); border-color: #198754 !important; color: #198754 !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                        class="rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none border transition-all"
+                        style="font-size: 0.82rem; {% if filter_status == 'OPEN' %}background: rgba(16, 185, 129, 0.18); border-color: rgba(16, 185, 129, 0.45) !important; color: #34d399 !important;{% else %}background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
                         hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=OPEN"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-play-circle-fill {% if filter_status == 'OPEN' %}text-success{% else %}opacity-75{% endif %}"></i>
-                    <span class="fw-semibold">Open</span>
+                    <span>Open</span>
                     <span class="badge {% if filter_status == 'OPEN' %}bg-success text-white{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 ms-1 smaller">{{ open_positions_count|default:"0" }}</span>
                 </button>
 
                 <button type="button" 
-                        class="btn-date-picker text-decoration-none shadow-sm {% if filter_status == 'CLOSED' %}border-secondary text-white-50 fw-bold{% endif %}"
-                        style="{% if filter_status == 'CLOSED' %}background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.25) !important; color: #fff !important;{% else %}background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                        class="rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none border transition-all"
+                        style="font-size: 0.82rem; {% if filter_status == 'CLOSED' %}background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.3) !important; color: #fff !important;{% else %}background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
                         hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=CLOSED"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-check2-circle opacity-75"></i>
-                    <span class="fw-semibold">Closed</span>
+                    <span>Closed</span>
                     <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 ms-1 smaller">{{ closed_positions_count|default:"0" }}</span>
                 </button>
             </div>
@@ -80,6 +80,7 @@
                     <th class="text-center">Net Qty</th>
                     <th class="text-end">Buy Avg</th>
                     <th class="text-end">Sell Avg</th>
+                    <th class="text-end">Current LTP</th>
                     <th class="text-end">Realized P&amp;L</th>
                     <th class="text-end">Unrealized P&amp;L</th>
                     <th class="text-end">Total P&amp;L</th>
@@ -127,6 +128,12 @@
                     <td class="text-end font-monospace small">
                         ₹{{ pos.sell_avg|floatformat:2 }}
                         <div class="theme-text-muted smaller">Qty: {{ pos.sell_qty }}</div>
+                    </td>
+                    <td class="text-end font-monospace small fw-bold text-white">
+                        ₹{{ pos.current_ltp|default:pos.buy_avg|floatformat:2 }}
+                        {% if pos.status == 'OPEN' %}
+                            <span class="spinner-grow spinner-grow-sm text-success ms-1" style="width: 0.35rem; height: 0.35rem;" role="status"></span>
+                        {% endif %}
                     </td>
                     <td class="text-end font-monospace small {% if pos.realized_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
                         ₹{{ pos.realized_profit|floatformat:2 }}

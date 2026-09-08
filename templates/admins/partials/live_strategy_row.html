@@ -51,11 +51,10 @@
                 </span>
                 <button type="button" 
                         class="btn btn-sm btn-outline-warning rounded-pill px-2.5 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1"
-                        hx-get="{% url 'admins:live-strategy-toggle-modal' strategy.pk %}"
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        data-bs-toggle="modal"
-                        data-bs-target="#globalHtmxModal"
+                        hx-post="{% url 'admins:live-strategy-toggle' strategy.pk %}"
+                        hx-target="#live-strategy-row-{{ strategy.pk }}"
+                        hx-swap="outerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                         title="Pause strategy execution">
                     <i class="bi bi-pause-fill"></i> Pause
                 </button>
@@ -65,13 +64,22 @@
                 </span>
                 <button type="button" 
                         class="btn btn-sm btn-outline-success rounded-pill px-2.5 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1"
-                        hx-get="{% url 'admins:live-strategy-toggle-modal' strategy.pk %}"
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        data-bs-toggle="modal"
-                        data-bs-target="#globalHtmxModal"
+                        hx-post="{% url 'admins:live-strategy-toggle' strategy.pk %}"
+                        hx-target="#live-strategy-row-{{ strategy.pk }}"
+                        hx-swap="outerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                         title="Arm strategy execution">
                     <i class="bi bi-play-fill"></i> Turn ON
+                </button>
+                <button type="button" 
+                        class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                        hx-post="{% url 'admins:live-strategy-delete' strategy.pk %}"
+                        hx-target="#live-strategy-row-{{ strategy.pk }}"
+                        hx-swap="outerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        hx-confirm="Are you sure you want to remove deployed strategy '{{ strategy.name }}'?"
+                        title="Remove inactive strategy">
+                    <i class="bi bi-trash3"></i> Remove
                 </button>
             {% endif %}
         </div>

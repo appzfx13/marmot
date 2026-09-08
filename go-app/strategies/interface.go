@@ -51,8 +51,13 @@ type LiveOrderRequest struct {
 	Quantity      int     `json:"quantity"`       // Position quantity
 	TargetPrice   float64 `json:"target_price"`
 	StopLossPrice float64 `json:"stop_loss_price"`
-	StrategyName  string  `json:"strategy_name"`
-	Timestamp     string  `json:"timestamp"`
+	StrategyName  string                 `json:"strategy_name"`
+	Timestamp     string                 `json:"timestamp"`
+	RuleID        int                    `json:"rule_id,omitempty"`
+	RuleName      string                 `json:"rule_name,omitempty"`
+	TriggerReason string                 `json:"trigger_reason,omitempty"`
+	Indicators    map[string]interface{} `json:"indicators,omitempty"`
+	SlippagePts   float64                `json:"slippage_pts"`
 }
 
 // Strategy defines the interface for all plug-and-play backtest & live automated trading modules.
