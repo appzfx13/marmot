@@ -122,7 +122,7 @@
 <div class="row mb-4">
     <div class="col-12">
         <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-            <div class="page-header-top-bar d-flex align-items-center justify-content-between w-100">
+            <div class="d-flex align-items-center gap-3">
                 <a href="{% url 'admins:trader_list' %}"
                    class="glass-icon-btn text-decoration-none page-header-back-btn"
                    title="Back to Traders List"
@@ -131,17 +131,26 @@
                    hx-push-url="true">
                     <span class="material-icons fs-5">arrow_back</span>
                 </a>
-                <div class="page-header-actions d-flex align-items-center gap-2">
-                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-2 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
-                        {% if form.instance.pk %}Editing Trader{% else %}New Trader{% endif %}
-                    </span>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                        <h1 class="page-title mb-0">
+                            {% if form.instance.pk %}Edit Trader: {{ form.instance.username }}{% else %}Create New Trader{% endif %}
+                        </h1>
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-3 py-1 fw-bold text-uppercase" style="letter-spacing: 0.5px;">
+                            {% if form.instance.pk %}Editing Trader{% else %}New Trader{% endif %}
+                        </span>
+                    </div>
+                    <p class="page-subtitle mb-0">Configure trader profile, authentication credentials, and freeze flags.</p>
                 </div>
             </div>
-            <div class="page-header-title-wrapper text-center">
-                <h1 class="page-title mb-0">
-                    {% if form.instance.pk %}Edit Trader: {{ form.instance.username }}{% else %}Create New Trader{% endif %}
-                </h1>
-                <p class="page-subtitle">Configure trader profile, authentication credentials, and freeze flags.</p>
+            <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+                <a href="{% url 'admins:trader_list' %}"
+                   class="btn btn-outline-secondary rounded-pill px-3 py-2 small fw-semibold"
+                   hx-get="{% url 'admins:trader_list' %}"
+                   hx-target="#app-main-container"
+                   hx-push-url="true">
+                    Cancel
+                </a>
             </div>
         </div>
     </div>

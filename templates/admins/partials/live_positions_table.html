@@ -3,43 +3,40 @@
 <div id="live-positions-container" class="card mb-0 border-0 shadow-none bg-transparent">
     <!-- Sub-header Controls -->
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 pb-3 mb-2 border-bottom" style="border-color: var(--border-color) !important;">
-        <div class="d-flex align-items-center gap-2 flex-wrap">
-            <span class="fw-bold theme-text-main small d-flex align-items-center gap-1.5 me-1">
+        <div class="d-flex align-items-center gap-2.5 flex-wrap">
+            <span class="fw-bold theme-text-muted small text-uppercase d-flex align-items-center gap-2 me-1" style="font-size: 0.74rem; letter-spacing: 0.03em;">
                 <i class="bi bi-funnel text-primary"></i>
                 <span>Filter Positions:</span>
             </span>
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <button type="button" 
-                        class="rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none border transition-all"
-                        style="font-size: 0.82rem; {% if filter_status == 'ALL' or not filter_status %}background: rgba(180, 241, 5, 0.12); border-color: rgba(180, 241, 5, 0.35) !important; color: #B4F105 !important;{% else %}background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                        class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'ALL' or not filter_status %}active-all{% endif %}"
                         hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=ALL"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
-                    <i class="bi bi-layers {% if filter_status == 'ALL' or not filter_status %}text-success{% else %}opacity-75{% endif %}"></i>
+                    <i class="bi bi-layers"></i>
                     <span>All</span>
-                    <span class="badge {% if filter_status == 'ALL' or not filter_status %}bg-success text-white{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 ms-1 smaller">{{ all_positions_count|default:live_positions|length }}</span>
+                    <span class="filter-count-badge font-monospace">{{ all_positions_count|default:live_positions|length }}</span>
                 </button>
 
                 <button type="button" 
-                        class="rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none border transition-all"
-                        style="font-size: 0.82rem; {% if filter_status == 'OPEN' %}background: rgba(16, 185, 129, 0.18); border-color: rgba(16, 185, 129, 0.45) !important; color: #34d399 !important;{% else %}background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                        class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'OPEN' %}active-open{% endif %}"
                         hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=OPEN"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
-                    <i class="bi bi-play-circle-fill {% if filter_status == 'OPEN' %}text-success{% else %}opacity-75{% endif %}"></i>
+                    <i class="bi bi-play-circle-fill"></i>
                     <span>Open</span>
-                    <span class="badge {% if filter_status == 'OPEN' %}bg-success text-white{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 ms-1 smaller">{{ open_positions_count|default:"0" }}</span>
+                    <span class="filter-count-badge font-monospace">{{ open_positions_count|default:"0" }}</span>
                 </button>
 
                 <button type="button" 
-                        class="rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none border transition-all"
-                        style="font-size: 0.82rem; {% if filter_status == 'CLOSED' %}background: rgba(255, 255, 255, 0.12); border-color: rgba(255, 255, 255, 0.3) !important; color: #fff !important;{% else %}background: rgba(255, 255, 255, 0.04); border-color: var(--border-color) !important; color: var(--text-main) !important;{% endif %}"
+                        class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'CLOSED' %}active-closed{% endif %}"
                         hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=CLOSED"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
-                    <i class="bi bi-check2-circle opacity-75"></i>
+                    <i class="bi bi-check2-circle"></i>
                     <span>Closed</span>
-                    <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 ms-1 smaller">{{ closed_positions_count|default:"0" }}</span>
+                    <span class="filter-count-badge font-monospace">{{ closed_positions_count|default:"0" }}</span>
                 </button>
             </div>
         </div>
@@ -229,4 +226,119 @@
         <p class="small mb-0 opacity-75">Intraday and delivery positions from your Dhan account will stream here in real-time.</p>
     </div>
     {% endif %}
+
+    <!-- Scoped Styling for Filter Pill Buttons & Count Capsules -->
+    <style>
+        .filter-pill-btn {
+            font-size: 0.82rem;
+            background: rgba(255, 255, 255, 0.03);
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            color: var(--text-muted, #94a3b8) !important;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .filter-pill-btn:hover {
+            background: rgba(255, 255, 255, 0.06);
+            border-color: rgba(255, 255, 255, 0.2) !important;
+            color: var(--text-main, #f8fafc) !important;
+            transform: translateY(-1px);
+        }
+
+        .filter-count-badge {
+            min-width: 22px;
+            height: 20px;
+            padding: 0 6px;
+            border-radius: 50rem;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.72rem;
+            font-weight: 700;
+            line-height: 1;
+            background: rgba(255, 255, 255, 0.07);
+            color: #cbd5e1;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            transition: all 0.2s ease;
+        }
+
+        /* Active states with coordinated theme colors */
+        .filter-pill-btn.active-all {
+            background: rgba(56, 189, 248, 0.14) !important;
+            border-color: rgba(56, 189, 248, 0.4) !important;
+            color: #38bdf8 !important;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.18);
+        }
+
+        .filter-pill-btn.active-all .filter-count-badge {
+            background: rgba(56, 189, 248, 0.25);
+            color: #e0f2fe;
+            border-color: rgba(56, 189, 248, 0.45);
+        }
+
+        .filter-pill-btn.active-open {
+            background: rgba(16, 185, 129, 0.16) !important;
+            border-color: rgba(16, 185, 129, 0.45) !important;
+            color: #34d399 !important;
+            box-shadow: 0 0 10px rgba(16, 185, 129, 0.18);
+        }
+
+        .filter-pill-btn.active-open .filter-count-badge {
+            background: rgba(16, 185, 129, 0.25);
+            color: #d1fae5;
+            border-color: rgba(16, 185, 129, 0.45);
+        }
+
+        .filter-pill-btn.active-closed {
+            background: rgba(255, 255, 255, 0.12) !important;
+            border-color: rgba(255, 255, 255, 0.3) !important;
+            color: #ffffff !important;
+        }
+
+        .filter-pill-btn.active-closed .filter-count-badge {
+            background: rgba(255, 255, 255, 0.2);
+            color: #ffffff;
+            border-color: rgba(255, 255, 255, 0.35);
+        }
+
+        /* Light theme overrides */
+        [data-theme="light"] .filter-pill-btn {
+            background: #ffffff;
+            border-color: #e2e8f0 !important;
+            color: #64748b !important;
+        }
+
+        [data-theme="light"] .filter-pill-btn:hover {
+            background: #f8fafc;
+            color: #0f172a !important;
+        }
+
+        [data-theme="light"] .filter-count-badge {
+            background: #f1f5f9;
+            color: #334155;
+            border-color: #cbd5e1;
+        }
+
+        [data-theme="light"] .filter-pill-btn.active-all {
+            background: rgba(2, 132, 199, 0.08) !important;
+            border-color: #0284c7 !important;
+            color: #0284c7 !important;
+        }
+
+        [data-theme="light"] .filter-pill-btn.active-open {
+            background: rgba(22, 163, 74, 0.08) !important;
+            border-color: #16a34a !important;
+            color: #15803d !important;
+        }
+
+        [data-theme="light"] .filter-pill-btn.active-closed {
+            background: rgba(0, 0, 0, 0.06) !important;
+            border-color: rgba(0, 0, 0, 0.15) !important;
+            color: #18181b !important;
+        }
+
+        [data-theme="light"] .filter-pill-btn.active-closed .filter-count-badge {
+            background: rgba(0, 0, 0, 0.1);
+            color: #18181b;
+        }
+    </style>
 </div>

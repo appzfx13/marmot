@@ -144,129 +144,128 @@
 
 <!-- Top Header Navigation & Live Controls -->
 <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
-    <div class="page-header-top-bar d-flex align-items-center justify-content-between w-100 flex-wrap gap-2">
-        <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 page-header-back-btn" style="border-color: var(--border-default) !important; background: var(--bg-surface);">
+    <div class="d-flex align-items-center gap-3">
+        <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 page-header-back-btn flex-shrink-0" style="border-color: var(--border-default) !important; background: var(--bg-surface);">
             <span class="material-icons" style="font-size: 1.1rem;">arrow_back</span>
-            <span class="fw-medium">Back to Dashboard</span>
+            <span class="fw-medium">Back</span>
         </a>
-        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap ms-auto">
-            <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" class="btn btn-success text-white rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5 fw-semibold" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-color: #059669; font-size: 0.825rem;" title="Download Executive Multi-Sheet Excel Report">
-                <span class="material-icons" style="font-size: 1.05rem;">file_download</span>
-                <span>Download Report</span>
-            </a>
-            <a href="{% url 'backtest:rule_list' %}" class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" target="_blank" title="Manage Execution Rules" style="font-size: 0.825rem;">
-                <span class="material-icons" style="font-size: 1.05rem;">rule</span>
-                <span class="fw-medium">Rules</span>
-            </a>
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_logs_modal' backtest.pk %}" 
-                    hx-target="#globalHtmxModalDialog" 
-                    hx-swap="innerHTML" 
-                    class="btn btn-outline-info rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5 fw-semibold" 
-                    title="View Backtest Execution Trace & Telemetry" 
-                    style="font-size: 0.825rem;">
-                <span class="material-icons" style="font-size: 1.05rem;">terminal</span>
-                <span class="fw-medium">Execution Logs</span>
-            </button>
-            <div id="backtest-control-actions" class="d-inline-flex align-items-center gap-2">
-                {% if backtest.status|lower == 'created' %}
-                <button type="button" 
-                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
-                        style="font-size: 0.825rem;">
-                    <span class="material-icons" style="font-size: 1.05rem;">play_arrow</span>
-                    <span>Start Execution</span>
-                </button>
-                {% elif backtest.status|lower == 'paused' %}
-                <button type="button" 
-                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=resume" 
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
-                        style="font-size: 0.825rem;">
-                    <span class="material-icons" style="font-size: 1.05rem;">play_arrow</span>
-                    <span>Resume</span>
-                </button>
-                <button type="button" 
-                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        class="btn btn-outline-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
-                        style="font-size: 0.825rem;">
-                    <span class="material-icons" style="font-size: 1.05rem;">stop</span>
-                    <span>Cancel</span>
-                </button>
-                {% elif backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
-                <button type="button" 
-                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        class="btn btn-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
-                        style="font-size: 0.825rem;">
-                    <span class="material-icons" style="font-size: 1.05rem;">pause</span>
-                    <span>Pause</span>
-                </button>
-                <button type="button" 
-                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        class="btn btn-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
-                        style="font-size: 0.825rem;">
-                    <span class="material-icons" style="font-size: 1.05rem;">stop</span>
-                    <span>Stop</span>
-                </button>
-                {% else %}
-                <button type="button" 
-                        hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        class="btn btn-outline-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5"
-                        style="font-size: 0.825rem;">
-                    <span class="material-icons" style="font-size: 1.05rem;">replay</span>
-                    <span>Re-run Backtest</span>
-                </button>
-                {% endif %}
-                <button type="button" 
-                        hx-get="{% url 'backtest:backtest_deploy_modal' backtest.pk %}" 
-                        hx-target="#globalHtmxModalDialog"
-                        hx-swap="innerHTML"
-                        data-bs-toggle="modal"
-                        data-bs-target="#globalHtmxModal"
-                        class="btn btn-outline-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5"
-                        style="font-size: 0.825rem;"
-                        title="Clone configuration to isolated Live Strategy registry">
-                    <span class="material-icons text-warning" style="font-size: 1.05rem;">rocket_launch</span>
-                    <span>Move to Execute</span>
-                </button>
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                <h1 class="page-title mb-0">Backtest Analytics #BT-{{ backtest.id|stringformat:"04d" }}</h1>
+                <span class="fs-6 fw-normal text-primary">({{ backtest.get_strategy_name_display }})</span>
+                <span id="backtest-status-badge-container">
+                    {% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Running</span>
+                    {% elif backtest.status|lower == 'completed' or backtest.status|lower == 'success' %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Completed</span>
+                    {% elif backtest.status|lower == 'paused' %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Paused</span>
+                    {% elif backtest.status|lower == 'error' or backtest.status|lower == 'failed' %}
+                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Failed</span>
+                    {% else %}
+                        <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Ready</span>
+                    {% endif %}
+                </span>
             </div>
+            <p class="page-subtitle mb-0">
+                Index: <strong class="theme-text-main">{{ backtest.index_name }}</strong> &nbsp;|&nbsp; 
+                Period: <span class="theme-font-mono">{{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</span> &nbsp;|&nbsp; 
+                Initial Capital: <strong class="theme-font-mono text-success">₹{{ backtest.initial_capital|floatformat:0 }}</strong>
+            </p>
         </div>
     </div>
-
-    <div class="page-header-title-wrapper text-center w-100">
-        <h1 class="page-title d-flex align-items-center justify-content-center flex-wrap gap-2">
-            <span>Backtest Analytics #BT-{{ backtest.id|stringformat:"04d" }}</span>
-            <span class="fs-6 fw-normal text-primary">({{ backtest.get_strategy_name_display }})</span>
-            <span id="backtest-status-badge-container">
-                {% if backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
-                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Running</span>
-                {% elif backtest.status|lower == 'completed' or backtest.status|lower == 'success' %}
-                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Completed</span>
-                {% elif backtest.status|lower == 'paused' %}
-                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Paused</span>
-                {% elif backtest.status|lower == 'error' or backtest.status|lower == 'failed' %}
-                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Failed</span>
-                {% else %}
-                    <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Ready</span>
-                {% endif %}
-            </span>
-        </h1>
-        <p class="page-subtitle mb-0">
-            Index: <strong class="theme-text-main">{{ backtest.index_name }}</strong> &nbsp;|&nbsp; 
-            Period: <span class="theme-font-mono">{{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</span> &nbsp;|&nbsp; 
-            Initial Capital: <strong class="theme-font-mono text-success">₹{{ backtest.initial_capital|floatformat:0 }}</strong>
-        </p>
+    <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+        <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" class="btn btn-success text-white rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5 fw-semibold" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-color: #059669; font-size: 0.825rem;" title="Download Executive Multi-Sheet Excel Report">
+            <span class="material-icons" style="font-size: 1.05rem;">file_download</span>
+            <span>Download Report</span>
+        </a>
+        <a href="{% url 'backtest:rule_list' %}" class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" target="_blank" title="Manage Execution Rules" style="font-size: 0.825rem;">
+            <span class="material-icons" style="font-size: 1.05rem;">rule</span>
+            <span class="fw-medium">Rules</span>
+        </a>
+        <button type="button" 
+                hx-get="{% url 'backtest:backtest_logs_modal' backtest.pk %}" 
+                hx-target="#globalHtmxModalDialog" 
+                hx-swap="innerHTML" 
+                class="btn btn-outline-info rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5 fw-semibold" 
+                title="View Backtest Execution Trace & Telemetry" 
+                style="font-size: 0.825rem;">
+            <span class="material-icons" style="font-size: 1.05rem;">terminal</span>
+            <span class="fw-medium">Execution Logs</span>
+        </button>
+        <div id="backtest-control-actions" class="d-inline-flex align-items-center gap-2">
+            {% if backtest.status|lower == 'created' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
+                    hx-target="#globalHtmxModalDialog" 
+                    hx-swap="innerHTML" 
+                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    style="font-size: 0.825rem;">
+                <span class="material-icons" style="font-size: 1.05rem;">play_arrow</span>
+                <span>Start Execution</span>
+            </button>
+            {% elif backtest.status|lower == 'paused' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=resume" 
+                    hx-target="#globalHtmxModalDialog" 
+                    hx-swap="innerHTML" 
+                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    style="font-size: 0.825rem;">
+                <span class="material-icons" style="font-size: 1.05rem;">play_arrow</span>
+                <span>Resume</span>
+            </button>
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
+                    hx-target="#globalHtmxModalDialog" 
+                    hx-swap="innerHTML" 
+                    class="btn btn-outline-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    style="font-size: 0.825rem;">
+                <span class="material-icons" style="font-size: 1.05rem;">stop</span>
+                <span>Cancel</span>
+            </button>
+            {% elif backtest.status|lower == 'running' or backtest.status|lower == 'pending' or backtest.status|lower == 'in_progress' %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
+                    hx-target="#globalHtmxModalDialog" 
+                    hx-swap="innerHTML" 
+                    class="btn btn-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    style="font-size: 0.825rem;">
+                <span class="material-icons" style="font-size: 1.05rem;">pause</span>
+                <span>Pause</span>
+            </button>
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
+                    hx-target="#globalHtmxModalDialog" 
+                    hx-swap="innerHTML" 
+                    class="btn btn-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    style="font-size: 0.825rem;">
+                <span class="material-icons" style="font-size: 1.05rem;">stop</span>
+                <span>Stop</span>
+            </button>
+            {% else %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
+                    hx-target="#globalHtmxModalDialog" 
+                    hx-swap="innerHTML" 
+                    class="btn btn-outline-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    style="font-size: 0.825rem;">
+                <span class="material-icons" style="font-size: 1.05rem;">replay</span>
+                <span>Re-run Backtest</span>
+            </button>
+            {% endif %}
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_deploy_modal' backtest.pk %}" 
+                    hx-target="#globalHtmxModalDialog" 
+                    hx-swap="innerHTML" 
+                    data-bs-toggle="modal" 
+                    data-bs-target="#globalHtmxModal" 
+                    class="btn btn-outline-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" 
+                    style="font-size: 0.825rem;" 
+                    title="Clone configuration to isolated Live Strategy registry">
+                <span class="material-icons text-warning" style="font-size: 1.05rem;">rocket_launch</span>
+                <span>Move to Execute</span>
+            </button>
+        </div>
     </div>
 </div>
 

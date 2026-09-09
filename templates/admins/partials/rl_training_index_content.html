@@ -44,14 +44,17 @@
 
                     <!-- Target Asset Cards -->
                     <div class="mb-4">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-2">Target Index Asset</label>
-                        <div class="d-flex flex-wrap gap-2.5 align-items-stretch">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">Target Index Asset</label>
+                            <span class="badge bg-secondary bg-opacity-20 text-muted rounded-pill font-monospace" style="font-size: 0.65rem;">7 Options Markets</span>
+                        </div>
+                        <div class="rl-asset-grid">
                             {% for index_val, index_label in index_form.fields.index_name.choices %}
-                            <div style="flex: 1 1 125px; min-width: 105px;">
+                            <div class="rl-asset-item">
                                 <input type="radio" class="btn-check" name="index_name" id="index_{{ index_val }}" value="{{ index_val }}" {% if forloop.first %}checked{% endif %}>
-                                <label class="btn btn-outline-primary theme-text-main border-secondary border-opacity-25 w-100 h-100 py-2.5 px-2 rounded-3 text-center d-flex flex-column align-items-center justify-content-center shadow-xs" for="index_{{ index_val }}">
-                                    <span class="fw-bold fs-6 mb-0">{{ index_val }}</span>
-                                    <span class="theme-text-muted text-xs opacity-75 mt-1" style="font-size: 0.7rem;">
+                                <label class="rl-asset-card" for="index_{{ index_val }}" title="Select {{ index_val }}">
+                                    <span class="rl-asset-title">{{ index_val }}</span>
+                                    <span class="rl-asset-sub">
                                         {% if index_val == 'NIFTY' %}Lot 65
                                         {% elif index_val == 'BANKNIFTY' %}Lot 30
                                         {% elif index_val == 'FINNIFTY' %}Lot 60
@@ -293,4 +296,138 @@
             </div>
         </div>
     </div>
+
+    <!-- Scoped Styling for RL Asset Selector Grid & HUD Mirrored Cards -->
+    <style>
+        .rl-asset-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(0, 1fr));
+            gap: 8px;
+            width: 100%;
+        }
+
+        @media (max-width: 1399.98px) {
+            .rl-asset-grid {
+                grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 8px;
+            }
+        }
+
+        @media (max-width: 767.98px) {
+            .rl-asset-grid {
+                grid-template-columns: repeat(2, minmax(0, 1fr));
+                gap: 8px;
+            }
+        }
+
+        .rl-asset-item {
+            position: relative;
+            width: 100%;
+            display: flex;
+        }
+
+        .rl-asset-card {
+            width: 100%;
+            min-height: 60px;
+            padding: 8px 4px;
+            border-radius: 10px;
+            background: rgba(255, 255, 255, 0.02);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+            position: relative;
+            overflow: hidden;
+            margin-bottom: 0;
+        }
+
+        .rl-asset-card:hover {
+            background: rgba(255, 255, 255, 0.05);
+            border-color: rgba(56, 189, 248, 0.35);
+            transform: translateY(-1px);
+        }
+
+        .rl-asset-title {
+            font-weight: 700;
+            font-size: 0.82rem;
+            line-height: 1.2;
+            letter-spacing: -0.01em;
+            color: var(--text-main, #f8fafc);
+            transition: color 0.2s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            padding: 0 4px;
+        }
+
+        .rl-asset-sub {
+            font-size: 0.67rem;
+            font-weight: 500;
+            color: var(--text-muted, #94a3b8);
+            margin-top: 3px;
+            line-height: 1.1;
+            transition: color 0.2s ease;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 100%;
+            padding: 0 4px;
+        }
+
+        /* Active / Checked State mirroring the right-side highlight */
+        .btn-check:checked + .rl-asset-card {
+            background: linear-gradient(135deg, rgba(37, 99, 235, 0.18) 0%, rgba(56, 189, 248, 0.12) 100%);
+            border-color: #38bdf8 !important;
+            box-shadow: 0 0 14px rgba(56, 189, 248, 0.22), inset 0 0 0 1px rgba(56, 189, 248, 0.4);
+        }
+
+        .btn-check:checked + .rl-asset-card .rl-asset-title {
+            color: #38bdf8 !important;
+            font-weight: 800;
+        }
+
+        .btn-check:checked + .rl-asset-card .rl-asset-sub {
+            color: #e0f2fe !important;
+            font-weight: 600;
+        }
+
+        /* Light Theme Compatibility */
+        [data-theme="light"] .rl-asset-card {
+            background: rgba(0, 0, 0, 0.02);
+            border: 1px solid rgba(0, 0, 0, 0.1);
+        }
+
+        [data-theme="light"] .rl-asset-card:hover {
+            background: rgba(0, 0, 0, 0.04);
+            border-color: rgba(2, 132, 199, 0.4);
+        }
+
+        [data-theme="light"] .rl-asset-title {
+            color: #0f172a;
+        }
+
+        [data-theme="light"] .rl-asset-sub {
+            color: #64748b;
+        }
+
+        [data-theme="light"] .btn-check:checked + .rl-asset-card {
+            background: rgba(2, 132, 199, 0.08);
+            border-color: #0284c7 !important;
+            box-shadow: 0 0 10px rgba(2, 132, 199, 0.15), inset 0 0 0 1px rgba(2, 132, 199, 0.3);
+        }
+
+        [data-theme="light"] .btn-check:checked + .rl-asset-card .rl-asset-title {
+            color: #0284c7 !important;
+        }
+
+        [data-theme="light"] .btn-check:checked + .rl-asset-card .rl-asset-sub {
+            color: #0369a1 !important;
+        }
+    </style>
 </div>
