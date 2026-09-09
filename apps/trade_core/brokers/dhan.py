@@ -485,7 +485,6 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         token = str(self.get_access_token() or '').strip().strip('"').strip("'")
         client_id = str(self.client_id or '').strip().strip('"').strip("'")
         if not token or not client_id:
-            print(f"[DHAN API DEBUG] get_trade_book() skipped: Missing token or client_id (client_id={client_id})")
             return {'success': False, 'trades': [], 'trades_count': 0}
 
         try:
@@ -503,7 +502,13 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                 except Exception:
                     pass
                 return result
-            return {'success': False, 'trades': [], 'trades_count': 0}
+            fail_res = {'success': False, 'trades': [], 'trades_count': 0}
+            if resp.status_code in (401, 403):
+                try:
+                    _get_redis().setex(cache_key, 60, json.dumps(fail_res))
+                except Exception:
+                    pass
+            return fail_res
         except Exception as e:
             logger.warning("Dhan get_trade_book exception: %s", e)
             print(f"[DHAN API DEBUG] get_trade_book Exception: {e}")
@@ -527,7 +532,6 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         token = str(self.get_access_token() or '').strip().strip('"').strip("'")
         client_id = str(self.client_id or '').strip().strip('"').strip("'")
         if not token or not client_id:
-            print(f"[DHAN STATEMENTS DEBUG] get_trade_history() skipped: Missing token or client_id (client_id={client_id})")
             return {'success': False, 'trades': [], 'trades_count': 0}
 
         try:
@@ -547,6 +551,13 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                             break
                         curr_page += 1
                         continue
+                elif resp.status_code in (401, 403):
+                    fail_res = {'success': False, 'trades': [], 'trades_count': 0}
+                    try:
+                        _get_redis().setex(cache_key, 60, json.dumps(fail_res))
+                    except Exception:
+                        pass
+                    return fail_res
                 break
 
             result = {'success': True, 'trades': all_trades_list, 'trades_count': len(all_trades_list)}
@@ -569,34 +580,31 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             cached_json = _get_redis().get(cache_key)
             if cached_json:
                 return json.loads(cached_json)
-        except Exception:
-            pass
+        except Exception as cache_err:
+            logger.warning("Redis read exception in get_ledger_statements: %s", cache_err)
 
         import requests
         token = str(self.get_access_token() or '').strip().strip('"').strip("'")
         client_id = str(self.client_id or '').strip().strip('"').strip("'")
         if not token or not client_id:
-            return {'success': False, 'ledger': [], 'total_charges': 0.0}
+            return {'success': False, 'statements': []}
 
         try:
             url = f"https://api.dhan.co/v2/ledger?from-date={from_date}&to-date={to_date}"
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
-            resp = requests.get(url, headers=headers, timeout=6)
+            resp = requests.get(url, headers=headers, timeout=5)
             if resp.status_code == 200:
-                ledger_data = resp.json()
-                if not isinstance(ledger_data, list):
-                    ledger_data = []
-                total_charges = sum(float(item.get('dhanFee', 0.0) or item.get('stt', 0.0) or item.get('sebiTax', 0.0) or 0.0) for item in ledger_data)
-                result = {'success': True, 'ledger': ledger_data, 'total_charges': round(total_charges, 2)}
+                data = resp.json()
+                result = {'success': True, 'statements': data if isinstance(data, list) else []}
                 try:
                     _get_redis().setex(cache_key, 60, json.dumps(result))
                 except Exception:
                     pass
                 return result
-            return {'success': False, 'ledger': [], 'total_charges': 0.0}
+            return {'success': False, 'statements': []}
         except Exception as e:
             logger.warning("Dhan get_ledger_statements exception: %s", e)
-            return {'success': False, 'ledger': [], 'total_charges': 0.0}
+            return {'success': False, 'statements': []}
 
     def get_live_dashboard_summary(self) -> Dict[str, Any]:
         """Aggregates funds, positions, PnL, and auth health for the Live Dashboard via parallel ThreadPool & shared Redis cache."""
@@ -609,6 +617,24 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                 return json.loads(cached_json)
         except Exception as cache_err:
             logger.warning("Redis read exception in get_live_dashboard_summary: %s", cache_err)
+
+        token = str(self.get_access_token() or '').strip().strip('"').strip("'")
+        client_id = str(self.client_id or '').strip().strip('"').strip("'")
+        if not token or not client_id:
+            unauth_result = {
+                'is_token_active': False, 'needs_consent': True,
+                'available_margin': '0.00', 'cash': '0.00', 'collateral': '0.00', 'margin_utilized': '0.00',
+                'live_net_pnl': 0.00, 'realized_pnl': 0.00, 'unrealized_pnl': 0.00,
+                'open_positions_count': 0, 'closed_positions_count': 0,
+                'todays_orders_count': 0, 'open_orders_count': 0, 'traded_orders_count': 0,
+                'positions': [], 'holdings': [], 'total_invested': 0.00, 'current_value': 0.00,
+                'holdings_pnl': 0.00, 'holdings_pnl_pct': 0.00, 'holdings_count': 0, 'orders': []
+            }
+            try:
+                _get_redis().setex(cache_key, 60, json.dumps(unauth_result))
+            except Exception:
+                pass
+            return unauth_result
 
         # Parallel execution of 4 HTTP API requests to Dhan
         with ThreadPoolExecutor(max_workers=4) as executor:
@@ -651,7 +677,8 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         }
 
         try:
-            _get_redis().setex(cache_key, 30, json.dumps(result))
+            ttl = 30 if is_active else 60
+            _get_redis().setex(cache_key, ttl, json.dumps(result))
         except Exception as cache_err:
             logger.warning("Redis write exception in get_live_dashboard_summary: %s", cache_err)
 

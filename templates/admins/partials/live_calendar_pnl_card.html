@@ -1,31 +1,91 @@
 {% load static %}
-<!-- Current Month Calendar PnL Card Widget -->
+<!-- Current Month Calendar PnL & Real-Time Position P&L Bar Graph Card Widget -->
 <div class="card p-3.5 rounded-4 shadow-sm h-100" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+    
     <!-- Card Header -->
-    <div class="d-flex align-items-center justify-content-between mb-3 border-bottom pb-2.5" style="border-color: var(--border-color) !important;">
-        <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle bg-success bg-opacity-15 text-success d-flex align-items-center justify-content-center" style="width: 36px; height: 36px;">
-                <i class="bi bi-calendar3 fs-5"></i>
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3 border-bottom pb-2.5" style="border-color: var(--border-color) !important;">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle bg-success bg-opacity-15 text-success d-flex align-items-center justify-content-center flex-shrink-0" style="width: 38px; height: 38px;">
+                <i class="bi bi-bar-chart-line-fill fs-5" id="calendarCardHeaderIcon"></i>
             </div>
             <div>
-                <h5 class="fw-bold theme-text-main mb-0">{{ calendar_pnl.month_name }} {{ calendar_pnl.year }} Calendar P&amp;L</h5>
-                <small class="theme-text-muted">Month-to-Date Realized Trading Performance</small>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h5 class="fw-bold theme-text-main mb-0" id="calendarCardHeaderTitle">{{ calendar_pnl.month_name }} {{ calendar_pnl.year }} Position P&amp;L Bar Graph</h5>
+                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 smaller fw-bold" id="calendarModeBadge">Position P&amp;L</span>
+                </div>
+                <small class="theme-text-muted" id="calendarCardHeaderSubtitle">Contract-level Mark-to-Market &amp; Realized P&amp;L Distribution</small>
             </div>
         </div>
-        <div class="text-end">
-            <div class="fw-bold font-monospace fs-5 {% if calendar_pnl.total_monthly_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
-                {% if calendar_pnl.total_monthly_pnl >= 0 %}+{% endif %}₹{{ calendar_pnl.total_monthly_pnl|floatformat:2 }}
+
+        <!-- Mode Switcher Pills & Monthly Returns -->
+        <div class="d-flex align-items-center gap-3 flex-wrap ms-md-auto">
+            <!-- Mode Switcher Buttons -->
+            <div class="btn-group p-0.5 rounded-pill shadow-sm" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color);" role="group">
+                <button type="button" 
+                        id="btnSwitchPositionBars"
+                        class="btn btn-sm rounded-pill px-3 py-1 fw-bold btn-primary text-white" 
+                        onclick="switchCalendarViewMode('bars')">
+                    <i class="bi bi-bar-chart-fill me-1"></i>Position P&amp;L Bars
+                </button>
+                <button type="button" 
+                        id="btnSwitchCalendarGrid"
+                        class="btn btn-sm rounded-pill px-3 py-1 fw-bold text-muted" 
+                        style="background: transparent; border: none;"
+                        onclick="switchCalendarViewMode('calendar')">
+                    <i class="bi bi-calendar3 me-1"></i>Calendar Grid
+                </button>
             </div>
-            <div class="smaller theme-text-muted">
-                <span class="text-success fw-bold">{{ calendar_pnl.profit_days }}W</span> &bull; 
-                <span class="text-danger fw-bold">{{ calendar_pnl.loss_days }}L</span> 
-                ({{ calendar_pnl.win_rate }}% Win Rate)
+
+            <!-- Total Monthly PnL Badge -->
+            <div class="text-end ps-2 border-start border-secondary border-opacity-20">
+                <div class="fw-bold font-monospace fs-5 {% if calendar_pnl.total_monthly_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {% if calendar_pnl.total_monthly_pnl >= 0 %}+{% endif %}₹{{ calendar_pnl.total_monthly_pnl|floatformat:2 }}
+                </div>
+                <div class="smaller theme-text-muted">
+                    <span class="text-success fw-bold">{{ calendar_pnl.profit_days }}W</span> &bull; 
+                    <span class="text-danger fw-bold">{{ calendar_pnl.loss_days }}L</span> 
+                    ({{ calendar_pnl.win_rate }}% Win Rate)
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Calendar Days Grid -->
-    <div class="calendar-mini-grid">
+    <!-- VIEW 1: Position P&L Bar Graph (Default Active View) -->
+    <div id="positionPnlBarViewContainer" class="position-relative w-100">
+        <!-- Sub-header KPI Ribbon for Positions -->
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2.5 pb-2 border-bottom border-secondary border-opacity-10">
+            <div class="d-flex align-items-center gap-3 flex-wrap">
+                <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.72rem; letter-spacing: 0.04em;">
+                    <i class="bi bi-layers-half text-primary me-1"></i>Active Contracts: <strong class="theme-text-main">{{ open_positions_count|default:"0" }} Open</strong>
+                </span>
+                <span class="text-secondary opacity-50">&bull;</span>
+                <span class="theme-text-muted smaller text-uppercase fw-bold" style="font-size: 0.72rem; letter-spacing: 0.04em;">
+                    Settled: <strong class="theme-text-main">{{ closed_positions_count|default:"0" }} Closed</strong>
+                </span>
+            </div>
+            <div class="d-flex align-items-center gap-2">
+                <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-0.5 smaller fw-semibold">
+                    <i class="bi bi-arrow-up-circle me-1"></i>Profit: Green
+                </span>
+                <span class="badge bg-danger bg-opacity-15 text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-0.5 smaller fw-semibold">
+                    <i class="bi bi-arrow-down-circle me-1"></i>Loss: Red
+                </span>
+            </div>
+        </div>
+
+        <!-- Position P&L Bar Chart Canvas -->
+        <div style="height: 270px; width: 100%; position: relative;">
+            <canvas id="positionPnlBarChartCanvas"></canvas>
+            
+            <div id="positionBarEmptyState" class="d-none text-center py-5 theme-text-muted">
+                <i class="bi bi-bar-chart fs-1 opacity-40 mb-2 d-block"></i>
+                <p class="mb-0 small">No positions active or settled in current session yet.<br>New trades and open positions will dynamically graph here.</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- VIEW 2: Calendar Days Grid (Toggleable View) -->
+    <div id="monthlyCalendarGridViewContainer" class="calendar-mini-grid" style="display: none;">
         <!-- Weekday Headers -->
         <div class="d-grid gap-1 mb-1.5" style="grid-template-columns: repeat(7, 1fr); text-align: center;">
             <div class="smaller theme-text-muted fw-bold">M</div>
@@ -82,3 +142,148 @@
         </div>
     </div>
 </div>
+
+<!-- Position P&L Bar Chart Script & Mode Switcher -->
+<script>
+(function() {
+    window.switchCalendarViewMode = function(mode) {
+        const barContainer = document.getElementById('positionPnlBarViewContainer');
+        const calContainer = document.getElementById('monthlyCalendarGridViewContainer');
+        const btnBars = document.getElementById('btnSwitchPositionBars');
+        const btnCal = document.getElementById('btnSwitchCalendarGrid');
+        const title = document.getElementById('calendarCardHeaderTitle');
+        const subtitle = document.getElementById('calendarCardHeaderSubtitle');
+        const badge = document.getElementById('calendarModeBadge');
+
+        if (mode === 'calendar') {
+            if (barContainer) barContainer.style.display = 'none';
+            if (calContainer) calContainer.style.display = 'block';
+            if (btnBars) {
+                btnBars.classList.remove('btn-primary', 'text-white');
+                btnBars.classList.add('text-muted');
+                btnBars.style.background = 'transparent';
+            }
+            if (btnCal) {
+                btnCal.classList.remove('text-muted');
+                btnCal.classList.add('btn-primary', 'text-white');
+                btnCal.style.background = '';
+            }
+            if (title) title.innerHTML = '{{ calendar_pnl.month_name }} {{ calendar_pnl.year }} Calendar P&amp;L';
+            if (subtitle) subtitle.textContent = 'Month-to-Date Realized Trading Performance';
+            if (badge) {
+                badge.textContent = 'Monthly Calendar';
+                badge.className = 'badge bg-info bg-opacity-25 text-info rounded-pill px-2.5 py-0.5 smaller fw-bold';
+            }
+        } else {
+            if (calContainer) calContainer.style.display = 'none';
+            if (barContainer) barContainer.style.display = 'block';
+            if (btnCal) {
+                btnCal.classList.remove('btn-primary', 'text-white');
+                btnCal.classList.add('text-muted');
+                btnCal.style.background = 'transparent';
+            }
+            if (btnBars) {
+                btnBars.classList.remove('text-muted');
+                btnBars.classList.add('btn-primary', 'text-white');
+                btnBars.style.background = '';
+            }
+            if (title) title.innerHTML = '{{ calendar_pnl.month_name }} {{ calendar_pnl.year }} Position P&amp;L Bar Graph';
+            if (subtitle) subtitle.textContent = 'Contract-level Mark-to-Market & Realized P&L Distribution';
+            if (badge) {
+                badge.textContent = 'Position P&L';
+                badge.className = 'badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 smaller fw-bold';
+            }
+            renderPositionPnlBarChart();
+        }
+    };
+
+    function renderPositionPnlBarChart() {
+        const canvas = document.getElementById('positionPnlBarChartCanvas');
+        const emptyState = document.getElementById('positionBarEmptyState');
+        if (!canvas) return;
+
+        const labels = {{ position_chart_labels|safe|default:"[]" }};
+        const pnlData = {{ position_chart_data|safe|default:"[]" }};
+        const colors = {{ position_chart_colors|safe|default:"[]" }};
+
+        if (!labels || labels.length === 0) {
+            canvas.style.display = 'none';
+            if (emptyState) emptyState.classList.remove('d-none');
+            return;
+        } else {
+            canvas.style.display = 'block';
+            if (emptyState) emptyState.classList.add('d-none');
+        }
+
+        const isDark = document.documentElement.getAttribute('data-theme') === 'dark';
+        const gridColor = isDark ? 'rgba(255, 255, 255, 0.08)' : 'rgba(0, 0, 0, 0.06)';
+        const textColor = isDark ? '#94a3b8' : '#64748b';
+
+        if (window._positionPnlBarChartInstance) {
+            window._positionPnlBarChartInstance.destroy();
+        }
+
+        if (typeof Chart === 'undefined') return;
+
+        window._positionPnlBarChartInstance = new Chart(canvas, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Position P&L (₹)',
+                    data: pnlData,
+                    backgroundColor: colors,
+                    borderColor: colors,
+                    borderWidth: 1,
+                    borderRadius: 6,
+                    borderSkipped: false,
+                    barThickness: 'flex',
+                    maxBarThickness: 45
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: { duration: 400 },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(ctx) {
+                                const val = ctx.parsed.y || 0;
+                                const formatted = Math.abs(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                return (val >= 0 ? '+₹' : '-₹') + formatted;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: gridColor, drawBorder: false },
+                        ticks: {
+                            color: textColor,
+                            font: { family: 'var(--font-sans, inherit)', size: 11, weight: '600' }
+                        }
+                    },
+                    y: {
+                        grid: { color: gridColor, drawBorder: false },
+                        ticks: {
+                            color: textColor,
+                            font: { family: 'var(--font-mono, monospace)', size: 11 },
+                            callback: function(v) {
+                                return '₹' + v.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', renderPositionPnlBarChart);
+    } else {
+        renderPositionPnlBarChart();
+    }
+})();
+</script>

@@ -191,6 +191,8 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context['live_positions'] = []
         context['live_holdings'] = []
         context['live_orders'] = []
+        raw_pos = []
+        raw_ord = []
 
         if live_account:
             broker_name = live_account.broker.name if live_account.broker else 'DHAN'
@@ -268,8 +270,12 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context['master_live_switch'] = site_settings.live_execution_master_switch
         context['live_strategies'] = user.live_strategies.filter(is_deleted=False, execution_mode=AccountTypeChoices.LIVE).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
         context['market_clock'] = get_ist_market_clock()
-        context['calendar_pnl'] = get_current_month_calendar_pnl(live_account or user)
-        context['intraday_graph'] = get_today_intraday_equity_curve(live_account or user)
+        if is_token_active:
+            context['calendar_pnl'] = get_current_month_calendar_pnl(live_account or user, trades=raw_ord)
+            context['intraday_graph'] = get_today_intraday_equity_curve(live_account or user, trades=raw_ord)
+        else:
+            context['calendar_pnl'] = get_current_month_calendar_pnl(None)
+            context['intraday_graph'] = get_today_intraday_equity_curve(None)
         selected_index = self.request.GET.get('index', 'NIFTY').upper().strip()
         available_indexes = get_available_backup_indexes()
         context['available_backup_indexes'] = available_indexes
@@ -291,6 +297,17 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context['is_sandbox'] = False
         context['positions_partial_url'] = reverse('admins:admin-live-positions-partial')
         context['orders_partial_url'] = reverse('admins:admin-live-orders-partial')
+
+        pos_labels = [p.get('trading_symbol', p.get('tradingSymbol', 'Position')) for p in raw_pos]
+        pos_pnls = [
+            round(float(p.get('total_pnl', float(p.get('realized_profit', p.get('realizedProfit', 0.0))) + float(p.get('unrealized_profit', p.get('unrealizedProfit', 0.0))))), 2)
+            for p in raw_pos
+        ]
+        pos_colors = ['#10B981' if pnl >= 0 else '#EF4444' for pnl in pos_pnls]
+        context['position_chart_labels'] = json.dumps(pos_labels)
+        context['position_chart_data'] = json.dumps(pos_pnls)
+        context['position_chart_colors'] = json.dumps(pos_colors)
+        context['raw_positions_json'] = json.dumps(raw_pos)
         return context
 
 
@@ -636,6 +653,14 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         context['calendar_pnl'] = get_current_month_calendar_pnl(sandbox_account or user)
         context['intraday_graph'] = get_today_intraday_equity_curve(sandbox_account or user)
 
+        pos_labels = [p.get('trading_symbol', 'Position') for p in raw_pos]
+        pos_pnls = [round(float(p.get('total_pnl', float(p.get('realized_profit', 0.0)) + float(p.get('unrealized_profit', 0.0)))), 2) for p in raw_pos]
+        pos_colors = ['#10B981' if pnl >= 0 else '#EF4444' for pnl in pos_pnls]
+        context['position_chart_labels'] = json.dumps(pos_labels)
+        context['position_chart_data'] = json.dumps(pos_pnls)
+        context['position_chart_colors'] = json.dumps(pos_colors)
+        context['raw_positions_json'] = json.dumps(raw_pos)
+
         selected_index = self.request.GET.get('index', 'NIFTY').upper().strip()
         available_indexes = get_available_backup_indexes()
         context['available_backup_indexes'] = available_indexes
@@ -902,6 +927,12 @@ def _build_sandbox_journal_stats(orders: list) -> dict:
         'max_loss_streak': max_loss_streak,
         'current_streak': last_streak,
         'max_drawdown': max_drawdown_pct,
+        'recovery_days': 0,
+        'avg_trades_day': round(total_trades / max(1, len(set(str(o.get('create_time', '') or o.get('signal_time', ''))[:10] for o in orders if str(o.get('create_time', '') or o.get('signal_time', ''))[:10]))), 1) if total_trades else 0.0,
+        'total_charges': round(total_trades * 20.0, 2),
+        'total_deposited': base_capital,
+        'total_withdrawn': 0.0,
+        'net_capital': round(avail_capital, 2),
         'base_capital': base_capital,
         'margin_used': round(margin_used, 2),
         'avail_capital': round(avail_capital, 2),
@@ -909,12 +940,22 @@ def _build_sandbox_journal_stats(orders: list) -> dict:
 
 
 def _build_sandbox_journal_calendar(orders: list, year: str):
-    """Build 12-month calendar data structure with per-day simulated PnL from paper orders."""
+    """Build 12-month calendar data structure matching AdminJournalCalendarView."""
     import calendar as cal_mod
     from datetime import date as date_cls, datetime
 
-    today = date_cls.today()
-    daily_pnl = {}
+    raw_year = str(year).strip()
+    if raw_year in ('all', 'overall', ''):
+        selected_year = 2026
+        is_overall = True
+    else:
+        try:
+            selected_year = int(raw_year)
+        except ValueError:
+            selected_year = 2026
+        is_overall = False
+
+    daily_map = {}
     for o in orders:
         raw_ts = str(o.get('create_time') or o.get('signal_time') or '')
         if not raw_ts:
@@ -923,47 +964,119 @@ def _build_sandbox_journal_calendar(orders: list, year: str):
             dt = datetime.strptime(raw_ts[:10], '%Y-%m-%d').date()
         except (ValueError, TypeError):
             continue
-        if year not in ('all', 'overall', '') and not str(dt.year) == str(year):
-            continue
         ymd = dt.strftime('%Y-%m-%d')
         pnl = float(o.get('realized_profit', 0.0) or 0.0)
-        daily_pnl[ymd] = round(daily_pnl.get(ymd, 0.0) + pnl, 2)
+        if ymd not in daily_map:
+            daily_map[ymd] = {
+                'net_pnl': 0.0,
+                'gross_pnl': 0.0,
+                'brokerage': 0.0,
+                'govt_charges': 0.0,
+                'trades': 0,
+            }
+        daily_map[ymd]['net_pnl'] = round(daily_map[ymd]['net_pnl'] + pnl, 2)
+        daily_map[ymd]['gross_pnl'] = round(daily_map[ymd]['gross_pnl'] + pnl, 2)
+        daily_map[ymd]['trades'] += 1
 
-    calendar_months = []
-    years_to_show = list(range(2024, today.year + 1)) if year in ('all', 'overall', '') else [int(year)]
-    for yr in years_to_show:
-        for month_num in range(1, 13):
-            if yr == today.year and month_num > today.month:
-                continue
-            month_name = date_cls(yr, month_num, 1).strftime('%B %Y')
-            first_weekday, num_days = cal_mod.monthrange(yr, month_num)
-            # Make Sunday = 0 (calendar starts Sunday)
-            leading_blanks = (first_weekday + 1) % 7
-            days_data = []
-            month_total = 0.0
-            for day_num in range(1, num_days + 1):
-                d = date_cls(yr, month_num, day_num)
-                ymd = d.strftime('%Y-%m-%d')
-                pnl = daily_pnl.get(ymd, None)
-                has_trades = pnl is not None
-                month_total = round(month_total + (pnl or 0.0), 2)
-                abs_pnl = abs(pnl) if pnl is not None else 0
-                intensity = min(0.85, 0.25 + (abs_pnl / 2000)) if abs_pnl else 0.25
-                days_data.append({
-                    'day_num': day_num,
-                    'date': d,
-                    'pnl': pnl or 0.0,
-                    'has_trades': has_trades,
-                    'is_today': (d == today),
-                    'intensity': round(intensity, 2),
-                })
-            calendar_months.append({
-                'month_name': month_name,
-                'leading_blanks': range(leading_blanks),
-                'days': days_data,
-                'month_total': month_total,
+    month_names = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+    months_data = []
+
+    for m_idx in range(1, 13):
+        month_name = month_names[m_idx - 1]
+        cal_obj = cal_mod.Calendar(firstweekday=0)
+        month_days = []
+        monthly_pnl = 0.0
+        profit_days = 0
+        loss_days = 0
+
+        for day_date in cal_obj.itermonthdates(selected_year, m_idx):
+            is_current_month = (day_date.month == m_idx)
+            d_str = day_date.strftime('%Y-%m-%d')
+
+            if is_current_month and d_str in daily_map:
+                day_info = daily_map[d_str]
+                pnl_val = day_info['net_pnl']
+                trades_cnt = day_info['trades']
+                status = 'profit' if pnl_val >= 0 else 'loss'
+                if pnl_val >= 0:
+                    profit_days += 1
+                else:
+                    loss_days += 1
+                monthly_pnl += pnl_val
+                gross_pnl_val = day_info['gross_pnl']
+                brokerage_val = day_info['brokerage']
+                govt_val = day_info['govt_charges']
+            else:
+                pnl_val = 0.0
+                trades_cnt = 0
+                status = 'neutral'
+                gross_pnl_val = 0.0
+                brokerage_val = 0.0
+                govt_val = 0.0
+
+            abs_pnl = abs(pnl_val)
+            if abs_pnl >= 2000.0:
+                intensity = 'high'
+            elif abs_pnl >= 500.0:
+                intensity = 'med'
+            else:
+                intensity = 'low'
+
+            month_days.append({
+                'date': day_date,
+                'day_num': day_date.day,
+                'is_current_month': is_current_month,
+                'pnl': pnl_val,
+                'pnl_abs': abs_pnl,
+                'intensity': intensity,
+                'gross_pnl': gross_pnl_val,
+                'brokerage': brokerage_val,
+                'govt_charges': govt_val,
+                'trades': trades_cnt,
+                'status': status,
+                'weekday': day_date.weekday(),
             })
-    return calendar_months
+
+        months_data.append({
+            'month_num': m_idx,
+            'name': month_name,
+            'days': month_days,
+            'monthly_pnl': round(monthly_pnl, 2),
+            'monthly_pnl_abs': abs(round(monthly_pnl, 2)),
+            'profit_days': profit_days,
+            'loss_days': loss_days,
+        })
+    return months_data, selected_year, is_overall
+
+
+def _format_sandbox_orders(raw_orders: list) -> list:
+    """Format simulated paper order dicts into unified trade row dictionaries."""
+    formatted = []
+    for o in raw_orders:
+        ts = str(o.get('create_time', '') or o.get('signal_time', '') or '09:15:00')
+        time_part = ts[11:19] if len(ts) >= 19 else (ts if ':' in ts else '09:15:00')
+        date_part = ts[:10] if len(ts) >= 10 else ''
+        qty = int(o.get('quantity', 0) or o.get('qty', 0) or 25)
+        price = float(o.get('price', 0.0) or 0.0)
+        side = str(o.get('transaction_type') or o.get('side') or 'BUY').upper()
+        formatted.append({
+            'time': time_part,
+            'date_str': date_part,
+            'is_fund': False,
+            'type': side,
+            'side_code': 'B' if side == 'BUY' else 'S',
+            'symbol': str(o.get('trading_symbol') or o.get('symbol') or 'NIFTY 25000 CE'),
+            'segment': str(o.get('product_type') or 'OPT'),
+            'exchange_trade_id': str(o.get('order_id') or o.get('id') or 'SBX-SIM'),
+            'order_type': str(o.get('order_type') or 'MARKET'),
+            'qty': qty,
+            'turnover': round(price * qty, 2),
+            'entry': price,
+            'order_id': str(o.get('order_id') or o.get('id') or 'SBX-1'),
+            'realized_profit': float(o.get('realized_profit', 0.0) or 0.0),
+            'status': str(o.get('order_status') or 'FILLED'),
+        })
+    return formatted
 
 
 class AdminSandboxJournalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
@@ -979,12 +1092,11 @@ class AdminSandboxJournalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequire
 
 
 class AdminSandboxJournalStatsView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """HTMX partial: 9-card stats grid + optional Chart.js canvas for Sandbox Journal."""
+    """HTMX partial: 9-card stats grid matching Live Journal format."""
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        year = request.GET.get('year', '2026')
-        chart_mode = request.GET.get('chart', '')
+        year = str(request.GET.get('year', '2026')).strip()
         raw_orders = get_sandbox_simulated_orders(user_id=user.id)
 
         if year not in ('all', 'overall', ''):
@@ -994,61 +1106,169 @@ class AdminSandboxJournalStatsView(LoginRequiredMixin, AdminRequiredMixin, View)
             ]
 
         stats = _build_sandbox_journal_stats(raw_orders)
+        stats['total_charges'] = round(len(raw_orders) * 20.0, 2)
+        stats['target_year'] = year
+        stats['dhan_active'] = False
+        stats['available_margin'] = f"{stats.get('avail_capital', 1000000.0):,.2f}"
 
-        chart_labels, daily_pnl_data, cum_pnl_data, colors = [], [], [], []
-        if chart_mode:
-            from datetime import datetime as dt_mod
-            dated = {}
-            for o in raw_orders:
-                ts = str(o.get('create_time', '') or o.get('signal_time', '') or '')
-                try:
-                    d = dt_mod.strptime(ts[:10], '%Y-%m-%d').strftime('%d %b')
-                except (ValueError, TypeError):
-                    continue
-                pnl = float(o.get('realized_profit', 0.0) or 0.0)
-                dated[d] = round(dated.get(d, 0.0) + pnl, 2)
-            running = 0.0
-            for label, pnl in sorted(dated.items()):
-                chart_labels.append(label)
-                daily_pnl_data.append(pnl)
-                running = round(running + pnl, 2)
-                cum_pnl_data.append(running)
-                colors.append('rgba(16,185,129,0.75)' if pnl >= 0 else 'rgba(239,68,68,0.75)')
-
-        import json as json_mod
-        context = {
-            'stats': stats,
-            'chart_mode': chart_mode,
-            'chart_labels_json': json_mod.dumps(chart_labels),
-            'daily_pnl_data_json': json_mod.dumps(daily_pnl_data),
-            'cum_pnl_data_json': json_mod.dumps(cum_pnl_data),
-            'pnl_bar_colors_json': json_mod.dumps(colors),
-        }
-        return render(request, 'admins/partials/sandbox_journal_stats_partial.html', context)
+        return render(request, 'admins/partials/sandbox_journal_stats_partial.html', {'stats': stats})
 
 
 class AdminSandboxJournalCalendarView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """HTMX partial: 12-month P/L calendar heatmap for Sandbox Journal."""
+    """HTMX partial: 12-month P/L calendar heatmap for Sandbox Journal with OOB sync."""
 
     def get(self, request, *args, **kwargs):
+        from datetime import datetime
+        current_year = datetime.now().year
+        raw_year = str(request.GET.get('year', '2026')).strip()
         user = request.user
-        year = request.GET.get('year', '2026')
         raw_orders = get_sandbox_simulated_orders(user_id=user.id)
-        calendar_months = _build_sandbox_journal_calendar(raw_orders, year)
-        return render(request, 'admins/partials/sandbox_journal_calendar_partial.html', {
-            'calendar_months': calendar_months,
-            'year': year,
-        })
+
+        months_data, selected_year, is_overall = _build_sandbox_journal_calendar(raw_orders, raw_year)
+
+        filtered_orders = raw_orders
+        if raw_year not in ('all', 'overall', ''):
+            filtered_orders = [
+                o for o in raw_orders
+                if str(o.get('create_time', '') or o.get('signal_time', '') or '')[:4] == str(selected_year)
+            ]
+
+        year_stats = _build_sandbox_journal_stats(filtered_orders)
+        year_stats['total_charges'] = round(len(filtered_orders) * 20.0, 2)
+        year_stats['available_margin'] = f"{year_stats.get('avail_capital', 1000000.0):,.2f}"
+
+        can_go_next = (selected_year < current_year)
+        formatted_trades = _format_sandbox_orders(filtered_orders)
+
+        context = {
+            'year': selected_year,
+            'prev_year': selected_year - 1,
+            'next_year': selected_year + 1,
+            'current_year': current_year,
+            'can_go_next': can_go_next,
+            'is_overall': is_overall,
+            'months': months_data,
+            'stats': year_stats,
+            'trades': formatted_trades[:10],
+            'orders': formatted_trades[:10],
+            'total_count': len(filtered_orders),
+            'total_trades_count': len(filtered_orders),
+            'filter_year': raw_year,
+            'filter_date': '',
+            'page': 1,
+            'has_more': len(filtered_orders) > 10,
+            'next_page': 2 if len(filtered_orders) > 10 else None,
+            'total_pages': max(1, (len(filtered_orders) + 9) // 10),
+        }
+        return render(request, 'admins/partials/sandbox_journal_calendar_partial.html', context)
+
+
+class AdminSandboxJournalChartView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX Partial View returning 3-mode Chart.js canvas matching Live Journal."""
+
+    def get(self, request, *args, **kwargs):
+        import json as json_mod
+        from datetime import datetime as dt_mod
+
+        user = request.user
+        raw_year = str(request.GET.get('year', '2026')).strip()
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+
+        dated = {}
+        for o in raw_orders:
+            ts = str(o.get('create_time', '') or o.get('signal_time', '') or '')
+            if not ts:
+                continue
+            if raw_year not in ('all', 'overall', '') and not ts.startswith(str(raw_year)):
+                continue
+            d = ts[:10]
+            pnl = float(o.get('realized_profit', 0.0) or 0.0)
+            dated[d] = round(dated.get(d, 0.0) + pnl, 2)
+
+        chart_labels = []
+        daily_pnl_data = []
+        daily_gross_pnl_data = []
+        cum_pnl_data = []
+        equity_data = []
+        drawdown_data = []
+        deposit_data = []
+        opening_balance_data = []
+        pnl_bar_colors = []
+
+        base_capital = 1000000.0
+        cum_equity = base_capital
+        running_cum_pnl = 0.0
+        peak_equity = base_capital
+
+        if dated:
+            for d_str in sorted(dated.keys()):
+                pnl = dated[d_str]
+                daily_pnl_data.append(pnl)
+                daily_gross_pnl_data.append(pnl)
+                running_cum_pnl = round(running_cum_pnl + pnl, 2)
+                cum_pnl_data.append(running_cum_pnl)
+
+                day_start_bal = cum_equity
+                opening_balance_data.append(round(day_start_bal, 2))
+                cum_equity = round(cum_equity + pnl, 2)
+                equity_data.append(round(cum_equity, 2))
+                deposit_data.append(round(base_capital, 2))
+
+                if cum_equity > peak_equity:
+                    peak_equity = cum_equity
+                dd_pct = round(((cum_equity - peak_equity) / max(peak_equity, 1.0)) * 100, 2) if peak_equity > 0 else 0.0
+                drawdown_data.append(min(0.0, dd_pct))
+
+                try:
+                    dt_obj = dt_mod.strptime(d_str, '%Y-%m-%d')
+                    fmt_label = dt_obj.strftime('%b %d')
+                except Exception:
+                    fmt_label = d_str
+                chart_labels.append(fmt_label)
+                pnl_bar_colors.append('rgba(16, 185, 129, 0.85)' if pnl >= 0 else 'rgba(239, 68, 68, 0.85)')
+        else:
+            for m in ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']:
+                chart_labels.append(f"{m} 01")
+                equity_data.append(round(base_capital, 2))
+                drawdown_data.append(0.0)
+                deposit_data.append(round(base_capital, 2))
+                opening_balance_data.append(round(base_capital, 2))
+                daily_pnl_data.append(0.0)
+                daily_gross_pnl_data.append(0.0)
+                cum_pnl_data.append(0.0)
+                pnl_bar_colors.append('rgba(16, 185, 129, 0.85)')
+
+        context = {
+            'chart_labels_json': json_mod.dumps(chart_labels),
+            'equity_data_json': json_mod.dumps(equity_data),
+            'drawdown_data_json': json_mod.dumps(drawdown_data),
+            'deposit_data_json': json_mod.dumps(deposit_data),
+            'opening_balance_data_json': json_mod.dumps(opening_balance_data),
+            'daily_pnl_data_json': json_mod.dumps(daily_pnl_data),
+            'daily_gross_pnl_data_json': json_mod.dumps(daily_gross_pnl_data),
+            'cum_pnl_data_json': json_mod.dumps(cum_pnl_data),
+            'pnl_bar_colors_json': json_mod.dumps(pnl_bar_colors),
+            'base_deposit': round(base_capital, 2),
+            'current_equity': round(cum_equity, 2),
+            'total_trading_pnl': round(running_cum_pnl, 2),
+            'selected_year': raw_year,
+        }
+        return render(request, 'admins/partials/sandbox_journal_chart_partial.html', context)
 
 
 class AdminSandboxJournalOrdersView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """HTMX partial: Paper order execution log table for Sandbox Journal."""
+    """HTMX partial: Paper order execution log table matching Live Journal format."""
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        year = request.GET.get('year', '2026')
-        filter_date = request.GET.get('date', '')
+        year = str(request.GET.get('year', '2026')).strip()
+        filter_date = str(request.GET.get('date', '')).strip()
         raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+
+        try:
+            page = int(request.GET.get('page', 1))
+        except ValueError:
+            page = 1
 
         if filter_date:
             filtered = [
@@ -1063,25 +1283,48 @@ class AdminSandboxJournalOrdersView(LoginRequiredMixin, AdminRequiredMixin, View
         else:
             filtered = raw_orders
 
+        total_trades = len(filtered)
+        page_size = 10
+        total_pages = max(1, (total_trades + page_size - 1) // page_size)
+        start_idx = (page - 1) * page_size
+        end_idx = start_idx + page_size
+        orders_slice = filtered[start_idx:end_idx]
+        has_more = (end_idx < total_trades)
+        next_page = page + 1 if has_more else None
+
         day_summary = None
         if filter_date and filtered:
             total_pnl = round(sum(float(o.get('realized_profit', 0.0) or 0.0) for o in filtered), 2)
             day_summary = {
+                'date_str': filter_date,
                 'gross_pnl': total_pnl,
                 'gross_pnl_abs': abs(total_pnl),
                 'net_pnl': total_pnl,
                 'net_pnl_abs': abs(total_pnl),
+                'govt_charges': 0.0,
+                'brokerage': round(len(filtered) * 20.0, 2),
                 'trades': len(filtered),
-                'strategy_name': (filtered[0].get('strategy_name') or 'TensorTrade RL') if filtered else 'TensorTrade RL',
             }
 
+        trades_slice = _format_sandbox_orders(orders_slice)
+        rows_only = bool(request.GET.get('rows_only') == '1')
+
         context = {
-            'orders': filtered,
-            'total_count': len(filtered),
+            'trades': trades_slice,
+            'orders': trades_slice,
+            'total_count': total_trades,
+            'total_trades_count': total_trades,
             'filter_date': filter_date,
             'filter_year': year,
             'day_summary': day_summary,
+            'page': page,
+            'has_more': has_more,
+            'next_page': next_page,
+            'total_pages': total_pages,
+            'rows_only': rows_only,
         }
+        if rows_only:
+            return render(request, 'admins/partials/sandbox_journal_trades_rows_partial.html', context)
         return render(request, 'admins/partials/sandbox_journal_orders_partial.html', context)
 
 

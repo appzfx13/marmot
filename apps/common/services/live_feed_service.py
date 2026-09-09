@@ -94,12 +94,19 @@ def _calculate_real_daily_pnl(trades_list: list) -> dict:
     return result
 
 
-def get_current_month_calendar_pnl(target):
+def get_current_month_calendar_pnl(target, trades=None):
     """Calculate and return monthly realized PnL calendar grid and summary KPIs from real broker trades."""
     from apps.trade_config.models import UserTradingAccount
     from apps.trade_core.brokers.factory import BrokerFactory
 
-    account = target if isinstance(target, UserTradingAccount) else UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+    if target is None:
+        account = None
+    elif isinstance(target, UserTradingAccount):
+        account = target
+    elif hasattr(target, 'trading_accounts'):
+        account = target.trading_accounts.filter(broker__code='dhan', is_active=True).first()
+    else:
+        account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
 
     ist_tz = ZoneInfo('Asia/Kolkata')
     now_ist = datetime.datetime.now(ist_tz)
@@ -115,18 +122,23 @@ def get_current_month_calendar_pnl(target):
     num_days = (next_month - first_day).days
 
     daily_map = {}
-    if account:
+    if trades is not None:
+        if trades:
+            daily_map = _calculate_real_daily_pnl(trades)
+    elif account:
         try:
             adapter = BrokerFactory.get_adapter(account)
-            from_d = first_day.strftime('%Y-%m-%d')
-            to_d = datetime.date(year, month, num_days).strftime('%Y-%m-%d')
-            t_res = adapter.get_trade_history(from_d, to_d, page=0, fetch_all=True)
-            raw_trades = t_res.get('trades', []) if t_res.get('success') else []
-            if not raw_trades:
-                tb_res = adapter.get_trade_book()
-                raw_trades = tb_res.get('trades', []) if tb_res.get('success') else []
-            if raw_trades:
-                daily_map = _calculate_real_daily_pnl(raw_trades)
+            token = getattr(adapter, 'get_access_token', lambda: '')()
+            if token:
+                from_d = first_day.strftime('%Y-%m-%d')
+                to_d = datetime.date(year, month, num_days).strftime('%Y-%m-%d')
+                t_res = adapter.get_trade_history(from_d, to_d, page=0, fetch_all=True)
+                raw_trades = t_res.get('trades', []) if t_res.get('success') else []
+                if not raw_trades:
+                    tb_res = adapter.get_trade_book()
+                    raw_trades = tb_res.get('trades', []) if tb_res.get('success') else []
+                if raw_trades:
+                    daily_map = _calculate_real_daily_pnl(raw_trades)
         except Exception:
             pass
 
@@ -170,33 +182,46 @@ def get_current_month_calendar_pnl(target):
     win_rate = round((profit_days / total_traded_days * 100.0), 1) if total_traded_days > 0 else 0.0
 
     return {
-        'month_name': month_name,
+        'month': month,
         'year': year,
+        'month_name': month_name,
+        'days': days_list,
         'total_monthly_pnl': round(total_monthly_pnl, 2),
         'profit_days': profit_days,
         'loss_days': loss_days,
+        'total_traded_days': total_traded_days,
         'win_rate': win_rate,
-        'days': days_list,
     }
 
 
-def get_today_intraday_equity_curve(target, base_capital=100000.0):
+def get_today_intraday_equity_curve(target, base_capital=100000.0, trades=None):
     """Generate today's minute-interval equity curve from actual executed trades or flatline standby."""
     from apps.trade_config.models import UserTradingAccount
     from apps.trade_core.brokers.factory import BrokerFactory
 
-    account = target if isinstance(target, UserTradingAccount) else UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+    if target is None:
+        account = None
+    elif isinstance(target, UserTradingAccount):
+        account = target
+    elif hasattr(target, 'trading_accounts'):
+        account = target.trading_accounts.filter(broker__code='dhan', is_active=True).first()
+    else:
+        account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
     ist_tz = ZoneInfo('Asia/Kolkata')
     now_ist = datetime.datetime.now(ist_tz)
     today_str = now_ist.strftime('%Y-%m-%d')
 
     today_trades = []
-    if account:
+    if trades is not None:
+        today_trades = [t for t in trades if _extract_trade_date(t) == today_str]
+    elif account:
         try:
             adapter = BrokerFactory.get_adapter(account)
-            tb_res = adapter.get_trade_book()
-            raw_trades = tb_res.get('trades', []) if tb_res.get('success') else []
-            today_trades = [t for t in raw_trades if _extract_trade_date(t) == today_str]
+            token = getattr(adapter, 'get_access_token', lambda: '')()
+            if token:
+                tb_res = adapter.get_trade_book()
+                raw_trades = tb_res.get('trades', []) if tb_res.get('success') else []
+                today_trades = [t for t in raw_trades if _extract_trade_date(t) == today_str]
         except Exception:
             pass
 

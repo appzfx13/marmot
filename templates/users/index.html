@@ -12,7 +12,7 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
     <link
-        href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,400..700;1,400..700&family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..700,0..100&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,400..700;1,400..700&family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..700,0..100&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link
         href="https://fonts.googleapis.com/css2?family=Google+Symbols:opsz,wght,FILL,GRAD,ROND@20..48,100..700,0..1,-50..200,0..100&display=block"
@@ -32,11 +32,11 @@
     <!-- Lenis Smooth Scroll CSS -->
     <link rel="stylesheet" href="https://unpkg.com/lenis@1.3.26/dist/lenis.css">
 
-    <!-- Dynamic Shadcn Theme Stylesheet -->
+    <!-- Theme Stylesheets (Base Theme followed by Shadcn Override) -->
     <link rel="stylesheet" href="{% static 'libs/bootstrap-icons/bootstrap-icons.css' %}">
-    <link rel="stylesheet" href="{% static 'css/theme-shadcn.css' %}">
     <link rel="stylesheet" href="{% static 'css/antigravity-theme.css' %}">
     <link rel="stylesheet" href="{% static 'css/spark-theme.css' %}">
+    <link rel="stylesheet" href="{% static 'css/theme-shadcn.css' %}">
 
     <!-- HTMX Library -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
@@ -1575,6 +1575,24 @@
                 padding-right: 0 !important;
             }
         }
+
+        /* Global HTMX Top Progress Bar */
+        .htmx-progress-bar {
+            position: fixed;
+            top: 0;
+            left: 0;
+            height: 3px;
+            width: 0%;
+            background: linear-gradient(90deg, #B4F105, #10B981, #06B6D4);
+            box-shadow: 0 0 12px rgba(180, 241, 5, 0.9), 0 0 6px rgba(16, 185, 129, 0.7);
+            z-index: 999999;
+            transition: width 0.2s ease, opacity 0.3s ease;
+            pointer-events: none;
+            opacity: 0;
+        }
+        .htmx-progress-bar.loading {
+            opacity: 1;
+        }
     </style>
     {% block extra_head %}{% endblock %}
 </head>
@@ -1612,25 +1630,10 @@
         <div class="sidebar-nav-container flex-grow-1 overflow-y-auto" id="userSidebarNav" data-lenis-prevent
             style="position: relative;">
             <div class="sidebar-active-pill" id="userSidebarActivePill"></div>
-            <!-- Group: Terminal -->
-            <div class="sidebar-menu-section">
-                <div class="sidebar-menu-title">Terminal</div>
-                <ul class="sidebar-menu-list">
-                    <li class="sidebar-menu-item">
-                        <a href="{% url 'users:user-terminal' %}"
-                            class="sidebar-menu-link {% if active_tab == 'terminal' or request.resolver_match.url_name == 'user-terminal' %}active{% endif %}"
-                            id="menu-terminal" hx-get="{% url 'users:user-terminal' %}"
-                            hx-target="#user-portal-container" hx-swap="innerHTML" hx-push-url="true">
-                            <i class="bi bi-terminal-fill"></i>
-                            <span>Terminal Panel</span>
-                        </a>
-                    </li>
-                </ul>
-            </div>
 
-            <!-- Group: Dashboards -->
+            <!-- Group 1: Dashboards & Trading (Daily Operations) -->
             <div class="sidebar-menu-section">
-                <div class="sidebar-menu-title">Dashboards</div>
+                <div class="sidebar-menu-title">Dashboards &amp; Trading</div>
                 <ul class="sidebar-menu-list">
                     <li class="sidebar-menu-item">
                         <a href="{% url 'users:user-live-dashboard' %}"
@@ -1639,6 +1642,15 @@
                             hx-target="#user-portal-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-activity text-success"></i>
                             <span>Live Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="{% url 'users:user-journal' %}"
+                            class="sidebar-menu-link {% if active_tab == 'journal' or request.resolver_match.url_name == 'user-journal' %}active{% endif %}"
+                            id="menu-journal" hx-get="{% url 'users:user-journal' %}" hx-target="#user-portal-container"
+                            hx-swap="innerHTML" hx-push-url="true">
+                            <i class="bi bi-journal-bookmark-fill text-primary"></i>
+                            <span>Trading Journal</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
@@ -1659,21 +1671,12 @@
                             <span>AI Dashboard</span>
                         </a>
                     </li>
-                    <li class="sidebar-menu-item">
-                        <a href="{% url 'users:user-journal' %}"
-                            class="sidebar-menu-link {% if active_tab == 'journal' or request.resolver_match.url_name == 'user-journal' %}active{% endif %}"
-                            id="menu-journal" hx-get="{% url 'users:user-journal' %}" hx-target="#user-portal-container"
-                            hx-swap="innerHTML" hx-push-url="true">
-                            <i class="bi bi-journal-bookmark-fill"></i>
-                            <span>Journal</span>
-                        </a>
-                    </li>
                 </ul>
             </div>
 
-            <!-- Group: Analysis & Data -->
+            <!-- Group 2: Analysis & Research -->
             <div class="sidebar-menu-section">
-                <div class="sidebar-menu-title">Analysis & Data</div>
+                <div class="sidebar-menu-title">Analysis &amp; Research</div>
                 <ul class="sidebar-menu-list">
                     <li class="sidebar-menu-item">
                         <a href="{% url 'users:user-backtest' %}"
@@ -1696,10 +1699,19 @@
                 </ul>
             </div>
 
-            <!-- Group: Account & Profile -->
+            <!-- Group 3: Platform & Accounts -->
             <div class="sidebar-menu-section">
-                <div class="sidebar-menu-title">Account & Profile</div>
+                <div class="sidebar-menu-title">Platform &amp; Accounts</div>
                 <ul class="sidebar-menu-list">
+                    <li class="sidebar-menu-item">
+                        <a href="{% url 'users:user-terminal' %}"
+                            class="sidebar-menu-link {% if active_tab == 'terminal' or request.resolver_match.url_name == 'user-terminal' %}active{% endif %}"
+                            id="menu-terminal" hx-get="{% url 'users:user-terminal' %}"
+                            hx-target="#user-portal-container" hx-swap="innerHTML" hx-push-url="true">
+                            <i class="bi bi-terminal-fill"></i>
+                            <span>Terminal Panel</span>
+                        </a>
+                    </li>
                     <li class="sidebar-menu-item">
                         <a href="{% url 'users:user-accounts' %}"
                             class="sidebar-menu-link {% if active_tab == 'accounts' or active_tab == 'sandbox' or request.resolver_match.url_name == 'user-accounts' or request.resolver_match.url_name == 'user-sandbox' %}active{% endif %}"
@@ -1952,11 +1964,13 @@
 
         function applyTheme(theme) {
             document.documentElement.setAttribute('data-theme', theme);
+            document.documentElement.classList.toggle('dark', theme === 'dark');
             localStorage.setItem('marmot_theme', theme);
             localStorage.setItem('theme', theme);
             if (themeToggleIcon) {
                 themeToggleIcon.className = theme === 'dark' ? 'bi bi-moon-stars-fill' : 'bi bi-sun-fill';
             }
+            window.dispatchEvent(new CustomEvent('themeChanged', { detail: { theme } }));
         }
 
         const savedTheme = localStorage.getItem('marmot_theme') || localStorage.getItem('theme') || 'dark';
@@ -2399,6 +2413,45 @@
                     new ResizeObserver(updateFixedNavbarOffset).observe(navElem);
                 }
             }
+        })();
+    </script>
+
+    <!-- Global HTMX Top Progress Bar Controller -->
+    <script>
+        (function () {
+            const bar = document.getElementById('loading-bar');
+            let progressTimer = null;
+            let currentProgress = 0;
+
+            document.addEventListener('htmx:beforeRequest', function () {
+                if (!bar) return;
+                clearInterval(progressTimer);
+                currentProgress = 15;
+                bar.classList.add('loading');
+                bar.style.width = currentProgress + '%';
+                progressTimer = setInterval(function () {
+                    if (currentProgress < 85) {
+                        currentProgress += (85 - currentProgress) * 0.15;
+                        bar.style.width = currentProgress + '%';
+                    }
+                }, 100);
+            });
+
+            function finishProgress() {
+                if (!bar) return;
+                clearInterval(progressTimer);
+                bar.style.width = '100%';
+                setTimeout(function () {
+                    bar.classList.remove('loading');
+                    setTimeout(function () {
+                        bar.style.width = '0%';
+                    }, 200);
+                }, 150);
+            }
+
+            document.addEventListener('htmx:afterOnLoad', finishProgress);
+            document.addEventListener('htmx:afterRequest', finishProgress);
+            document.addEventListener('htmx:requestError', finishProgress);
         })();
     </script>
 </body>

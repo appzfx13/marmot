@@ -1,6 +1,6 @@
 {% load static %}
 <!-- Real-Time Dynamic Option Chain & Live FYERS Index Pricing Telemetry Widget -->
-<div class="card shadow-sm overflow-hidden h-100 mb-0 p-0"
+<div class="card shadow-sm overflow-hidden mb-0 p-0"
      {% if option_chain.is_live %}
          hx-get="{% url 'admins:admin-live-option-chain' %}?index={{ selected_index|default:option_chain.index_name }}"
          hx-trigger="every 6s"
@@ -170,8 +170,8 @@
     </div>
     <!-- END: Real-Time Index Pricing HUD Card -->
 
-    <!-- Mini Option Chain Heatmap Table -->
-    <div class="table-responsive mb-0" style="max-height: 250px; overflow-y: auto;">
+    <!-- Mini Option Chain Heatmap Table (Full Strikes Window - No Vertical Scroll) -->
+    <div class="table-responsive mb-0" style="overflow-x: auto; overflow-y: visible;">
         <table class="table table-custom align-middle mb-0 text-center smaller">
             <thead>
                 <tr class="border-bottom" style="border-color: var(--border-color, rgba(255,255,255,0.08)) !important; background: rgba(0,0,0,0.3);">
@@ -195,7 +195,7 @@
             </thead>
             <tbody>
                 {% for row in option_chain.strikes %}
-                <tr {% if row.is_atm %}class="table-active" style="background: rgba(180, 241, 5, 0.09) !important; border-top: 2px solid #B4F105 !important; border-bottom: 2px solid #B4F105 !important;"{% endif %}>
+                <tr {% if row.is_atm %}class="table-active option-chain-atm-row" style="background: rgba(180, 241, 5, 0.09) !important; border-top: 2px solid #B4F105 !important; border-bottom: 2px solid #B4F105 !important;"{% endif %}>
                     <!-- Call OI -->
                     <td class="font-monospace text-muted smaller py-2.5">
                         {{ row.ce_oi }}
@@ -212,7 +212,7 @@
                     <!-- Strike -->
                     <td class="py-2.5">
                         {% if row.is_atm %}
-                            <span class="badge rounded-pill fw-bold font-monospace px-3 py-1 text-dark shadow-sm" style="background: #B4F105; font-size: 0.825rem;">
+                            <span class="badge rounded-pill fw-bold font-monospace px-3 py-1 text-dark shadow-sm option-chain-atm-badge" style="background: #B4F105; font-size: 0.825rem;">
                                 {{ row.strike }} ATM
                             </span>
                         {% else %}

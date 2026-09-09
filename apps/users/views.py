@@ -325,6 +325,8 @@ class UserLiveDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateV
         context['live_positions'] = []
         context['live_holdings'] = []
         context['live_orders'] = []
+        raw_pos = []
+        raw_ord = []
 
         if live_account:
             broker_name = live_account.broker.name if live_account.broker else 'DHAN'
@@ -400,11 +402,28 @@ class UserLiveDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateV
         site_settings = SiteSettings.load()
         context['site_settings'] = site_settings
         context['master_live_switch'] = site_settings.live_execution_master_switch
-        context['live_strategies'] = user.live_strategies.filter(is_deleted=False, execution_mode=AccountTypeChoices.LIVE).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
+        context['live_strategies'] = user.live_strategies.filter(
+            is_deleted=False, execution_mode=AccountTypeChoices.LIVE
+        ).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
         context['market_clock'] = get_ist_market_clock()
-        context['calendar_pnl'] = get_current_month_calendar_pnl(user)
-        context['intraday_graph'] = get_today_intraday_equity_curve(user)
+        if is_token_active:
+            context['calendar_pnl'] = get_current_month_calendar_pnl(live_account or user, trades=raw_ord)
+            context['intraday_graph'] = get_today_intraday_equity_curve(live_account or user, trades=raw_ord)
+        else:
+            context['calendar_pnl'] = get_current_month_calendar_pnl(None)
+            context['intraday_graph'] = get_today_intraday_equity_curve(None)
         context['option_chain'] = get_nifty_mini_option_chain()
+
+        pos_labels = [p.get('trading_symbol', p.get('tradingSymbol', 'Position')) for p in raw_pos]
+        pos_pnls = [
+            round(float(p.get('total_pnl', float(p.get('realized_profit', p.get('realizedProfit', 0.0))) + float(p.get('unrealized_profit', p.get('unrealizedProfit', 0.0))))), 2)
+            for p in raw_pos
+        ]
+        pos_colors = ['#10B981' if pnl >= 0 else '#EF4444' for pnl in pos_pnls]
+        context['position_chart_labels'] = json.dumps(pos_labels)
+        context['position_chart_data'] = json.dumps(pos_pnls)
+        context['position_chart_colors'] = json.dumps(pos_colors)
+        context['raw_positions_json'] = json.dumps(raw_pos)
         return context
 
 
@@ -417,8 +436,12 @@ class UserSandboxDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, Templa
         context = super().get_context_data(**kwargs)
         user = self.request.user
 
-        sandbox_accounts = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name')
-        sandbox_account = sandbox_accounts.filter(is_default=True).first() or sandbox_accounts.first()
+        sandbox_accounts = list(user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name'))
+        sandbox_account = next((a for a in sandbox_accounts if a.is_default), None) or (sandbox_accounts[0] if sandbox_accounts else None)
+
+        from apps.admins.views import get_sandbox_simulated_positions, get_sandbox_simulated_orders
+        raw_pos = get_sandbox_simulated_positions(user_id=user.id)
+        raw_ord = get_sandbox_simulated_orders(user_id=user.id)
 
         telemetry_summary = {}
         try:
@@ -431,29 +454,84 @@ class UserSandboxDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, Templa
         except Exception:
             pass
 
-        context['active_tab'] = 'sandbox-dashboard'
-        context['sandbox_account'] = sandbox_account
-        context['sandbox_accounts'] = list(sandbox_accounts)
-        context['marmot_profile'] = get_user_profile(user.username)
+        open_cnt = sum(1 for p in raw_pos if p.get('status') == 'OPEN')
+        closed_cnt = sum(1 for p in raw_pos if p.get('status') == 'CLOSED')
+        realized_pnl = sum(float(p.get('realized_profit', 0.0)) for p in raw_pos)
+        unrealized_pnl = sum(float(p.get('unrealized_profit', 0.0)) for p in raw_pos)
+        net_pnl = realized_pnl + unrealized_pnl
+        open_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM'])
+        traded_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() == 'TRADED')
 
+        base_capital = 1000000.00
+        margin_used = sum(float(p.get('buy_avg', 0.0)) * int(p.get('net_qty', 0)) for p in raw_pos if p.get('status') == 'OPEN')
+        avail_margin = base_capital - margin_used + realized_pnl
+
+        context['is_sandbox'] = True
+        context['active_tab'] = 'sandbox-dashboard'
+        context['live_account'] = sandbox_account
+        context['sandbox_account'] = sandbox_account
+        context['sandbox_accounts'] = sandbox_accounts
+        context['has_live_account'] = True
+        context['marmot_profile'] = get_user_profile(user.username)
+        context['broker_name'] = 'SANDBOX PAPER BROKER'
+        context['is_token_active'] = True
+        context['needs_consent'] = False
+
+        context['available_margin'] = telemetry_summary.get('available_margin', f"{avail_margin:,.2f}")
+        context['cash_balance'] = telemetry_summary.get('cash', f"{base_capital:,.2f}")
+        context['collateral'] = "0.00"
+        context['margin_utilized'] = telemetry_summary.get('margin_utilized', f"{margin_used:,.2f}")
+        context['live_net_pnl'] = telemetry_summary.get('live_net_pnl', net_pnl)
+        context['realized_pnl'] = telemetry_summary.get('realized_pnl', realized_pnl)
+        context['unrealized_pnl'] = telemetry_summary.get('unrealized_pnl', unrealized_pnl)
+        context['open_positions_count'] = open_cnt
+        context['closed_positions_count'] = closed_cnt
+        context['todays_orders_count'] = len(raw_ord)
+        context['open_orders_count'] = open_ord_cnt
+        context['traded_orders_count'] = traded_ord_cnt
+        context['total_invested'] = margin_used
+        context['current_value'] = margin_used + unrealized_pnl
+        context['holdings_pnl'] = unrealized_pnl
+        context['holdings_pnl_pct'] = (unrealized_pnl / margin_used * 100.0) if margin_used > 0 else 0.00
+        context['holdings_count'] = open_cnt
+
+        context['all_positions_count'] = len(raw_pos)
+        from django.core.paginator import Paginator
+        pos_paginator = Paginator(raw_pos, 10)
+        context['live_positions'] = pos_paginator.page(1).object_list
+        context['page_obj'] = pos_paginator.page(1)
+        context['is_paginated'] = pos_paginator.num_pages > 1
+
+        context['orders_count'] = len(raw_ord)
+        ord_paginator = Paginator(raw_ord, 10)
+        context['live_orders'] = ord_paginator.page(1).object_list
+
+        site_settings = SiteSettings.load()
+        context['site_settings'] = site_settings
+        context['master_live_switch'] = site_settings.live_execution_master_switch
         context['sandbox_strategy_configs'] = TradeExecConfig.objects.filter(
-            admins_user=user,
-            account_type='SANDBOX',
-            is_deleted=False
+            admins_user=user, account_type='SANDBOX', is_deleted=False
         ).select_related('trading_account')
         context['live_strategies'] = user.live_strategies.filter(
             is_deleted=False, execution_mode=AccountTypeChoices.SANDBOX
         ).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
 
-        acc_summary = sandbox_account.account_summary if sandbox_account else {}
-        base_cap = acc_summary.get('balance') or acc_summary.get('initial_capital') or 100000.00
-        formatted_base_cap = f"{float(base_cap):,.2f}"
+        context['market_clock'] = get_ist_market_clock()
+        context['calendar_pnl'] = get_current_month_calendar_pnl(sandbox_account or user)
+        context['intraday_graph'] = get_today_intraday_equity_curve(sandbox_account or user)
 
-        context['virtual_capital'] = telemetry_summary.get('cash') or telemetry_summary.get('cash_balance') or formatted_base_cap
-        context['virtual_available_margin'] = telemetry_summary.get('available_margin') or formatted_base_cap
-        context['simulated_pnl'] = telemetry_summary.get('live_net_pnl', 0.00)
-        context['simulated_win_rate'] = telemetry_summary.get('win_rate', "0.0%")
-        context['simulated_trades_count'] = telemetry_summary.get('todays_orders_count') or telemetry_summary.get('trades_count', 0)
+        pos_labels = [p.get('trading_symbol', 'Position') for p in raw_pos]
+        pos_pnls = [round(float(p.get('total_pnl', float(p.get('realized_profit', 0.0)) + float(p.get('unrealized_profit', 0.0)))), 2) for p in raw_pos]
+        pos_colors = ['#10B981' if pnl >= 0 else '#EF4444' for pnl in pos_pnls]
+        context['position_chart_labels'] = json.dumps(pos_labels)
+        context['position_chart_data'] = json.dumps(pos_pnls)
+        context['position_chart_colors'] = json.dumps(pos_colors)
+        context['raw_positions_json'] = json.dumps(raw_pos)
+
+        selected_index = self.request.GET.get('index', 'NIFTY').upper().strip()
+        from apps.common.services.live_feed_service import get_live_index_option_chain
+        context['selected_index'] = selected_index
+        context['option_chain'] = get_live_index_option_chain(selected_index)
         return context
 
 
