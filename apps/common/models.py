@@ -105,6 +105,7 @@ class SiteSettings(BaseModel):
     logo_dark = models.ImageField(upload_to=site_setting_logo_path, null=True, blank=True, help_text="Dark theme logo (.svg, .png, .jpg)")
     logo_light = models.ImageField(upload_to=site_setting_logo_path, null=True, blank=True, help_text="Light theme logo (.svg, .png, .jpg)")
     favicon = models.ImageField(upload_to=site_setting_logo_path, null=True, blank=True, help_text="Favicon icon (.ico, .png, .svg)")
+    banner_video = models.FileField(upload_to=site_setting_logo_path, null=True, blank=True, help_text="Home banner hero video (.mp4, .webm, .mov)")
     meta_config = models.JSONField(default=dict, blank=True, help_text="Extensible metadata & SEO configuration")
 
     # FYERS Live Data Feed Integration Configuration
@@ -131,6 +132,10 @@ class SiteSettings(BaseModel):
     @property
     def favicon_url(self):
         return self.favicon.url if self.favicon else ''
+
+    @property
+    def banner_video_url(self):
+        return self.banner_video.url if self.banner_video else ''
 
     def __str__(self):
         return f"SiteSettings ({self.brand_name})"

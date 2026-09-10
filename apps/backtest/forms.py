@@ -83,7 +83,7 @@ class IndexBacktestTaskForm(forms.ModelForm):
     """Form dedicated to Indian Index & Option (F&O) Backtesting."""
     market_type = forms.CharField(initial=MarketTypeChoices.INDEX_FO, widget=forms.HiddenInput())
     backup_task = MarketBackupTaskChoiceField(
-        queryset=MarketBackupTask.objects.filter(is_deleted=False, market_type='INDEX_FO').order_by('-id'),
+        queryset=MarketBackupTask.objects.filter(is_deleted=False, market_type='INDEX_FO', is_macro_assist=False).order_by('-id'),
         required=False,
         empty_label="-- Select Existing Index Backup Dataset (Optional) --",
         widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_backup_task'})
@@ -139,7 +139,7 @@ class ForexBacktestTaskForm(forms.ModelForm):
     """Form dedicated to Forex & CME Micro Futures Backtesting (NO strike_selection)."""
     market_type = forms.CharField(initial=MarketTypeChoices.FOREX_FUTURES, widget=forms.HiddenInput())
     backup_task = MarketBackupTaskChoiceField(
-        queryset=MarketBackupTask.objects.filter(is_deleted=False, market_type='FOREX_FUTURES').order_by('-id'),
+        queryset=MarketBackupTask.objects.filter(is_deleted=False, market_type='FOREX_FUTURES', is_macro_assist=False).order_by('-id'),
         required=False,
         empty_label="-- Select Existing Databento Forex Backup Dataset (Optional) --",
         widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_backup_task'})

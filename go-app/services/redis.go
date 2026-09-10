@@ -42,9 +42,9 @@ func NewRedisService(ctx context.Context, redisURL string) (*RedisService, error
 	return nil, fmt.Errorf("unable to connect to redis after %d attempts: %w", maxRetries, err)
 }
 
-// Subscribe returns a Redis PubSub object listening to the specified Pub/Sub channel
-func (s *RedisService) Subscribe(ctx context.Context, channel string) *redis.PubSub {
-	return s.Client.Subscribe(ctx, channel)
+// Subscribe returns a Redis PubSub object listening to the specified Pub/Sub channels
+func (s *RedisService) Subscribe(ctx context.Context, channels ...string) *redis.PubSub {
+	return s.Client.Subscribe(ctx, channels...)
 }
 
 // Close gracefully releases the Redis connection

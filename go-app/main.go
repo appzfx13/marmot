@@ -46,9 +46,10 @@ func main() {
 	}
 	defer redisService.Close()
 
-	// 5. Initialize WebSocket Hub
+	// 5. Initialize WebSocket Hub & Market Data Broadcaster
 	hub := ws.NewHub()
 	go hub.Run()
+	go ws.StartMarketDataBroadcaster(ctx, redisService, hub)
 
 	// 6. Initialize Task Manager
 	taskManager := workers.NewTaskManager(dbService, cfg, hub, redisService)

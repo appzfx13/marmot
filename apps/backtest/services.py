@@ -124,6 +124,12 @@ def execute_python_rl_backtest(task_id):
     from .rl_engine import TensorTradeRLEngine
     try:
         task = BacktestTask.objects.get(id=task_id)
+        if task.backup_task and task.backup_task.is_macro_assist and task.backup_task.linked_backup_task:
+            if not task.macro_backup_task:
+                task.macro_backup_task = task.backup_task
+            task.backup_task = task.backup_task.linked_backup_task
+            task.save(update_fields=["backup_task", "macro_backup_task"])
+
         user_id = str(task.created_by_id or 1)
         backup_id = str(task.backup_task.id) if task.backup_task else str(task.id)
         backup_dir = os.path.join(str(settings.BASE_DIR), "backup", user_id, backup_id)
@@ -179,7 +185,8 @@ def execute_python_rl_backtest(task_id):
         task.metrics = {k: v for k, v in results.items() if k != 'trades'}
         task.status = BacktestTask.StatusChoices.COMPLETED
         task.progress = 100
-        task.save(update_fields=['results', 'metrics', 'status', 'progress'])
+        task.error_logs = None
+        task.save(update_fields=['results', 'metrics', 'status', 'progress', 'error_logs'])
 
         net_pnl = float(results.get('net_pnl', 0.0))
         total_trades = int(results.get('total_trades', len(results.get('trades', []))))

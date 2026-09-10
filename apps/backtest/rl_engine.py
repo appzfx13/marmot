@@ -185,11 +185,24 @@ class TensorTradeRLEngine:
                     if end_dt:
                         temp_df = temp_df[temp_df["session_date"] <= end_dt]
 
-                # Map Databento price column to close if missing
-                if "close" not in temp_df.columns and "price" in temp_df.columns:
-                    temp_df["close"] = temp_df["price"]
-                if "open" not in temp_df.columns and "close" in temp_df.columns:
-                    temp_df["open"] = temp_df["close"]
+                # Normalize column names case-insensitively for OHLCV columns
+                col_map = {str(c).lower(): c for c in temp_df.columns}
+                if "close" not in temp_df.columns:
+                    if "close" in col_map:
+                        temp_df["close"] = temp_df[col_map["close"]]
+                    elif "price" in col_map:
+                        temp_df["close"] = temp_df[col_map["price"]]
+                if "open" not in temp_df.columns:
+                    if "open" in col_map:
+                        temp_df["open"] = temp_df[col_map["open"]]
+                    elif "close" in temp_df.columns:
+                        temp_df["open"] = temp_df["close"]
+                if "high" not in temp_df.columns and "high" in col_map:
+                    temp_df["high"] = temp_df[col_map["high"]]
+                if "low" not in temp_df.columns and "low" in col_map:
+                    temp_df["low"] = temp_df[col_map["low"]]
+                if "volume" not in temp_df.columns and "volume" in col_map:
+                    temp_df["volume"] = temp_df[col_map["volume"]]
 
                 # Derive Databento Order Flow metrics (CVD, Delta, Imbalance) if order book columns exist
                 if "bid_sz_00" in temp_df.columns and "ask_sz_00" in temp_df.columns:
@@ -552,6 +565,8 @@ class TensorTradeRLEngine:
         total_gross_pnl = 0.0
         total_net_pnl = 0.0
 
+        strategy_name = str(params.get("strategy_name", "tensortrade_rl"))
+        timeframe = str(params.get("macro_timeframe", "1m"))
         strike_step = int(params.get("strike_step") or INDEX_STRIKE_INTERVAL.get(index_name.upper(), 50))
 
         rules = params.get("rules", [])
@@ -667,6 +682,14 @@ class TensorTradeRLEngine:
             total_qty = lots_count * lot_size
 
             session_df = session_df.copy()
+            if "close" not in session_df.columns:
+                lower_cols = {str(c).lower(): c for c in session_df.columns}
+                if "close" in lower_cols:
+                    session_df["close"] = session_df[lower_cols["close"]]
+                elif "price" in lower_cols:
+                    session_df["close"] = session_df[lower_cols["price"]]
+                else:
+                    raise KeyError(f"Session {session_date} dataset is missing required 'close' candle price column. Available columns: {list(session_df.columns)}")
             session_df["ema9"] = session_df["close"].ewm(span=9, adjust=False).mean()
             session_df["ema21"] = session_df["close"].ewm(span=21, adjust=False).mean()
             if "volume" in session_df.columns and session_df["volume"].sum() > 0:

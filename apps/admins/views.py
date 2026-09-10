@@ -2969,7 +2969,7 @@ class SiteSettingsAdminView(AdminRequiredMixin, View):
 class SiteSettingsLogoUploadView(AdminRequiredMixin, View):
     """Handle HTMX multipart/form-data logo upload and return HTML partial preview."""
     def post(self, request, field_name, *args, **kwargs):
-        allowed_fields = ['logo_dark', 'logo_light', 'favicon']
+        allowed_fields = ['logo_dark', 'logo_light', 'favicon', 'banner_video']
         if field_name not in allowed_fields:
             return HttpResponse("Invalid upload field", status=400)
 

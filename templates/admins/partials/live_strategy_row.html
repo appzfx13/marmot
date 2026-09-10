@@ -1,5 +1,5 @@
 {% load static %}<tr id="live-strategy-row-{{ strategy.pk }}">
-    <td>
+    <td class="ps-2">
         <div class="fw-bold theme-text-main d-flex align-items-center gap-1.5">
             {% if strategy.is_active %}
                 <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.5rem; height: 0.5rem;"></span>
@@ -103,8 +103,8 @@
     </td>
 </tr>
 <tr id="strategy-rules-{{ strategy.pk }}" class="collapse bg-transparent">
-    <td colspan="7" class="p-0 border-0">
-        <div class="p-3 my-2 mx-3 rounded-3 border" style="background: rgba(255, 255, 255, 0.02); border-color: rgba(255, 255, 255, 0.08) !important;">
+    <td colspan="7" class="p-0 border-0" style="white-space: normal !important;">
+        <div class="p-3 my-2 rounded-3 border" style="background: rgba(255, 255, 255, 0.02); border-color: rgba(255, 255, 255, 0.08) !important;">
             <div class="d-flex align-items-center justify-content-between mb-2.5 flex-wrap gap-2">
                 <div class="d-flex align-items-center gap-2">
                     <i class="bi bi-shield-lock-fill text-primary fs-6"></i>
@@ -119,29 +119,29 @@
             </div>
 
             <!-- Rules Grid -->
-            <div class="row g-2">
+            <div class="row g-2.5">
                 {% for rule in strategy.frozen_rules_snapshot %}
                 <div class="col-12 col-md-6 col-lg-4">
-                    <div class="p-2.5 rounded-3 border h-100 d-flex flex-column justify-content-between" style="background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.07) !important;">
+                    <div class="p-3 rounded-3 border h-100 d-flex flex-column justify-content-between" style="background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.08) !important; word-break: break-word; overflow: hidden;">
                         <div>
-                            <div class="d-flex align-items-center justify-content-between mb-1.5">
-                                <span class="badge bg-info bg-opacity-20 text-info font-monospace smaller fw-bold">
+                            <div class="d-flex align-items-center justify-content-between mb-2 gap-2">
+                                <span class="badge bg-info bg-opacity-20 text-info font-monospace smaller fw-bold flex-shrink-0">
                                     {% if rule.rule_id %}Rule #{{ rule.rule_id }}{% elif rule.id %}Rule #{{ rule.id }}{% else %}Rule #{{ forloop.counter }}{% endif %}
                                 </span>
-                                <span class="badge bg-secondary bg-opacity-25 text-white-50 fs-xs font-monospace">
+                                <span class="badge bg-secondary bg-opacity-25 text-white-50 fs-xs font-monospace text-truncate">
                                     {{ rule.rule_type|default:"QUANTITATIVE" }}
                                 </span>
                             </div>
-                            <div class="fw-bold text-white small mb-1">{{ rule.name }}</div>
-                            <div class="theme-text-muted smaller" style="font-size: 0.74rem; line-height: 1.4;">
+                            <div class="fw-bold text-white small mb-1.5" style="white-space: normal; line-height: 1.35;">{{ rule.name }}</div>
+                            <div class="theme-text-muted smaller" style="font-size: 0.76rem; line-height: 1.45; white-space: normal;">
                                 {% if rule.description %}{{ rule.description }}{% elif rule.prompt_directive %}{{ rule.prompt_directive }}{% else %}Rule criteria strictly verified at live tick arrival.{% endif %}
                             </div>
                         </div>
                         {% if rule.parameters %}
-                        <div class="mt-2 pt-1.5 border-top border-white border-opacity-10 d-flex flex-wrap gap-1">
+                        <div class="mt-2.5 pt-2 border-top border-white border-opacity-10 d-flex flex-wrap gap-1.5" style="white-space: normal;">
                             {% for p_key, p_val in rule.parameters.items %}
-                            <span class="badge bg-dark bg-opacity-60 text-white-50 border border-white border-opacity-10 font-monospace fs-xs">
-                                {{ p_key }}: <span class="text-warning fw-bold">{{ p_val }}</span>
+                            <span class="badge border border-white border-opacity-15 font-monospace fs-xs" style="background: rgba(0, 0, 0, 0.4); color: #cbd5e1; white-space: normal;">
+                                <span class="text-white-50">{{ p_key }}:</span> <span class="text-warning fw-bold">{{ p_val }}</span>
                             </span>
                             {% endfor %}
                         </div>
@@ -157,21 +157,21 @@
 
             <!-- Hyperparameters & Risk Management Snapshot -->
             {% if strategy.frozen_parameters %}
-            <div class="mt-2.5 pt-2 border-top border-white border-opacity-10 d-flex flex-wrap align-items-center gap-2 smaller theme-text-muted font-monospace">
-                <span class="text-uppercase fw-semibold text-white-50 fs-xs">Hyperparameters:</span>
+            <div class="mt-3 pt-2.5 border-top border-white border-opacity-10 d-flex flex-wrap align-items-center gap-2 smaller theme-text-muted font-monospace" style="white-space: normal;">
+                <span class="text-uppercase fw-semibold text-white-50 fs-xs me-1">Hyperparameters:</span>
                 {% if strategy.frozen_parameters.strategy_parameters %}
                     {% for sp_k, sp_v in strategy.frozen_parameters.strategy_parameters.items %}
                     {% if sp_k != 'rules' and sp_k != 'prompt_directives' %}
-                    <span class="badge bg-white bg-opacity-5 border border-white border-opacity-10 text-white font-monospace fs-xs">
-                        {{ sp_k }}: <span class="text-info fw-bold">{{ sp_v }}</span>
+                    <span class="badge border border-white border-opacity-15 font-monospace fs-xs" style="background: rgba(255, 255, 255, 0.05); color: #cbd5e1; white-space: normal;">
+                        <span class="text-white-50">{{ sp_k }}:</span> <span class="text-info fw-bold">{{ sp_v }}</span>
                     </span>
                     {% endif %}
                     {% endfor %}
                 {% else %}
                     {% for fp_k, fp_v in strategy.frozen_parameters.items %}
                     {% if fp_k != 'rules' and fp_k != 'prompt_directives' %}
-                    <span class="badge bg-white bg-opacity-5 border border-white border-opacity-10 text-white font-monospace fs-xs">
-                        {{ fp_k }}: <span class="text-info fw-bold">{{ fp_v }}</span>
+                    <span class="badge border border-white border-opacity-15 font-monospace fs-xs" style="background: rgba(255, 255, 255, 0.05); color: #cbd5e1; white-space: normal;">
+                        <span class="text-white-50">{{ fp_k }}:</span> <span class="text-info fw-bold">{{ fp_v }}</span>
                     </span>
                     {% endif %}
                     {% endfor %}

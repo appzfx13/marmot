@@ -1,9 +1,15 @@
 {% load static %}
 <div id="preview-container-{{ field_name }}" class="rounded-3 p-3 d-flex flex-column align-items-center justify-content-center border" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border-color: var(--border-color) !important; min-height: 140px;">
     {% if asset_file %}
-        <div class="w-100 d-flex align-items-center justify-content-center p-2 rounded-2 border overflow-hidden" style="height: 90px; background: rgba(0, 0, 0, 0.2); border-color: var(--border-color) !important;">
-            <img src="{{ asset_file.url }}" alt="{{ field_name }}" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;">
-        </div>
+        {% if field_name == 'banner_video' %}
+            <div class="w-100 d-flex align-items-center justify-content-center rounded-2 border overflow-hidden position-relative" style="height: 100px; background: rgba(0, 0, 0, 0.4); border-color: var(--border-color) !important;">
+                <video src="{{ asset_file.url }}" autoplay muted loop playsinline controls class="w-100 h-100" style="object-fit: cover;"></video>
+            </div>
+        {% else %}
+            <div class="w-100 d-flex align-items-center justify-content-center p-2 rounded-2 border overflow-hidden" style="height: 90px; background: rgba(0, 0, 0, 0.2); border-color: var(--border-color) !important;">
+                <img src="{{ asset_file.url }}" alt="{{ field_name }}" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+            </div>
+        {% endif %}
         <div class="mt-2 text-center w-100">
             <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 fs-xs fw-bold d-inline-flex align-items-center gap-1">
                 <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.35rem; height: 0.35rem;"></span>
@@ -12,9 +18,15 @@
             <div class="text-truncate theme-text-muted small mt-1 font-monospace" style="font-size: 0.7rem;" title="{{ asset_file.url }}">{{ asset_file.url }}</div>
         </div>
     {% elif image_url %}
-        <div class="w-100 d-flex align-items-center justify-content-center p-2 rounded-2 border overflow-hidden" style="height: 90px; background: rgba(0, 0, 0, 0.2); border-color: var(--border-color) !important;">
-            <img src="{{ image_url }}" alt="{{ field_name }}" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;">
-        </div>
+        {% if field_name == 'banner_video' %}
+            <div class="w-100 d-flex align-items-center justify-content-center rounded-2 border overflow-hidden position-relative" style="height: 100px; background: rgba(0, 0, 0, 0.4); border-color: var(--border-color) !important;">
+                <video src="{{ image_url }}" autoplay muted loop playsinline controls class="w-100 h-100" style="object-fit: cover;"></video>
+            </div>
+        {% else %}
+            <div class="w-100 d-flex align-items-center justify-content-center p-2 rounded-2 border overflow-hidden" style="height: 90px; background: rgba(0, 0, 0, 0.2); border-color: var(--border-color) !important;">
+                <img src="{{ image_url }}" alt="{{ field_name }}" class="img-fluid" style="max-height: 100%; max-width: 100%; object-fit: contain;">
+            </div>
+        {% endif %}
         <div class="mt-2 text-center w-100">
             <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-0.5 fs-xs fw-bold d-inline-flex align-items-center gap-1">
                 <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.35rem; height: 0.35rem;"></span>
@@ -23,9 +35,14 @@
             <div class="text-truncate theme-text-muted small mt-1 font-monospace" style="font-size: 0.7rem;" title="{{ image_url }}">{{ image_url }}</div>
         </div>
     {% else %}
-        <div class="w-100 d-flex flex-column align-items-center justify-content-center p-3 rounded-2 border border-dashed text-secondary" style="height: 90px; border-color: var(--border-color) !important;">
-            <i class="bi bi-image fs-3 opacity-50 mb-1"></i>
-            <span class="small opacity-75">No asset uploaded</span>
+        <div class="w-100 d-flex flex-column align-items-center justify-content-center p-3 rounded-2 border border-dashed text-secondary" style="height: 100px; border-color: var(--border-color) !important;">
+            {% if field_name == 'banner_video' %}
+                <i class="bi bi-camera-video fs-3 opacity-50 mb-1"></i>
+                <span class="small opacity-75">No banner video uploaded</span>
+            {% else %}
+                <i class="bi bi-image fs-3 opacity-50 mb-1"></i>
+                <span class="small opacity-75">No asset uploaded</span>
+            {% endif %}
         </div>
     {% endif %}
 </div>

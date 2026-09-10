@@ -171,9 +171,18 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             }
         }
         logger.info(f"Dhan Order Executed [{account_type}]: {order_id} for user @{self.user.username}")
+        try:
+            _get_redis().publish('marmot:orders', json.dumps({'type': 'order_update', 'broker': 'DHAN', 'order_id': order_id}))
+            _get_redis().publish('marmot:positions', json.dumps({'type': 'position_update', 'broker': 'DHAN'}))
+        except Exception:
+            pass
         return telemetry
 
     def cancel_order(self, order_id: str, account_type: str = 'SANDBOX') -> Dict[str, Any]:
+        try:
+            _get_redis().publish('marmot:orders', json.dumps({'type': 'order_update', 'broker': 'DHAN', 'order_id': order_id, 'status': 'CANCELLED'}))
+        except Exception:
+            pass
         return {
             'success': True,
             'order_id': order_id,
@@ -449,6 +458,10 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
             resp = requests.delete(url, headers=headers, timeout=6)
             if resp.status_code == 200:
+                try:
+                    _get_redis().publish('marmot:orders', json.dumps({'type': 'order_update', 'broker': 'DHAN', 'order_id': order_id, 'status': 'CANCELLED'}))
+                except Exception:
+                    pass
                 return {'success': True, 'order_id': order_id, 'message': f'Order {order_id} cancelled successfully.'}
             return {'success': False, 'order_id': order_id, 'message': f'Cancel failed (HTTP {resp.status_code}): {resp.text}'}
         except Exception as e:

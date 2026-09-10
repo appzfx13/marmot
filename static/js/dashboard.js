@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 },
                 fontFamily: 'Plus Jakarta Sans, sans-serif'
             },
-            colors: ['#072F1F', '#B4F105'], // Dark Green (Income), Lime Green (Expenses)
+            colors: ['#0072FF', '#00F2FE'], // Electric Blue (Income), Cyber Cyan (Expenses)
             states: {
                 hover: {
                     filter: {
@@ -164,7 +164,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 fontFamily: 'Plus Jakarta Sans, sans-serif'
             },
             labels: ['View Count', 'Percentage', 'Sales'],
-            colors: ['#B4F105', '#051C12', '#F97316'], // Lime, Forest Dark, Orange
+            colors: ['#00F2FE', '#0072FF', '#F97316'], // Cyber Cyan, Electric Blue, Orange
             states: {
                 hover: {
                     filter: {

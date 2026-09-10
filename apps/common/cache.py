@@ -19,6 +19,7 @@ def get_site_settings():
         'logo_dark': obj.logo_dark.url if obj.logo_dark else None,
         'logo_light': obj.logo_light.url if obj.logo_light else None,
         'favicon': obj.favicon.url if obj.favicon else None,
+        'banner_video': obj.banner_video.url if obj.banner_video else None,
         'meta_config': obj.meta_config or {},
     }
     cache.set(SITE_SETTINGS_CACHE_KEY, data, timeout=SITE_SETTINGS_CACHE_TIMEOUT)

@@ -38,7 +38,8 @@
     <link rel="stylesheet" href="{% static 'css/spark-theme.css' %}?v=2.1">
     <link rel="stylesheet" href="{% static 'css/theme-shadcn.css' %}?v=2.1">
 
-    <!-- HTMX Library -->
+    <!-- HTMX Configuration: Disable LocalStorage historyCache to prevent QuotaExceededError on large data pages -->
+    <meta name="htmx-config" content='{"historyCacheSize": 0, "refreshOnHistoryMiss": true}'>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
 
     <!-- Antigravity HUD Controller -->
@@ -48,30 +49,30 @@
         /* Dark Theme Variables (Spark Theme Dark Canvas) */
         :root[data-theme="dark"] {
             --bg-gradient: var(--bs-body-bg);
-            --glass-bg: rgba(11, 29, 22, 0.88);
-            --sidebar-bg: #04140D;
-            --border-color: rgba(255, 255, 255, 0.08);
-            --text-main: #F1F5F9;
+            --glass-bg: rgba(10, 20, 36, 0.88);
+            --sidebar-bg: #040810;
+            --border-color: rgba(0, 242, 254, 0.12);
+            --text-main: #F8FAFC;
             --text-muted: #94A3B8;
-            --nav-hover: rgba(180, 241, 5, 0.08);
-            --nav-active: rgba(180, 241, 5, 0.15);
-            --nav-active-border: #B4F105;
-            --btn-primary-bg: #B4F105;
-            --btn-primary-text: #051C12;
-            --btn-secondary-bg: rgba(255, 255, 255, 0.08);
-            --btn-secondary-text: #F1F5F9;
-            --btn-secondary-border: rgba(255, 255, 255, 0.15);
-            --modal-bg: #0B1D16;
-            --dropdown-bg: #0B1D16;
-            --dropdown-border: rgba(255, 255, 255, 0.1);
-            --dropdown-shadow: 0 20px 45px rgba(0, 0, 0, 0.7);
-            --dropdown-hover-bg: rgba(180, 241, 5, 0.15);
-            --dropdown-hover-text: #B4F105;
+            --nav-hover: rgba(0, 242, 254, 0.08);
+            --nav-active: rgba(0, 242, 254, 0.14);
+            --nav-active-border: #00F2FE;
+            --btn-primary-bg: #00F2FE;
+            --btn-primary-text: #040810;
+            --btn-secondary-bg: rgba(255, 255, 255, 0.06);
+            --btn-secondary-text: #F8FAFC;
+            --btn-secondary-border: rgba(0, 242, 254, 0.18);
+            --modal-bg: #0A1424;
+            --dropdown-bg: #0A1424;
+            --dropdown-border: rgba(0, 242, 254, 0.16);
+            --dropdown-shadow: 0 20px 45px rgba(0, 0, 0, 0.85);
+            --dropdown-hover-bg: rgba(0, 242, 254, 0.12);
+            --dropdown-hover-text: #00F2FE;
             --dropdown-divider: rgba(255, 255, 255, 0.08);
-            --input-bg: rgba(255, 255, 255, 0.05);
+            --input-bg: rgba(255, 255, 255, 0.04);
             --input-placeholder: #64748B;
             --calendar-icon-filter: invert(0.9);
-            --table-hover-bg: rgba(180, 241, 5, 0.06);
+            --table-hover-bg: rgba(0, 242, 254, 0.04);
         }
 
         /* Light Theme Variables (Spark Theme Light Canvas) */
@@ -82,9 +83,9 @@
             --border-color: #E9EFEF;
             --text-main: #0B130F;
             --text-muted: #6C7E75;
-            --nav-hover: rgba(180, 241, 5, 0.08);
-            --table-hover-bg: rgba(180, 241, 5, 0.06);
-            --nav-active: rgba(180, 241, 5, 0.12);
+            --nav-hover: rgba(0, 242, 254, 0.08);
+            --table-hover-bg: rgba(0, 242, 254, 0.06);
+            --nav-active: rgba(0, 242, 254, 0.12);
             --nav-active-border: #051C12;
             --btn-primary-bg: #051C12;
             --btn-primary-text: #FFFFFF;
@@ -95,7 +96,7 @@
             --dropdown-bg: #FFFFFF;
             --dropdown-border: #E9EFEF;
             --dropdown-shadow: 0 15px 35px rgba(11, 19, 15, 0.08);
-            --dropdown-hover-bg: rgba(180, 241, 5, 0.12);
+            --dropdown-hover-bg: rgba(0, 242, 254, 0.12);
             --dropdown-hover-text: #051C12;
             --dropdown-divider: rgba(11, 19, 15, 0.06);
             --input-bg: #FFFFFF;
@@ -456,7 +457,7 @@
 
         .sidebar-menu-link.active i,
         .sidebar-menu-link.active .material-icons {
-            color: var(--brand-lime, #B4F105) !important;
+            color: var(--brand-lime, #00F2FE) !important;
         }
 
         .sidebar-section-header {
@@ -1586,8 +1587,8 @@
             left: 0;
             height: 3px;
             width: 0%;
-            background: linear-gradient(90deg, #B4F105, #10B981, #06B6D4);
-            box-shadow: 0 0 12px rgba(180, 241, 5, 0.9), 0 0 6px rgba(16, 185, 129, 0.7);
+            background: linear-gradient(90deg, #00F2FE, #10B981, #06B6D4);
+            box-shadow: 0 0 12px rgba(0, 242, 254, 0.9), 0 0 6px rgba(16, 185, 129, 0.7);
             z-index: 999999;
             transition: width 0.2s ease, opacity 0.3s ease;
             pointer-events: none;
@@ -2512,10 +2513,10 @@
             const isTunnel = host.includes('ngrok') || host.includes('loca.lt') || host.includes('trycloudflare');
 
             if (!wsUrl && host) {
+                const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                 if (isTunnel) {
-                    wsUrl = null;
+                    wsUrl = proto + '//' + window.location.host + '/ws';
                 } else {
-                    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
                     wsUrl = proto + '//' + host + ':8082/ws';
                 }
             }
@@ -2526,13 +2527,13 @@
                 subscribers: {},
                 callbacks: {},
                 reconnectDelay: 5000,
-                maxReconnectAttempts: 3,
+                maxReconnectAttempts: 5,
                 reconnectAttempts: 0,
-                useFallback: isTunnel,
+                useFallback: false,
                 fallbackIntervals: {},
 
                 connect: function () {
-                    if (!this.url || this.useFallback) return;
+                    if (!this.url) return;
                     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
                         this.enableFallback();
                         return;
@@ -2556,10 +2557,16 @@
                             try {
                                 const data = JSON.parse(event.data);
                                 if (data.type === 'sandbox_telemetry' || data.type === 'live_tick') {
-                                    const spot = data.data ? data.data.spot_price : data.spot_price;
+                                    const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
                                     if (spot && window.updateLiveSpotDOM) {
                                         window.updateLiveSpotDOM(spot, data.data || data);
                                     }
+                                }
+                                if (data.type === 'order_update' || data.type === 'orders') {
+                                    document.body.dispatchEvent(new CustomEvent('reloadLiveOrders'));
+                                }
+                                if (data.type === 'position_update' || data.type === 'positions') {
+                                    document.body.dispatchEvent(new CustomEvent('reloadLivePositions'));
                                 }
                                 if (data.type !== 'progress' && data.type !== 'backtest_progress') return;
                                 const taskIdStr = String(data.task_id);
@@ -2695,10 +2702,14 @@
                 }
             };
 
-            // Ultra-fast sub-second tick updater (polls lightweight JSON endpoint every 500ms when dashboard is active)
-            (function initSubSecondTickSync() {
+            // Smart tick updater (automatically bypassed when WebSocket is connected; throttled fallback otherwise)
+            (function initSmartTickSync() {
                 let isFetching = false;
                 function fetchLiveTick() {
+                    // 1. If WebSocket is connected, skip HTTP polling completely (0 HTTP requests)
+                    if (window.MarmotWS && window.MarmotWS.ws && window.MarmotWS.ws.readyState === WebSocket.OPEN) {
+                        return;
+                    }
                     if (isFetching || document.hidden) return;
                     if (!document.getElementById('live-macro-spot-ltp') && !document.getElementById('live-option-chain-spot-ltp')) return;
                     isFetching = true;
@@ -2722,7 +2733,7 @@
                             isFetching = false;
                         });
                 }
-                setInterval(fetchLiveTick, 500);
+                setInterval(fetchLiveTick, 2500);
             })();
         })();
     </script>

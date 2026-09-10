@@ -100,6 +100,19 @@ services:
     networks:
       - app_network
 
+  # --- Nginx Reverse Proxy Gateway ---
+  nginx_proxy:
+    image: nginx:alpine
+    container_name: nginx_proxy
+    restart: always
+    volumes:
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - web
+      - go_app
+    networks:
+      - app_network
+
   # --- Ngrok Tunnel Container ---
   ngrok:
     image: ngrok/ngrok:latest
@@ -107,14 +120,14 @@ services:
     restart: always
     command:
       - "http"
-      - "web:8000"
+      - "nginx_proxy:80"
       - "--authtoken=${NGROK_AUTHTOKEN}"
     ports:
       - "4040:4040"
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     depends_on:
-      - web
+      - nginx_proxy
     networks:
       - app_network
 
