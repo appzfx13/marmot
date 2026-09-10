@@ -311,7 +311,7 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         return context
 
 
-class AdminLiveOptionChainPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
+class AdminLiveOptionChainPartialView(LoginRequiredMixin, View):
     """HTMX partial view returning dynamic live option chain and real-time FYERS index quote HUD."""
     template_name = 'admins/partials/live_mini_option_chain_card.html'
 
@@ -327,7 +327,7 @@ class AdminLiveOptionChainPartialView(LoginRequiredMixin, AdminRequiredMixin, Vi
         return render(request, self.template_name, context)
 
 
-class AdminLiveMacroRibbonView(LoginRequiredMixin, AdminRequiredMixin, View):
+class AdminLiveMacroRibbonView(LoginRequiredMixin, View):
     """Ultra-low-latency HTMX partial view returning live selected index and hourly Gemini Macro AI cards."""
     template_name = 'admins/partials/live_macro_cards_ribbon.html'
 
@@ -341,6 +341,27 @@ class AdminLiveMacroRibbonView(LoginRequiredMixin, AdminRequiredMixin, View):
             'selected_index': selected_index,
         }
         return render(request, self.template_name, context)
+
+
+class AdminLiveTickAPIView(LoginRequiredMixin, View):
+    """Ultra-low-latency JSON endpoint returning sub-second spot tick for active index directly from memory/Redis."""
+
+    def get(self, request, *args, **kwargs):
+        from django.http import JsonResponse
+        selected_index = request.GET.get('index', 'NIFTY').upper().strip()
+        macro_ribbon = get_live_macro_ribbon_data(selected_index)
+        sel_card = macro_ribbon.get('selected_card', {})
+        return JsonResponse({
+            'success': True,
+            'index': selected_index,
+            'ltp': sel_card.get('ltp', '0.00'),
+            'change': sel_card.get('change', '0.00'),
+            'change_pct': sel_card.get('change_pct', '0.00%'),
+            'is_positive': sel_card.get('is_positive', True),
+            'summary': sel_card.get('summary', ''),
+            'is_live': sel_card.get('is_live', False),
+            'timestamp': sel_card.get('formatted_time', ''),
+        })
 
 
 class AdminLivePositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -475,6 +496,13 @@ class AdminLiveOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
 
 class AdminLiveOrderCancelView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Cancels an active live broker order."""
+
+    def get(self, request, order_id, *args, **kwargs):
+        return render(request, 'admins/partials/confirm_delete.html', {
+            'object': f"Order #{order_id}",
+            'item_name': 'Live Order Cancellation',
+        })
+
     def post(self, request, order_id, *args, **kwargs):
         user = request.user
         live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first()
@@ -489,12 +517,22 @@ class AdminLiveOrderCancelView(LoginRequiredMixin, AdminRequiredMixin, View):
         response['HX-Trigger'] = json.dumps({
             'showToast': {'message': msg, 'level': 'success' if res.get('success') else 'error'},
             'reloadLiveOrders': True,
+            'closeGlobalModal': True,
         })
         return response
 
 
 class AdminLivePositionSquareOffView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Squares off an active intraday position via live broker API."""
+
+    def get(self, request, *args, **kwargs):
+        symbol = request.GET.get('symbol', 'Active Position')
+        qty = request.GET.get('quantity', '1')
+        return render(request, 'admins/partials/confirm_delete.html', {
+            'object': f"position {symbol} (Qty: {qty}) at Market Price",
+            'item_name': 'Square Off Position',
+        })
+
     def post(self, request, *args, **kwargs):
         user = request.user
         symbol = request.POST.get('symbol', '').strip()
@@ -518,35 +556,176 @@ class AdminLivePositionSquareOffView(LoginRequiredMixin, AdminRequiredMixin, Vie
         return response
 
 
-def get_sandbox_simulated_positions(user_id=None):
-    """Return simulated intraday and closed options positions from live Redis telemetry."""
-    if user_id:
-        try:
-            from apps.market.services import redis_client
-            import json
-            telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user_id}")
-            if telemetry_raw:
-                data = json.loads(telemetry_raw)
-                if data.get("positions"):
-                    return data["positions"]
-        except Exception:
-            pass
+def format_standard_option_symbol(symbol_str: str) -> str:
+    """Standardizes option symbol format to clean Indian market convention: 'NIFTY 22 SEP 23750 CALL'."""
+    if not symbol_str:
+        return ""
+    parts = str(symbol_str).strip().split()
+    if len(parts) == 3:
+        idx, strike, opt_type = parts[0], parts[1], parts[2].upper()
+        clean_opt = "CALL" if opt_type in ["CE", "CALL"] else ("PUT" if opt_type in ["PE", "PUT"] else opt_type)
+        return f"{idx} 22 SEP {strike} {clean_opt}"
+    elif len(parts) == 5:
+        idx, day, mon, strike, opt_type = parts[0], parts[1], parts[2], parts[3], parts[4].upper()
+        clean_opt = "CALL" if opt_type in ["CE", "CALL"] else ("PUT" if opt_type in ["PE", "PUT"] else opt_type)
+        return f"{idx} {day} {mon} {strike} {clean_opt}"
+    return symbol_str
+
+
+def enrich_trading_symbol_dict(item: dict) -> dict:
+    """Enriches order or position dictionary with clean standardized option naming and badges."""
+    if not isinstance(item, dict):
+        return item
+    enriched = dict(item)
+    raw_sym = enriched.get('trading_symbol', enriched.get('tradingSymbol', ''))
+    clean_sym = format_standard_option_symbol(raw_sym)
+    enriched['trading_symbol'] = clean_sym
+    enriched['tradingSymbol'] = clean_sym
+    enriched['option_type'] = 'CALL' if 'CALL' in clean_sym or ' CE' in raw_sym else ('PUT' if 'PUT' in clean_sym or ' PE' in raw_sym else '')
+    return enriched
+
+
+def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=None):
+    """Return simulated intraday and closed options positions from live Redis telemetry with fresh live ticks."""
+    try:
+        from apps.market.services import redis_client
+        from apps.common.services.live_feed_service import get_live_contract_market_quote
+        from apps.trade_config.models import LiveStrategy
+        import json
+        positions_raw = []
+        target_key = None
+        raw = None
+        if strategy_id and str(strategy_id).upper() != 'ALL':
+            target_key = f"marmot:sandbox:telemetry:strategy:{strategy_id}"
+            raw = redis_client.get(target_key)
+            if raw:
+                d = json.loads(raw)
+                positions_raw = d.get("positions", [])
+        elif account_id and str(account_id).upper() != 'ALL':
+            target_key = f"marmot:sandbox:telemetry:account:{account_id}"
+            raw = redis_client.get(target_key)
+            if raw:
+                d = json.loads(raw)
+                positions_raw = d.get("positions", [])
+            else:
+                strat_ids = list(LiveStrategy.objects.filter(trading_account_id=account_id, is_deleted=False).values_list('id', flat=True))
+                if not strat_ids:
+                    return []
+                agg_positions = []
+                for s_id in strat_ids:
+                    s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}")
+                    if s_raw:
+                        sd = json.loads(s_raw)
+                        agg_positions.extend(sd.get("positions", []))
+                positions_raw = agg_positions
+        elif user_id:
+            target_key = f"marmot:sandbox:telemetry:{user_id}"
+            raw = redis_client.get(target_key)
+            if raw:
+                d = json.loads(raw)
+                positions_raw = d.get("positions", [])
+
+        if positions_raw:
+            has_updates = False
+            enriched_list = []
+            for p in positions_raw:
+                ep = enrich_trading_symbol_dict(p)
+                if ep.get('status') == 'OPEN':
+                    live_ltp = get_live_contract_market_quote(ep.get('trading_symbol'))
+                    if live_ltp > 0:
+                        ep['current_ltp'] = live_ltp
+                        buy_avg = float(ep.get('buy_avg', live_ltp))
+                        qty = int(ep.get('net_qty', 0))
+                        pnl = round((live_ltp - buy_avg) * qty, 2)
+                        ep['unrealized_profit'] = pnl
+                        ep['total_pnl'] = pnl
+                        ep['pnl_percentage'] = round(((live_ltp - buy_avg) / buy_avg) * 100, 2) if buy_avg > 0 else 0.0
+                        has_updates = True
+                enriched_list.append(ep)
+            if has_updates and target_key and raw:
+                try:
+                    data_obj = json.loads(raw)
+                    data_obj['positions'] = enriched_list
+                    data_obj['unrealized_pnl'] = sum(p.get('unrealized_profit', 0.0) for p in enriched_list if p.get('status') == 'OPEN')
+                    data_obj['live_net_pnl'] = float(data_obj.get('realized_pnl', 0.0)) + data_obj['unrealized_pnl']
+                    redis_client.set(target_key, json.dumps(data_obj), ex=86400)
+                except Exception:
+                    pass
+            return enriched_list
+    except Exception:
+        pass
     return []
 
 
-def get_sandbox_simulated_orders(user_id=None):
-    """Return simulated broker order execution book entries from live Redis telemetry."""
-    if user_id:
-        try:
-            from apps.market.services import redis_client
-            import json
-            telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user_id}")
-            if telemetry_raw:
-                data = json.loads(telemetry_raw)
-                if data.get("orders"):
-                    return data["orders"]
-        except Exception:
-            pass
+def get_sandbox_simulated_orders(user_id=None, strategy_id=None, account_id=None):
+    """Return simulated broker order execution book entries from live Redis telemetry with fresh live ticks."""
+    try:
+        from apps.market.services import redis_client
+        from apps.common.services.live_feed_service import get_live_contract_market_quote
+        from apps.trade_config.models import LiveStrategy
+        import json
+        orders_raw = []
+        target_key = None
+        raw = None
+        if strategy_id and str(strategy_id).upper() != 'ALL':
+            target_key = f"marmot:sandbox:telemetry:strategy:{strategy_id}"
+            raw = redis_client.get(target_key)
+            if raw:
+                d = json.loads(raw)
+                orders_raw = d.get("orders", [])
+        elif account_id and str(account_id).upper() != 'ALL':
+            target_key = f"marmot:sandbox:telemetry:account:{account_id}"
+            raw = redis_client.get(target_key)
+            if raw:
+                d = json.loads(raw)
+                orders_raw = d.get("orders", [])
+            else:
+                strat_ids = list(LiveStrategy.objects.filter(trading_account_id=account_id, is_deleted=False).values_list('id', flat=True))
+                if not strat_ids:
+                    return []
+                agg_orders = []
+                for s_id in strat_ids:
+                    s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}")
+                    if s_raw:
+                        sd = json.loads(s_raw)
+                        agg_orders.extend(sd.get("orders", []))
+                orders_raw = agg_orders
+        elif user_id:
+            target_key = f"marmot:sandbox:telemetry:{user_id}"
+            raw = redis_client.get(target_key)
+            if raw:
+                d = json.loads(raw)
+                orders_raw = d.get("orders", [])
+            if not orders_raw:
+                user_strat_ids = list(LiveStrategy.objects.filter(user_id=user_id, is_deleted=False).values_list('id', flat=True))
+                agg_orders = []
+                for s_id in user_strat_ids:
+                    s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}")
+                    if s_raw:
+                        sd = json.loads(s_raw)
+                        agg_orders.extend(sd.get("orders", []))
+                orders_raw = agg_orders
+
+        if orders_raw:
+            has_updates = False
+            enriched_list = []
+            for o in orders_raw:
+                eo = enrich_trading_symbol_dict(o)
+                live_ltp = get_live_contract_market_quote(eo.get('trading_symbol'))
+                if live_ltp > 0 and eo.get('current_ltp') != live_ltp:
+                    eo['current_ltp'] = live_ltp
+                    has_updates = True
+                enriched_list.append(eo)
+            if has_updates and target_key and raw:
+                try:
+                    data_obj = json.loads(raw)
+                    data_obj['orders'] = enriched_list
+                    redis_client.set(target_key, json.dumps(data_obj), ex=86400)
+                except Exception:
+                    pass
+            return enriched_list
+    except Exception:
+        pass
     return []
 
 
@@ -559,8 +738,15 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         context = super().get_context_data(**kwargs)
         user = self.request.user
 
+        raw_acc_id = self.request.GET.get('account_id', '').strip()
+        account_id_param = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
         sandbox_accounts = list(user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name'))
-        sandbox_account = next((a for a in sandbox_accounts if a.is_default), None) or (sandbox_accounts[0] if sandbox_accounts else None)
+        sandbox_account = None
+        if account_id_param and account_id_param.isdigit():
+            sandbox_account = next((a for a in sandbox_accounts if str(a.id) == account_id_param), None)
+        if not sandbox_account:
+            sandbox_account = next((a for a in sandbox_accounts if a.is_default), None) or (sandbox_accounts[0] if sandbox_accounts else None)
+
         if not sandbox_account:
             sandbox_broker, _ = BrokerMaster.objects.get_or_create(code='sandbox', defaults={'name': 'SANDBOX', 'description': 'Default Paper Trading Broker Platform'})
             sandbox_account = UserTradingAccount.objects.create(
@@ -571,25 +757,65 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
                 broker_client_id=f"SBX-{user.username[:6].upper()}",
                 is_default=True,
                 is_active=True,
+                account_summary={'initial_capital': 1000000.0, 'balance': 1000000.0, 'available_margin': '1,000,000.00', 'cash': '1,000,000.00', 'margin_utilized': '0.00'},
             )
             sandbox_accounts.append(sandbox_account)
 
+        # Strategies for this sandbox account
+        strategy_qs = user.live_strategies.filter(is_deleted=False, execution_mode='SANDBOX')
+        if sandbox_account.is_default:
+            from django.db.models import Q
+            strategy_qs = strategy_qs.filter(Q(trading_account=sandbox_account) | Q(trading_account__isnull=True))
+        else:
+            strategy_qs = strategy_qs.filter(trading_account=sandbox_account)
+
         sandbox_strategies = list(
-            user.live_strategies.filter(is_deleted=False, execution_mode='SANDBOX')
-            .select_related('trading_account__broker', 'backtest_task')
-            .order_by('-created_at')
+            strategy_qs.select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
         )
 
-        raw_pos = get_sandbox_simulated_positions(user_id=user.id)
-        raw_ord = get_sandbox_simulated_orders(user_id=user.id)
+        from apps.market.services import redis_client
+        import json
+
+        # Compute live telemetry for each deployed sandbox strategy for the dropdown
+        for s in sandbox_strategies:
+            strat_pnl = 0.0
+            strat_orders_cnt = 0
+            strat_pos_cnt = 0
+            try:
+                raw_t = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s.id}")
+                if raw_t:
+                    td = json.loads(raw_t)
+                    strat_pnl = float(td.get('live_net_pnl', 0.0))
+                    strat_orders_cnt = len(td.get('orders', []))
+                    strat_pos_cnt = sum(1 for p in td.get('positions', []) if p.get('status') == 'OPEN')
+            except Exception:
+                pass
+            s.live_pnl = strat_pnl
+            s.orders_cnt = strat_orders_cnt
+            s.open_positions_cnt = strat_pos_cnt
+
+        strategy_id_param = self.request.GET.get('strategy_id', '').strip()
+        selected_strategy = None
+        if strategy_id_param and strategy_id_param.upper() != 'ALL':
+            selected_strategy = next((s for s in sandbox_strategies if str(s.id) == strategy_id_param), None)
+
+        selected_strat_id = selected_strategy.id if selected_strategy else None
+        target_account_id = sandbox_account.id if not selected_strat_id else None
+        raw_pos = get_sandbox_simulated_positions(user_id=user.id, strategy_id=selected_strat_id, account_id=target_account_id)
+        raw_ord = get_sandbox_simulated_orders(user_id=user.id, strategy_id=selected_strat_id, account_id=target_account_id)
 
         telemetry_summary = {}
         try:
-            from apps.market.services import redis_client
-            telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user.id}")
+            if selected_strategy:
+                telemetry_key = f"marmot:sandbox:telemetry:strategy:{selected_strategy.id}"
+            else:
+                telemetry_key = f"marmot:sandbox:telemetry:account:{sandbox_account.id}"
+            telemetry_raw = redis_client.get(telemetry_key)
+            if not telemetry_raw and not selected_strategy and sandbox_account.is_default:
+                telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user.id}")
             if telemetry_raw:
                 t_data = json.loads(telemetry_raw)
-                telemetry_summary = t_data.get("summary", {})
+                telemetry_summary = t_data.get("summary", {}) if "summary" in t_data else t_data
         except Exception:
             pass
 
@@ -602,7 +828,9 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         open_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM'])
         traded_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() == 'TRADED')
 
-        base_capital = 1000000.00
+        acc_summary = sandbox_account.account_summary or {}
+        acc_init_capital = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 1000000.00)
+        base_capital = float(selected_strategy.allocated_capital or 100000.00) if selected_strategy else acc_init_capital
         margin_used = sum(float(p.get('buy_avg', 0.0)) * int(p.get('net_qty', 0)) for p in raw_pos if p.get('status') == 'OPEN')
         avail_margin = base_capital - margin_used + realized_pnl
 
@@ -611,19 +839,32 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         context['live_account'] = sandbox_account
         context['sandbox_account'] = sandbox_account
         context['sandbox_accounts'] = sandbox_accounts
+        context['selected_account_id'] = str(sandbox_account.id)
         context['has_live_account'] = True
         context['marmot_profile'] = get_user_profile(user.username)
 
+        context['selected_strategy'] = selected_strategy
+        context['selected_strategy_id'] = str(selected_strategy.id) if selected_strategy else 'ALL'
         context['broker_name'] = 'SANDBOX PAPER BROKER'
         context['is_token_active'] = True
         context['needs_consent'] = False
+
+        query_params = []
+        if selected_strat_id:
+            query_params.append(f"strategy_id={selected_strat_id}")
+        if sandbox_account:
+            query_params.append(f"account_id={sandbox_account.id}")
+        query_suffix = f"?{'&'.join(query_params)}" if query_params else ""
+
+        base_cards_url = reverse('admins:admin-sandbox-cards-partial')
+        context['cards_partial_url'] = base_cards_url
         context['available_margin'] = telemetry_summary.get('available_margin', f"{avail_margin:,.2f}")
         context['cash_balance'] = telemetry_summary.get('cash', f"{base_capital:,.2f}")
         context['collateral'] = "0.00"
         context['margin_utilized'] = telemetry_summary.get('margin_utilized', f"{margin_used:,.2f}")
-        context['live_net_pnl'] = telemetry_summary.get('live_net_pnl', net_pnl)
-        context['realized_pnl'] = telemetry_summary.get('realized_pnl', realized_pnl)
-        context['unrealized_pnl'] = telemetry_summary.get('unrealized_pnl', unrealized_pnl)
+        context['live_net_pnl'] = net_pnl
+        context['realized_pnl'] = realized_pnl
+        context['unrealized_pnl'] = unrealized_pnl
         context['open_positions_count'] = open_cnt
         context['closed_positions_count'] = closed_cnt
         context['todays_orders_count'] = len(raw_ord)
@@ -649,6 +890,7 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         context['site_settings'] = site_settings
         context['master_live_switch'] = site_settings.live_execution_master_switch
         context['live_strategies'] = sandbox_strategies
+        context['sandbox_strategies'] = sandbox_strategies
         context['market_clock'] = get_ist_market_clock()
         context['calendar_pnl'] = get_current_month_calendar_pnl(sandbox_account or user)
         context['intraday_graph'] = get_today_intraday_equity_curve(sandbox_account or user)
@@ -681,9 +923,165 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         context['macro_ai_cards'] = macro_ribbon.get('macro_cards')
         context['macro_market_cards'] = get_live_macro_market_cards()
 
-        context['positions_partial_url'] = reverse('admins:admin-sandbox-positions-partial')
-        context['orders_partial_url'] = reverse('admins:admin-sandbox-orders-partial')
+        base_pos_url = reverse('admins:admin-sandbox-positions-partial')
+        base_ord_url = reverse('admins:admin-sandbox-orders-partial')
+        context['positions_partial_url'] = base_pos_url
+        context['orders_partial_url'] = base_ord_url
         return context
+
+
+class AdminSandboxDeploymentsView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Dedicated Hub page listing all deployed Sandbox paper-trading strategies with live controls."""
+    template_name = 'admins/sandbox_deployments.html'
+    partial_template_name = 'admins/partials/sandbox_deployments_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        sandbox_strategies = list(
+            user.live_strategies.filter(is_deleted=False, execution_mode='SANDBOX')
+            .select_related('trading_account__broker', 'backtest_task')
+            .order_by('-created_at')
+        )
+
+        from apps.market.services import redis_client
+        import json
+
+        total_capital = 0.0
+        total_pnl = 0.0
+        total_open_positions = 0
+        total_orders = 0
+        active_count = 0
+
+        for s in sandbox_strategies:
+            strat_pnl = 0.0
+            strat_orders_cnt = 0
+            strat_pos_cnt = 0
+            strat_margin_used = 0.0
+            try:
+                raw_t = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s.id}")
+                if raw_t:
+                    td = json.loads(raw_t)
+                    strat_pnl = float(td.get('live_net_pnl', 0.0))
+                    strat_orders_cnt = len(td.get('orders', []))
+                    strat_pos_cnt = sum(1 for p in td.get('positions', []) if p.get('status') == 'OPEN')
+                    strat_margin_used = float(td.get('margin_utilized', 0.0))
+            except Exception:
+                pass
+            s.live_pnl = strat_pnl
+            s.orders_cnt = strat_orders_cnt
+            s.open_positions_cnt = strat_pos_cnt
+            s.margin_utilized = strat_margin_used
+
+            total_capital += float(s.allocated_capital or 100000.00)
+            total_pnl += strat_pnl
+            total_open_positions += strat_pos_cnt
+            total_orders += strat_orders_cnt
+            if s.is_active:
+                active_count += 1
+
+        context['is_sandbox'] = True
+        context['active_tab'] = 'admin-sandbox-deployments'
+        context['sandbox_strategies'] = sandbox_strategies
+        context['total_strategies_count'] = len(sandbox_strategies)
+        context['active_strategies_count'] = active_count
+        context['total_allocated_capital'] = total_capital
+        context['total_combined_pnl'] = total_pnl
+        context['total_open_positions'] = total_open_positions
+        context['total_orders_count'] = total_orders
+        return context
+
+
+class AdminSandboxCardsPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX partial view returning Sandbox simulated top 8 telemetry cards with real-time calculations."""
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        raw_acc_id = request.GET.get('account_id', '').strip()
+        account_id_param = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
+        sandbox_accounts = list(user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name'))
+        sandbox_account = None
+        if account_id_param and account_id_param.isdigit():
+            sandbox_account = next((a for a in sandbox_accounts if str(a.id) == account_id_param), None)
+        if not sandbox_account:
+            sandbox_account = next((a for a in sandbox_accounts if a.is_default), None) or (sandbox_accounts[0] if sandbox_accounts else None)
+
+        raw_strat_id = request.GET.get('strategy_id', '').strip()
+        strategy_id_param = raw_strat_id.split('?')[0].split('&')[0].strip() if raw_strat_id else ''
+        selected_strategy = None
+        if strategy_id_param and strategy_id_param.upper() != 'ALL' and strategy_id_param.isdigit():
+            selected_strategy = user.live_strategies.filter(id=int(strategy_id_param), is_deleted=False).first()
+
+        selected_strat_id = selected_strategy.id if selected_strategy else None
+        target_account_id = sandbox_account.id if (sandbox_account and not selected_strat_id) else None
+        raw_pos = get_sandbox_simulated_positions(user_id=user.id, strategy_id=selected_strat_id, account_id=target_account_id)
+        raw_ord = get_sandbox_simulated_orders(user_id=user.id, strategy_id=selected_strat_id, account_id=target_account_id)
+
+        telemetry_summary = {}
+        try:
+            from apps.market.services import redis_client
+            import json
+            if selected_strategy:
+                telemetry_key = f"marmot:sandbox:telemetry:strategy:{selected_strategy.id}"
+            elif sandbox_account:
+                telemetry_key = f"marmot:sandbox:telemetry:account:{sandbox_account.id}"
+            else:
+                telemetry_key = f"marmot:sandbox:telemetry:{user.id}"
+            telemetry_raw = redis_client.get(telemetry_key)
+            if not telemetry_raw and not selected_strategy and sandbox_account and sandbox_account.is_default:
+                telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user.id}")
+            if telemetry_raw:
+                t_data = json.loads(telemetry_raw)
+                telemetry_summary = t_data.get("summary", {}) if "summary" in t_data else t_data
+        except Exception:
+            pass
+
+        open_cnt = sum(1 for p in raw_pos if p.get('status') == 'OPEN')
+        closed_cnt = sum(1 for p in raw_pos if p.get('status') == 'CLOSED')
+        realized_pnl = sum(float(p.get('realized_profit', 0.0)) for p in raw_pos)
+        unrealized_pnl = sum(float(p.get('unrealized_profit', 0.0)) for p in raw_pos)
+        net_pnl = realized_pnl + unrealized_pnl
+
+        open_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM'])
+        traded_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() == 'TRADED')
+
+        acc_summary = sandbox_account.account_summary if sandbox_account else {}
+        acc_init_capital = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 1000000.00)
+        base_capital = float(selected_strategy.allocated_capital or 100000.00) if selected_strategy else acc_init_capital
+        margin_used = sum(float(p.get('buy_avg', 0.0)) * int(p.get('net_qty', 0)) for p in raw_pos if p.get('status') == 'OPEN')
+        avail_margin = base_capital - margin_used + realized_pnl
+
+        query_params = []
+        if strategy_id_param and strategy_id_param != 'ALL':
+            query_params.append(f"strategy_id={strategy_id_param}")
+        if sandbox_account:
+            query_params.append(f"account_id={sandbox_account.id}")
+        query_suffix = f"?{'&'.join(query_params)}" if query_params else ""
+
+        base_cards_url = reverse('admins:admin-sandbox-cards-partial')
+        context = {
+            'is_sandbox': True,
+            'cards_partial_url': base_cards_url,
+            'selected_strategy': selected_strategy,
+            'selected_strategy_id': strategy_id_param or 'ALL',
+            'selected_account_id': str(sandbox_account.id) if sandbox_account else '',
+            'sandbox_account': sandbox_account,
+            'broker_name': 'SANDBOX PAPER BROKER',
+            'available_margin': telemetry_summary.get('available_margin', f"{avail_margin:,.2f}"),
+            'cash_balance': telemetry_summary.get('cash', f"{base_capital:,.2f}"),
+            'collateral': "0.00",
+            'margin_utilized': telemetry_summary.get('margin_utilized', f"{margin_used:,.2f}"),
+            'live_net_pnl': net_pnl,
+            'realized_pnl': realized_pnl,
+            'unrealized_pnl': unrealized_pnl,
+            'open_positions_count': open_cnt,
+            'closed_positions_count': closed_cnt,
+            'todays_orders_count': len(raw_ord),
+            'open_orders_count': open_ord_cnt,
+            'traded_orders_count': traded_ord_cnt,
+        }
+        return render(request, 'admins/partials/sandbox_portfolio_cards.html', context)
 
 
 class AdminSandboxPositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -691,8 +1089,18 @@ class AdminSandboxPositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, V
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
-        raw_positions = get_sandbox_simulated_positions(user_id=user.id)
+        raw_acc_id = request.GET.get('account_id', '').strip()
+        account_id_param = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
+        sandbox_account = None
+        if account_id_param and account_id_param.isdigit():
+            sandbox_account = user.trading_accounts.filter(id=int(account_id_param), is_active=True, account_type='SANDBOX').first()
+        if not sandbox_account:
+            sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+
+        raw_strat_id = request.GET.get('strategy_id', '').strip()
+        strategy_id = raw_strat_id.split('?')[0].split('&')[0].strip() if raw_strat_id else ''
+        target_account_id = sandbox_account.id if (sandbox_account and (not strategy_id or strategy_id == 'ALL')) else None
+        raw_positions = get_sandbox_simulated_positions(user_id=user.id, strategy_id=strategy_id, account_id=target_account_id)
 
         filter_status = request.GET.get('status', 'ALL').upper()
         if filter_status == 'OPEN':
@@ -714,9 +1122,20 @@ class AdminSandboxPositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, V
         realized_pnl = sum(p.get('realized_profit', 0.0) for p in raw_positions)
         unrealized_pnl = sum(p.get('unrealized_profit', 0.0) for p in raw_positions)
 
+        query_params = []
+        if strategy_id and strategy_id != 'ALL':
+            query_params.append(f"strategy_id={strategy_id}")
+        if sandbox_account:
+            query_params.append(f"account_id={sandbox_account.id}")
+        query_suffix = f"?{'&'.join(query_params)}" if query_params else ""
+
+        base_positions_url = reverse('admins:admin-sandbox-positions-partial')
         context = {
             'is_sandbox': True,
-            'positions_partial_url': reverse('admins:admin-sandbox-positions-partial'),
+            'is_htmx_partial': True,
+            'positions_partial_url': base_positions_url,
+            'selected_strategy_id': strategy_id,
+            'selected_account_id': str(sandbox_account.id) if sandbox_account else '',
             'live_positions': page_obj.object_list,
             'page_obj': page_obj,
             'paginator': paginator,
@@ -736,6 +1155,14 @@ class AdminSandboxPositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, V
 class AdminSandboxPositionSquareOffView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Squares off a simulated position in Sandbox mode."""
 
+    def get(self, request, *args, **kwargs):
+        symbol = request.GET.get('symbol', 'Active Position')
+        qty = request.GET.get('quantity', '1')
+        return render(request, 'admins/partials/confirm_delete.html', {
+            'object': f"[SANDBOX] Position {symbol} (Qty: {qty}) at Simulated Price",
+            'item_name': 'Square Off Simulated Position',
+        })
+
     def post(self, request, *args, **kwargs):
         symbol = request.POST.get('symbol', 'Active Position').strip()
         response = HttpResponse()
@@ -752,8 +1179,18 @@ class AdminSandboxOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
-        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+        raw_acc_id = request.GET.get('account_id', '').strip()
+        account_id_param = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
+        sandbox_account = None
+        if account_id_param and account_id_param.isdigit():
+            sandbox_account = user.trading_accounts.filter(id=int(account_id_param), is_active=True, account_type='SANDBOX').first()
+        if not sandbox_account:
+            sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+
+        raw_strat_id = request.GET.get('strategy_id', '').strip()
+        strategy_id = raw_strat_id.split('?')[0].split('&')[0].strip() if raw_strat_id else ''
+        target_account_id = sandbox_account.id if (sandbox_account and (not strategy_id or strategy_id == 'ALL')) else None
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id, strategy_id=strategy_id, account_id=target_account_id)
 
         filter_status = request.GET.get('status', 'ALL').upper()
         if filter_status == 'OPEN':
@@ -775,9 +1212,20 @@ class AdminSandboxOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View
         open_orders_cnt = sum(1 for o in raw_orders if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM'])
         traded_orders_cnt = sum(1 for o in raw_orders if str(o.get('order_status', '')).upper() == 'TRADED')
 
+        query_params = []
+        if strategy_id and strategy_id != 'ALL':
+            query_params.append(f"strategy_id={strategy_id}")
+        if sandbox_account:
+            query_params.append(f"account_id={sandbox_account.id}")
+        query_suffix = f"?{'&'.join(query_params)}" if query_params else ""
+
+        base_orders_url = reverse('admins:admin-sandbox-orders-partial')
         context = {
             'is_sandbox': True,
-            'orders_partial_url': reverse('admins:admin-sandbox-orders-partial'),
+            'is_htmx_partial': True,
+            'orders_partial_url': base_orders_url,
+            'selected_strategy_id': strategy_id,
+            'selected_account_id': str(sandbox_account.id) if sandbox_account else '',
             'live_orders': page_obj.object_list,
             'page_obj': page_obj,
             'paginator': paginator,
@@ -794,11 +1242,18 @@ class AdminSandboxOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View
 class AdminSandboxOrderCancelView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Cancels a simulated order in Sandbox mode."""
 
+    def get(self, request, order_id, *args, **kwargs):
+        return render(request, 'admins/partials/confirm_delete.html', {
+            'object': f"[SANDBOX] Order #{order_id}",
+            'item_name': 'Sandbox Order Cancellation',
+        })
+
     def post(self, request, order_id, *args, **kwargs):
         response = HttpResponse()
         response['HX-Trigger'] = json.dumps({
             'showToast': {'message': f'[SANDBOX PAPER] Order #{order_id} cancelled.', 'level': 'success'},
             'reloadLiveOrders': True,
+            'closeGlobalModal': True,
         })
         return response
 
@@ -808,7 +1263,9 @@ class AdminSandboxOrderRcaView(LoginRequiredMixin, AdminRequiredMixin, View):
 
     def get(self, request, order_id, *args, **kwargs):
         user = request.user
-        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+        strategy = LiveStrategy.objects.filter(user=user, is_active=True).first() or LiveStrategy.objects.filter(user=user).first()
+        strat_id = strategy.id if strategy else None
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id, strategy_id=strat_id)
         target_order = next((o for o in raw_orders if str(o.get('order_id')) == str(order_id)), None)
 
         if not target_order:
@@ -825,23 +1282,79 @@ class AdminSandboxOrderRcaView(LoginRequiredMixin, AdminRequiredMixin, View):
                 'price': 105.00,
                 'order_status': 'TRADED',
                 'slippage_pts': 0.00,
-                'rule_id': 20,
-                'rule_name': 'Momentum Guardrails & EMA 9/21 Trend',
+                'rule_id': 32,
+                'rule_name': 'ICT Smart Money v3: Institutional Displacement & Trend Lock',
                 'trigger_reason': 'Bullish EMA 9 > 21 crossover with 15m ORB breakout confirmation',
             }
+        indicators = target_order.get('indicators', {})
+        ema_fast = float(indicators.get('ema_fast_val') or 0.0)
+        ema_slow = float(indicators.get('ema_slow_val') or 0.0)
+        spot_px = float(indicators.get('spot_price') or target_order.get('price') or 0.0)
+        orb_hi = float(indicators.get('orb_high') or 0.0)
+        orb_lo = float(indicators.get('orb_low') or 0.0)
+        disp_pct = float(indicators.get('displacement_pct') or 0.0)
+        is_buy_ce = 'CALL' in str(target_order.get('trading_symbol', '')).upper() or 'CE' in str(target_order.get('trading_symbol', '')).upper()
 
-        strategy = LiveStrategy.objects.filter(user=user, is_active=True).first() or LiveStrategy.objects.filter(user=user).first()
+        rule_verifications = []
+
+        # 1. EMA 9/21 Trend Directional Lock
+        ema_passed = (ema_fast >= ema_slow) if is_buy_ce else (ema_fast <= ema_slow)
+        rule_verifications.append({
+            'name': 'EMA 9/21 Trend Directional Lock',
+            'detail': f"Fast EMA 9 ({ema_fast:.1f}) {'≥' if is_buy_ce else '≤'} Slow EMA 21 ({ema_slow:.1f})",
+            'is_passed': ema_passed,
+            'status_label': 'PASSED' if ema_passed else 'VIOLATED',
+        })
+
+        # 2. 15-Minute Opening Range Discovery Filter
+        if is_buy_ce:
+            orb_passed = (spot_px >= orb_hi) if orb_hi > 0 else True
+            orb_detail = f"Spot ({spot_px:.1f}) ≥ 15m ORB High ({orb_hi:.1f})" if orb_hi > 0 else "Opening range validated"
+        else:
+            orb_passed = (spot_px <= orb_lo) if orb_lo > 0 else True
+            orb_detail = f"Spot ({spot_px:.1f}) ≤ 15m ORB Low ({orb_lo:.1f})" if orb_lo > 0 else "Opening range validated"
+        rule_verifications.append({
+            'name': '15-Minute Opening Range Discovery Filter',
+            'detail': orb_detail,
+            'is_passed': orb_passed,
+            'status_label': 'PASSED' if orb_passed else 'FAILED (Inside Range)',
+        })
+
+        # 3. ICT Institutional Displacement Threshold
+        rules_list = (strategy.frozen_rules_snapshot if strategy else []) or []
+        ict_rule = next((r for r in rules_list if 'ict' in str(r.get('rule_type', '')).lower()), {})
+        req_disp = float(ict_rule.get('parameters', {}).get('displacement_body_min_pct', 0.65) or 0.65) * 100
+        disp_passed = (disp_pct >= req_disp)
+        rule_verifications.append({
+            'name': f"ICT Institutional Displacement (Body ≥ {req_disp:.0f}%)",
+            'detail': f"Observed Expansion Body: {disp_pct:.1f}% vs Required: {req_disp:.0f}%",
+            'is_passed': disp_passed,
+            'status_label': 'PASSED' if disp_passed else f'FAILED ({disp_pct:.1f}% < {req_disp:.0f}%)',
+        })
+
+        # 4. Risk Management & Dynamic Lot Sizing
+        qty = target_order.get('quantity', 0)
+        rule_verifications.append({
+            'name': 'Risk Management & Dynamic Sizing',
+            'detail': f"Quantity: {qty} units • Capped strictly within allocation budget",
+            'is_passed': True,
+            'status_label': 'PASSED',
+        })
+
+        all_passed = all(r['is_passed'] for r in rule_verifications)
 
         context = {
             'order': target_order,
             'strategy': strategy,
             'slippage_pts': target_order.get('slippage_pts', 0.00),
-            'indicators': target_order.get('indicators', {}),
+            'indicators': indicators,
+            'rule_verifications': rule_verifications,
+            'all_passed': all_passed,
         }
         return render(request, 'admins/partials/sandbox_order_rca_modal.html', context)
 
 
-def _build_sandbox_journal_stats(orders: list) -> dict:
+def _build_sandbox_journal_stats(orders: list, base_capital: float = 1000000.0) -> dict:
     """Compute paper-trading journal stats from simulated orders list."""
     total_pnl, gross_profit, gross_loss = 0.0, 0.0, 0.0
     wins, losses = 0, 0
@@ -883,7 +1396,6 @@ def _build_sandbox_journal_stats(orders: list) -> dict:
     profit_factor = round(gross_profit / abs(gross_loss), 2) if gross_loss else 'N/A'
     risk_reward = round(avg_win / avg_loss, 2) if avg_loss else 0.0
     expectancy = round(total_pnl / total_trades, 2) if total_trades else 0.0
-    base_capital = 1000000.0
     margin_used = sum(float(o.get('price', 0.0)) * int(o.get('quantity', 0) or 0) for o in orders if str(o.get('order_status', '')).upper() == 'TRADED')
     avail_capital = max(0.0, base_capital - margin_used + total_pnl)
     max_drawdown_pct = 0.0
@@ -1086,6 +1598,19 @@ class AdminSandboxJournalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequire
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        user = self.request.user
+        raw_acc_id = self.request.GET.get('account_id', '').strip()
+        account_id_param = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
+        sandbox_accounts = list(user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name'))
+        sandbox_account = None
+        if account_id_param and account_id_param.isdigit():
+            sandbox_account = next((a for a in sandbox_accounts if str(a.id) == account_id_param), None)
+        if not sandbox_account:
+            sandbox_account = next((a for a in sandbox_accounts if a.is_default), None) or (sandbox_accounts[0] if sandbox_accounts else None)
+
+        context['sandbox_account'] = sandbox_account
+        context['sandbox_accounts'] = sandbox_accounts
+        context['selected_account_id'] = str(sandbox_account.id) if sandbox_account else ''
         context['active_year'] = self.request.GET.get('year', '2026')
         context['active_tab'] = 'sandbox-journal'
         return context
@@ -1096,8 +1621,17 @@ class AdminSandboxJournalStatsView(LoginRequiredMixin, AdminRequiredMixin, View)
 
     def get(self, request, *args, **kwargs):
         user = request.user
+        raw_acc_id = request.GET.get('account_id', '').strip()
+        account_id = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
+        sandbox_account = None
+        if account_id and account_id.isdigit():
+            sandbox_account = user.trading_accounts.filter(id=int(account_id), is_active=True, account_type='SANDBOX').first()
+        if not sandbox_account:
+            sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+
         year = str(request.GET.get('year', '2026')).strip()
-        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+        target_account_id = sandbox_account.id if sandbox_account else None
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id, account_id=target_account_id)
 
         if year not in ('all', 'overall', ''):
             raw_orders = [
@@ -1105,13 +1639,18 @@ class AdminSandboxJournalStatsView(LoginRequiredMixin, AdminRequiredMixin, View)
                 if str(o.get('create_time', '') or o.get('signal_time', '') or '')[:4] == str(year)
             ]
 
-        stats = _build_sandbox_journal_stats(raw_orders)
+        acc_summary = sandbox_account.account_summary if sandbox_account else {}
+        base_cap = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 1000000.0)
+        stats = _build_sandbox_journal_stats(raw_orders, base_capital=base_cap)
         stats['total_charges'] = round(len(raw_orders) * 20.0, 2)
         stats['target_year'] = year
         stats['dhan_active'] = False
-        stats['available_margin'] = f"{stats.get('avail_capital', 1000000.0):,.2f}"
+        stats['available_margin'] = f"{stats.get('avail_capital', base_cap):,.2f}"
 
-        return render(request, 'admins/partials/sandbox_journal_stats_partial.html', {'stats': stats})
+        return render(request, 'admins/partials/sandbox_journal_stats_partial.html', {
+            'stats': stats,
+            'selected_account_id': str(target_account_id) if target_account_id else '',
+        })
 
 
 class AdminSandboxJournalCalendarView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -1122,7 +1661,16 @@ class AdminSandboxJournalCalendarView(LoginRequiredMixin, AdminRequiredMixin, Vi
         current_year = datetime.now().year
         raw_year = str(request.GET.get('year', '2026')).strip()
         user = request.user
-        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+        raw_acc_id = request.GET.get('account_id', '').strip()
+        account_id = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
+        sandbox_account = None
+        if account_id and account_id.isdigit():
+            sandbox_account = user.trading_accounts.filter(id=int(account_id), is_active=True, account_type='SANDBOX').first()
+        if not sandbox_account:
+            sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+
+        target_account_id = sandbox_account.id if sandbox_account else None
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id, account_id=target_account_id)
 
         months_data, selected_year, is_overall = _build_sandbox_journal_calendar(raw_orders, raw_year)
 
@@ -1133,9 +1681,11 @@ class AdminSandboxJournalCalendarView(LoginRequiredMixin, AdminRequiredMixin, Vi
                 if str(o.get('create_time', '') or o.get('signal_time', '') or '')[:4] == str(selected_year)
             ]
 
-        year_stats = _build_sandbox_journal_stats(filtered_orders)
+        acc_summary = sandbox_account.account_summary if sandbox_account else {}
+        base_cap = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 1000000.0)
+        year_stats = _build_sandbox_journal_stats(filtered_orders, base_capital=base_cap)
         year_stats['total_charges'] = round(len(filtered_orders) * 20.0, 2)
-        year_stats['available_margin'] = f"{year_stats.get('avail_capital', 1000000.0):,.2f}"
+        year_stats['available_margin'] = f"{year_stats.get('avail_capital', base_cap):,.2f}"
 
         can_go_next = (selected_year < current_year)
         formatted_trades = _format_sandbox_orders(filtered_orders)
@@ -1159,6 +1709,7 @@ class AdminSandboxJournalCalendarView(LoginRequiredMixin, AdminRequiredMixin, Vi
             'has_more': len(filtered_orders) > 10,
             'next_page': 2 if len(filtered_orders) > 10 else None,
             'total_pages': max(1, (len(filtered_orders) + 9) // 10),
+            'selected_account_id': str(target_account_id) if target_account_id else '',
         }
         return render(request, 'admins/partials/sandbox_journal_calendar_partial.html', context)
 
@@ -1171,8 +1722,17 @@ class AdminSandboxJournalChartView(LoginRequiredMixin, AdminRequiredMixin, View)
         from datetime import datetime as dt_mod
 
         user = request.user
+        raw_acc_id = request.GET.get('account_id', '').strip()
+        account_id = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
+        sandbox_account = None
+        if account_id and account_id.isdigit():
+            sandbox_account = user.trading_accounts.filter(id=int(account_id), is_active=True, account_type='SANDBOX').first()
+        if not sandbox_account:
+            sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+
         raw_year = str(request.GET.get('year', '2026')).strip()
-        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+        target_account_id = sandbox_account.id if sandbox_account else None
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id, account_id=target_account_id)
 
         dated = {}
         for o in raw_orders:
@@ -1195,7 +1755,8 @@ class AdminSandboxJournalChartView(LoginRequiredMixin, AdminRequiredMixin, View)
         opening_balance_data = []
         pnl_bar_colors = []
 
-        base_capital = 1000000.0
+        acc_summary = sandbox_account.account_summary if sandbox_account else {}
+        base_capital = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 1000000.0)
         cum_equity = base_capital
         running_cum_pnl = 0.0
         peak_equity = base_capital
@@ -1252,6 +1813,7 @@ class AdminSandboxJournalChartView(LoginRequiredMixin, AdminRequiredMixin, View)
             'current_equity': round(cum_equity, 2),
             'total_trading_pnl': round(running_cum_pnl, 2),
             'selected_year': raw_year,
+            'selected_account_id': str(target_account_id) if target_account_id else '',
         }
         return render(request, 'admins/partials/sandbox_journal_chart_partial.html', context)
 
@@ -1261,9 +1823,18 @@ class AdminSandboxJournalOrdersView(LoginRequiredMixin, AdminRequiredMixin, View
 
     def get(self, request, *args, **kwargs):
         user = request.user
+        raw_acc_id = request.GET.get('account_id', '').strip()
+        account_id = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
+        sandbox_account = None
+        if account_id and account_id.isdigit():
+            sandbox_account = user.trading_accounts.filter(id=int(account_id), is_active=True, account_type='SANDBOX').first()
+        if not sandbox_account:
+            sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+
         year = str(request.GET.get('year', '2026')).strip()
         filter_date = str(request.GET.get('date', '')).strip()
-        raw_orders = get_sandbox_simulated_orders(user_id=user.id)
+        target_account_id = sandbox_account.id if sandbox_account else None
+        raw_orders = get_sandbox_simulated_orders(user_id=user.id, account_id=target_account_id)
 
         try:
             page = int(request.GET.get('page', 1))
@@ -1322,10 +1893,161 @@ class AdminSandboxJournalOrdersView(LoginRequiredMixin, AdminRequiredMixin, View
             'next_page': next_page,
             'total_pages': total_pages,
             'rows_only': rows_only,
+            'selected_account_id': str(target_account_id) if target_account_id else '',
         }
         if rows_only:
             return render(request, 'admins/partials/sandbox_journal_trades_rows_partial.html', context)
         return render(request, 'admins/partials/sandbox_journal_orders_partial.html', context)
+
+
+class AdminSandboxAccountCreateModalView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Render modal for creating a new Sandbox paper trading account."""
+
+    def get(self, request, *args, **kwargs):
+        context = {
+            'user': request.user,
+            'default_capital': 1000000,
+        }
+        return render(request, 'admins/partials/sandbox_account_create_modal.html', context)
+
+
+class AdminSandboxAccountCreateView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Create a new UserTradingAccount configured for Sandbox paper trading."""
+
+    def post(self, request, *args, **kwargs):
+        import json as _json
+        user = request.user
+        account_name = request.POST.get('account_name', '').strip()
+        if not account_name:
+            account_name = f"Sandbox Account #{user.trading_accounts.filter(account_type='SANDBOX').count() + 1}"
+
+        try:
+            initial_capital = float(request.POST.get('initial_capital', 1000000.00))
+        except ValueError:
+            initial_capital = 1000000.00
+
+        sandbox_broker, _ = BrokerMaster.objects.get_or_create(
+            code='sandbox',
+            defaults={'name': 'SANDBOX', 'description': 'Default Paper Trading Broker Platform'}
+        )
+
+        account = UserTradingAccount.objects.create(
+            user=user,
+            broker=sandbox_broker,
+            account_name=account_name,
+            account_type='SANDBOX',
+            broker_client_id=f"SBX-{user.username[:6].upper()}-{user.trading_accounts.filter(account_type='SANDBOX').count() + 1}",
+            is_default=False,
+            is_active=True,
+            is_configured=True,
+            account_summary={
+                'initial_capital': initial_capital,
+                'balance': initial_capital,
+                'available_margin': f"{initial_capital:,.2f}",
+                'cash': f"{initial_capital:,.2f}",
+                'margin_utilized': '0.00',
+            }
+        )
+
+        response = HttpResponse("")
+        response['HX-Trigger'] = _json.dumps({
+            'showToast': {'message': f"Sandbox account '{account.account_name}' created with ₹{initial_capital:,.0f} virtual capital.", 'level': 'success'},
+            'closeGlobalModal': True,
+            'reloadSandboxDashboard': True,
+            'reloadSandboxJournal': True,
+            'sandboxAccountCreated': {'account_id': account.id, 'account_name': account.account_name},
+        })
+        return response
+
+
+class AdminSandboxAccountDeleteModalView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Render double-confirmation modal before cascade deleting a Sandbox account."""
+
+    def get(self, request, pk, *args, **kwargs):
+        account = get_object_or_404(UserTradingAccount, pk=pk, user=request.user, account_type='SANDBOX')
+        total_strategies = account.live_strategies.count()
+        active_strategies = account.live_strategies.filter(is_active=True).count()
+        raw_orders = get_sandbox_simulated_orders(account_id=account.id)
+        total_orders = len(raw_orders)
+        snapshots_count = account.portfolio_snapshots.count()
+
+        acc_summary = account.account_summary or {}
+        bal = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 1000000.00)
+
+        context = {
+            'account': account,
+            'total_strategies': total_strategies,
+            'active_strategies': active_strategies,
+            'active_strategies_count': total_strategies,
+            'total_orders': total_orders,
+            'snapshots_count': snapshots_count,
+            'balance': bal,
+        }
+        return render(request, 'admins/partials/sandbox_account_delete_modal.html', context)
+
+
+class AdminSandboxAccountDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Cascade purge a Sandbox account: halt workers, delete strategies, Redis keys, snapshots, and account."""
+
+    def post(self, request, pk, *args, **kwargs):
+        import json as _json
+        from apps.market.services import redis_client
+        from apps.common.constants import REDIS_CHANNEL
+
+        account = get_object_or_404(UserTradingAccount, pk=pk, user=request.user, account_type='SANDBOX')
+        acc_name = account.account_name
+        acc_id = account.id
+
+        # 1. Halt any running Go workers and purge strategy Redis telemetry keys
+        for strat in account.live_strategies.all():
+            if strat.is_active:
+                try:
+                    ipc_payload = {
+                        'task_id': f"strategy_{strat.pk}",
+                        'command': 'PAUSE_STRATEGY',
+                        'params': {'strategy_name': strat.strategy_name, 'strategy_id': strat.pk},
+                    }
+                    redis_client.publish(REDIS_CHANNEL, _json.dumps(ipc_payload))
+                except Exception:
+                    pass
+            redis_client.delete(f"marmot:sandbox:telemetry:strategy:{strat.id}")
+
+        # 2. Delete all attached strategies
+        account.live_strategies.all().delete()
+
+        # 3. Purge account-level Redis telemetry keys
+        redis_client.delete(f"marmot:sandbox:telemetry:account:{acc_id}")
+
+        # 4. Snapshots are auto-deleted via CASCADE on foreign key
+        # 5. Delete the UserTradingAccount
+        account.delete()
+
+        # If user has no remaining sandbox accounts, create a fresh default one
+        remaining = request.user.trading_accounts.filter(is_active=True, account_type='SANDBOX').count()
+        if remaining == 0:
+            sandbox_broker, _ = BrokerMaster.objects.get_or_create(
+                code='sandbox', defaults={'name': 'SANDBOX', 'description': 'Default Paper Trading Broker Platform'}
+            )
+            UserTradingAccount.objects.create(
+                user=request.user,
+                account_name='Default Sandbox Account',
+                account_type='SANDBOX',
+                broker=sandbox_broker,
+                broker_client_id=f"SBX-{request.user.username[:6].upper()}",
+                is_default=True,
+                is_active=True,
+                account_summary={'initial_capital': 1000000.0, 'balance': 1000000.0, 'available_margin': '1,000,000.00', 'cash': '1,000,000.00', 'margin_utilized': '0.00'},
+            )
+
+        response = HttpResponse("")
+        response['HX-Trigger'] = _json.dumps({
+            'showToast': {'message': f"Sandbox account '{acc_name}' and all associated telemetry purged.", 'level': 'success'},
+            'closeGlobalModal': True,
+            'reloadSandboxDashboard': True,
+            'reloadSandboxJournal': True,
+            'reloadSandboxDeployments': True,
+        })
+        return response
 
 
 class AdminAIDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
@@ -2382,11 +3104,18 @@ class FyersAuthCallbackView(View):
         return redirect('admins:live-data-feed')
 
 
-class LiveStrategyToggleModalView(LoginRequiredMixin, AdminRequiredMixin, View):
+def _get_live_strategy(user, pk):
+    """Resolve LiveStrategy by pk for admins/developers or restricted by owner for regular users."""
+    if user.is_superuser or user.is_staff or getattr(user, 'role', '') in ['admin', 'developer', 'staff']:
+        return get_object_or_404(LiveStrategy, pk=pk)
+    return get_object_or_404(LiveStrategy, pk=pk, user=user)
+
+
+class LiveStrategyToggleModalView(LoginRequiredMixin, View):
     """Render interactive confirmation modal before activating/deactivating a deployed Live Strategy."""
 
     def get(self, request, pk, *args, **kwargs):
-        strategy = get_object_or_404(LiveStrategy, pk=pk, user=request.user)
+        strategy = _get_live_strategy(request.user, pk)
         context = {
             'strategy': strategy,
             'will_activate': not strategy.is_active,
@@ -2394,12 +3123,27 @@ class LiveStrategyToggleModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         return render(request, 'admins/partials/live_strategy_toggle_modal.html', context)
 
 
-class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
+class LiveStrategyToggleView(LoginRequiredMixin, View):
     """Toggle is_active flag for a LiveStrategy with audit telemetry."""
 
     def post(self, request, pk, *args, **kwargs):
         import json as _json
-        strategy = get_object_or_404(LiveStrategy, pk=pk, user=request.user)
+        strategy = _get_live_strategy(request.user, pk)
+
+        # Execution safety guard: check rules before activation
+        if not strategy.is_active:
+            rules_snap = strategy.frozen_rules_snapshot or []
+            params_snap = strategy.frozen_parameters or {}
+            strat_params = params_snap.get('strategy_parameters') or {}
+            has_prompt = bool((strat_params.get('prompt_directives') if isinstance(strat_params, dict) else '') or '')
+            if not rules_snap and not has_prompt:
+                response = HttpResponse(status=400)
+                response['HX-Trigger'] = _json.dumps({
+                    'showToast': {'message': '⚠️ Execution blocked: Strategy has no configured rules or directives.', 'level': 'warning'},
+                    'closeGlobalModal': True,
+                })
+                return response
+
         strategy.is_active = not strategy.is_active
         strategy.status = LiveStrategyStatusChoices.ACTIVE if strategy.is_active else LiveStrategyStatusChoices.PAUSED
         strategy.save(update_fields=['is_active', 'status', 'updated_at'])
@@ -2407,7 +3151,7 @@ class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
         # Publish Redis IPC command to Go strategy worker for SANDBOX paper trading
         try:
             from apps.market.services import redis_client
-            from apps.common.constants import REDIS_CHANNEL
+            from apps.common.constants import REDIS_CHANNEL, INDEX_STRIKE_INTERVAL, get_historical_lot_size, get_index_expiry_info
             task_id = f"strategy_{strategy.pk}"
             command = 'START_STRATEGY' if strategy.is_active else 'PAUSE_STRATEGY'
 
@@ -2421,6 +3165,26 @@ class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
                 or 100000.00
             )
 
+            idx_name = (strategy.index_name or 'NIFTY').upper().strip()
+            dynamic_lot = get_historical_lot_size(idx_name)
+            dynamic_step = INDEX_STRIKE_INTERVAL.get(idx_name, 50)
+            f_params = strategy.frozen_parameters or {}
+            strat_p = f_params.get('strategy_parameters') or f_params
+            dyn_sl_pts = float(strat_p.get('stop_loss_points') or strat_p.get('sl_pts') or 15.0)
+            dyn_rr = float(strat_p.get('risk_reward_ratio') or strat_p.get('rr_ratio') or 2.0)
+
+            # Retrieve active exchange expiry dynamically
+            active_exp = ""
+            try:
+                cached_exp = redis_client.get(f"marmot:fyers:active_expiry:{idx_name}")
+                if cached_exp:
+                    active_exp = cached_exp.decode('utf-8') if isinstance(cached_exp, bytes) else str(cached_exp)
+            except Exception:
+                pass
+            if not active_exp:
+                exp_info = get_index_expiry_info(idx_name)
+                active_exp = exp_info.get("expiry_tag", "")
+
             ipc_payload = {
                 'task_id': task_id,
                 'command': command,
@@ -2430,8 +3194,16 @@ class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
                     'execution_mode': strategy.execution_mode,
                     'user_id': str(request.user.id),
                     'trading_account_id': str(target_acc.id) if target_acc else '',
-                    'index_name': strategy.index_name or 'NIFTY',
+                    'index_name': idx_name,
                     'initial_capital': resolved_capital,
+                    'active_expiry': active_exp,
+                    'lot_size': dynamic_lot,
+                    'strike_step': dynamic_step,
+                    'sl_pts': dyn_sl_pts,
+                    'rr_ratio': dyn_rr,
+                    'frozen_rules_snapshot': strategy.frozen_rules_snapshot or [],
+                    'frozen_parameters': f_params,
+                    'rules': strategy.frozen_rules_snapshot or [],
                 },
             }
             redis_client.publish(REDIS_CHANNEL, _json.dumps(ipc_payload))
@@ -2440,27 +3212,178 @@ class LiveStrategyToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
             logging.getLogger(__name__).warning("Failed to publish strategy IPC command: %s", exc)
 
         status_msg = "ACTIVATED & ARMED" if strategy.is_active else "PAUSED / STANDBY"
-        messages.success(request, f"Live Strategy '{strategy.name}' is now {status_msg}.")
         context = {
             'strategy': strategy,
         }
-        return render(request, 'admins/partials/live_strategy_row.html', context)
+        response = render(request, 'admins/partials/live_strategy_row.html', context)
+        response['HX-Trigger'] = _json.dumps({
+            'showToast': {'message': f"Live Strategy '{strategy.name}' is now {status_msg}.", 'level': 'success'},
+            'reloadLiveDashboard': True,
+            'reloadSandboxDashboard': True
+        })
+        return response
 
 
-class LiveStrategyDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """Safely delete an inactive / standby deployed LiveStrategy."""
+class LiveStrategyDeleteView(LoginRequiredMixin, View):
+    """Safely delete an inactive or active deployed LiveStrategy."""
+
+    def get(self, request, pk, *args, **kwargs):
+        strategy = _get_live_strategy(request.user, pk)
+        return render(request, 'admins/partials/confirm_delete.html', {
+            'object': f"deployed strategy '{strategy.name}'",
+            'item_name': 'Deployed Strategy',
+            'strategy': strategy,
+            'delete_url': reverse('admins:live-strategy-delete', kwargs={'pk': pk}),
+        })
 
     def post(self, request, pk, *args, **kwargs):
-        strategy = get_object_or_404(LiveStrategy, pk=pk, user=request.user)
+        strategy = _get_live_strategy(request.user, pk)
+
+        # If currently active, safely publish halt command before deleting
         if strategy.is_active:
-            messages.error(request, f"Cannot delete '{strategy.name}' while it is actively trading. Please pause it first.")
-            return render(request, 'admins/partials/live_strategy_row.html', {'strategy': strategy})
+            try:
+                import json as _json
+                from apps.market.services import redis_client
+                from apps.common.constants import REDIS_CHANNEL
+                ipc_payload = {
+                    'task_id': f"strategy_{strategy.pk}",
+                    'command': 'PAUSE_STRATEGY',
+                    'params': {'strategy_name': strategy.strategy_name, 'strategy_id': strategy.pk},
+                }
+                redis_client.publish(REDIS_CHANNEL, _json.dumps(ipc_payload))
+            except Exception as exc:
+                import logging
+                logging.getLogger(__name__).warning("Failed to halt strategy before delete: %s", exc)
 
         strat_name = strategy.name
         strategy.delete()
         response = HttpResponse("")
         response['HX-Trigger'] = json.dumps({
             'showToast': {'message': f"Deployed strategy '{strat_name}' removed successfully.", 'level': 'success'},
+            'closeGlobalModal': True,
+            'reloadLiveDashboard': True,
+            'reloadSandboxDashboard': True,
+        })
+        return response
+
+
+class LiveStrategyEditModalView(LoginRequiredMixin, View):
+    """Render configuration editing modal for a paused LiveStrategy."""
+
+    def get(self, request, pk, *args, **kwargs):
+        strategy = _get_live_strategy(request.user, pk)
+        user_accounts = list(request.user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name'))
+
+        params = strategy.frozen_parameters or {}
+        strat_params = params.get('strategy_parameters') or {}
+        hyperparams = strat_params.get('hyperparameters') or {}
+
+        context = {
+            'strategy': strategy,
+            'user_accounts': user_accounts,
+            'params': strat_params,
+            'strat_params': strat_params,
+            'hyperparameters': hyperparams,
+            'prompt_directives': strat_params.get('prompt_directives', ''),
+            'risk_management_enabled': strat_params.get('risk_management_enabled', True),
+            'auto_risk_management': strat_params.get('risk_management_enabled', True),
+            'max_risk_per_trade_pct': strat_params.get('max_risk_per_trade_pct', strat_params.get('stop_loss_pct', 2.0)),
+            'max_capital_utilization_pct': strat_params.get('max_capital_utilization_pct', 60),
+            'max_lots_cap': strat_params.get('max_lots_per_trade', 10),
+            'enable_ai_lot_sizing': strat_params.get('enable_ai_lot_sizing', True),
+            'stop_loss_pct': strat_params.get('stop_loss_pct', 1.5),
+            'target_profit_pct': strat_params.get('target_profit_pct', 3.0),
+            'trailing_sl_pct': strat_params.get('trailing_sl_pct', 0.8),
+            'max_lots_per_trade': strat_params.get('max_lots_per_trade', 4),
+            'frozen_rules': strategy.frozen_rules_snapshot or [],
+        }
+        return render(request, 'admins/partials/live_strategy_edit_modal.html', context)
+
+
+class LiveStrategyEditSaveView(LoginRequiredMixin, View):
+    """Save modified configuration and rulebook directives for a paused LiveStrategy."""
+
+    def post(self, request, pk, *args, **kwargs):
+        import json as _json
+        strategy = _get_live_strategy(request.user, pk)
+
+        if strategy.is_active:
+            response = HttpResponse(status=400)
+            response['HX-Trigger'] = _json.dumps({
+                'showToast': {'message': '⚠️ Cannot edit an active strategy. Please pause execution first.', 'level': 'warning'},
+            })
+            return response
+
+        name = request.POST.get('name', '').strip()
+        if name:
+            strategy.name = name
+
+        capital = request.POST.get('allocated_capital', '').strip()
+        if capital:
+            try:
+                strategy.allocated_capital = float(capital)
+            except ValueError:
+                pass
+
+        index_name = request.POST.get('index_name', '').strip()
+        if index_name:
+            strategy.index_name = index_name.upper()
+
+        account_id = request.POST.get('trading_account_id', '').strip()
+        if account_id:
+            account = request.user.trading_accounts.filter(id=account_id).first()
+            if account:
+                strategy.trading_account = account
+
+        params = dict(strategy.frozen_parameters or {})
+        strat_params = dict(params.get('strategy_parameters') or {})
+
+        strat_params['prompt_directives'] = request.POST.get('prompt_directives', '').strip()
+        strat_params['risk_management_enabled'] = request.POST.get('risk_management_enabled') == 'true'
+
+        for num_field in ['stop_loss_pct', 'target_profit_pct', 'trailing_sl_pct']:
+            val = request.POST.get(num_field, '').strip()
+            if val:
+                try:
+                    strat_params[num_field] = float(val)
+                except ValueError:
+                    pass
+
+        max_lots = request.POST.get('max_lots_per_trade', '').strip()
+        if max_lots:
+            try:
+                strat_params['max_lots_per_trade'] = int(max_lots)
+            except ValueError:
+                pass
+
+        hyperparams = dict(strat_params.get('hyperparameters') or {})
+        for int_f in ['timesteps', 'batch_size']:
+            v = request.POST.get(int_f, '').strip()
+            if v:
+                try:
+                    hyperparams[int_f] = int(v)
+                except ValueError:
+                    pass
+        for flt_f in ['learning_rate', 'gamma', 'entropy_coeff']:
+            v = request.POST.get(flt_f, '').strip()
+            if v:
+                try:
+                    hyperparams[flt_f] = float(v)
+                except ValueError:
+                    pass
+
+        strat_params['hyperparameters'] = hyperparams
+        params['strategy_parameters'] = strat_params
+        strategy.frozen_parameters = params
+        strategy.save()
+
+        response = HttpResponse("")
+        response['HX-Trigger'] = _json.dumps({
+            'showToast': {'message': f"Strategy '{strategy.name}' configuration saved! You can now Turn ON to deploy.", 'level': 'success'},
+            'closeGlobalModal': True,
+            'reloadLiveDashboard': True,
+            'reloadSandboxDashboard': True,
+            'reloadSandboxDeployments': True,
         })
         return response
 

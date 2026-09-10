@@ -1,5 +1,4 @@
-{% load static %}
-<tr id="live-strategy-row-{{ strategy.pk }}">
+{% load static %}<tr id="live-strategy-row-{{ strategy.pk }}">
     <td>
         <div class="fw-bold theme-text-main d-flex align-items-center gap-1.5">
             {% if strategy.is_active %}
@@ -10,7 +9,7 @@
             <span>{{ strategy.name }}</span>
         </div>
         <div class="theme-text-muted smaller d-flex align-items-center gap-2">
-            <span>ID: #LS-{{ strategy.id|stringformat:"04d" }}</span>
+            <span>ID: {% if strategy.execution_mode == 'SANDBOX' %}#SS-{% else %}#LS-{% endif %}{{ strategy.id|stringformat:"04d" }}</span>
             {% if strategy.backtest_task_id %}
             <span>&bull;</span>
             <a href="{% url 'backtest:backtest_detail' strategy.backtest_task_id %}" class="text-primary text-decoration-none"
@@ -27,8 +26,11 @@
         </span>
     </td>
     <td>
-        <div class="small theme-text-main fw-semibold">{{ strategy.trading_account.account_name|default:"User Profile Broker" }}</div>
-        <div class="smaller text-success">{{ strategy.trading_account.broker.name|default:"DHAN" }} ({{ strategy.execution_mode }})</div>
+        <div class="small theme-text-main fw-semibold">{{ strategy.trading_account.account_name|default:"Default Paper Account" }}</div>
+        <div class="smaller {% if strategy.execution_mode == 'SANDBOX' %}text-info{% else %}text-success{% endif %} d-flex align-items-center gap-1 mt-0.5">
+            <span>{{ strategy.trading_account.broker.name|default:"PAPER BROKER" }}</span>
+            <span class="badge {% if strategy.execution_mode == 'SANDBOX' %}bg-info bg-opacity-20 text-info border border-info border-opacity-30{% else %}bg-success bg-opacity-20 text-success border border-success border-opacity-30{% endif %} rounded-pill px-1.5 py-0.5 fs-xs fw-bold">{{ strategy.execution_mode }}</span>
+        </div>
     </td>
     <td>
         <span class="badge bg-dark bg-opacity-50 border border-white border-opacity-10 text-white font-monospace">
@@ -63,6 +65,14 @@
                     STANDBY (OFF)
                 </span>
                 <button type="button" 
+                        class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                        hx-get="{% url 'admins:live-strategy-edit-modal' strategy.pk %}"
+                        hx-target="#global-modal-container"
+                        hx-swap="innerHTML"
+                        title="Edit strategy configuration">
+                    <i class="bi bi-pencil-square"></i> Edit
+                </button>
+                <button type="button" 
                         class="btn btn-sm btn-outline-success rounded-pill px-2.5 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1"
                         hx-post="{% url 'admins:live-strategy-toggle' strategy.pk %}"
                         hx-target="#live-strategy-row-{{ strategy.pk }}"
@@ -71,17 +81,16 @@
                         title="Arm strategy execution">
                     <i class="bi bi-play-fill"></i> Turn ON
                 </button>
-                <button type="button" 
-                        class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
-                        hx-post="{% url 'admins:live-strategy-delete' strategy.pk %}"
-                        hx-target="#live-strategy-row-{{ strategy.pk }}"
-                        hx-swap="outerHTML"
-                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
-                        hx-confirm="Are you sure you want to remove deployed strategy '{{ strategy.name }}'?"
-                        title="Remove inactive strategy">
-                    <i class="bi bi-trash3"></i> Remove
-                </button>
             {% endif %}
+            <button type="button" 
+                    class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                    hx-post="{% url 'admins:live-strategy-delete' strategy.pk %}"
+                    hx-confirm="Are you sure you want to delete deployed strategy &quot;{{ strategy.name }}&quot;? This will halt active trading and permanently remove this strategy."
+                    hx-swap="none"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    title="Remove deployed strategy">
+                <i class="bi bi-trash3"></i> Remove
+            </button>
         </div>
     </td>
 </tr>

@@ -3,6 +3,7 @@ package strategies
 import (
 	"fmt"
 	"math"
+	"strings"
 	"sync"
 	"time"
 )
@@ -24,6 +25,13 @@ func NewTensorTradeRLStrategy() *TensorTradeRLStrategy {
 		orbHigh:      0,
 		orbLow:       0,
 	}
+}
+
+var istLocation = time.FixedZone("IST", 5*3600+1800)
+
+// nowIST returns current time in Indian Standard Time (Asia/Kolkata).
+func nowIST() time.Time {
+	return time.Now().In(istLocation)
 }
 
 // GetName returns the strategy identifier.
@@ -90,7 +98,7 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 	}
 
 	// 3. Enforce trade cooldown (Minimum 10 minutes between signals to prevent spam)
-	now := time.Now()
+	now := nowIST()
 	if !s.lastSignalTime.IsZero() && now.Sub(s.lastSignalTime) < 10*time.Minute {
 		return nil
 	}
@@ -104,35 +112,62 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 	emaFast := s.calculateEMA(s.candleBuffer, 9)
 	emaSlow := s.calculateEMA(s.candleBuffer, 21)
 
-	// 5. Calculate ICT Displacement ratio: candle_body / candle_range >= 0.65
+	// 5. Calculate ICT Displacement ratio: candle_body / candle_range >= minDisplacement (65%)
 	candBody := math.Abs(closePrice - openPrice)
 	candRange := math.Max(1.0, highPrice-lowPrice)
 	displacementRatio := candBody / candRange
 	displacementPct := math.Round(displacementRatio*1000) / 10
 
-	// 6. Strategy Rules Matching (Rule #20 Momentum Guardrails + Rule #23 ICT Displacement)
+	minDisplacement := 0.65
+	ruleID := 32
+	ruleName := "ICT Smart Money v3: Institutional Displacement & Trend Lock"
+
+	// Dynamically extract rules and thresholds from incoming strategy parameters
+	if params != nil {
+		if rawRules, ok := params["rules"].([]interface{}); ok && len(rawRules) > 0 {
+			for _, r := range rawRules {
+				if rMap, isMap := r.(map[string]interface{}); isMap {
+					rType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
+					if strings.Contains(rType, "ict") {
+						if idVal, idOk := rMap["id"].(float64); idOk && idVal > 0 {
+							ruleID = int(idVal)
+						}
+						if nameVal, nameOk := rMap["name"].(string); nameOk && nameVal != "" {
+							ruleName = nameVal
+						}
+						if pMap, pOk := rMap["parameters"].(map[string]interface{}); pOk {
+							if dPct, dOk := pMap["displacement_body_min_pct"].(float64); dOk && dPct > 0 {
+								minDisplacement = dPct
+							}
+						}
+						break
+					}
+				}
+			}
+		}
+	}
+
+	// 6. Strategy Rules Matching - STRICT Mathematical Verification (Zero Fudge Factors)
 	isBullishSignal := false
 	isBearishSignal := false
 	var triggerReason string
-	var ruleID int
-	var ruleName string
 
-	// Bullish Criteria: EMA 9 >= EMA 21 AND (close >= ORB High OR Displacement >= 65%)
-	if emaFast >= emaSlow && (closePrice >= s.orbHigh*0.999 || displacementRatio >= 0.60) {
+	// Bullish Criteria: EMA 9 >= EMA 21 AND Strict ORB Breakout (close > orbHigh) AND Displacement >= minDisplacement
+	isBullishBreakout := (s.orbHigh == 0 || closePrice > s.orbHigh)
+	isBearishBreakdown := (s.orbLow == 0 || closePrice < s.orbLow)
+	isDisplaced := displacementRatio >= minDisplacement
+
+	if emaFast >= emaSlow && isBullishBreakout && isDisplaced {
 		isBullishSignal = true
-		ruleID = 20
-		ruleName = "Professional Intraday Trend & Momentum Guardrails"
 		triggerReason = fmt.Sprintf(
-			"⚡ [Momentum Guardrail] EMA 9/21 Bullish Trend (%.1f >= %.1f) with 15m ORB Breakout (%.1f >= %.1f) & ICT Displacement %.1f%%",
-			emaFast, emaSlow, closePrice, s.orbHigh, displacementPct,
+			"⚡ [ICT SMC v3] EMA 9/21 Bullish Trend (%.1f >= %.1f) with 15m ORB Breakout (%.1f > %.1f) & ICT Displacement %.1f%% (>= %.1f%%)",
+			emaFast, emaSlow, closePrice, s.orbHigh, displacementPct, minDisplacement*100,
 		)
-	} else if emaFast < emaSlow && (closePrice <= s.orbLow*1.001 || displacementRatio >= 0.60) {
+	} else if emaFast < emaSlow && isBearishBreakdown && isDisplaced {
 		isBearishSignal = true
-		ruleID = 23
-		ruleName = "ICT Smart Money v3: Institutional Displacement & Trend Lock"
 		triggerReason = fmt.Sprintf(
-			"⚡ [ICT SMC v3] EMA 9/21 Bearish Trend (%.1f < %.1f) with 15m ORB Breakdown (%.1f <= %.1f) & ICT Displacement %.1f%%",
-			emaFast, emaSlow, closePrice, s.orbLow, displacementPct,
+			"⚡ [ICT SMC v3] EMA 9/21 Bearish Trend (%.1f < %.1f) with 15m ORB Breakdown (%.1f < %.1f) & ICT Displacement %.1f%% (>= %.1f%%)",
+			emaFast, emaSlow, closePrice, s.orbLow, displacementPct, minDisplacement*100,
 		)
 	}
 
@@ -144,23 +179,72 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 	// Mark signal timestamp for cooldown enforcement
 	s.lastSignalTime = now
 
-	// 7. Dynamic Lot Sizing & Strike Selection
-	atmStrike := int(math.Round(closePrice/50.0) * 50)
-	lotSize := 25
-	if indexName == "BANKNIFTY" {
-		lotSize = 15
-		atmStrike = int(math.Round(closePrice/100.0) * 100)
+	// 7. Dynamic Lot Sizing & Strike Selection from Incoming Data
+	strikeStep := 50
+	if params != nil {
+		if step, ok := params["strike_step"].(float64); ok && step > 0 {
+			strikeStep = int(step)
+		} else if stepInt, ok := params["strike_step"].(int); ok && stepInt > 0 {
+			strikeStep = stepInt
+		}
+	}
+	if strikeStep <= 0 {
+		if indexName == "BANKNIFTY" || indexName == "SENSEX" {
+			strikeStep = 100
+		} else if indexName == "MIDCPNIFTY" {
+			strikeStep = 25
+		} else {
+			strikeStep = 50
+		}
+	}
+	atmStrike := int(math.Round(closePrice/float64(strikeStep)) * float64(strikeStep))
+
+	lotSize := 65
+	if params != nil {
+		if l, ok := params["lot_size"].(float64); ok && l > 0 {
+			lotSize = int(l)
+		} else if lInt, ok := params["lot_size"].(int); ok && lInt > 0 {
+			lotSize = lInt
+		}
+	}
+	if lotSize <= 0 {
+		if indexName == "BANKNIFTY" {
+			lotSize = 30
+		} else {
+			lotSize = 65
+		}
 	}
 
-	optionType := "CE"
+	optionType := "CALL"
 	transaction := "BUY"
 	if isBearishSignal {
-		optionType = "PE"
+		optionType = "PUT"
 	}
 
-	tradingSymbol := fmt.Sprintf("%s %d %s", indexName, atmStrike, optionType)
-	targetPrice := math.Round(closePrice*1.015*100) / 100
-	stopLossPrice := math.Round(closePrice*0.985*100) / 100
+	activeExpiry := ""
+	if params != nil {
+		if exp, ok := params["active_expiry"].(string); ok && exp != "" {
+			activeExpiry = strings.TrimSpace(exp)
+		}
+	}
+	tradingSymbol := fmt.Sprintf("%s %s %d %s", indexName, activeExpiry, atmStrike, optionType)
+	if activeExpiry == "" {
+		tradingSymbol = fmt.Sprintf("%s %d %s", indexName, atmStrike, optionType)
+	}
+
+	slPts := 15.0
+	rrRatio := 2.0
+	if params != nil {
+		if sl, ok := params["sl_pts"].(float64); ok && sl > 0 {
+			slPts = sl
+		}
+		if rr, ok := params["rr_ratio"].(float64); ok && rr > 0 {
+			rrRatio = rr
+		}
+	}
+
+	targetPrice := math.Round((closePrice+slPts*rrRatio)*100) / 100
+	stopLossPrice := math.Round((closePrice-slPts)*100) / 100
 
 	indicators := map[string]interface{}{
 		"ema_fast":         9,
@@ -173,16 +257,24 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 		"spot_price":       closePrice,
 	}
 
+	orderType := "MARKET"
+	limitPrice := 0.0
+	if ruleID == 23 {
+		orderType = "LIMIT"
+		limitPrice = closePrice
+	}
+
 	return &LiveOrderRequest{
 		IndexName:     indexName,
 		TradingSymbol: tradingSymbol,
 		Transaction:   transaction,
-		OrderType:     "MARKET",
+		OrderType:     orderType,
+		LimitPrice:    limitPrice,
 		Quantity:      lotSize * 2, // 2 lots standard sizing
 		TargetPrice:   targetPrice,
 		StopLossPrice: stopLossPrice,
 		StrategyName:  s.GetName(),
-		Timestamp:     now.Format("2006-01-02 15:04:05"),
+		Timestamp:     now.Format("03:04:05 PM"),
 		RuleID:        ruleID,
 		RuleName:      ruleName,
 		TriggerReason: triggerReason,

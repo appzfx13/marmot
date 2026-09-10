@@ -2,7 +2,7 @@
 <div class="row g-3" 
      id="live-macro-cards-container"
      hx-get="{% url 'admins:admin-live-macro-ribbon' %}?index={{ selected_index|default:'NIFTY' }}"
-     hx-trigger="every 8s"
+     hx-trigger="every 2s"
      hx-swap="outerHTML">
 
     <!-- CARD 1: Selected Index Real-Time Live Ticker Card -->
@@ -18,10 +18,17 @@
                     </span>
                 </div>
                 {% if selected_macro_card.is_live %}
-                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
-                        <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.38rem; height: 0.38rem; animation-duration: 0.75s;"></span>
-                        <span>LIVE TICK</span>
-                    </span>
+                    {% if selected_macro_card.is_cached %}
+                        <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm" title="Last confirmed exchange tick (cached)">
+                            <i class="bi bi-clock-history"></i>
+                            <span>CACHED</span>
+                        </span>
+                    {% else %}
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
+                            <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.38rem; height: 0.38rem; animation-duration: 0.75s;"></span>
+                            <span>LIVE TICK</span>
+                        </span>
+                    {% endif %}
                 {% else %}
                     <span class="badge bg-secondary bg-opacity-20 text-muted px-2 py-0.5 rounded-pill" style="font-size: 0.62rem;">Offline</span>
                 {% endif %}
@@ -30,24 +37,24 @@
             <!-- Main Metric Stance (LTP & Day Range Summary) -->
             <div class="my-0.5">
                 <div class="d-flex align-items-baseline gap-2">
-                    <h5 class="fw-extrabold theme-text-main mb-0 font-monospace text-truncate" style="font-size: 1.05rem; letter-spacing: -0.01em;">
+                    <h5 class="fw-extrabold theme-text-main mb-0 font-monospace text-truncate" style="font-size: 1.05rem; letter-spacing: -0.01em;" id="live-macro-spot-ltp" data-val="{{ selected_macro_card.raw_ltp|default:selected_macro_card.ltp|default:0 }}">
                         {% if selected_macro_card.is_live %}₹{{ selected_macro_card.ltp }}{% else %}-{% endif %}
                     </h5>
-                    <span class="badge {% if selected_macro_card.is_positive %}bg-success bg-opacity-20 text-success{% else %}bg-danger bg-opacity-20 text-danger{% endif %} rounded-pill px-1.5 py-0.5 font-monospace fw-bold" style="font-size: 0.64rem;">
+                    <span class="badge {% if selected_macro_card.is_positive %}bg-success bg-opacity-20 text-success{% else %}bg-danger bg-opacity-20 text-danger{% endif %} rounded-pill px-1.5 py-0.5 font-monospace fw-bold" style="font-size: 0.64rem;" id="live-macro-spot-change-pct">
                         {{ selected_macro_card.change_pct }}
                     </span>
                 </div>
-                <small class="theme-text-muted text-truncate d-block mt-0.5 font-monospace" style="font-size: 0.72rem;" title="{{ selected_macro_card.summary }}">
+                <small class="theme-text-muted text-truncate d-block mt-0.5 font-monospace" style="font-size: 0.72rem;" title="{{ selected_macro_card.summary }}" id="live-macro-spot-summary">
                     {{ selected_macro_card.summary|default:"Day Range: -" }}
                 </small>
             </div>
 
             <!-- Score / Change & Real-Time Sync Timestamp Footer -->
             <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex align-items-center justify-content-between gap-1 flex-wrap" style="font-size: 0.74rem;">
-                <span class="badge {% if selected_macro_card.is_positive %}bg-success bg-opacity-15 text-success border border-success border-opacity-20{% else %}bg-danger bg-opacity-15 text-danger border border-danger border-opacity-20{% endif %} px-2 py-0.5 rounded-pill font-monospace" style="font-size: 0.66rem;">
+                <span class="badge {% if selected_macro_card.is_positive %}bg-success bg-opacity-15 text-success border border-success border-opacity-20{% else %}bg-danger bg-opacity-15 text-danger border border-danger border-opacity-20{% endif %} px-2 py-0.5 rounded-pill font-monospace" style="font-size: 0.66rem;" id="live-macro-spot-change">
                     <i class="bi {% if selected_macro_card.is_positive %}bi-caret-up-fill{% else %}bi-caret-down-fill{% endif %} me-0.5"></i>{{ selected_macro_card.change }} ({{ selected_macro_card.change_pct }})
                 </span>
-                <span class="font-monospace text-white-50 ms-auto" style="font-size: 0.68rem;" title="Live Exchange Tick Stream">
+                <span class="font-monospace text-white-50 ms-auto" style="font-size: 0.68rem;" title="Live Exchange Tick Stream" id="live-macro-spot-time">
                     <i class="bi bi-clock me-0.5"></i>{{ selected_macro_card.formatted_time|default:"Live Tick" }}
                 </span>
             </div>

@@ -1,0 +1,76 @@
+{% load static %}
+<!-- Modal Content: Delete Sandbox Account Confirmation -->
+<div class="modal-content glass-card border-0 shadow-2xl overflow-hidden" 
+     style="background: var(--glass-bg, rgba(11, 29, 22, 0.95)) !important; backdrop-filter: blur(24px) saturate(180%); -webkit-backdrop-filter: blur(24px) saturate(180%); color: var(--text-main, #F1F5F9); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12)) !important; border-radius: 1.25rem; font-family: var(--font-sans, inherit);">
+    
+    <!-- Modal Header -->
+    <div class="modal-header border-bottom border-white border-opacity-10 px-4 py-3.5 d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.02);">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" 
+                 style="width: 44px; height: 44px; background: rgba(239, 68, 68, 0.15); border: 1px solid rgba(239, 68, 68, 0.35); color: #f87171;">
+                <i class="bi bi-exclamation-triangle-fill fs-5"></i>
+            </div>
+            <div>
+                <h5 class="modal-title fw-bold mb-0 text-white" style="font-size: 1.1rem; letter-spacing: -0.01em;">
+                    Delete Sandbox Account
+                </h5>
+                <small class="theme-text-muted opacity-85 fw-medium" style="font-size: 0.78rem;">Permanent cascade removal of account &amp; historical telemetry</small>
+            </div>
+        </div>
+        <button type="button" class="btn-close btn-close-white opacity-75 shadow-none" data-bs-dismiss="modal" aria-label="Close"></button>
+    </div>
+
+    <!-- Form -->
+    <form hx-post="{% url 'admins:admin-sandbox-account-delete' account.pk %}"
+          hx-target="#globalHtmxModalDialog"
+          id="deleteSandboxAccountForm">
+        {% csrf_token %}
+        <div class="modal-body px-4 py-4">
+            
+            <div class="rounded-3 p-3 mb-4 d-flex align-items-start gap-3 shadow-xs" 
+                 style="background: rgba(239, 68, 68, 0.08); border: 1px solid rgba(239, 68, 68, 0.25); border-left: 4px solid #ef4444 !important;">
+                <i class="bi bi-shield-x text-danger fs-5 mt-0.5 flex-shrink-0"></i>
+                <div style="font-size: 0.84rem; line-height: 1.45;">
+                    <strong class="text-white d-block mb-1 fw-bold" style="font-size: 0.88rem;">Irreversible Cascade Deletion</strong>
+                    <span style="color: rgba(241, 245, 249, 0.88);">
+                        Deleting <strong class="text-white">"{{ account.account_name }}"</strong> will halt all running strategies, flush all order logs and positions from Redis, and permanently purge historical journal records.
+                    </span>
+                </div>
+            </div>
+
+            <!-- Account Summary Card -->
+            <div class="p-3.5 rounded-3 border mb-3" style="background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.08) !important; font-size: 0.84rem;">
+                <div class="d-flex align-items-center justify-content-between py-1.5 border-bottom border-white border-opacity-10">
+                    <span class="theme-text-muted">Account Name:</span>
+                    <strong class="text-white font-monospace">{{ account.account_name }}</strong>
+                </div>
+                <div class="d-flex align-items-center justify-content-between py-1.5 border-bottom border-white border-opacity-10">
+                    <span class="theme-text-muted">Account ID / Code:</span>
+                    <span class="badge bg-secondary bg-opacity-30 text-white font-monospace">{{ account.broker_client_id|default:account.id }}</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between py-1.5 border-bottom border-white border-opacity-10">
+                    <span class="theme-text-muted">Linked Strategies:</span>
+                    <span class="badge bg-primary bg-opacity-20 text-primary fw-bold font-monospace">{{ active_strategies_count }} Strategies</span>
+                </div>
+                <div class="d-flex align-items-center justify-content-between py-1.5">
+                    <span class="theme-text-muted">Virtual Balance:</span>
+                    <strong class="text-success font-monospace">₹{{ balance|floatformat:2 }}</strong>
+                </div>
+            </div>
+
+            <p class="smaller text-danger mb-0">
+                <i class="bi bi-info-circle me-1"></i>Are you sure you want to proceed with this deletion? This action cannot be undone.
+            </p>
+        </div>
+
+        <!-- Modal Footer -->
+        <div class="modal-footer border-top border-white border-opacity-10 px-4 py-3 d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.02);">
+            <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3.5 py-1.5 fw-semibold" data-bs-dismiss="modal">
+                Cancel
+            </button>
+            <button type="submit" class="btn btn-danger btn-sm rounded-pill px-4 py-1.5 fw-bold shadow-sm d-inline-flex align-items-center gap-1.5">
+                <i class="bi bi-trash3-fill"></i> Permanently Delete Account
+            </button>
+        </div>
+    </form>
+</div>

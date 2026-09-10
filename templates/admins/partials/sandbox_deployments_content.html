@@ -1,0 +1,338 @@
+<!-- templates/admins/partials/sandbox_deployments_content.html -->
+<div class="d-flex flex-column gap-4">
+
+    <!-- START: Deployments Header Banner -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-1">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge rounded-pill px-2.5 py-1 fw-bold fs-xs" style="background: rgba(180, 241, 5, 0.12); border: 1px solid rgba(180, 241, 5, 0.30); color: #B4F105;">
+                    <i class="bi bi-layers-half me-1"></i>MULTI-RUN ENGINE
+                </span>
+                <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 fs-xs">
+                    {{ total_strategies_count }} Total Models
+                </span>
+            </div>
+            <h1 class="page-title">Sandbox Runs Hub</h1>
+            <p class="page-subtitle mb-0">Manage, monitor, and compare all simulated quantitative strategy runs with isolated capital and execution loops.</p>
+        </div>
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+            <a href="{% url 'admins:admin-sandbox-dashboard' %}"
+               class="btn rounded-pill px-3.5 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none transition-all"
+               style="background: rgba(56, 189, 248, 0.10); border: 1px solid rgba(56, 189, 248, 0.28) !important; color: #38bdf8 !important; backdrop-filter: blur(12px); font-size: 0.82rem;"
+               hx-get="{% url 'admins:admin-sandbox-dashboard' %}"
+               hx-target="#app-main-container"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-cpu-fill"></i>
+                <span>Sandbox Cockpit</span>
+                <i class="bi bi-chevron-right opacity-50" style="font-size: 0.75rem;"></i>
+            </a>
+
+            <a href="{% url 'admins:backtest_dashboard' %}"
+               class="btn btn-primary rounded-pill px-3.5 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none transition-all"
+               style="font-size: 0.82rem;"
+               hx-get="{% url 'admins:backtest_dashboard' %}"
+               hx-target="#app-main-container"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-plus-lg"></i>
+                <span>Deploy From Backtest</span>
+            </a>
+        </div>
+    </div>
+    <!-- END: Deployments Header Banner -->
+
+    <!-- Top KPI Telemetry Cards Grid (4 Columns) -->
+    <div class="row g-3">
+        <!-- KPI 1: Active Deployments -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card theme-metric-card h-100">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="metric-card-badge">
+                        <i class="bi bi-play-circle-fill text-success"></i>
+                        <span>Active Runs</span>
+                    </span>
+                    <span class="badge {% if active_strategies_count > 0 %}bg-success bg-opacity-25 text-success{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 smaller fw-bold">
+                        {{ active_strategies_count }} / {{ total_strategies_count }} Armed
+                    </span>
+                </div>
+                <div class="metric-card-date">Autonomous Execution Loops</div>
+                <div class="metric-card-value font-monospace text-white">
+                    {{ active_strategies_count }} <span class="fs-6 text-muted fw-normal">Running</span>
+                </div>
+                <div class="metric-card-footer mt-auto">
+                    <span>Multi-Goroutine Engine</span>
+                    <span class="text-success fw-bold smaller">Online</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 2: Combined Allocated Capital -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card theme-metric-card h-100">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="metric-card-badge">
+                        <i class="bi bi-wallet2 text-primary"></i>
+                        <span>Allocated Virtual Capital</span>
+                    </span>
+                    <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller fw-bold">Pool</span>
+                </div>
+                <div class="metric-card-date">Total Isolated Capital</div>
+                <div class="metric-card-value font-monospace text-white">
+                    ₹{{ total_allocated_capital|floatformat:2 }}
+                </div>
+                <div class="metric-card-footer mt-auto">
+                    <span>Virtual Paper Ledger</span>
+                    <span class="theme-text-muted smaller">Zero Risk</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 3: Combined Real-time PnL -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card theme-metric-card h-100">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="metric-card-badge">
+                        <i class="bi bi-graph-up-arrow text-info"></i>
+                        <span>Combined Live Net P&amp;L</span>
+                    </span>
+                    <span class="badge {% if total_combined_pnl >= 0 %}bg-success bg-opacity-25 text-success{% else %}bg-danger bg-opacity-25 text-danger{% endif %} rounded-pill px-2 py-0.5 smaller fw-bold">
+                        Intraday
+                    </span>
+                </div>
+                <div class="metric-card-date">All Strategy Runs Combined</div>
+                <div class="metric-card-value font-monospace {% if total_combined_pnl > 0 %}text-success{% elif total_combined_pnl < 0 %}text-danger{% else %}text-white{% endif %}">
+                    {% if total_combined_pnl > 0 %}+{% endif %}₹{{ total_combined_pnl|floatformat:2 }}
+                </div>
+                <div class="metric-card-footer mt-auto">
+                    <span>Real-Time Contract Ticks</span>
+                    <span class="{% if total_combined_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold smaller">Synced</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- KPI 4: Open Contracts & Orders -->
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card theme-metric-card h-100">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="metric-card-badge">
+                        <i class="bi bi-activity text-warning"></i>
+                        <span>Active Exposure</span>
+                    </span>
+                    <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0.5 smaller fw-bold">Market</span>
+                </div>
+                <div class="metric-card-date">Positions &amp; Orders Today</div>
+                <div class="metric-card-value font-monospace text-white">
+                    {{ total_open_positions }} <span class="fs-6 text-muted fw-normal">Positions &bull; {{ total_orders_count }} Orders</span>
+                </div>
+                <div class="metric-card-footer mt-auto">
+                    <span>Exchange Segment</span>
+                    <span class="text-warning fw-bold smaller">NSE_FNO</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Strategy Deployments Table Card (Full Width col-12) -->
+    <div class="card shadow-sm overflow-hidden mb-0 p-0 border border-secondary border-opacity-20">
+        <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-primary bg-opacity-15 text-primary d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                    <i class="bi bi-cpu-fill fs-5"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Deployed Sandbox Strategies</h5>
+                        <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold">
+                            {{ sandbox_strategies|length }} CONCURRENT RUNS
+                        </span>
+                    </div>
+                    <small class="theme-text-muted" style="font-size: 0.74rem;">Click "Open Cockpit" on any strategy to filter dashboard telemetry, open positions, and orders specifically to that run.</small>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 ms-md-auto">
+                <a href="{% url 'admins:admin-sandbox-dashboard' %}"
+                   class="btn btn-sm btn-outline-info rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none"
+                   hx-get="{% url 'admins:admin-sandbox-dashboard' %}"
+                   hx-target="#app-main-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
+                    <i class="bi bi-grid-fill"></i>
+                    <span>Combined Dashboard</span>
+                </a>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            {% if sandbox_strategies %}
+            <div class="table-responsive">
+                <table class="table table-custom align-middle mb-0">
+                    <thead>
+                        <tr class="border-bottom" style="border-color: var(--border-color) !important;">
+                            <th class="ps-4">Run # &amp; Strategy Name</th>
+                            <th>Asset</th>
+                            <th>Allocated Virtual Capital</th>
+                            <th>Execution Status</th>
+                            <th>Live Session P&amp;L</th>
+                            <th>Positions &amp; Orders</th>
+                            <th class="text-end pe-4">Controls &amp; Cockpit</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for strat in sandbox_strategies %}
+                        <tr id="strategy-row-{{ strat.id }}" class="border-bottom" style="border-color: var(--border-color) !important;">
+                            <!-- Strategy Name & Details -->
+                            <td class="ps-4 py-3">
+                                <div class="d-flex align-items-center gap-2.5">
+                                    <div class="rounded-circle {% if strat.is_active %}bg-success bg-opacity-15 text-success{% else %}bg-secondary bg-opacity-15 text-white-50{% endif %} d-flex align-items-center justify-content-center flex-shrink-0" style="width: 36px; height: 36px;">
+                                        <i class="bi bi-cpu-fill fs-6"></i>
+                                    </div>
+                                    <div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span class="badge bg-secondary bg-opacity-25 text-white-50 px-1.5 py-0.5 rounded font-monospace" style="font-size: 0.72rem;">#{{ strat.id }}</span>
+                                            <span class="fw-bold theme-text-main fs-6">{{ strat.name }}</span>
+                                        </div>
+                                        <div class="theme-text-muted smaller d-flex align-items-center gap-2 mt-0.5">
+                                            <span><i class="bi bi-gear-wide-connected me-1"></i>{{ strat.strategy_name }}</span>
+                                            <span>&bull;</span>
+                                            <span><i class="bi bi-calendar3 me-1"></i>{{ strat.created_at|date:"d M Y, H:i" }}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </td>
+
+                            <!-- Asset Badge -->
+                            <td>
+                                <span class="badge rounded-pill px-2.5 py-1 fw-bold fs-xs" style="background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.28); color: #38bdf8;">
+                                    {{ strat.index_name|default:"NIFTY" }}
+                                </span>
+                            </td>
+
+                            <!-- Allocated Capital -->
+                            <td>
+                                <div class="fw-bold text-white font-monospace">₹{{ strat.allocated_capital|floatformat:2 }}</div>
+                                <div class="smaller theme-text-muted">Margin Pool</div>
+                            </td>
+
+                            <!-- Execution Status -->
+                            <td>
+                                {% if strat.is_active %}
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5">
+                                    <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                                    <span>RUNNING</span>
+                                </span>
+                                {% else %}
+                                <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2.5 py-1 fs-xs fw-bold">
+                                    STANDBY
+                                </span>
+                                {% endif %}
+                            </td>
+
+                            <!-- Live Session PnL -->
+                            <td>
+                                <div class="fw-bold font-monospace fs-6 {% if strat.live_pnl > 0 %}text-success{% elif strat.live_pnl < 0 %}text-danger{% else %}text-white-50{% endif %}">
+                                    {% if strat.live_pnl > 0 %}+{% endif %}₹{{ strat.live_pnl|floatformat:2 }}
+                                </div>
+                                <div class="smaller theme-text-muted">Net Return</div>
+                            </td>
+
+                            <!-- Positions & Orders -->
+                            <td>
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <span class="badge {% if strat.open_positions_cnt > 0 %}bg-info bg-opacity-20 text-info{% else %}bg-secondary bg-opacity-20 text-white-50{% endif %} rounded-pill px-2 py-0.5 smaller font-monospace">
+                                        {{ strat.open_positions_cnt }} Open
+                                    </span>
+                                    <span class="badge bg-secondary bg-opacity-20 text-white-50 rounded-pill px-2 py-0.5 smaller font-monospace">
+                                        {{ strat.orders_cnt }} Orders
+                                    </span>
+                                </div>
+                            </td>
+
+                            <!-- Actions & Cockpit Button -->
+                            <td class="text-end pe-4 py-3">
+                                <div class="d-inline-flex align-items-center gap-2">
+                                    <!-- Open Cockpit (Filtered Dashboard) -->
+                                    <a href="{% url 'admins:admin-sandbox-dashboard' %}?strategy_id={{ strat.id }}"
+                                       class="btn btn-sm btn-info rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none"
+                                       hx-get="{% url 'admins:admin-sandbox-dashboard' %}?strategy_id={{ strat.id }}"
+                                       hx-target="#app-main-container"
+                                       hx-swap="innerHTML"
+                                       hx-push-url="true"
+                                       title="Open Strategy Cockpit">
+                                        <i class="bi bi-speedometer2"></i>
+                                        <span>Open Cockpit</span>
+                                    </a>
+
+                                    <!-- Edit Configuration (when paused) -->
+                                    {% if not strat.is_active %}
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                            hx-get="{% url 'admins:live-strategy-edit-modal' strat.id %}"
+                                            hx-target="#globalHtmxModalDialog"
+                                            hx-swap="innerHTML"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#globalHtmxModal"
+                                            title="Edit Strategy Configuration">
+                                        <i class="bi bi-pencil-square"></i>
+                                        <span>Edit</span>
+                                    </button>
+                                    {% endif %}
+
+                                    <!-- Arm / Pause Toggle -->
+                                    <form class="d-inline mb-0" 
+                                          hx-post="{% url 'admins:live-strategy-toggle' strat.id %}" 
+                                          hx-target="#strategy-row-{{ strat.id }}" 
+                                          hx-swap="outerHTML">
+                                        {% csrf_token %}
+                                        <button type="submit" 
+                                                class="btn btn-sm {% if strat.is_active %}btn-outline-warning text-warning{% else %}btn-outline-success text-success{% endif %} rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                                title="{% if strat.is_active %}Pause Execution Loop{% else %}Arm Strategy Engine{% endif %}">
+                                            <i class="bi {% if strat.is_active %}bi-pause-circle-fill{% else %}bi-play-circle-fill{% endif %}"></i>
+                                            <span>{% if strat.is_active %}Pause{% else %}Arm{% endif %}</span>
+                                        </button>
+                                    </form>
+
+                                    <!-- Delete Button -->
+                                    <button type="button" 
+                                            class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                            hx-get="{% url 'admins:live-strategy-delete' strat.id %}"
+                                            hx-target="#globalHtmxModalDialog"
+                                            hx-swap="innerHTML"
+                                            data-bs-toggle="modal"
+                                            data-bs-target="#globalHtmxModal"
+                                            title="Delete Strategy Run">
+                                        <i class="bi bi-trash3-fill"></i>
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <!-- Empty State -->
+            <div class="text-center py-5 theme-text-muted">
+                <div class="rounded-circle bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-3 mx-auto" style="width: 58px; height: 58px;">
+                    <i class="bi bi-layers-half fs-2 text-primary"></i>
+                </div>
+                <h5 class="fw-bold theme-text-main mb-1">No Sandbox Strategy Runs Deployed</h5>
+                <p class="small mb-4 mx-auto" style="max-width: 520px;">
+                    You haven't deployed any paper-trading strategies to Sandbox yet. Select any backtested reinforcement learning or quantitative strategy model and click 
+                    <span class="badge bg-warning text-dark fw-bold px-2 py-0.5">Move to Execute (Sandbox)</span> to run it autonomously with isolated capital.
+                </p>
+                <a href="{% url 'admins:backtest_dashboard' %}" 
+                   class="btn btn-primary rounded-pill px-4 py-2 fw-bold shadow-sm"
+                   hx-get="{% url 'admins:backtest_dashboard' %}" 
+                   hx-target="#app-main-container" 
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
+                    <i class="bi bi-rocket-takeoff me-1"></i>
+                    Browse Backtest Engine
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    <!-- END: Main Strategy Deployments Table Card -->
+
+</div>

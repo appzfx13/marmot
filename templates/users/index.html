@@ -1158,10 +1158,13 @@
         }
 
         .modal.show,
-        .modal.fade.show {
+        .modal.fade.show,
+        #globalHtmxModal.show,
+        #globalHtmxModal.fade.show {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
+            z-index: 1070 !important;
         }
 
         .modal-backdrop {
@@ -2071,7 +2074,9 @@
             const modalEl = getGlobalModalEl();
             if (!modalEl) return;
             try {
-                const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+                const existing = bootstrap.Modal.getInstance(modalEl);
+                if (existing) existing.dispose();
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: true });
                 modal.show();
             } catch (err) {
                 console.error('showGlobalModal error:', err);
@@ -2082,8 +2087,14 @@
             const modalEl = getGlobalModalEl();
             if (!modalEl) return;
             try {
-                const instance = bootstrap.Modal.getInstance(modalEl);
+                const instance = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
                 if (instance) instance.hide();
+                setTimeout(function () {
+                    document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                }, 150);
             } catch (err) { }
         }
 
@@ -2096,6 +2107,44 @@
             if (responseUrl && (responseUrl.includes('/login') || responseUrl.includes('/accounts/login'))) {
                 evt.detail.shouldSwap = false;
                 window.location.href = responseUrl;
+            }
+        });
+
+        // Global HTMX Confirm Interceptor: Render theme-aware glassmorphic modal instead of native browser confirm()
+        document.body.addEventListener('htmx:confirm', function (evt) {
+            if (evt.detail && evt.detail.question) {
+                evt.preventDefault();
+                const modalEl = getGlobalModalEl();
+                const dialogEl = document.getElementById('globalHtmxModalDialog');
+                if (modalEl && dialogEl) {
+                    dialogEl.innerHTML = `
+                        <div class="modal-content glass-card p-3 shadow-lg" style="max-width: 520px; width: 100%; margin: 0 auto; border-radius: 16px; border: 1px solid var(--border-color, rgba(255,255,255,0.15)); background: var(--nav-hover, rgba(15,23,42,0.95)); backdrop-filter: blur(24px);">
+                            <div class="modal-header border-0 pb-1">
+                                <h5 class="modal-title theme-text-main fw-bold d-flex align-items-center gap-2">
+                                    <i class="bi bi-exclamation-triangle-fill text-danger"></i> Confirm Action
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body theme-text-muted py-3">
+                                ${evt.detail.question}
+                            </div>
+                            <div class="modal-footer border-0 pt-1 d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3.5 py-1.5" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" id="user-global-modal-confirm-btn" class="btn btn-danger rounded-pill px-4 py-1.5 fw-bold shadow-sm">
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    showGlobalModal();
+                    const confirmBtn = document.getElementById('user-global-modal-confirm-btn');
+                    if (confirmBtn) {
+                        confirmBtn.onclick = function () {
+                            hideGlobalModal();
+                            evt.detail.issueRequest(true);
+                        };
+                    }
+                }
             }
         });
 
@@ -2452,6 +2501,229 @@
             document.addEventListener('htmx:afterOnLoad', finishProgress);
             document.addEventListener('htmx:afterRequest', finishProgress);
             document.addEventListener('htmx:requestError', finishProgress);
+        })();
+    </script>
+
+    <!-- Global WebSocket Client & Sub-Second Live Tick HUD Controller -->
+    <script>
+        (function () {
+            let wsUrl = '{{ ws_url|default:"" }}';
+            const host = window.location.hostname || '';
+            const isTunnel = host.includes('ngrok') || host.includes('loca.lt') || host.includes('trycloudflare');
+
+            if (!wsUrl && host) {
+                if (isTunnel) {
+                    wsUrl = null;
+                } else {
+                    const proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    wsUrl = proto + '//' + host + ':8082/ws';
+                }
+            }
+
+            window.MarmotWS = {
+                ws: null,
+                url: wsUrl,
+                subscribers: {},
+                callbacks: {},
+                reconnectDelay: 5000,
+                maxReconnectAttempts: 3,
+                reconnectAttempts: 0,
+                useFallback: isTunnel,
+                fallbackIntervals: {},
+
+                connect: function () {
+                    if (!this.url || this.useFallback) return;
+                    if (this.reconnectAttempts >= this.maxReconnectAttempts) {
+                        this.enableFallback();
+                        return;
+                    }
+                    if (this.ws && (this.ws.readyState === WebSocket.OPEN || this.ws.readyState === WebSocket.CONNECTING)) {
+                        return;
+                    }
+                    try {
+                        this.ws = new WebSocket(this.url);
+                        this.ws.onopen = function () {
+                            window.MarmotWS.useFallback = false;
+                            window.MarmotWS.reconnectAttempts = 0;
+                            const activeSubTasks = Object.keys(window.MarmotWS.subscribers);
+                            activeSubTasks.forEach(function (taskId) {
+                                if (window.MarmotWS.ws && window.MarmotWS.ws.readyState === WebSocket.OPEN) {
+                                    window.MarmotWS.ws.send(JSON.stringify({ type: 'subscribe', task_id: String(taskId) }));
+                                }
+                            });
+                        };
+                        this.ws.onmessage = function (event) {
+                            try {
+                                const data = JSON.parse(event.data);
+                                if (data.type === 'sandbox_telemetry' || data.type === 'live_tick') {
+                                    const spot = data.data ? data.data.spot_price : data.spot_price;
+                                    if (spot && window.updateLiveSpotDOM) {
+                                        window.updateLiveSpotDOM(spot, data.data || data);
+                                    }
+                                }
+                                if (data.type !== 'progress' && data.type !== 'backtest_progress') return;
+                                const taskIdStr = String(data.task_id);
+                                const cbs = window.MarmotWS.callbacks[taskIdStr];
+                                if (cbs && cbs.length > 0) {
+                                    cbs.forEach(function (cb) {
+                                        try { cb(data); } catch (err) {}
+                                    });
+                                }
+                            } catch (e) {}
+                        };
+                        this.ws.onclose = function () {
+                            window.MarmotWS.ws = null;
+                            if (!window.MarmotWS.useFallback && window.MarmotWS.reconnectAttempts < window.MarmotWS.maxReconnectAttempts) {
+                                window.MarmotWS.reconnectAttempts++;
+                                setTimeout(function () { window.MarmotWS.connect(); }, window.MarmotWS.reconnectDelay);
+                            } else {
+                                window.MarmotWS.enableFallback();
+                            }
+                        };
+                        this.ws.onerror = function () {
+                            window.MarmotWS.enableFallback();
+                        };
+                    } catch (e) {
+                        window.MarmotWS.enableFallback();
+                    }
+                },
+
+                subscribe: function (taskId, callback) {
+                    const taskIdStr = String(taskId);
+                    this.subscribers[taskIdStr] = true;
+                    if (!this.callbacks[taskIdStr]) {
+                        this.callbacks[taskIdStr] = [];
+                    }
+                    if (callback && !this.callbacks[taskIdStr].includes(callback)) {
+                        this.callbacks[taskIdStr].push(callback);
+                    }
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({ type: 'subscribe', task_id: taskIdStr }));
+                    }
+                },
+
+                unsubscribe: function (taskId) {
+                    const taskIdStr = String(taskId);
+                    delete this.subscribers[taskIdStr];
+                    delete this.callbacks[taskIdStr];
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({ type: 'unsubscribe', task_id: taskIdStr }));
+                    }
+                },
+
+                enableFallback: function () {
+                    if (this.useFallback) return;
+                    this.useFallback = true;
+                    document.querySelectorAll('[data-ws-fallback]').forEach(function (el) {
+                        const taskId = el.getAttribute('data-ws-fallback');
+                        if (!window.MarmotWS.fallbackIntervals[taskId]) {
+                            window.MarmotWS.fallbackIntervals[taskId] = setInterval(function () {
+                                el.dispatchEvent(new CustomEvent('wsFallbackTick'));
+                            }, 2500);
+                        }
+                    });
+                },
+
+                disableFallback: function () {
+                    this.useFallback = false;
+                    Object.values(this.fallbackIntervals).forEach(function (interval) { clearInterval(interval); });
+                    this.fallbackIntervals = {};
+                }
+            };
+
+            window.MarmotWS.connect();
+
+            window.updateLiveSpotDOM = function (spotPrice, payload) {
+                if (!spotPrice || isNaN(spotPrice) || spotPrice <= 0) return;
+                const numPrice = Number(spotPrice);
+                const formattedPrice = '₹' + numPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                // 1. Top Ribbon Spot LTP
+                const ltpEl = document.getElementById('live-macro-spot-ltp');
+                if (ltpEl) {
+                    const prevVal = parseFloat(ltpEl.getAttribute('data-val') || 0);
+                    ltpEl.setAttribute('data-val', numPrice);
+                    ltpEl.textContent = formattedPrice;
+                    if (prevVal > 0 && Math.abs(numPrice - prevVal) >= 0.05) {
+                        ltpEl.style.transition = 'color 0.15s ease';
+                        ltpEl.style.color = numPrice >= prevVal ? '#22c55e' : '#ef4444';
+                        clearTimeout(ltpEl._colorTimer);
+                        ltpEl._colorTimer = setTimeout(function () {
+                            ltpEl.style.color = '';
+                        }, 400);
+                    }
+                }
+
+                // 2. Option Chain HUD Spot LTP
+                const ocLtpEl = document.getElementById('live-option-chain-spot-ltp');
+                if (ocLtpEl) {
+                    const prevOcVal = parseFloat(ocLtpEl.getAttribute('data-val') || 0);
+                    ocLtpEl.setAttribute('data-val', numPrice);
+                    ocLtpEl.textContent = formattedPrice;
+                    if (prevOcVal > 0 && Math.abs(numPrice - prevOcVal) >= 0.05) {
+                        ocLtpEl.style.transition = 'color 0.15s ease';
+                        ocLtpEl.style.color = numPrice >= prevOcVal ? '#22c55e' : '#ef4444';
+                        clearTimeout(ocLtpEl._colorTimer);
+                        ocLtpEl._colorTimer = setTimeout(function () {
+                            ocLtpEl.style.color = '';
+                        }, 400);
+                    }
+                }
+
+                // 3. Option Chain ATM Strike Indicator
+                const atmEl = document.getElementById('live-option-chain-atm');
+                if (atmEl) {
+                    const atmStrike = Math.round(numPrice / 50) * 50;
+                    atmEl.textContent = atmStrike;
+                }
+
+                // 4. Option Chain Spot Change Badge
+                if (payload && payload.change && payload.change_pct) {
+                    const ocChgEl = document.getElementById('live-option-chain-spot-change');
+                    if (ocChgEl) {
+                        ocChgEl.textContent = payload.change + ' (' + payload.change_pct + ')';
+                    }
+                }
+
+                // 5. Timestamps
+                if (payload && (payload.formatted_time || payload.timestamp)) {
+                    const ts = payload.formatted_time || payload.timestamp;
+                    const timeEl = document.getElementById('live-macro-spot-time');
+                    if (timeEl) timeEl.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + ts;
+                    const ocTimeEl = document.getElementById('live-option-chain-time');
+                    if (ocTimeEl) ocTimeEl.textContent = ts;
+                }
+            };
+
+            // Ultra-fast sub-second tick updater (polls lightweight JSON endpoint every 500ms when dashboard is active)
+            (function initSubSecondTickSync() {
+                let isFetching = false;
+                function fetchLiveTick() {
+                    if (isFetching || document.hidden) return;
+                    if (!document.getElementById('live-macro-spot-ltp') && !document.getElementById('live-option-chain-spot-ltp')) return;
+                    isFetching = true;
+                    fetch('/admins/dashboard/live/tick/?index=NIFTY')
+                        .then(function (res) { return res.json(); })
+                        .then(function (data) {
+                            isFetching = false;
+                            if (data && data.success && data.ltp) {
+                                const cleanLtp = parseFloat(String(data.ltp).replace(/,/g, ''));
+                                if (cleanLtp > 0 && window.updateLiveSpotDOM) {
+                                    window.updateLiveSpotDOM(cleanLtp, { 
+                                        formatted_time: data.timestamp,
+                                        timestamp: data.timestamp,
+                                        change: data.change,
+                                        change_pct: data.change_pct
+                                    });
+                                }
+                            }
+                        })
+                        .catch(function () {
+                            isFetching = false;
+                        });
+                }
+                setInterval(fetchLiveTick, 500);
+            })();
         })();
     </script>
 </body>

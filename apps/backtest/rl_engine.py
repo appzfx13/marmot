@@ -16,6 +16,83 @@ from apps.common.logger import Logger
 logger = Logger(section="BACKTEST", app="backtest", log_type="rl_engine")
 
 
+class DynamicRuleActionScheme:
+    """Compiles user strategy rules dynamically into constrained RL action spaces and execution brackets."""
+
+    def __init__(self, params: dict = None, rule_types: list = None, prompt_directives: str = ""):
+        self.params = params or {}
+        self.rule_types = set(rule_types or [])
+        self.prompt_directives = (prompt_directives or "").lower()
+        self.stop_loss_pts = float(self.params.get("stop_loss_points") or self.params.get("sl_pts") or 0.0)
+        self.rr_ratio = float(self.params.get("risk_reward_ratio") or self.params.get("rr_ratio") or 0.0)
+
+        # Strategy Rule Capabilities
+        self.has_ict_v3 = ("ict_smc_v3" in self.rule_types) or ("ict v3" in self.prompt_directives)
+        self.has_ict_v2 = (("ict_smc_v2" in self.rule_types) or ("ict v2" in self.prompt_directives)) and not self.has_ict_v3
+        self.has_ict = (("ict_smc_matrix" in self.rule_types) or ("ict" in self.prompt_directives)) and not self.has_ict_v2 and not self.has_ict_v3
+        self.has_momentum = ("momentum_guardrail" in self.rule_types) or ("momentum" in self.prompt_directives)
+        self.has_vix = ("india_vix" in self.rule_types) or ("vix" in self.prompt_directives)
+        self.has_atr = ("atr_noise_filter" in self.rule_types) or ("atr" in self.prompt_directives)
+
+    def get_action_space(self) -> list:
+        """Returns the dynamically configured discrete action definitions."""
+        actions = ["HOLD"]
+        if self.has_ict_v3 or self.has_ict_v2 or self.has_ict:
+            actions.extend(["BUY_CE_OTE_RETEST", "BUY_PE_OTE_RETEST"])
+        if self.has_momentum or not (self.has_ict_v3 or self.has_ict_v2 or self.has_ict):
+            actions.extend(["BUY_CE_MOMENTUM_BREAKOUT", "BUY_PE_MOMENTUM_BREAKOUT"])
+        actions.extend(["TRAIL_STOP_BREAKEVEN", "SQUARE_OFF_POSITION"])
+        return actions
+
+    def evaluate_action_mask(self, action: str, time_minutes: int, vix_val: float = 14.0) -> bool:
+        """Determines if a candidate action is allowed under active strategy constraints."""
+        if action == "HOLD":
+            return True
+
+        if time_minutes >= 15 * 60 + 15 or time_minutes < 9 * 60 + 18:
+            return False
+
+        if (self.has_ict_v3 or self.has_ict_v2 or self.has_ict) and "OTE_RETEST" in action:
+            is_morning_kz = (9 * 60 + 25 <= time_minutes <= 11 * 60 + 15)
+            is_afternoon_kz = (13 * 60 + 15 <= time_minutes <= 15 * 60 + 0)
+            if not (is_morning_kz or is_afternoon_kz):
+                return False
+
+        if self.has_vix and vix_val < 11.0 and ("BUY_CE" in action or "BUY_PE" in action):
+            return False
+
+        return True
+
+    def calculate_risk_bracket(self, action: str, spot_price: float, delta: float = 0.50, vix_val: float = 14.0) -> dict:
+        """Computes dynamic Stop-Loss, Target RR, and Limit Offset based on active strategy rules."""
+        sl_pts = self.stop_loss_pts if self.stop_loss_pts > 0 else 15.0
+        rr = self.rr_ratio if self.rr_ratio > 0 else 2.0
+
+        if self.has_ict_v2 and sl_pts == 15.0:
+            sl_pts = 8.0
+            rr = 3.5
+        elif (self.has_ict_v3 or self.has_ict) and rr == 2.0:
+            rr = 3.0
+
+        if self.has_atr:
+            dynamic_atr_sl = round(max(12.0, spot_price * 0.0032 * delta), 1)
+            sl_pts = max(sl_pts, dynamic_atr_sl)
+
+        if self.has_vix:
+            if vix_val < 12.0:
+                sl_pts = round(sl_pts * 0.75, 1)
+                rr = max(1.5, round(rr * 0.85, 1))
+            elif vix_val > 18.0:
+                rr = max(2.5, round(rr * 1.25, 1))
+
+        return {
+            "stop_loss_pts": sl_pts,
+            "risk_reward_ratio": rr,
+            "target_pts": round(sl_pts * rr, 2),
+            "is_limit_order": "OTE_RETEST" in action or "LIMIT" in action,
+        }
+
+
 class TensorTradeRLEngine:
     """TensorTrade Reinforcement Learning Engine for date-partitioned Marmot Parquet datasets."""
 
@@ -508,7 +585,7 @@ class TensorTradeRLEngine:
         has_ict_v3 = ("ict_smc_v3" in rule_types) or ("ict v3" in prompt_lower) or ("displacement" in prompt_lower and "ict" in prompt_lower)
         has_ict_v2 = (("ict_smc_v2" in rule_types) or ("ict v2" in prompt_lower) or ("ote retest" in prompt_lower) or ("mitigation" in prompt_lower) or ("zero drawdown" in prompt_lower)) and not has_ict_v3
         has_ict = (("ict_smc_matrix" in rule_types) or ("ict" in prompt_lower) or ("fvg" in prompt_lower) or ("killzone" in prompt_lower) or ("ote" in prompt_lower) or ("market structure" in prompt_lower) or ("smart money" in prompt_lower)) and not has_ict_v2 and not has_ict_v3
-        has_morning_macd = ("morning_macd_retest" in rule_types) or ("macd" in prompt_lower) or ("3 min" in prompt_lower) or ("3min" in prompt_lower) or ("sharp retest" in prompt_lower) or ("option strike retest" in prompt_lower)
+        has_morning_macd = ("morning_macd_retest" in rule_types) or ("macd" in prompt_lower and not (has_ict or has_ict_v2 or has_ict_v3))
 
         # Forex Order Flow Strategy Flags
         has_cvd_divergence = ("forex_cvd_divergence" in rule_types) or ("cvd" in prompt_lower) or ("orderflow" in prompt_lower)
@@ -552,6 +629,10 @@ class TensorTradeRLEngine:
                     if pd.notnull(dt_val):
                         key = f"{dt_val.strftime('%Y-%m-%d %H')}"
                         macro_by_hour[key] = m_row.to_dict()
+
+        action_scheme = DynamicRuleActionScheme(params=params, rule_types=rule_types, prompt_directives=prompt_directives)
+        action_space = action_scheme.get_action_space()
+        print(f"[TENSORTRADE-RL] Dynamic Action Scheme Active ({len(action_space)} Actions): {action_space}", flush=True)
 
         print(f"[TENSORTRADE-RL] Active Strategy Constraints: MomentumGuardrail={has_momentum_guardrail}, UseMacroAssist={use_macro_assist}, IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}, ICT_SMC_V2={has_ict_v2}, ICT_SMC_V3={has_ict_v3}", flush=True)
         if prompt_directives:
@@ -695,12 +776,7 @@ class TensorTradeRLEngine:
                 elif has_smc_displacement:
                     rule_matched_tag = "Forex SMC Displacement"
                     rule_matched_reason = "⚡ [Forex SMC Displacement] Fair Value Gap (FVG) Liquidity Sweep & Displacement"
-                # 1. Morning 3-Min HTF Momentum & Option Strike MACD Retest Guardrail
-                elif (has_morning_macd or "macd" in prompt_lower) and (9 * 60 + 18 <= time_minutes <= 10 * 60 + 30):
-                    cand_close = float(row_entry["close"])
-                    rule_matched_tag = "Morning 3-Min MACD Retest"
-                    rule_matched_reason = "⚡ [Morning MACD Retest] 3-Min HTF Momentum + 1-Min MACD Crossover Sharp Retest Entry (1:2.5 RR)"
-                # 2. ICT Institutional Smart Money Strategy v3 (Displacement, HTF Trend Lock & OTE Mitigation)
+                # 1. ICT Institutional Smart Money Strategy v3 (Displacement, HTF Trend Lock & OTE Mitigation)
                 elif has_ict_v3 and in_ict_killzone:
                     # Enforce 15m Initial Balance price discovery: No blind entries before 09:30
                     if time_minutes < 9 * 60 + 30:
@@ -917,6 +993,11 @@ class TensorTradeRLEngine:
                     else:
                         k += 1
                         continue
+                # 2. Morning 3-Min HTF Momentum & Option Strike MACD Retest Guardrail
+                elif (has_morning_macd or "macd" in prompt_lower) and (9 * 60 + 18 <= time_minutes <= 10 * 60 + 30):
+                    cand_close = float(row_entry["close"])
+                    rule_matched_tag = "Morning 3-Min MACD Retest"
+                    rule_matched_reason = "⚡ [Morning MACD Retest] 3-Min HTF Momentum + 1-Min MACD Crossover Sharp Retest Entry (1:2.5 RR)"
                 # 3. Morning Trend Capture (ORB)
                 elif (has_morning or "morning" in prompt_lower) and (9 * 60 + 15 <= time_minutes <= 10 * 60 + 15):
                     rule_matched_tag = "Morning ORB"

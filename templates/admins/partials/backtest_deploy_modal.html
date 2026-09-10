@@ -39,14 +39,24 @@
                 <!-- Strategy Deployment Name -->
                 <div class="col-12">
                     <label class="form-label small fw-semibold text-white mb-1">Execution Strategy Name</label>
-                    <input type="text" name="name" class="form-control" 
+                    <input type="text" name="name" id="deployStrategyNameInput" class="form-control" 
                            style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;"
                            value="{{ suggested_name }}" required>
                 </div>
 
                 <!-- Target Trading Account -->
                 <div class="col-md-7">
-                    <label class="form-label small fw-semibold text-white mb-1">Target Trading Account (Broker API)</label>
+                    <div class="d-flex align-items-center justify-content-between mb-1">
+                        <label class="form-label small fw-semibold text-white mb-0">Target Trading Account (Broker API)</label>
+                        <button type="button" 
+                                class="btn btn-link p-0 text-decoration-none text-info smaller fw-bold d-inline-flex align-items-center gap-1"
+                                hx-get="{% url 'admins:admin-sandbox-account-create-modal' %}"
+                                hx-target="#globalHtmxModalDialog"
+                                hx-swap="innerHTML"
+                                title="Create a new isolated Sandbox Account">
+                            <i class="bi bi-plus-circle-fill"></i> + New Sandbox Account
+                        </button>
+                    </div>
                     <select name="trading_account_id" id="deployTradingAccountSelect" class="form-select"
                             style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
                         {% if user_accounts %}
@@ -66,8 +76,8 @@
                     <label class="form-label small fw-semibold text-white mb-1">Execution Mode</label>
                     <select name="execution_mode" id="deployExecutionModeSelect" class="form-select"
                             style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
-                        <option value="LIVE" selected>LIVE Real Market Execution</option>
-                        <option value="SANDBOX">SANDBOX Paper Trading</option>
+                        <option value="LIVE" {% if default_mode == 'LIVE' %}selected{% endif %}>LIVE Real Market Execution</option>
+                        <option value="SANDBOX" {% if default_mode == 'SANDBOX' %}selected{% endif %}>SANDBOX Paper Trading</option>
                     </select>
                 </div>
 
@@ -129,7 +139,18 @@
     (function() {
         var accSelect = document.getElementById('deployTradingAccountSelect');
         var modeSelect = document.getElementById('deployExecutionModeSelect');
+        var nameInput = document.getElementById('deployStrategyNameInput');
         if (!accSelect || !modeSelect) return;
+
+        function updateNamePrefix(mode) {
+            if (!nameInput) return;
+            var val = nameInput.value;
+            if (mode === 'SANDBOX' && val.startsWith('Live ')) {
+                nameInput.value = 'Sandbox ' + val.substring(5);
+            } else if (mode === 'LIVE' && val.startsWith('Sandbox ')) {
+                nameInput.value = 'Live ' + val.substring(8);
+            }
+        }
 
         function syncFromAccount() {
             var opt = accSelect.options[accSelect.selectedIndex];
@@ -137,14 +158,17 @@
                 var accType = opt.getAttribute('data-account-type').toUpperCase();
                 if (accType === 'SANDBOX') {
                     modeSelect.value = 'SANDBOX';
+                    updateNamePrefix('SANDBOX');
                 } else if (accType === 'LIVE') {
                     modeSelect.value = 'LIVE';
+                    updateNamePrefix('LIVE');
                 }
             }
         }
 
         function syncFromMode() {
             var mode = modeSelect.value;
+            updateNamePrefix(mode);
             var currentOpt = accSelect.options[accSelect.selectedIndex];
             if (currentOpt && currentOpt.getAttribute('data-account-type') !== mode) {
                 for (var i = 0; i < accSelect.options.length; i++) {

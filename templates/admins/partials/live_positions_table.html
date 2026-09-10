@@ -1,6 +1,11 @@
 {% load static %}
 <!-- templates/admins/partials/live_positions_table.html -->
-<div id="live-positions-container" class="card mb-0 border-0 shadow-none bg-transparent">
+<div id="live-positions-container" 
+     class="card mb-0 border-0 shadow-none bg-transparent"
+     hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
+     hx-trigger="reloadLivePositions from:body, every 3s"
+     hx-target="#live-positions-container"
+     hx-swap="outerHTML">
     <!-- Sub-header Controls -->
     <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 pb-3 mb-2 border-bottom" style="border-color: var(--border-color) !important;">
         <div class="d-flex align-items-center gap-2.5 flex-wrap">
@@ -11,7 +16,7 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <button type="button" 
                         class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'ALL' or not filter_status %}active-all{% endif %}"
-                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=ALL"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=ALL{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-layers"></i>
@@ -21,7 +26,7 @@
 
                 <button type="button" 
                         class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'OPEN' %}active-open{% endif %}"
-                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=OPEN"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=OPEN{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-play-circle-fill"></i>
@@ -31,7 +36,7 @@
 
                 <button type="button" 
                         class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'CLOSED' %}active-closed{% endif %}"
-                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=CLOSED"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=CLOSED{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-check2-circle"></i>
@@ -57,7 +62,7 @@
             <button type="button" 
                     class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1.5"
                     style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
-                    hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.number|default:1 }}"
+                    hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.number|default:1 }}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                     hx-target="#live-positions-container"
                     hx-swap="outerHTML"
                     title="Refresh Positions">
@@ -86,9 +91,16 @@
             </thead>
             <tbody>
                 {% for pos in live_positions %}
-                <tr>
+                <tr data-symbol="{{ pos.trading_symbol }}" data-pnl="{{ pos.total_pnl|default:pos.unrealized_profit|default:0 }}" data-ltp="{{ pos.current_ltp|default:0 }}">
                     <td>
-                        <div class="fw-bold theme-text-main font-monospace">{{ pos.trading_symbol }}</div>
+                        <div class="fw-bold theme-text-main font-monospace d-flex align-items-center gap-1.5 flex-wrap">
+                            <span>{{ pos.trading_symbol }}</span>
+                            {% if 'CALL' in pos.trading_symbol or pos.option_type == 'CALL' %}
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-1.5 py-0.5 fs-xs fw-bold font-monospace">CALL</span>
+                            {% elif 'PUT' in pos.trading_symbol or pos.option_type == 'PUT' %}
+                                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-1.5 py-0.5 fs-xs fw-bold font-monospace">PUT</span>
+                            {% endif %}
+                        </div>
                         <div class="theme-text-muted smaller d-flex align-items-center gap-1.5">
                             <span class="badge bg-secondary bg-opacity-25 px-1.5 py-0.5 rounded text-uppercase fs-xs">{{ pos.exchange_segment }}</span>
                             {% if pos.status == 'OPEN' %}
@@ -127,7 +139,7 @@
                         <div class="theme-text-muted smaller">Qty: {{ pos.sell_qty }}</div>
                     </td>
                     <td class="text-end font-monospace small fw-bold text-white">
-                        ₹{{ pos.current_ltp|default:pos.buy_avg|floatformat:2 }}
+                        <span id="pos-ltp-{{ forloop.counter }}" class="pos-live-ltp" data-symbol="{{ pos.trading_symbol }}">₹{{ pos.current_ltp|default:pos.buy_avg|floatformat:2 }}</span>
                         {% if pos.status == 'OPEN' %}
                             <span class="spinner-grow spinner-grow-sm text-success ms-1" style="width: 0.35rem; height: 0.35rem;" role="status"></span>
                         {% endif %}
@@ -135,26 +147,24 @@
                     <td class="text-end font-monospace small {% if pos.realized_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
                         ₹{{ pos.realized_profit|floatformat:2 }}
                     </td>
-                    <td class="text-end font-monospace small {% if pos.unrealized_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    <td id="pos-unrealized-{{ forloop.counter }}" class="text-end font-monospace small pos-live-unrealized {% if pos.unrealized_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
                         ₹{{ pos.unrealized_profit|floatformat:2 }}
                     </td>
-                    <td class="text-end font-monospace fw-bold fs-6 {% if pos.total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    <td id="pos-total-{{ forloop.counter }}" class="text-end font-monospace fw-bold fs-6 pos-live-total {% if pos.total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
                         ₹{{ pos.total_pnl|floatformat:2 }}
                     </td>
                     <td class="text-end pe-3">
                         {% if pos.net_qty != 0 %}
-                            <form hx-post="{% if is_sandbox %}{% url 'admins:admin-sandbox-position-square-off' %}{% else %}{% url 'admins:admin-live-position-square-off' %}{% endif %}"
-                                  hx-confirm="Are you sure you want to SQUARE OFF {{ pos.trading_symbol }} (Qty: {{ pos.net_qty }}) at Market Price?"
-                                  class="d-inline">
-                                {% csrf_token %}
-                                <input type="hidden" name="symbol" value="{{ pos.trading_symbol }}">
-                                <input type="hidden" name="quantity" value="{{ pos.net_qty }}">
-                                <input type="hidden" name="side" value="{% if pos.net_qty > 0 %}SELL{% else %}BUY{% endif %}">
-                                <input type="hidden" name="product_type" value="{{ pos.product_type }}">
-                                <button type="submit" class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-1 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
-                                    <i class="bi bi-x-octagon"></i> Square Off
-                                </button>
-                            </form>
+                            <button type="button"
+                                    class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-1 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                    hx-get="{% if is_sandbox %}{% url 'admins:admin-sandbox-position-square-off' %}{% else %}{% url 'admins:admin-live-position-square-off' %}{% endif %}?symbol={{ pos.trading_symbol|urlencode }}&quantity={{ pos.net_qty }}&side={% if pos.net_qty > 0 %}SELL{% else %}BUY{% endif %}&product_type={{ pos.product_type }}"
+                                    hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#globalHtmxModal"
+                                    title="Square Off Position">
+                                <i class="bi bi-x-octagon"></i> Square Off
+                            </button>
                         {% else %}
                             <span class="text-white-50 smaller">&mdash;</span>
                         {% endif %}
@@ -176,7 +186,7 @@
                 <button type="button"
                         class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1"
                         style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
-                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.previous_page_number }}"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.previous_page_number }}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML"
                         aria-label="Previous Page">
@@ -194,7 +204,7 @@
                     <button type="button"
                             class="btn-date-picker text-decoration-none shadow-sm px-3 py-1"
                             style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
-                            hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ num }}"
+                            hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ num }}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                             hx-target="#live-positions-container"
                             hx-swap="outerHTML">
                         {{ num }}
@@ -206,7 +216,7 @@
                 <button type="button"
                         class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1"
                         style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;"
-                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.next_page_number }}"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}&page={{ page_obj.next_page_number }}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML"
                         aria-label="Next Page">
@@ -342,3 +352,20 @@
         }
     </style>
 </div>
+
+{% if is_sandbox and is_htmx_partial %}
+<!-- HTMX Out-Of-Band Instant Sync for Top Portfolio Cards (Only rendered during HTMX partial requests) -->
+<div style="display:none !important;" hidden>
+    <div id="sandbox-live-net-pnl" hx-swap-oob="true" class="metric-card-value font-monospace {% if live_net_pnl > 0 %}text-success{% elif live_net_pnl < 0 %}text-danger{% endif %}">
+        {% if live_net_pnl > 0 %}+{% endif %}₹{{ live_net_pnl|floatformat:2 }}
+    </div>
+    <div id="sandbox-unrealized-pnl" hx-swap-oob="true" class="metric-card-value font-monospace {% if unrealized_pnl > 0 %}text-success{% elif unrealized_pnl < 0 %}text-danger{% endif %}">
+        {% if unrealized_pnl > 0 %}+{% endif %}₹{{ unrealized_pnl|floatformat:2 }}
+    </div>
+    <span id="sandbox-open-positions-badge" hx-swap-oob="true">{{ open_positions_count|default:"0" }} Active Pos</span>
+    <div id="calendarCardPnlValue" hx-swap-oob="true" class="fw-bold font-monospace fs-5 {% if live_net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+        {% if live_net_pnl > 0 %}+{% endif %}₹{{ live_net_pnl|floatformat:2 }}
+    </div>
+</div>
+{% endif %}
+

@@ -1619,10 +1619,13 @@
         }
 
         .modal.show,
-        .modal.fade.show {
+        .modal.fade.show,
+        #globalHtmxModal.show,
+        #globalHtmxModal.fade.show {
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
+            z-index: 1070 !important;
         }
 
         .modal-backdrop {
@@ -1731,9 +1734,9 @@
         <!-- Brand Logo / Identity -->
         <a href="{% url 'home' %}" class="sidebar-brand">
             {% if site_settings.favicon %}
-                <img src="{{ site_settings.favicon }}" alt="{{ site_settings.brand_name|default:'Marmot' }}" class="sidebar-brand-icon" style="width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; border-radius: 6px;">
+                <img src="{% if site_settings.favicon.url %}{{ site_settings.favicon.url }}{% elif site_settings.favicon|slice:':1' == '/' %}{{ site_settings.favicon }}{% else %}/media/{{ site_settings.favicon }}{% endif %}" alt="{{ site_settings.brand_name|default:'Marmot' }}" class="sidebar-brand-icon" style="width: 28px; height: 28px; object-fit: contain; flex-shrink: 0; border-radius: 6px;">
             {% elif site_settings.logo_dark %}
-                <img src="{{ site_settings.logo_dark }}" alt="{{ site_settings.brand_name|default:'Marmot' }}" class="sidebar-brand-icon" style="height: 28px; max-width: 32px; object-fit: contain; flex-shrink: 0; border-radius: 6px;">
+                <img src="{% if site_settings.logo_dark.url %}{{ site_settings.logo_dark.url }}{% elif site_settings.logo_dark|slice:':1' == '/' %}{{ site_settings.logo_dark }}{% else %}/media/{{ site_settings.logo_dark }}{% endif %}" alt="{{ site_settings.brand_name|default:'Marmot' }}" class="sidebar-brand-icon" style="height: 28px; max-width: 32px; object-fit: contain; flex-shrink: 0; border-radius: 6px;">
             {% else %}
                 <i class="bi bi-asterisk"></i>
             {% endif %}
@@ -1772,11 +1775,20 @@
                     </li>
                     <li class="sidebar-menu-item">
                         <a href="{% url 'admins:admin-sandbox-dashboard' %}"
-                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-sandbox-dashboard' or '/admins/dashboard/sandbox/' in request.path and 'journal' not in request.path %}active{% endif %}"
+                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-sandbox-dashboard' or '/admins/dashboard/sandbox/' in request.path and 'journal' not in request.path and 'deployments' not in request.path %}active{% endif %}"
                             id="admin-menu-sandbox-dashboard" hx-get="{% url 'admins:admin-sandbox-dashboard' %}"
                             hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-cpu-fill text-info"></i>
                             <span>Sandbox Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="{% url 'admins:admin-sandbox-deployments' %}"
+                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-sandbox-deployments' or '/admins/dashboard/sandbox/deployments/' in request.path %}active{% endif %}"
+                            id="admin-menu-sandbox-deployments" hx-get="{% url 'admins:admin-sandbox-deployments' %}"
+                            hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
+                            <i class="bi bi-layers-half" style="color: #B4F105;"></i>
+                            <span>Sandbox Runs Hub</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
@@ -2176,23 +2188,73 @@
                 window.location.href = responseUrl;
             }
         });
+        function showGlobalModal() {
+            const modalEl = document.getElementById('globalHtmxModal');
+            if (!modalEl) return;
+            try {
+                const existing = bootstrap.Modal.getInstance(modalEl);
+                if (existing) existing.dispose();
+                const modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: true });
+                modal.show();
+            } catch (err) {
+                console.error('showGlobalModal error:', err);
+            }
+        }
+
+        // Global HTMX Confirm Interceptor: Render theme-aware glassmorphic modal instead of native browser confirm()
+        document.body.addEventListener('htmx:confirm', function (evt) {
+            if (evt.detail && evt.detail.question) {
+                evt.preventDefault();
+                const modalEl = document.getElementById('globalHtmxModal');
+                const dialogEl = document.getElementById('globalHtmxModalDialog');
+                if (modalEl && dialogEl) {
+                    dialogEl.innerHTML = `
+                        <div class="modal-content glass-card p-3 shadow-lg" style="max-width: 520px; width: 100%; margin: 0 auto; border-radius: 16px; border: 1px solid var(--border-color, rgba(255,255,255,0.15)); background: var(--nav-hover, rgba(15,23,42,0.95)); backdrop-filter: blur(24px);">
+                            <div class="modal-header border-0 pb-1">
+                                <h5 class="modal-title theme-text-main fw-bold d-flex align-items-center gap-2">
+                                    <i class="bi bi-exclamation-triangle-fill text-danger"></i> Confirm Action
+                                </h5>
+                                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                            </div>
+                            <div class="modal-body theme-text-muted py-3">
+                                ${evt.detail.question}
+                            </div>
+                            <div class="modal-footer border-0 pt-1 d-flex justify-content-end gap-2">
+                                <button type="button" class="btn btn-outline-secondary rounded-pill px-3.5 py-1.5" data-bs-dismiss="modal">Cancel</button>
+                                <button type="button" id="global-modal-confirm-btn" class="btn btn-danger rounded-pill px-4 py-1.5 fw-bold shadow-sm">
+                                    Confirm
+                                </button>
+                            </div>
+                        </div>
+                    `;
+                    showGlobalModal();
+                    const confirmBtn = document.getElementById('global-modal-confirm-btn');
+                    if (confirmBtn) {
+                        confirmBtn.onclick = function () {
+                            hideGlobalModal();
+                            evt.detail.issueRequest(true);
+                        };
+                    }
+                }
+            }
+        });
         document.body.addEventListener('htmx:afterSwap', function (evt) {
             var target = (evt.detail && evt.detail.target) ? evt.detail.target : evt.target;
             if (target && (target.id === 'globalHtmxModalDialog' || (target.closest && target.closest('#globalHtmxModal')))) {
-                const modalEl = document.getElementById('globalHtmxModal');
-                if (modalEl) {
-                    requestAnimationFrame(function () {
-                        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-                        modal.show();
-                    });
-                }
+                showGlobalModal();
             }
         });
         function hideGlobalModal() {
             const modalEl = document.getElementById('globalHtmxModal');
             if (modalEl) {
-                const modal = bootstrap.Modal.getInstance(modalEl);
+                const modal = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
                 if (modal) modal.hide();
+                setTimeout(function () {
+                    document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+                    document.body.classList.remove('modal-open');
+                    document.body.style.removeProperty('overflow');
+                    document.body.style.removeProperty('padding-right');
+                }, 150);
             }
         }
         document.body.addEventListener('closeDeleteModal', hideGlobalModal);
@@ -2513,6 +2575,12 @@
                         this.ws.onmessage = function (event) {
                             try {
                                 const data = JSON.parse(event.data);
+                                if (data.type === 'sandbox_telemetry' || data.type === 'live_tick') {
+                                    const spot = data.data ? data.data.spot_price : data.spot_price;
+                                    if (spot && window.updateLiveSpotDOM) {
+                                        window.updateLiveSpotDOM(spot, data.data || data);
+                                    }
+                                }
                                 if (data.type !== 'progress' && data.type !== 'backtest_progress') return;
                                 const taskIdStr = String(data.task_id);
                                 const cbs = window.MarmotWS.callbacks[taskIdStr];
@@ -2590,6 +2658,98 @@
             };
 
             window.MarmotWS.connect();
+
+            window.updateLiveSpotDOM = function (spotPrice, payload) {
+                if (!spotPrice || isNaN(spotPrice) || spotPrice <= 0) return;
+                const numPrice = Number(spotPrice);
+                const formattedPrice = '₹' + numPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+
+                // 1. Top Ribbon Spot LTP
+                const ltpEl = document.getElementById('live-macro-spot-ltp');
+                if (ltpEl) {
+                    const prevVal = parseFloat(ltpEl.getAttribute('data-val') || 0);
+                    ltpEl.setAttribute('data-val', numPrice);
+                    ltpEl.textContent = formattedPrice;
+                    if (prevVal > 0 && Math.abs(numPrice - prevVal) >= 0.05) {
+                        ltpEl.style.transition = 'color 0.15s ease';
+                        ltpEl.style.color = numPrice >= prevVal ? '#22c55e' : '#ef4444';
+                        clearTimeout(ltpEl._colorTimer);
+                        ltpEl._colorTimer = setTimeout(function () {
+                            ltpEl.style.color = '';
+                        }, 400);
+                    }
+                }
+
+                // 2. Option Chain HUD Spot LTP
+                const ocLtpEl = document.getElementById('live-option-chain-spot-ltp');
+                if (ocLtpEl) {
+                    const prevOcVal = parseFloat(ocLtpEl.getAttribute('data-val') || 0);
+                    ocLtpEl.setAttribute('data-val', numPrice);
+                    ocLtpEl.textContent = formattedPrice;
+                    if (prevOcVal > 0 && Math.abs(numPrice - prevOcVal) >= 0.05) {
+                        ocLtpEl.style.transition = 'color 0.15s ease';
+                        ocLtpEl.style.color = numPrice >= prevOcVal ? '#22c55e' : '#ef4444';
+                        clearTimeout(ocLtpEl._colorTimer);
+                        ocLtpEl._colorTimer = setTimeout(function () {
+                            ocLtpEl.style.color = '';
+                        }, 400);
+                    }
+                }
+
+                // 3. Option Chain ATM Strike Indicator
+                const atmEl = document.getElementById('live-option-chain-atm');
+                if (atmEl) {
+                    const atmStrike = Math.round(numPrice / 50) * 50;
+                    atmEl.textContent = atmStrike;
+                }
+
+                // 4. Option Chain Spot Change Badge
+                if (payload && payload.change && payload.change_pct) {
+                    const ocChgEl = document.getElementById('live-option-chain-spot-change');
+                    if (ocChgEl) {
+                        ocChgEl.textContent = payload.change + ' (' + payload.change_pct + ')';
+                    }
+                }
+
+                // 5. Timestamps
+                if (payload && (payload.formatted_time || payload.timestamp)) {
+                    const ts = payload.formatted_time || payload.timestamp;
+                    const timeEl = document.getElementById('live-macro-spot-time');
+                    if (timeEl) timeEl.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + ts;
+                    const ocTimeEl = document.getElementById('live-option-chain-time');
+                    if (ocTimeEl) ocTimeEl.textContent = ts;
+                }
+            };
+
+            // Ultra-fast sub-second tick updater (polls lightweight JSON endpoint every 500ms when dashboard is active)
+            (function initSubSecondTickSync() {
+                let isFetching = false;
+                function fetchLiveTick() {
+                    if (isFetching || document.hidden) return;
+                    if (!document.getElementById('live-macro-spot-ltp') && !document.getElementById('live-option-chain-spot-ltp')) return;
+                    isFetching = true;
+                    fetch('/admins/dashboard/live/tick/?index=NIFTY')
+                        .then(function (res) { return res.json(); })
+                        .then(function (data) {
+                            isFetching = false;
+                            if (data && data.success && data.ltp) {
+                                const cleanLtp = parseFloat(String(data.ltp).replace(/,/g, ''));
+                                if (cleanLtp > 0 && window.updateLiveSpotDOM) {
+                                    window.updateLiveSpotDOM(cleanLtp, { 
+                                        formatted_time: data.timestamp,
+                                        timestamp: data.timestamp,
+                                        change: data.change,
+                                        change_pct: data.change_pct
+                                    });
+                                }
+                            }
+                        })
+                        .catch(function () {
+                            isFetching = false;
+                        });
+                }
+                setInterval(fetchLiveTick, 500);
+            })();
         })();
     </script>
 

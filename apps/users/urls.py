@@ -43,6 +43,7 @@ from .views import (
     UserProfileView,
     UserProfilePasswordChangeView
 )
+from apps.admins.views import AdminLiveTickAPIView, AdminLiveOptionChainPartialView
 
 app_name = 'users'
 
@@ -62,6 +63,8 @@ urlpatterns = [
     path('terminal/', UserTerminalView.as_view(), name='user-terminal'),
     path('dashboard/', UserDashboardView.as_view(), name='marmot-dashboard'),
     path('dashboard/live/', UserLiveDashboardView.as_view(), name='user-live-dashboard'),
+    path('dashboard/live/tick/', AdminLiveTickAPIView.as_view(), name='user-live-tick'),
+    path('dashboard/live/option-chain/', AdminLiveOptionChainPartialView.as_view(), name='user-live-option-chain'),
     path('dashboard/sandbox/', UserSandboxDashboardView.as_view(), name='user-sandbox-dashboard'),
     path('dashboard/ai/', UserAIDashboardView.as_view(), name='user-ai-dashboard'),
 

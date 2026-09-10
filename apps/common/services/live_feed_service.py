@@ -267,10 +267,17 @@ def get_live_index_option_chain(index_name: str = 'NIFTY') -> dict:
 
     idx_clean = (index_name or 'NIFTY').upper().strip()
     cache_key = f"marmot:fyers:option_chain:{idx_clean}"
+    last_known_key = f"marmot:fyers:last_known_option_chain:{idx_clean}"
+    rate_limit_key = "marmot:fyers_rate_limited"
     from django.core.cache import cache
     cached_payload = cache.get(cache_key)
     if cached_payload and cached_payload.get('is_live'):
         return cached_payload
+
+    if cache.get(rate_limit_key):
+        last_known = cache.get(last_known_key)
+        if last_known and last_known.get('is_live'):
+            return last_known
 
     strike_step = INDEX_STRIKE_INTERVAL.get(idx_clean, 50)
     fyers_sym = FYERS_INDEX_SYMBOLS.get(idx_clean, f"NSE:{idx_clean}50-INDEX")
@@ -291,8 +298,11 @@ def get_live_index_option_chain(index_name: str = 'NIFTY') -> dict:
     token_valid = bool(settings_obj.fyers_access_token and settings_obj.fyers_token_generated_date == today)
     app_id = (settings_obj.fyers_app_id or '').strip()
 
-    # If FYERS credentials or daily token are not active, return clean unauthenticated state (Strictly NO fake data)
+    # If FYERS credentials or daily token are not active, check last known or return clean unauthenticated state
     if not (token_valid and app_id and settings_obj.fyers_access_token):
+        last_known = cache.get(last_known_key)
+        if last_known and last_known.get('is_live'):
+            return last_known
         return {
             'is_live': False,
             'is_fyers_live': False,
@@ -316,7 +326,7 @@ def get_live_index_option_chain(index_name: str = 'NIFTY') -> dict:
             'expiry_info': get_option_expiry_analysis(idx_clean, today),
             'strikes': [],
             'error_message': 'FYERS daily session unauthenticated. Please authorize live feed in Site Settings.',
-            'last_updated': timezone.now().strftime('%H:%M:%S IST'),
+            'last_updated': timezone.localtime().strftime('%I:%M:%S %p IST'),
         }
 
     auth_header = f"{app_id}:{settings_obj.fyers_access_token}"
@@ -337,7 +347,7 @@ def get_live_index_option_chain(index_name: str = 'NIFTY') -> dict:
 
     # 1. Fetch real-time option chain contracts from FYERS API
     try:
-        oc_url = f"https://api-t1.fyers.in/data/options-chain-v3?symbol={fyers_sym}&strikecount=3"
+        oc_url = f"https://api-t1.fyers.in/data/options-chain-v3?symbol={fyers_sym}&strikecount=15"
         oc_resp = requests.get(oc_url, headers=headers, timeout=3.5)
         if oc_resp.status_code == 200:
             oc_json = oc_resp.json()
@@ -400,41 +410,111 @@ def get_live_index_option_chain(index_name: str = 'NIFTY') -> dict:
                         strikes_map[sp]['pe_chg_pct'] = chgp_val
                         strikes_map[sp]['pe_oi'] = f"{oi_val:,}"
 
+                # Cache individual real-time option contract prices with strict expiry partitioning
+                from apps.market.services import redis_client
+                import datetime
+                active_exp_tag = ''
+                active_exp_display = ''
+                if expiry_tag:
+                    try:
+                        exp_dt = datetime.datetime.strptime(expiry_tag, '%d-%m-%Y')
+                        active_exp_display = exp_dt.strftime('%d %b').upper()
+                        active_exp_tag = exp_dt.strftime('%d%b').upper()
+                    except Exception:
+                        pass
+
+                if active_exp_display:
+                    try:
+                        redis_client.set(f"marmot:fyers:active_expiry:{idx_clean}", active_exp_display, ex=86400)
+                    except Exception:
+                        pass
+
+                for sp, sval in strikes_map.items():
+                    try:
+                        if sval.get('ce_ltp'):
+                            cache.set(f"marmot:opt_ltp:{idx_clean}:{sp}:CE", sval['ce_ltp'], timeout=120)
+                            cache.set(f"marmot:opt_ltp:{idx_clean}:{sp}:CALL", sval['ce_ltp'], timeout=120)
+                            if active_exp_tag:
+                                redis_client.set(f"marmot:opt_ltp:{idx_clean}:{active_exp_tag}:{sp}:CE", str(sval['ce_ltp']), ex=120)
+                                redis_client.set(f"marmot:opt_ltp:{idx_clean}:{active_exp_tag}:{sp}:CALL", str(sval['ce_ltp']), ex=120)
+                        if sval.get('pe_ltp'):
+                            cache.set(f"marmot:opt_ltp:{idx_clean}:{sp}:PE", sval['pe_ltp'], timeout=120)
+                            cache.set(f"marmot:opt_ltp:{idx_clean}:{sp}:PUT", sval['pe_ltp'], timeout=120)
+                            if active_exp_tag:
+                                redis_client.set(f"marmot:opt_ltp:{idx_clean}:{active_exp_tag}:{sp}:PE", str(sval['pe_ltp']), ex=120)
+                                redis_client.set(f"marmot:opt_ltp:{idx_clean}:{active_exp_tag}:{sp}:PUT", str(sval['pe_ltp']), ex=120)
+                    except Exception:
+                        pass
+
                 sorted_strikes = sorted(strikes_map.values(), key=lambda x: x['strike'])
+                atm_idx = -1
                 if sorted_strikes and spot_ltp > 0:
                     closest = min(sorted_strikes, key=lambda x: abs(x['strike'] - spot_ltp))
                     closest['is_atm'] = True
                     atm_strike_val = closest['strike']
+                    atm_idx = sorted_strikes.index(closest)
                 else:
                     atm_strike_val = int(round(spot_ltp / strike_step) * strike_step) if spot_ltp > 0 else '-'
 
+                for idx, s_row in enumerate(sorted_strikes):
+                    s_row['is_active_window'] = (atm_idx - 3 <= idx <= atm_idx + 3) if atm_idx >= 0 else True
+
                 strikes_data = sorted_strikes
                 is_fyers_live = True
+        elif oc_resp.status_code == 429:
+            cache.set(rate_limit_key, True, timeout=60)
     except Exception:
         pass
 
-    # 2. Fetch session metrics (Day Open, High, Low, Prev Close) from FYERS Quotes API
-    try:
-        q_url = f"https://api-t1.fyers.in/data/quotes?symbols={fyers_sym}"
-        q_resp = requests.get(q_url, headers=headers, timeout=2.5)
-        if q_resp.status_code == 200:
-            q_json = q_resp.json()
-            if q_json.get('s') == 'ok' and q_json.get('d'):
-                qv = q_json['d'][0].get('v', {})
-                open_px = float(qv.get('open_price', 0.0))
-                high_px = float(qv.get('high_price', 0.0))
-                low_px = float(qv.get('low_price', 0.0))
-                prev_close = float(qv.get('prev_close_price', 0.0))
-                if spot_ltp == 0.0 and qv.get('lp'):
-                    spot_ltp = float(qv.get('lp', 0.0))
-                    spot_change = float(qv.get('ch', 0.0))
-                    spot_change_pct = float(qv.get('chp', 0.0))
-                is_fyers_live = True
-    except Exception:
-        pass
+    # 2. Fetch or fallback session metrics (Day Open, High, Low, Prev Close)
+    last_known_q = cache.get(f"marmot:fyers_last_known_quote:{fyers_sym}") or {}
+    open_px = float(last_known_q.get('open_price', 0.0))
+    high_px = float(last_known_q.get('high_price', 0.0))
+    low_px = float(last_known_q.get('low_price', 0.0))
+    prev_close = float(last_known_q.get('prev_close_price', 0.0))
 
-    # If FYERS live call failed, strictly return offline state without any fabricated data
+    if not cache.get(rate_limit_key):
+        try:
+            q_url = f"https://api-t1.fyers.in/data/quotes?symbols={fyers_sym}"
+            q_resp = requests.get(q_url, headers=headers, timeout=2.5)
+            if q_resp.status_code == 200:
+                q_json = q_resp.json()
+                if q_json.get('s') == 'ok' and q_json.get('d'):
+                    qv = q_json['d'][0].get('v', {})
+                    open_px = float(qv.get('open_price', open_px))
+                    high_px = float(qv.get('high_price', high_px))
+                    low_px = float(qv.get('low_price', low_px))
+                    prev_close = float(qv.get('prev_close_price', prev_close))
+            elif q_resp.status_code == 429:
+                cache.set(rate_limit_key, True, timeout=60)
+        except Exception:
+            pass
+
+    # Synchronize shared live spot quote across all widgets so top ribbon and option chain are 100% in sync
+    if spot_ltp > 0:
+        quote_sync = {
+            'lp': spot_ltp,
+            'ch': spot_change,
+            'chp': spot_change_pct,
+            'high_price': high_px if high_px > 0 else spot_ltp,
+            'low_price': low_px if low_px > 0 else spot_ltp,
+            'open_price': open_px if open_px > 0 else spot_ltp,
+            'prev_close_price': prev_close if prev_close > 0 else spot_ltp,
+        }
+        cache.set(f"marmot:fyers_quote:{fyers_sym}", quote_sync, timeout=2)
+        cache.set(f"marmot:fyers_last_known_quote:{fyers_sym}", quote_sync, timeout=86400)
+        try:
+            from apps.market.services import redis_client
+            import json
+            redis_client.set(f"marmot:fyers_quote:{fyers_sym}", json.dumps(quote_sync), ex=10)
+        except Exception:
+            pass
+
+    # If FYERS live call failed, check last known quote before reporting offline
     if not is_fyers_live or not strikes_data:
+        last_known = cache.get(last_known_key)
+        if last_known and last_known.get('is_live'):
+            return last_known
         return {
             'is_live': False,
             'is_fyers_live': False,
@@ -457,6 +537,8 @@ def get_live_index_option_chain(index_name: str = 'NIFTY') -> dict:
             'india_vix': 0.0,
             'expiry_info': get_option_expiry_analysis(idx_clean, today),
             'strikes': [],
+            'total_strikes': 0,
+            'active_window_strikes': 0,
             'error_message': 'FYERS live market feed offline or session timed out.',
             'last_updated': timezone.now().strftime('%H:%M:%S IST'),
         }
@@ -488,16 +570,111 @@ def get_live_index_option_chain(index_name: str = 'NIFTY') -> dict:
         'india_vix': f"{india_vix:.2f}" if india_vix else "-",
         'expiry_info': expiry_info,
         'strikes': strikes_data,
-        'last_updated': timezone.now().strftime('%H:%M:%S IST'),
+        'total_strikes': len(strikes_data),
+        'active_window_strikes': len([s for s in strikes_data if s.get('is_active_window')]),
+        'last_updated': timezone.localtime().strftime('%I:%M:%S %p IST'),
     }
-    cache.set(cache_key, res, timeout=1)
+    cache.set(cache_key, res, timeout=2)
+    cache.set(last_known_key, res, timeout=86400)
     try:
         from apps.market.services import redis_client
         import json
-        redis_client.set(f"marmot:fyers:option_chain:{idx_clean}", json.dumps(res), ex=5)
+        redis_client.set(f"marmot:fyers:option_chain:{idx_clean}", json.dumps(res), ex=2)
     except Exception:
         pass
     return res
+
+
+def to_fyers_option_symbol(symbol_str: str) -> str:
+    """Map human-readable standard option symbol to exchange FYERS symbol."""
+    import re
+    if not symbol_str:
+        return ""
+    m = re.search(r'([A-Z]+)\s+(\d{1,2})\s+([A-Z]{3})\s+(\d+)\s+(CALL|PUT|CE|PE)', str(symbol_str).upper())
+    if m:
+        idx, day, mon, strike, otype = m.groups()
+        months = {'JAN': '1', 'FEB': '2', 'MAR': '3', 'APR': '4', 'MAY': '5', 'JUN': '6', 'JUL': '7', 'AUG': '8', 'SEP': '9', 'OCT': 'O', 'NOV': 'N', 'DEC': 'D'}
+        m_code = months.get(mon, '9')
+        opt = 'CE' if otype in ['CALL', 'CE'] else 'PE'
+        return f"NSE:{idx}26{m_code}{int(day):02d}{strike}{opt}"
+    return str(symbol_str).strip()
+
+
+def get_live_contract_market_quote(symbol_str: str) -> float:
+    """Fetch real-time option contract market quote from FYERS with 5s caching in Redis."""
+    from django.core.cache import cache
+    from apps.market.services import redis_client
+    from apps.common.models import SiteSettings
+    import requests
+    import re
+
+    if not symbol_str:
+        return 0.0
+
+    fyers_sym = to_fyers_option_symbol(symbol_str)
+    cache_key = f"marmot:contract_ltp:{fyers_sym}"
+    cached_val = cache.get(cache_key)
+    if cached_val:
+        try:
+            return float(cached_val)
+        except (ValueError, TypeError):
+            pass
+
+    m = re.search(r'([A-Z]+).*?(\d{4,5})\s+(CALL|PUT|CE|PE)', str(symbol_str).upper())
+    idx_clean = m.group(1) if m else 'NIFTY'
+    strike_val = m.group(2) if m else ''
+    opt_type = 'CE' if (m and m.group(3) in ['CALL', 'CE']) else 'PE'
+
+    settings_obj = SiteSettings.load()
+    if settings_obj.fyers_access_token and settings_obj.fyers_app_id:
+        try:
+            url = f"https://api-t1.fyers.in/data/quotes?symbols={fyers_sym}"
+            headers = {'Authorization': f"{settings_obj.fyers_app_id}:{settings_obj.fyers_access_token}"}
+            resp = requests.get(url, headers=headers, timeout=2.0)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get('s') == 'ok' and data.get('d'):
+                    v = data['d'][0].get('v', {})
+                    lp = float(v.get('lp', 0.0))
+                    if lp > 0:
+                        cache.set(cache_key, lp, timeout=5)
+                        try:
+                            redis_client.set(f"marmot:contract_ltp:{fyers_sym}", str(lp), ex=120)
+                        except Exception:
+                            pass
+                        m_exp = re.search(r'([A-Z]+)\s+(\d{1,2})\s+([A-Z]{3})\s+(\d+)\s+(CALL|PUT|CE|PE)', str(symbol_str).upper())
+                        if m_exp:
+                            idx_clean, day, mon, strike_val, otype = m_exp.groups()
+                            exp_tag = f"{int(day):02d}{mon}"
+                            opt_type = 'CE' if otype in ['CALL', 'CE'] else 'PE'
+                            try:
+                                redis_client.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{strike_val}:{opt_type}", str(lp), ex=120)
+                                redis_client.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{strike_val}:CALL" if opt_type == 'CE' else f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{strike_val}:PUT", str(lp), ex=120)
+                            except Exception:
+                                pass
+                        return lp
+        except Exception:
+            pass
+
+    if strike_val:
+        m_exp = re.search(r'([A-Z]+)\s+(\d{1,2})\s+([A-Z]{3})\s+(\d+)\s+(CALL|PUT|CE|PE)', str(symbol_str).upper())
+        if m_exp:
+            _, day_val, mon_val, _, _ = m_exp.groups()
+            exp_tag_val = f"{int(day_val):02d}{mon_val}"
+            try:
+                val_exp = redis_client.get(f"marmot:opt_ltp:{idx_clean}:{exp_tag_val}:{strike_val}:{opt_type}")
+                if val_exp:
+                    return float(val_exp)
+            except Exception:
+                pass
+        try:
+            val = redis_client.get(f"marmot:opt_ltp:{idx_clean}:{strike_val}:{opt_type}")
+            if val:
+                return float(val)
+        except Exception:
+            pass
+
+    return 0.0
 
 
 def get_nifty_mini_option_chain():
@@ -506,9 +683,18 @@ def get_nifty_mini_option_chain():
 
 
 def get_live_macro_market_cards():
-    """Fetch real-time macro indices (NIFTY, BANKNIFTY, FINNIFTY, INDIA VIX, SENSEX) from FYERS quotes API."""
+    """Fetch real-time macro indices (NIFTY, BANKNIFTY, FINNIFTY, INDIA VIX, SENSEX) with 15s caching and fallback."""
     import requests
+    from django.core.cache import cache
     from apps.common.models import SiteSettings
+
+    cache_key = "marmot:fyers:macro_market_cards"
+    last_known_key = "marmot:fyers:last_known_macro_market_cards"
+    rate_limit_key = "marmot:fyers_rate_limited"
+
+    cached = cache.get(cache_key)
+    if cached:
+        return cached
 
     macro_configs = [
         {'name': 'NIFTY 50', 'fyers_sym': 'NSE:NIFTY50-INDEX', 'exchange': 'NSE', 'type': 'INDEX'},
@@ -517,6 +703,11 @@ def get_live_macro_market_cards():
         {'name': 'INDIA VIX', 'fyers_sym': 'NSE:INDIAVIX-INDEX', 'exchange': 'NSE', 'type': 'VOLATILITY'},
         {'name': 'SENSEX', 'fyers_sym': 'BSE:SENSEX-INDEX', 'exchange': 'BSE', 'type': 'INDEX'},
     ]
+
+    if cache.get(rate_limit_key):
+        last_known = cache.get(last_known_key)
+        if last_known:
+            return last_known
 
     site_settings = SiteSettings.load()
     today = timezone.localdate()
@@ -527,6 +718,9 @@ def get_live_macro_market_cards():
     )
 
     if not is_fyers_token_valid:
+        last_known = cache.get(last_known_key)
+        if last_known:
+            return last_known
         return [
             {
                 'name': m['name'],
@@ -559,14 +753,18 @@ def get_live_macro_market_cards():
                     val = item.get('v', {})
                     if sym and val:
                         quotes_by_sym[sym] = val
+        elif resp.status_code == 429:
+            cache.set(rate_limit_key, True, timeout=60)
     except Exception:
         pass
 
     cards = []
+    has_any_live = False
     for m in macro_configs:
         sym = m['fyers_sym']
         q = quotes_by_sym.get(sym)
         if q and q.get('lp') is not None:
+            has_any_live = True
             lp = float(q.get('lp', 0.0))
             ch = float(q.get('ch', 0.0))
             chp = float(q.get('chp', 0.0))
@@ -600,6 +798,14 @@ def get_live_macro_market_cards():
                 'is_live': False,
             })
 
+    if has_any_live:
+        cache.set(cache_key, cards, timeout=15)
+        cache.set(last_known_key, cards, timeout=86400)
+    else:
+        last_known = cache.get(last_known_key)
+        if last_known:
+            return last_known
+
     return cards
 
 
@@ -625,28 +831,65 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY') -> dict:
     cfg = index_map.get(idx_upper, index_map['NIFTY'])
 
     cache_key = f"marmot:fyers_quote:{cfg['fyers_sym']}"
+    last_known_key = f"marmot:fyers_last_known_quote:{cfg['fyers_sym']}"
+    rate_limit_key = "marmot:fyers_rate_limited"
+
     quote_data = cache.get(cache_key)
+    is_fresh = bool(quote_data)
 
     if not quote_data:
-        site_settings = SiteSettings.load()
-        today = timezone.localdate()
-        is_token_valid = bool(
-            site_settings.fyers_access_token and
-            site_settings.fyers_token_generated_date == today and
-            site_settings.fyers_feed_is_active
-        )
-        if is_token_valid:
-            try:
-                headers = {'Authorization': f"{site_settings.fyers_app_id}:{site_settings.fyers_access_token}"}
-                url = f"https://api-t1.fyers.in/data/quotes?symbols={cfg['fyers_sym']}"
-                resp = requests.get(url, headers=headers, timeout=2.5)
-                if resp.status_code == 200:
-                    r_json = resp.json()
-                    if r_json.get('s') == 'ok' and r_json.get('d'):
-                        quote_data = r_json['d'][0].get('v', {})
-                        cache.set(cache_key, quote_data, timeout=2)
-            except Exception:
-                pass
+        opt_chain_data = cache.get(f"marmot:fyers:option_chain:{cfg['name']}") or cache.get(f"marmot:fyers:option_chain:{idx_upper}")
+        if opt_chain_data and opt_chain_data.get('is_live') and opt_chain_data.get('raw_spot_ltp'):
+            raw_ltp = float(opt_chain_data.get('raw_spot_ltp', 0.0))
+            if raw_ltp > 0:
+                raw_ch = float(str(opt_chain_data.get('spot_change', '0')).replace('+', ''))
+                raw_chp = float(str(opt_chain_data.get('spot_change_pct', '0')).replace('%', '').replace('+', ''))
+                last_known_q = cache.get(last_known_key) or {}
+                hp_val = float(str(opt_chain_data.get('high_price', '0')).replace(',', '')) or float(last_known_q.get('high_price', raw_ltp))
+                lowp_val = float(str(opt_chain_data.get('low_price', '0')).replace(',', '')) or float(last_known_q.get('low_price', raw_ltp))
+                openp_val = float(str(opt_chain_data.get('open_price', '0')).replace(',', '')) or float(last_known_q.get('open_price', raw_ltp))
+                prevp_val = float(str(opt_chain_data.get('prev_close', '0')).replace(',', '')) or float(last_known_q.get('prev_close_price', raw_ltp))
+                quote_data = {
+                    'lp': raw_ltp,
+                    'ch': raw_ch,
+                    'chp': raw_chp,
+                    'high_price': hp_val,
+                    'low_price': lowp_val,
+                    'open_price': openp_val,
+                    'prev_close_price': prevp_val,
+                }
+                cache.set(cache_key, quote_data, timeout=2)
+                cache.set(last_known_key, quote_data, timeout=86400)
+                is_fresh = True
+
+        if not quote_data:
+            is_rate_limited = bool(cache.get(rate_limit_key))
+            site_settings = SiteSettings.load()
+            today = timezone.localdate()
+            is_token_valid = bool(
+                site_settings.fyers_access_token and
+                site_settings.fyers_token_generated_date == today and
+                site_settings.fyers_feed_is_active
+            )
+            if is_token_valid and not is_rate_limited:
+                try:
+                    headers = {'Authorization': f"{site_settings.fyers_app_id}:{site_settings.fyers_access_token}"}
+                    url = f"https://api-t1.fyers.in/data/quotes?symbols={cfg['fyers_sym']}"
+                    resp = requests.get(url, headers=headers, timeout=2.5)
+                    if resp.status_code == 200:
+                        r_json = resp.json()
+                        if r_json.get('s') == 'ok' and r_json.get('d'):
+                            quote_data = r_json['d'][0].get('v', {})
+                            cache.set(cache_key, quote_data, timeout=2)
+                            cache.set(last_known_key, quote_data, timeout=86400)
+                            is_fresh = True
+                    elif resp.status_code == 429:
+                        cache.set(rate_limit_key, True, timeout=60)
+                except Exception:
+                    pass
+
+        if not quote_data:
+            quote_data = cache.get(last_known_key)
 
     now_time_str = timezone.localtime().strftime("%I:%M %p")
     if quote_data and quote_data.get('lp') is not None:
@@ -670,6 +913,7 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY') -> dict:
             'formatted_time': now_time_str,
             'is_positive': ch >= 0,
             'is_live': True,
+            'is_cached': not is_fresh,
         }
     else:
         selected_card = {
@@ -685,6 +929,7 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY') -> dict:
             'formatted_time': now_time_str,
             'is_positive': True,
             'is_live': False,
+            'is_cached': False,
         }
 
     ai_intel = get_cached_macro_ai_intel(selected_index=cfg['name']) or {}

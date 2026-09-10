@@ -127,9 +127,9 @@
     // Sync theme icons once DOM is ready
     updateThemeToggleIcons(document.documentElement.getAttribute('data-theme') || 'dark');
 
-    // Enable HTMX Global View Transitions if supported
+    // Disable HTMX Global View Transitions to prevent AbortError collisions on high-frequency auto-polling
     if (window.htmx && window.htmx.config) {
-      window.htmx.config.globalViewTransitions = true;
+      window.htmx.config.globalViewTransitions = false;
     }
   });
 

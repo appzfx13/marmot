@@ -3,7 +3,7 @@
 <div class="card shadow-sm overflow-hidden mb-0 p-0"
      {% if option_chain.is_live %}
          hx-get="{% url 'admins:admin-live-option-chain' %}?index={{ selected_index|default:option_chain.index_name }}"
-         hx-trigger="every 6s"
+         hx-trigger="every 2s"
          hx-target="#live-option-chain-container"
          hx-swap="innerHTML"
      {% endif %}>
@@ -49,6 +49,17 @@
 
         <!-- Right: Available Backup Index Selector & Controls -->
         <div class="d-flex align-items-center gap-2.5 flex-wrap">
+            <!-- Expand / Collapse Full Strikes Toggle Button -->
+            <button type="button" 
+                    id="btn-toggle-option-chain-strikes"
+                    class="btn btn-sm rounded-pill px-3 py-1 font-monospace fw-bold shadow-sm d-inline-flex align-items-center gap-1.5"
+                    style="border: 1px solid rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.05); color: #ffffff; font-size: 0.74rem; cursor: pointer;"
+                    onclick="window.toggleOptionChainStrikesView && window.toggleOptionChainStrikesView()"
+                    title="Toggle between Compact ±3 Strikes Window and Full Strikes View">
+                <i class="bi bi-arrows-angle-expand" id="option-chain-expand-icon" style="color: #B4F105;"></i>
+                <span id="option-chain-expand-text">Expand ({{ option_chain.total_strikes|default:31 }} Strikes)</span>
+            </button>
+
             <div class="d-flex align-items-center gap-2">
                 <label for="backupIndexSelect" class="smaller fw-bold text-muted text-uppercase d-none d-sm-inline mb-0" style="font-size: 0.74rem;">
                     <i class="bi bi-database-fill-check me-1 text-warning"></i>Backup Index:
@@ -96,11 +107,12 @@
                     </span>
                     <div class="d-flex align-items-baseline gap-1.5 flex-wrap">
                         <span class="fw-bold font-monospace fs-5 text-white px-1.5 py-0.5 rounded transition-tick"
+                              id="live-option-chain-spot-ltp"
                               data-tick-key="spot_{{ option_chain.index_name }}"
                               data-tick-price="{{ option_chain.raw_spot_ltp|default:option_chain.spot_ltp }}">
                             ₹{{ option_chain.spot_ltp }}
                         </span>
-                        <span class="badge {% if option_chain.is_positive %}bg-success bg-opacity-20 text-success{% else %}bg-danger bg-opacity-20 text-danger{% endif %} rounded-pill px-1.5 py-0.5 font-monospace fw-bold" style="font-size: 0.65rem;">
+                        <span class="badge {% if option_chain.is_positive %}bg-success bg-opacity-20 text-success{% else %}bg-danger bg-opacity-20 text-danger{% endif %} rounded-pill px-1.5 py-0.5 font-monospace fw-bold" style="font-size: 0.65rem;" id="live-option-chain-spot-change">
                             {{ option_chain.spot_change }} ({{ option_chain.spot_change_pct }})
                         </span>
                     </div>
@@ -151,6 +163,7 @@
                             <i class="bi bi-bullseye text-danger me-1"></i>ATM
                         </span>
                         <span class="badge rounded-pill fw-bold font-monospace px-2.5 py-1 text-dark shadow-sm" 
+                              id="live-option-chain-atm"
                               style="background: #B4F105; font-size: 0.78rem;">
                             {{ option_chain.atm_strike }}
                         </span>
@@ -159,7 +172,7 @@
                         <span class="badge bg-secondary bg-opacity-25 theme-text-muted font-monospace px-2 py-0.5 rounded-pill" style="font-size: 0.62rem;">
                             {{ option_chain.expiry_info.expiry_tag|default:"Weekly Expiry" }}
                         </span>
-                        <div class="smaller text-muted font-monospace mt-0.5" style="font-size: 0.62rem;">
+                        <div class="smaller text-muted font-monospace mt-0.5" style="font-size: 0.62rem;" id="live-option-chain-time">
                             {{ option_chain.last_updated }}
                         </div>
                     </div>
@@ -195,7 +208,7 @@
             </thead>
             <tbody>
                 {% for row in option_chain.strikes %}
-                <tr {% if row.is_atm %}class="table-active option-chain-atm-row" style="background: rgba(180, 241, 5, 0.09) !important; border-top: 2px solid #B4F105 !important; border-bottom: 2px solid #B4F105 !important;"{% endif %}>
+                <tr class="{% if not row.is_active_window %}option-chain-outer-strike d-none{% endif %} {% if row.is_atm %}table-active option-chain-atm-row{% endif %}" {% if row.is_atm %}style="background: rgba(180, 241, 5, 0.09) !important; border-top: 2px solid #B4F105 !important; border-bottom: 2px solid #B4F105 !important;"{% endif %}>
                     <!-- Call OI -->
                     <td class="font-monospace text-muted smaller py-2.5">
                         {{ row.ce_oi }}
@@ -251,7 +264,7 @@
          style="background: rgba(0, 0, 0, 0.15); font-size: 0.74rem;">
         <div>
             <i class="bi bi-info-circle me-1 text-primary"></i>
-            Instrument: <strong class="text-white">{{ option_chain.fyers_symbol }}</strong> &bull; Window: <strong class="text-white">ATM &plusmn;3 Strikes</strong>
+            Instrument: <strong class="text-white">{{ option_chain.fyers_symbol }}</strong> &bull; Window: <strong class="text-white" id="option-chain-window-indicator">ATM &plusmn;3 Strikes (7 Active)</strong>
         </div>
         <div class="d-flex align-items-center gap-2">
             <span class="badge bg-secondary bg-opacity-25 text-white-50 px-2 py-0.5">FYERS Realtime v3</span>
@@ -299,6 +312,58 @@
 
 <script>
 (function() {
+    // 1. Manage Expanded / Compact Strikes View State
+    if (window._optionChainExpanded === undefined) {
+        window._optionChainExpanded = localStorage.getItem('marmot_option_chain_expanded') === 'true';
+    }
+
+    window.toggleOptionChainStrikesView = function() {
+        window._optionChainExpanded = !window._optionChainExpanded;
+        localStorage.setItem('marmot_option_chain_expanded', window._optionChainExpanded ? 'true' : 'false');
+        applyOptionChainViewState();
+    };
+
+    function applyOptionChainViewState() {
+        const isExpanded = window._optionChainExpanded;
+        const outerRows = document.querySelectorAll('.option-chain-outer-strike');
+        outerRows.forEach(function(row) {
+            if (isExpanded) {
+                row.classList.remove('d-none');
+            } else {
+                row.classList.add('d-none');
+            }
+        });
+
+        const btnText = document.getElementById('option-chain-expand-text');
+        const btnIcon = document.getElementById('option-chain-expand-icon');
+        const windowIndicator = document.getElementById('option-chain-window-indicator');
+        const totalCount = '{{ option_chain.total_strikes|default:31 }}';
+
+        if (btnText && btnIcon) {
+            if (isExpanded) {
+                btnText.textContent = 'Compact (±3 Strikes)';
+                btnIcon.className = 'bi bi-arrows-angle-contract text-warning';
+                btnIcon.style.color = '';
+            } else {
+                btnText.textContent = 'Expand (' + totalCount + ' Strikes)';
+                btnIcon.className = 'bi bi-arrows-angle-expand';
+                btnIcon.style.color = '#B4F105';
+            }
+        }
+
+        if (windowIndicator) {
+            if (isExpanded) {
+                windowIndicator.textContent = 'Full Active Contracts (' + totalCount + ' Strikes)';
+            } else {
+                windowIndicator.textContent = 'ATM ±3 Strikes (7 Active)';
+            }
+        }
+    }
+
+    // Apply state on initial render and subsequent HTMX swaps
+    applyOptionChainViewState();
+
+    // 2. Real-Time Visual Tick Flash Listener
     if (!window._optionChainLtpMap) {
         window._optionChainLtpMap = {};
     }

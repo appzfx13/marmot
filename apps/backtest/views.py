@@ -1779,6 +1779,20 @@ class BacktestControlView(LoginRequiredMixin, AdminRequiredMixin, View):
 
     def post(self, request, pk, *args, **kwargs):
         action = request.POST.get('action', 'start')
+        task = BacktestTask.objects.filter(pk=pk).first()
+
+        if action == 'start' and task:
+            params = task.parameters if isinstance(task.parameters, dict) else {}
+            task_rules = params.get('rules', []) or list(task.rules.all())
+            prompt_dir = (params.get('prompt_directives') or '').strip()
+            if not task_rules and not prompt_dir and not (task.prompt_directives or '').strip():
+                response = HttpResponse(status=400)
+                response['HX-Trigger'] = json.dumps({
+                    'showToast': {'message': '⚠️ Execution blocked: Please select at least one Strategy Rule or prompt directive first.', 'level': 'warning'},
+                    'closeGlobalModal': True,
+                })
+                return response
+
         send_backtest_control_command(pk, action)
         msg = f"Backtest command '{action.upper()}' sent successfully."
         response = HttpResponse(status=204)
@@ -2802,12 +2816,17 @@ class BacktestDeployModalView(LoginRequiredMixin, View):
             for r in backtest.rules.all()
         ]
 
+        default_account = next((a for a in user_accounts if a.is_default), None) or (user_accounts[0] if user_accounts else None)
+        default_mode = default_account.account_type if default_account else AccountTypeChoices.SANDBOX
+        mode_prefix = "Sandbox" if default_mode == AccountTypeChoices.SANDBOX else "Live"
+
         context = {
             'backtest': backtest,
             'user_accounts': user_accounts,
             'rules_snapshot': rules_snapshot,
-            'suggested_name': f"Live {backtest.index_name} {backtest.get_strategy_name_display()} #BT-{backtest.id:04d}",
+            'suggested_name': f"{mode_prefix} {backtest.index_name} {backtest.get_strategy_name_display()} #BT-{backtest.id:04d}",
             'suggested_capital': backtest.initial_capital,
+            'default_mode': default_mode,
         }
         return render(request, 'admins/partials/backtest_deploy_modal.html', context)
 
@@ -2818,16 +2837,22 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
     def post(self, request, pk, *args, **kwargs):
         backtest = get_object_or_404(BacktestTask, pk=pk)
 
-        name = request.POST.get('name', '').strip() or f"Live {backtest.index_name} #BT-{backtest.id:04d}"
         trading_account_id = request.POST.get('trading_account_id')
         raw_mode = request.POST.get('execution_mode', 'LIVE').strip().upper()
         execution_mode = AccountTypeChoices.SANDBOX if raw_mode == 'SANDBOX' else AccountTypeChoices.LIVE
-        
+
         target_account = None
         if trading_account_id:
             target_account = request.user.trading_accounts.filter(id=trading_account_id, is_active=True).first()
             if target_account and target_account.account_type in [AccountTypeChoices.LIVE, AccountTypeChoices.SANDBOX]:
                 execution_mode = target_account.account_type
+
+        mode_prefix = "Sandbox" if execution_mode == AccountTypeChoices.SANDBOX else "Live"
+        raw_name = request.POST.get('name', '').strip()
+        if not raw_name:
+            name = f"{mode_prefix} {backtest.index_name} {backtest.get_strategy_name_display()} #BT-{backtest.id:04d}"
+        else:
+            name = raw_name
         try:
             allocated_capital = float(request.POST.get('allocated_capital', backtest.initial_capital))
         except (ValueError, TypeError):

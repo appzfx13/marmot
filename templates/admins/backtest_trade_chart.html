@@ -2450,11 +2450,12 @@
                 btnDeleteTpl.addEventListener('click', function() {
                     const selected = tplSelect.value;
                     if (!selected) return;
-                    if (confirm(`Are you sure you want to delete template "${selected}"?`)) {
-                        const templates = getSavedTemplates();
-                        delete templates[selected];
-                        setSavedTemplates(templates);
-                        refreshTemplatesDropdown();
+                    const templates = getSavedTemplates();
+                    delete templates[selected];
+                    setSavedTemplates(templates);
+                    refreshTemplatesDropdown();
+                    if (window.showToast) {
+                        window.showToast(`Template "${selected}" deleted.`, 'info');
                     }
                 });
             }

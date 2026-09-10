@@ -48,6 +48,7 @@ type LiveOrderRequest struct {
 	TradingSymbol string  `json:"trading_symbol"` // e.g. NIFTY 22400 CE
 	Transaction   string  `json:"transaction"`    // BUY / SELL
 	OrderType     string  `json:"order_type"`     // MARKET / LIMIT
+	LimitPrice    float64 `json:"limit_price,omitempty"` // Execution limit price if LIMIT order
 	Quantity      int     `json:"quantity"`       // Position quantity
 	TargetPrice   float64 `json:"target_price"`
 	StopLossPrice float64 `json:"stop_loss_price"`
