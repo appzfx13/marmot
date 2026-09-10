@@ -216,6 +216,9 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							positions[i].Status = "CLOSED"
 							positions[i].RealizedProfit = posPnl
 							positions[i].UnrealizedProfit = 0
+							positions[i].SellQty = positions[i].BuyQty
+							positions[i].SellAvg = positions[i].CurrentLTP
+							positions[i].NetQty = 0
 							
 							nowStr := nowIST().Format("03:04:05 PM")
 							exitOrder := SimulatedOrder{
@@ -228,8 +231,8 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								OrderType:       "MARKET",
 								ProductType:     "INTRADAY",
 								Validity:        "DAY",
-								Quantity:        positions[i].NetQty,
-								FilledQty:       positions[i].NetQty,
+								Quantity:        positions[i].BuyQty,
+								FilledQty:       positions[i].BuyQty,
 								Price:           positions[i].CurrentLTP,
 								CurrentLTP:      positions[i].CurrentLTP,
 								OrderStatus:     "TRADED",

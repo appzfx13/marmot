@@ -154,7 +154,7 @@
                         ₹{{ pos.total_pnl|floatformat:2 }}
                     </td>
                     <td class="text-end pe-3">
-                        {% if pos.net_qty != 0 %}
+                        {% if pos.status == 'OPEN' and pos.net_qty != 0 %}
                             <button type="button"
                                     class="btn btn-sm btn-outline-danger rounded-pill px-2.5 py-1 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
                                     hx-get="{% if is_sandbox %}{% url 'admins:admin-sandbox-position-square-off' %}{% else %}{% url 'admins:admin-live-position-square-off' %}{% endif %}?symbol={{ pos.trading_symbol|urlencode }}&quantity={{ pos.net_qty }}&side={% if pos.net_qty > 0 %}SELL{% else %}BUY{% endif %}&product_type={{ pos.product_type }}"
@@ -166,7 +166,7 @@
                                 <i class="bi bi-x-octagon"></i> Square Off
                             </button>
                         {% else %}
-                            <span class="text-white-50 smaller">&mdash;</span>
+                            <span class="badge bg-secondary bg-opacity-20 text-white-50 px-2 py-0.5 rounded-pill fs-xs">CLOSED</span>
                         {% endif %}
                     </td>
                 </tr>

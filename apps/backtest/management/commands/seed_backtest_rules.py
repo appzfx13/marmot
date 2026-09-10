@@ -146,6 +146,36 @@ class Command(BaseCommand):
                 "is_active": True,
             },
             {
+                "name": "Institutional Micro-Scalp: VWAP Confluence, Momentum Thrust & Auto Risk Guard",
+                "rule_type": BacktestRuleTypeChoices.ALGO_MICRO_SCALP,
+                "market_type": RuleMarketTypeChoices.ALL,
+                "description": (
+                    "Engineered for high-frequency precision by a 20-year prop trader. Exploits structural momentum "
+                    "breakouts aligning Session VWAP, EMA 9, and 1.4x volume surge. Features built-in automated risk control: "
+                    "tight 7 pt SL, 1:2.0 RR target, instant Auto-Breakeven at 1:1.0 RR (+7 pts), and a 5-bar Time-Stop decay exit."
+                ),
+                "prompt_directive": (
+                    "Micro-Scalp Execution Setup: 1. Confluence: Price must reject and break beyond Session VWAP and EMA 9. "
+                    "2. Volume Thrust: Require volume >= 1.4x 10-period SMA volume with candle body >= 55% of range. "
+                    "3. Auto Risk: Place 7.0 pt SL and 14.0 pt Target (1:2.0 RR). Move SL to Breakeven (+0.5 pt) immediately upon "
+                    "reaching +7.0 pts. Hard exit after 5 bars if target unfilled. Max 3 trades per session."
+                ),
+                "parameters": {
+                    "sl_pts": 7.0,
+                    "min_risk_reward": 2.0,
+                    "auto_breakeven_rr": 1.0,
+                    "time_stop_bars": 5,
+                    "volume_surge_multiplier": 1.4,
+                    "min_body_ratio": 0.55,
+                    "vwap_filter": True,
+                    "ema9_filter": True,
+                    "max_trades_per_day": 3,
+                    "killzone_filter": True,
+                },
+                "is_system_preset": True,
+                "is_active": True,
+            },
+            {
                 "name": "Morning 3-Min Multi-Timeframe MACD & Option Momentum Retest",
                 "rule_type": BacktestRuleTypeChoices.MORNING_MACD_RETEST,
                 "market_type": RuleMarketTypeChoices.INDEX_FO,

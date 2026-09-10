@@ -33,9 +33,17 @@
         </div>
     </td>
     <td>
-        <span class="badge bg-dark bg-opacity-50 border border-white border-opacity-10 text-white font-monospace">
-            {{ strategy.frozen_rules_snapshot|length }} Isolated Rules
-        </span>
+        <button type="button" 
+                class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 smaller fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                data-bs-toggle="collapse" 
+                data-bs-target="#strategy-rules-{{ strategy.pk }}" 
+                aria-expanded="false" 
+                aria-controls="strategy-rules-{{ strategy.pk }}"
+                title="Click to expand applied rules and directives">
+            <i class="bi bi-shield-check"></i>
+            <span>{{ strategy.frozen_rules_snapshot|length }} Isolated Rules</span>
+            <i class="bi bi-chevron-down ms-0.5"></i>
+        </button>
     </td>
     <td>
         <span class="font-monospace text-success fw-bold">₹{{ strategy.allocated_capital|floatformat:0 }}</span>
@@ -91,6 +99,85 @@
                     title="Remove deployed strategy">
                 <i class="bi bi-trash3"></i> Remove
             </button>
+        </div>
+    </td>
+</tr>
+<tr id="strategy-rules-{{ strategy.pk }}" class="collapse bg-transparent">
+    <td colspan="7" class="p-0 border-0">
+        <div class="p-3 my-2 mx-3 rounded-3 border" style="background: rgba(255, 255, 255, 0.02); border-color: rgba(255, 255, 255, 0.08) !important;">
+            <div class="d-flex align-items-center justify-content-between mb-2.5 flex-wrap gap-2">
+                <div class="d-flex align-items-center gap-2">
+                    <i class="bi bi-shield-lock-fill text-primary fs-6"></i>
+                    <span class="fw-bold text-white small">Applied Rulebook Directives &amp; Execution Constraints</span>
+                    <span class="badge bg-primary bg-opacity-20 text-primary rounded-pill px-2 py-0.5 smaller fw-bold">
+                        {{ strategy.frozen_rules_snapshot|length }} Active Rules
+                    </span>
+                </div>
+                <div class="theme-text-muted smaller font-monospace">
+                    Frozen at Deployment &bull; Immutable Snapshot
+                </div>
+            </div>
+
+            <!-- Rules Grid -->
+            <div class="row g-2">
+                {% for rule in strategy.frozen_rules_snapshot %}
+                <div class="col-12 col-md-6 col-lg-4">
+                    <div class="p-2.5 rounded-3 border h-100 d-flex flex-column justify-content-between" style="background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.07) !important;">
+                        <div>
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <span class="badge bg-info bg-opacity-20 text-info font-monospace smaller fw-bold">
+                                    {% if rule.rule_id %}Rule #{{ rule.rule_id }}{% elif rule.id %}Rule #{{ rule.id }}{% else %}Rule #{{ forloop.counter }}{% endif %}
+                                </span>
+                                <span class="badge bg-secondary bg-opacity-25 text-white-50 fs-xs font-monospace">
+                                    {{ rule.rule_type|default:"QUANTITATIVE" }}
+                                </span>
+                            </div>
+                            <div class="fw-bold text-white small mb-1">{{ rule.name }}</div>
+                            <div class="theme-text-muted smaller" style="font-size: 0.74rem; line-height: 1.4;">
+                                {% if rule.description %}{{ rule.description }}{% elif rule.prompt_directive %}{{ rule.prompt_directive }}{% else %}Rule criteria strictly verified at live tick arrival.{% endif %}
+                            </div>
+                        </div>
+                        {% if rule.parameters %}
+                        <div class="mt-2 pt-1.5 border-top border-white border-opacity-10 d-flex flex-wrap gap-1">
+                            {% for p_key, p_val in rule.parameters.items %}
+                            <span class="badge bg-dark bg-opacity-60 text-white-50 border border-white border-opacity-10 font-monospace fs-xs">
+                                {{ p_key }}: <span class="text-warning fw-bold">{{ p_val }}</span>
+                            </span>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+                {% empty %}
+                <div class="col-12 text-center text-white-50 py-3 smaller">
+                    <i class="bi bi-info-circle me-1"></i> No isolated rules snapshot found for this deployment.
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Hyperparameters & Risk Management Snapshot -->
+            {% if strategy.frozen_parameters %}
+            <div class="mt-2.5 pt-2 border-top border-white border-opacity-10 d-flex flex-wrap align-items-center gap-2 smaller theme-text-muted font-monospace">
+                <span class="text-uppercase fw-semibold text-white-50 fs-xs">Hyperparameters:</span>
+                {% if strategy.frozen_parameters.strategy_parameters %}
+                    {% for sp_k, sp_v in strategy.frozen_parameters.strategy_parameters.items %}
+                    {% if sp_k != 'rules' and sp_k != 'prompt_directives' %}
+                    <span class="badge bg-white bg-opacity-5 border border-white border-opacity-10 text-white font-monospace fs-xs">
+                        {{ sp_k }}: <span class="text-info fw-bold">{{ sp_v }}</span>
+                    </span>
+                    {% endif %}
+                    {% endfor %}
+                {% else %}
+                    {% for fp_k, fp_v in strategy.frozen_parameters.items %}
+                    {% if fp_k != 'rules' and fp_k != 'prompt_directives' %}
+                    <span class="badge bg-white bg-opacity-5 border border-white border-opacity-10 text-white font-monospace fs-xs">
+                        {{ fp_k }}: <span class="text-info fw-bold">{{ fp_v }}</span>
+                    </span>
+                    {% endif %}
+                    {% endfor %}
+                {% endif %}
+            </div>
+            {% endif %}
         </div>
     </td>
 </tr>

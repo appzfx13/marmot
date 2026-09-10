@@ -15,6 +15,7 @@ from apps.common.constants import (
     get_index_expiry_info,
     get_option_expiry_analysis,
     calculate_trade_charges,
+    INDEX_STRIKE_INTERVAL,
 )
 from apps.users.mixins import HTMXPartialMixin
 from apps.admins.permissions import AdminRequiredMixin
@@ -122,7 +123,9 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
             "prompt_directives": prompt_directives,
         }
 
-        # Strike selection only applies to Index Options
+        # Strike selection & step interval
+        index_sym = str(form.cleaned_data.get('index_name') or 'NIFTY').upper()
+        params["strike_step"] = INDEX_STRIKE_INTERVAL.get(index_sym, 50)
         if 'strike_selection' in form.cleaned_data and form.cleaned_data['strike_selection']:
             params["strike_selection"] = form.cleaned_data['strike_selection']
 
@@ -222,6 +225,17 @@ def get_backtest_trades_context(backtest, request):
             en = trade_item.get('index_entry_price', trade_item.get('entry_price', 0))
             ex = trade_item.get('index_exit_price', trade_item.get('exit_price', 0))
             trade_item['index_points'] = round(ex - en, 2)
+
+        raw_ts = str(trade_item.get('timestamp') or trade_item.get('fill_timestamp') or trade_item.get('exit_timestamp') or '').replace('T', ' ')
+        trade_item['timestamp'] = raw_ts
+        trade_item['datetime'] = raw_ts
+        trade_item['entry_time'] = raw_ts[11:16] if len(raw_ts) >= 16 else (raw_ts or '-')
+        trade_item['entry_spot'] = trade_item.get('index_entry_price', trade_item.get('entry_price', 0))
+        trade_item['exit_spot'] = trade_item.get('index_exit_price', trade_item.get('exit_price', 0))
+        trade_item['quantity'] = trade_item.get('quantity', trade_item.get('lots_count', 1))
+        trade_item['lots_count'] = trade_item.get('lots_count', trade_item.get('quantity', 1))
+        trade_item['reason'] = trade_item.get('reason') or trade_item.get('entry_reason') or 'Order Flow Signal'
+        trade_item['entry_reason'] = trade_item.get('entry_reason') or trade_item.get('reason') or 'Order Flow Signal'
 
         all_enriched_trades.append(trade_item)
 
@@ -554,6 +568,7 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
             'ict_smc_v2': {'icon': 'offline_bolt', 'color': '#8b5cf6', 'role': 'ICT v2: Confirmed OTE Retest & Mitigation (Zero Drawdown)'},
             'ict_smc_v3': {'icon': 'verified_user', 'color': '#10b981', 'role': 'ICT v3: Institutional Displacement, HTF Bias & Liquidity Sweep'},
             'morning_macd_retest': {'icon': 'candlestick_chart', 'color': '#f59e0b', 'role': 'Morning 3-Min HTF & Option Strike MACD Retest Guardrail'},
+            'algo_micro_scalp': {'icon': 'bolt', 'color': '#06b6d4', 'role': 'Institutional VWAP Micro-Scalp & Auto Risk Guard'},
         }
 
         for r in task_rules_qs:
@@ -567,6 +582,8 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
                 t_subset = [t for t in all_trades if 'macd' in str(t.get('reason', '')).lower() or 'morning' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
             elif rtype in ['ict_smc_matrix', 'ict_smc_v2', 'ict_smc_v3']:
                 t_subset = [t for t in all_trades if 'ict' in str(t.get('reason', '')).lower() or 'fvg' in str(t.get('reason', '')).lower() or 'ote' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
+            elif rtype == 'algo_micro_scalp':
+                t_subset = [t for t in all_trades if 'scalp' in str(t.get('reason', '')).lower() or 'vwap' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
             elif rtype == 'pdh_pdl':
                 t_subset = [t for t in all_trades if 'pdh' in str(t.get('reason', '')).lower() or 'pdl' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
             elif rtype == 'trendline_retest':
@@ -936,7 +953,7 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                             trade_strike_raw = str(target_trade.get('strike', ''))
                             is_ce = ('CE' in trade_type or 'CALL' in trade_type)
                             index_name = str(backtest.index_name or target_trade.get('symbol') or '').upper()
-                            strike_step = 100 if ('BANK' in index_name or 'SENSEX' in index_name) else (25 if 'MIDCP' in index_name else 50)
+                            strike_step = INDEX_STRIKE_INTERVAL.get(index_name, 50)
 
                             target_num = None
                             m_num = re.search(r'(\d{4,6})', trade_strike_raw)
@@ -1685,6 +1702,7 @@ class BacktestRuleAblationAuditView(LoginRequiredMixin, AdminRequiredMixin, View
             'ict_smc_v2': {'icon': 'offline_bolt', 'color': '#8b5cf6', 'role': 'ICT v2: Confirmed OTE Retest & Mitigation (Zero Drawdown)'},
             'ict_smc_v3': {'icon': 'verified_user', 'color': '#10b981', 'role': 'ICT v3: Institutional Displacement, HTF Bias & Liquidity Sweep'},
             'morning_macd_retest': {'icon': 'candlestick_chart', 'color': '#f59e0b', 'role': 'Morning 3-Min HTF & Option Strike MACD Retest Guardrail'},
+            'algo_micro_scalp': {'icon': 'bolt', 'color': '#06b6d4', 'role': 'Institutional VWAP Micro-Scalp & Auto Risk Guard'},
         }
         meta = rule_meta.get(rtype, {'icon': 'check_circle', 'color': '#3b82f6', 'role': rule.get_rule_type_display()})
 

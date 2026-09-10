@@ -10,6 +10,7 @@ from apps.common.constants import (
     get_historical_lot_size,
     get_index_expiry_info,
     get_option_expiry_analysis,
+    INDEX_STRIKE_INTERVAL,
 )
 from apps.common.logger import Logger
 
@@ -551,7 +552,7 @@ class TensorTradeRLEngine:
         total_gross_pnl = 0.0
         total_net_pnl = 0.0
 
-        strike_step = 100 if "BANK" in index_name.upper() else 50
+        strike_step = int(params.get("strike_step") or INDEX_STRIKE_INTERVAL.get(index_name.upper(), 50))
 
         rules = params.get("rules", [])
         prompt_directives = str(params.get("prompt_directives", "")).strip()
@@ -586,6 +587,7 @@ class TensorTradeRLEngine:
         has_ict_v2 = (("ict_smc_v2" in rule_types) or ("ict v2" in prompt_lower) or ("ote retest" in prompt_lower) or ("mitigation" in prompt_lower) or ("zero drawdown" in prompt_lower)) and not has_ict_v3
         has_ict = (("ict_smc_matrix" in rule_types) or ("ict" in prompt_lower) or ("fvg" in prompt_lower) or ("killzone" in prompt_lower) or ("ote" in prompt_lower) or ("market structure" in prompt_lower) or ("smart money" in prompt_lower)) and not has_ict_v2 and not has_ict_v3
         has_morning_macd = ("morning_macd_retest" in rule_types) or ("macd" in prompt_lower and not (has_ict or has_ict_v2 or has_ict_v3))
+        has_algo_micro_scalp = ("algo_micro_scalp" in rule_types) or ("scalp" in prompt_lower) or ("micro scalp" in prompt_lower)
 
         # Forex Order Flow Strategy Flags
         has_cvd_divergence = ("forex_cvd_divergence" in rule_types) or ("cvd" in prompt_lower) or ("orderflow" in prompt_lower)
@@ -634,7 +636,7 @@ class TensorTradeRLEngine:
         action_space = action_scheme.get_action_space()
         print(f"[TENSORTRADE-RL] Dynamic Action Scheme Active ({len(action_space)} Actions): {action_space}", flush=True)
 
-        print(f"[TENSORTRADE-RL] Active Strategy Constraints: MomentumGuardrail={has_momentum_guardrail}, UseMacroAssist={use_macro_assist}, IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}, ICT_SMC_V2={has_ict_v2}, ICT_SMC_V3={has_ict_v3}", flush=True)
+        print(f"[TENSORTRADE-RL] Active Strategy Constraints: MomentumGuardrail={has_momentum_guardrail}, AlgoMicroScalp={has_algo_micro_scalp}, UseMacroAssist={use_macro_assist}, IsForex={is_forex}, CVD_Divergence={has_cvd_divergence}, DOM_Absorption={has_dom_absorption}, KillzoneDelta={has_killzone_delta}, SMC_Displacement={has_smc_displacement}, Intraday={has_intraday}, Gamma0DTE={has_gamma}, MorningORB={has_morning}, IndiaVIX={has_vix}, TrendlineRetest={has_trendline}, ATRNoiseFilter={has_atr_noise}, ICT_SMC={has_ict}, ICT_SMC_V2={has_ict_v2}, ICT_SMC_V3={has_ict_v3}", flush=True)
         if prompt_directives:
             print(f"[TENSORTRADE-RL] AI Prompt Directive: '{prompt_directives}'", flush=True)
 
@@ -667,6 +669,17 @@ class TensorTradeRLEngine:
             session_df = session_df.copy()
             session_df["ema9"] = session_df["close"].ewm(span=9, adjust=False).mean()
             session_df["ema21"] = session_df["close"].ewm(span=21, adjust=False).mean()
+            if "volume" in session_df.columns and session_df["volume"].sum() > 0:
+                h_col = session_df["high"] if "high" in session_df.columns else session_df["close"]
+                l_col = session_df["low"] if "low" in session_df.columns else session_df["close"]
+                typical_price = (h_col + l_col + session_df["close"]) / 3.0
+                cum_vol = session_df["volume"].cumsum().replace(0, 1)
+                session_df["vwap"] = (typical_price * session_df["volume"]).cumsum() / cum_vol
+                session_df["vol_sma10"] = session_df["volume"].rolling(10, min_periods=1).mean()
+            else:
+                session_df["vwap"] = session_df["close"]
+                session_df["vol_sma10"] = 1000.0
+            session_scalp_count = 0
             orb_slice = session_df.iloc[:min(15, len(session_df))]
             orb_high = float(orb_slice["high"].max() if "high" in orb_slice else orb_slice["close"].max())
             orb_low = float(orb_slice["low"].min() if "low" in orb_slice else orb_slice["close"].min())
@@ -763,6 +776,52 @@ class TensorTradeRLEngine:
                     else:
                         k += 1
                         continue
+                # 0. Institutional Micro-Scalp (Session VWAP + EMA 9 Momentum Thrust & Auto Risk Guard)
+                elif has_algo_micro_scalp:
+                    if session_scalp_count >= 3:
+                        k += 1
+                        continue
+                    is_morning_scalp_win = (9 * 60 + 25 <= time_minutes <= 11 * 60)
+                    is_afternoon_scalp_win = (13 * 60 + 15 <= time_minutes <= 14 * 60 + 45)
+                    if not (is_morning_scalp_win or is_afternoon_scalp_win):
+                        k += 1
+                        continue
+
+                    cand_close = float(row_entry["close"])
+                    cand_open = float(row_entry["open"]) if "open" in row_entry else cand_close
+                    cand_high = float(row_entry["high"]) if "high" in row_entry else cand_close
+                    cand_low = float(row_entry["low"]) if "low" in row_entry else cand_close
+                    cand_vol = float(row_entry["volume"]) if "volume" in row_entry else 1000.0
+
+                    vwap_val = float(row_entry["vwap"]) if "vwap" in row_entry else cand_close
+                    ema9_val = float(row_entry["ema9"]) if "ema9" in row_entry else cand_close
+                    vol_sma10 = float(row_entry["vol_sma10"]) if "vol_sma10" in row_entry else 1000.0
+
+                    cand_body = abs(cand_close - cand_open)
+                    cand_range = max(0.5, cand_high - cand_low)
+                    body_ratio = cand_body / cand_range
+
+                    # Volume surge factor: 1.4x 10-period SMA & Body >= 55%
+                    is_volume_thrust = (cand_vol >= 1.4 * vol_sma10) or (vol_sma10 <= 0)
+                    is_quality_body = (body_ratio >= 0.55)
+
+                    if not (is_volume_thrust and is_quality_body):
+                        k += 1
+                        continue
+
+                    if cand_close > vwap_val and cand_close > ema9_val and cand_close > cand_open:
+                        rule_matched_tag = "Institutional Micro-Scalp"
+                        rule_matched_reason = f"⚡ [Institutional Micro-Scalp] Bullish VWAP ({cand_close:.1f} > {vwap_val:.1f}) + EMA 9 Thrust ({cand_vol:.0f} vol)"
+                        is_ce = True
+                        session_scalp_count += 1
+                    elif cand_close < vwap_val and cand_close < ema9_val and cand_close < cand_open:
+                        rule_matched_tag = "Institutional Micro-Scalp"
+                        rule_matched_reason = f"⚡ [Institutional Micro-Scalp] Bearish VWAP ({cand_close:.1f} < {vwap_val:.1f}) + EMA 9 Thrust ({cand_vol:.0f} vol)"
+                        is_ce = False
+                        session_scalp_count += 1
+                    else:
+                        k += 1
+                        continue
                 # 0. Forex Order Flow Strategy Rules (CVD Divergence, DOM Absorption, Killzone Delta, SMC Displacement)
                 elif has_cvd_divergence:
                     rule_matched_tag = "Forex CVD Divergence"
@@ -811,9 +870,10 @@ class TensorTradeRLEngine:
                     sw3_high = float(last3["high"].max() if "high" in last3 else last3["close"].max())
                     sw3_low = float(last3["low"].min() if "low" in last3 else last3["close"].min())
 
-                    # Signal triggers with Displacement Requirement (Body >= 60% of candle range)
-                    bullish_disp = (curr_c > sw3_high and curr_c > curr_o and displacement_ratio >= 0.60)
-                    bearish_disp = (curr_c < sw3_low and curr_c < curr_o and displacement_ratio >= 0.60)
+                    # Signal triggers with Displacement Requirement (Body >= threshold of candle range)
+                    disp_threshold = float(params.get("displacement_body_min_pct", 0.65))
+                    bullish_disp = (curr_c > sw3_high and curr_c > curr_o and displacement_ratio >= disp_threshold)
+                    bearish_disp = (curr_c < sw3_low and curr_c < curr_o and displacement_ratio >= disp_threshold)
 
                     # Liquidity Sweeps with structural rejection
                     ssl_swept = (curr_l <= pdl_val and curr_c > pdl_val and curr_c > curr_o) or (curr_l <= sw_low and curr_c > sw_low and curr_c > curr_o)
@@ -1187,6 +1247,9 @@ class TensorTradeRLEngine:
                 elif rule_matched_tag == "Momentum Guardrail":
                     active_rr = rr_ratio if (rr_ratio and rr_ratio > 0) else 1.75
                     active_sl_pts = stop_loss_pts if (stop_loss_pts and stop_loss_pts > 0) else 15.0
+                elif rule_matched_tag == "Institutional Micro-Scalp":
+                    active_sl_pts = stop_loss_pts if (stop_loss_pts and stop_loss_pts > 0) else 7.0
+                    active_rr = rr_ratio if (rr_ratio and rr_ratio > 0) else 2.0
 
                 if has_vix and (not stop_loss_pts or stop_loss_pts <= 0):
                     if vix_val < 12.0:
@@ -1224,6 +1287,10 @@ class TensorTradeRLEngine:
                             if has_momentum_guardrail and (opt_h - opt_entry_price) >= 10.0:
                                 sl_price = max(sl_price, opt_entry_price + 2.0)
 
+                            # Auto-Breakeven for Micro-Scalp (+1R profit moves SL to Entry + 0.5 pt)
+                            if rule_matched_tag == "Institutional Micro-Scalp" and (opt_h - opt_entry_price) >= active_sl_pts:
+                                sl_price = max(sl_price, opt_entry_price + 0.5)
+
                             if opt_h >= target_price:
                                 opt_exit_price = target_price
                                 opt_pts = target_pts
@@ -1251,6 +1318,13 @@ class TensorTradeRLEngine:
                                 ts_exit = cand_opt_row["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
                                 exit_spot = float(cand_opt_row["spot_price"]) if "spot_price" in cand_opt_row and pd.notnull(cand_opt_row["spot_price"]) else entry_spot
                                 exit_reason = f"⏰ 45-Min Momentum Time-Stop ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts | Anti-Theta Protection)"
+                                break
+                            elif rule_matched_tag == "Institutional Micro-Scalp" and opt_step_idx >= 5:
+                                opt_exit_price = round(opt_c, 2)
+                                opt_pts = round(opt_exit_price - opt_entry_price, 2)
+                                ts_exit = cand_opt_row["dt_parsed"].strftime("%Y-%m-%d %H:%M:%S")
+                                exit_spot = float(cand_opt_row["spot_price"]) if "spot_price" in cand_opt_row and pd.notnull(cand_opt_row["spot_price"]) else entry_spot
+                                exit_reason = f"⏱️ 5-Bar Micro-Scalp Time-Stop Squared Off ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
                                 break
                             elif cand_time_min >= 15 * 60 + 15:
                                 opt_exit_price = round(opt_c, 2)
@@ -1314,6 +1388,11 @@ class TensorTradeRLEngine:
                                 running_sl_pts = max(running_sl_pts, 2.0)
                                 trailing_sl_price = max(trailing_sl_price, round(opt_entry_price + running_sl_pts, 2))
 
+                            # Auto-Breakeven for Micro-Scalp (+1R profit moves SL to Entry + 0.5 pt)
+                            if rule_matched_tag == "Institutional Micro-Scalp" and cand_opt_pts >= active_sl_pts:
+                                running_sl_pts = max(running_sl_pts, 0.5)
+                                trailing_sl_price = max(trailing_sl_price, round(opt_entry_price + running_sl_pts, 2))
+
                             if cand_opt_pts >= target_pts:
                                 opt_pts = target_pts
                                 exit_idx = j
@@ -1335,6 +1414,11 @@ class TensorTradeRLEngine:
                                 opt_pts = round(cand_opt_pts, 2)
                                 exit_idx = j
                                 exit_reason = f"⏰ 45-Min Momentum Time-Stop ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts | Anti-Theta Protection)"
+                                break
+                            elif rule_matched_tag == "Institutional Micro-Scalp" and (j - k) >= 5:
+                                opt_pts = round(cand_opt_pts, 2)
+                                exit_idx = j
+                                exit_reason = f"⏱️ 5-Bar Micro-Scalp Time-Stop Squared Off ({'+' if opt_pts >= 0 else ''}{round(opt_pts, 1)} pts)"
                                 break
                             elif cand_time_min >= 15 * 60 + 15:
                                 opt_pts = round(cand_opt_pts, 2)

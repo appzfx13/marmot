@@ -33,3 +33,5 @@ class BacktestRuleTypeChoices(models.TextChoices):
     CUSTOM_PROMPT = 'custom_prompt', 'AI Prompt Directive'
     TECHNICAL = 'technical', 'Technical / Indicator'
     MOMENTUM_GUARDRAIL = 'momentum_guardrail', 'Professional Intraday Trend & Momentum Guardrails'
+    ALGO_MICRO_SCALP = 'algo_micro_scalp', 'Institutional Micro-Scalp & Dynamic Risk Guard'
+

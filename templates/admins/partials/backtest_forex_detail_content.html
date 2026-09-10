@@ -394,7 +394,7 @@
                 <tr class="border-bottom border-secondary border-opacity-10">
                     <td class="ps-3 py-2 font-monospace theme-text-muted">{{ trade.serial_no|default:forloop.counter }}</td>
                     <td class="py-2 font-monospace theme-text-main" style="font-size: 0.78rem;">
-                        {{ trade.datetime|default:trade.entry_time|default:'-' }}
+                        {{ trade.timestamp|default:trade.datetime|default:'-' }}
                     </td>
                     <td class="py-2">
                         <span class="badge rounded-pill px-2.5 py-1 font-monospace fw-bold {% if 'BUY' in trade.trade_type or 'LONG' in trade.trade_type or 'CE' in trade.trade_type %}bg-success bg-opacity-20 text-success border border-success border-opacity-35{% else %}bg-danger bg-opacity-20 text-danger border border-danger border-opacity-35{% endif %}">
@@ -402,11 +402,11 @@
                         </span>
                     </td>
                     <td class="py-2 text-center font-monospace fw-bold theme-text-main">
-                        {{ trade.lots_count|default:trade.quantity|default:1 }} Lot{% if trade.lots_count > 1 %}s{% endif %}
+                        {{ trade.lots_count|default:1 }} Lot{% if trade.lots_count > 1 %}s{% endif %}
                     </td>
                     <td class="py-2 text-end font-monospace" style="font-size: 0.78rem;">
-                        <div class="theme-text-main fw-bold">{{ trade.entry_price|default:trade.entry_spot|floatformat:2 }}</div>
-                        <div class="theme-text-muted" style="font-size: 0.72rem;">➔ {{ trade.exit_price|default:trade.exit_spot|floatformat:2 }}</div>
+                        <div class="theme-text-main fw-bold">{{ trade.entry_price|floatformat:2 }}</div>
+                        <div class="theme-text-muted" style="font-size: 0.72rem;">➔ {{ trade.exit_price|floatformat:2 }}</div>
                     </td>
                     <td class="py-2 text-end font-monospace fw-bold {% if trade.net_pnl > 0 %}text-success{% elif trade.net_pnl < 0 %}text-danger{% else %}theme-text-muted{% endif %}">
                         {% if trade.index_points >= 0 %}+{% endif %}{{ trade.index_points|floatformat:1 }} pts
@@ -415,8 +415,8 @@
                         {% if trade.net_pnl >= 0 %}+{% endif %}${{ trade.net_pnl|floatformat:2 }}
                     </td>
                     <td class="py-2 text-center">
-                        <small class="theme-text-muted font-monospace d-block text-truncate" style="max-width: 240px; font-size: 0.72rem;" title="{{ trade.reason|default:trade.entry_reason }}">
-                            {{ trade.reason|default:trade.entry_reason|default:'Order Flow CVD Signal' }}
+                        <small class="theme-text-muted font-monospace d-block text-truncate" style="max-width: 240px; font-size: 0.72rem;" title="{{ trade.reason }}">
+                            {{ trade.reason|default:'Order Flow CVD Signal' }}
                         </small>
                     </td>
                 </tr>
