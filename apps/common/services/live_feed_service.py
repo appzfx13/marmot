@@ -580,6 +580,7 @@ def get_live_index_option_chain(index_name: str = 'NIFTY') -> dict:
         from apps.market.services import redis_client
         import json
         redis_client.set(f"marmot:fyers:option_chain:{idx_clean}", json.dumps(res), ex=2)
+        redis_client.set(f"marmot:fyers:last_known_option_chain:{idx_clean}", json.dumps(res), ex=86400)
     except Exception:
         pass
     return res

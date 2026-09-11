@@ -219,4 +219,15 @@ func readLastCloseFromParquetDir(dirPath string) (float64, error) {
 	}
 
 	return closeVal, nil
-}
+}
+
+// GetBrokerCredentials retrieves FYERS App ID and Access Token from common_sitesettings.
+func (s *DBService) GetBrokerCredentials(ctx context.Context) (string, string, error) {
+	var appID, token string
+	query := `SELECT COALESCE(fyers_app_id, ''), COALESCE(fyers_access_token, '') FROM common_sitesettings ORDER BY id LIMIT 1`
+	err := s.Pool.QueryRow(ctx, query).Scan(&appID, &token)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to fetch broker credentials: %w", err)
+	}
+	return appID, token, nil
+}

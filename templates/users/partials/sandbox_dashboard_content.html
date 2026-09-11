@@ -538,6 +538,7 @@
         const formatted = '₹' + Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const displayText = (num > 0 && prefix === '+') ? '+' + formatted : (num < 0 ? '-' + formatted : formatted);
         if (el.textContent.trim() !== displayText) {
+            console.log('📈 [SandboxUI:MetricCard] #' + elId + ' updated -> ' + displayText);
             el.textContent = displayText;
             if (num > 0) {
                 el.classList.add('text-success');
@@ -555,6 +556,14 @@
     function handleSandboxTelemetry(data) {
         const payload = data.data || data;
         if (!payload) return;
+        console.log('🎯 [SandboxUI:TelemetrySync] Live sync applied from Go WS:', {
+            net_pnl: payload.live_net_pnl,
+            unrealized: payload.unrealized_pnl,
+            realized: payload.realized_pnl,
+            available_margin: payload.available_margin,
+            open_positions_count: payload.open_positions_count,
+            latency_ms: payload.processing_latency_ms
+        });
         if (payload.live_net_pnl !== undefined) updateMetric('sandbox-user-live-net-pnl', payload.live_net_pnl, '+');
         if (payload.unrealized_pnl !== undefined) updateMetric('sandbox-user-unrealized-pnl', payload.unrealized_pnl, '+');
         if (payload.realized_pnl !== undefined) updateMetric('sandbox-user-realized-pnl', payload.realized_pnl, '+');

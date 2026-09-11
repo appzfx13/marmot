@@ -12,9 +12,9 @@ import (
 
 	"go-app/config"
 	"go-app/services"
+	_ "go-app/strategies"
 	"go-app/workers"
 	"go-app/ws"
-	_ "go-app/strategies"
 )
 
 func main() {
@@ -49,14 +49,15 @@ func main() {
 	// 5. Initialize WebSocket Hub & Market Data Broadcaster
 	hub := ws.NewHub()
 	go hub.Run()
-	go ws.StartMarketDataBroadcaster(ctx, redisService, hub)
+	go ws.StartMarketDataBroadcaster(ctx, redisService, dbService, hub)
 
 	// 6. Initialize Task Manager
 	taskManager := workers.NewTaskManager(dbService, cfg, hub, redisService)
 
-	// 7. Start Listening for Django IPC Commands on Redis Channel
+	// 7. Start Listening for Django IPC Commands on Redis Channel & Auto-Resume Active Strategies
 	redisChannel := "market_backup_commands"
 	go taskManager.StartListener(ctx, redisService, redisChannel)
+	go taskManager.AutoResumeActiveStrategies(ctx)
 
 	// 8. Start HTTP Server for WebSockets, TradingView Chart Data API & UDF Protocol
 	http.HandleFunc("/ws", func(w http.ResponseWriter, r *http.Request) {

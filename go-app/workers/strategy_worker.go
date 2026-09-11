@@ -141,10 +141,25 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			return
 
 		case <-ticker.C:
+			segment := "INDEX"
+			if strings.Contains(indexName, "INR") || strings.Contains(indexName, "USD") || strings.Contains(indexName, "EUR") {
+				segment = "FOREX"
+			}
+			isMarketOpen := isSegmentMarketOpen(segment)
+			if !isMarketOpen {
+				// When market is closed, sleep evaluation to avoid CPU and log churn
+				if tickCounter%30 == 0 {
+					spotPrice, _ := j.fetchSpotPrice(ctx, indexName)
+					j.saveTelemetry(ctx, userID, params.StrategyID, strategyName, false, "MARKET_CLOSED",
+						spotPrice, cashBalance, cashBalance, positions, orders, 0)
+				}
+				tickCounter++
+				continue
+			}
+
 			loopStart := time.Now()
 			tickCounter++
 			spotPrice, _ := j.fetchSpotPrice(ctx, indexName)
-			isMarketOpen := isIndianMarketOpen()
 
 			var realizedTotal, unrealizedTotal, marginUtilized float64
 
@@ -155,13 +170,13 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						orders[k].CurrentLTP = liveLTP
 					}
 				}
-				
+
 				if orders[k].OrderStatus == "PENDING" && orders[k].CurrentLTP > 0 {
 					if orders[k].TransactionType == "BUY" && orders[k].CurrentLTP <= orders[k].LimitEntryPrice {
 						orders[k].OrderStatus = "TRADED"
 						orders[k].ExecutionTime = nowIST().Format("03:04:05 PM")
 						orders[k].FilledQty = orders[k].Quantity
-						
+
 						newPos := SimulatedPosition{
 							TradingSymbol:    orders[k].TradingSymbol,
 							ExchangeSegment:  "NSE_FNO",
@@ -185,16 +200,16 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			for i := range positions {
 				if positions[i].Status == "OPEN" {
 					marginUtilized += float64(positions[i].NetQty) * positions[i].BuyAvg
-					
+
 					liveLTP := j.fetchOptionLTP(ctx, indexName, positions[i].TradingSymbol, spotPrice)
 					if liveLTP > 0 {
 						positions[i].CurrentLTP = liveLTP
 					}
-					
+
 					posPnl := math.Round((positions[i].CurrentLTP - positions[i].BuyAvg) * float64(positions[i].NetQty))
 					positions[i].UnrealizedProfit = posPnl
 					positions[i].TotalPnL = posPnl
-					
+
 					var sl, tp float64
 					for _, o := range orders {
 						if o.TradingSymbol == positions[i].TradingSymbol && o.TransactionType == "BUY" && o.OrderStatus == "TRADED" {
@@ -203,7 +218,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							break
 						}
 					}
-					
+
 					if positions[i].CurrentLTP > 0 && sl > 0 && tp > 0 {
 						triggerReason := ""
 						if positions[i].CurrentLTP <= sl {
@@ -211,7 +226,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						} else if positions[i].CurrentLTP >= tp {
 							triggerReason = "TP Hit"
 						}
-						
+
 						if triggerReason != "" {
 							positions[i].Status = "CLOSED"
 							positions[i].RealizedProfit = posPnl
@@ -219,7 +234,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							positions[i].SellQty = positions[i].BuyQty
 							positions[i].SellAvg = positions[i].CurrentLTP
 							positions[i].NetQty = 0
-							
+
 							nowStr := nowIST().Format("03:04:05 PM")
 							exitOrder := SimulatedOrder{
 								OrderID:         fmt.Sprintf("SBX-%d%02d", time.Now().Unix()%100000, rand.Intn(90)+10),
@@ -242,7 +257,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							log.Printf("🛡️ [StrategyWorker #%s] POSITION SQUARED OFF (%s): SELL %s @ ₹%.2f\n", taskID, triggerReason, positions[i].TradingSymbol, positions[i].CurrentLTP)
 						}
 					}
-					
+
 					if positions[i].Status == "OPEN" {
 						unrealizedTotal += positions[i].UnrealizedProfit
 					} else {
@@ -303,7 +318,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						now := nowIST()
 						newOrderID := fmt.Sprintf("SBX-%d%02d", now.Unix()%100000, rand.Intn(90)+10)
 						fillPrice := j.fetchOptionLTP(ctx, indexName, sig.TradingSymbol, spotPrice)
-						
+
 						if fillPrice > 0 {
 							slPts := 15.0
 							rrRatio := 2.0
@@ -323,7 +338,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							if signalTime == "" {
 								signalTime = nowStr
 							}
-							
+
 							status := "TRADED"
 							if sig.OrderType == "LIMIT" {
 								status = "PENDING"
@@ -355,7 +370,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								Indicators:      sig.Indicators,
 								SlippagePts:     0.00,
 							}
-							
+
 							if status == "TRADED" {
 								newOrder.ExecutionTime = nowStr
 								newOrder.FilledQty = sig.Quantity
@@ -378,7 +393,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							} else {
 								log.Printf("⏳ [StrategyWorker #%s] LIMIT ORDER PLACED (PENDING): %s %s @ ₹%.2f\n", taskID, sig.Transaction, sig.TradingSymbol, fillPrice)
 							}
-							
+
 							orders = append([]SimulatedOrder{newOrder}, orders...)
 						} else {
 							log.Printf("⚠️ [StrategyWorker #%s] Missed tick for %s, skipping fake fallback logic.", taskID, sig.TradingSymbol)
@@ -391,7 +406,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			if !isMarketOpen {
 				statusStr = "MARKET_CLOSED"
 			}
-			
+
 			latencyMs := time.Since(loopStart).Milliseconds()
 			j.saveTelemetry(ctx, userID, params.StrategyID, strategyName, isMarketOpen, statusStr,
 				spotPrice, cashBalance, cashBalance-marginUtilized, positions, orders, latencyMs)
@@ -406,16 +421,34 @@ func nowIST() time.Time {
 	return time.Now().In(istLocation)
 }
 
-// isIndianMarketOpen checks if current time in IST is within active NSE trading hours (09:15 to 15:30, Mon-Fri).
+// isIndianMarketOpen checks if current time in IST is within active trading hours for the given instrument segment.
 func isIndianMarketOpen() bool {
+	return isSegmentMarketOpen("INDEX")
+}
+
+// isSegmentMarketOpen checks trading hours by segment:
+// - "INDEX": 09:15 to 15:30 IST (NIFTY, BANKNIFTY, SENSEX)
+// - "FOREX": 09:00 to 17:00 IST (USDINR, EURINR, etc.)
+// - "FOREX_CROSS": 09:00 to 19:30 IST (EURUSD, GBPUSD, etc.)
+func isSegmentMarketOpen(segment string) bool {
 	now := nowIST()
 	weekday := now.Weekday()
 	if weekday == time.Saturday || weekday == time.Sunday {
 		return false
 	}
 	totalMinutes := now.Hour()*60 + now.Minute()
-	return totalMinutes >= 555 && totalMinutes <= 930
+	switch strings.ToUpper(segment) {
+	case "FOREX", "CURRENCY":
+		return totalMinutes >= 540 && totalMinutes <= 1020
+	case "FOREX_CROSS":
+		return totalMinutes >= 540 && totalMinutes <= 1170
+	case "INDEX", "EQUITY":
+		fallthrough
+	default:
+		return totalMinutes >= 555 && totalMinutes <= 930
+	}
 }
+
 
 // parseOptionSymbol extracts strike price, option type ("CALL" / "PUT"), and expiry tag (e.g. "15SEP") from trading symbol.
 func parseOptionSymbol(symbol string) (int, string, string) {
@@ -630,35 +663,41 @@ func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName stri
 		fmt.Sprintf(":1:marmot:fyers_quote:NSE:%s-INDEX", indexName),
 		fmt.Sprintf("marmot:fyers:option_chain:%s", indexName),
 		fmt.Sprintf(":1:marmot:fyers:option_chain:%s", indexName),
+		fmt.Sprintf("marmot:fyers:last_known_option_chain:%s", indexName),
 	}
 
 	for _, k := range keysToTry {
 		data, err := j.redisService.Client.Get(ctx, k).Result()
 		if err == nil && len(data) > 0 {
-			var parsed struct {
-				RawSpotLTP float64 `json:"raw_spot_ltp"`
-				LP         float64 `json:"lp"`
-				ATMStrike  int     `json:"atm_strike"`
-				OpenPrice  float64 `json:"open_price"`
-				HighPrice  float64 `json:"high_price"`
-				LowPrice   float64 `json:"low_price"`
-			}
-			if unmarshalErr := json.Unmarshal([]byte(data), &parsed); unmarshalErr == nil {
-				price := parsed.RawSpotLTP
-				if price == 0 {
-					price = parsed.LP
+			var rawMap map[string]interface{}
+			if unmarshalErr := json.Unmarshal([]byte(data), &rawMap); unmarshalErr == nil {
+				var price float64
+				if v, ok := rawMap["raw_spot_ltp"].(float64); ok && v > 0 {
+					price = v
+				} else if v, ok := rawMap["lp"].(float64); ok && v > 0 {
+					price = v
+				} else if s, ok := rawMap["spot_ltp"].(string); ok {
+					cleanStr := strings.ReplaceAll(strings.ReplaceAll(s, ",", ""), "₹", "")
+					_, _ = fmt.Sscanf(cleanStr, "%f", &price)
 				}
+
 				if price > 0 {
 					res.SpotPrice = price
-					res.OpenPrice = parsed.OpenPrice
+					if v, ok := rawMap["open_price"].(float64); ok {
+						res.OpenPrice = v
+					}
 					if res.OpenPrice == 0 {
 						res.OpenPrice = price
 					}
-					res.HighPrice = parsed.HighPrice
+					if v, ok := rawMap["high_price"].(float64); ok {
+						res.HighPrice = v
+					}
 					if res.HighPrice == 0 {
 						res.HighPrice = price
 					}
-					res.LowPrice = parsed.LowPrice
+					if v, ok := rawMap["low_price"].(float64); ok {
+						res.LowPrice = v
+					}
 					if res.LowPrice == 0 {
 						res.LowPrice = price
 					}
@@ -667,8 +706,9 @@ func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName stri
 					if step <= 0 {
 						step = 50
 					}
-					res.ATMStrike = parsed.ATMStrike
-					if res.ATMStrike == 0 {
+					if v, ok := rawMap["atm_strike"].(float64); ok && v > 0 {
+						res.ATMStrike = int(v)
+					} else {
 						res.ATMStrike = int(math.Round(price/float64(step)) * float64(step))
 					}
 					return res
@@ -766,6 +806,10 @@ func (j *StrategySignalJob) saveTelemetry(
 			"spot_price": spotPrice,
 			"data":       telemetry,
 		})
+		if status == "STREAMING" && processingLatencyMs > 0 {
+			log.Printf("📡 [WS Telemetry] Task=%s | Spot=₹%.2f | NetPnL=₹%.2f | Margin=₹%s | OpenPos=%d | Latency=%dms\n",
+				j.payload.TaskID, spotPrice, realizedTotal+unrealizedTotal, telemetry["available_margin"], openCount, processingLatencyMs)
+		}
 		j.hub.BroadcastToTask(j.payload.TaskID, wsPayload)
 		select {
 		case j.hub.Broadcast <- wsPayload:

@@ -354,6 +354,7 @@
         const formatted = '₹' + Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
         const displayText = (num > 0 && prefix === '+') ? '+' + formatted : (num < 0 ? '-' + formatted : formatted);
         if (el.textContent.trim() !== displayText) {
+            console.log('📈 [SandboxUI:MetricCard] #' + elId + ' updated -> ' + displayText);
             el.textContent = displayText;
             if (num > 0) {
                 el.classList.add('text-success');
@@ -371,6 +372,15 @@
     function handleSandboxTelemetry(data) {
         const payload = data.data || data;
         if (!payload) return;
+        console.log('🎯 [SandboxUI:TelemetrySync] Live sync applied from Go WS:', {
+            net_pnl: payload.live_net_pnl,
+            unrealized: payload.unrealized_pnl,
+            realized: payload.realized_pnl,
+            available_margin: payload.available_margin,
+            open_positions_count: payload.open_positions_count,
+            positions_len: (payload.positions || []).length,
+            latency_ms: payload.processing_latency_ms
+        });
         if (payload.live_net_pnl !== undefined) updateMetric('sandbox-live-net-pnl', payload.live_net_pnl, '+');
         if (payload.unrealized_pnl !== undefined) updateMetric('sandbox-unrealized-pnl', payload.unrealized_pnl, '+');
         if (payload.realized_pnl !== undefined) updateMetric('sandbox-realized-pnl', payload.realized_pnl, '+');
@@ -397,6 +407,7 @@
             window._positionPnlBarChartInstance.data.datasets[0].backgroundColor = colors;
             window._positionPnlBarChartInstance.data.datasets[0].borderColor = colors;
             window._positionPnlBarChartInstance.update('none');
+            console.log('📊 [SandboxUI:Chart] Position P&L Bar Chart updated (' + payload.positions.length + ' positions)');
         }
 
         // 0-Latency Micro-Updates for Open Positions in Table
@@ -419,6 +430,7 @@
                     totEl.className = 'text-end font-monospace fw-bold fs-6 pos-live-total ' + (t >= 0 ? 'text-success' : 'text-danger');
                 }
             });
+            console.log('📋 [SandboxUI:Positions] Micro-updated table rows for ' + payload.positions.length + ' active position(s)');
         }
 
         // 0-Latency Micro-Updates for Orders in Table
@@ -429,6 +441,7 @@
                     ordLtpEl.textContent = 'LTP: ₹' + parseFloat(ord.current_ltp).toFixed(2);
                 }
             });
+            console.log('📑 [SandboxUI:Orders] Micro-updated table rows for ' + payload.orders.length + ' simulated order(s)');
         }
         
         // 0-Latency Tick Latency Metric Update

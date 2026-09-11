@@ -3,6 +3,7 @@ package workers
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"log"
 	"strings"
 	"sync"
@@ -163,5 +164,44 @@ func (m *TaskManager) runWorkerWrapper(ctx context.Context, payload models.Comma
 	} else {
 		job := NewBackupJob(m.dbService, m.config, payload, m.hub)
 		job.Run(ctx)
+	}
+}
+
+// AutoResumeActiveStrategies queries active LiveStrategy records from DB on startup and resumes them
+func (m *TaskManager) AutoResumeActiveStrategies(ctx context.Context) {
+	if m.dbService == nil || m.dbService.Pool == nil {
+		return
+	}
+	rows, err := m.dbService.Pool.Query(ctx, `
+		SELECT id, name, strategy_name, index_name, execution_mode, user_id, allocated_capital 
+		FROM trade_config_livestrategy 
+		WHERE is_active = true AND is_deleted = false
+	`)
+	if err != nil {
+		log.Printf("⚠️ [TaskManager:AutoResume] Query active strategies error: %v\n", err)
+		return
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id, userID int
+		var name, stratName, indexName, execMode string
+		var capital float64
+		if err := rows.Scan(&id, &name, &stratName, &indexName, &execMode, &userID, &capital); err == nil {
+			payload := models.CommandPayload{
+				TaskID:  fmt.Sprintf("strategy_%d", id),
+				Command: "START_STRATEGY",
+				Params: models.TaskParams{
+					StrategyID:     id,
+					StrategyName:   stratName,
+					IndexName:      indexName,
+					ExecutionMode:  execMode,
+					UserID:         fmt.Sprintf("%d", userID),
+					InitialCapital: capital,
+				},
+			}
+			log.Printf("🚀 [TaskManager:AutoResume] Resuming active strategy #%d (%s) on startup\n", id, name)
+			m.startOrResumeTask(ctx, payload)
+		}
 	}
 }

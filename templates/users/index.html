@@ -19,8 +19,8 @@
         rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     {% if site_settings.favicon %}
-    <link rel="icon" href="{{ site_settings.favicon }}">
-    <link rel="shortcut icon" href="{{ site_settings.favicon }}">
+    <link rel="icon" href="{% if site_settings.favicon.url %}{{ site_settings.favicon.url }}{% elif site_settings.favicon|slice:':1' == '/' %}{{ site_settings.favicon }}{% else %}/media/{{ site_settings.favicon }}{% endif %}">
+    <link rel="shortcut icon" href="{% if site_settings.favicon.url %}{{ site_settings.favicon.url }}{% elif site_settings.favicon|slice:':1' == '/' %}{{ site_settings.favicon }}{% else %}/media/{{ site_settings.favicon }}{% endif %}">
     {% else %}
     <link rel="icon" type="image/png" href="{% static 'images/ref/logo/logo-icon.png' %}">
     <link rel="shortcut icon" href="{% static 'images/ref/logo/logo-icon.png' %}">
@@ -2544,6 +2544,7 @@
                     try {
                         this.ws = new WebSocket(this.url);
                         this.ws.onopen = function () {
+                            window.MarmotWS.disableFallback();
                             window.MarmotWS.useFallback = false;
                             window.MarmotWS.reconnectAttempts = 0;
                             const activeSubTasks = Object.keys(window.MarmotWS.subscribers);
@@ -2562,19 +2563,40 @@
                                         window.updateLiveSpotDOM(spot, data.data || data);
                                     }
                                 }
+                                if (data.type === 'sandbox_telemetry') {
+                                    const t = data.data || data;
+                                    console.log('📊 [MarmotWS:Telemetry] Received for Task #' + (data.task_id || t.strategy_id) + ':', {
+                                        net_pnl: t.live_net_pnl,
+                                        unrealized: t.unrealized_pnl,
+                                        realized: t.realized_pnl,
+                                        margin: t.available_margin,
+                                        positions: (t.positions || []).length,
+                                        latency_ms: t.processing_latency_ms
+                                    });
+                                    window.dispatchEvent(new CustomEvent('marmot:sandbox-telemetry', { detail: data }));
+                                    const stratKey = data.task_id || (data.data && data.data.strategy_id ? 'strategy_' + data.data.strategy_id : null);
+                                    if (stratKey && window.MarmotWS.callbacks[String(stratKey)]) {
+                                        window.MarmotWS.callbacks[String(stratKey)].forEach(function (cb) {
+                                            try { cb(data); } catch (err) {}
+                                        });
+                                    }
+                                }
                                 if (data.type === 'order_update' || data.type === 'orders') {
+                                    console.log('📑 [MarmotWS:Orders] Dispatching reloadLiveOrders event');
                                     document.body.dispatchEvent(new CustomEvent('reloadLiveOrders'));
                                 }
                                 if (data.type === 'position_update' || data.type === 'positions') {
+                                    console.log('📑 [MarmotWS:Positions] Dispatching reloadLivePositions event');
                                     document.body.dispatchEvent(new CustomEvent('reloadLivePositions'));
                                 }
-                                if (data.type !== 'progress' && data.type !== 'backtest_progress') return;
-                                const taskIdStr = String(data.task_id);
-                                const cbs = window.MarmotWS.callbacks[taskIdStr];
-                                if (cbs && cbs.length > 0) {
-                                    cbs.forEach(function (cb) {
-                                        try { cb(data); } catch (err) {}
-                                    });
+                                if (data.type === 'progress' || data.type === 'backtest_progress') {
+                                    const taskIdStr = String(data.task_id);
+                                    const cbs = window.MarmotWS.callbacks[taskIdStr];
+                                    if (cbs && cbs.length > 0) {
+                                        cbs.forEach(function (cb) {
+                                            try { cb(data); } catch (err) {}
+                                        });
+                                    }
                                 }
                             } catch (e) {}
                         };
@@ -2640,33 +2662,101 @@
 
             window.MarmotWS.connect();
 
+            // Auto-reconnect when page is restored from bfcache or tab visibility changes
+            window.addEventListener('pageshow', function (event) {
+                if (event.persisted && window.MarmotWS) {
+                    console.log('🔄 [WS] Page restored from bfcache -> Reconnecting WebSocket');
+                    window.MarmotWS.useFallback = false;
+                    window.MarmotWS.reconnectAttempts = 0;
+                    window.MarmotWS.connect();
+                }
+            });
+            document.addEventListener('visibilitychange', function () {
+                if (!document.hidden && window.MarmotWS && (!window.MarmotWS.ws || window.MarmotWS.ws.readyState !== WebSocket.OPEN)) {
+                    console.log('👁️ [WS] Tab became visible -> Resuming WebSocket connection');
+                    window.MarmotWS.useFallback = false;
+                    window.MarmotWS.reconnectAttempts = 0;
+                    window.MarmotWS.connect();
+                }
+            });
+
+            // Throttled Option Chain reload trigger for live and sandbox dashboards
+            let _lastOcReloadTime = 0;
+            let _ocReloadPendingTimer = null;
+            window.triggerOptionChainReload = function (force) {
+                const now = Date.now();
+                if (!force && (now - _lastOcReloadTime < 5000)) {
+                    if (!_ocReloadPendingTimer) {
+                        _ocReloadPendingTimer = setTimeout(function () {
+                            _ocReloadPendingTimer = null;
+                            window.triggerOptionChainReload(true);
+                        }, 5000);
+                    }
+                    return;
+                }
+                _lastOcReloadTime = now;
+                const ocContainer = document.getElementById('live-option-chain-container');
+                if (ocContainer) {
+                    console.log('🔄 [OptionChain] Dispatching reloadOptionChain event to HTMX');
+                    document.body.dispatchEvent(new CustomEvent('reloadOptionChain'));
+                }
+            };
+
             window.updateLiveSpotDOM = function (spotPrice, payload) {
                 if (!spotPrice || isNaN(spotPrice) || spotPrice <= 0) return;
                 const numPrice = Number(spotPrice);
                 const formattedPrice = '₹' + numPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                const tickIndex = (payload && payload.index) ? String(payload.index).toUpperCase().trim() : '';
 
-                // 1. Top Ribbon Spot LTP
+                // 1. Top Ribbon Spot LTP: Check if ribbon card matches tick index
                 const ltpEl = document.getElementById('live-macro-spot-ltp');
                 if (ltpEl) {
-                    const prevVal = parseFloat(ltpEl.getAttribute('data-val') || 0);
-                    ltpEl.setAttribute('data-val', numPrice);
-                    ltpEl.textContent = formattedPrice;
-                    if (prevVal > 0 && Math.abs(numPrice - prevVal) >= 0.05) {
-                        ltpEl.style.transition = 'color 0.15s ease';
-                        ltpEl.style.color = numPrice >= prevVal ? '#22c55e' : '#ef4444';
-                        clearTimeout(ltpEl._colorTimer);
-                        ltpEl._colorTimer = setTimeout(function () {
-                            ltpEl.style.color = '';
-                        }, 400);
+                    const cardIdx = (ltpEl.getAttribute('data-index') || 'NIFTY').toUpperCase().trim();
+                    if (!tickIndex || tickIndex === cardIdx) {
+                        const prevVal = parseFloat(ltpEl.getAttribute('data-val') || 0);
+                        ltpEl.setAttribute('data-val', numPrice);
+                        ltpEl.textContent = formattedPrice;
+                        if (prevVal > 0 && Math.abs(numPrice - prevVal) >= 0.05) {
+                            ltpEl.style.transition = 'color 0.15s ease';
+                            ltpEl.style.color = numPrice >= prevVal ? '#22c55e' : '#ef4444';
+                            clearTimeout(ltpEl._colorTimer);
+                            ltpEl._colorTimer = setTimeout(function () {
+                                ltpEl.style.color = '';
+                            }, 400);
+                        }
+                        if (payload && payload.change_pct) {
+                            const pctEl = document.getElementById('live-macro-spot-change-pct');
+                            if (pctEl) pctEl.textContent = payload.change_pct;
+                        }
+                        if (payload && payload.change) {
+                            const chgEl = document.getElementById('live-macro-spot-change');
+                            if (chgEl) chgEl.innerHTML = (payload.is_positive ? '<i class="bi bi-caret-up-fill me-0.5"></i>' : '<i class="bi bi-caret-down-fill me-0.5"></i>') + payload.change + ' (' + payload.change_pct + ')';
+                        }
+                        if (payload && (payload.formatted_time || payload.timestamp)) {
+                            const ts = payload.formatted_time || payload.timestamp;
+                            const timeEl = document.getElementById('live-macro-spot-time');
+                            if (timeEl) timeEl.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + ts;
+                        }
                     }
                 }
 
-                // 2. Option Chain HUD Spot LTP
+                // 2. Option Chain HUD Spot LTP: STRICT INDEX GUARD
                 const ocLtpEl = document.getElementById('live-option-chain-spot-ltp');
                 if (ocLtpEl) {
+                    const backupSelect = document.getElementById('backupIndexSelect');
+                    const activeIndex = ((backupSelect ? backupSelect.value : null) || ocLtpEl.getAttribute('data-index') || 'NIFTY').toUpperCase().trim();
+
+                    // If the incoming tick has a specified index, it MUST match the active option chain index
+                    if (tickIndex && tickIndex !== activeIndex) {
+                        return;
+                    }
+
                     const prevOcVal = parseFloat(ocLtpEl.getAttribute('data-val') || 0);
                     ocLtpEl.setAttribute('data-val', numPrice);
                     ocLtpEl.textContent = formattedPrice;
+                    if (prevOcVal !== numPrice) {
+                        console.log('⚡ [MarmotWS:SpotDOM] ' + activeIndex + ' Spot: ' + formattedPrice + (payload && payload.change_pct ? ' (' + payload.change_pct + ')' : ''));
+                    }
                     if (prevOcVal > 0 && Math.abs(numPrice - prevOcVal) >= 0.05) {
                         ocLtpEl.style.transition = 'color 0.15s ease';
                         ocLtpEl.style.color = numPrice >= prevOcVal ? '#22c55e' : '#ef4444';
@@ -2675,30 +2765,55 @@
                             ocLtpEl.style.color = '';
                         }, 400);
                     }
-                }
 
-                // 3. Option Chain ATM Strike Indicator
-                const atmEl = document.getElementById('live-option-chain-atm');
-                if (atmEl) {
-                    const atmStrike = Math.round(numPrice / 50) * 50;
-                    atmEl.textContent = atmStrike;
-                }
-
-                // 4. Option Chain Spot Change Badge
-                if (payload && payload.change && payload.change_pct) {
-                    const ocChgEl = document.getElementById('live-option-chain-spot-change');
-                    if (ocChgEl) {
-                        ocChgEl.textContent = payload.change + ' (' + payload.change_pct + ')';
+                    // Dynamic step calculation for ATM strike
+                    let step = 50;
+                    if (activeIndex === 'BANKNIFTY' || activeIndex === 'SENSEX') {
+                        step = 100;
+                    } else if (activeIndex === 'MIDCPNIFTY') {
+                        step = 25;
                     }
-                }
+                    const atmStrike = Math.round(numPrice / step) * step;
 
-                // 5. Timestamps
-                if (payload && (payload.formatted_time || payload.timestamp)) {
-                    const ts = payload.formatted_time || payload.timestamp;
-                    const timeEl = document.getElementById('live-macro-spot-time');
-                    if (timeEl) timeEl.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + ts;
-                    const ocTimeEl = document.getElementById('live-option-chain-time');
-                    if (ocTimeEl) ocTimeEl.textContent = ts;
+                    const atmEl = document.getElementById('live-option-chain-atm');
+                    if (atmEl) {
+                        const prevAtm = parseInt(atmEl.textContent.trim(), 10);
+                        atmEl.textContent = atmStrike;
+                        // If ATM strike shifted, trigger option chain table reload to realign strikes heatmap
+                        if (!isNaN(prevAtm) && prevAtm > 0 && prevAtm !== atmStrike) {
+                            console.log('🎯 [OptionChain] ATM strike shifted from ' + prevAtm + ' to ' + atmStrike + ' -> Triggering table reload');
+                            window.triggerOptionChainReload(true);
+                        }
+                    }
+
+                    // Option Chain Spot Change Badge
+                    if (payload && payload.change && payload.change_pct) {
+                        const ocChgEl = document.getElementById('live-option-chain-spot-change');
+                        if (ocChgEl) {
+                            ocChgEl.textContent = payload.change + ' (' + payload.change_pct + ')';
+                            ocChgEl.className = 'badge ' + (payload.is_positive ? 'bg-success bg-opacity-20 text-success' : 'bg-danger bg-opacity-20 text-danger') + ' rounded-pill px-1.5 py-0.5 font-monospace fw-bold';
+                        }
+                    }
+
+                    // Option Chain Day High / Low
+                    if (payload && payload.high) {
+                        const highEl = document.querySelector('[data-tick-key="high_' + activeIndex + '"]');
+                        if (highEl) highEl.textContent = '₹' + payload.high;
+                    }
+                    if (payload && payload.low) {
+                        const lowEl = document.querySelector('[data-tick-key="low_' + activeIndex + '"]');
+                        if (lowEl) lowEl.textContent = '₹' + payload.low;
+                    }
+
+                    // Timestamp
+                    if (payload && (payload.formatted_time || payload.timestamp)) {
+                        const ts = payload.formatted_time || payload.timestamp;
+                        const ocTimeEl = document.getElementById('live-option-chain-time');
+                        if (ocTimeEl) ocTimeEl.textContent = ts;
+                    }
+
+                    // Periodic throttled option chain reload while user views the card
+                    window.triggerOptionChainReload(false);
                 }
             };
 

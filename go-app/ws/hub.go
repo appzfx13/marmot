@@ -80,11 +80,10 @@ func (h *Hub) Run() {
 			}
 		case tm := <-h.TaskMessage:
 			subs, ok := h.taskSubs[tm.TaskID]
-			if !ok {
-				log.Printf("🔕 [WS] No subscribers for task %s\n", tm.TaskID)
+			if !ok || len(subs) == 0 {
 				continue
 			}
-			log.Printf("📤 [WS] Broadcasting to %d subscriber(s) for task %s\n", len(subs), tm.TaskID)
+			log.Printf("📤 [WS Broadcast -> Task %s] Subs: %d | Data: %s\n", tm.TaskID, len(subs), string(tm.Data))
 			for client := range subs {
 				if _, stillConnected := h.clients[client]; stillConnected {
 					select {
