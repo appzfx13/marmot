@@ -15,6 +15,18 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
     Handles Dhan REST API & WebSocket execution telemetry for Sandbox & Live modes.
     """
 
+    def get_base_url(self, account_type: str = None) -> str:
+        """Resolves Dhan base URL dynamically according to account_type or account environment."""
+        mode = str(account_type or getattr(self.account, 'account_type', 'SANDBOX')).upper()
+        if mode == 'LIVE':
+            return getattr(settings, 'DHAN_LIVE_BASE_URL', 'https://api.dhan.co/v2').rstrip('/')
+        return getattr(settings, 'DHAN_MOCK_BASE_URL', 'http://mock_broker:8088/mock/v2').rstrip('/')
+
+    @property
+    def base_url(self) -> str:
+        """Returns the configured Dhan API v2 base URL (Live vs Mock Emulator)."""
+        return self.get_base_url()
+
     @classmethod
     def get_admin_dhan_credentials(cls) -> Tuple[str, str, str]:
         """Returns (client_id, api_key, api_secret) for the global admin Dhan account from settings."""
@@ -54,7 +66,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         if token_to_test:
             clean_token = str(token_to_test).strip().strip('"').strip("'")
             try:
-                url = "https://api.dhan.co/v2/fundlimit"
+                url = f"{self.base_url}/fundlimit"
                 headers = {
                     "access-token": clean_token,
                     "client-id": clean_client_id,
@@ -170,6 +182,36 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                 'remarks': f"Dhan order {order_id} placed in {account_type} mode."
             }
         }
+        # Forward order to Dhan API (Live or Mock Emulator Sandbox)
+        if account_type == 'LIVE' or getattr(settings, 'DHAN_EMULATOR_ENABLED', False):
+            try:
+                import requests
+                target_base_url = self.get_base_url(account_type)
+                token = str(self.get_access_token() or '').strip().strip('"').strip("'")
+                clean_cid = str(self.client_id or '1000000001').strip().strip('"').strip("'")
+                payload = {
+                    "dhanClientId": clean_cid,
+                    "correlationId": symbol,
+                    "transactionType": side.upper(),
+                    "exchangeSegment": "NSE_FNO" if any(idx in symbol.upper() for idx in ['NIFTY', 'BANKNIFTY']) else "NSE_EQ",
+                    "productType": "INTRADAY",
+                    "orderType": order_type.upper(),
+                    "validity": "DAY",
+                    "securityId": symbol,
+                    "quantity": quantity,
+                    "price": price,
+                    "triggerPrice": stop_loss
+                }
+                headers = {"access-token": token, "client-id": clean_cid, "Content-Type": "application/json"}
+                resp = requests.post(f"{target_base_url}/orders", json=payload, headers=headers, timeout=6)
+                if resp.status_code in (200, 201, 202):
+                    dhan_data = resp.json()
+                    order_id = dhan_data.get("orderId", order_id)
+                    telemetry['order_id'] = order_id
+                    telemetry['api_response'] = dhan_data
+            except Exception as ex:
+                logger.warning(f"Dhan gateway order dispatch exception: {ex}")
+
         logger.info(f"Dhan Order Executed [{account_type}]: {order_id} for user @{self.user.username}")
         try:
             _get_redis().publish('marmot:orders', json.dumps({'type': 'order_update', 'broker': 'DHAN', 'order_id': order_id}))
@@ -201,7 +243,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             return {'success': False, 'status': 'UNCONFIGURED', 'available_balance': '0.00', 'cash': '0.00'}
 
         try:
-            url = "https://api.dhan.co/v2/fundlimit"
+            url = f"{self.base_url}/fundlimit"
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
             resp = requests.get(url, headers=headers, timeout=6)
             if resp.status_code == 200:
@@ -241,7 +283,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             return {'success': False, 'holdings': [], 'total_invested': 0.00, 'current_value': 0.00, 'total_pnl': 0.00, 'pnl_pct': 0.00, 'holdings_count': 0}
 
         try:
-            url = "https://api.dhan.co/v2/holdings"
+            url = f"{self.base_url}/holdings"
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
             resp = requests.get(url, headers=headers, timeout=6)
             if resp.status_code == 200:
@@ -315,7 +357,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             return {'success': False, 'positions': [], 'net_pnl': 0.00, 'realized_pnl': 0.00, 'unrealized_pnl': 0.00, 'open_positions_count': 0, 'closed_positions_count': 0}
 
         try:
-            url = "https://api.dhan.co/v2/positions"
+            url = f"{self.base_url}/positions"
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
             resp = requests.get(url, headers=headers, timeout=6)
             if resp.status_code == 200:
@@ -391,7 +433,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             return {'success': False, 'orders': [], 'orders_count': 0, 'open_orders_count': 0, 'traded_orders_count': 0}
 
         try:
-            url = "https://api.dhan.co/v2/orders"
+            url = f"{self.base_url}/orders"
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
             resp = requests.get(url, headers=headers, timeout=6)
             if resp.status_code == 200:
@@ -454,7 +496,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             return {'success': False, 'message': 'Missing Dhan credentials or active session token.'}
 
         try:
-            url = f"https://api.dhan.co/v2/orders/{order_id}"
+            url = f"{self.base_url}/orders/{order_id}"
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
             resp = requests.delete(url, headers=headers, timeout=6)
             if resp.status_code == 200:
@@ -501,7 +543,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             return {'success': False, 'trades': [], 'trades_count': 0}
 
         try:
-            url = "https://api.dhan.co/v2/trades"
+            url = f"{self.base_url}/trades"
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
             resp = requests.get(url, headers=headers, timeout=5)
             print(f"[DHAN API DEBUG] GET /v2/trades HTTP {resp.status_code} | Raw Response: {resp.text[:300]}")
@@ -553,7 +595,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
             
             while True:
-                url = f"https://api.dhan.co/v2/trades/{from_date}/{to_date}/{curr_page}"
+                url = f"{self.base_url}/trades/{from_date}/{to_date}/{curr_page}"
                 resp = requests.get(url, headers=headers, timeout=6)
                 print(f"[DHAN STATEMENTS DEBUG] GET /v2/trades/{from_date}/{to_date}/{curr_page} HTTP {resp.status_code} | Raw: {resp.text[:200]}")
                 if resp.status_code == 200:
@@ -603,7 +645,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             return {'success': False, 'statements': []}
 
         try:
-            url = f"https://api.dhan.co/v2/ledger?from-date={from_date}&to-date={to_date}"
+            url = f"{self.base_url}/ledger?from-date={from_date}&to-date={to_date}"
             headers = {"access-token": token, "client-id": client_id, "Accept": "application/json"}
             resp = requests.get(url, headers=headers, timeout=5)
             if resp.status_code == 200:
@@ -619,10 +661,11 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             logger.warning("Dhan get_ledger_statements exception: %s", e)
             return {'success': False, 'statements': []}
 
-    def get_live_dashboard_summary(self) -> Dict[str, Any]:
-        """Aggregates funds, positions, PnL, and auth health for the Live Dashboard via parallel ThreadPool & shared Redis cache."""
+    def get_live_dashboard_summary(self, account_type: str = None) -> Dict[str, Any]:
+        """Aggregates funds, positions, PnL, and auth health for the Dashboard via parallel ThreadPool & shared Redis cache."""
+        mode = str(account_type or getattr(self.account, 'account_type', 'SANDBOX')).upper()
         account_id = getattr(self.account, 'id', None) or getattr(self.user, 'id', 'default')
-        cache_key = f"marmot:dhan:live_summary:{account_id}"
+        cache_key = f"marmot:dhan:live_summary:{account_id}:{mode}"
 
         try:
             cached_json = _get_redis().get(cache_key)
@@ -633,6 +676,12 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
 
         token = str(self.get_access_token() or '').strip().strip('"').strip("'")
         client_id = str(self.client_id or '').strip().strip('"').strip("'")
+        if mode != 'LIVE':
+            if not client_id:
+                client_id = "1000000001"
+            if not token:
+                token = "mock_emulator_token"
+
         if not token or not client_id:
             unauth_result = {
                 'is_token_active': False, 'needs_consent': True,

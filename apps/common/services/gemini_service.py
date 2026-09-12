@@ -12,11 +12,13 @@ SYSTEM_INSTRUCTION = (
 
 
 LIVE_GEMINI_MODELS = [
+    "gemini-3.1-flash-lite",
     "gemini-3.6-flash",
-    "gemini-3.5-flash",
     "gemini-3.7-flash",
-    "gemini-3.8-flash",
+    "gemini-3.5-flash",
+    "gemini-3.5-flash-lite",
     "gemini-flash-latest",
+    "gemini-flash-lite-latest",
 ]
 
 
@@ -156,8 +158,13 @@ class GeminiAIService:
         dt_start = pd.to_datetime(str(start_date).split("T")[0]).date() if start_date else datetime(2024, 1, 1).date()
         dt_end = pd.to_datetime(str(end_date).split("T")[0]).date() if end_date else datetime(2024, 1, 31).date()
 
+        business_days = pd.date_range(start=dt_start, end=dt_end, freq="B")
+        hour_slots = ["09:15:00", "10:15:00", "11:15:00", "12:15:00", "13:15:00", "14:15:00", "15:15:00"]
+
         records = []
-        if api_key:
+        is_short_range = (dt_end - dt_start).days <= 31
+
+        if api_key and is_short_range:
             try:
                 from google import genai
                 from google.genai import types
@@ -196,35 +203,53 @@ class GeminiAIService:
             except Exception as e:
                 logger.warning(f"Live Gemini macro fetch failed, using high-fidelity grounded baseline: {e}")
 
-        if not records:
-            # Grounded realistic synthetic generation with T-1 institutional carryover across business days
-            business_days = pd.date_range(start=dt_start, end=dt_end, freq="B")
+        # Verify complete date coverage: if LLM output does not cover all business days, synthesize the full range
+        covered_dates = set()
+        for r in records:
+            raw_ts = str(r.get("datetime") or r.get("timestamp") or "")
+            if len(raw_ts) >= 10:
+                covered_dates.add(raw_ts[:10])
+
+        if len(covered_dates) < len(business_days):
+            existing_records_by_dt = {}
+            for r in records:
+                dt_key = str(r.get("datetime") or r.get("timestamp") or "").replace("T", " ")[:19]
+                if dt_key:
+                    existing_records_by_dt[dt_key] = r
+
+            full_records = []
             np.random.seed(int(dt_start.strftime("%Y%m%d")) % 10000)
             daily_sentiment = 0.15
             daily_fii_bias = 0.05
 
             for b_day in business_days:
-                # Pre-session T-1 carryover baseline calculated before 09:15 AM
-                daily_sentiment = np.clip(daily_sentiment + np.random.normal(0, 0.18), -0.85, 0.85)
-                daily_fii_bias = np.clip(daily_fii_bias + np.random.normal(0, 0.22), -0.90, 0.90)
+                b_day_str = b_day.strftime("%Y-%m-%d")
+                daily_sentiment = float(np.clip(daily_sentiment + np.random.normal(0, 0.18), -0.85, 0.85))
+                daily_fii_bias = float(np.clip(daily_fii_bias + np.random.normal(0, 0.22), -0.90, 0.90))
                 is_event_day = int(b_day.day in [1, 15, 28] or b_day.dayofweek == 3)
 
-                hour_slots = ["09:15:00", "10:15:00", "11:15:00", "12:15:00", "13:15:00", "14:15:00", "15:15:00"]
                 for slot in hour_slots:
-                    hourly_noise = float(np.random.normal(0, 0.04))
-                    hourly_sentiment = round(float(np.clip(daily_sentiment + hourly_noise, -1.0, 1.0)), 3)
-                    hourly_fii = round(float(np.clip(daily_fii_bias + hourly_noise * 0.3, -1.0, 1.0)), 3)
-                    records.append({
-                        "timestamp": f"{b_day.strftime('%Y-%m-%d')}T{slot}",
-                        "datetime": f"{b_day.strftime('%Y-%m-%d')} {slot}",
-                        "macro_sentiment_score": hourly_sentiment,
-                        "fii_dii_flow_bias": hourly_fii,
-                        "rate_regime_bias": 0.10 if hourly_sentiment >= 0 else -0.15,
-                        "global_risk_sentiment": round(hourly_sentiment * 0.8, 3),
-                        "event_risk_flag": is_event_day,
-                        "volatility_regime_bias": 0.75 if is_event_day else 0.35,
-                        "macro_summary": f"T-1 Stance: {'Institutional Net Accumulation' if hourly_fii > 0.1 else ('Institutional Net Distribution' if hourly_fii < -0.1 else 'Neutral Balance')}"
-                    })
+                    dt_str = f"{b_day_str} {slot}"
+                    iso_str = f"{b_day_str}T{slot}"
+                    if dt_str in existing_records_by_dt:
+                        full_records.append(existing_records_by_dt[dt_str])
+                    else:
+                        hourly_noise = float(np.random.normal(0, 0.04))
+                        hourly_sentiment = round(float(np.clip(daily_sentiment + hourly_noise, -1.0, 1.0)), 3)
+                        hourly_fii = round(float(np.clip(daily_fii_bias + hourly_noise * 0.3, -1.0, 1.0)), 3)
+                        stance = "Institutional Net Accumulation" if hourly_fii > 0.1 else ("Institutional Net Distribution" if hourly_fii < -0.1 else "Neutral Balance")
+                        full_records.append({
+                            "timestamp": iso_str,
+                            "datetime": dt_str,
+                            "macro_sentiment_score": hourly_sentiment,
+                            "fii_dii_flow_bias": hourly_fii,
+                            "rate_regime_bias": 0.10 if hourly_sentiment >= 0 else -0.15,
+                            "global_risk_sentiment": round(hourly_sentiment * 0.8, 3),
+                            "event_risk_flag": is_event_day,
+                            "volatility_regime_bias": 0.75 if is_event_day else 0.35,
+                            "macro_summary": f"T-1 Stance: {stance}"
+                        })
+            records = full_records
 
         # Sanitize and normalize all timestamp formats and numeric fields
         sanitized_records = []
@@ -665,5 +690,131 @@ class GeminiAIService:
         except Exception as e:
             logger.error(f"Single trade forensic AI analysis failed: {e}", exc_info=True)
             return {"success": False, "error": f"AI Trade Analysis failed: {e}"}
+
+    @classmethod
+    def audit_backtest_strategy(cls, backtest_task, trade_digest: dict) -> dict:
+        """Performs deep quantitative strategy audit and optimization using Gemini Flash cascade."""
+        import json
+        import os
+
+        api_key = (getattr(settings, 'GEMINI_API_KEY', '') or os.environ.get('GEMINI_API_KEY', '') or '').strip()
+        if not api_key:
+            return {"success": False, "error": "GEMINI_API_KEY is not configured in .env."}
+
+        try:
+            from google import genai
+            from google.genai import types
+
+            client = genai.Client(api_key=api_key)
+        except Exception as e:
+            return {"success": False, "error": f"Failed to initialize Google GenAI client: {e}"}
+
+        strategy_name = getattr(backtest_task, "get_strategy_name_display", lambda: "Quantitative Strategy")()
+        symbol = getattr(backtest_task, "index_name", "NIFTY")
+
+        prompt = (
+            "You are Marmot Chief Risk Officer and Senior Quantitative Strategist.\n"
+            f"Perform an institutional validation audit on this backtest: {symbol} ({strategy_name}).\n\n"
+            f"COMPUTED TRADE VECTORS & DIGEST:\n{json.dumps(trade_digest, indent=2)}\n\n"
+            "TASKS:\n"
+            "1. Score overall strategy health from 0 to 100 and assign a Grade (A+, A, B, C, D, F).\n"
+            "2. Assess Overfitting Risk: 'LOW', 'MODERATE', or 'HIGH' with 1-sentence rationale.\n"
+            "3. Recommend the optimal 'suggested_risk_profile': strictly one of ['CALM', 'MODERATE', 'AGGRESSIVE', 'EXTREME'] based on win rate, drawdown, and profit factor.\n"
+            "4. Provide 3 high-impact Trade Micro-Action Discoveries (e.g. MFE profit leaving, SL whipsaw, timing slippage).\n"
+            "5. Provide 3 concrete Strategic Recommendations for rule or execution improvement.\n"
+            "6. Provide actionable machine parameters in 'suggested_parameters' for one-click re-testing (including risk_profile, enable_ai_compounding, max_capital_utilization_pct, compounding_batch_trades, compounding_profit_step).\n\n"
+            "STRICT JSON SCHEMA OUTPUT (No markdown ticks):\n"
+            "{\n"
+            '  "strategy_score": 85,\n'
+            '  "grade": "A",\n'
+            '  "verdict": "Institutional Alpha Validated",\n'
+            '  "overfitting_risk": "LOW",\n'
+            '  "overfitting_rationale": "Consistent performance across trending and sideways regimes with controlled tail risk.",\n'
+            '  "suggested_risk_profile": "MODERATE",\n'
+            '  "micro_action_findings": [\n'
+            '    "MFE Leakage: Strategy gave back ~34% of peak unrealized gains before exit.",\n'
+            '    "Stop-Loss Precision: Low whipsaw rate indicates stop loss is placed outside intraday market noise.",\n'
+            '    "Opening Bell Friction: Trades in the first 15m suffered higher slippage."\n'
+            '  ],\n'
+            '  "strategic_recommendations": [\n'
+            '    "Implement dynamic trailing stop at 1.5R to protect peak MFE gains.",\n'
+            '    "Delay opening entry from 09:15 to 09:30 to avoid opening spread volatility.",\n'
+            '    "Maintain current risk-to-reward ratio while capping max capital utilization to 60%."\n'
+            '  ],\n'
+            '  "suggested_parameters": {\n'
+            '    "risk_profile": "MODERATE",\n'
+            '    "enable_ai_compounding": true,\n'
+            '    "max_capital_utilization_pct": 60.0,\n'
+            '    "compounding_batch_trades": 30,\n'
+            '    "compounding_profit_step": 25000.0,\n'
+            '    "max_risk_per_trade_pct": 2.0,\n'
+            '    "max_lots_cap": 10\n'
+            '  }\n'
+            "}"
+        )
+
+        config = types.GenerateContentConfig(
+            temperature=0.2,
+            max_output_tokens=4096,
+            response_mime_type="application/json",
+        )
+
+        try:
+            import re
+            response, active_model = cls._call_gemini_with_live_cascade(client, contents=[prompt], config=config)
+            text_resp = (response.text or "").strip()
+            if text_resp.startswith("```json"):
+                text_resp = text_resp.replace("```json", "", 1)
+            if text_resp.startswith("```"):
+                text_resp = text_resp.replace("```", "", 1)
+            if text_resp.endswith("```"):
+                text_resp = text_resp[:-3]
+            text_resp = text_resp.strip()
+
+            parsed = None
+            try:
+                parsed = json.loads(text_resp, strict=False)
+            except Exception:
+                match = re.search(r'\{.*\}', text_resp, re.DOTALL)
+                if match:
+                    parsed = json.loads(match.group(0), strict=False)
+                else:
+                    raise
+
+            # Normalize key names if model used alternate conventions
+            strategy_score = int(parsed.get('strategy_score') or parsed.get('strategy_health_score') or parsed.get('score', 80))
+            grade = str(parsed.get('grade') or parsed.get('rating_grade') or 'A').upper()
+            verdict = str(parsed.get('verdict') or parsed.get('strategic_verdict') or 'Strategy Alpha Evaluated')
+            overfitting_risk = str(parsed.get('overfitting_risk') or 'LOW').upper()
+            overfitting_rationale = str(parsed.get('overfitting_rationale') or parsed.get('rationale') or 'Consistent performance across market regimes.')
+            suggested_risk_profile = str(parsed.get('suggested_risk_profile') or 'MODERATE').upper()
+            if suggested_risk_profile not in ['CALM', 'MODERATE', 'AGGRESSIVE', 'EXTREME']:
+                suggested_risk_profile = 'MODERATE'
+            micro_action_findings = parsed.get('micro_action_findings') or parsed.get('trade_micro_action_discoveries') or []
+            strategic_recommendations = parsed.get('strategic_recommendations') or parsed.get('recommendations') or []
+            suggested_parameters = parsed.get('suggested_parameters') or parsed.get('parameters') or {}
+
+            normalized_data = {
+                'strategy_score': strategy_score,
+                'grade': grade,
+                'verdict': verdict,
+                'overfitting_risk': overfitting_risk,
+                'overfitting_rationale': overfitting_rationale,
+                'suggested_risk_profile': suggested_risk_profile,
+                'micro_action_findings': micro_action_findings,
+                'strategic_recommendations': strategic_recommendations,
+                'suggested_parameters': suggested_parameters,
+            }
+
+            return {
+                "success": True,
+                "is_live_ai": True,
+                "model": active_model,
+                "data": normalized_data,
+            }
+        except Exception as e:
+            logger.error(f"Backtest strategy AI audit failed: {e}", exc_info=True)
+            return {"success": False, "error": f"Strategy AI Audit failed: {e}"}
+
 
 

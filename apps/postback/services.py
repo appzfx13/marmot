@@ -110,8 +110,8 @@ class PostbackService:
 
         client_id = parsed.get('client_id')
         if not target_user and client_id:
-            # 1. Match User by broker_client_id
-            target_user = User.objects.filter(broker_client_id=client_id).first()
+            # 1. Match User via linked UserTradingAccount
+            target_user = User.objects.filter(trading_accounts__broker_client_id=client_id).first()
             # 2. Match User by username
             if not target_user:
                 target_user = User.objects.filter(username=client_id).first()

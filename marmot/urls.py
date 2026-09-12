@@ -29,6 +29,7 @@ urlpatterns = [
 
     # REST API & Webhook Routes
     path('api/', include(('apps.postback.urls', 'postback'), namespace='postback')),
+    path('postback/', include(('apps.postback.urls', 'postback_root'), namespace='postback_root')),
     path('api/', include(('apps.api.urls', 'api'), namespace='api')),
 
     # 404 Preview Route

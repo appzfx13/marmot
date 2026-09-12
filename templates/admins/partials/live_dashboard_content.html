@@ -2,12 +2,27 @@
 <div class="d-flex flex-column gap-4">
 
     <!-- START: Live Dashboard Header Banner -->
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-1">
-        <div>
-            <h1 class="page-title">Live Dashboard</h1>
-            <p class="page-subtitle mb-0">Realtime live broker telemetry, active portfolio margin, orders, and execution controls.</p>
+    <!-- START: Live Dashboard Header Banner -->
+    <div class="page-header d-flex flex-column flex-xl-row align-items-center align-items-xl-center justify-content-between gap-3 mb-2 text-center text-xl-start">
+        <div class="page-header-title-wrapper d-flex flex-column align-items-center align-items-xl-start w-100">
+            <h1 class="page-title mb-1 text-center text-xl-start">{% if env_mode == 'MOCK' %}Live Mock Dashboard{% else %}Live Dashboard{% endif %}</h1>
+            <div class="d-flex align-items-center justify-content-center justify-content-xl-start gap-2 mb-1.5 flex-wrap w-100">
+                {% if env_mode == 'MOCK' %}
+                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-40 px-2.5 py-1 fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                    <i class="bi bi-cpu me-1"></i> DHAN EMULATOR (:8088)
+                </span>
+                <a href="http://127.0.0.1:8088/mock/dashboard" target="_blank" class="btn btn-sm btn-outline-info py-0.5 px-2.5 rounded-pill" style="font-size: 0.72rem;">
+                    <i class="bi bi-sliders me-1"></i> Sandbox Controls
+                </a>
+                {% else %}
+                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-40 px-2.5 py-1 fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                    <i class="bi bi-shield-check me-1"></i> DHAN PRODUCTION LIVE
+                </span>
+                {% endif %}
+            </div>
+            <p class="page-subtitle mb-0 text-center text-xl-start">{% if env_mode == 'MOCK' %}High-fidelity broker gateway emulator, virtual ledger MTM, and chaos simulation.{% else %}Realtime live broker telemetry, active portfolio margin, orders, and execution controls.{% endif %}</p>
         </div>
-        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+        <div class="page-header-actions d-flex align-items-center justify-content-center justify-content-xl-end gap-2 flex-wrap ms-xl-auto">
             {% if request.user.trade_eligibility and not request.user.is_blocked %}
                 <span class="trend-badge trend-up py-1.5 px-3">
                     <i class="bi bi-check-circle-fill"></i>
@@ -50,7 +65,7 @@
     <!-- Top Latest Macro Market Benchmark Cards Ribbon -->
     {% include 'admins/partials/live_macro_cards_ribbon.html' %}
 
-    {% if not has_live_account %}
+    {% if not has_live_account and env_mode != 'MOCK' %}
     <!-- Onboarding Guide for Live Accounts -->
     <div class="card glass-card p-4 text-center border-warning border-opacity-25" 
          style="background: linear-gradient(135deg, rgba(255, 193, 7, 0.06) 0%, rgba(180, 241, 5, 0.04) 100%); border-radius: 16px !important;">
@@ -108,7 +123,8 @@
     </div>
     {% endif %}
 
-    <!-- FYERS Live Market Data Feed Status & Daily Auth Banner -->
+    <!-- FYERS Live Market Data Feed Status & Daily Auth Banner (Only for Live mode, Completely hidden in Mock mode) -->
+    {% if env_mode != 'MOCK' and not is_mock_mode %}
     {% if not fyers_telemetry.feed_active or not fyers_telemetry.is_token_valid %}
     <div class="card glass-card p-3 rounded-4 border-warning border-opacity-50 shadow-none" 
          style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(180, 241, 5, 0.04) 100%); border-radius: 16px !important;">
@@ -140,6 +156,7 @@
         </div>
     </div>
     {% endif %}
+    {% endif %}
 
     <!-- START: Top 8 Portfolio Telemetry Cards (4 Inline x 2 Rows, Spark Design Standard) -->
     <div class="d-flex flex-column gap-3">
@@ -149,7 +166,9 @@
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="card alert-green-card">
                     <div class="position-relative z-index-2">
-                        {% if is_token_active %}
+                        {% if is_mock_mode %}
+                            <span class="alert-green-badge">Dhan Mock Emulator Online</span>
+                        {% elif is_token_active %}
                             <span class="alert-green-badge">Live Broker Online</span>
                         {% else %}
                             <span class="badge bg-warning text-dark fw-bold px-2 py-1 mb-2 rounded-pill">Auth Required</span>

@@ -159,6 +159,10 @@ func (m *TaskManager) runWorkerWrapper(ctx context.Context, payload models.Comma
 		job := NewStrategySignalJob(m.dbService, m.config, payload, m.hub, m.redisService)
 		job.Run(ctx)
 	} else if payload.Command == "START_BACKTEST" || payload.Params.StrategyName != "" {
+		if payload.Params.StrategyName == "tensortrade_rl" {
+			log.Printf("ℹ️ [Task #%s] TensorTrade RL backtest delegated to Python RL Engine.\n", payload.TaskID)
+			return
+		}
 		job := NewBacktestJob(m.dbService, m.config, payload, m.hub)
 		job.Run(ctx)
 	} else {

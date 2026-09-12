@@ -16,6 +16,25 @@
         <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="modal" aria-label="Close"></button>
     </div>
 
+    <!-- Mock Broker Live Telemetry Status Banner -->
+    {% if mock_broker_available %}
+    <div class="d-flex align-items-center justify-content-between px-4 py-2 border-bottom border-white border-opacity-10" style="background: rgba(16, 185, 129, 0.08);">
+        <div class="d-flex align-items-center gap-2">
+            <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.65rem; height: 0.65rem;"></span>
+            <span class="small fw-semibold text-success"><i class="bi bi-hdd-network-fill me-1"></i> Dhan Mock Gateway Available (:8088)</span>
+        </div>
+        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 smaller font-monospace">ONLINE</span>
+    </div>
+    {% else %}
+    <div class="d-flex align-items-center justify-content-between px-4 py-2 border-bottom border-white border-opacity-10" style="background: rgba(255, 255, 255, 0.03);">
+        <div class="d-flex align-items-center gap-2">
+            <i class="bi bi-dash-circle text-muted"></i>
+            <span class="small text-muted">Dhan Mock Gateway (:8088) Offline</span>
+        </div>
+        <span class="badge bg-secondary bg-opacity-20 text-muted border border-white border-opacity-10 rounded-pill px-2.5 py-0.5 smaller">STANDBY</span>
+    </div>
+    {% endif %}
+
     <!-- Form for Deploying to LiveStrategy -->
     <form hx-post="{% url 'backtest:backtest_deploy_live' backtest.pk %}"
           hx-target="#globalHtmxModalDialog"
@@ -48,21 +67,31 @@
                 <div class="col-md-7">
                     <div class="d-flex align-items-center justify-content-between mb-1">
                         <label class="form-label small fw-semibold text-white mb-0">Target Trading Account (Broker API)</label>
-                        <button type="button" 
-                                class="btn btn-link p-0 text-decoration-none text-info smaller fw-bold d-inline-flex align-items-center gap-1"
-                                hx-get="{% url 'admins:admin-sandbox-account-create-modal' %}"
-                                hx-target="#globalHtmxModalDialog"
-                                hx-swap="innerHTML"
-                                title="Create a new isolated Sandbox Account">
-                            <i class="bi bi-plus-circle-fill"></i> + New Sandbox Account
-                        </button>
+                        <div class="d-flex align-items-center gap-2">
+                            <button type="button" 
+                                    class="btn btn-link p-0 text-decoration-none text-info smaller fw-bold d-inline-flex align-items-center gap-1"
+                                    hx-get="{% url 'admins:admin-sandbox-account-create-modal' %}"
+                                    hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
+                                    title="Create a new isolated Sandbox Account">
+                                <i class="bi bi-plus-circle-fill"></i> + Sandbox
+                            </button>
+                            <button type="button" 
+                                    class="btn btn-link p-0 text-decoration-none text-warning smaller fw-bold d-inline-flex align-items-center gap-1"
+                                    hx-post="{% url 'admins:admin-connect-mock-broker' %}"
+                                    hx-target="#deployTradingAccountSelect"
+                                    hx-swap="outerHTML"
+                                    title="Connect / Refresh Dhan Mock Gateway (:8088)">
+                                <i class="bi bi-hdd-network-fill"></i> + Connect Mock
+                            </button>
+                        </div>
                     </div>
                     <select name="trading_account_id" id="deployTradingAccountSelect" class="form-select"
                             style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
                         {% if user_accounts %}
                             {% for acc in user_accounts %}
-                            <option value="{{ acc.id }}" data-account-type="{{ acc.account_type }}" {% if acc.is_default %}selected{% endif %}>
-                                {{ acc.account_name }} ({{ acc.broker.name }} - {{ acc.account_type }})
+                            <option value="{{ acc.id }}" data-account-type="{{ acc.account_type }}" {% if acc.is_default or acc.account_type == default_mode %}selected{% endif %}>
+                                {{ acc.account_name }} ({{ acc.broker.name }} - {{ acc.account_type }}) {% if acc.account_type == 'MOCK' %}[ONLINE :8088]{% endif %}
                             </option>
                             {% endfor %}
                         {% else %}
@@ -78,6 +107,7 @@
                             style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
                         <option value="LIVE" {% if default_mode == 'LIVE' %}selected{% endif %}>LIVE Real Market Execution</option>
                         <option value="SANDBOX" {% if default_mode == 'SANDBOX' %}selected{% endif %}>SANDBOX Paper Trading</option>
+                        <option value="MOCK" {% if default_mode == 'MOCK' %}selected{% endif %}>MOCK Live Paper Trading (Dhan Emulator)</option>
                     </select>
                 </div>
 
@@ -145,10 +175,18 @@
         function updateNamePrefix(mode) {
             if (!nameInput) return;
             var val = nameInput.value;
-            if (mode === 'SANDBOX' && val.startsWith('Live ')) {
-                nameInput.value = 'Sandbox ' + val.substring(5);
-            } else if (mode === 'LIVE' && val.startsWith('Sandbox ')) {
-                nameInput.value = 'Live ' + val.substring(8);
+            if (mode === 'MOCK') {
+                if (val.startsWith('Live ')) nameInput.value = 'Mock ' + val.substring(5);
+                else if (val.startsWith('Sandbox ')) nameInput.value = 'Mock ' + val.substring(8);
+                else if (!val.startsWith('Mock ')) nameInput.value = 'Mock ' + val;
+            } else if (mode === 'SANDBOX') {
+                if (val.startsWith('Live ')) nameInput.value = 'Sandbox ' + val.substring(5);
+                else if (val.startsWith('Mock ')) nameInput.value = 'Sandbox ' + val.substring(5);
+                else if (!val.startsWith('Sandbox ')) nameInput.value = 'Sandbox ' + val;
+            } else if (mode === 'LIVE') {
+                if (val.startsWith('Sandbox ')) nameInput.value = 'Live ' + val.substring(8);
+                else if (val.startsWith('Mock ')) nameInput.value = 'Live ' + val.substring(5);
+                else if (!val.startsWith('Live ')) nameInput.value = 'Live ' + val;
             }
         }
 
@@ -156,7 +194,10 @@
             var opt = accSelect.options[accSelect.selectedIndex];
             if (opt && opt.getAttribute('data-account-type')) {
                 var accType = opt.getAttribute('data-account-type').toUpperCase();
-                if (accType === 'SANDBOX') {
+                if (accType === 'MOCK') {
+                    modeSelect.value = 'MOCK';
+                    updateNamePrefix('MOCK');
+                } else if (accType === 'SANDBOX') {
                     modeSelect.value = 'SANDBOX';
                     updateNamePrefix('SANDBOX');
                 } else if (accType === 'LIVE') {

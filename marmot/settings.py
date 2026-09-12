@@ -217,6 +217,10 @@ DHAN_CLIENT_ID = os.getenv('DHAN_CLIENT_ID')
 DHAN_API_KEY = os.getenv('DHAN_API_KEY')
 DHAN_API_SECRET = os.getenv('DHAN_API_SECRET')
 DHAN_ACCESS_TOKEN = os.getenv('DHAN_ACCESS_TOKEN')
+DHAN_LIVE_BASE_URL = os.getenv('DHAN_LIVE_BASE_URL', 'https://api.dhan.co/v2')
+DHAN_MOCK_BASE_URL = os.getenv('DHAN_MOCK_BASE_URL', 'http://mock_broker:8088/mock/v2')
+DHAN_API_BASE_URL = os.getenv('DHAN_API_BASE_URL', DHAN_LIVE_BASE_URL)
+DHAN_EMULATOR_ENABLED = os.getenv('DHAN_EMULATOR_ENABLED', 'false').lower() in ('true', '1')
 
 # OpenAlgo Integration
 OPENALGO_API_KEY = os.getenv('OPENALGO_API_KEY')

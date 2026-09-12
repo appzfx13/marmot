@@ -122,6 +122,39 @@ class Command(BaseCommand):
                 "is_active": True,
             },
             {
+                "name": "ICT Smart Money v4: Multi-Timeframe CHoCH & 0.5/0.705 Dual Layering OTE",
+                "rule_type": BacktestRuleTypeChoices.ICT_SMC_V4_LAYERING,
+                "market_type": RuleMarketTypeChoices.ALL,
+                "description": (
+                    "Institutional-grade Multi-Timeframe CHoCH (Change of Character) & Dual Layering Retest engine. "
+                    "Performs top-to-bottom HTF-to-LTF market structure analysis. On LTF displacement CHoCH, places dual-limit "
+                    "orders: Layer 1 @ 50.0% Fib Equilibrium (40% risk allocation) and Layer 2 @ 70.5% Deep OTE (60% risk allocation) "
+                    "with structural invalidation Stop-Loss below the swing low and 1:3.5+ Target."
+                ),
+                "prompt_directive": (
+                    "Execute Top-to-Bottom Multi-Timeframe analysis (HTF 15m trend bias + LTF 1m CHoCH displacement). "
+                    "On confirmed CHoCH displacement with body >= 60%, place dual limit orders: Layer 1 at 0.50 Fib Equilibrium "
+                    "and Layer 2 at 0.705 Deep OTE. Invalidation SL placed strictly below the structural swing low. Auto-cancel "
+                    "unfilled Layer 2 if target is reached or swing high is broken."
+                ),
+                "parameters": {
+                    "htf_trend_filter": True,
+                    "displacement_body_min_pct": 0.60,
+                    "enable_layering": True,
+                    "layer_1_fib": 0.50,
+                    "layer_1_risk_pct": 0.40,
+                    "layer_2_fib": 0.705,
+                    "layer_2_risk_pct": 0.60,
+                    "min_risk_reward": 3.5,
+                    "sl_pts": 7.0,
+                    "invalidation_buffer_pts": 2.0,
+                    "cancel_unfilled_bars": 10,
+                    "killzone_filter": True,
+                },
+                "is_system_preset": True,
+                "is_active": True,
+            },
+            {
                 "name": "Professional Intraday Trend & Momentum Guardrails",
                 "rule_type": BacktestRuleTypeChoices.MOMENTUM_GUARDRAIL,
                 "market_type": RuleMarketTypeChoices.ALL,

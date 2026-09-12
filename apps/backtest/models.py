@@ -106,6 +106,11 @@ class BacktestTask(BaseModel):
             lines = lines[-200:]
         return "\n".join(lines)
 
+    @property
+    def compounding_batch_trades(self):
+        """Returns configured evaluation period in closed trades for dynamic compounding."""
+        return int((self.parameters or {}).get('compounding_batch_trades', 30))
+
     def __str__(self):
         return f"Backtest #{self.id} | {self.get_strategy_name_display()} ({self.index_name}) - [{self.status.upper()}]"
 

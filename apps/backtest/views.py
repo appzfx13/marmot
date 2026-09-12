@@ -470,7 +470,14 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
                 'trade_num': idx,
                 'strike': trade.get('strike', trade.get('symbol', '')),
                 'type': t_type,
-                'exit_reason': trade.get('exit_reason', '')
+                'exit_reason': trade.get('exit_reason', ''),
+                'lots_count': trade.get('lots_count', 1),
+                'quantity': trade.get('quantity', 0),
+                'entry_price': trade.get('entry_price', 0.0),
+                'exit_price': trade.get('exit_price', 0.0),
+                'stop_loss_price': trade.get('stop_loss_price') or trade.get('initial_stop_loss_price', 0.0),
+                'target_price': trade.get('target_price') or trade.get('take_profit_price', 0.0),
+                'sizing_mode': trade.get('sizing_mode', ''),
             })
 
         gross_pnl = gross_profit + gross_loss
@@ -775,7 +782,13 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
                 'fillColor': '#10b981' if t_pnl >= 0 else '#ef4444',
                 'strike': p.get('strike', ''),
                 'type': p.get('type', ''),
-                'exit_reason': p.get('exit_reason', '')
+                'exit_reason': p.get('exit_reason', ''),
+                'lots_count': p.get('lots_count', 1),
+                'quantity': p.get('quantity', 0),
+                'entry_price': p.get('entry_price', 0.0),
+                'exit_price': p.get('exit_price', 0.0),
+                'stop_loss_price': p.get('stop_loss_price', 0.0),
+                'target_price': p.get('target_price', 0.0),
             })
             cum_equity_data.append({
                 'x': p['label'],
@@ -2222,9 +2235,9 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         is_forex = (task.market_type == 'FOREX_FUTURES' or (task.index_name and task.index_name.upper() in FOREX_SYMBOLS))
 
         if is_forex:
-            available_rules = BacktestRule.objects.filter(is_active=True, is_deleted=False, market_type__in=['FOREX_FUTURES', 'ALL'])
+            available_rules = list(BacktestRule.objects.filter(is_active=True, is_deleted=False, market_type__in=['FOREX_FUTURES', 'ALL']).order_by('-is_system_preset', 'id'))
         else:
-            available_rules = BacktestRule.objects.filter(is_active=True, is_deleted=False, market_type__in=['INDEX_FO', 'ALL'])
+            available_rules = list(BacktestRule.objects.filter(is_active=True, is_deleted=False, market_type__in=['INDEX_FO', 'ALL']).order_by('-is_system_preset', 'id'))
 
         active_rule_ids = set(task.rules.values_list('id', flat=True))
         if not active_rule_ids and task.parameters and 'rules' in task.parameters:
@@ -2232,9 +2245,12 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
                 if isinstance(r, dict) and 'id' in r:
                     active_rule_ids.add(r['id'])
                 elif isinstance(r, dict) and 'name' in r:
-                    matched = available_rules.filter(name=r['name']).first()
+                    matched = next((x for x in available_rules if x.name == r['name']), None)
                     if matched:
                         active_rule_ids.add(matched.id)
+
+        # Sort so active rules appear at the top of the list, followed by system presets
+        available_rules.sort(key=lambda r: (0 if r.id in active_rule_ids else 1, -1 if r.is_system_preset else 0, r.id))
 
         add_rule_type = request.GET.get('add_rule_type', '').strip()
         add_rule_id = request.GET.get('add_rule_id', '').strip()
@@ -2277,7 +2293,20 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             'end_date_val': task.end_date.strftime('%Y-%m-%d') if task.end_date else '',
             'initial_capital_val': task.initial_capital,
             'lots_count_val': params.get('lots_count', 1),
+            'risk_profile_val': (
+                str(params.get('risk_profile')).upper() if params.get('risk_profile') else
+                ('BEAST' if int(task.max_lots_cap or params.get('max_lots_cap', 10)) >= 50 or float(task.max_risk_per_trade_pct or params.get('max_risk_per_trade_pct', 2.0)) >= 8.0
+                 else 'EXTREME' if int(task.max_lots_cap or params.get('max_lots_cap', 10)) >= 25 or float(task.max_risk_per_trade_pct or params.get('max_risk_per_trade_pct', 2.0)) >= 5.0
+                 else 'AGGRESSIVE' if int(task.max_lots_cap or params.get('max_lots_cap', 10)) >= 15 or float(task.max_risk_per_trade_pct or params.get('max_risk_per_trade_pct', 2.0)) >= 3.5
+                 else 'CALM' if int(task.max_lots_cap or params.get('max_lots_cap', 10)) <= 5 and float(task.max_risk_per_trade_pct or params.get('max_risk_per_trade_pct', 2.0)) <= 1.5
+                 else 'MODERATE')
+            ),
+            'order_slice_size_val': int(params.get('order_slice_size', 30)),
+            'max_sliced_orders_val': int(params.get('max_sliced_orders', 2)),
             'enable_ai_lot_sizing_val': bool(task.enable_ai_lot_sizing or params.get('enable_ai_lot_sizing', False)),
+            'enable_ai_compounding_val': bool(params.get('enable_ai_compounding', False)),
+            'compounding_batch_trades_val': int(params.get('compounding_batch_trades', 30)),
+            'compounding_profit_step_val': float(params.get('compounding_profit_step', 25000.0 if not is_forex else 500.0)),
             'auto_risk_management_val': bool(task.auto_risk_management if task.auto_risk_management is not None else params.get('auto_risk_management', True)),
             'max_risk_per_trade_pct_val': float(task.max_risk_per_trade_pct or params.get('max_risk_per_trade_pct', 2.0)),
             'max_capital_utilization_pct_val': float(task.max_capital_utilization_pct or params.get('max_capital_utilization_pct', 60.0)),
@@ -2326,7 +2355,26 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             lots_count = 1
 
         enable_ai_lot_sizing = ('enable_ai_lot_sizing' in request.POST)
+        enable_ai_compounding = ('enable_ai_compounding' in request.POST)
+        try:
+            compounding_batch_trades = max(1, min(500, int(request.POST.get('compounding_batch_trades', '30').strip() or 30)))
+        except ValueError:
+            compounding_batch_trades = 30
+        try:
+            compounding_profit_step = float(request.POST.get('compounding_profit_step', '25000.0' if not is_forex else '500.0').strip() or (25000.0 if not is_forex else 500.0))
+        except ValueError:
+            compounding_profit_step = 25000.0 if not is_forex else 500.0
+
         auto_risk_management = ('auto_risk_management' in request.POST)
+        risk_profile = request.POST.get('risk_profile', 'MODERATE').strip().upper() or 'MODERATE'
+        try:
+            order_slice_size = int(request.POST.get('order_slice_size', '30').strip() or 30)
+        except ValueError:
+            order_slice_size = 30
+        try:
+            max_sliced_orders = int(request.POST.get('max_sliced_orders', '2').strip() or 2)
+        except ValueError:
+            max_sliced_orders = 2
         try:
             max_risk_pct = float(request.POST.get('max_risk_per_trade_pct', '2.0').strip() or 2.0)
         except ValueError:
@@ -2391,11 +2439,17 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         task.parameters = {
             **(task.parameters or {}),
             "market_type": "FOREX_FUTURES" if is_forex else "INDEX_FO",
+            "risk_profile": risk_profile,
+            "order_slice_size": order_slice_size,
+            "max_sliced_orders": max_sliced_orders,
             "rr_ratio": rr_ratio,
             "stop_loss_points": sl_pts,
             "sl_pts": sl_pts,
             "lots_count": lots_count,
             "enable_ai_lot_sizing": enable_ai_lot_sizing,
+            "enable_ai_compounding": enable_ai_compounding,
+            "compounding_batch_trades": compounding_batch_trades,
+            "compounding_profit_step": compounding_profit_step,
             "auto_risk_management": auto_risk_management,
             "max_risk_per_trade_pct": max_risk_pct,
             "max_capital_utilization_pct": max_cap_util_pct,
@@ -2406,6 +2460,41 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             "use_macro_assist": use_macro_assist,
             "macro_timeframe": macro_timeframe,
         }
+        is_clone = (request.POST.get('action') == 'clone')
+
+        if is_clone:
+            clone_task = BacktestTask.objects.create(
+                created_by=request.user,
+                market_type=task.market_type,
+                index_name=task.index_name,
+                strategy_name=task.strategy_name,
+                initial_capital=task.initial_capital,
+                start_date=task.start_date,
+                end_date=task.end_date,
+                status='PENDING',
+                parameters=task.parameters,
+                use_macro_assist=use_macro_assist,
+                macro_timeframe=macro_timeframe,
+                macro_backup_task=task.macro_backup_task,
+                backup_task=task.backup_task,
+                enable_ai_lot_sizing=enable_ai_lot_sizing,
+                auto_risk_management=auto_risk_management,
+                max_risk_per_trade_pct=max_risk_pct,
+                max_capital_utilization_pct=max_cap_util_pct,
+                max_lots_cap=max_lots_cap,
+            )
+            clone_task.rules.set(rules_qs)
+            send_backtest_control_command(clone_task.id, 'START')
+
+            response = HttpResponse(status=204)
+            response['HX-Trigger'] = json.dumps({
+                'showToast': {'message': f'Backtest cloned into #BT-{clone_task.id:04d} & execution started!', 'level': 'success'},
+                'closeGlobalModal': True,
+                'reloadBacktestTable': True,
+                'reloadBacktestDetail': True,
+            })
+            return response
+
         task.save(update_fields=['start_date', 'end_date', 'initial_capital', 'parameters', 'use_macro_assist', 'macro_timeframe', 'macro_backup_task', 'backup_task', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap'])
         task.rules.set(rules_qs)
 
@@ -2819,7 +2908,59 @@ class BacktestDeployModalView(LoginRequiredMixin, View):
 
     def get(self, request, pk, *args, **kwargs):
         backtest = get_object_or_404(BacktestTask, pk=pk)
-        user_accounts = request.user.trading_accounts.filter(is_active=True, is_deleted=False).select_related('broker')
+        user_accounts = list(request.user.trading_accounts.filter(is_active=True, is_deleted=False).select_related('broker'))
+
+        # Check if Dhan Mock Emulator is available on :8088
+        mock_broker_available = False
+        try:
+            import urllib.request
+            req = urllib.request.Request("http://mock_broker:8088/health")
+            with urllib.request.urlopen(req, timeout=0.5) as resp:
+                if resp.status == 200:
+                    mock_broker_available = True
+        except Exception:
+            try:
+                import urllib.request
+                req = urllib.request.Request("http://127.0.0.1:8088/health")
+                with urllib.request.urlopen(req, timeout=0.5) as resp:
+                    if resp.status == 200:
+                        mock_broker_available = True
+            except Exception:
+                mock_broker_available = False
+
+        if mock_broker_available:
+            from apps.trade_config.models import BrokerMaster, UserTradingAccount
+            dhan_broker = BrokerMaster.objects.filter(code='dhan').first()
+            if not dhan_broker:
+                dhan_broker = BrokerMaster.objects.create(
+                    code='dhan',
+                    name='DHAN',
+                    api_base_url='http://mock_broker:8088/mock/v2',
+                    description='DhanHQ Broker Gateway / Emulator',
+                )
+            mock_acc, _ = UserTradingAccount.objects.get_or_create(
+                user=request.user,
+                broker=dhan_broker,
+                account_type=AccountTypeChoices.MOCK,
+                defaults={
+                    'account_name': 'Dhan Mock Gateway (Emulator :8088)',
+                    'broker_client_id': '1000000001',
+                    'api_key': 'mock_token_jwt',
+                    'app_id': 'mock_dhan_app',
+                    'is_active': True,
+                    'is_configured': True,
+                    'is_default': False,
+                    'account_summary': {
+                        'initial_capital': 1000000.0,
+                        'balance': 1000000.0,
+                        'available_margin': '1,000,000.00',
+                        'cash': '1,000,000.00',
+                        'margin_utilized': '0.00',
+                    },
+                },
+            )
+            if mock_acc not in user_accounts:
+                user_accounts.append(mock_acc)
 
         rules_snapshot = [
             {
@@ -2836,7 +2977,12 @@ class BacktestDeployModalView(LoginRequiredMixin, View):
 
         default_account = next((a for a in user_accounts if a.is_default), None) or (user_accounts[0] if user_accounts else None)
         default_mode = default_account.account_type if default_account else AccountTypeChoices.SANDBOX
-        mode_prefix = "Sandbox" if default_mode == AccountTypeChoices.SANDBOX else "Live"
+        if default_mode == AccountTypeChoices.MOCK:
+            mode_prefix = "Mock"
+        elif default_mode == AccountTypeChoices.SANDBOX:
+            mode_prefix = "Sandbox"
+        else:
+            mode_prefix = "Live"
 
         context = {
             'backtest': backtest,
@@ -2845,6 +2991,7 @@ class BacktestDeployModalView(LoginRequiredMixin, View):
             'suggested_name': f"{mode_prefix} {backtest.index_name} {backtest.get_strategy_name_display()} #BT-{backtest.id:04d}",
             'suggested_capital': backtest.initial_capital,
             'default_mode': default_mode,
+            'mock_broker_available': mock_broker_available,
         }
         return render(request, 'admins/partials/backtest_deploy_modal.html', context)
 
@@ -2857,15 +3004,25 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
 
         trading_account_id = request.POST.get('trading_account_id')
         raw_mode = request.POST.get('execution_mode', 'LIVE').strip().upper()
-        execution_mode = AccountTypeChoices.SANDBOX if raw_mode == 'SANDBOX' else AccountTypeChoices.LIVE
+        if raw_mode == 'MOCK':
+            execution_mode = AccountTypeChoices.MOCK
+        elif raw_mode == 'SANDBOX':
+            execution_mode = AccountTypeChoices.SANDBOX
+        else:
+            execution_mode = AccountTypeChoices.LIVE
 
         target_account = None
         if trading_account_id:
             target_account = request.user.trading_accounts.filter(id=trading_account_id, is_active=True).first()
-            if target_account and target_account.account_type in [AccountTypeChoices.LIVE, AccountTypeChoices.SANDBOX]:
+            if target_account and target_account.account_type in [AccountTypeChoices.LIVE, AccountTypeChoices.SANDBOX, AccountTypeChoices.MOCK]:
                 execution_mode = target_account.account_type
 
-        mode_prefix = "Sandbox" if execution_mode == AccountTypeChoices.SANDBOX else "Live"
+        if execution_mode == AccountTypeChoices.MOCK:
+            mode_prefix = "Mock"
+        elif execution_mode == AccountTypeChoices.SANDBOX:
+            mode_prefix = "Sandbox"
+        else:
+            mode_prefix = "Live"
         raw_name = request.POST.get('name', '').strip()
         if not raw_name:
             name = f"{mode_prefix} {backtest.index_name} {backtest.get_strategy_name_display()} #BT-{backtest.id:04d}"
@@ -2892,9 +3049,15 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
         parameters_snapshot = {
             'strategy_parameters': backtest.parameters,
             'initial_capital': float(backtest.initial_capital),
+            'risk_profile': str((backtest.parameters or {}).get('risk_profile', 'MODERATE')),
+            'order_slice_size': int((backtest.parameters or {}).get('order_slice_size', 30)),
+            'max_sliced_orders': int((backtest.parameters or {}).get('max_sliced_orders', 2)),
             'use_macro_assist': backtest.use_macro_assist,
             'macro_timeframe': backtest.macro_timeframe,
             'enable_ai_lot_sizing': backtest.enable_ai_lot_sizing,
+            'enable_ai_compounding': bool((backtest.parameters or {}).get('enable_ai_compounding', False)),
+            'compounding_batch_trades': int((backtest.parameters or {}).get('compounding_batch_trades', 30)),
+            'compounding_profit_step': float((backtest.parameters or {}).get('compounding_profit_step', 25000.0)),
             'auto_risk_management': backtest.auto_risk_management,
             'max_risk_per_trade_pct': float(backtest.max_risk_per_trade_pct),
             'max_capital_utilization_pct': float(backtest.max_capital_utilization_pct),
@@ -2925,3 +3088,189 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
         return render(request, 'admins/partials/backtest_deploy_success.html', context)
 
 
+class BacktestAiAuditView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Institutional-grade AI strategy validation audit and vector analysis view."""
+
+    def get(self, request, pk, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        force = request.GET.get('force') == '1'
+
+        cached_audit = (backtest.results or {}).get('ai_audit') if isinstance(backtest.results, dict) else None
+        if cached_audit and not force:
+            context = {
+                'backtest': backtest,
+                'audit': cached_audit.get('data', cached_audit),
+                'model': cached_audit.get('model', 'gemini-3.6-flash'),
+                'is_live_ai': cached_audit.get('is_live_ai', True),
+                'trade_vectors': cached_audit.get('trade_vectors', {}),
+            }
+            return render(request, 'admins/partials/backtest_ai_audit_card.html', context)
+
+        return self._run_audit(request, backtest)
+
+    def post(self, request, pk, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        return self._run_audit(request, backtest)
+
+    def _run_audit(self, request, backtest):
+        from .trade_vector_engine import TradeVectorEngine
+        from apps.common.services.gemini_service import GeminiAIService
+
+        trade_digest = TradeVectorEngine.analyze_backtest_trades(backtest)
+        ai_res = GeminiAIService.audit_backtest_strategy(backtest, trade_digest)
+
+        if ai_res.get('success') and ai_res.get('data'):
+            if not isinstance(backtest.results, dict):
+                backtest.results = {}
+            audit_payload = {
+                'data': ai_res.get('data'),
+                'model': ai_res.get('model', 'gemini-3.6-flash'),
+                'is_live_ai': ai_res.get('is_live_ai', True),
+                'trade_vectors': trade_digest.get('trade_vectors', {}),
+            }
+            backtest.results['ai_audit'] = audit_payload
+            backtest.save(update_fields=['results'])
+
+            context = {
+                'backtest': backtest,
+                'audit': ai_res.get('data'),
+                'model': ai_res.get('model', 'gemini-3.6-flash'),
+                'is_live_ai': ai_res.get('is_live_ai', True),
+                'trade_vectors': trade_digest.get('trade_vectors', {}),
+            }
+            return render(request, 'admins/partials/backtest_ai_audit_card.html', context)
+
+        error_msg = ai_res.get('error', 'AI Strategy Validation is temporarily unavailable.')
+        context = {
+            'backtest': backtest,
+            'gemini_error': error_msg,
+            'trade_vectors': trade_digest.get('trade_vectors', {}),
+        }
+        return render(request, 'admins/partials/backtest_ai_audit_card.html', context)
+
+
+class BacktestApplyAiSuggestionsView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Clones backtest configuration with AI suggested parameter tweaks and executes comparative simulation."""
+
+    def post(self, request, pk, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        cached_audit = (backtest.results or {}).get('ai_audit', {})
+        audit_data = cached_audit.get('data', cached_audit) if isinstance(cached_audit, dict) else {}
+        suggested_params = audit_data.get('suggested_parameters', {})
+
+        new_params = dict(backtest.parameters or {})
+        new_params.update(suggested_params)
+        new_params['parent_backtest_id'] = backtest.id
+        new_params['is_ai_optimized'] = True
+
+        new_task = create_and_start_backtest_task(
+            strategy_name=backtest.strategy_name,
+            index_name=backtest.index_name,
+            start_date=backtest.start_date,
+            end_date=backtest.end_date,
+            initial_capital=backtest.initial_capital,
+            parameters=new_params,
+            user=request.user,
+            backup_task=backtest.backup_task,
+            use_macro_assist=backtest.use_macro_assist,
+            macro_timeframe=backtest.macro_timeframe,
+            macro_backup_task=backtest.macro_backup_task,
+            enable_ai_lot_sizing=backtest.enable_ai_lot_sizing,
+            auto_risk_management=backtest.auto_risk_management,
+            max_risk_per_trade_pct=float(suggested_params.get('max_risk_per_trade_pct', backtest.max_risk_per_trade_pct)),
+            max_capital_utilization_pct=float(suggested_params.get('max_capital_utilization_pct', backtest.max_capital_utilization_pct)),
+            max_lots_cap=backtest.max_lots_cap,
+        )
+
+        for rule in backtest.rules.all():
+            new_task.rules.add(rule)
+
+        # Unified Dual-Binding: Create and attach formal BacktestRule record
+        if suggested_params:
+            rec_text = "\n".join(audit_data.get('strategic_recommendations', []))
+            rule_name = f"AI Optimization Guardrail (BT-#{backtest.id})"
+            ai_rule, _ = BacktestRule.objects.get_or_create(
+                name=rule_name,
+                defaults={
+                    'market_type': backtest.market_type,
+                    'rule_type': 'momentum_guardrail',
+                    'description': rec_text or "AI-synthesized execution guardrail and parameter tuning.",
+                    'prompt_directive': f"Add Rule: Dynamic Trailing SL ({suggested_params.get('trailing_sl_trigger_r', 1.2)}R) with {suggested_params.get('entry_delay_minutes', 15)}m opening filter.",
+                    'parameters': suggested_params,
+                    'is_system_preset': False,
+                    'is_active': True,
+                    'created_by': request.user,
+                }
+            )
+            new_task.rules.add(ai_rule)
+
+        send_backtest_control_command(new_task.id, 'START_BACKTEST')
+
+        response = HttpResponse()
+        response['HX-Redirect'] = reverse('backtest:backtest_detail', kwargs={'pk': new_task.pk})
+        return response
+
+
+class BacktestSimulateCompoundingView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Clones backtest configuration with AI 30-Trade Safe Compounding Engine and executes comparative simulation."""
+
+    def post(self, request, pk, *args, **kwargs):
+        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        cached_audit = (backtest.results or {}).get('ai_audit', {})
+        audit_data = cached_audit.get('data', cached_audit) if isinstance(cached_audit, dict) else {}
+        suggested_params = audit_data.get('suggested_parameters', {})
+
+        new_params = dict(backtest.parameters or {})
+        new_params.update(suggested_params)
+        new_params['parent_backtest_id'] = backtest.id
+        new_params['is_ai_optimized'] = True
+        new_params['enable_ai_compounding'] = True
+        compounding_batch_trades = int(request.POST.get('compounding_batch_trades', (backtest.parameters or {}).get('compounding_batch_trades', 30)))
+        new_params['compounding_batch_trades'] = compounding_batch_trades
+        new_params['compounding_profit_step'] = 25000.0
+        new_params['max_capital_utilization_pct'] = float(suggested_params.get('max_capital_utilization_pct', 60.0))
+        new_params['max_lots_cap'] = int(suggested_params.get('max_lots_cap', 10))
+
+        new_task = create_and_start_backtest_task(
+            strategy_name=backtest.strategy_name,
+            index_name=backtest.index_name,
+            start_date=backtest.start_date,
+            end_date=backtest.end_date,
+            initial_capital=backtest.initial_capital,
+            parameters=new_params,
+            user=request.user,
+            backup_task=backtest.backup_task,
+            use_macro_assist=backtest.use_macro_assist,
+            macro_timeframe=backtest.macro_timeframe,
+            macro_backup_task=backtest.macro_backup_task,
+            enable_ai_lot_sizing=False,
+            auto_risk_management=True,
+            max_risk_per_trade_pct=float(suggested_params.get('max_risk_per_trade_pct', backtest.max_risk_per_trade_pct)),
+            max_capital_utilization_pct=float(new_params['max_capital_utilization_pct']),
+            max_lots_cap=int(new_params['max_lots_cap']),
+        )
+
+        for rule in backtest.rules.all():
+            new_task.rules.add(rule)
+
+        rule_name = f"AI {compounding_batch_trades}-Trade Safe Compounding Engine (BT-#{backtest.id})"
+        ai_rule, _ = BacktestRule.objects.get_or_create(
+            name=rule_name,
+            defaults={
+                'market_type': backtest.market_type,
+                'rule_type': 'momentum_guardrail',
+                'description': f"Evaluates closed equity every {compounding_batch_trades} trades. Auto-scales +1 lot per ₹25k net profit (Win Rate >= 50%), with 60% margin budget & drawdown lock.",
+                'prompt_directive': f"Add Rule: AI {compounding_batch_trades}-Trade Safe Compounding (+1 lot/₹25k profit, Win Rate ≥ 50%, Max 60% margin budget, Base-lot lock in drawdowns).",
+                'parameters': new_params,
+                'is_system_preset': False,
+                'is_active': True,
+                'created_by': request.user,
+            }
+        )
+        new_task.rules.add(ai_rule)
+
+        send_backtest_control_command(new_task.id, 'START_BACKTEST')
+
+        response = HttpResponse()
+        response['HX-Redirect'] = reverse('backtest:backtest_detail', kwargs={'pk': new_task.pk})
+        return response

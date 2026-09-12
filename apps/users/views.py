@@ -427,6 +427,68 @@ class UserLiveDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateV
         return context
 
 
+class UserLiveMockDashboardView(UserLiveDashboardView):
+    """User Live Mock Sandbox Trading Dashboard routed through Dhan Gateway Emulator."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        context['active_tab'] = 'live-mock'
+        context['env_mode'] = 'MOCK'
+        context['is_mock_mode'] = True
+        context['dashboard_title'] = 'Live Mock Dashboard'
+
+        mock_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default').first()
+        if not mock_account:
+            mock_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+
+        if mock_account:
+            try:
+                adapter = BrokerFactory.get_adapter(mock_account)
+                if hasattr(adapter, 'get_live_dashboard_summary'):
+                    summary = adapter.get_live_dashboard_summary(account_type='MOCK')
+                    context['is_token_active'] = True
+                    context['needs_consent'] = False
+                    context['broker_name'] = 'Dhan Emulator (Mock :8088)'
+                    context['available_margin'] = summary.get('available_margin', '500000.00')
+                    context['cash_balance'] = summary.get('cash', '500000.00')
+                    context['margin_utilized'] = summary.get('margin_utilized', '0.00')
+                    context['live_net_pnl'] = summary.get('live_net_pnl', 0.00)
+                    context['realized_pnl'] = summary.get('realized_pnl', 0.00)
+                    context['unrealized_pnl'] = summary.get('unrealized_pnl', 0.00)
+                    context['open_positions_count'] = summary.get('open_positions_count', 0)
+                    context['closed_positions_count'] = summary.get('closed_positions_count', 0)
+                    context['todays_orders_count'] = summary.get('todays_orders_count', 0)
+                    context['open_orders_count'] = summary.get('open_orders_count', 0)
+                    context['traded_orders_count'] = summary.get('traded_orders_count', 0)
+
+                    raw_pos = summary.get('positions', [])
+                    context['all_positions_count'] = len(raw_pos)
+                    pos_paginator = Paginator(raw_pos, 10)
+                    context['live_positions'] = pos_paginator.page(1).object_list
+                    context['page_obj'] = pos_paginator.page(1)
+                    context['is_paginated'] = pos_paginator.num_pages > 1
+
+                    raw_ord = summary.get('orders', [])
+                    context['orders_count'] = len(raw_ord)
+                    ord_paginator = Paginator(raw_ord, 10)
+                    context['live_orders'] = ord_paginator.page(1).object_list
+            except Exception as e:
+                logger.warning("UserLiveMockDashboardView telemetry exception: %s", e)
+
+        context['live_strategies'] = user.live_strategies.filter(
+            is_deleted=False,
+            execution_mode=AccountTypeChoices.SANDBOX
+        ).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
+
+        # Connect Option Chain HUD directly to Dhan Mock Emulator
+        selected_index = self.request.GET.get('index', 'NIFTY').upper().strip()
+        context['option_chain'] = get_live_index_option_chain(selected_index, is_mock=True)
+
+        return context
+
+
 class UserSandboxDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
     """Dedicated Sandbox Paper-Trading Dashboard running on local simulated ledger."""
     template_name = 'users/sandbox_dashboard.html'

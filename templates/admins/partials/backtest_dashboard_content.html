@@ -133,16 +133,18 @@
             sb.innerHTML = statusMap[status] || statusMap['created'];
         });
 
-        if (status === 'completed' || status === 'error' || progress >= 100) {
+        if (status === 'completed' || status === 'error' || status === 'paused' || status === 'cancelled' || progress >= 100) {
             setTimeout(function() {
-                const tableBody = document.getElementById('backtest-table-body');
-                if (tableBody && window.htmx) {
+                const container = document.getElementById('backtest-dashboard-container');
+                if (container && window.htmx) {
+                    window.htmx.trigger(document.body, 'reloadBacktestTable');
+                } else if (window.htmx) {
                     window.htmx.ajax('GET', window.location.pathname + window.location.search, {
                         target: '#mainContentBody',
                         swap: 'innerHTML'
                     });
                 }
-            }, 1200);
+            }, 500);
         }
     }
 

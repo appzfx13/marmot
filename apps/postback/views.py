@@ -84,3 +84,48 @@ class GenericBrokerPostbackWebhookView(View):
 
     def get(self, request, broker='dhan', *args, **kwargs):
         return JsonResponse({"status": "active", "broker": broker.upper(), "message": f"{broker.upper()} Postback Webhook endpoint ready."}, status=200)
+
+
+@method_decorator(csrf_exempt, name='dispatch')
+class MockDhanPostbackWebhookView(View):
+    """
+    Dedicated Dhan Emulator Live Mock Webhook Postback Endpoint.
+    Endpoints: POST /api/mock/dhan/postback/
+    """
+    def post(self, request, *args, **kwargs):
+        try:
+            if request.body:
+                payload = json.loads(request.body.decode('utf-8'))
+            else:
+                payload = request.POST.dict()
+        except Exception:
+            payload = {}
+
+        payload['execution_mode'] = 'MOCK'
+        x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
+        ip_address = x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.META.get('REMOTE_ADDR')
+
+        log = PostbackService.process_postback(
+            payload=payload,
+            broker_hint='dhan',
+            ip_address=ip_address
+        )
+
+        return JsonResponse({
+            "status": "success",
+            "environment": "MOCK",
+            "message": "Dhan Emulator Mock Postback received and backed up successfully",
+            "log_id": log.id,
+            "order_id": log.order_id,
+            "order_status": log.order_status,
+            "client_id": log.broker_client_id
+        }, status=200)
+
+    def get(self, request, *args, **kwargs):
+        return JsonResponse({
+            "status": "active",
+            "environment": "MOCK",
+            "broker": "DHAN-EMULATOR",
+            "message": "Mock Postback Webhook endpoint ready."
+        }, status=200)
+

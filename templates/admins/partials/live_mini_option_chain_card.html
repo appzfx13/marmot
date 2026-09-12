@@ -1,9 +1,9 @@
 {% load static %}
-<!-- Real-Time Dynamic Option Chain & Live FYERS Index Pricing Telemetry Widget -->
+<!-- Real-Time Dynamic Option Chain & Live Pricing Telemetry Widget -->
 <div class="card shadow-sm overflow-hidden mb-0 p-0"
      {% if option_chain.is_live %}
-         hx-get="{% url 'admins:admin-live-option-chain' %}"
-         hx-include="#backupIndexSelect"
+         hx-get="{% url 'admins:admin-live-option-chain' %}{% if is_mock_mode or env_mode == 'MOCK' %}?env=MOCK{% endif %}"
+         hx-include="#backupIndexSelect, #mockEnvInput"
          hx-trigger="reloadOptionChain from:body"
          hx-target="#live-option-chain-container"
          hx-swap="innerHTML"
@@ -29,6 +29,15 @@
                         <span class="badge bg-dark border border-success border-opacity-35 rounded-pill px-2.5 py-1 text-success font-monospace smaller d-inline-flex align-items-center gap-1.5 shadow-sm">
                             <i class="bi bi-lightning-charge-fill text-warning"></i>
                             <span>1s TICK STREAM</span>
+                        </span>
+                    {% elif option_chain.is_mock_live %}
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                            <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem; animation-duration: 0.75s;"></span>
+                            <span>MOCK STREAM LIVE</span>
+                        </span>
+                        <span class="badge bg-dark border border-success border-opacity-35 rounded-pill px-2.5 py-1 text-success font-monospace smaller d-inline-flex align-items-center gap-1.5 shadow-sm">
+                            <i class="bi bi-cpu text-info"></i>
+                            <span>PARQUET REPLAY</span>
                         </span>
                     {% elif option_chain.is_live %}
                         <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5">
@@ -62,6 +71,9 @@
             </button>
 
             <div class="d-flex align-items-center gap-2">
+                {% if is_mock_mode or env_mode == 'MOCK' %}
+                <input type="hidden" id="mockEnvInput" name="env" value="MOCK">
+                {% endif %}
                 <label for="backupIndexSelect" class="smaller fw-bold text-muted text-uppercase d-none d-sm-inline mb-0" style="font-size: 0.74rem;">
                     <i class="bi bi-database-fill-check me-1 text-warning"></i>Backup Index:
                 </label>
@@ -69,7 +81,7 @@
                         name="index"
                         class="form-select form-select-sm rounded-pill px-3 py-1.5 fw-bold font-monospace shadow-sm"
                         style="background: var(--card-bg, rgba(255, 255, 255, 0.04)); color: #ffffff; border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15)); min-width: 170px; cursor: pointer;"
-                        hx-get="{% url 'admins:admin-live-option-chain' %}"
+                        hx-get="{% url 'admins:admin-live-option-chain' %}{% if is_mock_mode or env_mode == 'MOCK' %}?env=MOCK{% endif %}"
                         hx-target="#live-option-chain-container"
                         hx-trigger="change"
                         hx-swap="innerHTML">
@@ -85,7 +97,7 @@
             <button type="button" 
                     class="btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
                     style="width: 34px; height: 34px; border-color: var(--border-color, rgba(255, 255, 255, 0.15));"
-                    hx-get="{% url 'admins:admin-live-option-chain' %}?index={{ selected_index|default:option_chain.index_name }}"
+                    hx-get="{% url 'admins:admin-live-option-chain' %}?index={{ selected_index|default:option_chain.index_name }}{% if is_mock_mode or env_mode == 'MOCK' %}&env=MOCK{% endif %}"
                     hx-target="#live-option-chain-container"
                     hx-swap="innerHTML"
                     title="Refresh Live Option Chain &amp; Quotes">

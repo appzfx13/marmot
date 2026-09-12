@@ -1,6 +1,6 @@
 from django.urls import path
 from apps.trade_core.views import DhanConsentCallbackView
-from .views import DhanPostbackWebhookView, GenericBrokerPostbackWebhookView
+from .views import DhanPostbackWebhookView, GenericBrokerPostbackWebhookView, MockDhanPostbackWebhookView
 
 app_name = 'postback'
 
@@ -11,6 +11,9 @@ urlpatterns = [
     # DhanHQ Specific Endpoints
     path('dhan/postback/', DhanPostbackWebhookView.as_view(), name='dhan_postback'),
     path('dhan/postback/<int:user_id>/', DhanPostbackWebhookView.as_view(), name='dhan_postback_user'),
+
+    # Dedicated Dhan Emulator Mock Endpoint
+    path('mock/dhan/postback/', MockDhanPostbackWebhookView.as_view(), name='mock_dhan_postback'),
 
     # Dynamic Multi-Broker Endpoints
     path('<str:broker>/postback/', GenericBrokerPostbackWebhookView.as_view(), name='broker_postback'),

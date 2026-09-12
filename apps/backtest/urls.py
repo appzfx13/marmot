@@ -33,6 +33,9 @@ from .views import (
     BacktestRuleUnlinkView,
     BacktestDeployModalView,
     BacktestDeployLiveView,
+    BacktestAiAuditView,
+    BacktestApplyAiSuggestionsView,
+    BacktestSimulateCompoundingView,
 )
 
 app_name = 'backtest'
@@ -52,6 +55,9 @@ urlpatterns = [
     path('<int:pk>/trade/<int:trade_num>/chart/', BacktestTradeChartView.as_view(), name='backtest_trade_chart'),
     path('<int:pk>/trade/<int:trade_num>/ai-analysis/', BacktestTradeAiAnalysisView.as_view(), name='backtest_trade_ai_analysis'),
     path('<int:pk>/trade/<int:trade_num>/adopt-rule/', BacktestAdoptTradeRuleView.as_view(), name='backtest_adopt_trade_rule'),
+    path('<int:pk>/ai-audit/', BacktestAiAuditView.as_view(), name='backtest_ai_audit'),
+    path('<int:pk>/apply-ai-suggestions/', BacktestApplyAiSuggestionsView.as_view(), name='backtest_apply_ai_suggestions'),
+    path('<int:pk>/simulate-compounding/', BacktestSimulateCompoundingView.as_view(), name='backtest_simulate_compounding'),
     path('<int:pk>/logs/', BacktestLogsModalView.as_view(), name='backtest_logs_modal'),
     path('<int:pk>/apply-ai-rule/', BacktestApplyAiRuleView.as_view(), name='backtest_apply_ai_rule'),
     path('<int:pk>/synthesize-ai-rules/', BacktestSynthesizeAiRulesView.as_view(), name='backtest_synthesize_ai_rules'),

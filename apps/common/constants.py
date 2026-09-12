@@ -304,8 +304,8 @@ FOREX_INSTRUMENT_SPECS = {
 }
 
 
-def calculate_trade_charges(entry_price: float, exit_price: float, quantity: int, is_option: bool = True, is_forex: bool = False) -> dict:
-    """Calculates regulatory & broker charges for Indian Options or CME Forex Micro Futures."""
+def calculate_trade_charges(entry_price: float, exit_price: float, quantity: int, is_option: bool = True, is_forex: bool = False, order_slices: int = 1) -> dict:
+    """Calculates regulatory & broker charges for Indian Options (with order slicing) or CME Forex Micro Futures."""
     buy_turnover = float(entry_price) * int(quantity)
     sell_turnover = float(exit_price) * int(quantity)
 
@@ -324,9 +324,10 @@ def calculate_trade_charges(entry_price: float, exit_price: float, quantity: int
         }
 
     total_turnover = buy_turnover + sell_turnover
+    slices = max(1, int(order_slices))
 
-    brokerage_entry = min(20.0, buy_turnover * 0.0005) if buy_turnover > 0 else 0.0
-    brokerage_exit = min(20.0, sell_turnover * 0.0005) if sell_turnover > 0 else 0.0
+    brokerage_entry = min(20.0 * slices, buy_turnover * 0.0005) if buy_turnover > 0 else 0.0
+    brokerage_exit = min(20.0 * slices, sell_turnover * 0.0005) if sell_turnover > 0 else 0.0
     total_brokerage = round(brokerage_entry + brokerage_exit, 2)
 
     stt = round(sell_turnover * 0.001, 2) if is_option else round(total_turnover * 0.00025, 2)

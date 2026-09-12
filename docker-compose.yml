@@ -131,6 +131,27 @@ services:
     networks:
       - app_network
 
+  # --- Dhan Broker Gateway Emulator ---
+  mock_broker:
+    build:
+      context: ./dhan-emulator
+      dockerfile: Dockerfile
+    container_name: dhan_mock_broker
+    restart: always
+    ports:
+      - "8088:8088"
+    volumes:
+      - ./dhan-emulator/templates:/app/templates
+      - ./backup:/app/backup:ro
+    env_file:
+      - .env
+    environment:
+      - PORT=8088
+      - MARMOT_POSTBACK_URL=http://web:8000/api/mock/dhan/postback/
+      - PARQUET_DIR=/app/backup
+    networks:
+      - app_network
+
 volumes:
   postgres_data:
   redis_data:

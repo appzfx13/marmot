@@ -311,18 +311,83 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         return context
 
 
+class AdminLiveMockDashboardView(AdminLiveDashboardView):
+    """Admin Live Mock Sandbox Trading Dashboard routed through Dhan Gateway Emulator."""
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+
+        context['active_tab'] = 'live-mock'
+        context['env_mode'] = 'MOCK'
+        context['is_mock_mode'] = True
+        context['dashboard_title'] = 'Live Mock Dashboard'
+
+        mock_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default').first()
+        if not mock_account:
+            mock_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+
+        if mock_account:
+            try:
+                adapter = BrokerFactory.get_adapter(mock_account)
+                if hasattr(adapter, 'get_live_dashboard_summary'):
+                    summary = adapter.get_live_dashboard_summary(account_type='MOCK')
+                    context['is_token_active'] = True
+                    context['needs_consent'] = False
+                    context['broker_name'] = 'Dhan Emulator (Mock :8088)'
+                    context['available_margin'] = summary.get('available_margin', '500000.00')
+                    context['cash_balance'] = summary.get('cash', '500000.00')
+                    context['margin_utilized'] = summary.get('margin_utilized', '0.00')
+                    context['live_net_pnl'] = summary.get('live_net_pnl', 0.00)
+                    context['realized_pnl'] = summary.get('realized_pnl', 0.00)
+                    context['unrealized_pnl'] = summary.get('unrealized_pnl', 0.00)
+                    context['open_positions_count'] = summary.get('open_positions_count', 0)
+                    context['closed_positions_count'] = summary.get('closed_positions_count', 0)
+                    context['todays_orders_count'] = summary.get('todays_orders_count', 0)
+                    context['open_orders_count'] = summary.get('open_orders_count', 0)
+                    context['traded_orders_count'] = summary.get('traded_orders_count', 0)
+
+                    raw_pos = summary.get('positions', [])
+                    context['all_positions_count'] = len(raw_pos)
+                    pos_paginator = Paginator(raw_pos, 10)
+                    context['live_positions'] = pos_paginator.page(1).object_list
+                    context['page_obj'] = pos_paginator.page(1)
+                    context['is_paginated'] = pos_paginator.num_pages > 1
+
+                    raw_ord = summary.get('orders', [])
+                    context['orders_count'] = len(raw_ord)
+                    ord_paginator = Paginator(raw_ord, 10)
+                    context['live_orders'] = ord_paginator.page(1).object_list
+            except Exception as e:
+                logger.warning("AdminLiveMockDashboardView telemetry exception: %s", e)
+
+        context['live_strategies'] = user.live_strategies.filter(
+            is_deleted=False,
+            execution_mode=AccountTypeChoices.SANDBOX
+        ).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
+
+        # Connect Option Chain HUD directly to Dhan Mock Emulator
+        selected_index = self.request.GET.get('index', 'NIFTY').upper().strip()
+        context['option_chain'] = get_live_index_option_chain(selected_index, is_mock=True)
+
+        return context
+
+
 class AdminLiveOptionChainPartialView(LoginRequiredMixin, View):
-    """HTMX partial view returning dynamic live option chain and real-time FYERS index quote HUD."""
+    """HTMX partial view returning dynamic live option chain from FYERS or Dhan Mock Emulator."""
     template_name = 'admins/partials/live_mini_option_chain_card.html'
 
     def get(self, request, *args, **kwargs):
         index_name = request.GET.get('index', 'NIFTY').upper().strip()
         available_indexes = get_available_backup_indexes()
-        option_chain = get_live_index_option_chain(index_name)
+        is_mock = request.GET.get('env') == 'MOCK' or request.session.get('active_tab') == 'live-mock' or 'live-mock' in request.META.get('HTTP_REFERER', '')
+        option_chain = get_live_index_option_chain(index_name, is_mock=is_mock)
         context = {
             'selected_index': index_name,
             'available_backup_indexes': available_indexes,
             'option_chain': option_chain,
+            'is_mock_mode': is_mock,
+            'env_mode': 'MOCK' if is_mock else 'LIVE',
         }
         return render(request, self.template_name, context)
 
@@ -1958,6 +2023,70 @@ class AdminSandboxAccountCreateView(LoginRequiredMixin, AdminRequiredMixin, View
             'sandboxAccountCreated': {'account_id': account.id, 'account_name': account.account_name},
         })
         return response
+
+
+class AdminConnectMockBrokerView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Auto-connect or register Dhan Mock Gateway account for the active admin user."""
+
+    def post(self, request, *args, **kwargs):
+        user = request.user
+        mock_broker_available = False
+        try:
+            import urllib.request
+            req = urllib.request.Request("http://mock_broker:8088/health")
+            with urllib.request.urlopen(req, timeout=0.5) as resp:
+                if resp.status == 200:
+                    mock_broker_available = True
+        except Exception:
+            try:
+                import urllib.request
+                req = urllib.request.Request("http://127.0.0.1:8088/health")
+                with urllib.request.urlopen(req, timeout=0.5) as resp:
+                    if resp.status == 200:
+                        mock_broker_available = True
+            except Exception:
+                mock_broker_available = False
+
+        dhan_broker, _ = BrokerMaster.objects.get_or_create(
+            code='dhan',
+            defaults={
+                'name': 'DHAN',
+                'api_base_url': 'http://mock_broker:8088/mock/v2',
+                'description': 'DhanHQ Broker Gateway / Emulator',
+            }
+        )
+
+        mock_account, _ = UserTradingAccount.objects.get_or_create(
+            user=user,
+            broker=dhan_broker,
+            account_type=AccountTypeChoices.MOCK,
+            defaults={
+                'account_name': 'Dhan Mock Gateway (Emulator :8088)',
+                'broker_client_id': '1000000001',
+                'api_key': 'mock_token_jwt',
+                'app_id': 'mock_dhan_app',
+                'is_active': True,
+                'is_configured': True,
+                'is_default': False,
+                'account_summary': {
+                    'initial_capital': 1000000.0,
+                    'balance': 1000000.0,
+                    'available_margin': '1,000,000.00',
+                    'cash': '1,000,000.00',
+                    'margin_utilized': '0.00',
+                },
+            }
+        )
+
+        user_accounts = list(user.trading_accounts.filter(is_active=True, is_deleted=False).select_related('broker'))
+        if mock_account not in user_accounts:
+            user_accounts.append(mock_account)
+
+        return render(request, 'admins/partials/deploy_trading_account_select.html', {
+            'user_accounts': user_accounts,
+            'selected_account_id': mock_account.id,
+            'mock_broker_available': mock_broker_available,
+        })
 
 
 class AdminSandboxAccountDeleteModalView(LoginRequiredMixin, AdminRequiredMixin, View):

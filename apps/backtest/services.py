@@ -14,6 +14,62 @@ REDIS_URL = settings.REDIS_URL
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
 
+class BacktestControlRegistry:
+    """Thread-safe in-memory controller for coordinating Pause, Resume, and Cancel signals."""
+    _lock = threading.Lock()
+    _controllers = {}
+
+    @classmethod
+    def register(cls, task_id: int):
+        with cls._lock:
+            pause_event = threading.Event()
+            pause_event.set()
+            cancel_event = threading.Event()
+            cls._controllers[int(task_id)] = {
+                "pause_event": pause_event,
+                "cancel_event": cancel_event,
+            }
+            return cancel_event, pause_event
+
+    @classmethod
+    def get(cls, task_id: int):
+        with cls._lock:
+            return cls._controllers.get(int(task_id))
+
+    @classmethod
+    def pause(cls, task_id: int):
+        with cls._lock:
+            ctrl = cls._controllers.get(int(task_id))
+            if ctrl:
+                ctrl["pause_event"].clear()
+                return True
+            return False
+
+    @classmethod
+    def resume(cls, task_id: int):
+        with cls._lock:
+            ctrl = cls._controllers.get(int(task_id))
+            if ctrl:
+                ctrl["pause_event"].set()
+                return True
+            return False
+
+    @classmethod
+    def cancel(cls, task_id: int):
+        with cls._lock:
+            ctrl = cls._controllers.get(int(task_id))
+            if ctrl:
+                ctrl["cancel_event"].set()
+                ctrl["pause_event"].set()
+                return True
+            return False
+
+    @classmethod
+    def cleanup(cls, task_id: int):
+        with cls._lock:
+            cls._controllers.pop(int(task_id), None)
+
+
 def broadcast_backtest_progress(task_id, progress: int, status: str, net_pnl: float = 0.0, total_trades: int = 0, step_info: str = ""):
     """Broadcasts live progress update to Redis Pub/Sub and WebSocket clients."""
     try:
@@ -26,7 +82,11 @@ def broadcast_backtest_progress(task_id, progress: int, status: str, net_pnl: fl
             "total_trades": int(total_trades),
             "step_info": str(step_info),
         }
-        BacktestTask.objects.filter(id=task_id).update(progress=progress, status=status)
+        t_qs = BacktestTask.objects.filter(id=task_id)
+        curr_status = t_qs.values_list('status', flat=True).first()
+        if curr_status in [BacktestTask.StatusChoices.PAUSED, BacktestTask.StatusChoices.CANCELLED] and status == BacktestTask.StatusChoices.RUNNING:
+            return
+        t_qs.update(progress=progress, status=status)
         pub_count = redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
         print(f"📡 [BROADCAST-PROGRESS] Task #{task_id} -> {progress}% ({status}) | Step: {step_info} | PnL: ₹{net_pnl:,.2f} | Trades: {total_trades} | Redis Pub Subscribed Clients: {pub_count}", flush=True)
     except Exception as e:
@@ -59,11 +119,11 @@ def create_and_start_backtest_task(strategy_name, index_name, start_date, end_da
 
 
 def send_backtest_control_command(task_id, command):
-    """Sends START_BACKTEST, PAUSE, or CANCEL command to Go Engine or Python RL worker."""
+    """Sends START_BACKTEST, PAUSE, RESUME, or CANCEL command to Go Engine or Python RL worker."""
     task = BacktestTask.objects.get(id=task_id)
     cmd = command.upper()
 
-    if cmd in ['START', 'START_BACKTEST', 'RESUME', 'RERUN', 'RESTART']:
+    if cmd in ['START', 'START_BACKTEST', 'RERUN', 'RESTART']:
         if task.results and isinstance(task.results, dict) and task.metrics:
             from .models import BacktestRunLog
             run_num = task.run_logs.count() + 1
@@ -82,39 +142,45 @@ def send_backtest_control_command(task_id, command):
         task.results = {}
         task.metrics = {}
         task.save(update_fields=['status', 'progress', 'error_logs', 'results', 'metrics'])
+        broadcast_backtest_progress(task.id, 5, BacktestTask.StatusChoices.RUNNING, step_info="Starting RL backtest execution...")
+        threading.Thread(target=execute_python_rl_backtest, args=(task.id,), daemon=True).start()
+    elif cmd == 'RESUME':
+        resumed = BacktestControlRegistry.resume(task.id)
+        task.status = BacktestTask.StatusChoices.RUNNING
+        task.save(update_fields=['status'])
+        broadcast_backtest_progress(task.id, task.progress or 10, BacktestTask.StatusChoices.RUNNING, step_info="Resuming backtest execution...")
+        if not resumed:
+            threading.Thread(target=execute_python_rl_backtest, args=(task.id,), daemon=True).start()
     elif cmd == 'PAUSE':
         task.status = BacktestTask.StatusChoices.PAUSED
         task.save(update_fields=['status'])
+        BacktestControlRegistry.pause(task.id)
+        broadcast_backtest_progress(task.id, task.progress or 0, BacktestTask.StatusChoices.PAUSED, step_info="Backtest paused by user.")
     elif cmd in ['CANCEL', 'STOP']:
         task.status = BacktestTask.StatusChoices.CANCELLED
         task.save(update_fields=['status'])
+        BacktestControlRegistry.cancel(task.id)
+        broadcast_backtest_progress(task.id, task.progress or 0, BacktestTask.StatusChoices.CANCELLED, step_info="Backtest cancelled by user.")
 
-    is_rl_strategy = (task.strategy_name == 'tensortrade_rl')
-
-    # If strategy is TensorTrade RL, execute Python RL Engine exclusively in background thread
-    if is_rl_strategy and cmd in ['START', 'START_BACKTEST', 'RESUME', 'RERUN', 'RESTART']:
-        broadcast_backtest_progress(task.id, 5, BacktestTask.StatusChoices.RUNNING, step_info="Starting RL backtest execution...")
-        threading.Thread(target=execute_python_rl_backtest, args=(task.id,), daemon=True).start()
-    else:
-        # Otherwise publish command to Go TaskManager on Redis Pub/Sub (for Go-native strategies or pause/cancel)
-        payload = {
-            "task_id": str(task.id),
-            "command": "START_BACKTEST" if cmd in ['START', 'START_BACKTEST', 'RESUME', 'RERUN', 'RESTART'] else cmd,
-            "params": {
-                "strategy_name": task.strategy_name,
-                "index_name": task.index_name,
-                "start_date": task.start_date.isoformat(),
-                "end_date": task.end_date.isoformat(),
-                "initial_capital": task.initial_capital,
-                "user_id": str(task.created_by.id if getattr(task, 'created_by', None) else 1),
-                "backup_task_id": str(task.backup_task.id) if task.backup_task else "",
-                "params": task.parameters or {}
-            }
+    # Also notify Redis for Go service or external subscribers
+    payload = {
+        "task_id": str(task.id),
+        "command": cmd,
+        "params": {
+            "strategy_name": task.strategy_name,
+            "index_name": task.index_name,
+            "start_date": task.start_date.isoformat(),
+            "end_date": task.end_date.isoformat(),
+            "initial_capital": task.initial_capital,
+            "user_id": str(task.created_by.id if getattr(task, 'created_by', None) else 1),
+            "backup_task_id": str(task.backup_task.id) if task.backup_task else "",
+            "params": task.parameters or {}
         }
-        try:
-            redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
-        except Exception as e:
-            logger.warning(f"Redis publish warning: {e}")
+    }
+    try:
+        redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
+    except Exception as e:
+        logger.warning(f"Redis publish warning: {e}")
 
     return task
 
@@ -122,6 +188,7 @@ def send_backtest_control_command(task_id, command):
 def execute_python_rl_backtest(task_id):
     """Executes TensorTrade RL engine over task Parquet backup directory asynchronously."""
     from .rl_engine import TensorTradeRLEngine
+    cancel_event, pause_event = BacktestControlRegistry.register(task_id)
     try:
         task = BacktestTask.objects.get(id=task_id)
         if task.backup_task and task.backup_task.is_macro_assist and task.backup_task.linked_backup_task:
@@ -130,9 +197,13 @@ def execute_python_rl_backtest(task_id):
             task.backup_task = task.backup_task.linked_backup_task
             task.save(update_fields=["backup_task", "macro_backup_task"])
 
-        user_id = str(task.created_by_id or 1)
+        b_user_id = str(task.backup_task.created_by_id or task.created_by_id or 1) if task.backup_task else str(task.created_by_id or 1)
         backup_id = str(task.backup_task.id) if task.backup_task else str(task.id)
-        backup_dir = os.path.join(str(settings.BASE_DIR), "backup", user_id, backup_id)
+        backup_dir = os.path.join(str(settings.BASE_DIR), "backup", b_user_id, backup_id)
+        if not os.path.exists(backup_dir) and task.backup_task:
+            alt_dir = os.path.join(str(settings.BASE_DIR), "backup", "1", backup_id)
+            if os.path.exists(alt_dir):
+                backup_dir = alt_dir
         
         print(f"\n[TENSORTRADE-RL] >>> Launching RL Backtest Task #{task.id} | Index: {task.index_name} | Strategy: {task.strategy_name} | Capital: ₹{task.initial_capital} | Period: {task.start_date} → {task.end_date}", flush=True)
         logger.info(f"Launching RL Backtest Task #{task.id} ({task.index_name})")
@@ -148,6 +219,13 @@ def execute_python_rl_backtest(task_id):
                 total_trades=total_trades,
                 step_info=step_info,
             )
+
+        def check_control():
+            if cancel_event.is_set():
+                return "CANCEL"
+            if not pause_event.is_set():
+                return "PAUSE"
+            return "CONTINUE"
 
         macro_dir = None
         if task.macro_backup_task:
@@ -178,29 +256,38 @@ def execute_python_rl_backtest(task_id):
                 "max_lots_cap": int(task.max_lots_cap or 10),
                 **task_params
             },
-            progress_callback=on_rl_progress
+            progress_callback=on_rl_progress,
+            control_callback=check_control
         )
 
+        task.refresh_from_db()
         task.results = results
         task.metrics = {k: v for k, v in results.items() if k != 'trades'}
-        task.status = BacktestTask.StatusChoices.COMPLETED
-        task.progress = 100
-        task.error_logs = None
-        task.save(update_fields=['results', 'metrics', 'status', 'progress', 'error_logs'])
 
-        net_pnl = float(results.get('net_pnl', 0.0))
-        total_trades = int(results.get('total_trades', len(results.get('trades', []))))
-        
-        print(f"[TENSORTRADE-RL] === Task #{task.id} FINISHED SUCCESSFULLY | Generated {total_trades} trades | Net PnL: ₹{net_pnl:,.2f} | Win Rate: {results.get('win_rate', 0)}% ===\n", flush=True)
-        broadcast_backtest_progress(task.id, 100, BacktestTask.StatusChoices.COMPLETED, net_pnl=net_pnl, total_trades=total_trades, step_info="Backtest completed!")
+        if task.status not in [BacktestTask.StatusChoices.CANCELLED, BacktestTask.StatusChoices.PAUSED]:
+            task.status = BacktestTask.StatusChoices.COMPLETED
+            task.progress = 100
+            task.error_logs = None
+            task.save(update_fields=['results', 'metrics', 'status', 'progress', 'error_logs'])
+
+            net_pnl = float(results.get('net_pnl', 0.0))
+            total_trades = int(results.get('total_trades', len(results.get('trades', []))))
+            
+            print(f"[TENSORTRADE-RL] === Task #{task.id} FINISHED SUCCESSFULLY | Generated {total_trades} trades | Net PnL: ₹{net_pnl:,.2f} | Win Rate: {results.get('win_rate', 0)}% ===\n", flush=True)
+            broadcast_backtest_progress(task.id, 100, BacktestTask.StatusChoices.COMPLETED, net_pnl=net_pnl, total_trades=total_trades, step_info="Backtest completed!")
+        else:
+            task.save(update_fields=['results', 'metrics'])
+            print(f"[TENSORTRADE-RL] Task #{task.id} halted in {task.status} state. Preserved {len(results.get('trades', []))} partial trades.", flush=True)
         return task
     except Exception as e:
         print(f"[TENSORTRADE-RL] !!! Task #{task_id} ERROR: {e}\n", flush=True)
         logger.error(f"Error executing Python RL backtest task #{task_id}: {e}", exc_info=True)
         task = BacktestTask.objects.filter(id=task_id).first()
-        if task:
+        if task and task.status not in [BacktestTask.StatusChoices.CANCELLED, BacktestTask.StatusChoices.PAUSED]:
             task.status = BacktestTask.StatusChoices.ERROR
             task.error_logs = str(e)
             task.save(update_fields=['status', 'error_logs'])
-        broadcast_backtest_progress(task_id, 0, BacktestTask.StatusChoices.ERROR, step_info=f"Error: {str(e)}")
+            broadcast_backtest_progress(task_id, 0, BacktestTask.StatusChoices.ERROR, step_info=f"Error: {str(e)}")
         return None
+    finally:
+        BacktestControlRegistry.cleanup(task_id)

@@ -94,6 +94,7 @@ class TestLogEventChoices(models.TextChoices):
 class AccountTypeChoices(models.TextChoices):
     LIVE = "LIVE", "Live Account"
     SANDBOX = "SANDBOX", "Sandbox Account"
+    MOCK = "MOCK", "Mock Emulator Account"
 
 
 # ─── New: Market Type Choices ───────────────────────────────────────────────

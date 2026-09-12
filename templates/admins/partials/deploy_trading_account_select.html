@@ -1,0 +1,37 @@
+<select name="trading_account_id" id="deployTradingAccountSelect" class="form-select"
+        style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
+    {% if user_accounts %}
+        {% for acc in user_accounts %}
+        <option value="{{ acc.id }}" data-account-type="{{ acc.account_type }}" {% if selected_account_id == acc.id or not selected_account_id and acc.is_default %}selected{% endif %}>
+            {{ acc.account_name }} ({{ acc.broker.name }} - {{ acc.account_type }}) {% if acc.account_type == 'MOCK' %}[ONLINE :8088]{% endif %}
+        </option>
+        {% endfor %}
+    {% else %}
+        <option value="" data-account-type="STANDBY">No Active Account Configured (Standby Mode)</option>
+    {% endif %}
+</select>
+<script>
+(function() {
+    var accSelect = document.getElementById('deployTradingAccountSelect');
+    var modeSelect = document.getElementById('deployExecutionModeSelect');
+    var nameInput = document.getElementById('deployStrategyNameInput');
+    if (accSelect && modeSelect) {
+        var opt = accSelect.options[accSelect.selectedIndex];
+        if (opt) {
+            var accType = (opt.getAttribute('data-account-type') || '').toUpperCase();
+            if (accType === 'MOCK') {
+                modeSelect.value = 'MOCK';
+                if (nameInput) {
+                    var val = nameInput.value;
+                    if (val.startsWith('Live ')) nameInput.value = 'Mock ' + val.substring(5);
+                    else if (val.startsWith('Sandbox ')) nameInput.value = 'Mock ' + val.substring(8);
+                }
+            } else if (accType === 'SANDBOX') {
+                modeSelect.value = 'SANDBOX';
+            } else if (accType === 'LIVE') {
+                modeSelect.value = 'LIVE';
+            }
+        }
+    }
+})();
+</script>

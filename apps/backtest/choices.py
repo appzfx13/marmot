@@ -25,6 +25,7 @@ class BacktestRuleTypeChoices(models.TextChoices):
     ICT_SMC = 'ict_smc_matrix', 'ICT Institutional Smart Money (Killzone, MSS, FVG & OTE)'
     ICT_SMC_V2 = 'ict_smc_v2', 'ICT v2: Confirmed OTE Retest & Mitigation (Zero Drawdown)'
     ICT_SMC_V3 = 'ict_smc_v3', 'ICT v3: Institutional Displacement, HTF Bias & Liquidity Sweep Engine'
+    ICT_SMC_V4_LAYERING = 'ict_smc_v4_layering', 'ICT v4: Multi-Timeframe CHoCH & 0.5/0.705 Dual Layering OTE'
     MORNING_MACD_RETEST = 'morning_macd_retest', 'Morning 3-Min HTF & Option MACD Retest'
     FOREX_CVD_DIVERGENCE = 'forex_cvd_divergence', 'Forex CVD (Cumulative Volume Delta) Divergence'
     FOREX_DOM_ABSORPTION = 'forex_dom_absorption', 'Forex Level-10 DOM Depth & Iceberg Absorption'

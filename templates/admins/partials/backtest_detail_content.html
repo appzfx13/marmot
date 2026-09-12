@@ -175,6 +175,18 @@
         </div>
     </div>
     <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+        <button type="button" 
+                hx-get="{% url 'backtest:backtest_ai_audit' backtest.pk %}" 
+                hx-target="#backtest-ai-audit-section" 
+                hx-swap="innerHTML" 
+                hx-indicator="#aiAuditHeaderSpinner"
+                class="btn rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 fw-bold text-white" 
+                style="background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%); border: 1px solid rgba(56, 189, 248, 0.4); font-size: 0.825rem;"
+                title="Run Vectorized Trade Action Engine & AI Strategy Audit">
+            <span id="aiAuditHeaderSpinner" class="spinner-border spinner-border-sm text-white htmx-indicator" role="status" style="width: 0.80rem; height: 0.80rem;"></span>
+            <span class="material-icons" style="font-size: 1.05rem;">auto_awesome</span>
+            <span>AI Strategy Audit</span>
+        </button>
         <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" class="btn btn-success text-white rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5 fw-semibold" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-color: #059669; font-size: 0.825rem;" title="Download Executive Multi-Sheet Excel Report">
             <span class="material-icons" style="font-size: 1.05rem;">file_download</span>
             <span>Download Report</span>
@@ -309,6 +321,13 @@
             <span class="theme-text-muted">Running Net PnL:</span> <span id="backtest-live-pnl" class="fw-bold {% if analytics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">₹{{ analytics.net_pnl|floatformat:2 }}</span>
         </div>
     </div>
+</div>
+
+<!-- AI Strategy Validation & Trade Vector Audit Mount Section -->
+<div id="backtest-ai-audit-section">
+    {% if backtest.results.ai_audit %}
+        {% include 'admins/partials/backtest_ai_audit_card.html' with audit=backtest.results.ai_audit.data model=backtest.results.ai_audit.model is_live_ai=backtest.results.ai_audit.is_live_ai trade_vectors=backtest.results.ai_audit.trade_vectors %}
+    {% endif %}
 </div>
 
 <!-- Comprehensive Strategy Configuration & Execution Parameters Card -->
@@ -1806,9 +1825,49 @@
                         titleFont: { family: fontMono, size: 12, weight: 'bold' },
                         bodyFont: { family: fontMono, size: 12 },
                         callbacks: {
+                            title: function(items) {
+                                if (!items.length) return '';
+                                const idx = items[0].dataIndex;
+                                if (mode === 'pnl') {
+                                    const pnlList = journalData.trade_pnl || [];
+                                    const d = pnlList[idx] || {};
+                                    return `Trade #${d.trade_num || (idx + 1)} (${d.x || d.date || ''})`;
+                                }
+                                return items[0].label || '';
+                            },
                             label: function(ctx) {
+                                const idx = ctx.dataIndex;
+                                if (mode === 'pnl') {
+                                    const pnlList = journalData.trade_pnl || [];
+                                    const d = pnlList[idx] || {};
+                                    const val = Number(d.y !== undefined ? d.y : ctx.parsed.y);
+                                    const prefix = val >= 0 ? '+₹' : '-₹';
+                                    const lines = [
+                                        ` Realized Trade P&L: ${prefix}${Math.abs(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}`
+                                    ];
+                                    if (d.lots_count) {
+                                        const qtyStr = d.quantity ? ` (${d.quantity} Qty)` : '';
+                                        lines.push(` Position Size: ${d.lots_count} Lot${d.lots_count > 1 ? 's' : ''}${qtyStr}`);
+                                    }
+                                    if (d.strike) {
+                                        lines.push(` Instrument: ${d.strike} ${d.type || ''}`.trim());
+                                    }
+                                    if (d.entry_price && Number(d.entry_price) > 0) {
+                                        lines.push(` Entry LTP: ₹${Number(d.entry_price).toFixed(2)}`);
+                                    }
+                                    if (d.stop_loss_price && Number(d.stop_loss_price) > 0) {
+                                        lines.push(` Stop-Loss (SL): ₹${Number(d.stop_loss_price).toFixed(2)}`);
+                                    }
+                                    if (d.target_price && Number(d.target_price) > 0) {
+                                        lines.push(` Take-Profit (TP): ₹${Number(d.target_price).toFixed(2)}`);
+                                    }
+                                    if (d.exit_reason) {
+                                        lines.push(` Exit: ${d.exit_reason}`);
+                                    }
+                                    return lines;
+                                }
                                 const val = ctx.parsed.y;
-                                const prefix = val >= 0 ? '+₹' : '-₹';
+                                const prefix = (mode === 'cumulative' && val >= 0) ? '+₹' : '₹';
                                 return ` ${ctx.dataset.label}: ${prefix}${Math.abs(val).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
                             }
                         }
@@ -1982,7 +2041,13 @@
                     drawdown: dd,
                     strike: p.strike,
                     type: p.type,
-                    exitReason: p.exit_reason
+                    exitReason: p.exit_reason,
+                    lotsCount: p.lots_count || 1,
+                    quantity: p.quantity || 0,
+                    entryPrice: p.entry_price || 0,
+                    exitPrice: p.exit_price || 0,
+                    stopLossPrice: p.stop_loss_price || 0,
+                    targetPrice: p.target_price || 0
                 });
             });
         }
@@ -2115,6 +2180,7 @@
                                 return d.tradeNum === 0 ? 'Starting Baseline' : `Trade #${d.tradeNum} (${d.label})`;
                             },
                             label: function(item) {
+                                if (item.datasetIndex !== 0) return null;
                                 const idx = item.dataIndex;
                                 const d = pointData[idx];
                                 const lines = [];
@@ -2135,8 +2201,26 @@
                                     }
                                 }
 
-                                if (d.tradeNum > 0 && d.strike) {
-                                    lines.push(` Instrument: ${d.strike} ${d.type}`);
+                                if (d.tradeNum > 0) {
+                                    if (d.lotsCount) {
+                                        const qtyStr = d.quantity ? ` (${d.quantity} Qty)` : '';
+                                        lines.push(` Position Size: ${d.lotsCount} Lot${d.lotsCount > 1 ? 's' : ''}${qtyStr}`);
+                                    }
+                                    if (d.strike) {
+                                        lines.push(` Instrument: ${d.strike} ${d.type || ''}`.trim());
+                                    }
+                                    if (d.entryPrice && Number(d.entryPrice) > 0) {
+                                        lines.push(` Entry LTP: ₹${Number(d.entryPrice).toFixed(2)}`);
+                                    }
+                                    if (d.stopLossPrice && Number(d.stopLossPrice) > 0) {
+                                        lines.push(` Stop-Loss (SL): ₹${Number(d.stopLossPrice).toFixed(2)}`);
+                                    }
+                                    if (d.targetPrice && Number(d.targetPrice) > 0) {
+                                        lines.push(` Take-Profit (TP): ₹${Number(d.targetPrice).toFixed(2)}`);
+                                    }
+                                    if (d.exitReason) {
+                                        lines.push(` Exit: ${d.exitReason}`);
+                                    }
                                 }
                                 return lines;
                             }
