@@ -136,21 +136,32 @@ def send_backtest_control_command(task_id, command):
                 notes=f"Snapshot of run #{run_num} before re-run execution.",
                 created_by=task.created_by
             )
+        # Sync task.parameters['rules'] from current M2M so Go always receives
+        # the latest attached rules, not the stale snapshot from task creation.
+        current_params = dict(task.parameters or {})
+        current_params['rules'] = [
+            {
+                'id': r.id,
+                'name': r.name,
+                'rule_type': r.rule_type,
+                'prompt_directive': r.prompt_directive or '',
+                'parameters': r.parameters or {},
+            }
+            for r in task.rules.filter(is_active=True)
+        ]
+        task.parameters = current_params
         task.status = BacktestTask.StatusChoices.RUNNING
         task.progress = 5
         task.error_logs = ""
         task.results = {}
         task.metrics = {}
-        task.save(update_fields=['status', 'progress', 'error_logs', 'results', 'metrics'])
-        broadcast_backtest_progress(task.id, 5, BacktestTask.StatusChoices.RUNNING, step_info="Starting RL backtest execution...")
-        threading.Thread(target=execute_python_rl_backtest, args=(task.id,), daemon=True).start()
+        task.save(update_fields=['status', 'progress', 'error_logs', 'results', 'metrics', 'parameters'])
+        broadcast_backtest_progress(task.id, 5, BacktestTask.StatusChoices.RUNNING, step_info="Starting Go Quantitative Rule Engine backtest execution...")
     elif cmd == 'RESUME':
-        resumed = BacktestControlRegistry.resume(task.id)
+        BacktestControlRegistry.resume(task.id)
         task.status = BacktestTask.StatusChoices.RUNNING
         task.save(update_fields=['status'])
         broadcast_backtest_progress(task.id, task.progress or 10, BacktestTask.StatusChoices.RUNNING, step_info="Resuming backtest execution...")
-        if not resumed:
-            threading.Thread(target=execute_python_rl_backtest, args=(task.id,), daemon=True).start()
     elif cmd == 'PAUSE':
         task.status = BacktestTask.StatusChoices.PAUSED
         task.save(update_fields=['status'])

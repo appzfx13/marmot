@@ -174,9 +174,11 @@ type SimulatedOrder struct {
 	ExecutionTime   string                 `json:"execution_time,omitempty"`
 	LimitEntryPrice float64                `json:"limit_entry_price,omitempty"`
 	LimitTappedTime string                 `json:"limit_tapped_time,omitempty"`
-	TargetPrice     float64                `json:"target_price,omitempty"`
-	StopLossPrice   float64                `json:"stop_loss_price,omitempty"`
-	CurrentLTP      float64                `json:"current_ltp,omitempty"`
+	TargetPrice          float64                `json:"target_price,omitempty"`
+	StopLossPrice        float64                `json:"stop_loss_price,omitempty"`
+	InitialTargetPrice   float64                `json:"initial_target_price,omitempty"`
+	InitialStopLossPrice float64                `json:"initial_stop_loss_price,omitempty"`
+	CurrentLTP           float64                `json:"current_ltp,omitempty"`
 	RuleID          int                    `json:"rule_id,omitempty"`
 	RuleName        string                 `json:"rule_name,omitempty"`
 	TriggerReason   string                 `json:"trigger_reason,omitempty"`

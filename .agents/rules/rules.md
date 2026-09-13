@@ -91,7 +91,10 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
   - Use `context.Context` for cancellation and timeout propagation across worker pools.
   - Protect shared state with `sync.RWMutex` or atomic operations.
   - Ensure goroutines terminate cleanly using `sync.WaitGroup` to avoid goroutine memory leaks.
-- **Modular Strategy Interfaces:** Strategies under `go-app/strategies/` must implement a unified plug-and-play `Strategy` interface.
+- **Modular Strategy Presets & Rule Configuration Workflow:**
+  - Keep hardcoded Go strategy presets modularized into dedicated files under `go-app/strategies/` (e.g. `preset_momentum.go`, `preset_orb.go`, `preset_scalp.go`, `preset_ict.go`) exposing clean `StrategyConfig` structs.
+  - Register presets in `StrategyPresets` map inside `go-app/strategies/registry.go` keyed by the rule type string.
+  - When introducing a genuinely new strategy type: (1) add choice to `apps/backtest/choices.py`, (2) create or extend `go-app/strategies/preset_<type>.go`, (3) wire into `StrategyPresets` in `registry.go`.
 - **High-Throughput Streaming & Parquet:**
   - Parquet dataset reader/writers (`go-app/parquet/`) must follow date-partitioned storage paths (`/app/backup/{user_id}/{task_id}/`).
   - WebSockets hub (`go-app/ws/hub.go`) must handle broadcast channels safely without blocking worker threads.

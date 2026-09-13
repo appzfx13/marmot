@@ -187,7 +187,9 @@ def get_backtest_trades_context(backtest, request):
             possible_paths.append(backtest.result_file_path)
             possible_paths.append(backtest.result_file_path.replace('.parquet', '.json'))
         
-        user_id = getattr(backtest, 'user_id', 1) or 1
+        user_id = getattr(backtest, 'user_id', 1) or getattr(backtest, 'created_by_id', 1) or 1
+        possible_paths.append(os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', str(user_id), 'backtests', f'backtest_{backtest.id}.json'))
+        possible_paths.append(f"/app/go-app/data/users/{user_id}/backtests/backtest_{backtest.id}.json")
         possible_paths.append(os.path.join(settings.BASE_DIR, 'data', 'users', str(user_id), 'backtests', f'backtest_{backtest.id}.json'))
         possible_paths.append(f"/app/data/users/{user_id}/backtests/backtest_{backtest.id}.json")
 
@@ -1816,7 +1818,7 @@ class BacktestControlView(LoginRequiredMixin, AdminRequiredMixin, View):
             params = task.parameters if isinstance(task.parameters, dict) else {}
             task_rules = params.get('rules', []) or list(task.rules.all())
             prompt_dir = (params.get('prompt_directives') or '').strip()
-            if not task_rules and not prompt_dir and not (task.prompt_directives or '').strip():
+            if not task_rules and not prompt_dir:
                 response = HttpResponse(status=400)
                 response['HX-Trigger'] = json.dumps({
                     'showToast': {'message': '⚠️ Execution blocked: Please select at least one Strategy Rule or prompt directive first.', 'level': 'warning'},
@@ -2325,6 +2327,7 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             'enable_ai_compounding_val': bool(params.get('enable_ai_compounding', False)),
             'compounding_batch_trades_val': int(params.get('compounding_batch_trades', 30)),
             'compounding_profit_step_val': float(params.get('compounding_profit_step', 25000.0 if not is_forex else 500.0)),
+            'compounding_profile_val': str(params.get('compounding_profile', 'STEP_UP')),
             'auto_risk_management_val': bool(task.auto_risk_management if task.auto_risk_management is not None else params.get('auto_risk_management', True)),
             'max_risk_per_trade_pct_val': float(task.max_risk_per_trade_pct or params.get('max_risk_per_trade_pct', 2.0)),
             'max_capital_utilization_pct_val': float(task.max_capital_utilization_pct or params.get('max_capital_utilization_pct', 60.0)),
@@ -2382,6 +2385,8 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             compounding_profit_step = float(request.POST.get('compounding_profit_step', '25000.0' if not is_forex else '500.0').strip() or (25000.0 if not is_forex else 500.0))
         except ValueError:
             compounding_profit_step = 25000.0 if not is_forex else 500.0
+        
+        compounding_profile = request.POST.get('compounding_profile', 'STEP_UP').strip() or 'STEP_UP'
 
         auto_risk_management = ('auto_risk_management' in request.POST)
         risk_profile = request.POST.get('risk_profile', 'MODERATE').strip().upper() or 'MODERATE'
@@ -2468,6 +2473,7 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             "enable_ai_compounding": enable_ai_compounding,
             "compounding_batch_trades": compounding_batch_trades,
             "compounding_profit_step": compounding_profit_step,
+            "compounding_profile": compounding_profile,
             "auto_risk_management": auto_risk_management,
             "max_risk_per_trade_pct": max_risk_pct,
             "max_capital_utilization_pct": max_cap_util_pct,

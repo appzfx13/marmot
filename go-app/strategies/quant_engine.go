@@ -47,19 +47,209 @@ func (s *QuantEngineStrategy) GetName() string {
 	return "quant_engine"
 }
 
-// Execute processes candle input for quantitative backtest evaluations.
+// Execute processes a broker-feed tick stream for leak-proof quantitative backtesting.
+// Signal entry is determined by spot OHLCV; all SL/TP/exit logic uses option premium prices.
 func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
+	trades := make([]TradeSignal, 0)
+
+	ticks := input.Ticks
+	if len(ticks) < 5 {
+		return StrategyResult{
+			StrategyName: s.GetName(),
+			Trades:       trades,
+		}
+	}
+
+	// Local stateless engine per day — ensures no cross-day ORB/EMA contamination
+	localEngine := NewQuantEngineStrategy(s.GetName())
+
+	var activeTrade *TradeSignal
+	activeStrikeKey := "" // e.g. "ATM CALL" or "ATM+1 PUT"
+
+	for i, tick := range ticks {
+		// ── Build spot candle for signal evaluation ──────────────────────────
+		spotCandle := map[string]interface{}{
+			"datetime":  tick.Datetime,
+			"timestamp": tick.Timestamp,
+			"open":      tick.SpotOpen,
+			"high":      tick.SpotHigh,
+			"low":       tick.SpotLow,
+			"close":     tick.SpotClose,
+		}
+
+		// ── 1. Manage active position using OPTION PREMIUM prices ─────────────
+		if activeTrade != nil {
+			optSnap, hasOpt := tick.Options[activeStrikeKey]
+
+			// Fallback: hold at last known premium if option row missing for this tick
+			optLow := activeTrade.EntryPrice
+			optHigh := activeTrade.EntryPrice
+			optClose := activeTrade.EntryPrice
+			if hasOpt && optSnap.Close > 0 {
+				optLow = optSnap.Low
+				optHigh = optSnap.High
+				optClose = optSnap.Close
+			}
+
+			isClosed := false
+			exitOptPrice := optClose
+			exitSpotPrice := tick.SpotClose
+			status := "WIN"
+
+			// Trailing stop loss to breakeven once option reaches +1.2R gain
+			initialRisk := activeTrade.EntryPrice - activeTrade.StopLossPrice
+			if initialRisk > 0 && optHigh >= activeTrade.EntryPrice+(initialRisk*1.2) {
+				if activeTrade.StopLossPrice < activeTrade.EntryPrice+1.0 {
+					activeTrade.StopLossPrice = activeTrade.EntryPrice + 1.0 // Lock in entry + slippage buffer
+				}
+			}
+
+			// All SL/TP decisions are on option premium — strictly no spot reference
+			if optLow <= activeTrade.StopLossPrice {
+				exitOptPrice = activeTrade.StopLossPrice
+				if exitOptPrice >= activeTrade.EntryPrice {
+					status = "WIN"
+				} else {
+					status = "LOSS"
+				}
+				isClosed = true
+			} else if optHigh >= activeTrade.TargetPrice {
+				exitOptPrice = activeTrade.TargetPrice
+				status = "WIN"
+				isClosed = true
+			}
+
+			// EOD square-off at last tick of the day
+			if !isClosed && i == len(ticks)-1 {
+				exitOptPrice = optClose
+				if exitOptPrice >= activeTrade.EntryPrice {
+					status = "WIN"
+				} else {
+					status = "LOSS"
+				}
+				isClosed = true
+			}
+
+			if isClosed {
+				activeTrade.ExitPrice = math.Round(exitOptPrice*100) / 100
+				activeTrade.IndexExitPrice = exitSpotPrice
+				activeTrade.ExitTimestamp = tick.Datetime
+				activeTrade.Status = status
+				activeTrade.PnL = math.Round((activeTrade.ExitPrice-activeTrade.EntryPrice)*float64(activeTrade.Quantity)*100) / 100
+				trades = append(trades, *activeTrade)
+				activeTrade = nil
+				activeStrikeKey = ""
+			}
+			continue
+		}
+
+		// ── 2. Evaluate entry signal on spot candle ───────────────────────────
+		sig := localEngine.EvaluateLiveSignal(spotCandle, nil, input.IndexName, input.Params)
+		if sig == nil {
+			continue
+		}
+
+		// Determine option type from signal
+		optionType := "CALL"
+		if strings.Contains(strings.ToLower(sig.TriggerReason), "bearish") ||
+			strings.Contains(strings.ToLower(sig.TriggerReason), "put") {
+			optionType = "PUT"
+		}
+
+		// Prefer ATM; cascade to ATM+1 if premium is zero/missing
+		strikeKey := ""
+		entryOptPrice := 0.0
+		for _, label := range []string{"ATM", "ATM+1", "ATM-1", "ATM+2", "ATM-2"} {
+			candidate := label + " " + optionType
+			if snap, ok := tick.Options[candidate]; ok && snap.Close > 0 {
+				strikeKey = candidate
+				entryOptPrice = snap.Close
+				break
+			}
+		}
+		if strikeKey == "" || entryOptPrice <= 0 {
+			continue // No valid option premium for entry — skip tick
+		}
+
+		// SL/TP in option premium points with 1:2.5 default Risk:Reward
+		slPts := 12.0
+		rrRatio := 2.5
+		if p, ok := input.Params["sl_pts"].(float64); ok && p > 0 {
+			slPts = p
+		} else if p2, ok := input.Params["stop_loss_points"].(float64); ok && p2 > 0 {
+			slPts = p2
+		}
+		if r, ok := input.Params["rr_ratio"].(float64); ok && r > 0 {
+			rrRatio = r
+		}
+
+		targetOptPrice := math.Round((entryOptPrice+slPts*rrRatio)*100) / 100
+		slOptPrice := math.Round((entryOptPrice-slPts)*100) / 100
+		if slOptPrice < 0.5 {
+			slOptPrice = 0.5 // floor: option can't go below 0.05 realistically
+		}
+
+		activeTrade = &TradeSignal{
+			Timestamp:            tick.Datetime,
+			Strike:               strikeKey,
+			Symbol:               input.IndexName,
+			TradeType:            "BUY",
+			IndexEntryPrice:      tick.SpotClose,
+			EntryPrice:           entryOptPrice,
+			TargetPrice:          targetOptPrice,
+			StopLossPrice:        slOptPrice,
+			InitialTargetPrice:   targetOptPrice,
+			InitialStopLossPrice: slOptPrice,
+			Quantity:             sig.Quantity,
+			UtilizedCapital:      math.Round(entryOptPrice * float64(sig.Quantity)),
+			Status:               "OPEN",
+			Reason:               sig.TriggerReason,
+		}
+		activeStrikeKey = strikeKey
+	}
+
+	totalPnL := 0.0
+	winningTrades, losingTrades := 0, 0
+	totalProfit, totalLoss := 0.0, 0.0
+	peakPnL, maxDD := 0.0, 0.0
+
+	for _, t := range trades {
+		totalPnL += t.PnL
+		if t.PnL > 0 {
+			winningTrades++
+			totalProfit += t.PnL
+		} else if t.PnL < 0 {
+			losingTrades++
+			totalLoss += math.Abs(t.PnL)
+		}
+		if totalPnL > peakPnL {
+			peakPnL = totalPnL
+		}
+		if dd := peakPnL - totalPnL; dd > maxDD {
+			maxDD = dd
+		}
+	}
+
+	winRate := 0.0
+	if len(trades) > 0 {
+		winRate = math.Round((float64(winningTrades)/float64(len(trades))*100.0)*100) / 100
+	}
+	profitFactor := 99.99
+	if totalLoss > 0 {
+		profitFactor = math.Round((totalProfit/totalLoss)*100) / 100
+	}
+
 	return StrategyResult{
-		StrategyName:  "Go Quantitative Rule Engine (ORB / SMC / Momentum)",
-		TotalTrades:   0,
-		WinningTrades: 0,
-		LosingTrades:  0,
-		WinRate:       0.0,
-		NetPnL:        0.0,
-		MaxDrawdown:   0.0,
-		SharpeRatio:   0.0,
-		ProfitFactor:  0.0,
-		Trades:        []TradeSignal{},
+		StrategyName:  s.GetName(),
+		TotalTrades:   len(trades),
+		WinningTrades: winningTrades,
+		LosingTrades:  losingTrades,
+		WinRate:       winRate,
+		NetPnL:        math.Round(totalPnL*100) / 100,
+		MaxDrawdown:   math.Round(maxDD*100) / 100,
+		SharpeRatio:   math.Round((totalPnL/10000.0)*100) / 100,
+		ProfitFactor:  profitFactor,
+		Trades:        trades,
 	}
 }
 
@@ -110,7 +300,7 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		}
 	}
 
-	// 3. Enforce trade cooldown (15s in SANDBOX mode, 3 minutes in LIVE mode to prevent spam)
+	// 3. Resolve Candle Time & Intraday Session Time Window Filter (09:20 - 15:00 IST)
 	candleTime := nowIST()
 	if dtStr, ok := currentCandle["datetime"].(string); ok && len(dtStr) >= 19 {
 		if pt, err := time.ParseInLocation("2006-01-02 15:04:05", dtStr[:19], istLocation); err == nil {
@@ -122,7 +312,14 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		candleTime = time.Unix(int64(tsFloat), 0).In(istLocation)
 	}
 
-	cooldown := 3 * time.Minute
+	// Time window will be enforced after preset is loaded (placeholder check using broadest window)
+	minuteOfDay := candleTime.Hour()*60 + candleTime.Minute()
+	if minuteOfDay < (9*60+15) || minuteOfDay > (15*60+5) {
+		return nil // Pre-filter: outside any valid market window
+	}
+
+	// Enforce trade cooldown (default 5 minutes in backtest/quant mode to avoid churning)
+	cooldown := 5 * time.Minute
 	if params != nil {
 		if mode, ok := params["execution_mode"].(string); ok && (strings.EqualFold(mode, "SANDBOX") || strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE")) {
 			cooldown = 15 * time.Second
@@ -139,66 +336,83 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		return nil
 	}
 
-	// 4. Calculate Exponential Moving Averages (Fast EMA 9 & Slow EMA 21)
-	emaFast := s.calculateEMA(s.candleBuffer, 9)
-	emaSlow := s.calculateEMA(s.candleBuffer, 21)
-
-	// 5. Calculate ICT Displacement ratio: candle_body / candle_range >= minDisplacement (60%)
-	candBody := math.Abs(closePrice - openPrice)
-	candRange := math.Max(0.5, highPrice-lowPrice)
-	displacementRatio := candBody / candRange
-	displacementPct := math.Round(displacementRatio*1000) / 10
-
-	minDisplacement := 0.60
-	ruleID := 32
-	ruleName := "ICT Smart Money v3: Institutional Displacement & Trend Lock"
-
-	// Dynamically extract rules and thresholds from incoming strategy parameters
+	// Load strategy preset from the first attached BacktestRule's rule_type.
+	// Falls back to "momentum_scalp" default if no rule is attached or key is unrecognised.
+	preset := GetStrategyPreset("momentum_scalp")
 	if params != nil {
 		if rawRules, ok := params["rules"].([]interface{}); ok && len(rawRules) > 0 {
-			for _, r := range rawRules {
-				if rMap, isMap := r.(map[string]interface{}); isMap {
-					rType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
-					if strings.Contains(rType, "ict") || strings.Contains(rType, "smc") || strings.Contains(rType, "orb") {
-						if idVal, idOk := rMap["id"].(float64); idOk && idVal > 0 {
-							ruleID = int(idVal)
-						}
-						if nameVal, nameOk := rMap["name"].(string); nameOk && nameVal != "" {
-							ruleName = nameVal
-						}
-						if pMap, pOk := rMap["parameters"].(map[string]interface{}); pOk {
-							if dPct, dOk := pMap["displacement_body_min_pct"].(float64); dOk && dPct > 0 {
-								minDisplacement = dPct
-							}
-						}
-						break
-					}
-				}
+			if rMap, isMap := rawRules[0].(map[string]interface{}); isMap {
+				ruleType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
+				preset = GetStrategyPreset(ruleType)
 			}
 		}
 	}
+	minDisplacement := preset.MinDisplacement
+	ruleID := 0
+	ruleName := preset.Name
 
-	// 6. Strategy Rules Matching - STRICT Mathematical Verification (Zero Fudge Factors)
+	// 4. Calculate Exponential Moving Averages using preset EMA periods
+	emaFast := s.calculateEMA(s.candleBuffer, preset.EMAFast)
+	emaSlow := s.calculateEMA(s.candleBuffer, preset.EMASlow)
+
+	// 5. Calculate Price Action Momentum Metrics:
+	// - candBody: real directional body (require >= 3.5 index pts to avoid flat chop candles)
+	// - candRange: total candle range
+	// - directionalClose: close in upper 30% for Call, lower 30% for Put
+	candBody := math.Abs(closePrice - openPrice)
+	candRange := math.Max(1.0, highPrice-lowPrice)
+	displacementRatio := candBody / candRange
+	displacementPct := math.Round(displacementRatio*1000) / 10
+
+
+	// 6. High-Probability Momentum Verification
 	isBullishSignal := false
 	isBearishSignal := false
 	var triggerReason string
 
-	// Bullish Criteria: EMA 9 >= EMA 21 AND (Breakout above ORB High OR EMA trend expansion) AND Displacement
-	isBullishBreakout := (!s.orbDiscovered || s.orbHigh == 0 || closePrice >= s.orbHigh || emaFast > emaSlow+0.2)
-	isBearishBreakdown := (!s.orbDiscovered || s.orbLow == 0 || closePrice <= s.orbLow || emaFast < emaSlow-0.2)
-	isDisplaced := displacementRatio >= minDisplacement || candBody >= 0.8
+	// Bullish Criteria:
+	// 1. EMA divergence
+	// 2. Strong green candle: close > open AND candBody >= 3.0 pts
+	// 3. Directional close in top 35% of candle range (buyers in full control)
+	// 4. Above ORB Midpoint / ORB High (if UseORBFilter is enabled)
+	orbMid := 0.0
+	if s.orbHigh > 0 && s.orbLow > 0 {
+		orbMid = (s.orbHigh + s.orbLow) / 2.0
+	}
+	isBullishTrend := emaFast >= (emaSlow + 0.3)
+	isBullishCandle := closePrice > openPrice && candBody >= 3.0 && (closePrice >= (highPrice - candRange*0.35))
+	isBullishORB := !preset.UseORBFilter || (orbMid == 0.0 || closePrice >= orbMid)
 
-	if emaFast >= emaSlow && isBullishBreakout && isDisplaced {
+	// Bearish Criteria:
+	// 1. EMA divergence
+	// 2. Strong red candle: close < open AND candBody >= 3.0 pts
+	// 3. Directional close in bottom 35% of candle range (sellers in full control)
+	// 4. Below ORB Midpoint / ORB Low (if UseORBFilter is enabled)
+	isBearishTrend := emaFast <= (emaSlow - 0.3)
+	isBearishCandle := closePrice < openPrice && candBody >= 3.0 && (closePrice <= (lowPrice + candRange*0.35))
+	isBearishORB := !preset.UseORBFilter || (orbMid == 0.0 || closePrice <= orbMid)
+
+	// Apply preset entry time window filter
+	if minuteOfDay < preset.EntryWindowFrom || minuteOfDay > preset.EntryWindowTo {
+		return nil
+	}
+
+	// Apply expiry day restriction if required by preset (e.g. Gamma Blast)
+	if preset.RequireExpiryDay && !isIndexExpiryDay(indexName, candleTime) {
+		return nil
+	}
+
+	if isBullishTrend && isBullishCandle && isBullishORB && displacementRatio >= minDisplacement {
 		isBullishSignal = true
 		triggerReason = fmt.Sprintf(
-			"⚡ [Quant Engine - SMC] EMA 9/21 Bullish Trend (%.1f >= %.1f) with ORB High (%.1f / %.1f) & Displacement %.1f%%",
-			emaFast, emaSlow, closePrice, s.orbHigh, displacementPct,
+			"⚡ [%s] EMA %d/%d Bullish Expansion (%.1f > %.1f) + Bullish Close (%.1f) & Displacement %.1f%%",
+			preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, closePrice, displacementPct,
 		)
-	} else if emaFast < emaSlow && isBearishBreakdown && isDisplaced {
+	} else if isBearishTrend && isBearishCandle && isBearishORB && displacementRatio >= minDisplacement {
 		isBearishSignal = true
 		triggerReason = fmt.Sprintf(
-			"⚡ [Quant Engine - SMC] EMA 9/21 Bearish Trend (%.1f < %.1f) with ORB Low (%.1f / %.1f) & Displacement %.1f%%",
-			emaFast, emaSlow, closePrice, s.orbLow, displacementPct,
+			"⚡ [%s] EMA %d/%d Bearish Expansion (%.1f < %.1f) + Bearish Close (%.1f) & Displacement %.1f%%",
+			preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, closePrice, displacementPct,
 		)
 	}
 
@@ -263,8 +477,14 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		tradingSymbol = fmt.Sprintf("%s %d %s", indexName, atmStrike, optionType)
 	}
 
-	slPts := 15.0
-	rrRatio := 2.0
+	slPts := preset.SLPts
+	if slPts <= 0 {
+		slPts = 12.0
+	}
+	rrRatio := preset.RR
+	if rrRatio <= 0 {
+		rrRatio = 2.5
+	}
 	if params != nil {
 		if sl, ok := params["sl_pts"].(float64); ok && sl > 0 {
 			slPts = sl
@@ -288,10 +508,12 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		"spot_price":       closePrice,
 	}
 
-	orderType := "MARKET"
+	orderType := preset.OrderType
+	if orderType == "" {
+		orderType = "MARKET"
+	}
 	limitPrice := 0.0
-	if ruleID == 23 {
-		orderType = "LIMIT"
+	if orderType == "LIMIT" {
 		limitPrice = closePrice
 	}
 
@@ -331,4 +553,36 @@ func (s *QuantEngineStrategy) calculateEMA(candles []map[string]interface{}, per
 		}
 	}
 	return ema
+}
+
+// isIndexExpiryDay checks if the given time corresponds to the regulatory exchange expiry day for the index.
+func isIndexExpiryDay(indexName string, t time.Time) bool {
+	idx := strings.ToUpper(strings.TrimSpace(indexName))
+	weekday := t.Weekday()
+	dateStr := t.Format("2006-01-02")
+
+	switch idx {
+	case "NIFTY":
+		return weekday == time.Thursday
+	case "BANKNIFTY":
+		// Historical: Wednesday (Sept 2023 - Nov 2024), otherwise Thursday
+		if dateStr >= "2023-09-04" && dateStr < "2024-11-20" {
+			return weekday == time.Wednesday
+		}
+		return weekday == time.Thursday
+	case "FINNIFTY":
+		return weekday == time.Tuesday
+	case "MIDCPNIFTY":
+		if dateStr >= "2023-08-21" {
+			return weekday == time.Monday
+		}
+		return weekday == time.Wednesday
+	case "SENSEX":
+		return weekday == time.Friday
+	case "BANKEX":
+		return weekday == time.Monday
+	default:
+		// Default to Thursday for Indian equity derivatives
+		return weekday == time.Thursday
+	}
 }

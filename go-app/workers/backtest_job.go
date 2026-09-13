@@ -13,6 +13,7 @@ import (
 
 	"go-app/config"
 	"go-app/models"
+	pqreader "go-app/parquet"
 	"go-app/services"
 	"go-app/strategies"
 	"go-app/ws"
@@ -84,25 +85,28 @@ func (j *BacktestJob) Run(ctx context.Context) {
 	}
 
 	backupTaskID := params.BackupTaskID
-	idxLower := strings.ToLower(indexName)
-	userDatasetDir := ""
+	_ = strings.ToLower(indexName) // idxLower reserved for future partitioned datasets
 
+	// Resolve flat parquet dataset path: /app/backup/{userID}/{backupTaskID}/dataset.parquet
+	parquetFilePath := ""
 	if backupTaskID != "" && backupTaskID != "<nil>" {
-		candidate := fmt.Sprintf("/app/backup/%s/%s/%s_options", userID, backupTaskID, idxLower)
-		if isDir(candidate) {
-			userDatasetDir = candidate
+		candidate := fmt.Sprintf("/app/backup/%s/%s/dataset.parquet", userID, backupTaskID)
+		if isFile(candidate) {
+			parquetFilePath = candidate
 		}
 	}
 
-	if userDatasetDir == "" {
+	// Fallback: scan /app/backup/{userID}/ for first backup task dir containing dataset.parquet
+	if parquetFilePath == "" {
 		backupUserParent := fmt.Sprintf("/app/backup/%s", userID)
-		entries, err := os.ReadDir(backupUserParent)
-		if err == nil {
+		entries, scanErr := os.ReadDir(backupUserParent)
+		if scanErr == nil {
 			for _, entry := range entries {
 				if entry.IsDir() {
-					candidate := filepath.Join(backupUserParent, entry.Name(), fmt.Sprintf("%s_options", idxLower))
-					if isDir(candidate) {
-						userDatasetDir = candidate
+					candidate := filepath.Join(backupUserParent, entry.Name(), "dataset.parquet")
+					if isFile(candidate) {
+						parquetFilePath = candidate
+						log.Printf("📂 [Backtest #%s] No backupTaskID, using first found: %s\n", taskID, parquetFilePath)
 						break
 					}
 				}
@@ -110,12 +114,24 @@ func (j *BacktestJob) Run(ctx context.Context) {
 		}
 	}
 
-	if userDatasetDir == "" {
-		userDatasetDir = fmt.Sprintf("/app/data/users/%s/%s_options", userID, idxLower)
+	// Preload all ticks from parquet once; group by date for O(1) per-day lookup
+	candlesByDate := make(map[string][]strategies.MarketTick)
+	if parquetFilePath != "" {
+		loaded, pqErr := pqreader.LoadTicksByDate(parquetFilePath)
+		if pqErr != nil {
+			log.Printf("⚠️  [Backtest #%s] Parquet load failed (%v), will use synthetic ticks\n", taskID, pqErr)
+		} else {
+			candlesByDate = loaded
+			log.Printf("✅ [Backtest #%s] Parquet loaded: %d trading days from %s\n", taskID, len(candlesByDate), parquetFilePath)
+		}
+	} else {
+		log.Printf("⚠️  [Backtest #%s] No dataset.parquet found, will use synthetic ticks\n", taskID)
 	}
-	
+
+	compounding := NewCompoundingEngine(params.InitialCapital, params.Params)
 	allTrades := make([]strategies.TradeSignal, 0)
 	var totalPnL, peakPnL, maxDD, totalProfit, totalLoss float64
+	var totalUtilizedCapital, maxUtilizedCapital float64
 	winningTrades, losingTrades := 0, 0
 
 	processedDays := 0
@@ -130,23 +146,44 @@ func (j *BacktestJob) Run(ctx context.Context) {
 		}
 
 		dateStr := currDate.Format("2006-01-02")
-		partitionPath := filepath.Join(userDatasetDir, fmt.Sprintf("year=%s", currDate.Format("2006")), fmt.Sprintf("month=%s", currDate.Format("01")), fmt.Sprintf("%s.parquet", dateStr))
 
-		// Read day candles (or fallback simulation if file pending)
-		candles := j.loadDayCandles(partitionPath, dateStr)
-		
+		// Retrieve pre-loaded real ticks for this date, fallback to synthetic spot-only ticks
+		dayTicks, hasReal := candlesByDate[dateStr]
+		if !hasReal || len(dayTicks) == 0 {
+			dayTicks = j.syntheticDayTicks(dateStr)
+		}
+
 		input := strategies.StrategyInput{
 			Date:      dateStr,
 			IndexName: indexName,
-			Candles:   candles,
+			Ticks:     dayTicks,
 			Params:    params.Params,
 		}
 
 		dayResult := strat.Execute(input)
 
 		for _, trade := range dayResult.Trades {
+			if compounding.EnableAICompounding && compounding.Profile != CompoundingFixed {
+				lotCount := compounding.CalculateLotSize(trade.EntryPrice)
+				baseLot := compounding.BaseLots
+				if baseLot <= 0 {
+					baseLot = 1
+				}
+				if lotCount != baseLot && baseLot > 0 {
+					multiplier := float64(lotCount) / float64(baseLot)
+					trade.Quantity = int(float64(trade.Quantity) * multiplier)
+					trade.PnL = math.Round(trade.PnL*multiplier*100) / 100
+					trade.UtilizedCapital = math.Round(trade.EntryPrice * float64(trade.Quantity))
+				}
+			}
+
+			compounding.UpdatePnL(trade.PnL)
 			allTrades = append(allTrades, trade)
 			totalPnL += trade.PnL
+			totalUtilizedCapital += trade.UtilizedCapital
+			if trade.UtilizedCapital > maxUtilizedCapital {
+				maxUtilizedCapital = trade.UtilizedCapital
+			}
 			if trade.PnL > 0 {
 				winningTrades++
 				totalProfit += trade.PnL
@@ -189,15 +226,35 @@ func (j *BacktestJob) Run(ctx context.Context) {
 
 	sharpeRatio := math.Round((totalPnL/10000.0)*100) / 100
 
+	avgUtilizedCapital := 0.0
+	if totalTrades > 0 {
+		avgUtilizedCapital = math.Round(totalUtilizedCapital/float64(totalTrades)*100) / 100
+	}
+	capUtilizationPct := 0.0
+	if params.InitialCapital > 0 {
+		capUtilizationPct = math.Round((maxUtilizedCapital/params.InitialCapital)*10000) / 100
+	}
+	roiOnUtilized := 0.0
+	if maxUtilizedCapital > 0 {
+		roiOnUtilized = math.Round((totalPnL/maxUtilizedCapital)*10000) / 100
+	}
+
 	metrics := map[string]interface{}{
-		"net_pnl":        math.Round(totalPnL*100) / 100,
-		"win_rate":       winRate,
-		"total_trades":   totalTrades,
-		"winning_trades": winningTrades,
-		"losing_trades":  losingTrades,
-		"max_drawdown":   math.Round(maxDD*100) / 100,
-		"profit_factor":  profitFactor,
-		"sharpe_ratio":   sharpeRatio,
+		"net_pnl":                 math.Round(totalPnL*100) / 100,
+		"win_rate":                winRate,
+		"total_trades":            totalTrades,
+		"winning_trades":          winningTrades,
+		"losing_trades":           losingTrades,
+		"max_drawdown":            math.Round(maxDD*100) / 100,
+		"profit_factor":           profitFactor,
+		"sharpe_ratio":            sharpeRatio,
+		"max_utilized_capital":    maxUtilizedCapital,
+		"avg_utilized_capital":    avgUtilizedCapital,
+		"capital_utilization_pct": capUtilizationPct,
+		"roi_on_utilized":         roiOnUtilized,
+		"final_capital":           math.Round(compounding.CurrentCapital*100) / 100,
+		"compounding_profile":     string(compounding.Profile),
+		"risk_profile":            string(compounding.RiskProfile),
 	}
 
 	// Write Detailed Trade Log JSON Result File
@@ -227,46 +284,42 @@ func (j *BacktestJob) Run(ctx context.Context) {
 	j.broadcastBacktestProgress(ctx, taskID, 100, "completed", totalPnL, totalTrades)
 }
 
-func (j *BacktestJob) loadDayCandles(filePath, dateStr string) []map[string]interface{} {
-	candles := make([]map[string]interface{}, 0)
-	file, err := os.Open(filePath)
-	if err == nil {
-		defer file.Close()
-		decoder := json.NewDecoder(file)
-		for decoder.More() {
-			var candle map[string]interface{}
-			if err := decoder.Decode(&candle); err == nil {
-				candles = append(candles, candle)
-			}
-		}
+// syntheticDayTicks generates deterministic synthetic 1-min broker ticks when no real data exists.
+// Ticks include a simulated spot OHLCV and a minimal ATM CALL/PUT option chain.
+func (j *BacktestJob) syntheticDayTicks(dateStr string) []strategies.MarketTick {
+	var dateHash float64
+	for _, ch := range dateStr {
+		dateHash += float64(ch)
 	}
-
-	// If no dataset on disk yet, generate synthetic 1-min baseline candles for simulation
-	if len(candles) == 0 {
-		var dateHash float64
-		for _, ch := range dateStr {
-			dateHash += float64(ch)
-		}
-		basePrice := 22000.0 + math.Sin(dateHash)*350.0
-		direction := 1.0
-		if int(dateHash)%2 == 0 {
-			direction = -1.0
-		}
-
-		for minute := 0; minute < 375; minute++ {
-			t := time.Date(2024, 1, 1, 9, 15, 0, 0, time.UTC).Add(time.Duration(minute) * time.Minute)
-			p := basePrice + math.Sin(float64(minute)/12.0)*30.0 + (float64(minute) * 0.1 * direction)
-			candles = append(candles, map[string]interface{}{
-				"date":   fmt.Sprintf("%sT%s", dateStr, t.Format("15:04:00")),
-				"open":   p - 2.0,
-				"high":   p + 6.0,
-				"low":    p - 5.0,
-				"close":  p + (2.5 * direction),
-				"volume": 1500 + int(math.Abs(p))*10,
-			})
-		}
+	basePrice := 22000.0 + math.Sin(dateHash)*350.0
+	direction := 1.0
+	if int(dateHash)%2 == 0 {
+		direction = -1.0
 	}
-	return candles
+	ticks := make([]strategies.MarketTick, 0, 375)
+	for minute := 0; minute < 375; minute++ {
+		t := time.Date(2024, 1, 1, 9, 15, 0, 0, time.UTC).Add(time.Duration(minute) * time.Minute)
+		p := basePrice + math.Sin(float64(minute)/12.0)*30.0 + (float64(minute) * 0.1 * direction)
+		optCall := math.Max(1.0, 80.0-float64(minute)*0.05)
+		optPut := math.Max(1.0, 80.0+float64(minute)*0.05*direction)
+		dtStr := fmt.Sprintf("%s %s", dateStr, t.Format("15:04:00"))
+		tick := strategies.MarketTick{
+			Timestamp: int64(t.Unix()),
+			Datetime:  dtStr,
+			Date:      dateStr,
+			IndexName: "NIFTY",
+			SpotOpen:  p - 2.0,
+			SpotHigh:  p + 6.0,
+			SpotLow:   p - 5.0,
+			SpotClose: p + (2.5 * direction),
+			Options: map[string]strategies.OptionSnap{
+				"ATM CALL": {Open: optCall - 2, High: optCall + 5, Low: optCall - 4, Close: optCall},
+				"ATM PUT":  {Open: optPut - 2, High: optPut + 5, Low: optPut - 4, Close: optPut},
+			},
+		}
+		ticks = append(ticks, tick)
+	}
+	return ticks
 }
 
 func (j *BacktestJob) updateBacktestProgress(ctx context.Context, taskID string, status string, progress int) error {
@@ -316,4 +369,12 @@ func isDir(path string) bool {
 		return false
 	}
 	return info.IsDir()
+}
+
+func isFile(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil {
+		return false
+	}
+	return !info.IsDir()
 }

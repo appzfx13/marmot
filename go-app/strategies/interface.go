@@ -1,30 +1,61 @@
 package strategies
 
-// StrategyInput contains candle data and parameters for strategy execution.
+// OptionSnap captures one option contract's OHLCV at a single timestamp.
+// Mirrors a broker WebSocket option chain tick for one strike+type.
+type OptionSnap struct {
+	Open   float64 `json:"open"`
+	High   float64 `json:"high"`
+	Low    float64 `json:"low"`
+	Close  float64 `json:"close"`
+	Volume int64   `json:"volume"`
+	OI     int64   `json:"oi"`
+	IV     float64 `json:"iv"`
+}
+
+// MarketTick is a per-minute complete market snapshot — spot OHLCV + full option chain.
+// Options key format: "{strike} {optionType}" e.g. "ATM CALL", "ATM+1 PUT".
+// Equivalent to one broker WebSocket broadcast per minute.
+type MarketTick struct {
+	Timestamp int64                `json:"timestamp"`
+	Datetime  string               `json:"datetime"`
+	Date      string               `json:"date"`
+	IndexName string               `json:"index_name"`
+	SpotOpen  float64              `json:"spot_open"`
+	SpotHigh  float64              `json:"spot_high"`
+	SpotLow   float64              `json:"spot_low"`
+	SpotClose float64              `json:"spot_close"`
+	Options   map[string]OptionSnap `json:"options"`
+}
+
+// StrategyInput carries the full tick feed and parameters for strategy execution.
 type StrategyInput struct {
-	Date          string                   `json:"date"`
-	IndexName     string                   `json:"index_name"`
-	Candles       []map[string]interface{} `json:"candles"`
+	Date          string                              `json:"date"`
+	IndexName     string                              `json:"index_name"`
+	Ticks         []MarketTick                        `json:"ticks"`
+	Candles       []map[string]interface{}            `json:"candles"`
 	OptionCandles map[string][]map[string]interface{} `json:"option_candles"`
-	Params        map[string]interface{}  `json:"params"`
+	Params        map[string]interface{}              `json:"params"`
 }
 
 // TradeSignal represents an executed trade entry/exit signal.
 type TradeSignal struct {
-	Timestamp       string  `json:"timestamp"`        // Entry time e.g. "2025-01-01 15:00:00"
-	ExitTimestamp   string  `json:"exit_timestamp"`   // Exit time e.g. "2025-01-01 15:01:00"
-	Strike          string  `json:"strike"`           // Contract Strike e.g. "NIFTY 22400 CE"
-	Symbol          string  `json:"symbol"`           // Index Name e.g. "NIFTY"
-	TradeType       string  `json:"trade_type"`       // BUY_CE, BUY_PE, SELL_CE, SELL_PE
-	IndexEntryPrice float64 `json:"index_entry_price"`// Index level at entry
-	IndexExitPrice  float64 `json:"index_exit_price"` // Index level at exit
-	EntryPrice      float64 `json:"entry_price"`
-	ExitPrice       float64 `json:"exit_price"`
-	TargetPrice     float64 `json:"target_price"`
-	StopLossPrice   float64 `json:"stop_loss_price"`
-	Quantity        int     `json:"quantity"`
+	Timestamp       string  `json:"timestamp"`         // Entry time
+	ExitTimestamp   string  `json:"exit_timestamp"`    // Exit time
+	Strike          string  `json:"strike"`            // Option key e.g. "ATM+1 CALL"
+	Symbol          string  `json:"symbol"`            // Index name e.g. "NIFTY"
+	TradeType       string  `json:"trade_type"`        // BUY
+	IndexEntryPrice float64 `json:"index_entry_price"` // Spot level at entry
+	IndexExitPrice  float64 `json:"index_exit_price"`  // Spot level at exit
+	EntryPrice          float64 `json:"entry_price"`       // Option premium at entry
+	ExitPrice           float64 `json:"exit_price"`        // Option premium at exit
+	TargetPrice         float64 `json:"target_price"`      // Current/Trailing target
+	StopLossPrice       float64 `json:"stop_loss_price"`   // Current/Trailing SL
+	InitialTargetPrice  float64 `json:"initial_target_price"` // Original Option premium target at entry
+	InitialStopLossPrice float64 `json:"initial_stop_loss_price"` // Original Option premium SL at entry
+	Quantity            int     `json:"quantity"`
+	UtilizedCapital float64 `json:"utilized_capital"`
 	PnL             float64 `json:"pnl"`
-	Status          string  `json:"status"` // WIN, LOSS, OPEN
+	Status          string  `json:"status"`            // WIN, LOSS, OPEN
 	Reason          string  `json:"reason"`
 }
 
