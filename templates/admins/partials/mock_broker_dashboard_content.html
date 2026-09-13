@@ -1,0 +1,397 @@
+{% load static %}
+
+<style>
+    /* Antigravity Typography & Spacing */
+    .font-monospace, .theme-font-mono {
+        font-family: var(--font-mono, 'Google Sans Code', 'JetBrains Mono', monospace) !important;
+    }
+    .sbx-journal-day-clickable {
+        transition: all 0.18s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        position: relative;
+    }
+    .sbx-journal-day-clickable:hover {
+        transform: translateY(-2px) scale(1.06);
+        filter: brightness(1.25);
+        z-index: 2;
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
+    }
+</style>
+
+<!-- Top Header Navigation & Live Controls -->
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4">
+    <div class="d-flex align-items-center gap-3">
+        <a href="{% url 'admins:admin-live-dashboard' %}" class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 page-header-back-btn flex-shrink-0" style="border-color: var(--border-default) !important; background: var(--bg-surface);">
+            <span class="material-icons" style="font-size: 1.1rem;">arrow_back</span>
+            <span class="fw-medium">Live Dashboard</span>
+        </a>
+        <div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h4 class="fw-bold mb-0 text-white tracking-tight">Dhan Mock Broker</h4>
+                {% if mock_online %}
+                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace" style="font-size: 0.72rem;">
+                    <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.5rem; height: 0.5rem;" role="status"></span>
+                    ONLINE :8088
+                </span>
+                {% else %}
+                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace" style="font-size: 0.72rem;">
+                    <span class="material-icons" style="font-size: 0.8rem;">error_outline</span>
+                    OFFLINE
+                </span>
+                {% endif %}
+                <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                    PARITY ENGINE
+                </span>
+            </div>
+            <div class="theme-text-muted small mt-0.5" style="font-size: 0.8rem;">
+                Dhan Gateway v2 Emulator &bull; Microsecond Matcher &bull; Account: <strong class="text-info font-monospace">{{ active_account.active_account_id|default:"1000000001" }}</strong> ({{ active_account.account_name|default:"Primary Algorithmic Trading" }})
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Header Action Buttons -->
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="clear_session">
+            <button type="submit" class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                    onclick="return confirm('Reset all mock orders, positions, and restore ₹1,00,000 initial balance?');">
+                <span class="material-icons" style="font-size: 1rem;">restart_alt</span>
+                <span>Reset Session</span>
+            </button>
+        </form>
+
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="kill_switch">
+            <button type="submit" class="btn btn-danger btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 fw-bold"
+                    onclick="return confirm('TRIGGER KILL-SWITCH: Cancel ALL pending orders across mock broker?');">
+                <span class="material-icons" style="font-size: 1rem;">bolt</span>
+                <span>Kill Switch</span>
+            </button>
+        </form>
+
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-2.5"
+                hx-get="{% url 'admins:admin-live-mock-dashboard' %}"
+                hx-target="#mock-broker-dashboard-container"
+                hx-swap="innerHTML"
+                title="Refresh Telemetry">
+            <span class="material-icons" style="font-size: 1rem;">refresh</span>
+        </button>
+    </div>
+</div>
+
+<!-- Capital Accounting & Balance Bridge Card -->
+<div class="glass-card p-3 mb-4 position-relative overflow-hidden"
+     style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+    <div class="d-flex align-items-center justify-content-between mb-2">
+        <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Account Balance & Capital Accounting</span>
+        <span class="badge {% if metrics.net_pnl >= 0 %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-25 border border-opacity-25 rounded-pill px-2.5 py-0.5 fs-7 font-monospace">
+            {% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }} Net Session PnL
+        </span>
+    </div>
+
+    <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 mb-2">
+        <div class="d-flex align-items-baseline gap-2 flex-wrap">
+            <span class="fs-3 fw-bold font-monospace text-white">
+                ₹{{ active_account.available_balance|default:100000|floatformat:2 }}
+            </span>
+            <span class="theme-text-muted small fw-medium">Available Cash Margin</span>
+        </div>
+        <div class="d-flex align-items-center gap-2 small font-monospace">
+            <span class="badge rounded-pill px-2.5 py-1" style="background: var(--bg-elevated, rgba(255,255,255,0.05)); color: var(--text-secondary); border: 1px solid var(--border-default, rgba(255,255,255,0.1));">
+                SOD Limit: ₹{{ active_account.sod_limit|default:100000|floatformat:2 }}
+            </span>
+            <span class="badge rounded-pill px-2.5 py-1 fw-bold {% if metrics.net_pnl >= 0 %}bg-success text-success border border-success{% else %}bg-danger text-danger border border-danger{% endif %} bg-opacity-20 border-opacity-35">
+                Utilized: ₹{{ active_account.utilized_margin|default:0|floatformat:2 }}
+            </span>
+        </div>
+    </div>
+
+    <div class="row g-2 pt-2 border-top border-secondary border-opacity-10 small">
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted" style="font-size: 0.72rem;">1. Starting SOD Capital:</div>
+            <div class="theme-text-main fw-semibold font-monospace">₹{{ active_account.sod_limit|default:100000|floatformat:2 }}</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted" style="font-size: 0.72rem;">2. (+) Gross Profits:</div>
+            <div class="text-success fw-semibold font-monospace">+₹{{ metrics.gross_pnl|floatformat:2 }}</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted" style="font-size: 0.72rem;">3. (-) Total Brokerage:</div>
+            <div class="text-warning fw-semibold font-monospace">-₹{{ metrics.total_charges|floatformat:2 }}</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted" style="font-size: 0.72rem;">4. (➔) Net Realized PnL:</div>
+            <div class="{% if metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold font-monospace">{% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }}</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted" style="font-size: 0.72rem;">5. Closed Pairs:</div>
+            <div class="text-info fw-semibold font-monospace">{{ metrics.total_trades }} Trades</div>
+        </div>
+        <div class="col-6 col-md-4 col-xl-2">
+            <div class="theme-text-muted" style="font-size: 0.72rem;">6. Current Available:</div>
+            <div class="text-white fw-bold font-monospace">₹{{ active_account.available_balance|default:100000|floatformat:2 }}</div>
+        </div>
+    </div>
+</div>
+
+<!-- KPI Cards Container -->
+<div id="mock-broker-stats-container">
+    {% include 'admins/partials/mock_broker_stats_partial.html' with metrics=metrics %}
+</div>
+
+<!-- Split Row: Mock Broker Controls (Left) + Interactive Equity Curve (Right) -->
+<div class="row g-3 mb-4">
+    <!-- Left Column: Realistic Dhan Broker & Streamer Controls -->
+    <div class="col-12 col-lg-5">
+        <div class="glass-card p-3 h-100 border rounded-3 position-relative d-flex flex-column justify-content-between"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+            <div>
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2" style="font-size: 1rem;">
+                        <span class="material-icons text-primary" style="font-size: 1.2rem;">tune</span>
+                        Replay & Connection Controls
+                    </h5>
+                    <span class="badge {% if streamer_status.is_playing %}bg-success text-success{% else %}bg-secondary text-muted{% endif %} bg-opacity-20 border border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                        {% if streamer_status.is_playing %}STREAMING ({{ streamer_status.current_speed|default:25 }}x){% else %}PAUSED{% endif %}
+                    </span>
+                </div>
+
+                <!-- 1. Dataset Selection -->
+                <div class="mb-3">
+                    <label class="form-label theme-text-muted small mb-1" style="font-size: 0.75rem;">Active Parquet Dataset</label>
+                    <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML">
+                        {% csrf_token %}
+                        <input type="hidden" name="action" value="select_file">
+                        <div class="input-group input-group-sm">
+                            <select name="file" class="form-select font-monospace" style="background: var(--bg-surface); color: var(--text-primary); border-color: var(--border-color);" onchange="this.form.requestSubmit()">
+                                {% for f in streamer_files %}
+                                <option value="{{ f }}" {% if f == streamer_status.active_file %}selected{% endif %}>{{ f }}</option>
+                                {% empty %}
+                                <option value="1/48/dataset.parquet">1/48/dataset.parquet (Default)</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                    </form>
+                </div>
+
+                <!-- 2. Playback Speed -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label theme-text-muted small mb-0" style="font-size: 0.75rem;">Replay Acceleration</label>
+                        <span class="font-monospace fw-bold text-info small">{{ streamer_status.current_speed|default:25 }}x Speed</span>
+                    </div>
+                    <div class="d-flex gap-1 flex-wrap">
+                        {% for spd in "1,5,10,25,50,100,250"|make_list %}
+                        {% endfor %}
+                        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="d-flex gap-1 flex-wrap w-100">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="speed">
+                            <button type="submit" name="val" value="1" class="btn btn-sm {% if streamer_status.current_speed == 1 %}btn-primary active{% else %}btn-outline-secondary{% endif %} flex-fill font-monospace" style="font-size: 0.75rem;">1x</button>
+                            <button type="submit" name="val" value="5" class="btn btn-sm {% if streamer_status.current_speed == 5 %}btn-primary active{% else %}btn-outline-secondary{% endif %} flex-fill font-monospace" style="font-size: 0.75rem;">5x</button>
+                            <button type="submit" name="val" value="10" class="btn btn-sm {% if streamer_status.current_speed == 10 %}btn-primary active{% else %}btn-outline-secondary{% endif %} flex-fill font-monospace" style="font-size: 0.75rem;">10x</button>
+                            <button type="submit" name="val" value="25" class="btn btn-sm {% if streamer_status.current_speed == 25 %}btn-primary active{% else %}btn-outline-secondary{% endif %} flex-fill font-monospace" style="font-size: 0.75rem;">25x</button>
+                            <button type="submit" name="val" value="50" class="btn btn-sm {% if streamer_status.current_speed == 50 %}btn-primary active{% else %}btn-outline-secondary{% endif %} flex-fill font-monospace" style="font-size: 0.75rem;">50x</button>
+                            <button type="submit" name="val" value="100" class="btn btn-sm {% if streamer_status.current_speed == 100 %}btn-primary active{% else %}btn-outline-secondary{% endif %} flex-fill font-monospace" style="font-size: 0.75rem;">100x</button>
+                            <button type="submit" name="val" value="250" class="btn btn-sm {% if streamer_status.current_speed == 250 %}btn-primary active{% else %}btn-outline-secondary{% endif %} flex-fill font-monospace fw-bold" style="font-size: 0.75rem;">250x</button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 3. Transport Controls (Play/Pause, Rewind) -->
+                <div class="mb-3">
+                    <label class="form-label theme-text-muted small mb-1" style="font-size: 0.75rem;">Stream Transport</label>
+                    <div class="d-flex gap-2">
+                        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="flex-fill">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="toggle">
+                            <button type="submit" class="btn {% if streamer_status.is_playing %}btn-warning{% else %}btn-success{% endif %} btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-sm fw-bold">
+                                <span class="material-icons" style="font-size: 1rem;">{% if streamer_status.is_playing %}pause{% else %}play_arrow{% endif %}</span>
+                                <span>{% if streamer_status.is_playing %}Pause Replay{% else %}Start Replay{% endif %}</span>
+                            </button>
+                        </form>
+
+                        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="flex-fill">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="restart">
+                            <button type="submit" class="btn btn-outline-secondary btn-sm w-100 d-inline-flex align-items-center justify-content-center gap-1.5 shadow-sm">
+                                <span class="material-icons" style="font-size: 1rem;">replay</span>
+                                <span>Rewind (Row 0)</span>
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- 4. Progress Bar -->
+                <div class="mb-3">
+                    <div class="d-flex justify-content-between align-items-center mb-1 small theme-text-muted" style="font-size: 0.72rem;">
+                        <span>Progress: <strong class="text-white font-monospace">{{ streamer_status.progress_pct|default:0|floatformat:1 }}%</strong></span>
+                        <span class="font-monospace">{{ streamer_status.current_row|default:0 }} / {{ streamer_status.total_rows|default:0 }} ticks</span>
+                    </div>
+                    <div class="progress" style="height: 6px; background: rgba(255, 255, 255, 0.08);">
+                        <div class="progress-bar bg-primary" role="progressbar" style="width: {{ streamer_status.progress_pct|default:0 }}%;" aria-valuenow="{{ streamer_status.progress_pct|default:0 }}" aria-valuemin="0" aria-valuemax="100"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 5. Fund Adjust -->
+            <div class="pt-2 border-top border-secondary border-opacity-10">
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="theme-text-muted small" style="font-size: 0.72rem;">Virtual Cash Adjust:</span>
+                    <div class="btn-group btn-group-sm">
+                        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="adjust_funds">
+                            <input type="hidden" name="amount" value="50000">
+                            <button type="submit" class="btn btn-outline-success btn-sm font-monospace" style="font-size: 0.72rem;">+₹50K</button>
+                        </form>
+                        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="d-inline">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="adjust_funds">
+                            <input type="hidden" name="amount" value="-50000">
+                            <button type="submit" class="btn btn-outline-danger btn-sm font-monospace" style="font-size: 0.72rem;">-₹50K</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Right Column: Interactive Cumulative Equity Curve Chart -->
+    <div class="col-12 col-lg-7">
+        <div class="glass-card p-3 h-100 border rounded-3 position-relative d-flex flex-column"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2" style="font-size: 1rem;">
+                        <span class="material-icons text-success" style="font-size: 1.2rem;">show_chart</span>
+                        Session Equity Curve
+                    </h5>
+                    <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                        POSTBACK AUDIT
+                    </span>
+                </div>
+                <div class="small font-monospace">
+                    Peak Drawdown: <strong class="text-danger">₹{{ metrics.max_drawdown|floatformat:2 }}</strong>
+                </div>
+            </div>
+
+            <!-- Canvas Container -->
+            <div class="flex-grow-1 position-relative" style="min-height: 240px;">
+                <canvas id="mockBrokerEquityChart"></canvas>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 12-Month Calendar Heatmap Container -->
+<div id="mock-broker-calendar-container" class="mb-4">
+    {% include 'admins/partials/mock_broker_calendar_partial.html' with months=months year=year prev_year=prev_year next_year=next_year %}
+</div>
+
+<!-- Closed Trades Table Container -->
+<div id="mock-broker-trades-container" class="mb-4">
+    {% include 'admins/partials/mock_broker_trades_table.html' with trades=trades page_obj=page_obj paginator=paginator is_paginated=is_paginated total_trades_count=total_trades_count filter_date=filter_date filter_status=filter_status %}
+</div>
+
+<!-- Equity Curve Chart Initialization Script -->
+<script>
+(function() {
+    function initEquityChart() {
+        const canvas = document.getElementById('mockBrokerEquityChart');
+        if (!canvas) return;
+
+        const rawData = {{ equity_curve_json|safe }};
+        if (!rawData || rawData.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.font = "14px 'Google Sans Flex', sans-serif";
+            ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+            ctx.textAlign = "center";
+            ctx.fillText("No closed trades recorded yet for equity curve.", canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        const labels = rawData.map(d => d.label || '');
+        const values = rawData.map(d => d.equity);
+
+        if (window._mockBrokerChartInstance) {
+            window._mockBrokerChartInstance.destroy();
+        }
+
+        const ctx = canvas.getContext('2d');
+        const isProfit = values.length > 0 && values[values.length - 1] >= 0;
+        const strokeColor = isProfit ? '#10b981' : '#ef4444';
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 240);
+        gradient.addColorStop(0, isProfit ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        window._mockBrokerChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Cumulative Net PnL (₹)',
+                    data: values,
+                    borderColor: strokeColor,
+                    borderWidth: 2,
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.25,
+                    pointRadius: values.length > 50 ? 1 : 3,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: strokeColor,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0c0d12',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderWidth: 1,
+                        titleColor: '#fff',
+                        bodyColor: '#e2e8f0',
+                        padding: 10,
+                        callbacks: {
+                            label: function(context) {
+                                const val = context.raw || 0;
+                                const sign = val >= 0 ? '+' : '';
+                                return 'Net PnL: ' + sign + '₹' + Number(val).toLocaleString('en-IN', {minimumFractionDigits: 2});
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', maxTicksLimit: 8, font: { family: "'Google Sans Code', monospace", size: 11 } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { family: "'Google Sans Code', monospace", size: 11 },
+                            callback: function(value) { return '₹' + Number(value).toLocaleString('en-IN'); }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    if (typeof Chart !== 'undefined') {
+        initEquityChart();
+    } else {
+        const script = document.createElement('script');
+        script.src = 'https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js';
+        script.onload = initEquityChart;
+        document.head.appendChild(script);
+    }
+})();
+</script>

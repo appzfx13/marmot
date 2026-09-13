@@ -21,7 +21,7 @@ class BacktestRuleForm(forms.ModelForm):
             'market_type': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25'}),
             'rule_type': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25'}),
             'description': forms.Textarea(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'rows': 2, 'placeholder': 'Describe rule logic & market conditions...'}),
-            'prompt_directive': forms.Textarea(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'rows': 2, 'placeholder': 'Natural language prompt instruction for TensorTrade RL...'}),
+            'prompt_directive': forms.Textarea(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'rows': 2, 'placeholder': 'Natural language prompt instruction for Go Quantitative Strategy Engine...'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
         }
 

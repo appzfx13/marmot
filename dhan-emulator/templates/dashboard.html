@@ -1,414 +1,1835 @@
 <!DOCTYPE html>
-<html lang="en" data-bs-theme="dark">
+<html lang="en" data-theme="dark" data-ui-theme="shadcn-zinc">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marmot Broker Gateway | Dhan Live Mock &amp; Parquet Replayer</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Live Mock Dashboard - Marmot Execution Engine</title>
+
+    <!-- Bootstrap 5 CSS & Google Fonts/Icons (Matching Marmot Production) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Google+Sans+Code:ital,wght@0,400..700;1,400..700&family=Google+Sans+Flex:opsz,slnt,wdth,wght,ROND@8..144,-10..0,25..150,400..700,0..100&family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+
+    <!-- HTMX Configuration -->
     <script src="https://unpkg.com/htmx.org@1.9.12"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+
     <style>
-        :root {
-            --bg-primary: #060D0A;
-            --bg-secondary: #0B1D16;
-            --card-bg: rgba(11, 29, 22, 0.75);
-            --card-border: rgba(180, 241, 5, 0.15);
-            --brand-lime: #B4F105;
-            --brand-cyan: #00F5FF;
-            --dhan-green: #00D09C;
-            --dhan-red: #EB5757;
-            --text-main: #F1F5F9;
-            --text-muted: #94A3B8;
+        /* ═══════════════════════════════════════════════════════════
+           Marmot Shadcn-Zinc Dark Theme Tokens (1:1 Exact Parity)
+           ═══════════════════════════════════════════════════════════ */
+        :root,
+        [data-ui-theme="shadcn-zinc"],
+        [data-ui-theme="shadcn"] {
+            --font-sans: 'Plus Jakarta Sans', 'Google Sans Flex', 'Google Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            --font-mono: 'Google Sans Code', 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+
+            --bg-gradient: #09090b;
+            --bs-body-bg: #09090b;
+            --sidebar-bg: #09090b;
+            --sidebar-width: 260px;
+            --navbar-height: 56px;
+
+            --glass-bg: rgba(12, 12, 14, 0.92);
+            --card-background: #0c0c0e;
+            --brand-forest-dark: #09090b;
+            --brand-forest-medium: #18181b;
+            --brand-lime: #fafafa;
+            --brand-lime-hover: #ffffff;
+            --brand-cyan: #38bdf8;
+
+            --border-color: rgba(255, 255, 255, 0.08);
+            --border-light: rgba(255, 255, 255, 0.04);
+
+            --text-main: #fafafa;
+            --text-muted: #a1a1aa;
+            --text-sidebar-muted: #a1a1aa;
+
+            --nav-hover: rgba(255, 255, 255, 0.05);
+            --nav-active: rgba(255, 255, 255, 0.08);
+            --nav-active-border: rgba(255, 255, 255, 0.2);
+
+            --btn-primary-bg: #fafafa;
+            --btn-primary-text: #09090b;
+
+            --radius-xxl: 16px;
+            --radius-xl: 12px;
+            --radius-lg: 10px;
+            --radius-md: 8px;
+
+            --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.35);
+            --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.5);
+            --shadow-lg: 0 10px 30px rgba(0, 0, 0, 0.7);
+
+            --sys-green: #10B981;
+            --sys-red: #EF4444;
+            --sys-warning: #F59E0B;
         }
+
+        html {
+            font-size: 87.5%;
+        }
+
+        html, body {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden !important;
+            margin: 0;
+            padding: 0;
+        }
+
         body {
-            background-color: var(--bg-primary);
-            color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+            font-family: var(--font-sans);
+            background: var(--bg-gradient);
+            background-attachment: fixed;
             min-height: 100vh;
-            overflow-x: hidden;
+            min-height: 100dvh;
+            font-size: 0.8125rem;
+            line-height: 1.45;
+            color: var(--text-main);
+            letter-spacing: -0.01em;
         }
-        .glass-card {
-            background: var(--card-bg);
-            backdrop-filter: blur(14px);
-            -webkit-backdrop-filter: blur(14px);
-            border: 1px solid var(--card-border);
-            border-radius: 14px;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.45);
+
+        .font-mono,
+        .font-monospace {
+            font-family: var(--font-mono) !important;
         }
-        .glass-card-sm {
-            background: rgba(11, 29, 22, 0.6);
-            backdrop-filter: blur(8px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
-            border-radius: 10px;
+
+        .theme-text-main {
+            color: var(--text-main) !important;
         }
-        .nav-pill-marmot {
+
+        .theme-text-muted {
+            color: var(--text-muted) !important;
+        }
+
+        .smaller, smaller {
+            font-size: 0.65rem !important;
+        }
+
+        .fs-xs {
+            font-size: 0.68rem !important;
+        }
+
+        /* ─── Layout Wrapper ─── */
+        .sidebar-wrapper {
+            width: var(--sidebar-width);
+            background: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
+            position: fixed;
+            top: 0;
+            bottom: 0;
+            left: 0;
+            z-index: 1050;
+            display: flex;
+            flex-direction: column;
+            padding: 1.15rem 1rem !important;
+            transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+        }
+
+        .sidebar-brand {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            text-decoration: none;
+            color: #ffffff;
+            margin-bottom: 1.25rem;
+            padding: 0 0.5rem;
+        }
+
+        .sidebar-brand:hover {
+            color: var(--brand-lime);
+        }
+
+        .sidebar-brand-name {
+            font-weight: 800;
+            letter-spacing: 0.5px;
+            font-size: 1.1rem;
+        }
+
+        .sidebar-menu-section {
+            margin-bottom: 1.25rem;
+        }
+
+        .sidebar-menu-title {
+            font-size: 0.68rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: var(--text-muted);
+            padding: 0.5rem 0.65rem 0.25rem;
+            opacity: 0.75;
+        }
+
+        .sidebar-menu-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar-menu-item {
+            margin-bottom: 2px;
+        }
+
+        .sidebar-menu-link {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 7px 12px;
+            border-radius: 8px;
             color: var(--text-muted);
             text-decoration: none;
-            padding: 8px 16px;
-            border-radius: 10px;
-            font-size: 0.88rem;
+            font-size: 0.82rem;
+            font-weight: 500;
+            transition: all 0.2s ease;
+        }
+
+        .sidebar-menu-link:hover {
+            color: #ffffff;
+            background: var(--nav-hover);
+        }
+
+        .sidebar-menu-link.active {
+            color: #fafafa !important;
+            background: rgba(255, 255, 255, 0.08) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12);
             font-weight: 600;
-            transition: all 0.2s;
-            border: 1px solid transparent;
+            box-shadow: none;
+        }
+
+        .sidebar-menu-link.active i,
+        .sidebar-menu-link.active span {
+            color: #fafafa !important;
+        }
+
+        .sidebar-profile {
+            margin-top: auto;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            padding: 0.75rem 0.5rem 0;
+            border-top: 1px solid var(--border-color);
+        }
+
+        .sidebar-profile-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #27272a;
+            color: #fafafa;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            font-weight: 700;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .sidebar-profile-info {
+            line-height: 1.2;
+            overflow: hidden;
+        }
+
+        .sidebar-profile-name {
+            font-weight: 600;
+            color: #ffffff;
+            font-size: 0.8rem;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+            overflow: hidden;
+        }
+
+        .sidebar-profile-sub {
+            color: var(--text-muted);
+            font-size: 0.68rem;
+        }
+
+        .main-wrapper {
+            margin-left: var(--sidebar-width);
+            width: calc(100% - var(--sidebar-width));
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            transition: margin-left 0.3s ease, width 0.3s ease;
+        }
+
+        @media (max-width: 991.98px) {
+            .sidebar-wrapper {
+                transform: translateX(-100%);
+            }
+            body.sidebar-open .sidebar-wrapper {
+                transform: translateX(0);
+                box-shadow: 4px 0 30px rgba(0, 0, 0, 0.7);
+            }
+            .main-wrapper {
+                margin-left: 0;
+                width: 100%;
+            }
+        }
+
+        /* ─── Top Navbar ─── */
+        .navbar-custom {
+            height: var(--navbar-height);
+            background: var(--glass-bg);
+            backdrop-filter: blur(20px) saturate(180%);
+            -webkit-backdrop-filter: blur(20px) saturate(180%);
+            border-bottom: 1px solid var(--border-color);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 1.5rem;
+            position: sticky;
+            top: 0;
+            z-index: 1020;
+        }
+
+        .btn-desktop-toggle,
+        .sidebar-toggle-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            width: 32px;
+            height: 32px;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .btn-desktop-toggle:hover,
+        .sidebar-toggle-btn:hover {
+            color: var(--text-main);
+            background: var(--nav-hover);
+            border-color: var(--nav-active-border);
+        }
+
+        .btn-quick-action {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            border-radius: 50px;
+            padding: 4px 12px;
+            font-size: 0.76rem;
+            font-weight: 600;
+            color: var(--text-main);
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
             cursor: pointer;
         }
-        .nav-pill-marmot:hover {
-            color: #fff;
-            background: rgba(180, 241, 5, 0.06);
-            border-color: rgba(180, 241, 5, 0.2);
+
+        .navbar-search-wrapper {
+            position: relative;
+            width: 100%;
+            max-width: 360px;
         }
-        .nav-pill-marmot.active {
-            color: #060D0A !important;
-            background: var(--brand-lime) !important;
-            font-weight: 700;
-            box-shadow: 0 0 16px rgba(180, 241, 5, 0.35);
+
+        .navbar-search-input {
+            width: 100%;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            border-radius: 50px;
+            padding: 5px 14px 5px 32px;
+            font-size: 0.76rem;
+            color: var(--text-main);
+            outline: none;
+            transition: all 0.2s ease;
         }
-        .speed-pill {
-            background: rgba(255, 255, 255, 0.05);
-            border: 1px solid rgba(255, 255, 255, 0.1);
+
+        .navbar-search-input:focus {
+            background: rgba(255, 255, 255, 0.08);
+            border-color: var(--brand-cyan);
+            box-shadow: 0 0 12px rgba(0, 242, 254, 0.2);
+        }
+
+        .navbar-search-icon {
+            position: absolute;
+            left: 10px;
+            top: 50%;
+            transform: translateY(-50%);
             color: var(--text-muted);
-            font-size: 0.78rem;
-            font-weight: 600;
-            padding: 4px 10px;
-            transition: all 0.2s;
+            font-size: 0.8rem;
         }
-        .speed-pill:hover {
-            color: #fff;
-            background: rgba(255, 255, 255, 0.12);
+
+        .navbar-actions {
+            display: flex;
+            align-items: center;
+            gap: 10px;
         }
-        .speed-pill.active {
-            background: var(--brand-lime) !important;
-            color: #060D0A !important;
-            border-color: var(--brand-lime) !important;
-            font-weight: bold;
+
+        .navbar-action-btn {
+            background: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
         }
-        .select-marmot {
-            background-color: #0B1D16 !important;
-            color: #FFFFFF !important;
-            border: 1px solid rgba(180, 241, 5, 0.35) !important;
-            border-radius: 10px !important;
-            font-weight: 500;
-            padding: 6px 14px;
-            box-shadow: 0 0 12px rgba(180, 241, 5, 0.1);
+
+        .navbar-action-btn:hover {
+            color: var(--text-main);
+            border-color: var(--nav-active-border);
+            background: var(--nav-hover);
         }
-        .select-marmot option {
-            background-color: #0B1D16;
-            color: #FFFFFF;
-            padding: 8px;
+
+        .profile-avatar-btn {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: #27272a;
+            color: #fafafa;
+            font-weight: 700;
+            font-size: 0.75rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            cursor: pointer;
         }
-        .badge-traded { background-color: rgba(0, 208, 156, 0.15); color: #00D09C; border: 1px solid #00D09C; }
-        .badge-pending { background-color: rgba(245, 158, 11, 0.15); color: #F59E0B; border: 1px solid #F59E0B; }
-        .badge-rejected { background-color: rgba(235, 87, 87, 0.15); color: #EB5757; border: 1px solid #EB5757; }
-        .badge-cancelled { background-color: rgba(148, 163, 184, 0.15); color: var(--text-muted); border: 1px solid rgba(148, 163, 184, 0.3); }
+
         .kill-switch {
             animation: pulse-red 2s infinite;
         }
         @keyframes pulse-red {
-            0% { box-shadow: 0 0 0 0 rgba(235, 87, 87, 0.7); }
-            70% { box-shadow: 0 0 0 10px rgba(235, 87, 87, 0); }
-            100% { box-shadow: 0 0 0 0 rgba(235, 87, 87, 0); }
+            0% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0.6); }
+            70% { box-shadow: 0 0 0 8px rgba(239, 68, 68, 0); }
+            100% { box-shadow: 0 0 0 0 rgba(239, 68, 68, 0); }
         }
-        .smaller { font-size: 0.78rem; }
+
+        /* ─── Cards & Glass Styling ─── */
+        .glass-card {
+            background: var(--glass-bg);
+            backdrop-filter: blur(24px) saturate(180%);
+            -webkit-backdrop-filter: blur(24px) saturate(180%);
+            border-radius: var(--radius-xl);
+            border: 1px solid var(--border-color);
+            box-shadow: var(--shadow-sm);
+            transition: border-color 0.25s ease, box-shadow 0.25s ease;
+        }
+
+        .glass-card:hover {
+            border-color: rgba(0, 242, 254, 0.25);
+            box-shadow: var(--shadow-md);
+        }
+
+        /* Alert Dark Zinc Card */
+        .alert-green-card {
+            background-color: #18181b !important;
+            color: #fafafa !important;
+            height: 100% !important;
+            min-height: 175px !important;
+            max-height: 175px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            padding: 1.15rem !important;
+            border-radius: var(--radius-xxl) !important;
+            position: relative;
+            overflow: hidden !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            box-sizing: border-box !important;
+        }
+
+        .alert-green-bg-shape {
+            position: absolute;
+            bottom: -20px;
+            right: -20px;
+            width: 120px;
+            height: 120px;
+            opacity: 0.08;
+            pointer-events: none;
+            z-index: 1;
+            transform: rotate(15deg);
+            transition: transform 0.4s ease-in-out;
+        }
+
+        .alert-green-card:hover .alert-green-bg-shape {
+            transform: rotate(45deg) scale(1.05);
+        }
+
+        .alert-green-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background-color: rgba(255, 255, 255, 0.08);
+            color: #fafafa;
+            font-size: 0.72rem;
+            font-weight: 600;
+            padding: 0.25rem 0.75rem;
+            border-radius: 50rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            margin-bottom: 0.65rem;
+            white-space: nowrap;
+        }
+
+        .alert-green-badge::before {
+            content: '';
+            display: inline-block;
+            width: 6px;
+            height: 6px;
+            background-color: #38bdf8;
+            border-radius: 50rem;
+            box-shadow: 0 0 6px #38bdf8;
+        }
+
+        .alert-green-date {
+            font-size: 0.74rem;
+            color: var(--text-muted);
+            opacity: 0.85;
+            margin-bottom: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .alert-green-text {
+            font-size: 1.22rem;
+            font-weight: 700;
+            line-height: 1.25;
+            margin-bottom: 0;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .alert-green-link {
+            color: #38bdf8;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.25rem;
+            margin-top: auto;
+            text-decoration: none;
+            transition: all 0.25s ease;
+        }
+
+        .alert-green-link:hover {
+            color: #ffffff;
+            text-decoration: underline;
+        }
+
+        /* Universal Theme Metric Card */
+        .theme-metric-card {
+            background-color: var(--card-background) !important;
+            color: var(--text-main) !important;
+            border: 1px solid var(--border-color) !important;
+            border-radius: var(--radius-xxl) !important;
+            height: 100% !important;
+            min-height: 175px !important;
+            max-height: 175px !important;
+            display: flex !important;
+            flex-direction: column !important;
+            justify-content: space-between !important;
+            padding: 1.15rem !important;
+            box-shadow: var(--shadow-sm);
+            position: relative;
+            overflow: hidden !important;
+            box-sizing: border-box !important;
+            transition: all 0.25s ease;
+        }
+
+        .theme-metric-card:hover {
+            box-shadow: var(--shadow-md);
+            border-color: rgba(0, 242, 254, 0.3) !important;
+        }
+
+        .metric-card-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            background-color: rgba(0, 242, 254, 0.08);
+            color: var(--text-main);
+            font-size: 0.72rem;
+            font-weight: 700;
+            padding: 0.25rem 0.65rem;
+            border-radius: 50rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 0.5rem;
+            white-space: nowrap;
+        }
+
+        .metric-card-date {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            opacity: 0.85;
+            margin-bottom: 0.25rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .metric-card-value {
+            font-size: 1.25rem;
+            font-weight: 700;
+            letter-spacing: -0.01em;
+            margin-bottom: 0;
+            line-height: 1.2;
+        }
+
+        .metric-card-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-top: auto;
+            padding-top: 0.65rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 0.74rem;
+            color: var(--text-muted);
+        }
+
+        /* Trend Badges */
+        .trend-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            border-radius: 50rem;
+            font-size: 0.72rem;
+            font-weight: 600;
+        }
+
+        .trend-badge.trend-up {
+            background-color: rgba(16, 185, 129, 0.15);
+            color: #10B981;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .trend-badge.trend-down {
+            background-color: rgba(239, 68, 68, 0.15);
+            color: #EF4444;
+            border: 1px solid rgba(239, 68, 68, 0.3);
+        }
+
+        /* ─── Custom Table Styling ─── */
+        .table {
+            --bs-table-bg: transparent !important;
+            --bs-table-color: var(--text-main) !important;
+            --bs-table-hover-bg: var(--nav-hover) !important;
+            --bs-table-border-color: var(--border-color) !important;
+            color: var(--text-main) !important;
+        }
+
+        .table th, .table td {
+            background-color: transparent !important;
+            color: inherit !important;
+            border-color: var(--border-color) !important;
+            padding: 0.45rem 0.65rem !important;
+            font-size: 0.76rem !important;
+            vertical-align: middle;
+        }
+
+        .table th {
+            font-size: 0.68rem !important;
+            font-weight: 700 !important;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--text-muted) !important;
+        }
+
+        /* Filter Pills & Selects */
+        .select-marmot {
+            background-color: #18181b !important;
+            color: #fafafa !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border-radius: 8px !important;
+            font-weight: 600;
+            font-size: 0.81rem;
+            padding: 7px 14px;
+            box-shadow: none;
+        }
+
+        .select-marmot option {
+            background-color: #18181b;
+            color: #fafafa;
+            padding: 8px;
+        }
+
+        .speed-pill {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: var(--text-muted);
+            font-size: 0.74rem;
+            font-weight: 600;
+            padding: 5px 11px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+
+        .speed-pill:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.12);
+        }
+
+        .speed-pill.active {
+            background: #fafafa !important;
+            color: #09090b !important;
+            border-color: #fafafa !important;
+            font-weight: bold;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.25);
+        }
+
+        .filter-pill-btn {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid var(--border-color);
+            color: var(--text-muted);
+            font-size: 0.74rem;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .filter-pill-btn:hover {
+            color: #ffffff;
+            border-color: var(--nav-active-border);
+        }
+
+        .filter-pill-btn.active-all,
+        .filter-pill-btn.active-open,
+        .filter-pill-btn.active-traded {
+            background: rgba(0, 242, 254, 0.15);
+            color: var(--brand-cyan);
+            border-color: var(--brand-cyan);
+            font-weight: 700;
+        }
+
+        /* ═══════════════════════════════════════════════════════════
+           Universal High-Contrast Semantic Badge System (Marmot Spec)
+           ═══════════════════════════════════════════════════════════ */
+        .bg-opacity-20 { --bs-bg-opacity: 0.2 !important; }
+        .bg-opacity-15 { --bs-bg-opacity: 0.15 !important; }
+        .bg-opacity-25 { --bs-bg-opacity: 0.25 !important; }
+        .border-opacity-30 { --bs-border-opacity: 0.3 !important; }
+        .border-opacity-20 { --bs-border-opacity: 0.2 !important; }
+        .border-opacity-40 { --bs-border-opacity: 0.4 !important; }
+
+        .badge {
+            font-weight: 600 !important;
+            letter-spacing: 0.025em !important;
+            display: inline-flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            line-height: 1.25 !important;
+            transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1) !important;
+        }
+
+        .badge .spinner-grow {
+            vertical-align: middle !important;
+            flex-shrink: 0 !important;
+        }
+
+        /* Base Text Colors for Badges */
+        .badge.text-success, .badge[class*="text-success"] { color: #4ade80 !important; }
+        .badge.text-warning, .badge[class*="text-warning"] { color: #fde047 !important; }
+        .badge.text-danger, .badge[class*="text-danger"] { color: #f87171 !important; }
+        .badge.text-info, .badge[class*="text-info"],
+        .badge.text-primary, .badge[class*="text-primary"] { color: #38bdf8 !important; }
+        .badge.text-white-50, .badge .text-white-50 { color: #e2e8f0 !important; }
+
+        /* Base Background & Border Colors for Badges */
+        .badge.bg-success, .badge[class*="bg-success"] {
+            background-color: rgba(34, 197, 94, 0.16) !important;
+            color: #4ade80 !important;
+            border: 1px solid rgba(34, 197, 94, 0.35) !important;
+        }
+
+        .badge.bg-warning, .badge[class*="bg-warning"] {
+            background-color: rgba(245, 158, 11, 0.16) !important;
+            color: #fde047 !important;
+            border: 1px solid rgba(245, 158, 11, 0.35) !important;
+        }
+
+        .badge.bg-danger, .badge[class*="bg-danger"] {
+            background-color: rgba(239, 68, 68, 0.16) !important;
+            color: #f87171 !important;
+            border: 1px solid rgba(239, 68, 68, 0.35) !important;
+        }
+
+        .badge.bg-info, .badge[class*="bg-info"],
+        .badge.bg-primary, .badge[class*="bg-primary"] {
+            background-color: rgba(56, 189, 248, 0.16) !important;
+            color: #38bdf8 !important;
+            border: 1px solid rgba(56, 189, 248, 0.35) !important;
+        }
+
+        .badge.bg-secondary, .badge.bg-dark,
+        .badge[class*="bg-secondary"], .badge[class*="bg-dark"] {
+            background-color: #1e293b !important;
+            color: #f1f5f9 !important;
+            border: 1px solid rgba(255, 255, 255, 0.15) !important;
+        }
+
+        /* ─── Interactive Hover States (Visible & Glowing) ─── */
+        .badge:hover {
+            filter: brightness(1.25) !important;
+            transform: translateY(-1px);
+        }
+
+        .badge.bg-success:hover, .badge[class*="bg-success"]:hover {
+            background-color: rgba(34, 197, 94, 0.28) !important;
+            color: #86efac !important;
+            border-color: rgba(34, 197, 94, 0.6) !important;
+            box-shadow: 0 0 10px rgba(34, 197, 94, 0.4) !important;
+        }
+
+        .badge.bg-warning:hover, .badge[class*="bg-warning"]:hover {
+            background-color: rgba(245, 158, 11, 0.28) !important;
+            color: #fef08a !important;
+            border-color: rgba(245, 158, 11, 0.6) !important;
+            box-shadow: 0 0 10px rgba(245, 158, 11, 0.4) !important;
+        }
+
+        .badge.bg-danger:hover, .badge[class*="bg-danger"]:hover {
+            background-color: rgba(239, 68, 68, 0.28) !important;
+            color: #fca5a5 !important;
+            border-color: rgba(239, 68, 68, 0.6) !important;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.4) !important;
+        }
+
+        .badge.bg-info:hover, .badge[class*="bg-info"]:hover,
+        .badge.bg-primary:hover, .badge[class*="bg-primary"]:hover {
+            background-color: rgba(56, 189, 248, 0.28) !important;
+            color: #7dd3fc !important;
+            border-color: rgba(56, 189, 248, 0.6) !important;
+            box-shadow: 0 0 10px rgba(56, 189, 248, 0.4) !important;
+        }
+
+        .badge.bg-secondary:hover, .badge.bg-dark:hover {
+            background-color: #334155 !important;
+            color: #ffffff !important;
+            border-color: rgba(255, 255, 255, 0.3) !important;
+            box-shadow: 0 0 8px rgba(255, 255, 255, 0.15) !important;
+        }
+
+        /* Traded / Pending / Rejected Badges */
+        .badge-traded { background-color: rgba(16, 185, 129, 0.18) !important; color: #34d399 !important; border: 1px solid rgba(16, 185, 129, 0.4) !important; }
+        .badge-traded:hover { background-color: rgba(16, 185, 129, 0.3) !important; color: #a7f3d0 !important; box-shadow: 0 0 10px rgba(16, 185, 129, 0.4) !important; }
+        .badge-pending { background-color: rgba(245, 158, 11, 0.18) !important; color: #fbbf24 !important; border: 1px solid rgba(245, 158, 11, 0.4) !important; }
+        .badge-pending:hover { background-color: rgba(245, 158, 11, 0.3) !important; color: #fde68a !important; box-shadow: 0 0 10px rgba(245, 158, 11, 0.4) !important; }
+        .badge-rejected { background-color: rgba(239, 68, 68, 0.18) !important; color: #f87171 !important; border: 1px solid rgba(239, 68, 68, 0.4) !important; }
+        .badge-rejected:hover { background-color: rgba(239, 68, 68, 0.3) !important; color: #fca5a5 !important; box-shadow: 0 0 10px rgba(239, 68, 68, 0.4) !important; }
+        .badge-cancelled { background-color: rgba(148, 163, 184, 0.18) !important; color: #cbd5e1 !important; border: 1px solid rgba(148, 163, 184, 0.35) !important; }
+        .badge-cancelled:hover { background-color: rgba(148, 163, 184, 0.3) !important; color: #ffffff !important; }
+
+        /* ─── Table Row Hover & High-Contrast Typography ─── */
+        .table > tbody > tr {
+            transition: background-color 0.15s ease;
+        }
+
+        .table > tbody > tr:hover > * {
+            background-color: rgba(0, 242, 254, 0.06) !important;
+            color: #ffffff !important;
+        }
+
+        .table > tbody > tr:hover .text-muted,
+        .table > tbody > tr:hover .text-secondary,
+        .table > tbody > tr:hover .theme-text-muted {
+            color: #cbd5e1 !important;
+        }
+
+        .table > tbody > tr:hover .text-success {
+            color: #4ade80 !important;
+            text-shadow: 0 0 8px rgba(74, 222, 128, 0.35);
+        }
+
+        .table > tbody > tr:hover .text-danger {
+            color: #f87171 !important;
+            text-shadow: 0 0 8px rgba(248, 113, 113, 0.35);
+        }
+
+        .table > tbody > tr:hover .text-info {
+            color: #38bdf8 !important;
+            text-shadow: 0 0 8px rgba(56, 189, 248, 0.35);
+        }
+
+        .table > tbody > tr:hover .text-warning {
+            color: #fde047 !important;
+            text-shadow: 0 0 8px rgba(253, 224, 71, 0.35);
+        }
+
+        .table > tbody > tr:hover .badge {
+            filter: brightness(1.2);
+        }
+
+        /* Glass Card Hover Font Clarity */
+        .glass-card:hover .theme-text-muted {
+            color: #cbd5e1;
+        }
+
+        .btn-date-picker {
+            border-radius: 50px;
+            padding: 5px 14px;
+            font-size: 0.76rem;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        /* ─── Parquet Dataset Glassmorphic Custom Dropdown ─── */
+        .custom-parquet-dropdown .dropdown-toggle::after {
+            display: none !important;
+        }
+        .custom-parquet-dropdown .btn {
+            background: #141416 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+        .custom-parquet-dropdown .btn:focus,
+        .custom-parquet-dropdown .btn:active,
+        .custom-parquet-dropdown .btn.show,
+        .custom-parquet-dropdown .btn:focus-visible {
+            outline: none !important;
+            box-shadow: 0 0 0 1px rgba(56, 189, 248, 0.3) !important;
+            border-color: rgba(56, 189, 248, 0.4) !important;
+        }
+        .custom-parquet-dropdown .dropdown-menu {
+            background: #121215 !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 16px 40px -6px rgba(0, 0, 0, 0.85) !important;
+            outline: none !important;
+            z-index: 1060 !important;
+        }
+        .custom-parquet-dropdown .dropdown-menu.show {
+            display: block !important;
+            position: absolute !important;
+            top: 100% !important;
+            left: 0 !important;
+            margin-top: 4px !important;
+        }
+
+        /* ─── Global Dark Theme Modals (Zero White Outlines) ─── */
+        .modal-content {
+            background: #0c0c0e !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            box-shadow: 0 24px 64px rgba(0, 0, 0, 0.9) !important;
+            color: #fafafa !important;
+            border-radius: 16px !important;
+            outline: none !important;
+        }
+        .modal-header {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.06) !important;
+            background: rgba(255, 255, 255, 0.02) !important;
+        }
+        .modal-footer {
+            border-top: 1px solid rgba(255, 255, 255, 0.06) !important;
+            background: rgba(255, 255, 255, 0.02) !important;
+        }
+        .modal-content .form-control,
+        .modal-content .form-select {
+            background: #141416 !important;
+            border: 1px solid rgba(255, 255, 255, 0.09) !important;
+            color: #fafafa !important;
+            box-shadow: none !important;
+            outline: none !important;
+        }
+        .modal-content .form-control:focus,
+        .modal-content .form-select:focus {
+            border-color: rgba(56, 189, 248, 0.5) !important;
+            box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.2) !important;
+            outline: none !important;
+        }
+        .modal-content .input-group-text {
+            background: #18181b !important;
+            border: 1px solid rgba(255, 255, 255, 0.09) !important;
+            color: #a1a1aa !important;
+        }
+        @keyframes toastSlideIn {
+            from { opacity: 0; transform: translateY(-10px) scale(0.95); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+
+        #streamer-controls-wrapper {
+            position: relative;
+            z-index: 50;
+        }
+
+        #streamer-controls-wrapper:focus-within,
+        #streamer-controls-wrapper:has(.dropdown-menu.show) {
+            z-index: 1050 !important;
+        }
+
+        #replay-progress-card {
+            position: relative;
+            z-index: 1;
+        }
+        .custom-parquet-dropdown .dropdown-item {
+            transition: all 0.15s ease-in-out;
+            color: #fafafa;
+            border: 1px solid transparent !important;
+        }
+        .custom-parquet-dropdown .dropdown-item:hover {
+            background: rgba(255, 255, 255, 0.05) !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+            transform: none !important;
+        }
+        .custom-parquet-dropdown .active-parquet-item {
+            background: rgba(56, 189, 248, 0.08) !important;
+            border-color: rgba(56, 189, 248, 0.25) !important;
+        }
+
+        .custom-scroll::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 4px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb {
+            background: rgba(255, 255, 255, 0.2);
+            border-radius: 4px;
+        }
+
+        .custom-scroll::-webkit-scrollbar-thumb:hover {
+            background: rgba(56, 189, 248, 0.5);
+        }
     </style>
 </head>
-<body class="pb-5">
-    <!-- Top Live Dhan Ticker Tape Navigation (Marmot Header) -->
-    <header class="border-bottom border-white border-opacity-10 px-4 py-2.5" style="background: rgba(11, 29, 22, 0.95);">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-            <!-- Brand & Gateway Logo -->
+
+<body>
+    <!-- ==========================================
+           START: Marmot Navigation Sidebar
+           ========================================== -->
+    <aside class="sidebar-wrapper" id="sidebar">
+        <!-- Brand Logo / Identity -->
+        <a href="http://localhost:8005/admins/dashboard/live-mock/" class="sidebar-brand" data-marmot-path="/admins/dashboard/live-mock/">
+            <div class="d-flex align-items-center justify-content-center rounded-3 fw-bold shadow-sm"
+                 style="width: 32px; height: 32px; background: #fafafa; color: #09090b; font-size: 1.1rem;">
+                <i class="bi bi-asterisk"></i>
+            </div>
+            <span class="sidebar-brand-name">MARMOT</span>
+            <span class="badge bg-secondary bg-opacity-25 text-light border border-secondary border-opacity-25 py-0 px-1 ms-auto"
+                  style="font-size: 0.65rem;">GATEWAY</span>
+        </a>
+
+        <!-- Navigation Menu -->
+        <div class="flex-grow-1 overflow-y-auto" style="scrollbar-width: thin;">
+            <!-- Group 1: Dashboards & Trading -->
+            <div class="sidebar-menu-section">
+                <div class="sidebar-menu-title">Dashboards &amp; Trading</div>
+                <ul class="sidebar-menu-list">
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/dashboard/live/" class="sidebar-menu-link" data-marmot-path="/admins/dashboard/live/">
+                            <i class="bi bi-activity text-success"></i>
+                            <span>Live Dashboard</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/dashboard/live-mock/" class="sidebar-menu-link" data-marmot-path="/admins/dashboard/live-mock/">
+                            <i class="bi bi-cpu text-info"></i>
+                            <span>Live Mock</span>
+                            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 ms-auto" style="font-size: 0.65rem;">MOCK</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="/mock/dashboard" class="sidebar-menu-link active">
+                            <i class="bi bi-motherboard-fill"></i>
+                            <span>Broker Gateway (:8088)</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/journal/" class="sidebar-menu-link" data-marmot-path="/admins/journal/">
+                            <i class="bi bi-journal-bookmark-fill text-primary"></i>
+                            <span>Trading Journal</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/sandbox/dashboard/" class="sidebar-menu-link" data-marmot-path="/admins/sandbox/dashboard/">
+                            <i class="bi bi-cpu-fill text-info"></i>
+                            <span>Sandbox Dashboard</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Group 2: Analysis & Research -->
+            <div class="sidebar-menu-section">
+                <div class="sidebar-menu-title">Analysis &amp; Research</div>
+                <ul class="sidebar-menu-list">
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/backtest/" class="sidebar-menu-link" data-marmot-path="/admins/backtest/">
+                            <i class="bi bi-bar-chart-line-fill text-warning"></i>
+                            <span>Backtest Engine</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/market/backup/" class="sidebar-menu-link" data-marmot-path="/market/backup/">
+                            <i class="bi bi-cloud-arrow-down-fill text-info"></i>
+                            <span>Market Backups</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/market/backup/macro/" class="sidebar-menu-link" data-marmot-path="/market/backup/macro/">
+                            <i class="bi bi-cpu-fill" style="color: #facc15;"></i>
+                            <span>AI Macro Assist</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+
+            <!-- Group 3: System & Administration -->
+            <div class="sidebar-menu-section">
+                <div class="sidebar-menu-title">System &amp; Administration</div>
+                <ul class="sidebar-menu-list">
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/terminal/" class="sidebar-menu-link" data-marmot-path="/admins/terminal/">
+                            <i class="bi bi-terminal-fill text-light"></i>
+                            <span>Terminal Panel</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/traders/" class="sidebar-menu-link" data-marmot-path="/admins/traders/">
+                            <i class="bi bi-people-fill"></i>
+                            <span>Traders</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/trade-configs/" class="sidebar-menu-link" data-marmot-path="/admins/trade-configs/">
+                            <i class="bi bi-sliders"></i>
+                            <span>Trade Controls</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/masters/brokers/" class="sidebar-menu-link" data-marmot-path="/admins/masters/brokers/">
+                            <i class="bi bi-building"></i>
+                            <span>Broker Masters</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/postbacks/" class="sidebar-menu-link" data-marmot-path="/admins/postbacks/">
+                            <i class="bi bi-receipt"></i>
+                            <span>Postback Logs</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8005/admins/settings/" class="sidebar-menu-link" data-marmot-path="/admins/settings/">
+                            <i class="bi bi-gear-fill text-warning"></i>
+                            <span>Site Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </div>
+        </div>
+
+        <!-- Sidebar Profile Footer -->
+        <div class="sidebar-profile">
+            <div class="sidebar-profile-avatar">AD</div>
+            <div class="sidebar-profile-info">
+                <div class="sidebar-profile-name" id="sidebar-account-name">{{if .ActiveAccount}}{{.ActiveAccount.AccountName}}{{else}}Primary Algorithmic Trading{{end}}</div>
+                <div class="sidebar-profile-sub" id="sidebar-account-sub">Client: <span class="font-monospace text-info">{{if .ActiveAccount}}{{.ActiveAccount.DhanClientID}}{{else}}1000000001{{end}}</span></div>
+            </div>
+            <a href="http://localhost:8005/admins/logout/" class="btn btn-sm btn-link text-danger p-0 ms-auto" title="Exit" data-marmot-path="/admins/logout/">
+                <i class="bi bi-box-arrow-right fs-5"></i>
+            </a>
+        </div>
+    </aside>
+
+    <!-- ==========================================
+           MAIN CONTENT AREA
+           ========================================== -->
+    <div class="main-wrapper">
+        <!-- Top Custom Navbar (Exact Marmot Copy) -->
+        <header class="navbar-custom">
             <div class="d-flex align-items-center gap-3">
-                <div class="d-flex align-items-center gap-2">
-                    <div class="d-flex align-items-center justify-content-center rounded-3 fw-bold"
-                         style="width: 36px; height: 36px; background: var(--brand-lime); color: #060D0A; font-size: 1.15rem;">
-                        <i class="bi bi-cpu-fill"></i>
-                    </div>
-                    <div>
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="fw-bold tracking-tight text-white fs-6">MARMOT</span>
-                            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 smaller font-monospace">DHAN EMULATOR :8088</span>
-                        </div>
-                        <small class="text-secondary smaller">High-Concurrency Broker Engine &amp; Parquet Replayer</small>
-                    </div>
+                <button class="btn-desktop-toggle d-none d-xl-flex" onclick="document.body.classList.toggle('sidebar-collapsed')" title="Toggle Sidebar">
+                    <i class="bi bi-chevron-bar-left"></i>
+                </button>
+                <button class="sidebar-toggle-btn d-xl-none" onclick="document.body.classList.toggle('sidebar-open')" title="Toggle Navigation">
+                    <i class="bi bi-list"></i>
+                </button>
+                <div class="dropdown">
+                    <button class="btn-quick-action dropdown-toggle" type="button" data-bs-toggle="dropdown">
+                        <i class="bi bi-lightning-charge-fill text-warning"></i>
+                        <span>Admin Actions</span>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark">
+                        <li><a class="dropdown-item" href="http://localhost:8005/admins/terminal/" data-marmot-path="/admins/terminal/"><i class="bi bi-terminal me-2"></i>Open Terminal</a></li>
+                        <li><a class="dropdown-item" href="http://localhost:8005/admins/traders/" data-marmot-path="/admins/traders/"><i class="bi bi-people me-2"></i>Manage Traders</a></li>
+                        <li><hr class="dropdown-divider"></li>
+                        <li><a class="dropdown-item text-danger fw-bold" href="#" hx-post="/mock/api/kill-switch" hx-swap="none" hx-confirm="Master Kill Switch: Cancel all active orders?"><i class="bi bi-shield-x me-2"></i>Master Kill Switch</a></li>
+                    </ul>
                 </div>
             </div>
 
-            <!-- Realtime Indices Ticker Ribbon (HTMX auto-refreshing) -->
-            <div id="top-tickers-ribbon" hx-get="/mock/dashboard/tickers" hx-trigger="load, every 2s" class="d-none d-lg-flex align-items-center">
-                <div class="d-flex align-items-center gap-4 text-nowrap">
-                    <div class="d-flex align-items-baseline gap-2">
-                        <span class="fw-bold text-light smaller">NIFTY 50</span>
-                        <span class="font-monospace fw-bold text-success">₹24,542.80</span>
-                        <span class="text-success smaller"><i class="bi bi-caret-up-fill"></i> +0.48%</span>
-                    </div>
-                    <div class="vr bg-secondary opacity-25" style="height: 16px;"></div>
-                    <div class="d-flex align-items-baseline gap-2">
-                        <span class="fw-bold text-light smaller">BANK NIFTY</span>
-                        <span class="font-monospace fw-bold text-success">₹51,280.50</span>
-                        <span class="text-success smaller"><i class="bi bi-caret-up-fill"></i> +0.39%</span>
-                    </div>
-                    <div class="vr bg-secondary opacity-25" style="height: 16px;"></div>
-                    <div class="d-flex align-items-baseline gap-2">
-                        <span class="fw-bold text-light smaller">INDIA VIX</span>
-                        <span class="font-monospace fw-bold text-danger">13.28</span>
-                        <span class="text-danger smaller"><i class="bi bi-caret-down-fill"></i> -2.15%</span>
-                    </div>
-                    <div class="vr bg-secondary opacity-25" style="height: 16px;"></div>
-                    <div class="d-flex align-items-baseline gap-2">
-                        <span class="fw-bold text-light smaller">SENSEX</span>
-                        <span class="font-monospace fw-bold text-success">80,420.50</span>
-                        <span class="text-success smaller"><i class="bi bi-caret-up-fill"></i> +0.41%</span>
-                    </div>
-                </div>
+            <!-- Search Bar -->
+            <div class="navbar-search-wrapper d-none d-md-block">
+                <i class="bi bi-search navbar-search-icon"></i>
+                <input type="text" class="navbar-search-input" placeholder="Search admin console, users, configs (Ctrl+K)...">
             </div>
 
-            <!-- Telemetry Status Pills & Kill Switch -->
-            <div class="d-flex align-items-center gap-2.5">
-                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-3 py-1.5 smaller">
-                    <i class="bi bi-broadcast me-1"></i> WebSocket Live
-                </span>
-                <span class="badge bg-dark border border-white border-opacity-10 text-white px-2.5 py-1.5 smaller">
-                    <i class="bi bi-person-fill text-info me-1"></i> Client: <strong class="text-white">1000000001</strong>
-                </span>
-                <button class="btn btn-sm btn-danger kill-switch fw-semibold px-3 py-1.5 rounded-pill d-inline-flex align-items-center gap-1.5"
+            <!-- Active Broker Account Switcher Dropdown (Marmot Parity) -->
+            <div id="account-switcher-wrapper" 
+                 hx-get="/mock/accounts/dropdown" 
+                 hx-trigger="load, accountChanged from:body" 
+                 class="d-flex align-items-center">
+                <div class="spinner-border spinner-border-sm text-secondary" role="status"></div>
+            </div>
+
+            <!-- Right Actions -->
+            <div class="navbar-actions">
+                <button class="navbar-action-btn" type="button" title="Toggle Dark/Light Mode">
+                    <i class="bi bi-moon-stars-fill"></i>
+                </button>
+                <button class="navbar-action-btn" type="button" title="Toggle Fullscreen" onclick="if (!document.fullscreenElement) { document.documentElement.requestFullscreen(); } else { document.exitFullscreen(); }">
+                    <i class="bi bi-arrows-fullscreen"></i>
+                </button>
+                <div class="position-relative">
+                    <button class="navbar-action-btn" type="button">
+                        <i class="bi bi-bell"></i>
+                    </button>
+                    <span class="position-absolute top-0 start-100 translate-middle p-1 bg-danger border border-light rounded-circle"></span>
+                </div>
+                <div class="profile-avatar-btn" title="Administrator">AD</div>
+                <button class="btn btn-sm btn-danger kill-switch fw-bold px-3 py-1.5 rounded-pill d-inline-flex align-items-center gap-1.5"
                         hx-post="/mock/api/kill-switch"
                         hx-swap="none"
-                        hx-confirm="EMERGENCY KILL SWITCH: Cancel all active orders across all clients immediately?">
-                    <i class="bi bi-slash-circle-fill"></i> Kill Switch
+                        hx-confirm="EMERGENCY KILL SWITCH: Cancel all active orders immediately?">
+                    <i class="bi bi-slash-circle-fill"></i>
+                    <span>Kill Switch</span>
                 </button>
             </div>
-        </div>
-    </header>
+        </header>
 
-    <!-- Parquet Dataset Replay & Fast-Forward Bar (Marmot Glass Style) -->
-    <section class="px-4 py-3 border-bottom border-white border-opacity-10" style="background: rgba(7, 18, 13, 0.9);">
-        <div class="d-flex flex-column gap-2.5">
-            <!-- Row 1: File Selection, Calendar, Play/Pause, Speed Pills -->
-            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                <!-- Parquet Dataset Selector (Visible & Beautifully Styled) -->
-                <div class="d-flex align-items-center gap-2 flex-grow-1" style="max-width: 650px;">
-                    <label class="text-white smaller fw-bold text-nowrap d-flex align-items-center gap-1.5">
-                        <i class="bi bi-file-earmark-binary-fill" style="color: var(--brand-lime);"></i>
-                        <span>Parquet Dataset:</span>
-                    </label>
-                    <select name="file" class="form-select form-select-sm select-marmot"
-                            hx-post="/mock/api/streamer/select"
-                            hx-target="#replay-progress-container"
-                            hx-trigger="change">
-                        {{if .ParquetFiles}}
-                            {{range .ParquetFiles}}
-                            <option value="{{.RelativePath}}" {{if eq .RelativePath $.CurrentFile}}selected{{end}}>
-                                {{.RelativePath}} ({{printf "%.1f" .SizeMB}} MB)
-                            </option>
-                            {{end}}
-                        {{else}}
-                            <option value="">Synthetic Brownian Walk (Default)</option>
-                        {{end}}
-                    </select>
-                    <button class="btn btn-sm {{if .StreamerPlaying}}btn-warning{{else}}btn-success{{end}} px-3 py-1.5 text-nowrap fw-bold rounded-pill d-inline-flex align-items-center gap-1"
-                            hx-post="/mock/api/streamer/toggle"
-                            hx-target="#replay-progress-container">
-                        {{if .StreamerPlaying}}<i class="bi bi-pause-fill fs-6"></i> Pause{{else}}<i class="bi bi-play-fill fs-6"></i> Play Replay{{end}}
-                    </button>
-                </div>
+        <!-- Main Portal Container -->
+        <div class="container-fluid px-4 py-3 flex-grow-1" id="app-main-container">
+            <div class="d-flex flex-column gap-4">
 
-                <!-- Speed Multiplier Pills -->
-                <div class="d-flex align-items-center gap-1.5">
-                    <span class="text-secondary smaller fw-bold me-1">Replay Speed:</span>
-                    <div class="btn-group btn-group-sm rounded-pill overflow-hidden border border-white border-opacity-15" role="group">
-                        <button class="btn speed-pill {{if eq .StreamerSpeed 1}}active{{end}}" hx-post="/mock/api/streamer/speed?val=1" hx-target="#replay-progress-container">1x</button>
-                        <button class="btn speed-pill {{if eq .StreamerSpeed 5}}active{{end}}" hx-post="/mock/api/streamer/speed?val=5" hx-target="#replay-progress-container">5x</button>
-                        <button class="btn speed-pill {{if eq .StreamerSpeed 10}}active{{end}}" hx-post="/mock/api/streamer/speed?val=10" hx-target="#replay-progress-container">10x</button>
-                        <button class="btn speed-pill {{if eq .StreamerSpeed 25}}active{{end}}" hx-post="/mock/api/streamer/speed?val=25" hx-target="#replay-progress-container">25x</button>
-                        <button class="btn speed-pill {{if eq .StreamerSpeed 50}}active{{end}}" hx-post="/mock/api/streamer/speed?val=50" hx-target="#replay-progress-container">50x</button>
-                        <button class="btn speed-pill {{if eq .StreamerSpeed 100}}active{{end}}" hx-post="/mock/api/streamer/speed?val=100" hx-target="#replay-progress-container">100x</button>
-                        <button class="btn speed-pill {{if eq .StreamerSpeed 250}}active{{end}}" hx-post="/mock/api/streamer/speed?val=250" hx-target="#replay-progress-container">MAX (250x)</button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Row 2: Real-time Replay Progress Bar & Calendar Date (HTMX Polled every 2s) -->
-            <div id="replay-progress-container" hx-get="/mock/dashboard/progress" hx-trigger="every 2s" class="w-100">
-                <div class="d-flex flex-column gap-1.5 w-100">
-                    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
-                        <div class="d-flex align-items-center gap-2">
-                            <span class="badge {{if .StreamerPlaying}}bg-success{{else}}bg-secondary{{end}} bg-opacity-25 text-success border border-success border-opacity-30 smaller font-monospace">
-                                <i class="bi bi-circle-fill me-1" style="font-size: 0.5rem;"></i> {{if .StreamerPlaying}}STREAMING{{else}}PAUSED{{end}}
+                <!-- 1. Live Mock Dashboard Header Banner (Exact Marmot Parity) -->
+                <div class="page-header d-flex flex-column flex-xl-row align-items-center justify-content-between gap-3 mb-1 text-center text-xl-start">
+                    <div class="d-flex flex-column align-items-center align-items-xl-start w-100">
+                        <h1 class="page-title mb-1 fw-bold text-white fs-4">Live Mock Dashboard</h1>
+                        <div class="d-flex align-items-center justify-content-center justify-content-xl-start gap-2 mb-1 flex-wrap w-100">
+                            <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-40 px-2.5 py-1 fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                                <i class="bi bi-cpu me-1"></i> DHAN EMULATOR (:8088)
                             </span>
-                            <span class="badge bg-dark border border-white border-opacity-10 text-warning smaller font-monospace">
-                                <i class="bi bi-calendar3 me-1"></i> {{.CurrentDate}}
-                            </span>
-                            <span class="text-white smaller font-monospace"><i class="bi bi-clock me-1 text-info"></i>{{.CurrentDatetime}}</span>
+                            <a href="http://localhost:8005/admins/dashboard/live-mock/" class="btn btn-sm btn-outline-info py-0.5 px-2.5 rounded-pill" style="font-size: 0.72rem;">
+                                <i class="bi bi-sliders me-1"></i> Marmot Live Mock HUD
+                            </a>
                         </div>
-                        <div class="d-flex align-items-center gap-2 smaller font-monospace text-secondary">
-                            <span>Dataset: <strong class="text-info">{{if .CurrentFile}}{{.CurrentFile}}{{else}}Synthetic Walk{{end}}</strong></span>
-                            <span>|</span>
-                            <span>Rows: <strong class="text-white">{{.CurrentRow}} / {{.TotalRows}}</strong></span>
-                            <span>|</span>
-                            <span>Progress: <strong class="text-success">{{printf "%.1f" .ProgressPct}}%</strong></span>
-                            <span>|</span>
-                            <span>Speed: <strong class="text-warning">{{.StreamerSpeed}}x</strong></span>
-                            <span>|</span>
-                            <span>Ticks: <strong class="text-white">{{.TicksIngested}}</strong></span>
-                        </div>
+                        <p class="page-subtitle mb-0 text-muted small">High-fidelity broker gateway emulator, virtual ledger MTM, and chaos simulation.</p>
                     </div>
-                    <div class="progress rounded-pill bg-dark border border-white border-opacity-10" style="height: 7px;">
-                        <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" 
-                             style="width: {{printf "%.2f" .ProgressPct}}%; background-color: var(--brand-lime) !important;" 
-                             aria-valuenow="{{printf "%.1f" .ProgressPct}}" aria-valuemin="0" aria-valuemax="100"></div>
+                    <div class="d-flex align-items-center justify-content-center justify-content-xl-end gap-2 flex-wrap ms-xl-auto">
+                        <span class="trend-badge trend-up py-1.5 px-3">
+                            <i class="bi bi-check-circle-fill"></i>
+                            <span>Trade Eligible</span>
+                        </span>
+                        <button type="button"
+                                class="btn btn-sm btn-primary rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                                hx-get="/mock/accounts/modal/create"
+                                hx-target="#globalHtmxModalDialog"
+                                data-bs-toggle="modal"
+                                data-bs-target="#globalHtmxModal">
+                            <i class="bi bi-plus-circle-fill"></i>
+                            <span>Add Account</span>
+                        </button>
+                        <button type="button"
+                                class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm text-white"
+                                hx-get="/mock/accounts/modal/list"
+                                hx-target="#globalHtmxModalDialog"
+                                data-bs-toggle="modal"
+                                data-bs-target="#globalHtmxModal">
+                            <i class="bi bi-person-lines-fill"></i>
+                            <span>Account Directory</span>
+                        </button>
+                        <a href="http://localhost:8005/users/accounts/" 
+                           class="btn-date-picker text-decoration-none shadow-sm"
+                           style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color) !important; color: var(--text-main) !important;">
+                            <i class="bi bi-wallet2 text-primary"></i>
+                            <span class="fw-semibold">Accounts &amp; Tokens</span>
+                            <i class="bi bi-chevron-right ms-1 opacity-75"></i>
+                        </a>
                     </div>
                 </div>
-            </div>
-        </div>
-    </section>
 
-    <!-- Main Container: Full Width Layout (Marmot Standard) -->
-    <div class="container-fluid px-4 py-4">
-        <!-- Live Market Feed Streaming Widget (Index Spot + Option Strikes) -->
-        <div class="glass-card p-3 mb-4">
-            <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-white border-opacity-10">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.65rem; height: 0.65rem;"></span>
-                    <h6 class="mb-0 fw-bold text-white">Live Replay Market Feed Telemetry (Index Spot &amp; Option Strikes)</h6>
-                </div>
-                <span class="text-secondary smaller"><i class="bi bi-activity me-1 text-info"></i> Streaming Live via :8088 WebSocket &amp; Parquet</span>
-            </div>
-            <div id="streamer-widget-container" hx-get="/mock/dashboard/streamer-widget" hx-trigger="load, every 2s">
-                <div class="row g-2">
-                    <div class="col-md-5">
-                        <div class="p-2.5 rounded-3 border border-white border-opacity-10 bg-dark bg-opacity-50">
-                            <span class="smaller fw-bold text-uppercase text-secondary d-block mb-1">Index Spot Feed</span>
-                            <div class="d-flex justify-content-between py-1 border-bottom border-white border-opacity-5">
-                                <span class="fw-semibold text-white smaller">NIFTY 50</span>
-                                <span class="text-success font-monospace fw-bold smaller">₹24,540.00</span>
+                <!-- 2. Real-Time Exchange Clock HUD Widget (Exact Copy) -->
+                <div class="glass-card p-3 rounded-4 border border-white border-opacity-10 d-flex align-items-center justify-content-between gap-3 shadow-sm"
+                     style="background: rgba(255, 255, 255, 0.03);">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle bg-primary bg-opacity-15 text-primary d-flex align-items-center justify-content-center flex-shrink-0" style="width: 44px; height: 44px;">
+                            <i class="bi bi-clock-history fs-4 text-warning"></i>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2 mb-0.5">
+                                <span class="fw-bold fs-4 font-monospace theme-text-main" id="live-exchange-clock-time">
+                                    15:30:00
+                                </span>
+                                <span class="badge bg-dark bg-opacity-75 text-white-50 font-monospace smaller px-2 py-0.5 border border-white border-opacity-10">IST</span>
                             </div>
-                            <div class="d-flex justify-content-between py-1">
-                                <span class="fw-semibold text-white smaller">BANK NIFTY</span>
-                                <span class="text-success font-monospace fw-bold smaller">₹51,220.00</span>
+                            <div class="theme-text-muted smaller d-flex align-items-center gap-2">
+                                <span id="live-exchange-clock-date">{{.CurrentDate}}</span>
+                                <span>&bull;</span>
+                                <span>NSE/BSE Exchange Zone &bull; Simulated Realtime Tick</span>
                             </div>
                         </div>
                     </div>
-                    <div class="col-md-7">
-                        <div class="p-2.5 rounded-3 border border-white border-opacity-10 bg-dark bg-opacity-50">
-                            <span class="smaller fw-bold text-uppercase text-secondary d-block mb-1">Active Option Strikes Replay</span>
-                            <div class="small text-secondary py-2 text-center">Loading real-time Parquet strike quotes...</div>
+                    <div class="text-end">
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5" id="live-exchange-clock-status">
+                            <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                            <span>SIMULATION ACTIVE</span>
+                        </span>
+                        <div class="theme-text-muted smaller mt-1 font-monospace">Square-off: 15:15 IST</div>
+                    </div>
+                </div>
+
+                <!-- 3. Top Macro Market Benchmark Cards Ribbon (4-Card Macro AI Grid Matching Marmot Production) -->
+                <div class="row g-3" id="live-macro-cards-container">
+                    <!-- CARD 1: NIFTY 50 • NSE Real-Time Live Ticker Card -->
+                    <div class="col-12 col-sm-6 col-xl-3" style="min-width: 0;">
+                        <div class="glass-card p-3 rounded-4 h-100 d-flex flex-column justify-content-between shadow-sm position-relative overflow-hidden" 
+                             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 14px !important;">
+                            
+                            <!-- Top Header: Title & Live Badge -->
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <div class="d-flex align-items-center gap-1.5 text-truncate">
+                                    <span class="theme-text-muted small fw-bold text-uppercase text-truncate" style="font-size: 0.74rem;" title="NIFTY 50 • NSE">
+                                        <i class="bi bi-graph-up-arrow text-primary me-1"></i>NIFTY 50 &bull; NSE
+                                    </span>
+                                </div>
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
+                                    <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.38rem; height: 0.38rem; animation-duration: 0.75s;"></span>
+                                    <span>LIVE TICK</span>
+                                </span>
+                            </div>
+
+                            <!-- Main Metric Stance (LTP & Day Range Summary) -->
+                            <div class="my-0.5">
+                                <div class="d-flex align-items-baseline gap-2">
+                                    <h5 class="fw-extrabold theme-text-main mb-0 font-monospace text-truncate" style="font-size: 1.05rem; letter-spacing: -0.01em;" id="emulator-nifty-ltp" data-index="NIFTY">—</h5>
+                                    <span class="badge bg-success bg-opacity-20 text-success rounded-pill px-1.5 py-0.5 font-monospace fw-bold" style="font-size: 0.64rem;" id="emulator-nifty-change">+0.00%</span>
+                                </div>
+                                <small class="theme-text-muted text-truncate d-block mt-0.5 font-monospace" style="font-size: 0.72rem;" id="emulator-nifty-summary">
+                                    Range: ₹24,242.15 - ₹24,245.85
+                                </small>
+                            </div>
+
+                            <!-- Score / Change & Real-Time Sync Timestamp Footer -->
+                            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex align-items-center justify-content-between gap-1 flex-wrap" style="font-size: 0.74rem;">
+                                <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-20 px-2 py-0.5 rounded-pill font-monospace" style="font-size: 0.66rem;" id="emulator-nifty-change-badge">
+                                    <i class="bi bi-caret-up-fill me-0.5"></i>+0.00 (+0.00%)
+                                </span>
+                                <span class="font-monospace text-white-50 ms-auto" style="font-size: 0.68rem;" title="Live Exchange Tick Stream">
+                                    <i class="bi bi-clock me-0.5"></i><span id="emulator-nifty-timestamp">Live Tick</span>
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARD 2: MACRO AI REGIME -->
+                    <div class="col-12 col-sm-6 col-xl-3" style="min-width: 0;">
+                        <div class="glass-card p-3 rounded-4 h-100 d-flex flex-column justify-content-between shadow-sm position-relative overflow-hidden" 
+                             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 14px !important;">
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <div class="d-flex align-items-center gap-1.5 text-truncate">
+                                    <span class="theme-text-muted small fw-bold text-uppercase text-truncate" style="font-size: 0.74rem;" title="MACRO AI REGIME">
+                                        <i class="bi bi-stars text-info me-1"></i>MACRO AI REGIME
+                                    </span>
+                                </div>
+                                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 px-2 py-0.5 rounded-pill fw-bold" style="font-size: 0.62rem;">
+                                    gemini-3.1-flash-lite
+                                </span>
+                            </div>
+                            <div class="my-0.5">
+                                <h5 class="fw-extrabold text-warning mb-0 text-truncate" style="font-size: 1.02rem; letter-spacing: -0.01em;" title="RANGEBOUND CONSOLIDATION">
+                                    RANGEBOUND CONSOLIDATION
+                                </h5>
+                                <small class="theme-text-muted text-truncate d-block mt-0.5" style="font-size: 0.72rem;" title="Nifty oscillating within a tight 24,100-24,500 band with significant gamma pinning at 24,300 strikes.">
+                                    Nifty oscillating within a tight 24,100-24,500 band with significant gamma pinning at 24,300 strikes.
+                                </small>
+                            </div>
+                            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex align-items-center justify-content-between gap-1 flex-wrap" style="font-size: 0.74rem;">
+                                <span class="badge bg-dark bg-opacity-50 text-white-50 border border-white border-opacity-10 px-2 py-0.5 rounded-pill font-monospace" style="font-size: 0.66rem;">
+                                    Conviction: +0.72
+                                </span>
+                                <span class="font-monospace text-white-50 ms-auto" style="font-size: 0.68rem;">
+                                    <i class="bi bi-clock me-0.5"></i>10:49 PM
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARD 3: INSTITUTIONAL FLOW BIAS -->
+                    <div class="col-12 col-sm-6 col-xl-3" style="min-width: 0;">
+                        <div class="glass-card p-3 rounded-4 h-100 d-flex flex-column justify-content-between shadow-sm position-relative overflow-hidden" 
+                             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 14px !important;">
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <div class="d-flex align-items-center gap-1.5 text-truncate">
+                                    <span class="theme-text-muted small fw-bold text-uppercase text-truncate" style="font-size: 0.74rem;" title="INSTITUTIONAL FLOW BIAS">
+                                        <i class="bi bi-graph-up-arrow text-success me-1"></i>INSTITUTIONAL FLOW BIAS
+                                    </span>
+                                </div>
+                                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-2 py-0.5 rounded-pill fw-bold" style="font-size: 0.62rem;">
+                                    FII / DII Flow
+                                </span>
+                            </div>
+                            <div class="my-0.5">
+                                <h5 class="fw-extrabold text-success mb-0 text-truncate" style="font-size: 1.02rem; letter-spacing: -0.01em;" title="NET INSTITUTIONAL DISTRIBUTION">
+                                    NET INSTITUTIONAL DISTRIBUTION
+                                </h5>
+                                <small class="theme-text-muted text-truncate d-block mt-0.5" style="font-size: 0.72rem;" title="FIIs continue to trim index long exposure while DIIs provide selective support at lower levels.">
+                                    FIIs continue to trim index long exposure while DIIs provide selective support at lower levels.
+                                </small>
+                            </div>
+                            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex align-items-center justify-content-between gap-1 flex-wrap" style="font-size: 0.74rem;">
+                                <span class="badge bg-dark bg-opacity-50 text-white-50 border border-white border-opacity-10 px-2 py-0.5 rounded-pill font-monospace" style="font-size: 0.66rem;">
+                                    Bias Score: -0.42
+                                </span>
+                                <span class="font-monospace text-white-50 ms-auto" style="font-size: 0.68rem;">
+                                    <i class="bi bi-clock me-0.5"></i>10:49 PM
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- CARD 4: GLOBAL & EVENT RISK -->
+                    <div class="col-12 col-sm-6 col-xl-3" style="min-width: 0;">
+                        <div class="glass-card p-3 rounded-4 h-100 d-flex flex-column justify-content-between shadow-sm position-relative overflow-hidden" 
+                             style="background: var(--card-bg, rgba(255, 255, 255, 0.03)); border: 1px solid var(--border-color) !important; border-radius: 14px !important;">
+                            <div class="d-flex align-items-center justify-content-between mb-1.5">
+                                <div class="d-flex align-items-center gap-1.5 text-truncate">
+                                    <span class="theme-text-muted small fw-bold text-uppercase text-truncate" style="font-size: 0.74rem;" title="GLOBAL & EVENT RISK">
+                                        <i class="bi bi-shield-check text-success me-1"></i>GLOBAL & EVENT RISK
+                                    </span>
+                                </div>
+                                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-2 py-0.5 rounded-pill fw-bold" style="font-size: 0.62rem;">
+                                    ELEVATED RISK
+                                </span>
+                            </div>
+                            <div class="my-0.5">
+                                <h5 class="fw-extrabold text-warning mb-0 text-truncate" style="font-size: 1.02rem; letter-spacing: -0.01em;" title="NEUTRAL GLOBAL CUES">
+                                    NEUTRAL GLOBAL CUES
+                                </h5>
+                                <small class="theme-text-muted text-truncate d-block mt-0.5" style="font-size: 0.72rem;" title="Mixed signals from US Treasury yields and cooling commodity prices leading to a wait-and-see appro...">
+                                    Mixed signals from US Treasury yields and cooling commodity prices leading to a wait-and-see appro...
+                                </small>
+                            </div>
+                            <div class="theme-text-muted small mt-2 pt-2 border-top border-secondary border-opacity-10 d-flex align-items-center justify-content-between gap-1 flex-wrap" style="font-size: 0.74rem;">
+                                <span class="badge bg-dark bg-opacity-50 text-white-50 border border-white border-opacity-10 px-2 py-0.5 rounded-pill font-monospace" style="font-size: 0.66rem;">
+                                    Score: +0.05 &bull; Guard Active
+                                </span>
+                                <span class="font-monospace text-white-50 ms-auto" style="font-size: 0.68rem;">
+                                    <i class="bi bi-clock me-0.5"></i>10:49 PM
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- START: 8 Spark Telemetry Cards (4 Inline x 2 Rows, Marmot Live Dashboard Standard) -->
-        <div class="row g-3 mb-4">
-            <!-- Stat 1: Broker Session Stream -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="glass-card p-3 h-100" style="border-left: 4px solid var(--brand-lime) !important;">
-                    <span class="text-secondary smaller text-uppercase fw-semibold d-block mb-1">Broker Session</span>
-                    <h5 class="fw-bold mb-1 text-white">Dhan Emulator</h5>
-                    <div class="d-flex align-items-center gap-1.5 smaller">
-                        <span class="badge bg-success bg-opacity-20 text-success rounded-pill px-2 py-0.5">Mock Online (:8088)</span>
-                        <span class="text-secondary">Client 1000000001</span>
-                    </div>
-                </div>
-            </div>
+                <!-- ═══════════════════════════════════════════════════════════════════
+                     UNCONGESTED & SEPARATED PARQUET STREAMER ARCHITECTURE (2 DISTINCT CARDS)
+                     ═══════════════════════════════════════════════════════════════════ -->
 
-            <!-- Stat 2: Real-time Net PnL (MTM) -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="glass-card p-3 h-100" style="border-left: 4px solid #00F5FF !important;">
-                    <span class="text-secondary smaller text-uppercase fw-semibold d-block mb-1">Realtime Session PnL</span>
-                    <h5 class="fw-bold mb-1 text-white font-monospace">₹0.00</h5>
-                    <small class="text-success smaller"><i class="bi bi-graph-up-arrow me-1"></i> Dynamic MTM Tracking</small>
-                </div>
-            </div>
-
-            <!-- Stat 3: Available Virtual Capital -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="glass-card p-3 h-100" style="border-left: 4px solid var(--brand-lime) !important;">
-                    <span class="text-secondary smaller text-uppercase fw-semibold d-block mb-1">Available Margin</span>
-                    <h5 class="fw-bold mb-1 text-success font-monospace">₹{{printf "%.2f" .Funds.AvailabelBalance}}</h5>
-                    <small class="text-secondary smaller">SOD Limit: ₹{{printf "%.2f" .Funds.SodLimit}}</small>
-                </div>
-            </div>
-
-            <!-- Stat 4: Utilized Margin -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="glass-card p-3 h-100" style="border-left: 4px solid #F59E0B !important;">
-                    <span class="text-secondary smaller text-uppercase fw-semibold d-block mb-1">Margin Utilized</span>
-                    <h5 class="fw-bold mb-1 text-warning font-monospace">₹{{printf "%.2f" .Funds.UtilizedAmount}}</h5>
-                    <small class="text-secondary smaller">Exposure across open positions</small>
-                </div>
-            </div>
-
-            <!-- Stat 5: Realized PnL -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="glass-card p-3 h-100">
-                    <span class="text-secondary smaller text-uppercase fw-semibold d-block mb-1">Realized Profit / Loss</span>
-                    <h5 class="fw-bold mb-1 text-white font-monospace">₹0.00</h5>
-                    <small class="text-secondary smaller">Closed position PnL</small>
-                </div>
-            </div>
-
-            <!-- Stat 6: Unrealized PnL (MTM) -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="glass-card p-3 h-100">
-                    <span class="text-secondary smaller text-uppercase fw-semibold d-block mb-1">Unrealized MTM PnL</span>
-                    <h5 class="fw-bold mb-1 text-white font-monospace">₹0.00</h5>
-                    <small class="text-secondary smaller">Open position live valuation</small>
-                </div>
-            </div>
-
-            <!-- Stat 7: Active Positions Count -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="glass-card p-3 h-100">
-                    <span class="text-secondary smaller text-uppercase fw-semibold d-block mb-1">Open Positions</span>
-                    <h5 class="fw-bold mb-1 text-white font-monospace">{{len .Positions}} Active</h5>
-                    <small class="text-secondary smaller">Market &amp; Option Legs</small>
-                </div>
-            </div>
-
-            <!-- Stat 8: Total Orders Journaled -->
-            <div class="col-12 col-sm-6 col-xl-3">
-                <div class="glass-card p-3 h-100">
-                    <span class="text-secondary smaller text-uppercase fw-semibold d-block mb-1">Today's Orders</span>
-                    <h5 class="fw-bold mb-1 text-white font-monospace">{{len .Orders}} Orders</h5>
-                    <small class="text-secondary smaller">Dhan API v2 Order Log</small>
-                </div>
-            </div>
-        </div>
-
-        <!-- Navigation Tabs for Content (Marmot Glass Style) -->
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-white border-opacity-10">
-            <button class="nav-pill-marmot active" data-bs-toggle="pill" data-bs-target="#panel-positions">
-                <i class="bi bi-pie-chart-fill me-1.5"></i> Positions (MTM &amp; SL/TP)
-            </button>
-            <button class="nav-pill-marmot" data-bs-toggle="pill" data-bs-target="#panel-orders">
-                <i class="bi bi-receipt me-1.5"></i> Orders Journal
-            </button>
-            <button class="nav-pill-marmot" data-bs-toggle="pill" data-bs-target="#panel-holdings">
-                <i class="bi bi-briefcase-fill me-1.5"></i> Demat Holdings
-            </button>
-            <button class="nav-pill-marmot" data-bs-toggle="pill" data-bs-target="#panel-funds">
-                <i class="bi bi-wallet2 me-1.5"></i> Virtual Cash Drawer
-            </button>
-            <button class="nav-pill-marmot" data-bs-toggle="pill" data-bs-target="#panel-chaos">
-                <i class="bi bi-sliders me-1.5"></i> Chaos &amp; Webhooks
-            </button>
-        </div>
-
-        <!-- Tab Content Panels -->
-        <div class="tab-content" id="marmotBrokerPanels">
-            <!-- 1. POSITIONS PANEL -->
-            <div class="tab-pane fade show active" id="panel-positions" role="tabpanel">
-                <div class="glass-card p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                <!-- CARD 1: Dedicated Parquet Replay Controller Card -->
+                <div class="card glass-card p-3 mb-0 border-secondary border-opacity-20 shadow-sm" id="streamer-controls-wrapper" style="position: relative; z-index: 50;">
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-20">
                         <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-pie-chart text-success fs-5"></i>
-                            <h6 class="mb-0 fw-bold text-white">Live Positions &amp; Trade Lifecycle (Entry, Exit, SL, TP)</h6>
+                            <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 32px; height: 32px; background: rgba(180, 241, 5, 0.12); color: #B4F105; border: 1px solid rgba(180, 241, 5, 0.25);">
+                                <i class="bi bi-sliders"></i>
+                            </div>
+                            <h6 class="mb-0 fw-bold theme-text-main" style="font-size: 0.95rem;">Parquet Replay Controller</h6>
                         </div>
-                        <span class="text-secondary smaller"><i class="bi bi-arrow-clockwise me-1"></i> Auto-refreshing every 2s via HTMX</span>
+                        <span class="badge {{if .StreamerPlaying}}bg-success bg-opacity-20 text-success border border-success border-opacity-30{{else}}bg-secondary bg-opacity-25 text-white-50 border border-white border-opacity-15{{end}} rounded-pill px-2.5 py-1 smaller font-monospace">
+                            <i class="bi bi-circle-fill me-1" style="font-size: 0.45rem;"></i> {{if .StreamerPlaying}}ENGINE ACTIVE{{else}}STANDBY{{end}}
+                        </span>
                     </div>
-                    <div class="table-responsive" id="positions-table-container" hx-get="/mock/dashboard/positions" hx-trigger="load, every 2s">
-                        <table class="table table-dark table-hover align-middle mb-0">
-                            <thead class="text-secondary small text-uppercase">
+                    <div class="row g-3 align-items-end">
+                        <div class="col-12 col-lg-5">
+                            <label class="text-secondary smaller fw-bold d-block mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">
+                                <i class="bi bi-file-earmark-binary-fill me-1 text-warning"></i>Parquet Dataset File
+                            </label>
+                            <div class="dropdown custom-parquet-dropdown w-100">
+                                <button class="btn dropdown-toggle w-100 text-start d-flex align-items-center justify-content-between px-3 py-2 rounded-3 font-monospace"
+                                        type="button" 
+                                        id="parquetDropdownBtn"
+                                        data-bs-toggle="dropdown" 
+                                        data-bs-display="static"
+                                        aria-expanded="false"
+                                        style="background: #141416; color: #fafafa; font-size: 0.78rem; min-height: 42px; border: 1px solid rgba(255, 255, 255, 0.08); outline: none;">
+                                    <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+                                        <span class="badge rounded-pill px-2 py-0.5 smaller fw-bold flex-shrink-0" style="color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.12);">
+                                            {{.CurrentIndex}}
+                                        </span>
+                                        <span class="text-truncate fw-semibold text-white">{{.CurrentFile}}</span>
+                                        {{if .CurrentDateRange}}
+                                        <span class="badge bg-secondary bg-opacity-25 text-white-50 font-monospace smaller px-1.5 py-0.5 d-none d-sm-inline-block">
+                                            <i class="bi bi-calendar3 me-1 text-warning"></i>{{.CurrentDateRange}}
+                                        </span>
+                                        {{end}}
+                                    </div>
+                                    <i class="bi bi-chevron-down text-white-50 flex-shrink-0 ms-2"></i>
+                                </button>
+                                <ul class="dropdown-menu dropdown-menu-dark w-100 shadow-lg p-1.5 custom-scroll"
+                                    aria-labelledby="parquetDropdownBtn"
+                                    style="background: #121215; backdrop-filter: blur(20px); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.08); max-height: 360px; overflow-y: auto; z-index: 1060;">
+                                    {{if .ParquetFiles}}
+                                        {{range .ParquetFiles}}
+                                        <li>
+                                            <a class="dropdown-item rounded-2 py-2 px-2.5 mb-1 d-flex align-items-center justify-content-between font-monospace text-wrap {{if eq .RelativePath $.CurrentFile}}active-parquet-item{{end}}"
+                                               href="javascript:void(0);"
+                                               hx-post="/mock/api/streamer/select?file={{.RelativePath}}"
+                                               hx-target="#streamer-controls-wrapper"
+                                               hx-swap="outerHTML"
+                                               style="font-size: 0.76rem; border: 1px solid {{if eq .RelativePath $.CurrentFile}}rgba(56, 189, 248, 0.4){{else}}transparent{{end}}; background: {{if eq .RelativePath $.CurrentFile}}rgba(56, 189, 248, 0.12){{else}}transparent{{end}}; cursor: pointer;">
+                                                <div class="d-flex flex-column gap-1 me-2 overflow-hidden text-start">
+                                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                                        <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
+                                                            {{.IndexName}}
+                                                        </span>
+                                                        <strong class="text-white text-truncate">{{.RelativePath}}</strong>
+                                                        <span class="badge bg-secondary bg-opacity-30 text-white-50 smaller px-1.5 py-0.5">
+                                                            {{.TypeLabel}}
+                                                        </span>
+                                                    </div>
+                                                    <div class="d-flex align-items-center gap-2 smaller text-muted">
+                                                        {{if .DateRange}}
+                                                        <span class="text-white-50"><i class="bi bi-calendar3 me-1 text-warning"></i>{{.DateRange}}</span>
+                                                        <span>&bull;</span>
+                                                        {{end}}
+                                                        <span>{{printf "%.1f" .SizeMB}} MB</span>
+                                                    </div>
+                                                </div>
+                                                {{if eq .RelativePath $.CurrentFile}}
+                                                <i class="bi bi-check-circle-fill text-info fs-6 flex-shrink-0 ms-2"></i>
+                                                {{end}}
+                                            </a>
+                                        </li>
+                                        {{end}}
+                                    {{else}}
+                                        <li><span class="dropdown-item text-muted">Synthetic Brownian Walk (Default)</span></li>
+                                    {{end}}
+                                </ul>
+                            </div>
+                        </div>
+                        <div class="col-12 col-sm-5 col-lg-3 text-start text-sm-center">
+                            <label class="text-secondary smaller fw-bold d-block mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">Playback State</label>
+                            <button class="btn {{if .StreamerPlaying}}btn-warning text-dark{{else}}btn-light text-dark{{end}} fw-bold btn-sm rounded-pill px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2"
+                                    hx-post="/mock/api/streamer/toggle"
+                                    hx-target="#streamer-controls-wrapper"
+                                    hx-swap="outerHTML">
+                                {{if .StreamerPlaying}}<i class="bi bi-pause-fill fs-5"></i> <span>Pause Replay</span>{{else}}<i class="bi bi-play-fill fs-5"></i> <span>Start Replay</span>{{end}}
+                            </button>
+                        </div>
+                        <div class="col-12 col-sm-7 col-lg-4 text-start text-sm-end">
+                            <label class="text-secondary smaller fw-bold d-block mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">Replay Speed</label>
+                            <div class="d-flex flex-wrap gap-1 justify-content-start justify-content-sm-end" role="group">
+                                <button class="btn speed-pill rounded-pill {{if eq .StreamerSpeed 1}}active{{end}}" hx-post="/mock/api/streamer/speed?val=1" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML">1x</button>
+                                <button class="btn speed-pill rounded-pill {{if eq .StreamerSpeed 5}}active{{end}}" hx-post="/mock/api/streamer/speed?val=5" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML">5x</button>
+                                <button class="btn speed-pill rounded-pill {{if eq .StreamerSpeed 10}}active{{end}}" hx-post="/mock/api/streamer/speed?val=10" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML">10x</button>
+                                <button class="btn speed-pill rounded-pill {{if eq .StreamerSpeed 25}}active{{end}}" hx-post="/mock/api/streamer/speed?val=25" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML">25x</button>
+                                <button class="btn speed-pill rounded-pill {{if eq .StreamerSpeed 50}}active{{end}}" hx-post="/mock/api/streamer/speed?val=50" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML">50x</button>
+                                <button class="btn speed-pill rounded-pill {{if eq .StreamerSpeed 100}}active{{end}}" hx-post="/mock/api/streamer/speed?val=100" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML">100x</button>
+                                <button class="btn speed-pill rounded-pill {{if eq .StreamerSpeed 250}}active{{end}}" hx-post="/mock/api/streamer/speed?val=250" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML">250x</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- CARD 2: Dedicated Replay Timeline & Progress Telemetry Card -->
+                <div class="card glass-card p-3 mb-0 border-secondary border-opacity-20 shadow-sm" id="replay-progress-card" style="position: relative; z-index: 1;">
+                    <div class="d-flex align-items-center justify-content-between mb-2.5 pb-2 border-bottom border-secondary border-opacity-20">
+                        <div class="d-flex align-items-center gap-2">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 32px; height: 32px; background: rgba(0, 245, 255, 0.12); color: #00F5FF; border: 1px solid rgba(0, 245, 255, 0.25);">
+                                <i class="bi bi-broadcast"></i>
+                            </div>
+                            <h6 class="mb-0 fw-bold theme-text-main" style="font-size: 0.95rem;">Real-time Replay Progress &amp; Timeline Telemetry</h6>
+                        </div>
+                        <span class="text-secondary smaller"><i class="bi bi-clock-history me-1 text-info"></i> Auto-synced every 2s</span>
+                    </div>
+                    <div id="replay-progress-container" hx-get="/mock/dashboard/progress" hx-trigger="load, replayCompleted from:body, replayRestarted from:body, accountChanged from:body, every 2s">
+                        <div class="d-flex flex-column gap-2.5">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <span class="badge {{if .StreamerPlaying}}bg-success bg-opacity-20 text-success border border-success border-opacity-30{{else}}bg-secondary bg-opacity-25 text-white-50 border border-white border-opacity-15{{end}} rounded-pill px-3 py-1 fs-xs fw-bold font-monospace shadow-sm">
+                                        {{if .StreamerPlaying}}<span class="spinner-grow spinner-grow-sm text-success me-1" role="status" style="width: 0.45rem; height: 0.45rem;"></span>STREAMING TICK FEED{{else}}<i class="bi bi-pause-circle me-1"></i>FEED PAUSED (STANDBY){{end}}
+                                    </span>
+                                    <span class="badge bg-dark border border-white border-opacity-10 text-warning px-2.5 py-1 font-monospace smaller shadow-sm">
+                                        <i class="bi bi-calendar3 me-1.5"></i> {{.CurrentDate}}
+                                    </span>
+                                    <span class="badge bg-dark border border-white border-opacity-10 text-info px-2.5 py-1 font-monospace smaller shadow-sm">
+                                        <i class="bi bi-clock me-1.5"></i> {{.CurrentDatetime}} IST
+                                    </span>
+                                </div>
+                                <div class="d-flex align-items-center gap-3 font-monospace smaller text-secondary flex-wrap">
+                                    <span>Dataset: <strong class="text-white">{{if .CurrentFile}}{{.CurrentFile}}{{else}}Synthetic Walk{{end}}</strong></span>
+                                    <span class="opacity-25">|</span>
+                                    <span>Rows: <strong class="text-white">{{.CurrentRow}} / {{.TotalRows}}</strong></span>
+                                    <span class="opacity-25">|</span>
+                                    <span>Progress: <strong class="text-success">{{printf "%.1f" .ProgressPct}}%</strong></span>
+                                    <span class="opacity-25">|</span>
+                                    <span>Speed: <strong class="text-warning">{{.StreamerSpeed}}x</strong></span>
+                                    <span class="opacity-25">|</span>
+                                    <span>Ticks: <strong class="text-white">{{.TicksIngested}}</strong></span>
+                                </div>
+                            </div>
+                            <div class="progress rounded-pill bg-dark border border-white border-opacity-10" style="height: 8px;">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" 
+                                     style="width: {{printf "%.2f" .ProgressPct}}%; background-color: var(--brand-lime, #B4F105) !important;" 
+                                     aria-valuenow="{{printf "%.1f" .ProgressPct}}" aria-valuemin="0" aria-valuemax="100"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Session Performance Summary & Equity Curve UI (Auto-loaded, updates on replayCompleted or accountChanged) -->
+                <div id="session-summary-container" hx-get="/mock/dashboard/summary" hx-trigger="load, replayCompleted from:body, accountChanged from:body, replayRestarted from:body"></div>
+
+                <!-- 4. Top 8 Portfolio Telemetry Cards (4 Inline x 2 Rows, Marmot Spark Design Standard) -->
+                <div class="d-flex flex-column gap-3">
+                    <!-- ROW 1: Core Execution & Risk Telemetry -->
+                    <div class="row g-3">
+                        <!-- Stat Card 1: Broker Session Stream -->
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <div class="card alert-green-card" style="background-color: var(--card-background, #0c0c0e) !important; border: 1px solid var(--border-color) !important; border-radius: var(--radius-xl) !important;">
+                                <div class="position-relative z-index-2">
+                                    <span class="badge rounded-pill px-2 py-0.5 mb-2 font-monospace fw-bold d-inline-flex align-items-center gap-1" style="background: rgba(16, 185, 129, 0.12); color: #4ade80; border: 1px solid rgba(16, 185, 129, 0.25); font-size: 0.72rem;">
+                                        <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.38rem; height: 0.38rem;"></span>
+                                        Dhan Mock Emulator Online
+                                    </span>
+                                    <div class="alert-green-date">Broker: <span id="telemetry-client-id" class="font-monospace fw-bold text-white">{{if .ActiveAccount}}{{.ActiveAccount.DhanClientID}}{{else}}1000000001{{end}}</span> ({{if .ActiveAccount}}{{.ActiveAccount.Broker}}{{else}}Dhan{{end}})</div>
+                                    <div class="alert-green-text fw-bold text-white" id="telemetry-account-name">
+                                        {{if .ActiveAccount}}{{.ActiveAccount.AccountName}}{{else}}Primary Algorithmic Trading{{end}} &bull; Realtime Stream
+                                    </div>
+                                </div>
+                                <div class="metric-card-footer border-top border-secondary border-opacity-15 z-index-2 mt-auto pt-2 d-flex align-items-center justify-content-between">
+                                    <a href="http://localhost:8005/users/accounts/" class="alert-green-link" data-marmot-path="/users/accounts/">
+                                        <span>Accounts</span>
+                                        <i class="bi bi-arrow-right"></i>
+                                    </a>
+                                    <a href="http://localhost:8005/users/accounts/" class="theme-text-muted text-decoration-none smaller font-monospace" data-marmot-path="/users/accounts/">
+                                        <i class="bi bi-key me-0.5"></i>Token
+                                    </a>
+                                </div>
+
+                                <!-- Inline SVG geometric decoration -->
+                                <svg class="alert-green-bg-shape" viewBox="0 0 100 100" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <g transform="translate(50,50)">
+                                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="rgba(255, 255, 255, 0.04)" />
+                                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="rgba(255, 255, 255, 0.04)" transform="rotate(60)" />
+                                        <rect x="-6" y="-45" width="12" height="90" rx="6" ry="6" fill="rgba(255, 255, 255, 0.04)" transform="rotate(120)" />
+                                    </g>
+                                </svg>
+                            </div>
+                        </div>
+
+                        <!-- Stat Card 2: Live Net P&L -->
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <div class="card theme-metric-card">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="metric-card-badge">
+                                            <i class="bi bi-graph-up-arrow text-primary"></i>
+                                            <span>Live Net P&amp;L</span>
+                                        </span>
+                                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Live Synced</span>
+                                    </div>
+                                    <div class="metric-card-date">Intraday Realtime Return</div>
+                                    <div class="metric-card-value font-monospace text-success" id="emulator-live-net-pnl">
+                                        +₹0.00
+                                    </div>
+                                </div>
+                                <div class="metric-card-footer">
+                                    <div class="trend-badge trend-up py-0 px-0 fs-xs">
+                                        <i class="bi bi-arrow-up-right text-success"></i>
+                                        <span id="emulator-active-positions-count">{{len .Positions}} Active Pos</span>
+                                    </div>
+                                    <span id="emulator-total-orders-count">{{len .Orders}} Orders</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stat Card 3: Available Margin -->
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <div class="card theme-metric-card">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="metric-card-badge">
+                                            <i class="bi bi-wallet2 text-success"></i>
+                                            <span>Available Margin</span>
+                                        </span>
+                                        <button class="btn btn-sm btn-link theme-text-muted p-0 text-decoration-none smaller" hx-get="/mock/dashboard/funds" hx-target="#panel-funds-summary">
+                                            <i class="bi bi-arrow-repeat text-primary"></i>
+                                        </button>
+                                    </div>
+                                    <div class="metric-card-date" id="emulator-available-margin-cash">Broker Funds &bull; Cash: ₹{{printf "%.2f" .Funds.AvailabelBalance}}</div>
+                                    <div class="metric-card-value font-monospace text-primary" id="emulator-available-margin">
+                                        ₹{{printf "%.2f" .Funds.AvailabelBalance}}
+                                    </div>
+                                </div>
+                                <div class="metric-card-footer">
+                                    <span><i class="bi bi-check2-circle text-success me-1"></i>Armed &amp; Synced</span>
+                                    <span class="text-success fw-bold smaller">Trading Power</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stat Card 4: Risk Shield & Kill Switch -->
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <div class="card theme-metric-card">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="metric-card-badge">
+                                            <i class="bi bi-shield-lock-fill text-danger"></i>
+                                            <span>Risk Shield</span>
+                                        </span>
+                                        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Active</span>
+                                    </div>
+                                    <div class="metric-card-date">Gate: <strong class="text-success">Enabled</strong></div>
+                                    <div class="metric-card-value d-flex align-items-center justify-content-between">
+                                        <span>Normal Arm</span>
+                                        <button type="button" 
+                                                class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm text-white kill-switch"
+                                                hx-post="/mock/api/kill-switch"
+                                                hx-swap="none"
+                                                hx-confirm="Kill Switch: Cancel all active orders?">
+                                            <i class="bi bi-lightning-fill"></i>
+                                            <span>Kill</span>
+                                        </button>
+                                    </div>
+                                </div>
+                                <div class="metric-card-footer">
+                                    <span>Circuit Gate Protected</span>
+                                    <span class="text-danger fw-bold smaller">Instant Freeze</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- ROW 2: Detailed Performance & Capital Telemetry -->
+                    <div class="row g-3">
+                        <!-- Stat Card 5: Realized P&L -->
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <div class="card theme-metric-card">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="metric-card-badge">
+                                            <i class="bi bi-check-circle-fill text-success"></i>
+                                            <span>Realized P&amp;L</span>
+                                        </span>
+                                        <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 smaller fw-bold" id="emulator-closed-positions-badge">0 Closed</span>
+                                    </div>
+                                    <div class="metric-card-date">Booked &amp; Settled Performance</div>
+                                    <div class="metric-card-value font-monospace text-success" id="emulator-realized-pnl">
+                                        +₹0.00
+                                    </div>
+                                </div>
+                                <div class="metric-card-footer">
+                                    <span><i class="bi bi-receipt-cutoff text-success me-1"></i>Settled</span>
+                                    <span class="text-success fw-bold smaller">Confirmed</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stat Card 6: Unrealized P&L -->
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <div class="card theme-metric-card">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="metric-card-badge">
+                                            <i class="bi bi-water text-info"></i>
+                                            <span>Unrealized P&amp;L</span>
+                                        </span>
+                                        <span class="badge {{if .Positions}}bg-primary bg-opacity-25 text-primary{{else}}bg-secondary bg-opacity-25 text-white-50{{end}} rounded-pill px-2 py-0.5 smaller fw-bold" id="emulator-open-positions-badge">{{len .Positions}} Open</span>
+                                    </div>
+                                    <div class="metric-card-date">Mark-to-Market Realtime Float</div>
+                                    <div class="metric-card-value font-monospace text-success" id="emulator-unrealized-pnl">
+                                        +₹0.00
+                                    </div>
+                                </div>
+                                <div class="metric-card-footer">
+                                    <span><i class="bi bi-activity text-info me-1"></i>MTM Float</span>
+                                    <span class="text-info fw-bold smaller">{{len .Positions}} Running</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stat Card 7: Margin Utilized -->
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <div class="card theme-metric-card">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="metric-card-badge">
+                                            <i class="bi bi-pie-chart-fill text-warning"></i>
+                                            <span>Margin Utilized</span>
+                                        </span>
+                                        <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0.5 smaller fw-bold">Active Exposure</span>
+                                    </div>
+                                    <div class="metric-card-date">Collateral: ₹0.00</div>
+                                    <div class="metric-card-value font-monospace text-warning" id="emulator-utilized-margin">
+                                        ₹{{printf "%.2f" .Funds.UtilizedAmount}}
+                                    </div>
+                                </div>
+                                <div class="metric-card-footer">
+                                    <span><i class="bi bi-layers text-warning me-1"></i>Capital in Use</span>
+                                    <span class="text-warning fw-bold smaller">Exposure Ratio</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Stat Card 8: Day Orders -->
+                        <div class="col-12 col-sm-6 col-xl-3">
+                            <div class="card theme-metric-card">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <span class="metric-card-badge">
+                                            <i class="bi bi-receipt text-primary"></i>
+                                            <span>Day Orders</span>
+                                        </span>
+                                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller fw-bold" id="emulator-day-orders-fills">{{len .Orders}} Fills</span>
+                                    </div>
+                                    <div class="metric-card-date">Pending: 0</div>
+                                    <div class="metric-card-value font-monospace text-primary" id="emulator-day-orders-count">
+                                        {{len .Orders}} <span class="fs-6 fw-normal text-muted">Orders</span>
+                                    </div>
+                                </div>
+                                <div class="metric-card-footer">
+                                    <span><i class="bi bi-check2-all text-primary me-1"></i>Traded: {{len .Orders}}</span>
+                                    <span class="text-primary fw-bold smaller">Pending: 0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 5. Open & Running Positions (Spark Design Standard) -->
+                <div class="card shadow-sm overflow-hidden mb-0 p-0 glass-card" id="panel-positions">
+                    <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
+                                 style="width: 38px; height: 38px; background: rgba(34, 197, 94, 0.12); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.25);">
+                                <i class="bi bi-layers-half fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Open &amp; Running Positions</h5>
+                                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5">
+                                        <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                                        <span>{{len .Positions}} ACTIVE POSITIONS</span>
+                                    </span>
+                                </div>
+                                <small class="theme-text-muted" style="font-size: 0.74rem;">Real-time MTM telemetry, live contract prices, and instant risk exit controls</small>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 ms-md-auto">
+                            <span class="badge bg-secondary bg-opacity-25 text-white-50 px-3 py-1.5 rounded-pill font-monospace small">
+                                {{len .Positions}} Total Contracts
+                            </span>
+                        </div>
+                    </div>
+                    <div class="card-body p-3.5" id="positions-table-container" hx-get="/mock/dashboard/positions" hx-trigger="load, brokerOrderUpdate from:body, accountChanged from:body">
+                        <table class="table table-custom align-middle mb-0">
+                            <thead>
                                 <tr>
                                     <th>Symbol</th><th>Type</th><th>Product</th><th>Net Qty</th>
                                     <th>Buy Avg</th><th>Sell Avg</th><th>SL</th><th>TP</th><th>Entry Time</th><th>Exit Time</th>
@@ -447,21 +1868,54 @@
                         </table>
                     </div>
                 </div>
-            </div>
 
-            <!-- 2. ORDERS JOURNAL PANEL -->
-            <div class="tab-pane fade" id="panel-orders" role="tabpanel">
-                <div class="glass-card p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
-                        <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-receipt text-info fs-5"></i>
-                            <h6 class="mb-0 fw-bold text-white">Live Orders Journal (Dhan API v2 Parity)</h6>
+                <!-- 6. Real-Time Dynamic Option Chain & Live Pricing Telemetry Widget (Full Width col-12) -->
+                <div class="row g-3">
+                    <div class="col-12" id="live-option-chain-container" hx-get="/mock/dashboard/option-chain?index=NIFTY" hx-trigger="load, every 3s, reloadMockOptionChain from:body">
+                        <div class="glass-card p-4 text-center text-muted">
+                            <span class="spinner-grow spinner-grow-sm text-success me-2" role="status"></span>
+                            <span>Loading Real-time Parquet Option Chain &amp; Heatmap...</span>
                         </div>
-                        <span class="text-secondary smaller"><i class="bi bi-arrow-clockwise me-1"></i> Auto-refreshing every 2s via HTMX</span>
                     </div>
-                    <div class="table-responsive" id="orders-table-container" hx-get="/mock/dashboard/orders" hx-trigger="load, every 2s">
-                        <table class="table table-dark table-hover align-middle mb-0">
-                            <thead class="text-secondary small text-uppercase">
+                </div>
+
+                <!-- 7. Broker Orders & Execution Book (Exact Spark Design Standard) -->
+                <div class="card shadow-sm overflow-hidden mb-0 p-0 glass-card" id="panel-orders">
+                    <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+                        <div class="d-flex align-items-center gap-3">
+                            <div class="rounded-circle bg-warning bg-opacity-15 text-warning d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                                <i class="bi bi-broadcast fs-5"></i>
+                            </div>
+                            <div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap">
+                                    <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Live Orders &amp; Execution Book</h5>
+                                    <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold">
+                                        {{len .Orders}} TOTAL ORDERS TODAY
+                                    </span>
+                                </div>
+                                <small class="theme-text-muted" style="font-size: 0.74rem;">Real-time broker order audit trail, pending triggers, and filled execution logs</small>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-2 ms-md-auto">
+                            <span class="badge bg-success bg-opacity-20 text-success rounded-pill px-3 py-1.5 smaller fw-bold font-monospace">
+                                {{len .Orders}} Executed
+                            </span>
+                            <span class="badge bg-warning bg-opacity-20 text-warning rounded-pill px-3 py-1.5 smaller fw-bold font-monospace">
+                                0 Pending
+                            </span>
+                            <button type="button" 
+                                    class="btn btn-xs btn-outline-danger rounded-pill px-2.5 py-1 smaller fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                    hx-post="/mock/api/session/clear"
+                                    hx-swap="none"
+                                    hx-confirm="Are you sure you want to clear all mock orders and reset positions?">
+                                <i class="bi bi-trash3"></i>
+                                <span>Clear Session</span>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body p-3.5" id="orders-table-container" hx-get="/mock/dashboard/orders" hx-trigger="load, brokerOrderUpdate from:body, accountChanged from:body">
+                        <table class="table table-custom align-middle mb-0">
+                            <thead>
                                 <tr>
                                     <th>Order ID</th><th>Time</th><th>Symbol</th><th>Side</th><th>Segment</th>
                                     <th>Type</th><th>Qty / Filled</th><th>Price / Avg</th><th>SL</th><th>TP</th><th>Status</th>
@@ -502,149 +1956,581 @@
                         </table>
                     </div>
                 </div>
-            </div>
 
-            <!-- 3. HOLDINGS PANEL -->
-            <div class="tab-pane fade" id="panel-holdings" role="tabpanel">
-                <div class="glass-card p-4">
-                    <div class="d-flex justify-content-between align-items-center mb-3">
+                <!-- 8. Developer Sandbox Tools: Virtual Cash Drawer & Chaos Engine (Clean Bottom Tabs) -->
+                <div class="card glass-card p-3 mb-4">
+                    <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-20">
                         <div class="d-flex align-items-center gap-2">
-                            <i class="bi bi-briefcase text-warning fs-5"></i>
-                            <h6 class="mb-0 fw-bold text-white">Demat Equity Holdings</h6>
-                        </div>
-                        <span class="badge bg-secondary bg-opacity-25 text-secondary border border-white border-opacity-10">2 Holdings Active</span>
-                    </div>
-                    <div class="table-responsive">
-                        <table class="table table-dark table-hover align-middle mb-0">
-                            <thead class="text-secondary small text-uppercase">
-                                <tr>
-                                    <th>Instrument</th><th>Qty</th><th>Avg Price</th><th>LTP</th><th>Invested Value</th><th>Current Value</th><th>P&amp;L</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr>
-                                    <td class="fw-semibold text-white">RELIANCE <small class="text-secondary">NSE_EQ</small></td>
-                                    <td>50</td>
-                                    <td>₹2,850.00</td>
-                                    <td class="text-success font-monospace">₹2,982.10</td>
-                                    <td>₹1,42,500.00</td>
-                                    <td class="font-monospace">₹1,49,105.00</td>
-                                    <td class="text-success font-monospace fw-bold">+₹6,605.00 (+4.63%)</td>
-                                </tr>
-                                <tr>
-                                    <td class="fw-semibold text-white">HDFCBANK <small class="text-secondary">NSE_EQ</small></td>
-                                    <td>100</td>
-                                    <td>₹1,610.00</td>
-                                    <td class="text-success font-monospace">₹1,641.50</td>
-                                    <td>₹1,61,000.00</td>
-                                    <td class="font-monospace">₹1,64,150.00</td>
-                                    <td class="text-success font-monospace fw-bold">+₹3,150.00 (+1.96%)</td>
-                                </tr>
-                            </tbody>
-                        </table>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 4. FUNDS & MARGINS PANEL -->
-            <div class="tab-pane fade" id="panel-funds" role="tabpanel">
-                <div class="row g-3">
-                    <div class="col-lg-6">
-                        <div class="glass-card p-4">
-                            <h6 class="text-uppercase text-secondary fw-semibold mb-3">Virtual Cash Drawer</h6>
-                            <div class="mb-4" id="fund-container" hx-get="/mock/dashboard/funds" hx-trigger="load, every 3s">
-                                <div class="d-flex justify-content-between align-items-baseline mb-1">
-                                    <span class="fs-4 fw-bold text-success font-monospace">₹{{printf "%.2f" .Funds.AvailabelBalance}}</span>
-                                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25 font-monospace">AVAILABLE</span>
-                                </div>
-                                <div class="small text-secondary d-flex justify-content-between">
-                                    <span>SOD Limit: ₹{{printf "%.2f" .Funds.SodLimit}}</span>
-                                    <span>Utilized: ₹{{printf "%.2f" .Funds.UtilizedAmount}}</span>
-                                </div>
-                            </div>
-                            <div class="d-flex gap-2">
-                                <button class="btn btn-sm btn-outline-success flex-fill" hx-post="/mock/api/funds/adjust?amount=100000" hx-target="#fund-container">
-                                    <i class="bi bi-plus-lg"></i> +1 Lakh
-                                </button>
-                                <button class="btn btn-sm btn-outline-success flex-fill" hx-post="/mock/api/funds/adjust?amount=500000" hx-target="#fund-container">
-                                    <i class="bi bi-plus-lg"></i> +5 Lakh
-                                </button>
-                                <button class="btn btn-sm btn-outline-warning flex-fill" hx-post="/mock/api/funds/adjust?amount=-100000" hx-target="#fund-container">
-                                    <i class="bi bi-dash-lg"></i> -1 Lakh
-                                </button>
-                            </div>
+                            <i class="bi bi-tools text-warning fs-5"></i>
+                            <h6 class="mb-0 fw-bold theme-text-main" style="font-size: 0.95rem;">Sandbox Utilities (Cash Drawer &amp; Rate Limiter Chaos)</h6>
                         </div>
                     </div>
-                    <div class="col-lg-6">
-                        <div class="glass-card p-4">
-                            <h6 class="text-uppercase text-secondary fw-semibold mb-3">Margin Breakdown</h6>
-                            <div class="d-flex justify-content-between py-2 border-bottom border-white border-opacity-5">
-                                <span class="text-secondary">Collateral Amount</span>
-                                <span class="font-monospace text-light">₹0.00</span>
-                            </div>
-                            <div class="d-flex justify-content-between py-2 border-bottom border-white border-opacity-5">
-                                <span class="text-secondary">Receivable Amount</span>
-                                <span class="font-monospace text-light">₹0.00</span>
-                            </div>
-                            <div class="d-flex justify-content-between py-2 border-bottom border-white border-opacity-5">
-                                <span class="text-secondary">Withdrawable Balance</span>
-                                <span class="font-monospace text-success fw-semibold">₹{{printf "%.2f" .Funds.AvailabelBalance}}</span>
-                            </div>
-                            <div class="d-flex justify-content-between py-2">
-                                <span class="text-secondary">Blocked Payout</span>
-                                <span class="font-monospace text-light">₹0.00</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- 5. CHAOS & WEBHOOKS PANEL -->
-            <div class="tab-pane fade" id="panel-chaos" role="tabpanel">
-                <div class="row g-3">
-                    <div class="col-lg-6">
-                        <div class="glass-card p-4">
-                            <h6 class="text-uppercase text-secondary fw-semibold mb-3">Token Bucket Rate Limiter</h6>
-                            <form hx-post="/mock/api/chaos" hx-swap="none" class="d-flex flex-column gap-3">
-                                <div>
-                                    <div class="d-flex justify-content-between mb-1">
-                                        <label class="small text-secondary">Rate Limit Ceiling</label>
-                                        <span class="small fw-bold text-warning" id="rps-val">{{.ChaosRPS}} req/s</span>
+                    <div class="row g-3">
+                        <div class="col-lg-6">
+                            <div class="p-3 rounded-3 border border-secondary border-opacity-20 bg-dark bg-opacity-40 h-100">
+                                <h6 class="text-uppercase text-secondary fw-semibold mb-2" style="font-size: 0.72rem;">Virtual Cash Drawer</h6>
+                                <div class="mb-3" id="fund-container" hx-get="/mock/dashboard/funds" hx-trigger="load, every 3s, accountChanged from:body">
+                                    <div class="d-flex justify-content-between align-items-baseline mb-1">
+                                        <span class="fs-4 fw-bold text-success font-monospace">₹{{printf "%.2f" .Funds.AvailabelBalance}}</span>
+                                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-25 font-monospace">AVAILABLE</span>
                                     </div>
-                                    <input type="range" name="rps" class="form-range" min="5" max="50" value="{{.ChaosRPS}}"
-                                           oninput="document.getElementById('rps-val').innerText = this.value + ' req/s'"
-                                           onchange="this.form.requestSubmit()">
+                                    <div class="small text-secondary d-flex justify-content-between">
+                                        <span>SOD Limit: ₹{{printf "%.2f" .Funds.SodLimit}}</span>
+                                        <span>Utilized: ₹{{printf "%.2f" .Funds.UtilizedAmount}}</span>
+                                    </div>
                                 </div>
-                                <div>
-                                    <label class="small text-secondary mb-1">Webhook Postback Behavior</label>
-                                    <select name="mode" class="form-select form-select-sm bg-dark text-light border-secondary" onchange="this.form.requestSubmit()">
-                                        <option value="NORMAL" {{if eq .ChaosMode "NORMAL"}}selected{{end}}>NORMAL (Instant Webhooks)</option>
-                                        <option value="DROP_WEBHOOKS" {{if eq .ChaosMode "DROP_WEBHOOKS"}}selected{{end}}>DROP WEBHOOKS (Test Polling Fallback)</option>
-                                        <option value="DELAY_WEBHOOKS" {{if eq .ChaosMode "DELAY_WEBHOOKS"}}selected{{end}}>DELAY WEBHOOKS (6s Lag Simulation)</option>
-                                    </select>
+                                <div class="d-flex gap-2">
+                                    <button class="btn btn-sm btn-outline-success flex-fill" hx-post="/mock/api/funds/adjust?amount=100000" hx-target="#fund-container">
+                                        <i class="bi bi-plus-lg"></i> +1 Lakh
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success flex-fill" hx-post="/mock/api/funds/adjust?amount=500000" hx-target="#fund-container">
+                                        <i class="bi bi-plus-lg"></i> +5 Lakh
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-warning flex-fill" hx-post="/mock/api/funds/adjust?amount=-100000" hx-target="#fund-container">
+                                        <i class="bi bi-dash-lg"></i> -1 Lakh
+                                    </button>
                                 </div>
-                            </form>
-                        </div>
-                    </div>
-                    <div class="col-lg-6">
-                        <div class="glass-card p-4">
-                            <h6 class="text-uppercase text-secondary fw-semibold mb-3">Target Postback Webhook</h6>
-                            <p class="small text-secondary mb-2">When simulated orders are matched, Dhan Emulator sends official Dhan JSON webhook postbacks to Marmot:</p>
-                            <div class="p-2.5 rounded-3 bg-dark border border-white border-opacity-10 font-monospace text-info smaller mb-3">
-                                POST http://web:8000/api/mock/dhan/postback/
                             </div>
-                            <div class="alert bg-success bg-opacity-10 border-0 rounded-3 p-2.5 d-flex align-items-center gap-2 text-success smaller mb-0">
-                                <i class="bi bi-shield-check fs-5"></i>
-                                <span>Postback endpoint verified active and returns HTTP 200 OK</span>
+                        </div>
+                        <div class="col-lg-6">
+                            <div class="p-3 rounded-3 border border-secondary border-opacity-20 bg-dark bg-opacity-40 h-100">
+                                <h6 class="text-uppercase text-secondary fw-semibold mb-2" style="font-size: 0.72rem;">Chaos Rate Limiter &amp; Webhooks</h6>
+                                <form hx-post="/mock/api/chaos" hx-swap="none" class="d-flex flex-column gap-2">
+                                    <div>
+                                        <div class="d-flex justify-content-between mb-1">
+                                            <label class="small text-secondary" style="font-size: 0.72rem;">Rate Limit Ceiling</label>
+                                            <span class="small fw-bold text-warning" id="rps-val">{{.ChaosRPS}} req/s</span>
+                                        </div>
+                                        <input type="range" name="rps" class="form-range" min="5" max="50" value="{{.ChaosRPS}}"
+                                               oninput="document.getElementById('rps-val').innerText = this.value + ' req/s'"
+                                               onchange="this.form.requestSubmit()">
+                                    </div>
+                                    <div>
+                                        <label class="small text-secondary mb-1" style="font-size: 0.72rem;">Webhook Postback Mode</label>
+                                        <select name="mode" class="form-select form-select-sm bg-dark text-light border-secondary" onchange="this.form.requestSubmit()">
+                                            <option value="NORMAL" {{if eq .ChaosMode "NORMAL"}}selected{{end}}>NORMAL (Instant Webhooks)</option>
+                                            <option value="DROP_WEBHOOKS" {{if eq .ChaosMode "DROP_WEBHOOKS"}}selected{{end}}>DROP WEBHOOKS (Test Polling Fallback)</option>
+                                            <option value="DELAY_WEBHOOKS" {{if eq .ChaosMode "DELAY_WEBHOOKS"}}selected{{end}}>DELAY WEBHOOKS (6s Lag Simulation)</option>
+                                        </select>
+                                    </div>
+                                </form>
                             </div>
                         </div>
                     </div>
                 </div>
+
             </div>
         </div>
     </div>
 
-    <!-- Bootstrap 5 JS -->
+    <!-- Bootstrap 5 JS & Reusable Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Real-time IST Clock updater
+        (function() {
+            function updateLiveClock() {
+                const timeElem = document.getElementById('live-exchange-clock-time');
+                if (!timeElem) return;
+                const now = new Date();
+                const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+                const istTime = new Date(utc + (3600000 * 5.5));
+                const hours = String(istTime.getHours()).padStart(2, '0');
+                const minutes = String(istTime.getMinutes()).padStart(2, '0');
+                const seconds = String(istTime.getSeconds()).padStart(2, '0');
+                timeElem.textContent = `${hours}:${minutes}:${seconds}`;
+            }
+            setInterval(updateLiveClock, 1000);
+            updateLiveClock();
+        })();
+
+        // Option Chain Strikes View Expander (±3 compact vs all 31 strikes)
+        (function() {
+            if (window._optionChainExpanded === undefined) {
+                window._optionChainExpanded = localStorage.getItem('marmot_option_chain_expanded') === 'true';
+            }
+
+            window.toggleOptionChainStrikesView = function() {
+                window._optionChainExpanded = !window._optionChainExpanded;
+                localStorage.setItem('marmot_option_chain_expanded', window._optionChainExpanded ? 'true' : 'false');
+                applyOptionChainViewState();
+            };
+
+            function applyOptionChainViewState() {
+                const isExpanded = window._optionChainExpanded;
+                const outerRows = document.querySelectorAll('.option-chain-outer-strike');
+                outerRows.forEach(function(row) {
+                    if (isExpanded) {
+                        row.classList.remove('d-none');
+                    } else {
+                        row.classList.add('d-none');
+                    }
+                });
+
+                const btnText = document.getElementById('option-chain-expand-text');
+                const btnIcon = document.getElementById('option-chain-expand-icon');
+
+                if (btnText && btnIcon) {
+                    if (isExpanded) {
+                        btnText.textContent = 'Compact (±3 Strikes)';
+                        btnIcon.className = 'bi bi-arrows-angle-contract text-warning';
+                        btnIcon.style.color = '';
+                    } else {
+                        btnText.textContent = 'Expand (31 Strikes)';
+                        btnIcon.className = 'bi bi-arrows-angle-expand';
+                        btnIcon.style.color = '#B4F105';
+                    }
+                }
+            }
+
+            document.body.addEventListener('htmx:afterSwap', function(evt) {
+                if (evt.detail.target && evt.detail.target.id === 'live-option-chain-container') {
+                    applyOptionChainViewState();
+                }
+            });
+        })();
+    </script>
+    <script>
+        // ─── Emulator Real-Time Tick WebSocket Client ───
+        // Connects to this emulator's own WS feed and updates live ticker DOM elements.
+        // No page reload needed — pure push-based updates.
+        (function () {
+            'use strict';
+
+            var reconnectDelay = 1000;
+            var maxDelay = 16000;
+            var ws = null;
+            var prevNifty = 0;
+            var prevVIX = 0;
+
+            function flashColor(el, color) {
+                if (!el) return;
+                el.style.transition = 'color 0.12s ease';
+                el.style.color = color;
+                clearTimeout(el._flashTimer);
+                el._flashTimer = setTimeout(function () {
+                    el.style.color = '';
+                }, 420);
+            }
+
+            function connect() {
+                var proto = (location.protocol === 'https:') ? 'wss:' : 'ws:';
+                var url = proto + '//' + location.host + '/mock/v2/marketfeed/ws';
+                ws = new WebSocket(url);
+
+                ws.onopen = function () {
+                    console.log('[EmulatorWS] Connected:', url);
+                    reconnectDelay = 1000;
+                };
+
+                ws.onmessage = function (evt) {
+                    var tick;
+                    try { tick = JSON.parse(evt.data); } catch (e) { return; }
+
+                    // Handle Broker Stats WebSocket Push
+                    if (tick.type === 'broker_stats') {
+                        var netPnl = parseFloat(tick.liveNetPnL || 0);
+                        var realPnl = parseFloat(tick.realizedProfit || 0);
+                        var unrealPnl = parseFloat(tick.unrealizedProfit || 0);
+                        var availMargin = parseFloat(tick.availableBalance || 0);
+                        var utilMargin = parseFloat(tick.utilizedMargin || 0);
+                        var openCount = parseInt(tick.openPositionsCount || 0, 10);
+                        var closedCount = parseInt(tick.closedPositionsCount || 0, 10);
+                        var totalOrders = parseInt(tick.totalOrdersCount || 0, 10);
+                        var tradedOrders = parseInt(tick.tradedOrdersCount || 0, 10);
+
+                        function formatINR(val, withSign) {
+                            var prefix = '';
+                            if (withSign) {
+                                prefix = val >= 0 ? '+₹' : '-₹';
+                            } else {
+                                prefix = '₹';
+                            }
+                            var absVal = Math.abs(val);
+                            return prefix + absVal.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        }
+
+                        var netEl = document.getElementById('emulator-live-net-pnl');
+                        if (netEl) {
+                            netEl.textContent = formatINR(netPnl, true);
+                            netEl.className = 'metric-card-value font-monospace ' + (netPnl >= 0 ? 'text-success' : 'text-danger');
+                        }
+
+                        var realEl = document.getElementById('emulator-realized-pnl');
+                        if (realEl) {
+                            realEl.textContent = formatINR(realPnl, true);
+                            realEl.className = 'metric-card-value font-monospace ' + (realPnl >= 0 ? 'text-success' : 'text-danger');
+                        }
+
+                        var unrealEl = document.getElementById('emulator-unrealized-pnl');
+                        if (unrealEl) {
+                            unrealEl.textContent = formatINR(unrealPnl, true);
+                            unrealEl.className = 'metric-card-value font-monospace ' + (unrealPnl >= 0 ? 'text-success' : 'text-danger');
+                        }
+
+                        var availEl = document.getElementById('emulator-available-margin');
+                        if (availEl) availEl.textContent = formatINR(availMargin, false);
+
+                        var cashEl = document.getElementById('emulator-available-margin-cash');
+                        if (cashEl) cashEl.textContent = 'Broker Funds • Cash: ' + formatINR(availMargin, false);
+
+                        var utilEl = document.getElementById('emulator-utilized-margin');
+                        if (utilEl) utilEl.textContent = formatINR(utilMargin, false);
+
+                        var actPosEl = document.getElementById('emulator-active-positions-count');
+                        if (actPosEl) actPosEl.textContent = openCount + ' Active Pos';
+
+                        var closedBadgeEl = document.getElementById('emulator-closed-positions-badge');
+                        if (closedBadgeEl) closedBadgeEl.textContent = closedCount + ' Closed';
+
+                        var openBadgeEl = document.getElementById('emulator-open-positions-badge');
+                        if (openBadgeEl) openBadgeEl.textContent = openCount + ' Open';
+
+                        var ordersCountEl = document.getElementById('emulator-total-orders-count');
+                        if (ordersCountEl) ordersCountEl.textContent = totalOrders + ' Orders';
+
+                        var dayOrdersFillsEl = document.getElementById('emulator-day-orders-fills');
+                        if (dayOrdersFillsEl) dayOrdersFillsEl.textContent = tradedOrders + ' Fills';
+
+                        var dayOrdersCountEl = document.getElementById('emulator-day-orders-count');
+                        if (dayOrdersCountEl) dayOrdersCountEl.innerHTML = totalOrders + ' <span class="fs-6 fw-normal text-muted">Orders</span>';
+
+                        return;
+                    }
+
+                    // Handle Broker Order Event
+                    if (tick.type === 'broker_order_event') {
+                        document.body.dispatchEvent(new CustomEvent('brokerOrderUpdate'));
+                        return;
+                    }
+
+                    // Handle Replay Session Completed Event
+                    if (tick.type === 'replay_completed') {
+                        console.log('[EmulatorWS] Parquet replay completed! Updating controls and session report.');
+                        document.body.dispatchEvent(new CustomEvent('replayCompleted'));
+                        if (window.htmx) {
+                            htmx.ajax('GET', '/mock/dashboard/controls', {target: '#streamer-controls-wrapper', swap: 'outerHTML'});
+                            htmx.ajax('GET', '/mock/dashboard/progress', {target: '#replay-progress-container', swap: 'innerHTML'});
+                        }
+                        return;
+                    }
+
+                    var secID = tick.security_id || tick.SecurityID || tick.securityId || '';
+                    var sym = tick.trading_symbol || tick.TradingSymbol || tick.tradingSymbol || '';
+                    var ltp = parseFloat(tick.ltp || tick.LTP || tick.LastTradedPrice || 0);
+                    if (ltp <= 0) return;
+
+                    // NIFTY spot tick (secID "13" or sym === "NIFTY")
+                    if (secID === '13' || sym === 'NIFTY') {
+                        var el = document.getElementById('emulator-nifty-ltp');
+                        if (el) {
+                            el.textContent = '\u20b9' + ltp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            flashColor(el, ltp >= prevNifty ? '#4ade80' : '#f87171');
+                        }
+
+                        // Also update Spot inside Option Chain in exact 0ms lockstep
+                        var ocSpotEl = document.getElementById('emulator-option-chain-spot-ltp');
+                        if (ocSpotEl) {
+                            ocSpotEl.textContent = '\u20b9' + ltp.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            flashColor(ocSpotEl, ltp >= prevNifty ? '#4ade80' : '#f87171');
+                        }
+
+                        if (prevNifty > 0) {
+                            var diff = ltp - prevNifty;
+                            var pct = (diff / prevNifty * 100);
+                            var chgText = (diff >= 0 ? '+' : '') + diff.toFixed(2) + ' (' + pct.toFixed(2) + '%)';
+                            var badgeClass = 'badge ' + (diff >= 0 ? 'bg-success bg-opacity-20 text-success' : 'bg-danger bg-opacity-20 text-danger') + ' rounded-pill font-monospace fw-bold';
+
+                            var chgEl = document.getElementById('emulator-nifty-change');
+                            if (chgEl) {
+                                chgEl.textContent = chgText;
+                                chgEl.className = badgeClass + ' px-2 py-0.5';
+                                chgEl.style.fontSize = '0.72rem';
+                            }
+                            var ocChgEl = document.getElementById('emulator-option-chain-spot-change');
+                            if (ocChgEl) {
+                                ocChgEl.textContent = chgText;
+                                ocChgEl.className = badgeClass + ' px-1.5 py-0.5';
+                                ocChgEl.style.fontSize = '0.65rem';
+                            }
+
+                            var chgBadgeEl = document.getElementById('emulator-nifty-change-badge');
+                            if (chgBadgeEl) {
+                                chgBadgeEl.className = 'badge ' + (diff >= 0 ? 'bg-success bg-opacity-15 text-success border border-success border-opacity-20' : 'bg-danger bg-opacity-15 text-danger border border-danger border-opacity-20') + ' px-2 py-0.5 rounded-pill font-monospace';
+                                chgBadgeEl.innerHTML = '<i class="bi ' + (diff >= 0 ? 'bi-caret-up-fill' : 'bi-caret-down-fill') + ' me-0.5"></i>' + (diff >= 0 ? '+' : '') + diff.toFixed(2) + ' (' + (pct >= 0 ? '+' : '') + pct.toFixed(2) + '%)';
+                            }
+                            var tsEl = document.getElementById('emulator-nifty-timestamp');
+                            if (tsEl && (tick.timestamp || tick.exchange_time)) {
+                                tsEl.textContent = (tick.timestamp || tick.exchange_time);
+                            }
+                        }
+                        prevNifty = ltp;
+                    }
+
+                    // INDIA VIX tick (secID "INDIAVIX" or sym contains VIX)
+                    if (secID === 'INDIAVIX' || sym.indexOf('VIX') !== -1) {
+                        var vixEl = document.getElementById('emulator-vix-ltp');
+                        if (vixEl) {
+                            vixEl.textContent = ltp.toFixed(2);
+                            flashColor(vixEl, ltp >= prevVIX ? '#f87171' : '#4ade80');
+                            prevVIX = ltp;
+                        }
+                    }
+
+                    // Direct Option Strike Tick (e.g. NIFTY 24550 CE or NIFTY 24550 PE)
+                    if (sym && (sym.indexOf(' CE') !== -1 || sym.indexOf(' PE') !== -1)) {
+                        var isCE = sym.indexOf(' CE') !== -1;
+                        var parts = sym.split(' ');
+                        for (var i = 0; i < parts.length; i++) {
+                            var num = parseInt(parts[i], 10);
+                            if (!isNaN(num) && num > 1000) {
+                                var strikeElId = isCE ? ('oc-ltp-ce-' + num) : ('oc-ltp-pe-' + num);
+                                var strikeEl = document.getElementById(strikeElId);
+                                if (strikeEl) {
+                                    strikeEl.textContent = '\u20b9' + ltp.toFixed(2);
+                                    flashColor(strikeEl, '#38bdf8');
+                                }
+                                var oiVal = parseInt(tick.oi || tick.OI || 0, 10);
+                                if (oiVal > 0) {
+                                    var oiElId = isCE ? ('oc-oi-ce-' + num) : ('oc-oi-pe-' + num);
+                                    var oiEl = document.getElementById(oiElId);
+                                    if (oiEl) {
+                                        oiEl.textContent = oiVal.toLocaleString('en-IN');
+                                    }
+                                }
+                                break;
+                            }
+                        }
+                    }
+                };
+
+                ws.onclose = function () {
+                    console.warn('[EmulatorWS] Disconnected. Reconnecting in ' + reconnectDelay + 'ms...');
+                    setTimeout(connect, reconnectDelay);
+                    reconnectDelay = Math.min(reconnectDelay * 2, maxDelay);
+                };
+
+                ws.onerror = function (err) {
+                    console.error('[EmulatorWS] Error:', err);
+                    ws.close();
+                };
+            }
+
+            // Speed-Aware Option Chain & Progress Refresh Manager
+            var currentSpeed = 1;
+            var ocTimer = null;
+
+            function updateDynamicPollers() {
+                if (ocTimer) clearInterval(ocTimer);
+
+                var activeSpeedBtn = document.querySelector('.speed-pill.active');
+                if (activeSpeedBtn) {
+                    var spd = parseInt(activeSpeedBtn.textContent, 10);
+                    if (!isNaN(spd) && spd > 0) currentSpeed = spd;
+                }
+
+                // Adaptive refresh rate: 1x -> 1200ms, 5x -> 700ms, 10x -> 400ms, >=25x -> 250ms
+                var interval = 1200;
+                if (currentSpeed >= 25) interval = 250;
+                else if (currentSpeed >= 10) interval = 400;
+                else if (currentSpeed >= 5) interval = 700;
+
+                ocTimer = setInterval(function () {
+                    var ocContainer = document.getElementById('live-option-chain-container');
+                    if (ocContainer && !document.hidden) {
+                        document.body.dispatchEvent(new CustomEvent('reloadMockOptionChain'));
+                    }
+                }, interval);
+            }
+
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('.speed-pill');
+                if (btn) {
+                    var spd = parseInt(btn.textContent, 10);
+                    if (!isNaN(spd) && spd > 0) {
+                        currentSpeed = spd;
+                        updateDynamicPollers();
+                        setTimeout(function () {
+                            document.body.dispatchEvent(new CustomEvent('reloadMockOptionChain'));
+                        }, 50);
+                    }
+                }
+            });
+
+            document.body.addEventListener('htmx:afterSettle', function (evt) {
+                if (evt.detail && evt.detail.target && evt.detail.target.id === 'streamer-controls-wrapper') {
+                    updateDynamicPollers();
+                }
+            });
+
+            updateDynamicPollers();
+
+            // Defer WS connection until after page interactive
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', connect);
+            } else {
+                connect();
+            }
+        })();
+
+        // ═══════════════════════════════════════════════════════════
+        // Marmot Dynamic Path Resolver (Cross-port & Host Aware)
+        // ═══════════════════════════════════════════════════════════
+        (function () {
+            var marmotPort = '8005';
+            var hostName = window.location.hostname;
+            var baseMarmotUrl;
+
+            if (window.location.port === '8088') {
+                baseMarmotUrl = window.location.protocol + '//' + hostName + ':' + marmotPort;
+            } else {
+                baseMarmotUrl = window.location.origin;
+            }
+
+            document.querySelectorAll('[data-marmot-path]').forEach(function (el) {
+                var path = el.getAttribute('data-marmot-path');
+                if (path) {
+                    el.href = baseMarmotUrl + path;
+                }
+            });
+        })();
+
+        // ═══════════════════════════════════════════════════════════
+        // Global HTMX Modal Lifecycle & Account Synchronization
+        // ═══════════════════════════════════════════════════════════
+        document.body.addEventListener('htmx:afterSwap', function (evt) {
+            if (evt.detail.target && evt.detail.target.id === 'globalHtmxModalDialog') {
+                var modalEl = document.getElementById('globalHtmxModal');
+                if (modalEl && window.bootstrap) {
+                    var modal = bootstrap.Modal.getInstance(modalEl);
+                    if (!modal) {
+                        modal = new bootstrap.Modal(modalEl);
+                    }
+                    modal.show();
+                }
+            }
+        });
+
+        window.closeGlobalModal = function () {
+            var modalEl = document.getElementById('globalHtmxModal');
+            if (modalEl && window.bootstrap) {
+                var modal = bootstrap.Modal.getInstance(modalEl);
+                if (modal) {
+                    modal.hide();
+                }
+            }
+        };
+
+        document.body.addEventListener('closeModal', function () {
+            window.closeGlobalModal();
+        });
+
+        document.body.addEventListener('accountChanged', function (evt) {
+            if (evt.detail && evt.detail.account) {
+                var acc = evt.detail.account;
+                var subEl = document.getElementById('sidebar-account-sub');
+                if (subEl) subEl.innerHTML = 'Client: <span class="font-monospace text-info">' + (acc.client_id || '') + '</span>';
+                var nameEl = document.getElementById('sidebar-account-name');
+                if (nameEl) nameEl.textContent = acc.account_name || '';
+                var telId = document.getElementById('telemetry-client-id');
+                if (telId) telId.textContent = acc.client_id || '';
+                var telName = document.getElementById('telemetry-account-name');
+                if (telName) telName.innerHTML = (acc.account_name || '') + ' &bull; Realtime Stream';
+            }
+        });
+
+        // ═══════════════════════════════════════════════════════════
+        // Global Floating Toast Notification System
+        // ═══════════════════════════════════════════════════════════
+        window.showToast = function (title, message, type) {
+            var container = document.getElementById('globalToastContainer');
+            if (!container) return;
+            type = type || 'success';
+            var iconClass = 'bi-check-circle-fill text-success';
+            var borderColor = 'rgba(74, 222, 128, 0.3)';
+            var glowColor = 'rgba(74, 222, 128, 0.15)';
+            if (type === 'danger' || type === 'error') {
+                iconClass = 'bi-exclamation-triangle-fill text-danger';
+                borderColor = 'rgba(239, 68, 68, 0.3)';
+                glowColor = 'rgba(239, 68, 68, 0.15)';
+            } else if (type === 'info') {
+                iconClass = 'bi-info-circle-fill text-info';
+                borderColor = 'rgba(56, 189, 248, 0.3)';
+                glowColor = 'rgba(56, 189, 248, 0.15)';
+            } else if (type === 'warning') {
+                iconClass = 'bi-exclamation-circle-fill text-warning';
+                borderColor = 'rgba(234, 179, 8, 0.3)';
+                glowColor = 'rgba(234, 179, 8, 0.15)';
+            }
+
+            var toastId = 'toast_' + Date.now();
+            var toastHtml = document.createElement('div');
+            toastHtml.id = toastId;
+            toastHtml.className = 'toast-card p-3 mb-2 rounded-3 shadow-lg d-flex align-items-start gap-2.5 font-monospace';
+            toastHtml.style.cssText = 'min-width: 290px; max-width: 380px; background: rgba(18, 18, 21, 0.95); backdrop-filter: blur(16px); border: 1px solid ' + borderColor + '; box-shadow: 0 10px 30px ' + glowColor + '; pointer-events: auto; animation: toastSlideIn 0.25s cubic-bezier(0.16, 1, 0.3, 1);';
+            toastHtml.innerHTML = 
+                '<i class="bi ' + iconClass + ' fs-5 flex-shrink-0 mt-0.5"></i>' +
+                '<div class="flex-grow-1 overflow-hidden">' +
+                    '<div class="fw-bold text-white small mb-0.5">' + (title || 'Notification') + '</div>' +
+                    '<div class="text-secondary smaller text-break" style="font-size: 0.76rem; line-height: 1.35;">' + (message || '') + '</div>' +
+                '</div>' +
+                '<button type="button" class="btn-close btn-close-white ms-auto flex-shrink-0 smaller" style="opacity: 0.4; transform: scale(0.8);" onclick="this.closest(\'.toast-card\').remove();"></button>';
+
+            container.appendChild(toastHtml);
+
+            setTimeout(function () {
+                if (toastHtml && toastHtml.parentNode) {
+                    toastHtml.style.transition = 'opacity 0.3s ease, transform 0.3s ease';
+                    toastHtml.style.opacity = '0';
+                    toastHtml.style.transform = 'translateY(-10px)';
+                    setTimeout(function () {
+                        if (toastHtml && toastHtml.parentNode) {
+                            toastHtml.remove();
+                        }
+                    }, 300);
+                }
+            }, 3500);
+        };
+
+        document.body.addEventListener('showToast', function (evt) {
+            if (evt.detail) {
+                var detail = evt.detail;
+                window.showToast(detail.title, detail.message, detail.type);
+            }
+        });
+
+        // Delegated click handler for parquet dropdown toggle across HTMX updates
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest('#parquetDropdownBtn');
+            var customDropdown = e.target.closest('.custom-parquet-dropdown');
+            if (btn) {
+                e.preventDefault();
+                var menu = btn.nextElementSibling;
+                if (menu) {
+                    menu.classList.toggle('show');
+                    btn.setAttribute('aria-expanded', menu.classList.contains('show'));
+                }
+            } else if (!customDropdown) {
+                document.querySelectorAll('.custom-parquet-dropdown .dropdown-menu.show').forEach(function (m) {
+                    m.classList.remove('show');
+                    var b = m.previousElementSibling;
+                    if (b) b.setAttribute('aria-expanded', 'false');
+                });
+            }
+        });
+    </script>
+
+    <!-- ==========================================
+         GLOBAL TOAST NOTIFICATION CONTAINER
+         ========================================== -->
+    <div id="globalToastContainer" class="position-fixed top-0 end-0 p-3" style="z-index: 1099; pointer-events: none;"></div>
+
+    <!-- ==========================================
+         GLOBAL HTMX MODAL CONTAINER
+         ========================================== -->
+    <div class="modal fade" id="globalHtmxModal" tabindex="-1" aria-hidden="true" style="backdrop-filter: blur(8px); background: rgba(0,0,0,0.65);">
+        <div class="modal-dialog modal-dialog-centered modal-xl" id="globalHtmxModalDialog" style="max-width: 1050px; width: 95vw;">
+            <!-- HTMX swaps modal content here -->
+        </div>
+    </div>
 </body>
 </html>

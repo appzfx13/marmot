@@ -145,7 +145,7 @@ class LiveStrategy(BaseModel):
     trading_account = models.ForeignKey(UserTradingAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='live_strategies', verbose_name="Target Trading Account")
     backtest_task = models.ForeignKey('backtest.BacktestTask', on_delete=models.SET_NULL, null=True, blank=True, related_name='live_deployments', verbose_name="Source Backtest")
     name = models.CharField(max_length=255, help_text="Live Strategy Deployment Name")
-    strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.TENSORTRADE_RL)
+    strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.QUANT_ENGINE)
     index_name = models.CharField(max_length=50, default='NIFTY', help_text="Target trading asset (e.g. NIFTY, BANKNIFTY)")
     market_type = models.CharField(max_length=20, choices=MarketTypeChoices.choices, default=MarketTypeChoices.INDEX_FO, help_text="Market segment")
     allocated_capital = models.DecimalField(max_digits=12, decimal_places=2, default=100000.00, help_text="Allocated capital in INR")

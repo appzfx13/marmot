@@ -282,6 +282,7 @@ def get_option_expiry_analysis(index_name: str, trade_date=None, strike_price: f
 
     return {
         "expiry_date": next_exp.strftime("%Y-%m-%d"),
+        "formatted_expiry": next_exp.strftime("%d %b %Y").upper(),
         "expiry_day": next_exp.strftime("%A"),
         "dte": dte,
         "is_0dte": is_0dte,

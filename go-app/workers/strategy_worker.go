@@ -1,15 +1,19 @@
 package workers
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math"
 	"math/rand"
+	"net/http"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/redis/go-redis/v9"
 
 	"go-app/config"
 	"go-app/models"
@@ -17,6 +21,111 @@ import (
 	"go-app/strategies"
 	"go-app/ws"
 )
+
+// DhanOrderPayload represents the REST payload dispatched to the Mock Broker Order API.
+type DhanOrderPayload struct {
+	DhanClientID    string  `json:"dhanClientId"`
+	CorrelationID   string  `json:"correlationId"`
+	TransactionType string  `json:"transactionType"`
+	ExchangeSegment string  `json:"exchangeSegment"`
+	ProductType     string  `json:"productType"`
+	OrderType       string  `json:"orderType"`
+	Validity        string  `json:"validity"`
+	SecurityID      string  `json:"securityId"`
+	Quantity        int     `json:"quantity"`
+	Price           float64 `json:"price,omitempty"`
+	TriggerPrice    float64 `json:"triggerPrice,omitempty"`
+	BoStopLossValue float64 `json:"boStopLossValue,omitempty"`
+	BoProfitValue   float64 `json:"boProfitValue,omitempty"`
+}
+
+// isMockOrSandbox returns true if the execution mode corresponds to paper trading, sandbox, or simulation.
+func isMockOrSandbox(mode string) bool {
+	return strings.EqualFold(mode, "SANDBOX") || strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE")
+}
+
+// getActiveMockAccountID queries the active mock broker account ID dynamically.
+func (j *StrategySignalJob) getActiveMockAccountID() string {
+	client := &http.Client{Timeout: 800 * time.Millisecond}
+	resp, err := client.Get("http://mock_broker:8088/mock/v2/active-account")
+	if err == nil && resp.StatusCode == http.StatusOK {
+		defer resp.Body.Close()
+		var res map[string]interface{}
+		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
+			if accID, ok := res["active_account_id"].(string); ok && accID != "" {
+				return accID
+			}
+			if accID, ok := res["accountId"].(string); ok && accID != "" {
+				return accID
+			}
+		}
+	}
+	return "1000000001"
+}
+
+// dispatchOrderToMockBroker sends an asynchronous order request to the Dhan mock broker REST endpoint.
+func (j *StrategySignalJob) dispatchOrderToMockBroker(req DhanOrderPayload) {
+	go func() {
+		if req.DhanClientID == "" || req.DhanClientID == "1000000001" {
+			req.DhanClientID = j.getActiveMockAccountID()
+		}
+		bodyBytes, err := json.Marshal(req)
+		if err != nil {
+			log.Printf("⚠️ [StrategyWorker] Failed to marshal mock broker order payload: %v", err)
+			return
+		}
+		httpReq, err := http.NewRequest("POST", "http://mock_broker:8088/mock/v2/orders", bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			log.Printf("⚠️ [StrategyWorker] Failed to create mock broker order request: %v", err)
+			return
+		}
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("client-id", req.DhanClientID)
+
+		client := &http.Client{Timeout: 3 * time.Second}
+		resp, err := client.Do(httpReq)
+		if err != nil {
+			log.Printf("⚠️ [StrategyWorker] Mock Broker HTTP Order API dispatch failed: %v", err)
+			return
+		}
+		defer resp.Body.Close()
+		log.Printf("📤 [StrategyWorker] Order dispatched to Mock Broker API (Acc: %s | %s %s x %d) -> HTTP %d",
+			req.DhanClientID, req.TransactionType, req.SecurityID, req.Quantity, resp.StatusCode)
+	}()
+}
+
+// MockBrokerPosition represents a position item returned by the Dhan mock broker.
+type MockBrokerPosition struct {
+	TradingSymbol    string  `json:"tradingSymbol"`
+	SecurityID       string  `json:"securityId"`
+	PositionType     string  `json:"positionType"`
+	BuyAvg           float64 `json:"buyAvg"`
+	BuyQty           int     `json:"buyQty"`
+	SellAvg          float64 `json:"sellAvg"`
+	SellQty          int     `json:"sellQty"`
+	NetQty           int     `json:"netQty"`
+	RealizedProfit   float64 `json:"realizedProfit"`
+	UnrealizedProfit float64 `json:"unrealizedProfit"`
+	ExitTime         string  `json:"exitTime"`
+	StopLoss         float64 `json:"stopLoss"`
+	TakeProfit       float64 `json:"takeProfit"`
+}
+
+// fetchMockBrokerPositions queries the mock broker for active and closed positions.
+func (j *StrategySignalJob) fetchMockBrokerPositions() []MockBrokerPosition {
+	client := &http.Client{Timeout: 1 * time.Second}
+	resp, err := client.Get("http://mock_broker:8088/mock/v2/positions")
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return nil
+	}
+	defer resp.Body.Close()
+	var posList []MockBrokerPosition
+	_ = json.NewDecoder(resp.Body).Decode(&posList)
+	return posList
+}
 
 // StrategySignalJob manages the autonomous paper trading loop for an active strategy in Sandbox mode.
 type StrategySignalJob struct {
@@ -98,7 +207,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 	params := j.payload.Params
 	strategyName := params.StrategyName
 	if strategyName == "" {
-		strategyName = "tensortrade_rl"
+		strategyName = "quant_engine"
 	}
 	indexName := params.IndexName
 	if indexName == "" {
@@ -131,6 +240,16 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 	orders := []SimulatedOrder{}
 
 	tickCounter := 0
+	var prevSpotPrice float64
+	var spotPrice float64
+
+	var candleSub *redis.PubSub
+	var candleChan <-chan *redis.Message
+	if j.redisService != nil && j.redisService.Client != nil {
+		candleSub = j.redisService.Client.Subscribe(ctx, "marmot:streamer:candles")
+		candleChan = candleSub.Channel()
+		defer candleSub.Close()
+	}
 
 	for {
 		select {
@@ -140,16 +259,248 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				23760.0, cashBalance, cashBalance, positions, orders, 0)
 			return
 
+		case msg, ok := <-candleChan:
+			if !ok || msg == nil {
+				continue
+			}
+			var cData map[string]interface{}
+			if err := json.Unmarshal([]byte(msg.Payload), &cData); err != nil {
+				continue
+			}
+			if idx, ok := cData["index"].(string); ok && len(idx) > 0 && !strings.EqualFold(idx, indexName) {
+				continue
+			}
+
+			loopStart := time.Now()
+			cSpot, _ := cData["spot_price"].(float64)
+			if cSpot <= 0 {
+				cSpot, _ = cData["close"].(float64)
+			}
+			if cSpot > 0 {
+				spotPrice = cSpot
+			}
+
+			// In SANDBOX / MOCK mode, sync open positions with mock broker matching engine
+			if isMockOrSandbox(params.ExecutionMode) && len(positions) > 0 {
+				mockPositions := j.fetchMockBrokerPositions()
+				for i := range positions {
+					if positions[i].Status == "OPEN" {
+						for _, mp := range mockPositions {
+							if (mp.TradingSymbol == positions[i].TradingSymbol || mp.SecurityID == positions[i].TradingSymbol) &&
+								(mp.PositionType == "CLOSED" || mp.NetQty == 0) {
+								positions[i].Status = "CLOSED"
+								positions[i].RealizedProfit = mp.RealizedProfit
+								positions[i].UnrealizedProfit = 0
+								positions[i].SellQty = mp.SellQty
+								positions[i].SellAvg = mp.SellAvg
+								positions[i].NetQty = 0
+
+								triggerReason := "SL Hit"
+								if mp.RealizedProfit > 0 {
+									triggerReason = "TP Hit"
+								}
+								exitTime := mp.ExitTime
+								if exitTime == "" {
+									if dt, ok := cData["datetime"].(string); ok && len(dt) >= 19 {
+										exitTime = dt[11:19]
+									} else {
+										exitTime = nowIST().Format("03:04:05 PM")
+									}
+								}
+								exitOrder := SimulatedOrder{
+									OrderID:         fmt.Sprintf("DHN-EXIT-%d", time.Now().Unix()%100000),
+									CreateTime:      exitTime,
+									ExecutionTime:   exitTime,
+									TradingSymbol:   positions[i].TradingSymbol,
+									ExchangeSegment: "NSE_FNO",
+									TransactionType: "SELL",
+									OrderType:       "MARKET",
+									ProductType:     "INTRADAY",
+									Validity:        "DAY",
+									Quantity:        positions[i].BuyQty,
+									FilledQty:       positions[i].BuyQty,
+									Price:           mp.SellAvg,
+									CurrentLTP:      mp.SellAvg,
+									OrderStatus:     "TRADED",
+									TriggerReason:   triggerReason,
+								}
+								orders = append([]SimulatedOrder{exitOrder}, orders...)
+								log.Printf("🛡️ [StrategyWorker #%s] POSITION SQUARED OFF BY BROKER OMS (%s): SELL %s @ ₹%.2f (Realized: ₹%.2f)\n",
+									taskID, triggerReason, positions[i].TradingSymbol, mp.SellAvg, mp.RealizedProfit)
+								break
+							}
+						}
+					}
+				}
+			}
+
+			// Evaluate strategy on arriving 1-minute candle
+			activeExp := j.fetchActiveExpiry(ctx, indexName)
+			if params.Params == nil {
+				params.Params = make(map[string]interface{})
+			}
+			params.Params["execution_mode"] = params.ExecutionMode
+			if activeExp != "" {
+				params.Params["active_expiry"] = activeExp
+			}
+
+			sig := strat.EvaluateLiveSignal(cData, nil, indexName, params.Params)
+			if sig != nil {
+				alreadyOpen := false
+				for _, pos := range positions {
+					if pos.Status == "OPEN" && pos.TradingSymbol == sig.TradingSymbol {
+						alreadyOpen = true
+						break
+					}
+				}
+				for _, o := range orders {
+					if o.OrderStatus == "PENDING" && o.TradingSymbol == sig.TradingSymbol {
+						alreadyOpen = true
+						break
+					}
+				}
+
+				openPositionsCount := 0
+				for _, pos := range positions {
+					if pos.Status == "OPEN" {
+						openPositionsCount++
+					}
+				}
+
+				if !alreadyOpen && openPositionsCount < 6 {
+					fillPrice := j.fetchOptionLTP(ctx, indexName, sig.TradingSymbol, spotPrice)
+					if fillPrice <= 0 {
+						fillPrice = 120.0
+					}
+
+					slPts := 15.0
+					rrRatio := 2.0
+					if params.Params != nil {
+						if sl, ok := params.Params["sl_pts"].(float64); ok && sl > 0 {
+							slPts = sl
+						}
+						if rr, ok := params.Params["rr_ratio"].(float64); ok && rr > 0 {
+							rrRatio = rr
+						}
+					}
+					stopLoss := math.Max(1.0, math.Round((fillPrice-slPts)*100)/100)
+					target := math.Round((fillPrice+(slPts*rrRatio))*100) / 100
+
+					orderTime := sig.Timestamp
+					if orderTime == "" {
+						if dt, ok := cData["datetime"].(string); ok && len(dt) >= 19 {
+							orderTime = dt[11:19]
+						} else {
+							orderTime = nowIST().Format("03:04:05 PM")
+						}
+					}
+
+					newOrderID := fmt.Sprintf("SBX-%d%02d", time.Now().Unix()%100000, rand.Intn(90)+10)
+					status := "TRADED"
+					if sig.OrderType == "LIMIT" {
+						status = "PENDING"
+					}
+
+					newOrder := SimulatedOrder{
+						OrderID:         newOrderID,
+						CreateTime:      orderTime,
+						SignalTime:      orderTime,
+						ExecutionTime:   "",
+						TradingSymbol:   sig.TradingSymbol,
+						ExchangeSegment: "NSE_FNO",
+						TransactionType: sig.Transaction,
+						OrderType:       sig.OrderType,
+						ProductType:     "INTRADAY",
+						Validity:        "DAY",
+						Quantity:        sig.Quantity,
+						FilledQty:       0,
+						Price:           fillPrice,
+						LimitEntryPrice: fillPrice,
+						LimitTappedTime: orderTime,
+						TargetPrice:     target,
+						StopLossPrice:   stopLoss,
+						CurrentLTP:      fillPrice,
+						OrderStatus:     status,
+						RuleID:          sig.RuleID,
+						RuleName:        sig.RuleName,
+						TriggerReason:   sig.TriggerReason,
+						Indicators:      sig.Indicators,
+						SlippagePts:     0.00,
+					}
+
+					if status == "TRADED" {
+						newOrder.ExecutionTime = orderTime
+						newOrder.FilledQty = sig.Quantity
+						newPos := SimulatedPosition{
+							TradingSymbol:    sig.TradingSymbol,
+							ExchangeSegment:  "NSE_FNO",
+							Status:           "OPEN",
+							ProductType:      "INTRADAY",
+							NetQty:           sig.Quantity,
+							BuyQty:           sig.Quantity,
+							BuyAvg:           fillPrice,
+							CurrentLTP:       fillPrice,
+							RealizedProfit:   0.0,
+							UnrealizedProfit: 0.0,
+							TotalPnL:         0.0,
+							EntrySpot:        spotPrice,
+						}
+						positions = append([]SimulatedPosition{newPos}, positions...)
+						log.Printf("🚀 [StrategyWorker #%s] EVENT-DRIVEN ENTRY BUY: %s @ ₹%.2f (Rule #%d: %s | SL=%.1f TP=%.1f)\n",
+							taskID, sig.TradingSymbol, fillPrice, sig.RuleID, sig.RuleName, stopLoss, target)
+
+						if isMockOrSandbox(params.ExecutionMode) {
+							j.dispatchOrderToMockBroker(DhanOrderPayload{
+								DhanClientID:    "1000000001",
+								CorrelationID:   sig.TradingSymbol,
+								TransactionType: sig.Transaction,
+								ExchangeSegment: "NSE_FNO",
+								ProductType:     "INTRADAY",
+								OrderType:       "MARKET",
+								Validity:        "DAY",
+								SecurityID:      sig.TradingSymbol,
+								Quantity:        sig.Quantity,
+								Price:           fillPrice,
+								TriggerPrice:    stopLoss,
+								BoStopLossValue: stopLoss,
+								BoProfitValue:   target,
+							})
+						}
+					}
+					orders = append([]SimulatedOrder{newOrder}, orders...)
+				}
+			}
+
+			var realizedTotal, unrealizedTotal, marginUtilized float64
+			for i := range positions {
+				if positions[i].Status == "OPEN" {
+					marginUtilized += float64(positions[i].NetQty) * positions[i].BuyAvg
+					unrealizedTotal += positions[i].UnrealizedProfit
+				} else {
+					realizedTotal += positions[i].RealizedProfit
+				}
+			}
+			latencyMs := time.Since(loopStart).Milliseconds()
+			j.saveTelemetry(ctx, userID, params.StrategyID, strategyName, true, "STREAMING",
+				spotPrice, cashBalance, cashBalance-marginUtilized, positions, orders, latencyMs)
+
 		case <-ticker.C:
 			segment := "INDEX"
 			if strings.Contains(indexName, "INR") || strings.Contains(indexName, "USD") || strings.Contains(indexName, "EUR") {
 				segment = "FOREX"
 			}
 			isMarketOpen := isSegmentMarketOpen(segment)
+			if isMockOrSandbox(params.ExecutionMode) {
+				isMarketOpen = true
+			} else if !isMarketOpen && j.redisService != nil && j.redisService.Client != nil {
+				if val, err := j.redisService.Client.Get(ctx, "marmot:mock_feed:active").Result(); err == nil && val == "true" {
+					isMarketOpen = true
+				}
+			}
 			if !isMarketOpen {
 				// When market is closed, sleep evaluation to avoid CPU and log churn
 				if tickCounter%30 == 0 {
-					spotPrice, _ := j.fetchSpotPrice(ctx, indexName)
+					spotPrice, _ = j.fetchSpotPrice(ctx, indexName)
 					j.saveTelemetry(ctx, userID, params.StrategyID, strategyName, false, "MARKET_CLOSED",
 						spotPrice, cashBalance, cashBalance, positions, orders, 0)
 				}
@@ -159,7 +510,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 
 			loopStart := time.Now()
 			tickCounter++
-			spotPrice, _ := j.fetchSpotPrice(ctx, indexName)
+			spotPrice, _ = j.fetchSpotPrice(ctx, indexName)
 
 			var realizedTotal, unrealizedTotal, marginUtilized float64
 
@@ -193,6 +544,23 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						}
 						positions = append([]SimulatedPosition{newPos}, positions...)
 						log.Printf("⚡ [StrategyWorker #%s] PENDING LIMIT EXECUTED: BUY %s @ ₹%.2f\n", taskID, orders[k].TradingSymbol, orders[k].CurrentLTP)
+
+						if isMockOrSandbox(params.ExecutionMode) {
+							j.dispatchOrderToMockBroker(DhanOrderPayload{
+								DhanClientID:    "1000000001",
+								CorrelationID:   orders[k].TradingSymbol,
+								TransactionType: "BUY",
+								ExchangeSegment: "NSE_FNO",
+								ProductType:     "INTRADAY",
+								OrderType:       "LIMIT",
+								Validity:        "DAY",
+								SecurityID:      orders[k].TradingSymbol,
+								Quantity:        orders[k].Quantity,
+								Price:           orders[k].CurrentLTP,
+								BoStopLossValue: orders[k].StopLossPrice,
+								BoProfitValue:   orders[k].TargetPrice,
+							})
+						}
 					}
 				}
 			}
@@ -219,7 +587,54 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						}
 					}
 
-					if positions[i].CurrentLTP > 0 && sl > 0 && tp > 0 {
+					if isMockOrSandbox(params.ExecutionMode) {
+						// In SANDBOX / MOCK mode, the Mock Broker Matching Engine autonomously monitors ticks and squares off
+						// positions on SL/TP breach. Marmot strictly relies on the broker OMS and never dispatches duplicate sells.
+						if tickCounter%2 == 0 {
+							mockPositions := j.fetchMockBrokerPositions()
+							for _, mp := range mockPositions {
+								if (mp.TradingSymbol == positions[i].TradingSymbol || mp.SecurityID == positions[i].TradingSymbol) &&
+									(mp.PositionType == "CLOSED" || mp.NetQty == 0) {
+									positions[i].Status = "CLOSED"
+									positions[i].RealizedProfit = mp.RealizedProfit
+									positions[i].UnrealizedProfit = 0
+									positions[i].SellQty = mp.SellQty
+									positions[i].SellAvg = mp.SellAvg
+									positions[i].NetQty = 0
+
+									triggerReason := "SL Hit"
+									if mp.RealizedProfit > 0 {
+										triggerReason = "TP Hit"
+									}
+									exitTime := mp.ExitTime
+									if exitTime == "" {
+										exitTime = nowIST().Format("03:04:05 PM")
+									}
+									exitOrder := SimulatedOrder{
+										OrderID:         fmt.Sprintf("DHN-EXIT-%d", time.Now().Unix()%100000),
+										CreateTime:      exitTime,
+										ExecutionTime:   exitTime,
+										TradingSymbol:   positions[i].TradingSymbol,
+										ExchangeSegment: "NSE_FNO",
+										TransactionType: "SELL",
+										OrderType:       "MARKET",
+										ProductType:     "INTRADAY",
+										Validity:        "DAY",
+										Quantity:        positions[i].BuyQty,
+										FilledQty:       positions[i].BuyQty,
+										Price:           mp.SellAvg,
+										CurrentLTP:      mp.SellAvg,
+										OrderStatus:     "TRADED",
+										TriggerReason:   triggerReason,
+									}
+									orders = append([]SimulatedOrder{exitOrder}, orders...)
+									log.Printf("🛡️ [StrategyWorker #%s] POSITION SQUARED OFF BY BROKER OMS (%s): SELL %s @ ₹%.2f (Realized: ₹%.2f)\n",
+										taskID, triggerReason, positions[i].TradingSymbol, mp.SellAvg, mp.RealizedProfit)
+									break
+								}
+							}
+						}
+					} else if positions[i].CurrentLTP > 0 && sl > 0 && tp > 0 {
 						triggerReason := ""
 						if positions[i].CurrentLTP <= sl {
 							triggerReason = "SL Hit"
@@ -273,29 +688,25 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				if params.Params == nil {
 					params.Params = make(map[string]interface{})
 				}
+				params.Params["execution_mode"] = params.ExecutionMode
 				if activeExp != "" {
 					params.Params["active_expiry"] = activeExp
 				}
 
-				metrics := j.fetchSpotMetrics(ctx, indexName)
-				cOpen := metrics.OpenPrice
-				if cOpen == 0 {
-					cOpen = spotPrice
+				if prevSpotPrice == 0 {
+					prevSpotPrice = spotPrice
 				}
-				cHigh := metrics.HighPrice
-				if cHigh == 0 {
-					cHigh = spotPrice
-				}
-				cLow := metrics.LowPrice
-				if cLow == 0 {
-					cLow = spotPrice
-				}
+				barOpen := prevSpotPrice
+				barClose := spotPrice
+				barHigh := math.Max(barOpen, barClose) + 0.5
+				barLow := math.Min(barOpen, barClose) - 0.5
+				prevSpotPrice = spotPrice
 
 				candle := map[string]interface{}{
-					"close":  spotPrice,
-					"open":   cOpen,
-					"high":   cHigh,
-					"low":    cLow,
+					"close":  barClose,
+					"open":   barOpen,
+					"high":   barHigh,
+					"low":    barLow,
 					"volume": 125000,
 				}
 				sig := strat.EvaluateLiveSignal(candle, nil, indexName, params.Params)
@@ -314,7 +725,14 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						}
 					}
 
-					if !alreadyOpen && len(positions) < 6 {
+					openPositionsCount := 0
+					for _, pos := range positions {
+						if pos.Status == "OPEN" {
+							openPositionsCount++
+						}
+					}
+
+					if !alreadyOpen && openPositionsCount < 6 {
 						now := nowIST()
 						newOrderID := fmt.Sprintf("SBX-%d%02d", now.Unix()%100000, rand.Intn(90)+10)
 						fillPrice := j.fetchOptionLTP(ctx, indexName, sig.TradingSymbol, spotPrice)
@@ -390,6 +808,23 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								}
 								positions = append([]SimulatedPosition{newPos}, positions...)
 								log.Printf("⚡ [StrategyWorker #%s] MARKET EXECUTED: %s %s @ ₹%.2f\n", taskID, sig.Transaction, sig.TradingSymbol, fillPrice)
+
+								if isMockOrSandbox(params.ExecutionMode) {
+									j.dispatchOrderToMockBroker(DhanOrderPayload{
+										DhanClientID:    "1000000001",
+										CorrelationID:   sig.TradingSymbol,
+										TransactionType: sig.Transaction,
+										ExchangeSegment: "NSE_FNO",
+										ProductType:     "INTRADAY",
+										OrderType:       sig.OrderType,
+										Validity:        "DAY",
+										SecurityID:      sig.TradingSymbol,
+										Quantity:        sig.Quantity,
+										Price:           fillPrice,
+										BoStopLossValue: stopLoss,
+										BoProfitValue:   target,
+									})
+								}
 							} else {
 								log.Printf("⏳ [StrategyWorker #%s] LIMIT ORDER PLACED (PENDING): %s %s @ ₹%.2f\n", taskID, sig.Transaction, sig.TradingSymbol, fillPrice)
 							}
@@ -559,12 +994,41 @@ func (j *StrategySignalJob) fetchActiveExpiry(ctx context.Context, indexName str
 
 // fetchOptionLTP queries the real-time option contract market price from Redis with strict expiry partitioning.
 func (j *StrategySignalJob) fetchOptionLTP(ctx context.Context, indexName, tradingSymbol string, spotPrice float64) float64 {
-	if j.redisService == nil || j.redisService.Client == nil {
+	strike, optType, expTag := parseOptionSymbol(tradingSymbol)
+	if strike <= 0 {
 		return 0.0
 	}
 
-	strike, optType, expTag := parseOptionSymbol(tradingSymbol)
-	if strike <= 0 {
+	// 1. In SANDBOX / MOCK mode, query local mock broker emulator directly for live advancing Parquet replay ticks
+	if isMockOrSandbox(j.payload.Params.ExecutionMode) {
+		resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var ocPayload struct {
+				Strikes []map[string]interface{} `json:"strikes"`
+			}
+			if jsonErr := json.NewDecoder(resp.Body).Decode(&ocPayload); jsonErr == nil {
+				resp.Body.Close()
+				for _, s := range ocPayload.Strikes {
+					spVal, _ := s["strike"].(float64)
+					if int(spVal) == strike {
+						if optType == "CALL" {
+							if cltp, ok := s["ce_ltp"].(float64); ok && cltp > 0 {
+								return cltp
+							}
+						} else {
+							if pltp, ok := s["pe_ltp"].(float64); ok && pltp > 0 {
+								return pltp
+							}
+						}
+					}
+				}
+			} else {
+				resp.Body.Close()
+			}
+		}
+	}
+
+	if j.redisService == nil || j.redisService.Client == nil {
 		return 0.0
 	}
 
@@ -579,21 +1043,26 @@ func (j *StrategySignalJob) fetchOptionLTP(ctx context.Context, indexName, tradi
 		)
 	}
 
-	// 2. Check expiry-partitioned keys
-	if expTag != "" {
+	// 2. Check SPOT and expiry-partitioned keys
+	tags := []string{"SPOT"}
+	if expTag != "" && expTag != "SPOT" {
+		tags = append(tags, expTag)
+	}
+
+	for _, tag := range tags {
 		keysToTry = append(keysToTry,
-			fmt.Sprintf("marmot:opt_ltp:%s:%s:%d:%s", indexName, expTag, strike, optType),
-			fmt.Sprintf(":1:marmot:opt_ltp:%s:%s:%d:%s", indexName, expTag, strike, optType),
+			fmt.Sprintf("marmot:opt_ltp:%s:%s:%d:%s", indexName, tag, strike, optType),
+			fmt.Sprintf(":1:marmot:opt_ltp:%s:%s:%d:%s", indexName, tag, strike, optType),
 		)
 		if optType == "CALL" {
 			keysToTry = append(keysToTry,
-				fmt.Sprintf("marmot:opt_ltp:%s:%s:%d:CE", indexName, expTag, strike),
-				fmt.Sprintf(":1:marmot:opt_ltp:%s:%s:%d:CE", indexName, expTag, strike),
+				fmt.Sprintf("marmot:opt_ltp:%s:%s:%d:CE", indexName, tag, strike),
+				fmt.Sprintf(":1:marmot:opt_ltp:%s:%s:%d:CE", indexName, tag, strike),
 			)
 		} else {
 			keysToTry = append(keysToTry,
-				fmt.Sprintf("marmot:opt_ltp:%s:%s:%d:PE", indexName, expTag, strike),
-				fmt.Sprintf(":1:marmot:opt_ltp:%s:%s:%d:PE", indexName, expTag, strike),
+				fmt.Sprintf("marmot:opt_ltp:%s:%s:%d:PE", indexName, tag, strike),
+				fmt.Sprintf(":1:marmot:opt_ltp:%s:%s:%d:PE", indexName, tag, strike),
 			)
 		}
 	}
@@ -637,6 +1106,33 @@ func (j *StrategySignalJob) fetchOptionLTP(ctx context.Context, indexName, tradi
 		}
 	}
 
+	// 4. Fall back to mock broker emulator directly
+	resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
+	if err == nil && resp.StatusCode == http.StatusOK {
+		var ocPayload struct {
+			Strikes []map[string]interface{} `json:"strikes"`
+		}
+		if jsonErr := json.NewDecoder(resp.Body).Decode(&ocPayload); jsonErr == nil {
+			resp.Body.Close()
+			for _, s := range ocPayload.Strikes {
+				spVal, _ := s["strike"].(float64)
+				if int(spVal) == strike {
+					if optType == "CALL" {
+						if cltp, ok := s["ce_ltp"].(float64); ok && cltp > 0 {
+							return cltp
+						}
+					} else {
+						if pltp, ok := s["pe_ltp"].(float64); ok && pltp > 0 {
+							return pltp
+						}
+					}
+				}
+			}
+		} else {
+			resp.Body.Close()
+		}
+	}
+
 	return 0.0
 }
 
@@ -652,6 +1148,32 @@ type LiveQuoteMetrics struct {
 // fetchSpotMetrics reads authentic session quote data from Redis (open, high, low, lp).
 func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName string) LiveQuoteMetrics {
 	res := LiveQuoteMetrics{}
+
+	// 1. In SANDBOX / MOCK mode, query local mock broker emulator directly for live advancing Parquet replay spot
+	if isMockOrSandbox(j.payload.Params.ExecutionMode) {
+		resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var mockData map[string]interface{}
+			if jsonErr := json.NewDecoder(resp.Body).Decode(&mockData); jsonErr == nil {
+				resp.Body.Close()
+				if p, ok := mockData["raw_spot_ltp"].(float64); ok && p > 0 {
+					res.SpotPrice = p
+					res.OpenPrice = p
+					res.HighPrice = p
+					res.LowPrice = p
+					step := StrikeIntervalForIndex(indexName)
+					if step <= 0 {
+						step = 50
+					}
+					res.ATMStrike = int(math.Round(p/float64(step)) * float64(step))
+					return res
+				}
+			} else {
+				resp.Body.Close()
+			}
+		}
+	}
+
 	if j.redisService == nil || j.redisService.Client == nil {
 		return res
 	}
@@ -714,6 +1236,28 @@ func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName stri
 					return res
 				}
 			}
+		}
+	}
+
+	// Fallback to local mock broker emulator endpoint
+	resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
+	if err == nil && resp.StatusCode == http.StatusOK {
+		var mockData map[string]interface{}
+		if jsonErr := json.NewDecoder(resp.Body).Decode(&mockData); jsonErr == nil {
+			resp.Body.Close()
+			if p, ok := mockData["raw_spot_ltp"].(float64); ok && p > 0 {
+				res.SpotPrice = p
+				res.OpenPrice = p
+				res.HighPrice = p
+				res.LowPrice = p
+				res.ATMStrike = int(math.Round(p/50.0) * 50.0)
+				if b, mErr := json.Marshal(mockData); mErr == nil && j.redisService != nil && j.redisService.Client != nil {
+					_ = j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:fyers:option_chain:%s", indexName), b, 1*time.Second).Err()
+				}
+				return res
+			}
+		} else {
+			resp.Body.Close()
 		}
 	}
 

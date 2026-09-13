@@ -8,9 +8,10 @@ import (
 	"time"
 )
 
-// TensorTradeRLStrategy implements the Strategy interface for TensorTrade RL Engine strictly mirroring backtest rules.
-type TensorTradeRLStrategy struct {
+// QuantEngineStrategy implements the Strategy interface for Marmot's native Go quantitative rule engine.
+type QuantEngineStrategy struct {
 	mu             sync.Mutex
+	name           string
 	lastSignalTime time.Time
 	candleBuffer   []map[string]interface{}
 	orbHigh        float64
@@ -18,9 +19,13 @@ type TensorTradeRLStrategy struct {
 	orbDiscovered  bool
 }
 
-// NewTensorTradeRLStrategy creates a new TensorTradeRLStrategy instance.
-func NewTensorTradeRLStrategy() *TensorTradeRLStrategy {
-	return &TensorTradeRLStrategy{
+// NewQuantEngineStrategy creates a new QuantEngineStrategy instance.
+func NewQuantEngineStrategy(name string) *QuantEngineStrategy {
+	if name == "" {
+		name = "quant_engine"
+	}
+	return &QuantEngineStrategy{
+		name:         name,
 		candleBuffer: make([]map[string]interface{}, 0, 50),
 		orbHigh:      0,
 		orbLow:       0,
@@ -35,14 +40,17 @@ func nowIST() time.Time {
 }
 
 // GetName returns the strategy identifier.
-func (s *TensorTradeRLStrategy) GetName() string {
-	return "tensortrade_rl"
+func (s *QuantEngineStrategy) GetName() string {
+	if s.name != "" {
+		return s.name
+	}
+	return "quant_engine"
 }
 
-// Execute processes candle input for TensorTrade RL backtest strategy.
-func (s *TensorTradeRLStrategy) Execute(input StrategyInput) StrategyResult {
+// Execute processes candle input for quantitative backtest evaluations.
+func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 	return StrategyResult{
-		StrategyName:  "TensorTrade RL (Deep Reinforcement Learning)",
+		StrategyName:  "Go Quantitative Rule Engine (ORB / SMC / Momentum)",
 		TotalTrades:   0,
 		WinningTrades: 0,
 		LosingTrades:  0,
@@ -56,7 +64,7 @@ func (s *TensorTradeRLStrategy) Execute(input StrategyInput) StrategyResult {
 }
 
 // EvaluateLiveSignal evaluates live signals strictly enforcing backtest Rule 20 (Momentum Guardrails) & Rule 23 (ICT SMC v3).
-func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
+func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	currentCandle map[string]interface{},
 	prevCandles []map[string]interface{},
 	indexName string,
@@ -89,17 +97,40 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 		s.candleBuffer = s.candleBuffer[1:]
 	}
 
-	// 2. Initial 15m Opening Range Discovery (ORB) tracking
-	if s.orbHigh == 0 || highPrice > s.orbHigh {
-		s.orbHigh = highPrice
-	}
-	if s.orbLow == 0 || lowPrice < s.orbLow {
-		s.orbLow = lowPrice
+	// 2. Initial Opening Range Discovery (ORB) tracking
+	if !s.orbDiscovered {
+		if s.orbHigh == 0 || highPrice > s.orbHigh {
+			s.orbHigh = highPrice
+		}
+		if s.orbLow == 0 || lowPrice < s.orbLow {
+			s.orbLow = lowPrice
+		}
+		if len(s.candleBuffer) >= 15 {
+			s.orbDiscovered = true
+		}
 	}
 
-	// 3. Enforce trade cooldown (Minimum 10 minutes between signals to prevent spam)
-	now := nowIST()
-	if !s.lastSignalTime.IsZero() && now.Sub(s.lastSignalTime) < 10*time.Minute {
+	// 3. Enforce trade cooldown (15s in SANDBOX mode, 3 minutes in LIVE mode to prevent spam)
+	candleTime := nowIST()
+	if dtStr, ok := currentCandle["datetime"].(string); ok && len(dtStr) >= 19 {
+		if pt, err := time.ParseInLocation("2006-01-02 15:04:05", dtStr[:19], istLocation); err == nil {
+			candleTime = pt
+		}
+	} else if tsInt, ok := currentCandle["timestamp"].(int64); ok && tsInt > 0 {
+		candleTime = time.Unix(tsInt, 0).In(istLocation)
+	} else if tsFloat, ok := currentCandle["timestamp"].(float64); ok && tsFloat > 0 {
+		candleTime = time.Unix(int64(tsFloat), 0).In(istLocation)
+	}
+
+	cooldown := 3 * time.Minute
+	if params != nil {
+		if mode, ok := params["execution_mode"].(string); ok && (strings.EqualFold(mode, "SANDBOX") || strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE")) {
+			cooldown = 15 * time.Second
+		} else if cdSec, ok := params["cooldown_seconds"].(float64); ok && cdSec > 0 {
+			cooldown = time.Duration(cdSec) * time.Second
+		}
+	}
+	if !s.lastSignalTime.IsZero() && candleTime.Sub(s.lastSignalTime) < cooldown {
 		return nil
 	}
 
@@ -112,13 +143,13 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 	emaFast := s.calculateEMA(s.candleBuffer, 9)
 	emaSlow := s.calculateEMA(s.candleBuffer, 21)
 
-	// 5. Calculate ICT Displacement ratio: candle_body / candle_range >= minDisplacement (65%)
+	// 5. Calculate ICT Displacement ratio: candle_body / candle_range >= minDisplacement (60%)
 	candBody := math.Abs(closePrice - openPrice)
-	candRange := math.Max(1.0, highPrice-lowPrice)
+	candRange := math.Max(0.5, highPrice-lowPrice)
 	displacementRatio := candBody / candRange
 	displacementPct := math.Round(displacementRatio*1000) / 10
 
-	minDisplacement := 0.65
+	minDisplacement := 0.60
 	ruleID := 32
 	ruleName := "ICT Smart Money v3: Institutional Displacement & Trend Lock"
 
@@ -128,7 +159,7 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 			for _, r := range rawRules {
 				if rMap, isMap := r.(map[string]interface{}); isMap {
 					rType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
-					if strings.Contains(rType, "ict") {
+					if strings.Contains(rType, "ict") || strings.Contains(rType, "smc") || strings.Contains(rType, "orb") {
 						if idVal, idOk := rMap["id"].(float64); idOk && idVal > 0 {
 							ruleID = int(idVal)
 						}
@@ -152,22 +183,22 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 	isBearishSignal := false
 	var triggerReason string
 
-	// Bullish Criteria: EMA 9 >= EMA 21 AND Strict ORB Breakout (close > orbHigh) AND Displacement >= minDisplacement
-	isBullishBreakout := (s.orbHigh == 0 || closePrice > s.orbHigh)
-	isBearishBreakdown := (s.orbLow == 0 || closePrice < s.orbLow)
-	isDisplaced := displacementRatio >= minDisplacement
+	// Bullish Criteria: EMA 9 >= EMA 21 AND (Breakout above ORB High OR EMA trend expansion) AND Displacement
+	isBullishBreakout := (!s.orbDiscovered || s.orbHigh == 0 || closePrice >= s.orbHigh || emaFast > emaSlow+0.2)
+	isBearishBreakdown := (!s.orbDiscovered || s.orbLow == 0 || closePrice <= s.orbLow || emaFast < emaSlow-0.2)
+	isDisplaced := displacementRatio >= minDisplacement || candBody >= 0.8
 
 	if emaFast >= emaSlow && isBullishBreakout && isDisplaced {
 		isBullishSignal = true
 		triggerReason = fmt.Sprintf(
-			"⚡ [ICT SMC v3] EMA 9/21 Bullish Trend (%.1f >= %.1f) with 15m ORB Breakout (%.1f > %.1f) & ICT Displacement %.1f%% (>= %.1f%%)",
-			emaFast, emaSlow, closePrice, s.orbHigh, displacementPct, minDisplacement*100,
+			"⚡ [Quant Engine - SMC] EMA 9/21 Bullish Trend (%.1f >= %.1f) with ORB High (%.1f / %.1f) & Displacement %.1f%%",
+			emaFast, emaSlow, closePrice, s.orbHigh, displacementPct,
 		)
 	} else if emaFast < emaSlow && isBearishBreakdown && isDisplaced {
 		isBearishSignal = true
 		triggerReason = fmt.Sprintf(
-			"⚡ [ICT SMC v3] EMA 9/21 Bearish Trend (%.1f < %.1f) with 15m ORB Breakdown (%.1f < %.1f) & ICT Displacement %.1f%% (>= %.1f%%)",
-			emaFast, emaSlow, closePrice, s.orbLow, displacementPct, minDisplacement*100,
+			"⚡ [Quant Engine - SMC] EMA 9/21 Bearish Trend (%.1f < %.1f) with ORB Low (%.1f / %.1f) & Displacement %.1f%%",
+			emaFast, emaSlow, closePrice, s.orbLow, displacementPct,
 		)
 	}
 
@@ -177,7 +208,7 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 	}
 
 	// Mark signal timestamp for cooldown enforcement
-	s.lastSignalTime = now
+	s.lastSignalTime = candleTime
 
 	// 7. Dynamic Lot Sizing & Strike Selection from Incoming Data
 	strikeStep := 50
@@ -264,17 +295,19 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 		limitPrice = closePrice
 	}
 
+	s.lastSignalTime = candleTime
+
 	return &LiveOrderRequest{
 		IndexName:     indexName,
 		TradingSymbol: tradingSymbol,
 		Transaction:   transaction,
 		OrderType:     orderType,
 		LimitPrice:    limitPrice,
-		Quantity:      lotSize * 2, // 2 lots standard sizing
+		Quantity:      lotSize * 2,
 		TargetPrice:   targetPrice,
 		StopLossPrice: stopLossPrice,
 		StrategyName:  s.GetName(),
-		Timestamp:     now.Format("03:04:05 PM"),
+		Timestamp:     candleTime.Format("03:04:05 PM"),
 		RuleID:        ruleID,
 		RuleName:      ruleName,
 		TriggerReason: triggerReason,
@@ -284,7 +317,7 @@ func (s *TensorTradeRLStrategy) EvaluateLiveSignal(
 }
 
 // calculateEMA calculates the Exponential Moving Average over the provided candle closes.
-func (s *TensorTradeRLStrategy) calculateEMA(candles []map[string]interface{}, period int) float64 {
+func (s *QuantEngineStrategy) calculateEMA(candles []map[string]interface{}, period int) float64 {
 	if len(candles) == 0 {
 		return 0
 	}

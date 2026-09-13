@@ -3,7 +3,7 @@
 <div id="live-orders-container" 
      class="card mb-0 border-0 shadow-none bg-transparent"
      hx-get="{{ orders_partial_url|default:'/admins/dashboard/live/orders/' }}?status={{ filter_status|default:'ALL' }}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
-     hx-trigger="reloadLiveOrders from:body"
+     hx-trigger="reloadLiveOrders from:body, brokerOrderUpdate from:body"
      hx-target="#live-orders-container"
      hx-swap="outerHTML">
     <!-- Sub-header & Filter Tabs -->
@@ -114,12 +114,20 @@
                     <td>
                         <div>
                             {% if ord.transaction_type == 'BUY' %}
-                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5 fw-bold fs-xs">
-                                    BUY
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5 fw-bold fs-xs d-inline-flex align-items-center gap-1">
+                                    <i class="bi bi-arrow-up-right"></i> BUY
+                                </span>
+                            {% elif ord.leg_name == 'SL_HIT' or 'SL' in ord.leg_name or 'SL' in ord.trigger_reason %}
+                                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-35 rounded-pill px-2 py-0.5 fw-bold fs-xs d-inline-flex align-items-center gap-1 shadow-sm" title="Stop-Loss Hit Triggered by Broker OMS">
+                                    <i class="bi bi-shield-x"></i> SL HIT (SELL)
+                                </span>
+                            {% elif ord.leg_name == 'TP_HIT' or 'TP' in ord.leg_name or 'TP' in ord.trigger_reason %}
+                                <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-35 rounded-pill px-2 py-0.5 fw-bold fs-xs d-inline-flex align-items-center gap-1 shadow-sm" title="Take-Profit Target Hit Triggered by Broker OMS">
+                                    <i class="bi bi-trophy"></i> TP HIT (SELL)
                                 </span>
                             {% else %}
-                                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5 fw-bold fs-xs">
-                                    SELL
+                                <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5 fw-bold fs-xs d-inline-flex align-items-center gap-1">
+                                    <i class="bi bi-arrow-down-right"></i> SELL
                                 </span>
                             {% endif %}
                         </div>
@@ -176,7 +184,11 @@
                                 {{ ord.order_status }}
                             </span>
                         {% endif %}
-                        {% if ord.oms_error_desc %}
+                        {% if ord.trigger_reason or ord.leg_name %}
+                            <div class="smaller mt-0.5 font-monospace {% if 'SL' in ord.leg_name or 'SL' in ord.trigger_reason %}text-danger{% else %}text-info{% endif %}" title="{{ ord.trigger_reason|default:ord.leg_name }}">
+                                <i class="bi {% if 'SL' in ord.leg_name or 'SL' in ord.trigger_reason %}bi-shield-exclamation{% else %}bi-flag{% endif %} me-0.5"></i>{{ ord.trigger_reason|default:ord.leg_name }}
+                            </div>
+                        {% elif ord.oms_error_desc %}
                             <div class="text-danger smaller text-truncate" style="max-width: 150px;" title="{{ ord.oms_error_desc }}">
                                 {{ ord.oms_error_desc }}
                             </div>

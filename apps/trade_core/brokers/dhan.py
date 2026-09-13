@@ -3,6 +3,7 @@ import uuid
 import json
 from typing import Dict, Any, Tuple
 from concurrent.futures import ThreadPoolExecutor
+import requests
 from django.conf import settings
 from apps.trade_core.services.dhan_token_service import UserDhanClient, _get_redis
 from .base import BaseBrokerAdapter
@@ -157,6 +158,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         order_type: str = 'MARKET', 
         price: float = 0.0, 
         stop_loss: float = 0.0,
+        take_profit: float = 0.0,
         account_type: str = 'SANDBOX'
     ) -> Dict[str, Any]:
         order_id = f"DHAN-{'SANDBOX' if account_type == 'SANDBOX' else 'LIVE'}-{uuid.uuid4().hex[:8].upper()}"
@@ -172,6 +174,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             'order_type': order_type,
             'price': price,
             'stop_loss': stop_loss,
+            'take_profit': take_profit,
             'status': 'EXECUTED',
             'estimated_brokerage': estimated_brokerage,
             'api_response': {
@@ -200,7 +203,9 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                     "securityId": symbol,
                     "quantity": quantity,
                     "price": price,
-                    "triggerPrice": stop_loss
+                    "triggerPrice": stop_loss,
+                    "boStopLossValue": stop_loss,
+                    "boProfitValue": take_profit
                 }
                 headers = {"access-token": token, "client-id": clean_cid, "Content-Type": "application/json"}
                 resp = requests.post(f"{target_base_url}/orders", json=payload, headers=headers, timeout=6)
@@ -350,10 +355,15 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
 
     def get_live_positions(self) -> Dict[str, Any]:
         """Fetches live intraday positions and real-time net PnL from Dhan /v2/positions."""
-        import requests
         token = str(self.get_access_token() or '').strip().strip('"').strip("'")
         client_id = str(self.client_id or '').strip().strip('"').strip("'")
-        if not token or not client_id:
+        is_mock = str(getattr(self.account, 'account_type', 'SANDBOX')).upper() in ['MOCK', 'SANDBOX']
+        if is_mock:
+            if not client_id:
+                client_id = "1000000001"
+            if not token:
+                token = "mock-token"
+        elif not token or not client_id:
             return {'success': False, 'positions': [], 'net_pnl': 0.00, 'realized_pnl': 0.00, 'unrealized_pnl': 0.00, 'open_positions_count': 0, 'closed_positions_count': 0}
 
         try:
@@ -394,7 +404,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
 
                     parsed_positions.append({
                         'position_type': pos.get("positionType", "LONG" if net_qty > 0 else ("SHORT" if net_qty < 0 else "CLOSED")),
-                        'trading_symbol': pos.get("tradingSymbol", ""),
+                        'trading_symbol': pos.get("tradingSymbol") or pos.get("securityId", ""),
                         'security_id': pos.get("securityId", ""),
                         'exchange_segment': pos.get("exchangeSegment", "NSE_FNO"),
                         'product_type': pos.get("productType", "INTRADAY"),
@@ -408,6 +418,10 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                         'total_pnl': tot_pos_pnl,
                         'status': pos_status,
                         'cross_currency': pos.get("crossCurrency", False),
+                        'entry_time': pos.get("entryTime", ""),
+                        'exit_time': pos.get("exitTime", ""),
+                        'stop_loss': float(pos.get("stopLoss", 0.0) or 0.0),
+                        'take_profit': float(pos.get("takeProfit", 0.0) or 0.0),
                     })
 
                 return {
@@ -426,10 +440,15 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
 
     def get_live_orders(self) -> Dict[str, Any]:
         """Fetches today's live orders telemetry from Dhan /v2/orders."""
-        import requests
         token = str(self.get_access_token() or '').strip().strip('"').strip("'")
         client_id = str(self.client_id or '').strip().strip('"').strip("'")
-        if not token or not client_id:
+        is_mock = str(getattr(self.account, 'account_type', 'SANDBOX')).upper() in ['MOCK', 'SANDBOX']
+        if is_mock:
+            if not client_id:
+                client_id = "1000000001"
+            if not token:
+                token = "mock-token"
+        elif not token or not client_id:
             return {'success': False, 'orders': [], 'orders_count': 0, 'open_orders_count': 0, 'traded_orders_count': 0}
 
         try:
@@ -440,36 +459,63 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                 orders_data = resp.json()
                 if not isinstance(orders_data, list):
                     orders_data = []
-                
+
                 open_cnt = 0
                 traded_cnt = 0
                 parsed_orders = []
                 for ord_item in orders_data:
-                    st = str(ord_item.get("orderStatus", "")).upper()
+                    sub_order = ord_item.get("order", {}) if isinstance(ord_item.get("order"), dict) else {}
+                    st = str(ord_item.get("status") or ord_item.get("orderStatus", "")).upper()
                     if st in ["PENDING", "TRANSIT", "CONFIRM"]:
                         open_cnt += 1
                     elif st == "TRADED":
                         traded_cnt += 1
 
+                    qty = int(ord_item.get("quantity") or sub_order.get("quantity", 0) or 0)
+                    filled_qty = int(ord_item.get("filledQty") or ord_item.get("quantity") or sub_order.get("quantity", 0) or 0)
+                    price = float(ord_item.get("filledPrice") or ord_item.get("price") or sub_order.get("price", 0.0) or 0.0)
+                    trig_price = float(ord_item.get("triggerPrice") or sub_order.get("triggerPrice", 0.0) or 0.0)
+                    sl = float(ord_item.get("stopLoss", 0.0) or 0.0)
+                    tp = float(ord_item.get("takeProfit", 0.0) or 0.0)
+                    c_time = ord_item.get("createdAt") or ord_item.get("createTime") or ord_item.get("entryTime") or ""
+                    u_time = ord_item.get("updatedAt") or ord_item.get("updateTime") or ord_item.get("exitTime") or ""
+                    sym = ord_item.get("tradingSymbol") or sub_order.get("securityId") or ord_item.get("securityId", "")
+                    sec_id = ord_item.get("securityId") or sub_order.get("securityId", "")
+                    tx_type = str(ord_item.get("transactionType") or sub_order.get("transactionType", "BUY")).upper()
+                    ord_type = ord_item.get("orderType") or sub_order.get("orderType", "MARKET")
+                    prod_type = ord_item.get("productType") or sub_order.get("productType", "INTRADAY")
+                    seg = ord_item.get("exchangeSegment") or sub_order.get("exchangeSegment", "NSE_FNO")
+                    leg_name = ord_item.get("legName") or sub_order.get("legName") or ord_item.get("leg_name", "")
+                    trig_reason = ord_item.get("triggerReason") or ord_item.get("trigger_reason") or ord_item.get("rejectReason", "")
+
                     parsed_orders.append({
                         'order_id': ord_item.get("orderId", ""),
                         'exchange_order_id': ord_item.get("exchangeOrderId", ""),
                         'order_status': st,
-                        'transaction_type': str(ord_item.get("transactionType", "BUY")).upper(),
-                        'exchange_segment': ord_item.get("exchangeSegment", "NSE_FNO"),
-                        'product_type': ord_item.get("productType", "INTRADAY"),
-                        'order_type': ord_item.get("orderType", "MARKET"),
-                        'validity': ord_item.get("validity", "DAY"),
-                        'trading_symbol': ord_item.get("tradingSymbol", ""),
-                        'security_id': ord_item.get("securityId", ""),
-                        'quantity': int(ord_item.get("quantity", 0) or 0),
-                        'filled_qty': int(ord_item.get("filledQty", ord_item.get("quantity", 0)) or 0),
-                        'price': float(ord_item.get("price", 0.0) or 0.0),
-                        'trigger_price': float(ord_item.get("triggerPrice", 0.0) or 0.0),
-                        'create_time': ord_item.get("createTime", ""),
-                        'update_time': ord_item.get("updateTime", ""),
+                        'transaction_type': tx_type,
+                        'leg_name': leg_name,
+                        'trigger_reason': trig_reason,
+                        'exchange_segment': seg,
+                        'product_type': prod_type,
+                        'order_type': ord_type,
+                        'validity': ord_item.get("validity") or sub_order.get("validity", "DAY"),
+                        'trading_symbol': sym,
+                        'security_id': sec_id,
+                        'quantity': qty,
+                        'filled_qty': filled_qty,
+                        'price': price,
+                        'limit_entry_price': price,
+                        'trigger_price': trig_price,
+                        'stop_loss_price': sl,
+                        'target_price': tp,
+                        'stop_loss': sl,
+                        'take_profit': tp,
+                        'create_time': c_time,
+                        'update_time': u_time,
+                        'signal_time': c_time,
+                        'execution_time': u_time,
                         'oms_error_code': ord_item.get("omsErrorCode", ""),
-                        'oms_error_desc': ord_item.get("omsErrorDescription", ""),
+                        'oms_error_desc': ord_item.get("omsErrorDescription", "") or ord_item.get("rejectReason", ""),
                     })
 
                 # Sort newest first by create_time

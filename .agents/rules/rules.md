@@ -69,6 +69,7 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
   - `Broker Credentials`: Cannot be modified by regular users once created (Admin/Developer role required).
   - `Trade Control & Freeze Flags` (`trade_eligibility`, `is_blocked`, `primary_freeze`, `final_freeze`): Always read-only for standard users.
 - **Navigation Structure:** The Profile settings link belongs exclusively in the top-right profile dropdown menu and navigation sidebar.
+- **Strictly Zero Periodic HTMX Polling for Real-Time Telemetry & Stats:** Never use periodic HTMX interval polling (e.g. `hx-trigger="every 1s/2s/3s"`) for real-time ticker prices, PnL metrics, positions, orders, or streamer progress. All real-time telemetry must strictly use WebSocket Push direct to DOM or event-driven HTMX swaps triggered exclusively by WebSocket events (`hx-trigger="event from:body"`).
 
 ---
 
@@ -102,6 +103,8 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
 - **Expiry Schedule Accuracy:** Backtest and strategy evaluators must account for exchange expiry schedules (`get_index_expiry_info(index_name, date)`) including weekly vs monthly expiry days and regulatory single-weekly index shifts.
 - **Full Charges & Brokerage Accounting:** Every backtest execution and trade log must calculate gross PnL, brokerage, STT/CTT, exchange charges, SEBI fees, stamp duty, and GST using `calculate_trade_charges()`.
 - **Utilized Capital Metrics:** Backtest reports and UI dashboards must report max utilized capital, average utilized capital, capital utilization %, and ROI on utilized capital alongside total capital ROI.
+- **Zero Synthetic Price Floors & Pure Historical Streaming:** Never inject arbitrary price floors (e.g. `math.Max(25.0, ...)`), fake Brownian walk seed constants, or fallback LTPs into the Dhan emulator or option chain streamers. Deep OTM options must reflect true historical Parquet data or mathematical Black-Scholes/extrinsic decay. If data is absent, display `—` (unavailable) rather than falsifying values.
+- **Event-Driven Virtual Clock for High-Speed Simulation:** All strategy signal generators, indicators, opening range discovery (ORB), time-stops, and trade cooldowns MUST evaluate against the market tick's timestamp (`tick.Timestamp`) rather than system wall-clock time (`time.Now()`). This guarantees that 1X, 5X, 10X, or event-driven accelerated playback produces 100% identical trading signals without distorting strategy logic.
 
 ---
 

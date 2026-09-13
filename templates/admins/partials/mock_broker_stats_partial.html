@@ -1,0 +1,78 @@
+<!-- KPI Cards Partial -->
+<div class="row g-3 mb-4">
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 h-100 border rounded-3 position-relative overflow-hidden"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="theme-text-muted small text-uppercase tracking-wider" style="font-size: 0.72rem;">Net Realized PnL</span>
+                <span class="badge {% if metrics.net_pnl >= 0 %}bg-success bg-opacity-20 text-success border border-success{% else %}bg-danger bg-opacity-20 text-danger border border-danger{% endif %} border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                    {% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }}
+                </span>
+            </div>
+            <div class="fs-3 fw-bold font-monospace {% if metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                {% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }}
+            </div>
+            <div class="theme-text-muted small d-flex justify-content-between mt-1 pt-1 border-top border-secondary border-opacity-10" style="font-size: 0.72rem;">
+                <span>Gross: <strong class="{% if metrics.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} font-monospace">₹{{ metrics.gross_pnl|floatformat:2 }}</strong></span>
+                <span>Charges: <strong class="text-warning font-monospace">₹{{ metrics.total_charges|floatformat:2 }}</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 h-100 border rounded-3 position-relative overflow-hidden"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="theme-text-muted small text-uppercase tracking-wider" style="font-size: 0.72rem;">Win Rate & Accuracy</span>
+                <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                    {{ metrics.win_rate }}%
+                </span>
+            </div>
+            <div class="fs-3 fw-bold font-monospace text-primary">
+                {{ metrics.win_rate }}%
+            </div>
+            <div class="theme-text-muted small d-flex justify-content-between mt-1 pt-1 border-top border-secondary border-opacity-10" style="font-size: 0.72rem;">
+                <span>Wins: <strong class="text-success font-monospace">{{ metrics.winning_trades }}</strong></span>
+                <span>Losses: <strong class="text-danger font-monospace">{{ metrics.losing_trades }}</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 h-100 border rounded-3 position-relative overflow-hidden"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="theme-text-muted small text-uppercase tracking-wider" style="font-size: 0.72rem;">Total Closed Trades</span>
+                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                    PAIRS
+                </span>
+            </div>
+            <div class="fs-3 fw-bold font-monospace theme-text-main">
+                {{ metrics.total_trades }}
+            </div>
+            <div class="theme-text-muted small d-flex justify-content-between mt-1 pt-1 border-top border-secondary border-opacity-10" style="font-size: 0.72rem;">
+                <span>Profit Factor: <strong class="text-info font-monospace">{{ metrics.profit_factor|floatformat:2 }}</strong></span>
+                <span>Avg Win: <strong class="text-success font-monospace">₹{{ metrics.avg_win|floatformat:0 }}</strong></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-12 col-sm-6 col-xl-3">
+        <div class="glass-card p-3 h-100 border rounded-3 position-relative overflow-hidden"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+            <div class="d-flex justify-content-between align-items-center mb-1">
+                <span class="theme-text-muted small text-uppercase tracking-wider" style="font-size: 0.72rem;">Max Drawdown</span>
+                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                    PEAK DROP
+                </span>
+            </div>
+            <div class="fs-3 fw-bold font-monospace text-danger">
+                ₹{{ metrics.max_drawdown|floatformat:2 }}
+            </div>
+            <div class="theme-text-muted small d-flex justify-content-between mt-1 pt-1 border-top border-secondary border-opacity-10" style="font-size: 0.72rem;">
+                <span>Avg Loss: <strong class="text-danger font-monospace">₹{{ metrics.avg_loss|floatformat:0 }}</strong></span>
+                <span>Status: <strong class="text-success font-monospace">HEALTHY</strong></span>
+            </div>
+        </div>
+    </div>
+</div>

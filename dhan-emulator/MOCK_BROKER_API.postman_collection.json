@@ -1,0 +1,453 @@
+{
+  "info": {
+    "name": "Marmot — Dhan Mock Broker (dhan-emulator)",
+    "description": "Complete REST API + WebSocket reference for the Dhan Emulator Mock Broker.\n\nBase URL: http://localhost:8088\nWebSocket: ws://localhost:8088/v2/marketfeed/ws\n\nAll Dhan v2 endpoints accept `client-id` header (defaults to active account if omitted).",
+    "_postman_id": "marmot-dhan-emulator-v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    { "key": "base_url",  "value": "http://localhost:8088", "type": "string" },
+    { "key": "client_id", "value": "1000000001",            "type": "string" },
+    { "key": "order_id",  "value": "DHN17893015880001",     "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "Health",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": { "method": "GET", "url": "{{base_url}}/health" }
+        }
+      ]
+    },
+    {
+      "name": "Dhan v2 — Orders",
+      "item": [
+        {
+          "name": "Place Order (MARKET)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "client-id",    "value": "{{client_id}}" }
+            ],
+            "url": "{{base_url}}/v2/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dhanClientId\": \"{{client_id}}\",\n  \"correlationId\": \"strat_nifty_leg1\",\n  \"transactionType\": \"BUY\",\n  \"exchangeSegment\": \"NSE_FNO\",\n  \"productType\": \"INTRADAY\",\n  \"orderType\": \"MARKET\",\n  \"validity\": \"DAY\",\n  \"securityId\": \"49081\",\n  \"tradingSymbol\": \"NIFTY24SEP24500CE\",\n  \"quantity\": 25,\n  \"price\": 0,\n  \"triggerPrice\": 0,\n  \"boProfitValue\": 200,\n  \"boStopLossValue\": 100\n}"
+            },
+            "description": "Places a MARKET order. Async execution in 35-50ms. Fires TRADED postback to Marmot. boProfitValue and boStopLossValue set TP/SL on the position for automatic square-off."
+          }
+        },
+        {
+          "name": "Place Order (STOP_LOSS_MARKET)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "client-id",    "value": "{{client_id}}" }
+            ],
+            "url": "{{base_url}}/v2/orders",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"dhanClientId\": \"{{client_id}}\",\n  \"correlationId\": \"strat_nifty_sl\",\n  \"transactionType\": \"SELL\",\n  \"exchangeSegment\": \"NSE_FNO\",\n  \"productType\": \"INTRADAY\",\n  \"orderType\": \"STOP_LOSS_MARKET\",\n  \"validity\": \"DAY\",\n  \"securityId\": \"49081\",\n  \"quantity\": 25,\n  \"price\": 0,\n  \"triggerPrice\": 95.0,\n  \"legName\": \"STOP_LOSS_LEG\"\n}"
+            },
+            "description": "SL order stays PENDING until IngestTick crosses triggerPrice. Pre-marked TRADED inside lock to prevent double-fire at high replay speeds."
+          }
+        },
+        {
+          "name": "List Orders (GET)",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "client-id", "value": "{{client_id}}" }],
+            "url": "{{base_url}}/v2/orders"
+          }
+        },
+        {
+          "name": "Get Order by ID",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "client-id", "value": "{{client_id}}" }],
+            "url": "{{base_url}}/v2/orders/{{order_id}}"
+          }
+        },
+        {
+          "name": "Modify Order (PUT)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "client-id",    "value": "{{client_id}}" }
+            ],
+            "url": "{{base_url}}/v2/orders/{{order_id}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"price\": 110.0,\n  \"triggerPrice\": 105.0,\n  \"quantity\": 25\n}"
+            }
+          }
+        },
+        {
+          "name": "Cancel Order (DELETE)",
+          "request": {
+            "method": "DELETE",
+            "header": [{ "key": "client-id", "value": "{{client_id}}" }],
+            "url": "{{base_url}}/v2/orders/{{order_id}}",
+            "description": "Cancels PENDING order. Fires CANCELLED postback to Marmot."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dhan v2 — Funds and Positions",
+      "item": [
+        {
+          "name": "Get Fund Limit",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "client-id", "value": "{{client_id}}" }],
+            "url": "{{base_url}}/v2/fundlimit",
+            "description": "availabelBalance, sodLimit, utilizedAmount, withdrawableBalance per account."
+          }
+        },
+        {
+          "name": "Get Positions",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "client-id", "value": "{{client_id}}" }],
+            "url": "{{base_url}}/v2/positions",
+            "description": "LONG / SHORT / CLOSED positions with real-time MTM unrealizedProfit from Parquet tick feed."
+          }
+        },
+        {
+          "name": "Get Holdings",
+          "request": {
+            "method": "GET",
+            "header": [{ "key": "client-id", "value": "{{client_id}}" }],
+            "url": "{{base_url}}/v2/holdings",
+            "description": "Always returns [] — emulator is FNO intraday only."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dhan v2 — Option Chain",
+      "item": [
+        {
+          "name": "Option Chain — NIFTY",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v2/optionchain?index=NIFTY",
+              "query": [{ "key": "index", "value": "NIFTY" }]
+            }
+          }
+        },
+        {
+          "name": "Option Chain — BANKNIFTY",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v2/optionchain?index=BANKNIFTY",
+              "query": [{ "key": "index", "value": "BANKNIFTY" }]
+            }
+          }
+        },
+        {
+          "name": "Option Chain — FINNIFTY",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/v2/optionchain?index=FINNIFTY",
+              "query": [{ "key": "index", "value": "FINNIFTY" }]
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "Active Account",
+      "item": [
+        {
+          "name": "Get Active Account Info",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/mock/v2/active-account",
+            "description": "Returns active account: ID, name, broker, available_balance, sod_limit, utilized_margin. Used by Marmot Live Mock Dashboard for real-time sync."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Account Management",
+      "item": [
+        {
+          "name": "Select Active Account",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/mock/accounts/select?id=1000000001",
+              "query": [{ "key": "id", "value": "1000000001" }]
+            },
+            "description": "Switches active account. All subsequent trades route to this account."
+          }
+        },
+        {
+          "name": "Create Account",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{base_url}}/mock/accounts/create",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "id",             "value": "1000000003" },
+                { "key": "name",           "value": "Swing Strategy Beta" },
+                { "key": "broker",         "value": "Dhan" },
+                { "key": "initialBalance", "value": "200000" }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Update Account",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{base_url}}/mock/accounts/update",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "id",           "value": "1000000001" },
+                { "key": "name",         "value": "Primary Algo v2" },
+                { "key": "adjustAmount", "value": "50000" }
+              ]
+            },
+            "description": "adjustAmount: positive = deposit, negative = withdraw."
+          }
+        },
+        {
+          "name": "Delete Account",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/mock/accounts/delete?id=1000000003",
+              "query": [{ "key": "id", "value": "1000000003" }]
+            },
+            "description": "Fails if account has open positions. Cannot delete last account."
+          }
+        },
+        {
+          "name": "Adjust Funds",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{base_url}}/mock/api/funds/adjust",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [{ "key": "amount", "value": "50000" }]
+            },
+            "description": "Deposits or withdraws virtual funds from active account. Broadcasts updated stats over WebSocket."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Streamer Control",
+      "item": [
+        {
+          "name": "List Parquet Files",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/mock/api/streamer/files",
+            "description": "Lists all parquet dataset files with: indexName, dateRange, sizeMB, hasOptions."
+          }
+        },
+        {
+          "name": "Select Dataset",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/mock/api/streamer/select?file=1/48/dataset.parquet",
+              "query": [{ "key": "file", "value": "1/48/dataset.parquet" }]
+            }
+          }
+        },
+        {
+          "name": "Toggle Play or Pause",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/mock/api/streamer/toggle"
+          }
+        },
+        {
+          "name": "Restart Replay",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/mock/api/streamer/restart",
+            "description": "Rewinds to row 0 and starts playing. Use after REPLAY COMPLETED."
+          }
+        },
+        {
+          "name": "Set Speed — 1x",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/mock/api/streamer/speed?val=1", "query": [{ "key": "val", "value": "1" }] }
+          }
+        },
+        {
+          "name": "Set Speed — 10x",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/mock/api/streamer/speed?val=10", "query": [{ "key": "val", "value": "10" }] }
+          }
+        },
+        {
+          "name": "Set Speed — 50x",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/mock/api/streamer/speed?val=50", "query": [{ "key": "val", "value": "50" }] }
+          }
+        },
+        {
+          "name": "Set Speed — 100x",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/mock/api/streamer/speed?val=100", "query": [{ "key": "val", "value": "100" }] }
+          }
+        },
+        {
+          "name": "Set Speed — 250x",
+          "request": {
+            "method": "POST",
+            "url": { "raw": "{{base_url}}/mock/api/streamer/speed?val=250", "query": [{ "key": "val", "value": "250" }] },
+            "description": "Maximum speed. SL/TP evaluation runs every tick regardless of speed."
+          }
+        },
+        {
+          "name": "Manual Tick Injection",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/json" }],
+            "url": "{{base_url}}/mock/api/tick",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"securityId\": \"49081\",\n  \"tradingSymbol\": \"NIFTY24SEP24500CE\",\n  \"ltp\": 95.0,\n  \"open\": 110.0,\n  \"high\": 125.0,\n  \"low\": 90.0,\n  \"volume\": 12500\n}"
+            },
+            "description": "Injects a synthetic tick directly into the matching engine. Use to manually trigger SL/TP in tests without waiting for replay."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Risk Controls",
+      "item": [
+        {
+          "name": "Kill Switch — Cancel All Pending",
+          "request": {
+            "method": "POST",
+            "url": "{{base_url}}/mock/api/kill-switch",
+            "description": "Immediately cancels ALL pending orders across ALL accounts. Fires CANCELLED postback for each. Emergency stop."
+          }
+        },
+        {
+          "name": "Clear Session",
+          "request": {
+            "method": "POST",
+            "url": {
+              "raw": "{{base_url}}/mock/api/session/clear?account={{client_id}}",
+              "query": [{ "key": "account", "value": "{{client_id}}" }]
+            },
+            "description": "Resets orders, positions, and restores balance to initialBalance."
+          }
+        },
+        {
+          "name": "Update Chaos Config",
+          "request": {
+            "method": "POST",
+            "header": [{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }],
+            "url": "{{base_url}}/mock/api/chaos",
+            "body": {
+              "mode": "urlencoded",
+              "urlencoded": [
+                { "key": "mode", "value": "NORMAL" },
+                { "key": "rps",  "value": "100" }
+              ]
+            },
+            "description": "Chaos modes: NORMAL, DROP_WEBHOOKS (drops all postbacks), DELAY_WEBHOOKS (6s postback delay). Note: RPS no longer applies to order placement — orders are never rate-limited."
+          }
+        }
+      ]
+    },
+    {
+      "name": "Dashboard and Analytics",
+      "item": [
+        {
+          "name": "Dashboard UI (Full Page)",
+          "request": { "method": "GET", "url": "{{base_url}}/mock/dashboard" }
+        },
+        {
+          "name": "Funds Widget (HTMX Partial)",
+          "request": { "method": "GET", "url": "{{base_url}}/mock/dashboard/funds" }
+        },
+        {
+          "name": "Positions Widget (HTMX Partial)",
+          "request": { "method": "GET", "url": "{{base_url}}/mock/dashboard/positions" }
+        },
+        {
+          "name": "Orders Widget (HTMX Partial)",
+          "request": { "method": "GET", "url": "{{base_url}}/mock/dashboard/orders" }
+        },
+        {
+          "name": "Progress Bar (HTMX Partial)",
+          "request": {
+            "method": "GET",
+            "url": "{{base_url}}/mock/dashboard/progress",
+            "description": "Live replay progress: currentRow, totalRows, pct, date, time. Returns HX-Trigger: replayCompleted header when replay finishes."
+          }
+        },
+        {
+          "name": "Replay Controls (HTMX Partial)",
+          "request": { "method": "GET", "url": "{{base_url}}/mock/dashboard/controls" }
+        },
+        {
+          "name": "Performance Summary",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/mock/dashboard/summary?account={{client_id}}",
+              "query": [{ "key": "account", "value": "{{client_id}}" }]
+            },
+            "description": "Session analytics: totalTrades, winRate, grossProfit, netRealizedPnL, maxDrawdown, ROI, equityCurve[]."
+          }
+        },
+        {
+          "name": "Option Chain Widget (HTMX Partial)",
+          "request": {
+            "method": "GET",
+            "url": {
+              "raw": "{{base_url}}/mock/dashboard/option-chain?index=NIFTY",
+              "query": [{ "key": "index", "value": "NIFTY" }]
+            }
+          }
+        },
+        {
+          "name": "Streamer Ticker Widget",
+          "request": { "method": "GET", "url": "{{base_url}}/mock/dashboard/streamer-widget" }
+        }
+      ]
+    },
+    {
+      "name": "WebSocket",
+      "item": [
+        {
+          "name": "Market Feed + Broker Events",
+          "request": {
+            "method": "GET",
+            "url": "ws://localhost:8088/v2/marketfeed/ws",
+            "description": "Persistent WebSocket. All messages are JSON.\n\nMessage types received:\n\n1. MarketTick (every tick from Parquet replay):\n{\"securityId\":\"49081\",\"tradingSymbol\":\"NIFTY24SEP24500CE\",\"ltp\":120.5,\"open\":110,\"high\":125,\"low\":90,\"volume\":15000,\"oi\":45000}\n\n2. broker_stats (throttled to 250ms, on position MTM change):\n{\"type\":\"broker_stats\",\"dhanClientId\":\"1000000001\",\"availableBalance\":98500,\"utilizedMargin\":1500,\"realizedProfit\":250,\"unrealizedProfit\":-45,\"liveNetPnL\":205,\"openPositionsCount\":1,\"totalOrdersCount\":3,\"tradedOrdersCount\":2,\"pendingOrdersCount\":1}\n\n3. broker_order_event (on every order state change: PENDING, TRADED, REJECTED, CANCELLED):\n{\"type\":\"broker_order_event\",\"dhanClientId\":\"1000000001\",\"orderId\":\"DHN...\",\"status\":\"TRADED\",\"tradingSymbol\":\"NIFTY24SEP24500CE\",\"transactionType\":\"BUY\",\"price\":120.5,\"quantity\":25,\"legName\":\"\"}\n\nAlso available at: ws://localhost:8088/mock/v2/marketfeed/ws"
+          }
+        }
+      ]
+    }
+  ]
+}

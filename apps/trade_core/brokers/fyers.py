@@ -34,6 +34,7 @@ class FyersBrokerAdapter(BaseBrokerAdapter):
         order_type: str = 'MARKET', 
         price: float = 0.0, 
         stop_loss: float = 0.0,
+        take_profit: float = 0.0,
         account_type: str = 'SANDBOX'
     ) -> Dict[str, Any]:
         order_id = f"FYERS-{'SANDBOX' if account_type == 'SANDBOX' else 'LIVE'}-{uuid.uuid4().hex[:8].upper()}"
@@ -49,6 +50,7 @@ class FyersBrokerAdapter(BaseBrokerAdapter):
             'order_type': order_type,
             'price': price,
             'stop_loss': stop_loss,
+            'take_profit': take_profit,
             'status': 'EXECUTED',
             'estimated_brokerage': estimated_brokerage,
             'api_response': {

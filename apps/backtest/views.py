@@ -1916,34 +1916,52 @@ def ensure_default_strategies():
     
     defaults = [
         {
-            "name": "TensorTrade RL (Deep Reinforcement Learning)",
-            "code_name": "tensortrade_rl",
-            "category": "Deep Reinforcement Learning",
+            "name": "Go Quantitative Rule Engine (ORB / SMC / Momentum)",
+            "code_name": "quant_engine",
+            "category": "Quantitative Rules",
             "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
-            "description": "Deep Reinforcement Learning trading agent trained over historical Parquet backup datasets using PPO / A2C policy optimization.",
-            "go_file_path": "apps/backtest/rl_engine.py",
+            "description": "High-performance Go-native strategy engine. Evaluates deterministic 15m ORB, EMA 9/21, ICT SMC displacement, and dynamic lot sizing rules on historical Parquet datasets.",
+            "go_file_path": "go-app/strategies/quant_engine.go",
             "default_parameters": {
                 "lots_count": 1,
                 "strike_selection": "ATM",
                 "risk_reward_ratio": 2.0,
-                "stop_loss_points": 30.0,
-                "algorithm": "PPO",
-                "reward_metric": "sharpe",
-                "total_timesteps": 10000
+                "stop_loss_points": 15.0,
             },
-            "user_manual": """# TensorTrade RL Engine Strategy Manual
+            "user_manual": """# Go Quantitative Rule Engine Strategy Manual
 
 ## 1. Overview
-The **TensorTrade RL Strategy** utilizes Deep Reinforcement Learning (PPO / A2C / DQN) to autonomously train trading agents directly on Marmot's date-partitioned Parquet backup datasets (`/app/backup/{user_id}/{task_id}/dataset.parquet`).
+The **Go Quantitative Strategy Engine** executes deterministic, auditable rule-based trading signals compiled natively in Go for microsecond-level evaluation on live ticks and historical Parquet datasets.
 
 ---
 
-## 2. Training & Signal Generation
-- Ingests `open`, `high`, `low`, `close`, `volume`, `oi`, `iv`, and `spot_price` into TensorTrade feature streams.
-- Trains policy neural networks over 10,000+ timesteps.
-- Evaluates risk-managed trade signals (BUY CE, BUY PE, HOLD) with configurable Stop Loss points.
+## 2. Signal Generation Logic
+- EMA 9 / EMA 21 trend direction filter.
+- 15-Minute Opening Range Breakout (ORB 9:15–9:30 IST) high/low breakout confirmation.
+- ICT Smart Money Concepts (SMC v3): Institutional Displacement body-to-range ratio ≥ 60%.
+- Dynamic ATM strike selection, lot sizing, stop-loss, and 2R profit target.
 """
-        }
+        },
+        {
+            "name": "Opening Range Breakout (ORB 15m) & Momentum",
+            "code_name": "orb_momentum",
+            "category": "Quantitative Rules",
+            "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
+            "description": "Pure 15-minute Opening Range Breakout with momentum EMA filter.",
+            "go_file_path": "go-app/strategies/quant_engine.go",
+            "default_parameters": {"lots_count": 1, "strike_selection": "ATM", "risk_reward_ratio": 2.0, "stop_loss_points": 15.0},
+            "user_manual": "# ORB Momentum Strategy\n\nBreakout above/below the 15-minute opening range with EMA trend confirmation.",
+        },
+        {
+            "name": "ICT Smart Money Concepts (SMC v3)",
+            "code_name": "ict_smc",
+            "category": "Quantitative Rules",
+            "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
+            "description": "ICT SMC v3: Institutional displacement, CHoCH, and liquidity sweep retest setups.",
+            "go_file_path": "go-app/strategies/quant_engine.go",
+            "default_parameters": {"lots_count": 1, "strike_selection": "ATM", "risk_reward_ratio": 2.0, "stop_loss_points": 15.0},
+            "user_manual": "# ICT SMC Strategy\n\nEvaluates institutional displacement candles (body/range ≥ 60%) with EMA 9/21 trend lock.",
+        },
     ]
 
     for item in defaults:
@@ -2517,9 +2535,9 @@ class RLTrainingIndexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['index_form'] = IndexBacktestTaskForm(initial={'strategy_name': 'tensortrade_rl'})
+        context['index_form'] = IndexBacktestTaskForm(initial={'strategy_name': 'quant_engine'})
         qs = BacktestTask.objects.filter(
-            strategy_name='tensortrade_rl',
+            strategy_name__in=['quant_engine', 'orb_momentum', 'ict_smc'],
             market_type='INDEX_FO',
             is_deleted=False
         ).select_related('created_by', 'backup_task').order_by('-created_at')[:10]
@@ -2588,7 +2606,7 @@ class RLTrainingIndexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
 
             backup_task = form.cleaned_data.get('backup_task')
             task = create_and_start_backtest_task(
-                strategy_name='tensortrade_rl',
+                strategy_name=form.cleaned_data.get('strategy_name', 'quant_engine'),
                 index_name=form.cleaned_data.get('index_name', 'NIFTY'),
                 start_date=form.cleaned_data.get('start_date'),
                 end_date=form.cleaned_data.get('end_date'),
@@ -2628,9 +2646,9 @@ class RLTrainingForexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context['forex_form'] = ForexBacktestTaskForm(initial={'strategy_name': 'tensortrade_rl', 'index_name': 'MNQ'})
+        context['forex_form'] = ForexBacktestTaskForm(initial={'strategy_name': 'quant_engine', 'index_name': 'MNQ'})
         qs = BacktestTask.objects.filter(
-            strategy_name='tensortrade_rl',
+            strategy_name__in=['quant_engine', 'orb_momentum', 'ict_smc'],
             market_type='FOREX_FUTURES',
             is_deleted=False
         ).select_related('created_by', 'backup_task').order_by('-created_at')[:10]
@@ -2694,7 +2712,7 @@ class RLTrainingForexView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
 
             backup_task = form.cleaned_data.get('backup_task')
             task = create_and_start_backtest_task(
-                strategy_name='tensortrade_rl',
+                strategy_name=form.cleaned_data.get('strategy_name', 'quant_engine'),
                 index_name=form.cleaned_data.get('index_name', 'MNQ'),
                 start_date=form.cleaned_data.get('start_date'),
                 end_date=form.cleaned_data.get('end_date'),

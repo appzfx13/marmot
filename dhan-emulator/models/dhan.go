@@ -11,6 +11,7 @@ type OrderRequest struct {
 	ProductType       string  `json:"productType"`     // CNC, INTRADAY, MARGIN, MTF, CO, BO
 	OrderType         string  `json:"orderType"`       // LIMIT, MARKET, STOP_LOSS, STOP_LOSS_MARKET
 	Validity          string  `json:"validity"`        // DAY, IOC
+	TradingSymbol     string  `json:"tradingSymbol,omitempty"`
 	SecurityID        string  `json:"securityId"`
 	Quantity          int     `json:"quantity"`
 	DisclosedQuantity int     `json:"disclosedQuantity,omitempty"`
@@ -23,6 +24,7 @@ type OrderRequest struct {
 	DrvExpiryDate     string  `json:"drvExpiryDate,omitempty"`
 	DrvOptionsType    string  `json:"drvOptionsType,omitempty"` // CALL / PUT
 	DrvStrikePrice    float64 `json:"drvStrikePrice,omitempty"`
+	LegName           string  `json:"legName,omitempty"`
 }
 
 // OrderResponse represents Dhan API v2 immediate synchronous response.
@@ -155,6 +157,7 @@ type MarketTick struct {
 	Low           float64   `json:"low"`
 	Close         float64   `json:"close"`
 	Volume        int64     `json:"volume"`
+	OI            int64     `json:"oi"`
 }
 
 // MarketCandleRecord represents a single OHLCV/OI/IV market candle in Apache Parquet format.
@@ -214,5 +217,67 @@ type OptionChainResponse struct {
 	TotalStrikes  int               `json:"total_strikes"`
 	Strikes       []OptionStrikeRow `json:"strikes"`
 	LastUpdated   string            `json:"last_updated"`
+	ExpiryDate    string            `json:"expiry_date"`
+	ExpiryTag     string            `json:"expiry_tag"`
 }
 
+// BrokerStatsPayload represents real-time account telemetry broadcast over WebSocket.
+type BrokerStatsPayload struct {
+	Type                 string  `json:"type"`
+	DhanClientID         string  `json:"dhanClientId"`
+	AvailableBalance     float64 `json:"availableBalance"`
+	AvailableMargin      float64 `json:"available_margin"`
+	UtilizedMargin       float64 `json:"utilizedMargin"`
+	RealizedProfit       float64 `json:"realizedProfit"`
+	RealizedPnL          float64 `json:"realized_pnl"`
+	UnrealizedProfit     float64 `json:"unrealizedProfit"`
+	LiveNetPnL           float64 `json:"liveNetPnL"`
+	NetPnL               float64 `json:"live_net_pnl"`
+	OpenPositionsCount   int     `json:"openPositionsCount"`
+	OpenPositions        int     `json:"open_positions"`
+	ClosedPositionsCount int     `json:"closedPositionsCount"`
+	TotalOrdersCount     int     `json:"totalOrdersCount"`
+	TotalOrders          int     `json:"total_orders"`
+	TradedOrdersCount    int     `json:"tradedOrdersCount"`
+	PendingOrdersCount   int     `json:"pendingOrdersCount"`
+}
+
+// BrokerOrderEvent represents order lifecycle changes pushed over WebSocket.
+type BrokerOrderEvent struct {
+	Type            string  `json:"type"`
+	DhanClientID    string  `json:"dhanClientId"`
+	OrderID         string  `json:"orderId"`
+	Status          string  `json:"status"`
+	TradingSymbol   string  `json:"tradingSymbol"`
+	TransactionType string  `json:"transactionType"`
+	Price           float64 `json:"price"`
+	Quantity        int     `json:"quantity"`
+	Event           string  `json:"event,omitempty"`
+	LegName         string  `json:"legName,omitempty"`
+}
+
+// EquityPoint represents a timestamped PnL point on the cumulative equity curve.
+type EquityPoint struct {
+	Timestamp string  `json:"timestamp"`
+	PnL       float64 `json:"pnl"`
+	Equity    float64 `json:"equity"`
+}
+
+// PerformanceSummary encapsulates session-level trading analytics and equity curve.
+type PerformanceSummary struct {
+	TotalTrades     int            `json:"totalTrades"`
+	WinningTrades   int            `json:"winningTrades"`
+	LosingTrades    int            `json:"losingTrades"`
+	WinRate         float64        `json:"winRate"`
+	GrossProfit     float64        `json:"grossProfit"`
+	GrossLoss       float64        `json:"grossLoss"`
+	NetRealizedPnL  float64        `json:"netRealizedPnL"`
+	ProfitFactor    float64        `json:"profitFactor"`
+	MaxDrawdown     float64        `json:"maxDrawdown"`
+	MaxDrawdownPct  float64        `json:"maxDrawdownPct"`
+	InitialCapital  float64        `json:"initialCapital"`
+	FinalEquity     float64        `json:"finalEquity"`
+	ROI             float64        `json:"roi"`
+	EquityCurve     []EquityPoint  `json:"equityCurve"`
+	ClosedPositions []PositionItem `json:"closedPositions"`
+}

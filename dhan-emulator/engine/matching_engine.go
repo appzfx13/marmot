@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"math"
 	"math/rand"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,59 +18,231 @@ import (
 // ClientAccount tracks isolated virtual balance, orders, and positions per dhanClientId.
 type ClientAccount struct {
 	DhanClientID     string                          `json:"dhanClientId"`
+	AccountName      string                          `json:"accountName"`
+	Broker           string                          `json:"broker"`
 	AvailableBalance float64                         `json:"availableBalance"`
+	InitialBalance   float64                         `json:"initialBalance"`
 	SodLimit         float64                         `json:"sodLimit"`
 	UtilizedMargin   float64                         `json:"utilizedMargin"`
+	CreatedAt        time.Time                       `json:"createdAt"`
 	Orders           map[string]*models.OrderRecord  `json:"orders"`
 	OrderList        []string                        `json:"orderList"` // ordered IDs
 	Positions        map[string]*models.PositionItem `json:"positions"` // key: securityId + "_" + productType
 }
 
+// BroadcastHandler defines the function signature for broadcasting raw WebSocket messages.
+type BroadcastHandler func(msg []byte)
+
 // MatchingEngine manages the central thread-safe multi-client mock broker state.
 type MatchingEngine struct {
-	mu           sync.RWMutex
-	accounts     map[string]*ClientAccount
-	ltpMap       map[string]float64
-	chaos        *ChaosManager
-	postbackURL  string
-	httpClient   *http.Client
-	orderCounter int64
+	mu                 sync.RWMutex
+	accounts           map[string]*ClientAccount
+	accountList        []string
+	activeAccountID    string
+	ltpMap             map[string]float64
+	chaos              *ChaosManager
+	postbackURL        string
+	httpClient         *http.Client
+	orderCounter       int64
+	broadcaster        BroadcastHandler
+	lastStatsBroadcast time.Time
 }
 
-// NewMatchingEngine initializes the MatchingEngine.
+// NewMatchingEngine initializes the MatchingEngine with seeded default accounts.
 func NewMatchingEngine(chaos *ChaosManager, postbackURL string) *MatchingEngine {
 	if postbackURL == "" {
 		postbackURL = "http://web:8000/postback/dhan/postback/"
 	}
-	return &MatchingEngine{
-		accounts:    make(map[string]*ClientAccount),
-		ltpMap:      make(map[string]float64),
-		chaos:       chaos,
-		postbackURL: postbackURL,
-		httpClient:  &http.Client{Timeout: 5 * time.Second},
+	now := time.Now()
+	engine := &MatchingEngine{
+		accounts:        make(map[string]*ClientAccount),
+		accountList:     make([]string, 0),
+		activeAccountID: "1000000001",
+		ltpMap:          make(map[string]float64),
+		chaos:           chaos,
+		postbackURL:     postbackURL,
+		httpClient:      &http.Client{Timeout: 5 * time.Second},
 	}
+
+	// Seed Primary Account (Dhan) - Default ₹1,00,000
+	acc1 := &ClientAccount{
+		DhanClientID:     "1000000001",
+		AccountName:      "Primary Algorithmic Trading",
+		Broker:           "Dhan",
+		AvailableBalance: 100000.0,
+		InitialBalance:   100000.0,
+		SodLimit:         100000.0,
+		UtilizedMargin:   0.0,
+		CreatedAt:        now,
+		Orders:           make(map[string]*models.OrderRecord),
+		OrderList:        make([]string, 0),
+		Positions:        make(map[string]*models.PositionItem),
+	}
+	// Seed Secondary Account (Fyers)
+	acc2 := &ClientAccount{
+		DhanClientID:     "1000000002",
+		AccountName:      "Scalp Strategy Alpha",
+		Broker:           "Fyers",
+		AvailableBalance: 100000.0,
+		InitialBalance:   100000.0,
+		SodLimit:         100000.0,
+		UtilizedMargin:   0.0,
+		CreatedAt:        now,
+		Orders:           make(map[string]*models.OrderRecord),
+		OrderList:        make([]string, 0),
+		Positions:        make(map[string]*models.PositionItem),
+	}
+
+	engine.accounts["1000000001"] = acc1
+	engine.accounts["1000000002"] = acc2
+	engine.accountList = append(engine.accountList, "1000000001", "1000000002")
+
+	return engine
 }
 
 // getOrCreateAccountLocked returns the ClientAccount, initializing with default 5,00,000 if new.
 func (m *MatchingEngine) getOrCreateAccountLocked(clientID string) *ClientAccount {
 	if clientID == "" {
-		clientID = "1000000001"
+		clientID = m.activeAccountID
+		if clientID == "" {
+			clientID = "1000000001"
+		}
 	}
 	acc, exists := m.accounts[clientID]
 	if !exists {
 		acc = &ClientAccount{
 			DhanClientID:     clientID,
+			AccountName:      fmt.Sprintf("Account %s", clientID),
+			Broker:           "Dhan",
 			AvailableBalance: 500000.0,
 			SodLimit:         500000.0,
 			UtilizedMargin:   0.0,
+			CreatedAt:        time.Now(),
 			Orders:           make(map[string]*models.OrderRecord),
 			OrderList:        make([]string, 0),
 			Positions:        make(map[string]*models.PositionItem),
 		}
 		m.accounts[clientID] = acc
+		m.accountList = append(m.accountList, clientID)
 	}
 	return acc
 }
+
+
+// SetBroadcaster attaches an external broadcast callback (e.g. from ParquetStreamer).
+func (m *MatchingEngine) SetBroadcaster(fn BroadcastHandler) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.broadcaster = fn
+}
+
+
+// GetAccountStats computes live aggregated metrics for the specified client.
+func (m *MatchingEngine) GetAccountStats(clientID string) models.BrokerStatsPayload {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	acc, ok := m.accounts[clientID]
+	if !ok {
+		return models.BrokerStatsPayload{
+			Type:             "broker_stats",
+			DhanClientID:     clientID,
+			AvailableBalance: 500000.0,
+		}
+	}
+
+	var realizedTotal, unrealizedTotal float64
+	openCount, closedCount := 0, 0
+	for _, pos := range acc.Positions {
+		realizedTotal += pos.RealizedProfit
+		unrealizedTotal += pos.UnrealizedProfit
+		if pos.NetQty != 0 {
+			openCount++
+		} else {
+			closedCount++
+		}
+	}
+
+	totalOrders := len(acc.OrderList)
+	tradedCount, pendingCount := 0, 0
+	for _, ord := range acc.Orders {
+		if ord.Status == "TRADED" {
+			tradedCount++
+		} else if ord.Status == "PENDING" {
+			pendingCount++
+		}
+	}
+
+	avail := acc.AvailableBalance
+	netPnl := realizedTotal + unrealizedTotal
+	return models.BrokerStatsPayload{
+		Type:                 "broker_stats",
+		DhanClientID:         clientID,
+		AvailableBalance:     avail,
+		AvailableMargin:      avail,
+		UtilizedMargin:       acc.UtilizedMargin,
+		RealizedProfit:       realizedTotal,
+		RealizedPnL:          realizedTotal,
+		UnrealizedProfit:     unrealizedTotal,
+		LiveNetPnL:           netPnl,
+		NetPnL:               netPnl,
+		OpenPositionsCount:   openCount,
+		OpenPositions:        openCount,
+		ClosedPositionsCount: closedCount,
+		TotalOrdersCount:     totalOrders,
+		TotalOrders:          totalOrders,
+		TradedOrdersCount:    tradedCount,
+		PendingOrdersCount:   pendingCount,
+	}
+}
+
+
+// BroadcastAccountStats pushes updated stats over WebSocket.
+func (m *MatchingEngine) BroadcastAccountStats(clientID string) {
+	stats := m.GetAccountStats(clientID)
+	bytes, err := json.Marshal(stats)
+	if err != nil {
+		return
+	}
+
+	m.mu.RLock()
+	fn := m.broadcaster
+	m.mu.RUnlock()
+
+	if fn != nil {
+		fn(bytes)
+	}
+}
+
+
+// BroadcastOrderEvent pushes an order update event over WebSocket.
+func (m *MatchingEngine) BroadcastOrderEvent(clientID string, ord *models.OrderRecord) {
+	evt := models.BrokerOrderEvent{
+		Type:            "broker_order_event",
+		DhanClientID:    clientID,
+		OrderID:         ord.OrderID,
+		Status:          ord.Status,
+		TradingSymbol:   ord.Order.CorrelationID,
+		TransactionType: ord.Order.TransactionType,
+		Price:           ord.FilledPrice,
+		Quantity:        ord.FilledQty,
+		Event:           ord.RejectMsg,
+		LegName:         ord.Order.LegName,
+	}
+	bytes, err := json.Marshal(evt)
+	if err != nil {
+		return
+	}
+
+	m.mu.RLock()
+	fn := m.broadcaster
+	m.mu.RUnlock()
+
+	if fn != nil {
+		fn(bytes)
+	}
+}
+
 
 // IngestTick updates internal LTP for symbols and recalculates MTM for all active accounts.
 func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
@@ -81,9 +255,11 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 	m.ltpMap[tick.SecurityID] = tick.LTP
 
 	// Recalculate Unrealized PnL and MTM across open positions
+	hasOpenPos := false
 	for _, acc := range m.accounts {
 		for _, pos := range acc.Positions {
 			if pos.SecurityID == tick.SecurityID && pos.NetQty != 0 {
+				hasOpenPos = true
 				if pos.NetQty > 0 {
 					pos.UnrealizedProfit = (tick.LTP - pos.BuyAvg) * float64(pos.NetQty)
 				} else {
@@ -91,6 +267,11 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 				}
 			}
 		}
+	}
+
+	if hasOpenPos && time.Since(m.lastStatsBroadcast) > 250*time.Millisecond {
+		m.lastStatsBroadcast = time.Now()
+		go m.BroadcastAccountStats(m.activeAccountID)
 	}
 
 	// Autonomous SL/TP Check on pending orders
@@ -106,7 +287,32 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 					}
 				}
 				if isTriggered {
+					// Pre-mark as TRADED inside the lock to prevent double-trigger on subsequent ticks
+					ord.Status = "TRADED"
 					go m.executeOrderAsync(acc.DhanClientID, ord.OrderID, tick.LTP)
+				}
+			}
+		}
+	}
+
+	// Autonomous SL/TP Check on open positions
+	for _, acc := range m.accounts {
+		for _, pos := range acc.Positions {
+			if pos.SecurityID == tick.SecurityID && pos.NetQty != 0 && pos.PositionType != "CLOSED" {
+				if pos.NetQty > 0 {
+					// LONG position
+					if pos.StopLoss > 0 && tick.LTP <= pos.StopLoss {
+						m.squareOffPositionAutoLocked(acc, pos, "SL_HIT", tick.LTP)
+					} else if pos.TakeProfit > 0 && tick.LTP >= pos.TakeProfit {
+						m.squareOffPositionAutoLocked(acc, pos, "TP_HIT", tick.LTP)
+					}
+				} else if pos.NetQty < 0 {
+					// SHORT position
+					if pos.StopLoss > 0 && tick.LTP >= pos.StopLoss {
+						m.squareOffPositionAutoLocked(acc, pos, "SL_HIT", tick.LTP)
+					} else if pos.TakeProfit > 0 && tick.LTP <= pos.TakeProfit {
+						m.squareOffPositionAutoLocked(acc, pos, "TP_HIT", tick.LTP)
+					}
 				}
 			}
 		}
@@ -136,6 +342,9 @@ func (m *MatchingEngine) PlaceOrder(req models.OrderRequest) (*models.OrderRespo
 	acc.Orders[orderID] = rec
 	acc.OrderList = append([]string{orderID}, acc.OrderList...)
 	m.mu.Unlock()
+
+	m.BroadcastAccountStats(req.DhanClientID)
+	m.BroadcastOrderEvent(req.DhanClientID, rec)
 
 	// Launch async execution simulating 35ms - 50ms realistic broker latency
 	go m.processAsyncLifecycle(req.DhanClientID, orderID)
@@ -174,6 +383,8 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 		webhook := m.buildPostbackWebhookLocked(ord)
 		m.mu.Unlock()
 		m.dispatchWebhook(webhook)
+		m.BroadcastAccountStats(clientID)
+		m.BroadcastOrderEvent(clientID, ord)
 		return
 	}
 
@@ -196,6 +407,8 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 		webhook := m.buildPostbackWebhookLocked(ord)
 		m.mu.Unlock()
 		m.dispatchWebhook(webhook)
+		m.BroadcastAccountStats(clientID)
+		m.BroadcastOrderEvent(clientID, ord)
 		return
 	}
 
@@ -218,11 +431,15 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 	ord.TakeProfit = ord.Order.BoProfitValue
 
 	posKey := ord.Order.SecurityID + "_" + ord.Order.ProductType
+	sym := ord.Order.TradingSymbol
+	if sym == "" {
+		sym = ord.Order.SecurityID
+	}
 	pos, exists := acc.Positions[posKey]
 	if !exists {
 		pos = &models.PositionItem{
 			DhanClientID:    clientID,
-			TradingSymbol:   ord.Order.CorrelationID,
+			TradingSymbol:   sym,
 			SecurityID:      ord.Order.SecurityID,
 			PositionType:    "CLOSED",
 			ExchangeSegment: ord.Order.ExchangeSegment,
@@ -233,6 +450,13 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 			TakeProfit:      ord.TakeProfit,
 		}
 		acc.Positions[posKey] = pos
+	} else {
+		if ord.StopLoss > 0 {
+			pos.StopLoss = ord.StopLoss
+		}
+		if ord.TakeProfit > 0 {
+			pos.TakeProfit = ord.TakeProfit
+		}
 	}
 
 	if ord.Order.TransactionType == "BUY" {
@@ -275,6 +499,8 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 	m.mu.Unlock()
 
 	m.dispatchWebhook(webhook)
+	m.BroadcastAccountStats(clientID)
+	m.BroadcastOrderEvent(clientID, ord)
 }
 
 // executeOrderAsync triggers fill on pending Stop-Loss or Limit orders when tick crosses trigger.
@@ -286,7 +512,8 @@ func (m *MatchingEngine) executeOrderAsync(clientID, orderID string, fillPrice f
 		return
 	}
 	ord, ok := acc.Orders[orderID]
-	if !ok || ord.Status != "PENDING" {
+	if !ok || ord.FilledQty > 0 {
+		// Already processed (pre-marked by IngestTick or already filled)
 		m.mu.Unlock()
 		return
 	}
@@ -329,6 +556,116 @@ func (m *MatchingEngine) executeOrderAsync(clientID, orderID string, fillPrice f
 	m.mu.Unlock()
 
 	m.dispatchWebhook(webhook)
+	m.BroadcastAccountStats(clientID)
+	m.BroadcastOrderEvent(clientID, ord)
+}
+
+// squareOffPositionAutoLocked closes an open position triggered by Stop-Loss or Take-Profit.
+func (m *MatchingEngine) squareOffPositionAutoLocked(acc *ClientAccount, pos *models.PositionItem, triggerReason string, fillPrice float64) {
+	if pos.NetQty == 0 || pos.PositionType == "CLOSED" {
+		return
+	}
+
+	m.orderCounter++
+	now := time.Now()
+	nowStr := now.Format("2006-01-02 15:04:05")
+	orderID := fmt.Sprintf("DHN%d%04d", now.Unix(), rand.Intn(10000))
+	exchangeID := fmt.Sprintf("NSE%d%04d", now.Unix(), rand.Intn(10000))
+
+	var exitSide string
+	qty := pos.NetQty
+	if qty > 0 {
+		// Long position -> Exit via SELL
+		exitSide = "SELL"
+		pnl := (fillPrice - pos.BuyAvg) * float64(qty)
+		pos.RealizedProfit += pnl
+		pos.SellQty += qty
+		pos.SellAvg = fillPrice
+		releasedMargin := pos.BuyAvg * float64(qty)
+		acc.AvailableBalance += releasedMargin + pnl
+		if acc.UtilizedMargin >= releasedMargin {
+			acc.UtilizedMargin -= releasedMargin
+		}
+	} else {
+		// Short position -> Exit via BUY
+		exitSide = "BUY"
+		qty = -qty
+		pnl := (pos.SellAvg - fillPrice) * float64(qty)
+		pos.RealizedProfit += pnl
+		pos.BuyQty += qty
+		pos.BuyAvg = fillPrice
+		releasedMargin := pos.SellAvg * float64(qty)
+		acc.AvailableBalance += releasedMargin + pnl
+		if acc.UtilizedMargin >= releasedMargin {
+			acc.UtilizedMargin -= releasedMargin
+		}
+	}
+
+	pos.NetQty = 0
+	pos.UnrealizedProfit = 0.0
+	pos.PositionType = "CLOSED"
+	pos.ExitTime = now.Format("15:04:05")
+
+	exitOrderReq := models.OrderRequest{
+		DhanClientID:    acc.DhanClientID,
+		CorrelationID:   pos.TradingSymbol,
+		TransactionType: exitSide,
+		ExchangeSegment: pos.ExchangeSegment,
+		ProductType:     pos.ProductType,
+		OrderType:       "MARKET",
+		Validity:        "DAY",
+		SecurityID:      pos.SecurityID,
+		Quantity:        qty,
+		Price:           fillPrice,
+		TriggerPrice:    fillPrice,
+		LegName:         triggerReason,
+	}
+
+	exitRec := &models.OrderRecord{
+		Order:       exitOrderReq,
+		OrderID:     orderID,
+		ExchangeID:  exchangeID,
+		Status:      "TRADED",
+		FilledQty:   qty,
+		FilledPrice: fillPrice,
+		RejectMsg:   fmt.Sprintf("%s at %.2f", triggerReason, fillPrice),
+		CreatedAt:   now,
+		UpdatedAt:   now,
+		EntryTime:   now,
+		ExitTime:    now,
+	}
+
+	acc.Orders[orderID] = exitRec
+	acc.OrderList = append([]string{orderID}, acc.OrderList...)
+
+	webhook := models.DhanPostbackWebhook{
+		DhanClientID:      acc.DhanClientID,
+		OrderID:           orderID,
+		ExchangeOrderID:   exchangeID,
+		CorrelationID:     pos.TradingSymbol,
+		OrderStatus:       "TRADED",
+		TransactionType:   exitSide,
+		ExchangeSegment:   pos.ExchangeSegment,
+		ProductType:       pos.ProductType,
+		OrderType:         "MARKET",
+		Validity:          "DAY",
+		TradingSymbol:     pos.TradingSymbol,
+		SecurityID:        pos.SecurityID,
+		Quantity:          qty,
+		Price:             fillPrice,
+		TriggerPrice:      fillPrice,
+		LegName:           triggerReason,
+		CreateTime:        nowStr,
+		UpdateTime:        nowStr,
+		ExchangeTime:      nowStr,
+		TradedPrice:       fillPrice,
+		TradedQuantity:    qty,
+		RejectionReason:   fmt.Sprintf("%s: Traded at %.2f", triggerReason, fillPrice),
+	}
+
+	go m.dispatchWebhook(webhook)
+	go m.BroadcastAccountStats(acc.DhanClientID)
+	go m.BroadcastOrderEvent(acc.DhanClientID, exitRec)
 }
 
 // buildPostbackWebhookLocked creates the official DhanPostbackWebhook struct.
@@ -351,6 +688,7 @@ func (m *MatchingEngine) buildPostbackWebhookLocked(ord *models.OrderRecord) mod
 		DisclosedQuantity: ord.Order.DisclosedQuantity,
 		Price:             ord.Order.Price,
 		TriggerPrice:      ord.Order.TriggerPrice,
+		LegName:           ord.Order.LegName,
 		CreateTime:        ord.CreatedAt.Format("2006-01-02 15:04:05"),
 		UpdateTime:        nowStr,
 		ExchangeTime:      nowStr,
@@ -457,15 +795,28 @@ func (m *MatchingEngine) GetFundLimit(clientID string) models.FundLimitResponse 
 
 	acc, ok := m.accounts[clientID]
 	if !ok {
+		// Fallback to active account if available, rather than hardcoding 500000
+		if activeAcc, haveActive := m.accounts[m.activeAccountID]; haveActive {
+			return models.FundLimitResponse{
+				DhanClientID:        activeAcc.DhanClientID,
+				AvailabelBalance:    activeAcc.AvailableBalance,
+				SodLimit:            activeAcc.SodLimit,
+				CollateralAmount:    0.0,
+				ReceiveableAmount:   0.0,
+				UtilizedAmount:      activeAcc.UtilizedMargin,
+				BlockedPayoutAmount: 0.0,
+				WithdrawableBalance: activeAcc.AvailableBalance,
+			}
+		}
 		return models.FundLimitResponse{
 			DhanClientID:        clientID,
-			AvailabelBalance:    500000.0,
-			SodLimit:            500000.0,
+			AvailabelBalance:    100000.0,
+			SodLimit:            100000.0,
 			CollateralAmount:    0.0,
 			ReceiveableAmount:   0.0,
 			UtilizedAmount:      0.0,
 			BlockedPayoutAmount: 0.0,
-			WithdrawableBalance: 500000.0,
+			WithdrawableBalance: 100000.0,
 		}
 	}
 
@@ -496,6 +847,21 @@ func (m *MatchingEngine) GetPositions(clientID string) []models.PositionItem {
 		res = append(res, *pos)
 	}
 	return res
+}
+
+
+// GetAllPositions returns all positions across all accounts for dashboard view.
+func (m *MatchingEngine) GetAllPositions() []models.PositionItem {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	var all []models.PositionItem
+	for _, acc := range m.accounts {
+		for _, pos := range acc.Positions {
+			all = append(all, *pos)
+		}
+	}
+	return all
 }
 
 // GetHoldings returns portfolio holdings.
@@ -546,6 +912,7 @@ func (m *MatchingEngine) DepositWithdraw(clientID string, amount float64) float6
 	acc := m.getOrCreateAccountLocked(clientID)
 	acc.AvailableBalance += amount
 	acc.SodLimit += amount
+	go m.BroadcastAccountStats(clientID)
 	return acc.AvailableBalance
 }
 
@@ -566,5 +933,255 @@ func (m *MatchingEngine) KillSwitch() int {
 			}
 		}
 	}
+	go m.BroadcastAccountStats(m.activeAccountID)
 	return cancelled
+}
+
+
+// ClearAccountSession resets orders, positions, and balances back to default.
+func (m *MatchingEngine) ClearAccountSession(clientID string) {
+	m.mu.Lock()
+	acc, ok := m.accounts[clientID]
+	if ok {
+		acc.Orders = make(map[string]*models.OrderRecord)
+		acc.OrderList = make([]string, 0)
+		acc.Positions = make(map[string]*models.PositionItem)
+		if acc.InitialBalance <= 0 {
+			acc.InitialBalance = 100000.0
+		}
+		acc.AvailableBalance = acc.InitialBalance
+		acc.SodLimit = acc.InitialBalance
+		acc.UtilizedMargin = 0.0
+	}
+	m.mu.Unlock()
+
+	go m.BroadcastAccountStats(clientID)
+}
+
+// GetActiveAccountID returns the currently selected active account ID.
+func (m *MatchingEngine) GetActiveAccountID() string {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	if m.activeAccountID == "" {
+		return "1000000001"
+	}
+	return m.activeAccountID
+}
+
+// SetActiveAccountID sets the active account ID if it exists.
+func (m *MatchingEngine) SetActiveAccountID(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if _, ok := m.accounts[id]; !ok {
+		return fmt.Errorf("account %s not found", id)
+	}
+	m.activeAccountID = id
+	return nil
+}
+
+// GetAccount returns the specified ClientAccount.
+func (m *MatchingEngine) GetAccount(id string) (*ClientAccount, bool) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	acc, ok := m.accounts[id]
+	return acc, ok
+}
+
+// GetAllAccounts returns all accounts in deterministic order.
+func (m *MatchingEngine) GetAllAccounts() []*ClientAccount {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	list := make([]*ClientAccount, 0, len(m.accountList))
+	for _, id := range m.accountList {
+		if acc, ok := m.accounts[id]; ok {
+			list = append(list, acc)
+		}
+	}
+	return list
+}
+
+// CreateAccount adds a new mock account to the engine.
+func (m *MatchingEngine) CreateAccount(id, name, broker string, initialBalance float64) (*ClientAccount, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	id = strings.TrimSpace(id)
+	if id == "" {
+		id = fmt.Sprintf("100000%04d", len(m.accounts)+1)
+	}
+	if _, exists := m.accounts[id]; exists {
+		return nil, fmt.Errorf("account ID %s already exists", id)
+	}
+	if name == "" {
+		name = fmt.Sprintf("Trading Account %s", id)
+	}
+	if broker == "" {
+		broker = "Dhan"
+	}
+	if initialBalance <= 0 {
+		initialBalance = 500000.0
+	}
+	acc := &ClientAccount{
+		DhanClientID:     id,
+		AccountName:      name,
+		Broker:           broker,
+		AvailableBalance: initialBalance,
+		SodLimit:         initialBalance,
+		UtilizedMargin:   0.0,
+		CreatedAt:        time.Now(),
+		Orders:           make(map[string]*models.OrderRecord),
+		OrderList:        make([]string, 0),
+		Positions:        make(map[string]*models.PositionItem),
+	}
+	m.accounts[id] = acc
+	m.accountList = append(m.accountList, id)
+	m.activeAccountID = id
+	return acc, nil
+}
+
+// UpdateAccount updates account metadata and balance adjustment.
+func (m *MatchingEngine) UpdateAccount(id, name, broker string, adjustAmount float64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	acc, exists := m.accounts[id]
+	if !exists {
+		return fmt.Errorf("account %s not found", id)
+	}
+	if name != "" {
+		acc.AccountName = name
+	}
+	if broker != "" {
+		acc.Broker = broker
+	}
+	if adjustAmount != 0 {
+		acc.AvailableBalance += adjustAmount
+		acc.SodLimit += adjustAmount
+		acc.InitialBalance = acc.AvailableBalance
+	}
+	return nil
+}
+
+// DeleteAccount removes an account with safety checks.
+func (m *MatchingEngine) DeleteAccount(id string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	if len(m.accounts) <= 1 {
+		return fmt.Errorf("cannot delete the only remaining account")
+	}
+	acc, exists := m.accounts[id]
+	if !exists {
+		return fmt.Errorf("account %s not found", id)
+	}
+	for _, p := range acc.Positions {
+		if p.NetQty != 0 {
+			return fmt.Errorf("cannot delete account %s with active open positions (Square off first)", id)
+		}
+	}
+	delete(m.accounts, id)
+	newList := make([]string, 0, len(m.accountList)-1)
+	for _, item := range m.accountList {
+		if item != id {
+			newList = append(newList, item)
+		}
+	}
+	m.accountList = newList
+
+	if m.activeAccountID == id {
+		if len(m.accountList) > 0 {
+			m.activeAccountID = m.accountList[0]
+		}
+	}
+	return nil
+}
+
+// GetPerformanceSummary computes session-level performance analytics and cumulative equity curve.
+func (m *MatchingEngine) GetPerformanceSummary(clientID string) models.PerformanceSummary {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	summary := models.PerformanceSummary{
+		InitialCapital: 500000.0,
+		EquityCurve:    []models.EquityPoint{},
+	}
+
+	acc, ok := m.accounts[clientID]
+	if !ok {
+		return summary
+	}
+
+	summary.InitialCapital = acc.SodLimit
+	if summary.InitialCapital <= 0 {
+		summary.InitialCapital = 500000.0
+	}
+
+	var cumPnL float64
+	peakEquity := summary.InitialCapital
+	maxDD := 0.0
+
+	summary.EquityCurve = append(summary.EquityCurve, models.EquityPoint{
+		Timestamp: "09:15:00",
+		PnL:       0.0,
+		Equity:    summary.InitialCapital,
+	})
+
+	for _, pos := range acc.Positions {
+		if pos.NetQty == 0 || pos.PositionType == "CLOSED" {
+			summary.TotalTrades++
+			pnl := pos.RealizedProfit
+			if pnl > 0 {
+				summary.WinningTrades++
+				summary.GrossProfit += pnl
+			} else if pnl < 0 {
+				summary.LosingTrades++
+				summary.GrossLoss += math.Abs(pnl)
+			}
+
+			cumPnL += pnl
+			currentEquity := summary.InitialCapital + cumPnL
+			if currentEquity > peakEquity {
+				peakEquity = currentEquity
+			}
+			dd := peakEquity - currentEquity
+			if dd > maxDD {
+				maxDD = dd
+			}
+
+			tStr := pos.ExitTime
+			if tStr == "" {
+				tStr = pos.EntryTime
+			}
+			if tStr == "" {
+				tStr = time.Now().Format("15:04:05")
+			}
+
+			summary.EquityCurve = append(summary.EquityCurve, models.EquityPoint{
+				Timestamp: tStr,
+				PnL:       math.Round(cumPnL*100) / 100,
+				Equity:    math.Round(currentEquity*100) / 100,
+			})
+			summary.ClosedPositions = append(summary.ClosedPositions, *pos)
+		}
+	}
+
+	summary.NetRealizedPnL = math.Round(cumPnL*100) / 100
+	summary.FinalEquity = math.Round((summary.InitialCapital+cumPnL)*100) / 100
+
+	if summary.TotalTrades > 0 {
+		summary.WinRate = math.Round(float64(summary.WinningTrades)/float64(summary.TotalTrades)*1000) / 10
+	}
+
+	if summary.GrossLoss > 0 {
+		summary.ProfitFactor = math.Round((summary.GrossProfit/summary.GrossLoss)*100) / 100
+	} else if summary.GrossProfit > 0 {
+		summary.ProfitFactor = 99.99
+	}
+
+	summary.MaxDrawdown = math.Round(maxDD*100) / 100
+	if peakEquity > 0 {
+		summary.MaxDrawdownPct = math.Round((maxDD/peakEquity)*1000) / 10
+	}
+	if summary.InitialCapital > 0 {
+		summary.ROI = math.Round((cumPnL/summary.InitialCapital)*1000) / 10
+	}
+
+	return summary
 }

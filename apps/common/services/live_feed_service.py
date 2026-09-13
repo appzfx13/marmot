@@ -1,7 +1,10 @@
 import datetime
+import logging
 import math
 from zoneinfo import ZoneInfo
 from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 
 def get_ist_market_clock():
@@ -259,8 +262,35 @@ def get_today_intraday_equity_curve(target, base_capital=100000.0, trades=None):
     }
 
 
+def format_indian_number(val) -> str:
+    """Format an integer or string into Indian numbering system comma notation (e.g. 1,52,22,285)."""
+    if val is None or val == '' or val == '—' or val == '-':
+        return '—'
+    try:
+        clean_val = str(val).split('.')[0].replace(',', '').strip()
+        num = int(clean_val)
+        if num == 0:
+            return '0'
+        sign = '-' if num < 0 else ''
+        s = str(abs(num))
+        if len(s) <= 3:
+            return f"{sign}{s}"
+        last3 = s[-3:]
+        rest = s[:-3]
+        groups = []
+        while len(rest) > 2:
+            groups.insert(0, rest[-2:])
+            rest = rest[:-2]
+        if rest:
+            groups.insert(0, rest)
+        return f"{sign}{','.join(groups)},{last3}"
+    except (ValueError, TypeError):
+        return str(val)
+
+
 def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: str, today) -> dict:
     """Fetch real-time option chain directly from Dhan Mock Broker Gateway emulator."""
+    import time
     import requests
     from apps.common.constants import get_option_expiry_analysis
 
@@ -270,39 +300,149 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
     ]
     for url in mock_urls:
         try:
-            resp = requests.get(url, timeout=2.0)
+            t0 = time.perf_counter()
+            resp = requests.get(url, timeout=1.5)
+            latency_ms = round((time.perf_counter() - t0) * 1000.0, 1)
             if resp.status_code == 200:
                 data = resp.json()
-                data['expiry_info'] = get_option_expiry_analysis(idx_clean, today)
+                trade_date = today
+                ts_str = data.get('last_updated', '')
+                if ts_str and len(ts_str) >= 10:
+                    try:
+                        trade_date = ts_str[:10]
+                    except Exception:
+                        trade_date = today
+                exp_info = get_option_expiry_analysis(idx_clean, trade_date)
+                data['expiry_info'] = exp_info
+                data['expiry_date'] = exp_info.get('formatted_expiry') or exp_info.get('expiry_date', '')
                 data['is_mock_mode'] = True
                 data['is_fyers_live'] = False
+                data['emulator_connected'] = True
+                data['latency_ms'] = latency_ms
+                data['emulator_url'] = url
+
+                # Evaluate active streaming state from emulator
+                f_status = data.get('feed_status', 'STANDBY').upper()
+                is_active = bool(f_status in ('ACTIVE', 'STREAMING') or data.get('is_live'))
+                data['is_mock_feed_active'] = is_active
+                # Format all prices and OI consistently with Indian comma notation
+                spot_num = float(data.get('raw_spot_ltp') or 0.0)
+                if spot_num > 0:
+                    data['spot_ltp'] = f"{spot_num:,.2f}"
+
+                for fld in ('open_price', 'high_price', 'low_price', 'prev_close'):
+                    v = data.get(fld)
+                    if v is not None:
+                        try:
+                            num_v = float(str(v).replace(',', '').strip())
+                            data[fld] = f"{num_v:,.2f}"
+                        except (ValueError, TypeError):
+                            pass
+
+                for row in data.get('strikes', []):
+                    if row.get('ce_oi') is not None:
+                        row['ce_oi'] = format_indian_number(row['ce_oi'])
+                    if row.get('pe_oi') is not None:
+                        row['pe_oi'] = format_indian_number(row['pe_oi'])
+
+                # Synchronize to Redis for Go strategy workers
+                try:
+                    import json
+                    import redis
+                    from django.conf import settings
+                    from django.core.cache import cache
+                    r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+                    mock_ex = 2 if is_active else 10
+                    r.set(f"marmot:fyers:option_chain:{idx_clean}", json.dumps(data), ex=mock_ex)
+                    r.set(f"marmot:fyers:last_known_option_chain:{idx_clean}", json.dumps(data), ex=30)
+                    cache.set(f"marmot:fyers:option_chain:{idx_clean}", data, timeout=mock_ex)
+
+                    if is_active:
+                        r.set("marmot:mock_feed:active", "true", ex=mock_ex)
+                    else:
+                        r.delete("marmot:mock_feed:active")
+
+                    spot_num = float(data.get('raw_spot_ltp') or 0.0)
+                    if spot_num > 0:
+                        quote_payload = {
+                            'raw_spot_ltp': spot_num,
+                            'lp': spot_num,
+                            'spot_ltp': f"{spot_num:.2f}",
+                            'open_price': float(data.get('open_price') or spot_num),
+                            'high_price': float(data.get('high_price') or spot_num),
+                            'low_price': float(data.get('low_price') or spot_num),
+                            'prev_close': float(data.get('prev_close') or spot_num),
+                        }
+                        quote_json = json.dumps(quote_payload)
+                        r.set(f"marmot:fyers_quote:NSE:{idx_clean}50-INDEX", quote_json, ex=mock_ex)
+                        r.set(f"marmot:fyers_quote:NSE:{idx_clean}-INDEX", quote_json, ex=mock_ex)
+
+                    exp_tag = ''
+                    if data.get('expiry_info') and data['expiry_info'].get('expiry_date'):
+                        try:
+                            import datetime as dt_mod
+                            exp_d = dt_mod.datetime.strptime(str(data['expiry_info']['expiry_date']), '%d-%m-%Y')
+                            exp_tag = exp_d.strftime('%d%b').upper()
+                        except Exception:
+                            pass
+
+                    for row in data.get('strikes', []):
+                        stk = row.get('strike')
+                        if stk:
+                            if row.get('ce_ltp') and float(row['ce_ltp']) > 0:
+                                val = str(row['ce_ltp'])
+                                r.set(f"marmot:opt_ltp:{idx_clean}:{stk}:CE", val, ex=120)
+                                r.set(f"marmot:opt_ltp:{idx_clean}:{stk}:CALL", val, ex=120)
+                                r.set(f"marmot:opt_ltp:{idx_clean}:SPOT:{stk}:CE", val, ex=120)
+                                r.set(f"marmot:opt_ltp:{idx_clean}:SPOT:{stk}:CALL", val, ex=120)
+                                cache.set(f"marmot:opt_ltp:{idx_clean}:{stk}:CE", float(val), timeout=120)
+                                cache.set(f"marmot:opt_ltp:{idx_clean}:{stk}:CALL", float(val), timeout=120)
+                                if exp_tag:
+                                    r.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{stk}:CE", val, ex=120)
+                                    r.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{stk}:CALL", val, ex=120)
+                            if row.get('pe_ltp') and float(row['pe_ltp']) > 0:
+                                val = str(row['pe_ltp'])
+                                r.set(f"marmot:opt_ltp:{idx_clean}:{stk}:PE", val, ex=120)
+                                r.set(f"marmot:opt_ltp:{idx_clean}:{stk}:PUT", val, ex=120)
+                                r.set(f"marmot:opt_ltp:{idx_clean}:SPOT:{stk}:PE", val, ex=120)
+                                r.set(f"marmot:opt_ltp:{idx_clean}:SPOT:{stk}:PUT", val, ex=120)
+                                cache.set(f"marmot:opt_ltp:{idx_clean}:{stk}:PE", float(val), timeout=120)
+                                cache.set(f"marmot:opt_ltp:{idx_clean}:{stk}:PUT", float(val), timeout=120)
+                                if exp_tag:
+                                    r.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{stk}:PE", val, ex=120)
+                                    r.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{stk}:PUT", val, ex=120)
+                except Exception as re_err:
+                    logger.debug("Redis mock sync exception: %s", re_err)
+
                 return data
         except Exception:
             continue
 
     return {
-        'is_live': True,
-        'is_mock_live': True,
-        'feed_status': 'STREAMING',
+        'is_live': False,
+        'is_mock_live': False,
+        'feed_status': 'DISCONNECTED',
+        'emulator_connected': False,
+        'latency_ms': None,
         'index_name': idx_clean,
         'spot_symbol': spot_symbol,
         'fyers_symbol': f"DHAN_MOCK:{idx_clean}",
-        'spot_ltp': '24,542.80',
-        'raw_spot_ltp': 24542.80,
-        'spot_change': '+118.20',
-        'spot_change_pct': '+0.48%',
+        'spot_ltp': '0.00',
+        'raw_spot_ltp': 0.0,
+        'spot_change': '0.00',
+        'spot_change_pct': '0.00%',
         'is_positive': True,
-        'open_price': '24,450.00',
-        'high_price': '24,590.00',
-        'low_price': '24,420.00',
-        'prev_close': '24,424.60',
-        'atm_strike': '24550',
+        'open_price': '0.00',
+        'high_price': '0.00',
+        'low_price': '0.00',
+        'prev_close': '0.00',
+        'atm_strike': '-',
         'strike_step': strike_step,
-        'pcr': 1.12,
-        'india_vix': 13.28,
+        'pcr': 0.0,
+        'india_vix': 0.0,
         'expiry_info': get_option_expiry_analysis(idx_clean, today),
         'strikes': [],
-        'error_message': 'Dhan Mock Gateway is ready.',
+        'error_message': 'Dhan Broker Gateway Emulator (:8088) is offline or unreachable. Verify the mock_broker container.',
         'last_updated': timezone.localtime().strftime('%I:%M:%S %p IST'),
     }
 
@@ -453,12 +593,12 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
                         strikes_map[sp]['ce_ltp'] = ltp_val
                         strikes_map[sp]['ce_chg'] = chg_val
                         strikes_map[sp]['ce_chg_pct'] = chgp_val
-                        strikes_map[sp]['ce_oi'] = f"{oi_val:,}"
+                        strikes_map[sp]['ce_oi'] = format_indian_number(oi_val)
                     elif opt_type == 'PE':
                         strikes_map[sp]['pe_ltp'] = ltp_val
                         strikes_map[sp]['pe_chg'] = chg_val
                         strikes_map[sp]['pe_chg_pct'] = chgp_val
-                        strikes_map[sp]['pe_oi'] = f"{oi_val:,}"
+                        strikes_map[sp]['pe_oi'] = format_indian_number(oi_val)
 
                 # Cache individual real-time option contract prices with strict expiry partitioning
                 from apps.market.services import redis_client

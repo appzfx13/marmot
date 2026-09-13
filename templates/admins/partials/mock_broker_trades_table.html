@@ -1,0 +1,166 @@
+<!-- Closed Trades Table Partial -->
+<div class="glass-card p-3 border rounded-3 position-relative overflow-hidden"
+     style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+
+    <!-- Table Header & Filters -->
+    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+        <div class="d-flex align-items-center gap-2">
+            <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2" style="font-size: 1.05rem;">
+                <span class="material-icons text-primary" style="font-size: 1.25rem;">receipt_long</span>
+                Closed Trades & Execution Pairs
+            </h5>
+            <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.75rem;">
+                {{ total_trades_count }} Total Closed
+            </span>
+            {% if filter_date %}
+            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace" style="font-size: 0.75rem;">
+                <span>Date: {{ filter_date }}</span>
+                <a href="#" hx-get="{% url 'admins:admin-mock-broker-trades' %}" hx-target="#mock-broker-trades-container" hx-swap="innerHTML" class="text-warning text-decoration-none">
+                    <span class="material-icons align-middle" style="font-size: 0.9rem;">close</span>
+                </a>
+            </span>
+            {% endif %}
+        </div>
+
+        <!-- Filter Buttons -->
+        <div class="d-flex align-items-center gap-2">
+            <div class="btn-group btn-group-sm" role="group">
+                <button type="button" class="btn {% if not filter_status %}btn-primary active{% else %}btn-outline-secondary{% endif %}"
+                        hx-get="{% url 'admins:admin-mock-broker-trades' %}{% if filter_date %}?date={{ filter_date }}{% endif %}"
+                        hx-target="#mock-broker-trades-container"
+                        hx-swap="innerHTML">
+                    All
+                </button>
+                <button type="button" class="btn {% if filter_status == 'WIN' %}btn-success active{% else %}btn-outline-secondary{% endif %}"
+                        hx-get="{% url 'admins:admin-mock-broker-trades' %}?status=WIN{% if filter_date %}&date={{ filter_date }}{% endif %}"
+                        hx-target="#mock-broker-trades-container"
+                        hx-swap="innerHTML">
+                    Winners
+                </button>
+                <button type="button" class="btn {% if filter_status == 'LOSS' %}btn-danger active{% else %}btn-outline-secondary{% endif %}"
+                        hx-get="{% url 'admins:admin-mock-broker-trades' %}?status=LOSS{% if filter_date %}&date={{ filter_date }}{% endif %}"
+                        hx-target="#mock-broker-trades-container"
+                        hx-swap="innerHTML">
+                    Losers
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Table Container -->
+    <div class="table-responsive">
+        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
+            <thead class="theme-text-muted small text-uppercase" style="border-bottom: 1px solid var(--border-color); font-size: 0.72rem;">
+                <tr>
+                    <th scope="col" class="ps-2">#</th>
+                    <th scope="col">Trading Symbol</th>
+                    <th scope="col">Entry Time</th>
+                    <th scope="col">Exit Time</th>
+                    <th scope="col" class="text-end">Entry (₹)</th>
+                    <th scope="col" class="text-end">Exit (₹)</th>
+                    <th scope="col" class="text-center">Qty</th>
+                    <th scope="col" class="text-end">Gross (₹)</th>
+                    <th scope="col" class="text-end">Charges</th>
+                    <th scope="col" class="text-end">Net PnL</th>
+                    <th scope="col" class="text-center">Exit Reason</th>
+                    <th scope="col" class="text-center pe-2">Duration</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for trade in trades %}
+                <tr style="border-bottom: 1px solid var(--border-color); background: transparent;">
+                    <td class="ps-2 font-monospace text-muted">{{ forloop.counter }}</td>
+                    <td class="fw-bold theme-text-main">
+                        <span class="font-monospace">{{ trade.symbol }}</span>
+                    </td>
+                    <td class="font-monospace text-muted" style="font-size: 0.8rem;">
+                        {{ trade.entry_time|date:"d M H:i:s"|default:"—" }}
+                    </td>
+                    <td class="font-monospace text-muted" style="font-size: 0.8rem;">
+                        {{ trade.exit_time|date:"d M H:i:s"|default:"—" }}
+                    </td>
+                    <td class="text-end font-monospace theme-text-main">
+                        ₹{{ trade.entry_price|floatformat:2 }}
+                    </td>
+                    <td class="text-end font-monospace theme-text-main">
+                        ₹{{ trade.exit_price|floatformat:2 }}
+                    </td>
+                    <td class="text-center font-monospace">
+                        <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2">
+                            {{ trade.qty }}
+                        </span>
+                    </td>
+                    <td class="text-end font-monospace {% if trade.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">
+                        {% if trade.gross_pnl >= 0 %}+{% endif %}₹{{ trade.gross_pnl|floatformat:2 }}
+                    </td>
+                    <td class="text-end font-monospace text-warning">
+                        -₹{{ trade.charges|floatformat:2 }}
+                    </td>
+                    <td class="text-end font-monospace {% if trade.is_winner %}text-success{% else %}text-danger{% endif %} fw-bold">
+                        {% if trade.net_pnl >= 0 %}+{% endif %}₹{{ trade.net_pnl|floatformat:2 }}
+                    </td>
+                    <td class="text-center">
+                        {% if trade.exit_reason == 'TP_HIT' %}
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
+                            TP HIT
+                        </span>
+                        {% elif trade.exit_reason == 'SL_HIT' %}
+                        <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
+                            SL HIT
+                        </span>
+                        {% else %}
+                        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.68rem;">
+                            {{ trade.exit_reason }}
+                        </span>
+                        {% endif %}
+                    </td>
+                    <td class="text-center pe-2 font-monospace text-muted" style="font-size: 0.78rem;">
+                        {% if trade.duration_secs < 60 %}
+                            {{ trade.duration_secs }}s
+                        {% elif trade.duration_secs < 3600 %}
+                            {% widthratio trade.duration_secs 60 1 %}m
+                        {% else %}
+                            {% widthratio trade.duration_secs 3600 1 %}h
+                        {% endif %}
+                    </td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="12" class="text-center py-5 theme-text-muted">
+                        <span class="material-icons d-block mb-2" style="font-size: 2.5rem; opacity: 0.4;">inbox</span>
+                        <div class="fw-semibold">No closed trades recorded yet for this filter.</div>
+                        <small class="opacity-75">Execute strategy trades or replay Parquet data to see executed trade pairs.</small>
+                    </td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    <!-- Pagination -->
+    {% if is_paginated %}
+    <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary border-opacity-10 flex-wrap gap-2">
+        <span class="theme-text-muted small font-monospace">
+            Page {{ page_obj.number }} of {{ paginator.num_pages }} ({{ total_trades_count }} total pairs)
+        </span>
+        <div class="btn-group btn-group-sm">
+            {% if page_obj.has_previous %}
+            <button class="btn btn-outline-secondary"
+                    hx-get="{% url 'admins:admin-mock-broker-trades' %}?page={{ page_obj.previous_page_number }}{% if filter_date %}&date={{ filter_date }}{% endif %}{% if filter_status %}&status={{ filter_status }}{% endif %}"
+                    hx-target="#mock-broker-trades-container"
+                    hx-swap="innerHTML">
+                <span class="material-icons align-middle" style="font-size: 1rem;">chevron_left</span> Previous
+            </button>
+            {% endif %}
+            {% if page_obj.has_next %}
+            <button class="btn btn-outline-secondary"
+                    hx-get="{% url 'admins:admin-mock-broker-trades' %}?page={{ page_obj.next_page_number }}{% if filter_date %}&date={{ filter_date }}{% endif %}{% if filter_status %}&status={{ filter_status }}{% endif %}"
+                    hx-target="#mock-broker-trades-container"
+                    hx-swap="innerHTML">
+                Next <span class="material-icons align-middle" style="font-size: 1rem;">chevron_right</span>
+            </button>
+            {% endif %}
+        </div>
+    </div>
+    {% endif %}
+</div>

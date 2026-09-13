@@ -1,0 +1,117 @@
+<!-- 12-Month Calendar Heatmap Partial -->
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2" style="font-size: 1.05rem;">
+            <span class="material-icons text-primary" style="font-size: 1.25rem;">calendar_month</span>
+            Trade Journal Calendar Heatmap
+        </h5>
+        <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.75rem;">
+            {{ year }} Session Heatmap
+        </span>
+    </div>
+
+    <!-- Year Navigation Controls -->
+    <div class="btn-group btn-group-sm shadow-sm" role="group">
+        <button type="button" class="btn btn-outline-secondary"
+                hx-get="{% url 'admins:admin-mock-broker-calendar' %}?year={{ prev_year }}"
+                hx-target="#mock-broker-calendar-container"
+                hx-swap="innerHTML">
+            <span class="material-icons align-middle" style="font-size: 1rem;">chevron_left</span>
+            {{ prev_year }}
+        </button>
+        <button type="button" class="btn btn-primary active fw-bold font-monospace px-3" style="font-size: 0.82rem;">
+            {{ year }}
+        </button>
+        <button type="button" class="btn btn-outline-secondary"
+                hx-get="{% url 'admins:admin-mock-broker-calendar' %}?year={{ next_year }}"
+                hx-target="#mock-broker-calendar-container"
+                hx-swap="innerHTML">
+            {{ next_year }}
+            <span class="material-icons align-middle" style="font-size: 1rem;">chevron_right</span>
+        </button>
+    </div>
+</div>
+
+<!-- 12-MONTH CALENDAR GRID -->
+<div class="row g-2 g-xl-3">
+    {% for month in months %}
+    <div class="col-12 col-md-4 col-lg-4 col-xl-2">
+        <div class="glass-card p-2 p-md-2.5 rounded-3 border h-100 d-flex flex-column justify-content-between shadow-sm"
+             style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+            
+            <!-- Month Card Header -->
+            <div class="d-flex justify-content-between align-items-center mb-2 pb-1.5 border-bottom border-secondary border-opacity-20 flex-wrap gap-1">
+                <h6 class="fw-bold theme-text-main mb-0 text-truncate" style="font-size: 0.82rem;">{{ month.name }}</h6>
+                {% if month.monthly_pnl >= 0 %}
+                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-1.5 py-0.5 fw-bold font-monospace" style="font-size: 0.65rem;">
+                    +₹{{ month.monthly_pnl|floatformat:0 }}
+                </span>
+                {% else %}
+                <span class="badge bg-danger bg-opacity-25 text-danger rounded-pill px-1.5 py-0.5 fw-bold font-monospace" style="font-size: 0.65rem;">
+                    -₹{{ month.monthly_pnl_abs|floatformat:0 }}
+                </span>
+                {% endif %}
+            </div>
+
+            <!-- Weekdays Row -->
+            <div class="row g-1 text-center mb-1 text-muted fw-bold" style="font-size: 0.62rem;">
+                <div class="col">M</div>
+                <div class="col">T</div>
+                <div class="col">W</div>
+                <div class="col">T</div>
+                <div class="col">F</div>
+                <div class="col text-secondary opacity-50">S</div>
+                <div class="col text-secondary opacity-50">S</div>
+            </div>
+
+            <!-- Month Days Grid -->
+            <div class="row g-1 text-center">
+                {% for day in month.days %}
+                <div class="col-1-7 col" style="flex: 0 0 14.285%; max-width: 14.285%;">
+                    {% if day.is_current_month %}
+                        {% if day.status == 'profit' %}
+                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm position-relative sbx-journal-day-clickable"
+                             style="{% if day.intensity == 'high' %}background: rgba(16, 185, 129, 0.45); border: 1px solid rgba(16, 185, 129, 0.78);{% elif day.intensity == 'med' %}background: rgba(16, 185, 129, 0.28); border: 1px solid rgba(16, 185, 129, 0.55);{% else %}background: rgba(16, 185, 129, 0.14); border: 1px solid rgba(16, 185, 129, 0.32);{% endif %} min-height: 26px; cursor: pointer;"
+                             hx-get="{% url 'admins:admin-mock-broker-trades' %}?date={{ day.date|date:'Y-m-d' }}"
+                             hx-target="#mock-broker-trades-container"
+                             hx-swap="innerHTML"
+                             data-bs-toggle="tooltip"
+                             data-bs-html="true"
+                             title="<div class='fw-bold border-bottom pb-1 mb-1.5 text-white'>{{ day.date|date:'d M Y' }}</div><div class='d-flex justify-content-between gap-3 small'><span class='theme-text-muted'>Net PnL:</span><span class='text-success fw-bold'>+₹{{ day.pnl|floatformat:2 }}</span></div><div class='text-center border-top pt-1 text-success fw-bold small'>Click to Filter Trades</div>">
+                            <span class="fw-bold text-success font-monospace" style="font-size: 0.75rem; line-height: 1;">{{ day.day_num }}</span>
+                        </div>
+                        {% elif day.status == 'loss' %}
+                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center shadow-sm position-relative sbx-journal-day-clickable"
+                             style="{% if day.intensity == 'high' %}background: rgba(239, 68, 68, 0.45); border: 1px solid rgba(239, 68, 68, 0.78);{% elif day.intensity == 'med' %}background: rgba(239, 68, 68, 0.28); border: 1px solid rgba(239, 68, 68, 0.55);{% else %}background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(239, 68, 68, 0.32);{% endif %} min-height: 26px; cursor: pointer;"
+                             hx-get="{% url 'admins:admin-mock-broker-trades' %}?date={{ day.date|date:'Y-m-d' }}"
+                             hx-target="#mock-broker-trades-container"
+                             hx-swap="innerHTML"
+                             data-bs-toggle="tooltip"
+                             data-bs-html="true"
+                             title="<div class='fw-bold border-bottom pb-1 mb-1.5 text-white'>{{ day.date|date:'d M Y' }}</div><div class='d-flex justify-content-between gap-3 small'><span class='theme-text-muted'>Net PnL:</span><span class='text-danger fw-bold'>-₹{{ day.pnl_abs|floatformat:2 }}</span></div><div class='text-center border-top pt-1 text-danger fw-bold small'>Click to Filter Trades</div>">
+                            <span class="fw-bold text-danger font-monospace" style="font-size: 0.75rem; line-height: 1;">{{ day.day_num }}</span>
+                        </div>
+                        {% else %}
+                        <div class="d-flex align-items-center justify-content-center rounded-2 p-1 text-center"
+                             style="min-height: 26px; opacity: 0.35;">
+                            <span class="text-muted font-monospace" style="font-size: 0.72rem; line-height: 1;">{{ day.day_num }}</span>
+                        </div>
+                        {% endif %}
+                    {% else %}
+                        <div style="min-height: 26px; opacity: 0.1;">
+                            <span class="text-muted font-monospace" style="font-size: 0.7rem;">{{ day.day_num }}</span>
+                        </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+
+            <!-- Month Summary Footer -->
+            <div class="d-flex justify-content-between align-items-center mt-2 pt-1 border-top border-secondary border-opacity-10 small theme-text-muted" style="font-size: 0.65rem;">
+                <span class="text-success"><span class="fw-bold">{{ month.profit_days }}</span> win</span>
+                <span class="text-danger"><span class="fw-bold">{{ month.loss_days }}</span> loss</span>
+            </div>
+        </div>
+    </div>
+    {% endfor %}
+</div>

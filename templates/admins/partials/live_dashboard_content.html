@@ -11,9 +11,17 @@
                 <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-40 px-2.5 py-1 fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                     <i class="bi bi-cpu me-1"></i> DHAN EMULATOR (:8088)
                 </span>
-                <a href="http://127.0.0.1:8088/mock/dashboard" target="_blank" class="btn btn-sm btn-outline-info py-0.5 px-2.5 rounded-pill" style="font-size: 0.72rem;">
-                    <i class="bi bi-sliders me-1"></i> Sandbox Controls
-                </a>
+                {% if mock_feed_active or option_chain.is_mock_feed_active or option_chain.feed_status == 'ACTIVE' %}
+                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm" style="font-size: 0.75rem;">
+                    <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.42rem; height: 0.42rem;"></span>
+                    <span>MOCK FEED: ACTIVE</span>
+                </span>
+                {% else %}
+                <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-white border-opacity-15 rounded-pill px-2.5 py-1 fw-bold font-monospace d-inline-flex align-items-center gap-1.5 shadow-sm" style="font-size: 0.75rem;">
+                    <i class="bi bi-pause-circle text-muted"></i>
+                    <span>MOCK FEED: INACTIVE (STANDBY)</span>
+                </span>
+                {% endif %}
                 {% else %}
                 <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-40 px-2.5 py-1 fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                     <i class="bi bi-shield-check me-1"></i> DHAN PRODUCTION LIVE
@@ -42,6 +50,24 @@
                 </span>
             {% endif %}
 
+            {% if env_mode == 'MOCK' %}
+            <button type="button" 
+                    class="btn btn-outline-danger rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    style="font-size: 0.8rem;"
+                    hx-post="{% url 'admins:admin-live-mock-clear-session' %}"
+                    hx-swap="none"
+                    hx-confirm="Are you sure you want to clear all mock trades, positions and restore starting balance (₹5,00,000)?">
+                <i class="bi bi-trash3"></i>
+                <span>Clear Mock Session</span>
+            </button>
+            <a href="http://127.0.0.1:8088/mock/dashboard" target="_blank" 
+               class="btn btn-outline-info rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+               style="font-size: 0.8rem; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08); color: #38bdf8;">
+                <i class="bi bi-sliders"></i>
+                <span>Sandbox Controls</span>
+                <i class="bi bi-box-arrow-up-right ms-1 smaller opacity-75"></i>
+            </a>
+            {% else %}
             {% include 'admins/partials/master_live_switch_badge.html' %}
 
             <a href="{% url 'users:user-accounts' %}" 
@@ -55,6 +81,7 @@
                 <span class="fw-semibold">Accounts &amp; Tokens</span>
                 <i class="bi bi-chevron-right ms-1 opacity-75"></i>
             </a>
+            {% endif %}
         </div>
     </div>
     <!-- END: Dashboard Header Banner -->
@@ -173,7 +200,7 @@
                         {% else %}
                             <span class="badge bg-warning text-dark fw-bold px-2 py-1 mb-2 rounded-pill">Auth Required</span>
                         {% endif %}
-                        <div class="alert-green-date">{{ broker_name }} {% if live_account.broker_client_id %}&bull; ID: {{ live_account.broker_client_id }}{% endif %}</div>
+                        <div id="live-broker-info-header" class="alert-green-date">{{ broker_name }} {% if live_account.broker_client_id %}&bull; ID: {{ live_account.broker_client_id }}{% endif %}</div>
                         <div class="alert-green-text">
                             {% if is_token_active %}
                                 Realtime Stream &bull; {{ open_positions_count }} Open
@@ -232,16 +259,16 @@
                             {% endif %}
                         </div>
                         <div class="metric-card-date">Intraday Realtime Return</div>
-                        <div class="metric-card-value font-monospace {% if live_net_pnl > 0 %}text-success{% elif live_net_pnl < 0 %}text-danger{% endif %}">
+                        <div id="live-summary-net-pnl" class="metric-card-value font-monospace {% if live_net_pnl > 0 %}text-success{% elif live_net_pnl < 0 %}text-danger{% endif %}">
                             {% if live_net_pnl > 0 %}+{% endif %}₹{{ live_net_pnl|floatformat:2 }}
                         </div>
                     </div>
                     <div class="metric-card-footer">
                         <div class="trend-badge {% if live_net_pnl >= 0 %}trend-up{% else %}trend-down{% endif %} py-0 px-0 fs-xs">
                             <i class="bi {% if live_net_pnl >= 0 %}bi-arrow-up-right text-success{% else %}bi-arrow-down-left text-danger{% endif %}"></i>
-                            <span>{% if is_token_active %}{{ open_positions_count }} Active Pos{% else %}Offline{% endif %}</span>
+                            <span id="live-summary-open-positions">{% if is_token_active %}{{ open_positions_count }} Active Pos{% else %}Offline{% endif %}</span>
                         </div>
-                        <span>{{ todays_orders_count }} Orders</span>
+                        <span id="live-summary-todays-orders">{{ todays_orders_count }} Orders</span>
                     </div>
                 </div>
             </div>
@@ -264,8 +291,8 @@
                                 <i class="bi bi-arrow-repeat text-primary"></i>
                             </a>
                         </div>
-                        <div class="metric-card-date">Broker Funds &bull; Cash: ₹{{ cash_balance }}</div>
-                        <div class="metric-card-value font-monospace text-primary">
+                        <div class="metric-card-date">Broker Funds &bull; Cash: <span id="live-summary-cash-balance">₹{{ cash_balance }}</span></div>
+                        <div id="live-summary-available-margin" class="metric-card-value font-monospace text-primary">
                             ₹{{ available_margin }}
                         </div>
                     </div>
@@ -478,7 +505,7 @@
                             LIVE EXECUTION
                         </span>
                     </div>
-                    <small class="theme-text-muted" style="font-size: 0.74rem;">TensorTrade RL &amp; quantitative strategy execution registry with isolated rulebook snapshots</small>
+                    <small class="theme-text-muted" style="font-size: 0.74rem;">Go Quant Engine &amp; quantitative strategy execution registry with isolated rulebook snapshots</small>
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2 ms-md-auto">

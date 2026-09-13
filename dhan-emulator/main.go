@@ -44,6 +44,7 @@ func main() {
 
 	// 3. Initialize Parquet & Market Feed Streamer
 	marketStreamer := streamer.NewParquetStreamer(matchingEngine, backupDir)
+	matchingEngine.SetBroadcaster(marketStreamer.BroadcastRawMessage)
 
 	// 4. Initialize HTTP Handler & Routes
 	handler, err := handlers.NewHandler(matchingEngine, chaos, marketStreamer, tmplPath)

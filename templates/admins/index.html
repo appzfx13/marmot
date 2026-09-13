@@ -1779,7 +1779,19 @@
                             hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-cpu text-info"></i>
                             <span>Live Mock</span>
-                            <span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 ms-auto" style="font-size: 0.65rem; padding: 2px 6px;">MOCK</span>
+                            <span
+                                class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 ms-auto"
+                                style="font-size: 0.65rem; padding: 2px 6px;">MOCK</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="http://localhost:8088/mock/dashboard" class="sidebar-menu-link"
+                            id="admin-menu-gateway-emulator" target="_blank">
+                            <i class="bi bi-motherboard-fill text-warning"></i>
+                            <span>Gateway Emulator</span>
+                            <span
+                                class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 ms-auto"
+                                style="font-size: 0.65rem; padding: 2px 6px;">:8088</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
@@ -1994,8 +2006,7 @@
             <img src="{% if request.user.avatar %}{{ request.user.avatar.url }}{% else %}{% static 'images/avatar.png' %}{% endif %}"
                 alt="Admin" class="sidebar-profile-img">
             <div class="sidebar-profile-info">
-                <div class="sidebar-profile-name">{% if request.user.first_name %}{{ request.user.first_name }}{% else
-                    %}{{ request.user.username }}{% endif %}</div>
+                <div class="sidebar-profile-name">{% if request.user.first_name %}{{ request.user.first_name }}{% else %}{{ request.user.username }}{% endif %}</div>
                 <div class="sidebar-profile-email">{{ request.user.email|default:"Administrator" }}</div>
             </div>
             <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-auto" data-bs-toggle="modal"
@@ -2814,19 +2825,15 @@
             let _ocReloadPendingTimer = null;
             window.triggerOptionChainReload = function (force) {
                 const now = Date.now();
-                if (!force && (now - _lastOcReloadTime < 5000)) {
-                    if (!_ocReloadPendingTimer) {
-                        _ocReloadPendingTimer = setTimeout(function () {
-                            _ocReloadPendingTimer = null;
-                            window.triggerOptionChainReload(true);
-                        }, 5000);
-                    }
+                if (!force && (now - _lastOcReloadTime < 2500)) {
                     return;
+                }
+                if (force && (now - _lastOcReloadTime < 600)) {
+                    return; // Debounce rapid ATM crossings
                 }
                 _lastOcReloadTime = now;
                 const ocContainer = document.getElementById('live-option-chain-container');
                 if (ocContainer) {
-                    console.log('🔄 [OptionChain] Dispatching reloadOptionChain event to HTMX');
                     document.body.dispatchEvent(new CustomEvent('reloadOptionChain'));
                 }
             };
@@ -2940,9 +2947,6 @@
                         const ocTimeEl = document.getElementById('live-option-chain-time');
                         if (ocTimeEl) ocTimeEl.textContent = ts;
                     }
-
-                    // Periodic throttled option chain reload while user views the card
-                    window.triggerOptionChainReload(false);
                 }
             };
 
@@ -2950,8 +2954,9 @@
             (function initSmartTickSync() {
                 let isFetching = false;
                 function fetchLiveTick() {
-                    // 1. If WebSocket is connected, skip HTTP polling completely (0 HTTP requests)
-                    if (window.MarmotWS && window.MarmotWS.ws && window.MarmotWS.ws.readyState === WebSocket.OPEN) {
+                    // 1. If WebSocket is connected (live broker or emulator), skip HTTP polling completely (0 HTTP requests)
+                    if ((window.MarmotWS && window.MarmotWS.ws && window.MarmotWS.ws.readyState === WebSocket.OPEN) ||
+                        (window._DhanEmulatorWS && window._DhanEmulatorWS.readyState === WebSocket.OPEN)) {
                         return;
                     }
                     if (isFetching || document.hidden) return;
@@ -2981,6 +2986,541 @@
             })();
         })();
     </script>
+
+    {% if is_mock_mode %}
+    <!-- Dhan Emulator Pure-WebSocket Feed (Mock Mode Only) — zero HTMX polling -->
+    <script>
+        (function () {
+            var isMockMode = true;
+            if (!isMockMode) return;
+
+            // Resolve emulator WS URL: direct connection to port 8088 on localhost/127.0.0.1, or through /mock-ws reverse proxy on domain/ngrok
+            var proto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            var hostName = window.location.hostname;
+            var emulatorWsUrl;
+            if (hostName === 'localhost' || hostName === '127.0.0.1') {
+                emulatorWsUrl = proto + '//' + hostName + ':8088/mock/v2/marketfeed/ws';
+            } else {
+                emulatorWsUrl = proto + '//' + window.location.host + '/mock-ws';
+            }
+
+            var _prevSpot = 0;
+            var _prevAtm = 0;
+            var _reconnectTimer = null;
+            var _reconnectDelay = 2000;
+            var _maxReconnectDelay = 30000;
+
+            // Flash helper: momentary color pulse on DOM element
+            function flashEl(el, color) {
+                if (!el) return;
+                el.style.transition = 'color 0.12s ease';
+                el.style.color = color;
+                clearTimeout(el._flashTimer);
+                el._flashTimer = setTimeout(function () { el.style.color = ''; }, 380);
+            }
+
+            // Format price to ₹X,XX,XXX.XX (Indian locale)
+            function fmtPrice(n) {
+                return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            // Update the NIFTY macro ribbon card (top card #1)
+            function updateMacroRibbon(spot, payload) {
+                var el = document.getElementById('live-macro-spot-ltp');
+                if (!el) return;
+                var cardIdx = (el.getAttribute('data-index') || 'NIFTY').toUpperCase();
+                var tickIdx = (payload.index || '').toUpperCase();
+                if (tickIdx && tickIdx !== cardIdx) return;
+                var prev = parseFloat(el.getAttribute('data-val') || 0);
+                el.setAttribute('data-val', spot);
+                el.textContent = fmtPrice(spot);
+                if (prev > 0 && Math.abs(spot - prev) >= 0.05) {
+                    flashEl(el, spot >= prev ? '#22c55e' : '#ef4444');
+                }
+            }
+
+            // Update option chain HUD (spot LTP, ATM, change, high, low, time)
+            function updateOptionChainHUD(spot, payload) {
+                var ocEl = document.getElementById('live-option-chain-spot-ltp');
+                if (!ocEl) return;
+                var activeIdx = ((document.getElementById('backupIndexSelect') || {}).value || ocEl.getAttribute('data-index') || 'NIFTY').toUpperCase();
+                var tickIdx = (payload.index || '').toUpperCase();
+                if (tickIdx && tickIdx !== activeIdx) return;
+
+                var prev = parseFloat(ocEl.getAttribute('data-tick-price') || ocEl.getAttribute('data-val') || 0);
+                ocEl.setAttribute('data-tick-price', spot);
+                ocEl.setAttribute('data-val', spot);
+                ocEl.textContent = fmtPrice(spot);
+                if (prev > 0 && Math.abs(spot - prev) >= 0.05) {
+                    flashEl(ocEl, spot >= prev ? '#22c55e' : '#ef4444');
+                }
+
+                // Change badge
+                if (payload.change !== undefined && payload.change_pct !== undefined) {
+                    var chgEl = document.getElementById('live-option-chain-spot-change');
+                    if (chgEl) {
+                        chgEl.textContent = payload.change + ' (' + payload.change_pct + ')';
+                        chgEl.className = 'badge ' + (payload.is_positive ? 'bg-success bg-opacity-20 text-success' : 'bg-danger bg-opacity-20 text-danger') + ' rounded-pill px-1.5 py-0.5 font-monospace fw-bold';
+                    }
+                }
+
+                // High / Low
+                if (payload.high) {
+                    var hEl = document.querySelector('[data-tick-key="high_' + activeIdx + '"]');
+                    if (hEl) hEl.textContent = fmtPrice(payload.high);
+                }
+                if (payload.low) {
+                    var lEl = document.querySelector('[data-tick-key="low_' + activeIdx + '"]');
+                    if (lEl) lEl.textContent = fmtPrice(payload.low);
+                }
+
+                // Benchmarks: Open & Prev Close
+                if (payload.open) {
+                    var oEl = document.querySelector('[data-tick-key="open_' + activeIdx + '"]');
+                    if (oEl) oEl.textContent = fmtPrice(payload.open);
+                }
+                if (payload.prev_close) {
+                    var pEl = document.querySelector('[data-tick-key="prev_close_' + activeIdx + '"]');
+                    if (pEl) pEl.textContent = fmtPrice(payload.prev_close);
+                }
+
+                // Timestamp
+                var ts = payload.formatted_time || payload.timestamp || '';
+                if (ts) {
+                    var tEl = document.getElementById('live-option-chain-time');
+                    if (tEl) tEl.textContent = ts;
+                    var tEl2 = document.getElementById('live-macro-spot-time');
+                    if (tEl2) tEl2.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + ts;
+                }
+
+                // ATM strike: recalculate and update badge
+                var step = 50;
+                if (activeIdx === 'BANKNIFTY' || activeIdx === 'SENSEX') step = 100;
+                else if (activeIdx === 'MIDCPNIFTY') step = 25;
+                var atm = Math.round(spot / step) * step;
+                var atmEl = document.getElementById('live-option-chain-atm');
+                if (atmEl) {
+                    var prevAtm = parseInt(atmEl.textContent.trim(), 10);
+                    atmEl.textContent = atm;
+                    if (!isNaN(prevAtm) && prevAtm > 0 && prevAtm !== atm) {
+                        var minVisible = atm - (3 * step);
+                        var maxVisible = atm + (3 * step);
+                        var isExpanded = window._optionChainExpanded === true;
+                        var rows = document.querySelectorAll('#live-option-chain-container tbody tr');
+                        rows.forEach(function (row) {
+                            var stkVal = parseInt(row.getAttribute('data-strike') || '', 10);
+                            var strikeCell = row.children && row.children.length > 2 ? row.children[2] : null;
+                            if (isNaN(stkVal) && strikeCell) {
+                                stkVal = parseInt(strikeCell.textContent.replace(/[^\d]/g, ''), 10);
+                            }
+                            if (isNaN(stkVal)) return;
+
+                            // Dynamic slide of ±3 strike window if in compact mode
+                            if (!isExpanded) {
+                                if (stkVal >= minVisible && stkVal <= maxVisible) {
+                                    row.classList.remove('d-none');
+                                    row.classList.remove('option-chain-outer-strike');
+                                } else {
+                                    row.classList.add('d-none');
+                                    row.classList.add('option-chain-outer-strike');
+                                }
+                            }
+
+                            var existingBadge = row.querySelector('.option-chain-atm-badge');
+                            if (stkVal === atm) {
+                                row.classList.add('table-active', 'option-chain-atm-row');
+                                row.setAttribute('style', 'background: rgba(180, 241, 5, 0.09) !important; border-top: 2px solid #B4F105 !important; border-bottom: 2px solid #B4F105 !important;');
+                                if (strikeCell) {
+                                    strikeCell.classList.remove('text-white');
+                                    strikeCell.classList.add('text-warning');
+                                    if (!existingBadge) {
+                                        var newBadge = document.createElement('span');
+                                        newBadge.className = 'badge rounded-pill px-1.5 py-0.5 smaller ms-1 option-chain-atm-badge';
+                                        newBadge.setAttribute('style', 'background: #B4F105; color: #000; font-size: 0.65rem; font-weight: 800;');
+                                        newBadge.textContent = 'ATM';
+                                        strikeCell.appendChild(newBadge);
+                                    }
+                                }
+                            } else {
+                                row.classList.remove('table-active', 'option-chain-atm-row');
+                                row.removeAttribute('style');
+                                if (strikeCell) {
+                                    strikeCell.classList.remove('text-warning');
+                                    strikeCell.classList.add('text-white');
+                                    if (existingBadge) {
+                                        existingBadge.remove();
+                                    }
+                                }
+                            }
+                        });
+
+                        // In live mode, synchronize backend dataset; in mock mode, client-side sliding
+                        // handles pre-rendered strikes in 0ms without jarring HTTP page/widget reload
+                        if (!isMockMode && typeof window.triggerOptionChainReload === 'function') {
+                            window.triggerOptionChainReload(false);
+                        }
+                    }
+                }
+            }
+
+            // Update CE or PE strike LTP in the option chain table
+            function updateStrikeLTP(strike, optType, ltp) {
+                var key = (optType === 'CE' ? 'ce_' : 'pe_') + strike;
+                var el = document.querySelector('[data-tick-key="' + key + '"]') || document.getElementById(optType === 'CE' ? ('oc-ltp-ce-' + strike) : ('oc-ltp-pe-' + strike));
+                if (!el) return;
+                var prev = parseFloat(el.getAttribute('data-tick-price') || 0);
+                el.setAttribute('data-tick-price', ltp);
+                if (ltp > 0) {
+                    el.textContent = fmtPrice(ltp);
+                    el.classList.remove('text-muted', 'fw-normal');
+                    el.classList.add('text-white', 'fw-bold');
+                    if (prev > 0 && Math.abs(ltp - prev) >= 0.01) {
+                        flashEl(el, ltp >= prev ? '#22c55e' : '#ef4444');
+                    }
+                } else {
+                    el.innerHTML = '&mdash;';
+                    el.classList.remove('text-white', 'fw-bold');
+                    el.classList.add('text-muted', 'fw-normal');
+                }
+            }
+
+            // Update CE or PE strike Open Interest (OI) in the option chain table
+            function updateStrikeOI(strike, optType, oi) {
+                var el = document.getElementById(optType === 'CE' ? ('oc-oi-ce-' + strike) : ('oc-oi-pe-' + strike));
+                if (!el) {
+                    var key = (optType === 'CE' ? 'ce_oi_' : 'pe_oi_') + strike;
+                    el = document.querySelector('[data-tick-key="' + key + '"]');
+                }
+                if (!el) return;
+                var numOI = parseInt(String(oi).replace(/,/g, '').trim(), 10);
+                if (!isNaN(numOI) && numOI > 0) {
+                    var prev = parseInt(String(el.getAttribute('data-tick-oi') || el.textContent).replace(/,/g, '').trim() || 0, 10);
+                    el.setAttribute('data-tick-oi', numOI);
+                    el.textContent = numOI.toLocaleString('en-IN');
+                    if (prev > 0 && Math.abs(numOI - prev) > 0) {
+                        flashEl(el, numOI >= prev ? '#22c55e' : '#ef4444');
+                    }
+                } else {
+                    el.innerHTML = '&mdash;';
+                }
+            }
+
+            // Parse Dhan emulator tick payload and route updates
+            function handleEmulatorTick(data) {
+                var ltp = parseFloat(data.ltp || data.lastTradedPrice || 0);
+                if (!ltp || ltp <= 0) return;
+
+                var sym = (data.tradingSymbol || '').toUpperCase().trim();
+                var secId = String(data.securityId || data.instrument_token || '');
+
+                // Volatility index tick detection (INDIA VIX) - update VIX HUD and return immediately
+                if (sym.includes('VIX') || secId === 'INDIAVIX' || secId === '442') {
+                    var vixEl = document.getElementById('live-option-chain-vix') || document.getElementById('emulator-vix-ltp');
+                    if (vixEl) vixEl.textContent = ltp.toFixed(2);
+                    return;
+                }
+
+                // Spot index tick detection (security IDs 13=NIFTY, 25=BANKNIFTY, 27=SENSEX etc.)
+                var isSpotTick = !sym.includes('VIX') && secId !== 'INDIAVIX' && secId !== '442' && (
+                    secId === '13' || secId === '25' || secId === '27' ||
+                    sym === 'NIFTY 50' || sym === 'NIFTY50' || sym === 'NIFTY' ||
+                    sym === 'BANKNIFTY' || sym === 'SENSEX' || sym === 'MIDCPNIFTY' ||
+                    (sym.length > 0 && !sym.includes(' CE') && !sym.includes(' PE') && !sym.match(/\d{5,}/))
+                );
+
+                if (isSpotTick) {
+                    // Normalise index name from symbol
+                    var idx = 'NIFTY';
+                    if (sym.includes('BANK') || sym === 'BANKNIFTY') idx = 'BANKNIFTY';
+                    else if (sym.includes('SENSEX')) idx = 'SENSEX';
+                    else if (sym.includes('MIDCP')) idx = 'MIDCPNIFTY';
+
+                    var payload = {
+                        index: idx,
+                        change: data.change !== undefined ? data.change : '',
+                        change_pct: data.changePercent !== undefined ? (data.changePercent + '%') : '',
+                        is_positive: ltp >= _prevSpot,
+                        open: data.open || data.dayOpen || 0,
+                        high: data.high || data.dayHigh || 0,
+                        low: data.low || data.dayLow || 0,
+                        prev_close: data.prevClose || data.previousClose || data.close || 0,
+                        formatted_time: data.timestamp || data.exchFeedTime || ''
+                    };
+                    _prevSpot = ltp;
+
+                    updateMacroRibbon(ltp, payload);
+                    updateOptionChainHUD(ltp, payload);
+
+                    // Also feed into the unified MarmotWS spot DOM updater
+                    if (window.updateLiveSpotDOM) {
+                        window.updateLiveSpotDOM(ltp, payload);
+                    }
+                    return;
+                }
+
+                // Option tick (CE or PE): parse strike from trading symbol or securityId e.g. "NIFTY 24500 CE", "NIFTY2491524500CE", or secId "24500_CE"
+                var optType = '';
+                if (sym.endsWith('CE') || sym.endsWith(' C') || sym.includes(' CE') || secId.endsWith('_CE')) {
+                    optType = 'CE';
+                } else if (sym.endsWith('PE') || sym.endsWith(' P') || sym.includes(' PE') || secId.endsWith('_PE')) {
+                    optType = 'PE';
+                }
+
+                if (optType) {
+                    var strike = 0;
+                    // 1. Try parsing numeric strike from secId (e.g. "24500_CE" or "24500")
+                    var secMatch = secId.match(/^(\d{4,6})/);
+                    if (secMatch) {
+                        strike = parseInt(secMatch[1], 10);
+                    }
+                    // 2. Fallback: extract numeric strike from symbol (e.g. "NIFTY 24500 CE", "NIFTY 24500.0 CE", "NIFTY2491524500CE")
+                    if (!strike) {
+                        var strikeMatch = sym.match(/(\d{4,6})(?:\.0+)?\s*(?:CE|PE|C|P)$/i);
+                        if (strikeMatch) {
+                            strike = parseInt(strikeMatch[1], 10);
+                        }
+                    }
+                    if (strike > 0 && ltp > 0) {
+                        updateStrikeLTP(strike, optType, ltp);
+                    }
+                    var oi = parseInt(data.oi || data.OI || data.openInterest || 0, 10);
+                    if (strike > 0 && oi > 0) {
+                        updateStrikeOI(strike, optType, oi);
+                    }
+                }
+            }
+
+            // Connect to dhan-emulator WS
+            function connectEmulatorWS() {
+                if (window._DhanEmulatorWS && (window._DhanEmulatorWS.readyState === WebSocket.OPEN || window._DhanEmulatorWS.readyState === WebSocket.CONNECTING)) {
+                    return;
+                }
+                try {
+                    var ws = new WebSocket(emulatorWsUrl);
+                    window._DhanEmulatorWS = ws;
+
+                    ws.onopen = function () {
+                        console.log('🔌 [DhanEmulatorWS] Connected to emulator feed:', emulatorWsUrl);
+                        _reconnectDelay = 2000;
+                        if (_reconnectTimer) { clearTimeout(_reconnectTimer); _reconnectTimer = null; }
+                        // Update status badge if present
+                        var badge = document.getElementById('emulator-ws-status');
+                        if (badge) { badge.textContent = 'WS Live'; badge.className = badge.className.replace('bg-secondary', 'bg-success'); }
+                    };
+
+                    ws.onmessage = function (evt) {
+                        try {
+                            var data = JSON.parse(evt.data);
+                            if (data && data.type === 'broker_stats') {
+                                handleBrokerStatsPush(data);
+                                return;
+                            }
+                            if (data && data.type === 'broker_order_event') {
+                                document.body.dispatchEvent(new CustomEvent('brokerOrderUpdate', { bubbles: true }));
+                                return;
+                            }
+                            // Emulator may send array of ticks or single tick
+                            if (Array.isArray(data)) {
+                                data.forEach(handleEmulatorTick);
+                            } else if (data && typeof data === 'object') {
+                                handleEmulatorTick(data);
+                            }
+                        } catch (e) { /* silent parse error */ }
+                    };
+
+                    var _pendingStats = null;
+                    var _statsRafScheduled = false;
+
+                    function handleBrokerStatsPush(stats) {
+                        if (!stats) return;
+                        _pendingStats = stats;
+                        if (!_statsRafScheduled) {
+                            _statsRafScheduled = true;
+                            requestAnimationFrame(function () {
+                                _statsRafScheduled = false;
+                                if (_pendingStats) {
+                                    applyBrokerStatsDOM(_pendingStats);
+                                    _pendingStats = null;
+                                }
+                            });
+                        }
+                    }
+
+                    function applyBrokerStatsDOM(stats) {
+                        var rawMargin = stats.availableBalance !== undefined ? stats.availableBalance : stats.available_margin;
+                        var rawPnl = stats.liveNetPnL !== undefined ? stats.liveNetPnL : stats.live_net_pnl;
+                        var rawOpenPos = stats.openPositionsCount !== undefined ? stats.openPositionsCount : stats.open_positions;
+                        var rawTotalOrd = stats.totalOrdersCount !== undefined ? stats.totalOrdersCount : stats.total_orders;
+
+                        if (rawPnl !== undefined) {
+                            var pnlEl = document.getElementById('live-summary-net-pnl');
+                            if (pnlEl) {
+                                var pnl = Number(rawPnl);
+                                pnlEl.textContent = (pnl > 0 ? '+' : '') + '₹' + pnl.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                                pnlEl.className = 'metric-card-value font-monospace ' + (pnl > 0 ? 'text-success' : (pnl < 0 ? 'text-danger' : ''));
+                            }
+                        }
+
+                        if (rawMargin !== undefined) {
+                            var numMargin = Number(rawMargin);
+                            var formattedMargin = '₹' + numMargin.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                            var marginEl = document.getElementById('live-summary-available-margin');
+                            if (marginEl) {
+                                marginEl.textContent = formattedMargin;
+                            }
+                            var cashEl = document.getElementById('live-summary-cash-balance');
+                            if (cashEl) {
+                                cashEl.textContent = formattedMargin;
+                            }
+                        }
+
+                        if (rawOpenPos !== undefined) {
+                            var posEl = document.getElementById('live-summary-open-positions');
+                            if (posEl) {
+                                posEl.textContent = rawOpenPos + ' Active Pos';
+                            }
+                        }
+
+                        if (rawTotalOrd !== undefined) {
+                            var ordEl = document.getElementById('live-summary-todays-orders');
+                            if (ordEl) {
+                                ordEl.textContent = rawTotalOrd + ' Orders';
+                            }
+                        }
+
+                        if (stats.dhanClientId) {
+                            var headerEl = document.getElementById('live-broker-info-header');
+                            if (headerEl) {
+                                headerEl.textContent = 'Dhan Emulator (Mock :8088) • ID: ' + stats.dhanClientId;
+                            }
+                        }
+
+                        // Real-time Intraday Equity Chart Live Update
+                        if (window._intradayChartInstance && rawPnl !== undefined) {
+                            var chart = window._intradayChartInstance;
+                            if (chart.data && chart.data.labels && chart.data.datasets && chart.data.datasets[0]) {
+                                var labels = chart.data.labels;
+                                var dataPts = chart.data.datasets[0].data;
+                                var nowStr = new Date().toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit' });
+                                if (labels.length > 0 && labels[labels.length - 1] === nowStr) {
+                                    dataPts[dataPts.length - 1] = Number(rawPnl);
+                                } else {
+                                    labels.push(nowStr);
+                                    dataPts.push(Number(rawPnl));
+                                    if (labels.length > 80) {
+                                        labels.shift();
+                                        dataPts.shift();
+                                    }
+                                }
+                                chart.update('none');
+                            }
+                        }
+
+                        if (window._lastTotalOrders !== undefined && (window._lastTotalOrders !== rawTotalOrd || window._lastOpenPositions !== rawOpenPos)) {
+                            document.body.dispatchEvent(new CustomEvent('brokerOrderUpdate', { bubbles: true }));
+                        }
+                        window._lastTotalOrders = rawTotalOrd;
+                        window._lastOpenPositions = rawOpenPos;
+                    }
+
+                    ws.onclose = function () {
+                        window._DhanEmulatorWS = null;
+                        console.warn('[DhanEmulatorWS] Connection closed — reconnecting in ' + (_reconnectDelay / 1000) + 's');
+                        _reconnectTimer = setTimeout(function () {
+                            _reconnectDelay = Math.min(_reconnectDelay * 1.5, _maxReconnectDelay);
+                            connectEmulatorWS();
+                        }, _reconnectDelay);
+                    };
+
+                    ws.onerror = function () {
+                        ws.close();
+                    };
+
+                } catch (e) {
+                    console.error('[DhanEmulatorWS] Failed to connect:', e);
+                    _reconnectTimer = setTimeout(connectEmulatorWS, _reconnectDelay);
+                }
+            }
+
+            // Start connection when DOM is ready or immediately if already loaded
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', connectEmulatorWS);
+            } else {
+                connectEmulatorWS();
+            }
+
+            // Reconnect when tab becomes visible
+            document.addEventListener('visibilitychange', function () {
+                if (!document.hidden && (!window._DhanEmulatorWS || window._DhanEmulatorWS.readyState === WebSocket.CLOSED)) {
+                    connectEmulatorWS();
+                }
+            });
+
+            // Reconnect on bfcache restore
+            window.addEventListener('pageshow', function (e) {
+                if (e.persisted) connectEmulatorWS();
+            });
+
+            // Speed-Aware Option Chain Dynamic Poller (Matching Dhan Emulator dashboard standard)
+            var currentSpeed = 1;
+            var ocTimer = null;
+
+            function updateDynamicPollers() {
+                if (ocTimer) clearInterval(ocTimer);
+
+                var activeSpeedBtn = document.querySelector('.speed-pill.active');
+                if (activeSpeedBtn) {
+                    var spd = parseInt(activeSpeedBtn.textContent, 10);
+                    if (!isNaN(spd) && spd > 0) currentSpeed = spd;
+                }
+
+                // Adaptive refresh rate matching Dhan Emulator: 1x -> 1200ms, 5x -> 700ms, 10x -> 400ms, >=25x -> 250ms
+                var interval = 1200;
+                if (currentSpeed >= 25) interval = 250;
+                else if (currentSpeed >= 10) interval = 400;
+                else if (currentSpeed >= 5) interval = 700;
+
+                ocTimer = setInterval(function () {
+                    // Skip periodic HTTP reloading if emulator WebSocket is connected and streaming directly to DOM
+                    if (window._DhanEmulatorWS && window._DhanEmulatorWS.readyState === WebSocket.OPEN) {
+                        return;
+                    }
+                    var ocContainer = document.getElementById('live-option-chain-container');
+                    if (ocContainer && !document.hidden) {
+                        window.triggerOptionChainReload(false);
+                    }
+                }, interval);
+            }
+
+            document.addEventListener('click', function (e) {
+                var btn = e.target.closest('.speed-pill');
+                if (btn) {
+                    var spd = parseInt(btn.textContent, 10);
+                    if (!isNaN(spd) && spd > 0) {
+                        currentSpeed = spd;
+                        updateDynamicPollers();
+                        setTimeout(function () {
+                            window.triggerOptionChainReload(true);
+                        }, 50);
+                    }
+                }
+            });
+
+            document.body.addEventListener('htmx:afterSwap', function (evt) {
+                if (evt.detail && evt.detail.target && evt.detail.target.id === 'live-option-chain-container') {
+                    if (typeof window.applyOptionChainViewState === 'function') {
+                        window.applyOptionChainViewState();
+                    }
+                }
+            });
+
+            updateDynamicPollers();
+
+            console.log('📡 [DhanEmulatorWS] Mock feed initialised. Target:', emulatorWsUrl);
+        })();
+    </script>
+    {% endif %}
+
 
     <!-- Flatpickr Date Picker JS & Global Auto-Attach Initializer -->
     <script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>

@@ -1,0 +1,1222 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI DeFi Guardian — Protect & Grow Your Capital | Ava Protocol</title>
+    <style>
+        :root {
+            --bg-primary: #030305;
+            --bg-card: #0c0d12;
+            --bg-card-hover: #12131a;
+            --border-color: rgba(255, 255, 255, 0.1);
+            --border-hover: rgba(168, 85, 247, 0.4);
+            --text-main: #ffffff;
+            --text-muted: #9ca3af;
+            --accent-purple: #9333ea;
+            --accent-bright: #a855f7;
+            --accent-glow: rgba(147, 51, 234, 0.4);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            background-color: var(--bg-primary);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            overflow-x: hidden;
+            line-height: 1.5;
+        }
+
+        a {
+            color: inherit;
+            text-decoration: none;
+        }
+
+        /* Container */
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 24px;
+        }
+
+        /* Navbar */
+        nav {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 24px 48px;
+            max-width: 1280px;
+            margin: 0 auto;
+            position: relative;
+            z-index: 10;
+        }
+
+        .logo-area {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-weight: 700;
+            font-size: 1.15rem;
+            letter-spacing: -0.5px;
+        }
+
+        .logo-icon {
+            background: linear-gradient(135deg, #a855f7, #6b21a8);
+            width: 28px;
+            height: 28px;
+            border-radius: 6px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: 800;
+            font-size: 0.8rem;
+            box-shadow: 0 0 15px var(--accent-glow);
+        }
+
+        .nav-links {
+            display: flex;
+            gap: 32px;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+        }
+
+        .nav-links a {
+            transition: color 0.2s ease;
+        }
+
+        .nav-links a:hover {
+            color: var(--text-main);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #a855f7, #7e22ce);
+            color: white;
+            border: none;
+            padding: 10px 22px;
+            border-radius: 9999px;
+            font-weight: 600;
+            font-size: 0.9rem;
+            cursor: pointer;
+            box-shadow: 0 0 25px var(--accent-glow);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 0 35px rgba(168, 85, 247, 0.6);
+        }
+
+        /* Hero Section */
+        .hero {
+            text-align: center;
+            padding: 80px 20px 40px;
+            max-width: 900px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .hero h1 {
+            font-size: clamp(2.5rem, 6vw, 4.75rem);
+            font-weight: 800;
+            letter-spacing: -2px;
+            line-height: 1.1;
+            margin-bottom: 24px;
+        }
+
+        .hero h1 span {
+            background: linear-gradient(135deg, #d8b4fe, #9333ea);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .hero p {
+            font-size: clamp(1.05rem, 2vw, 1.25rem);
+            color: var(--text-muted);
+            max-width: 680px;
+            margin: 0 auto 36px;
+            line-height: 1.6;
+        }
+
+        .hero-meta {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 16px;
+            letter-spacing: 0.2px;
+        }
+
+        /* Hero Graphic Illustration Container */
+        .hero-graphic {
+            max-width: 960px;
+            margin: 40px auto 0;
+            padding: 0 20px;
+            position: relative;
+        }
+
+        .isometric-card {
+            background: linear-gradient(180deg, rgba(16, 16, 24, 0.9) 0%, rgba(8, 8, 12, 0.95) 100%);
+            border: 1px solid var(--border-color);
+            border-radius: 28px;
+            padding: 50px 30px;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.7), inset 0 1px 0 rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+            animation: floatCard 6s ease-in-out infinite;
+        }
+
+        @keyframes floatCard {
+
+            0%,
+            100% {
+                transform: translateY(0);
+            }
+
+            50% {
+                transform: translateY(-8px);
+            }
+        }
+
+        .grid-bg {
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(to right, rgba(255, 255, 255, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+            background-size: 40px 40px;
+            z-index: 0;
+        }
+
+        .hero-core-content {
+            position: relative;
+            z-index: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .ai-core-icon {
+            width: 80px;
+            height: 80px;
+            background: radial-gradient(circle, rgba(168, 85, 247, 0.3) 0%, rgba(147, 51, 234, 0.05) 70%);
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 0 35px rgba(147, 51, 234, 0.3);
+            animation: pulseCore 3s ease-in-out infinite;
+        }
+
+        @keyframes pulseCore {
+
+            0%,
+            100% {
+                box-shadow: 0 0 20px rgba(147, 51, 234, 0.3);
+            }
+
+            50% {
+                box-shadow: 0 0 45px rgba(168, 85, 247, 0.6);
+            }
+        }
+
+        .status-badge {
+            background: rgba(34, 197, 94, 0.1);
+            color: #4ade80;
+            border: 1px solid rgba(34, 197, 94, 0.25);
+            padding: 6px 16px;
+            border-radius: 9999px;
+            font-size: 0.85rem;
+            font-weight: 500;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-badge::before {
+            content: '';
+            width: 7px;
+            height: 7px;
+            background-color: #4ade80;
+            border-radius: 50%;
+            box-shadow: 0 0 10px #4ade80;
+        }
+
+        /* Section Commons */
+        section {
+            padding: 100px 0;
+            position: relative;
+        }
+
+        .section-header {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 60px;
+        }
+
+        .section-tag {
+            color: var(--accent-bright);
+            font-size: 0.85rem;
+            text-transform: uppercase;
+            letter-spacing: 2px;
+            font-weight: 700;
+            margin-bottom: 12px;
+            display: block;
+        }
+
+        .section-header h2 {
+            font-size: clamp(2rem, 4vw, 3rem);
+            font-weight: 800;
+            letter-spacing: -1px;
+            margin-bottom: 16px;
+        }
+
+        .section-header p {
+            color: var(--text-muted);
+            font-size: 1.1rem;
+        }
+
+        /* Why It Matters Section */
+        .cards-grid-3 {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .feature-card {
+            background-color: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 36px 30px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .feature-card:hover {
+            border-color: var(--border-hover);
+            background-color: var(--bg-card-hover);
+            transform: translateY(-4px);
+        }
+
+        .feature-card h3 {
+            font-size: 1.25rem;
+            font-weight: 700;
+            margin-bottom: 12px;
+            letter-spacing: -0.3px;
+        }
+
+        .feature-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        /* See Ava in Action Section */
+        .action-demo-wrapper {
+            background: linear-gradient(145deg, rgba(16, 16, 24, 0.95), rgba(10, 10, 15, 0.98));
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px;
+            max-width: 900px;
+            margin: 0 auto 60px;
+            box-shadow: 0 25px 50px rgba(0, 0, 0, 0.5);
+        }
+
+        .demo-chat-box {
+            background: var(--bg-primary);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            margin-bottom: 30px;
+            font-family: monospace;
+            font-size: 0.9rem;
+        }
+
+        .chat-prompt {
+            color: #d8b4fe;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+        }
+
+        .chat-response {
+            color: var(--text-muted);
+            border-left: 2px solid var(--accent-purple);
+            padding-left: 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .metric-highlight {
+            color: #4ade80;
+            font-weight: bold;
+        }
+
+        .steps-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+            gap: 20px;
+            margin-top: 40px;
+        }
+
+        .step-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            padding: 24px;
+            border-radius: 16px;
+        }
+
+        .step-number {
+            background: rgba(147, 51, 234, 0.2);
+            color: var(--accent-bright);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            flex-shrink: 0;
+        }
+
+        .step-text h4 {
+            font-size: 1rem;
+            margin-bottom: 4px;
+            font-weight: 600;
+        }
+
+        .step-text p {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Safety First Section */
+        .safety-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+            gap: 24px;
+        }
+
+        .safety-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 36px;
+        }
+
+        .safety-card .tag-pill {
+            font-size: 0.75rem;
+            font-weight: 700;
+            letter-spacing: 1.5px;
+            color: var(--accent-bright);
+            margin-bottom: 16px;
+            display: inline-block;
+        }
+
+        .safety-card h3 {
+            font-size: 1.35rem;
+            margin-bottom: 14px;
+            letter-spacing: -0.5px;
+        }
+
+        .safety-card p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+        }
+
+        .safety-disclaimer {
+            text-align: center;
+            margin-top: 40px;
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        /* Community Testimonials Section */
+        .testimonials-masonry {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+            gap: 20px;
+        }
+
+        .testimonial-card {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 24px;
+            transition: border-color 0.2s ease;
+        }
+
+        .testimonial-card:hover {
+            border-color: var(--border-hover);
+        }
+
+        .testimonial-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            margin-bottom: 14px;
+        }
+
+        .avatar-placeholder {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #7e22ce, #3b82f6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            font-size: 0.9rem;
+            color: white;
+        }
+
+        .author-info h4 {
+            font-size: 0.95rem;
+            font-weight: 600;
+        }
+
+        .author-info span {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+        }
+
+        .testimonial-body p {
+            font-size: 0.9rem;
+            color: #d1d5db;
+            line-height: 1.5;
+        }
+
+        /* Ava Studio Banner Section */
+        .studio-banner {
+            background: linear-gradient(135deg, rgba(147, 51, 234, 0.15), rgba(3, 3, 5, 0.9)), var(--bg-card);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            border-radius: 28px;
+            padding: 60px 40px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .studio-banner h2 {
+            font-size: clamp(1.8rem, 3.5vw, 2.5rem);
+            font-weight: 800;
+            margin-bottom: 16px;
+            letter-spacing: -1px;
+        }
+
+        .studio-banner p {
+            color: var(--text-muted);
+            max-width: 600px;
+            margin: 0 auto 30px;
+            font-size: 1.05rem;
+        }
+
+        /* FAQ Section */
+        .faq-accordion {
+            max-width: 800px;
+            margin: 0 auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .faq-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 14px;
+            overflow: hidden;
+            transition: border-color 0.2s ease;
+        }
+
+        .faq-item:hover {
+            border-color: rgba(255, 255, 255, 0.2);
+        }
+
+        .faq-question {
+            padding: 20px 24px;
+            font-weight: 600;
+            font-size: 1.05rem;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .faq-question::after {
+            content: '+';
+            font-size: 1.25rem;
+            color: var(--accent-bright);
+            transition: transform 0.3s ease;
+        }
+
+        .faq-item.active .faq-question::after {
+            transform: rotate(45deg);
+        }
+
+        .faq-answer {
+            max-height: 0;
+            overflow: hidden;
+            padding: 0 24px;
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            line-height: 1.6;
+            transition: max-height 0.3s ease, padding 0.3s ease;
+        }
+
+        .faq-item.active .faq-answer {
+            max-height: 200px;
+            padding: 0 24px 24px 24px;
+        }
+
+        /* Footer */
+        footer {
+            border-top: 1px solid var(--border-color);
+            padding: 80px 0 40px;
+            background-color: var(--bg-primary);
+        }
+
+        .footer-cta-box {
+            text-align: center;
+            max-width: 700px;
+            margin: 0 auto 80px;
+        }
+
+        .footer-cta-box h2 {
+            font-size: 2.2rem;
+            font-weight: 800;
+            margin-bottom: 16px;
+        }
+
+        .footer-cta-box p {
+            color: var(--text-muted);
+            margin-bottom: 30px;
+            font-size: 1.05rem;
+        }
+
+        .footer-nav-grid {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            gap: 40px;
+            margin-bottom: 60px;
+            padding-bottom: 40px;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .footer-logo-col p {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            margin-top: 12px;
+            max-width: 260px;
+        }
+
+        .footer-links-col h5 {
+            font-size: 0.9rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+            color: var(--text-main);
+        }
+
+        .footer-links-col ul {
+            list-style: none;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .footer-links-col a {
+            color: var(--text-muted);
+            font-size: 0.9rem;
+            transition: color 0.2s ease;
+        }
+
+        .footer-links-col a:hover {
+            color: var(--text-main);
+        }
+
+        .footer-bottom {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: space-between;
+            align-items: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            gap: 20px;
+        }
+
+        .footer-legal-links {
+            display: flex;
+            gap: 24px;
+        }
+
+        .footer-legal-links a:hover {
+            color: var(--text-main);
+        }
+
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            nav {
+                padding: 20px;
+            }
+
+            .nav-links {
+                display: none;
+            }
+
+            .footer-nav-grid {
+                flex-direction: column;
+                gap: 30px;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Navigation Bar -->
+    <nav>
+        <div class="logo-area">
+            <div class="logo-icon">AP</div>
+            Ava Protocol
+        </div>
+        <div class="nav-links">
+            <a href="#guardian">Guardian</a>
+            <a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Docs</a>
+        </div>
+        <a href="https://avaprotocol.org/?ref=lapaninja" target="_blank" class="btn-primary">Request in Telegram</a>
+    </nav>
+
+    <!-- Hero Section -->
+    <header class="hero" id="guardian">
+        <h1>One guardian for your <span>DeFi portfolio</span></h1>
+        <p>Ava watches your positions, warns you before risk gets serious, and helps you act in Telegram. Start
+            read-only. Your funds stay in your wallet.</p>
+        <a href="https://avaprotocol.org/?ref=lapaninja" target="_blank" class="btn-primary"
+            style="padding: 14px 32px; font-size: 1rem;">Request in Telegram</a>
+        <div class="hero-meta">No deposit &middot; Read-only to start &middot; You approve every action</div>
+    </header>
+
+    <!-- Isometric Hero Graphic Mockup -->
+    <div class="hero-graphic">
+        <div class="isometric-card">
+            <div class="grid-bg"></div>
+            <div class="hero-core-content">
+                <div class="ai-core-icon">
+                    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#c084fc" stroke-width="2">
+                        <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
+                    </svg>
+                </div>
+                <div class="status-badge">Aave Liquidation Guard &mdash; Active</div>
+                <div style="font-size: 0.9rem; color: var(--text-muted); text-align: center;">
+                    Real-time Health Factor Monitoring &bull; Execution Speed: 0.002s
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Why It Matters Section -->
+    <section>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Why it matters</span>
+                <h2>DeFi doesn't sleep<br>You shouldn't have to either</h2>
+                <p>Markets move while you're away. Ava watches your positions, risks, and opportunities around the
+                    clock.</p>
+            </div>
+            <div class="cards-grid-3">
+                <div class="feature-card">
+                    <h3>Liquidation risk moves while you sleep</h3>
+                    <p>Health factors change with the market. Ava warns you before risk gets serious and helps keep your
+                        collateral safe.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>You miss the moment</h3>
+                    <p>Dips, depegs, and urgent fixes can pass before you even open your wallet app or fire up your
+                        desktop.</p>
+                </div>
+                <div class="feature-card">
+                    <h3>Idle capital does nothing</h3>
+                    <p>Stablecoins can sit unused while safer yield opportunities and automated portfolio adjustments
+                        happen in the background.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- See Ava in Action Section -->
+    <section>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">What Ava does</span>
+                <h2>See Ava in action</h2>
+                <p>Watch the Guardian handle a real position — right in Telegram.</p>
+            </div>
+
+            <div class="action-demo-wrapper">
+                <div class="demo-chat-box">
+                    <div class="chat-prompt">
+                        <span>👤</span>
+                        <span>If my Aave health factor drops below 1.5, repay debt to bring it back to 2.0.</span>
+                    </div>
+                    <div class="chat-response">
+                        <div>🤖 [Aave Liquidation Guard - Active]</div>
+                        <div>⚡ Health factor fell to 1.48 (ETH dropped 4.1% in 1h)</div>
+                        <div>🔄 Repaid 1,200 USDC of debt. Order completed in 0.002s.</div>
+                        <div>✨ Health factor restored to <span class="metric-highlight">2.04</span> (+0.56 restored)
+                        </div>
+                    </div>
+                </div>
+
+                <div class="steps-row">
+                    <div class="step-item">
+                        <div class="step-number">1</div>
+                        <div class="step-text">
+                            <h4>Tell Ava your goal</h4>
+                            <p>Set automated rules or risk thresholds naturally.</p>
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">2</div>
+                        <div class="step-text">
+                            <h4>Ava watches your wallet</h4>
+                            <p>Constant, automated monitoring on-chain 24/7.</p>
+                        </div>
+                    </div>
+                    <div class="step-item">
+                        <div class="step-number">3</div>
+                        <div class="step-text">
+                            <h4>You approve before execution</h4>
+                            <p>Complete confidence with human-in-the-loop controls.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div style="text-align: center; margin-top: 50px;">
+                <p style="color: var(--text-muted); margin-bottom: 16px; font-size: 1.05rem;">“Check my wallet and tell
+                    me what needs attention.”</p>
+                <a href="https://avaprotocol.org/?ref=lapaninja" target="_blank" class="btn-primary"
+                    style="padding: 14px 28px;">Request in Telegram</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- Safety First Section -->
+    <section>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">Safety first</span>
+                <h2>You're in complete control.<br>Always.</h2>
+            </div>
+
+            <div class="safety-grid">
+                <div class="safety-card">
+                    <span class="tag-pill">TRANSPARENCY</span>
+                    <h3>Every action is visible</h3>
+                    <p>You see each step in the chat, and every on-chain action is fully verifiable on a block explorer.
+                        Nothing happens silently behind the scenes.</p>
+                </div>
+                <div class="safety-card">
+                    <span class="tag-pill">SECURITY</span>
+                    <h3>Non-custodial by design</h3>
+                    <p>Funds stay in your wallet and you hold your keys. If you let Ava act, it can only operate within
+                        strict limits you set — limits it cannot exceed.</p>
+                </div>
+                <div class="safety-card">
+                    <span class="tag-pill">CONTROL</span>
+                    <h3>Every execution is your call</h3>
+                    <p>You approve every action before it runs. You can pause Ava, change its parameters, or revoke
+                        permissions anytime with zero friction.</p>
+                </div>
+            </div>
+
+            <div class="safety-disclaimer">
+                Ava acts only on your instructions. You confirm before anything executes. Ava surfaces information and
+                proposes actions — it is not financial advice.
+            </div>
+        </div>
+    </section>
+
+    <!-- Community Testimonials Section -->
+    <section>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">From the community</span>
+                <h2>What DeFi users are saying</h2>
+            </div>
+
+            <div class="testimonials-masonry">
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder">C</div>
+                        <div class="author-info">
+                            <h4>cyclops (winter arc)</h4>
+                            <span>@cyclops_fgs</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>I used to check my wallet constantly. Refreshing, switching tabs... it adds up and I don't
+                            like stress. So I set up a workflow on Ava Protocol that monitors my wallet.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #2563eb, #9333ea);">M
+                        </div>
+                        <div class="author-info">
+                            <h4>Matt Gems</h4>
+                            <span>@MattShiller_</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>If wallets are mobile, automations should be too. Good to see the tooling catching up with
+                            how people actually use crypto today.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #059669, #3b82f6);">E
+                        </div>
+                        <div class="author-info">
+                            <h4>EMERY016</h4>
+                            <span>@decalmeraph</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Set it once, stop babysitting wallets.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #dc2626, #9333ea);">G
+                        </div>
+                        <div class="author-info">
+                            <h4>MR GENESIS 🤞</h4>
+                            <span>@theladyann_</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Testing Ava Protocol, still early, but the automation workflow feature is seriously
+                            impressive.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #d97706, #059669);">Z
+                        </div>
+                        <div class="author-info">
+                            <h4>Zippy</h4>
+                            <span>@zippy257</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Finally mobile gets the love.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #7c3aed, #db2777);">H
+                        </div>
+                        <div class="author-info">
+                            <h4>HOPE</h4>
+                            <span>@hopeboyorel</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>The real value here is psychological as much as technical. Users stop second guessing every
+                            step and can finally focus on what they're trying to do.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #0284c7, #16a34a);">N
+                        </div>
+                        <div class="author-info">
+                            <h4>Naziru</h4>
+                            <span>@Nerxeerou</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Simulation before deployment is a feature users will appreciate 😮‍🔥</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #4f46e5, #9333ea);">P
+                        </div>
+                        <div class="author-info">
+                            <h4>Mr. Philip Grant</h4>
+                            <span>@MrPhilipGr18496</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Me pretending i didn't just spend 30 minutes on this page.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #db2777, #f59e0b);">C
+                        </div>
+                        <div class="author-info">
+                            <h4>Chuzi</h4>
+                            <span>@Chuzi_Defi</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Wallet ops from beach chair season.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #10b981, #6366f1);">G
+                        </div>
+                        <div class="author-info">
+                            <h4>Gregory Bernice</h4>
+                            <span>@BerniceGre18041</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Mobile automation game just leveled up 🔥 Ava Protocol Studio on the go is a total win.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #f97316, #06b6d4);">S
+                        </div>
+                        <div class="author-info">
+                            <h4>ShemaiahSB</h4>
+                            <span>@sheemzxx21</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>This is how onchain tools should be used tbh, not just trading, but actually simplifying real
+                            tasks.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #8b5cf6, #ec4899);">A
+                        </div>
+                        <div class="author-info">
+                            <h4>AnnaBell</h4>
+                            <span>@AnnaBellflaa</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Finally, no need to open my laptop for this.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #06b6d4, #3b82f6);">K
+                        </div>
+                        <div class="author-info">
+                            <h4>Crypto Koji</h4>
+                            <span>@ayanokojieth</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Ava focusing on correctness over hype is the right approach. Because in automation, if it
+                            fails once… trust is gone.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #14b8a6, #6366f1);">C
+                        </div>
+                        <div class="author-info">
+                            <h4>Chiko.Sol</h4>
+                            <span>@chikoevm</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>This actually makes so much sense once you see it, can't unsee it now.</p>
+                    </div>
+                </div>
+
+                <div class="testimonial-card">
+                    <div class="testimonial-header">
+                        <div class="avatar-placeholder" style="background: linear-gradient(135deg, #e11d48, #8b5cf6);">D
+                        </div>
+                        <div class="author-info">
+                            <h4>𝐃𝐨𝐥𝐥𝐲</h4>
+                            <span>@dollysznn</span>
+                        </div>
+                    </div>
+                    <div class="testimonial-body">
+                        <p>Once you automate it, you realize how unnecessary the stress was.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Ava Studio Section -->
+    <section>
+        <div class="container">
+            <div class="studio-banner">
+                <span class="section-tag">Ava Studio</span>
+                <h2>Need advanced controls?<br>Open Ava Studio.</h2>
+                <p>Use the web app when Ava needs a wallet signature, custom limits, or full position controls.</p>
+                <a href="https://avaprotocol.org/?ref=lapaninja" target="_blank" class="btn-primary"
+                    style="padding: 12px 28px;">Open Studio</a>
+            </div>
+        </div>
+    </section>
+
+    <!-- FAQ Section -->
+    <section>
+        <div class="container">
+            <div class="section-header">
+                <span class="section-tag">FAQ</span>
+                <h2>Common questions before you start</h2>
+            </div>
+
+            <div class="faq-accordion">
+                <div class="faq-item">
+                    <div class="faq-question">Do I need to sign or connect a wallet to start?</div>
+                    <div class="faq-answer">No wallet connection or signature is required to start in read-only mode via
+                        Telegram. You only sign when you decide to execute or approve automated actions.</div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">Is this safe? Does Ava hold my funds?</div>
+                    <div class="faq-answer">Ava Protocol is entirely non-custodial. Your funds always remain in your
+                        personal wallet under your keys. Ava can only operate within the precise constraints and limits
+                        you approve.</div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">What can Ava actually do?</div>
+                    <div class="faq-answer">Ava monitors health factors, tracks portfolio positions across protocols
+                        like Aave, executes risk management strategies, and handles multi-step on-chain workflows
+                        seamlessly.</div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">What does it cost?</div>
+                    <div class="faq-answer">Getting started and monitoring your wallet positions is free. Transaction
+                        fees apply only when executing on-chain automation workflows.</div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">Do I need to know DeFi or how to code?</div>
+                    <div class="faq-answer">Not at all. You can interact with Ava using plain natural language right
+                        inside Telegram without writing any code or dealing with complex setup procedures.</div>
+                </div>
+                <div class="faq-item">
+                    <div class="faq-question">Which chains and protocols?</div>
+                    <div class="faq-answer">Ava supports major EVM-compatible chains and top-tier lending/DeFi protocols
+                        like Aave, ensuring comprehensive portfolio coverage.</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Footer -->
+    <footer>
+        <div class="container">
+            <div class="footer-cta-box">
+                <h2>Not sure where to start?</h2>
+                <p>Tell Ava what you're worried about. It reads your wallet, watches for risk, and pings you in Telegram
+                    when something needs attention.</p>
+                <a href="https://avaprotocol.org/?ref=lapaninja" target="_blank" class="btn-primary"
+                    style="padding: 14px 32px;">Request in Telegram</a>
+            </div>
+
+            <div class="footer-nav-grid">
+                <div class="footer-logo-col">
+                    <div class="logo-area">
+                        <div class="logo-icon">AP</div>
+                        Ava Protocol
+                    </div>
+                    <p>AI DeFi Guardian protecting and growing your capital with complete transparency and security.</p>
+                </div>
+                <div class="footer-links-col">
+                    <h5>Navigation</h5>
+                    <ul>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Home</a></li>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">About</a></li>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Blog</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links-col">
+                    <h5>Resources</h5>
+                    <ul>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Docs</a></li>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Contact</a></li>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Launch Studio</a></li>
+                    </ul>
+                </div>
+                <div class="footer-links-col">
+                    <h5>Community</h5>
+                    <ul>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Telegram</a></li>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Twitter / X</a></li>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Discord</a></li>
+                        <li><a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">GitHub</a></li>
+                    </ul>
+                </div>
+            </div>
+
+            <div class="footer-bottom">
+                <div>&copy; 2026 Ava Protocol. All rights reserved.</div>
+                <div class="footer-legal-links">
+                    <a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Privacy</a>
+                    <a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Terms</a>
+                    <a href="https://avaprotocol.org/?ref=lapaninja" target="_blank">Telegram Bot Privacy</a>
+                </div>
+            </div>
+        </div>
+    </footer>
+
+    <!-- Interactive FAQ Script -->
+    <script>
+        document.querySelectorAll('.faq-question').forEach(question => {
+            question.addEventListener('click', () => {
+                const item = question.parentElement;
+                const isActive = item.classList.contains('active');
+
+                // Close all items
+                document.querySelectorAll('.faq-item').forEach(i => i.classList.remove('active'));
+
+                // Toggle clicked item if it wasn't active
+                if (!isActive) {
+                    item.classList.add('active');
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>

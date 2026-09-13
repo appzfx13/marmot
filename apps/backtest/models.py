@@ -13,7 +13,7 @@ class BacktestRule(BaseModel):
     market_type = models.CharField(max_length=20, choices=MarketTypeChoices.choices, default='ALL', help_text="Target market segment: Index F&O, Forex Futures, or Shared across all markets.")
     rule_type = models.CharField(max_length=50, choices=RuleTypeChoices.choices, default=RuleTypeChoices.INTRADAY)
     description = models.TextField(blank=True, default="", help_text="Detailed description of the trading rule")
-    prompt_directive = models.TextField(blank=True, default="", help_text="Natural language prompt directive for AI TensorTrade RL Engine")
+    prompt_directive = models.TextField(blank=True, default="", help_text="Natural language prompt directive for Go Quantitative Strategy Engine")
     parameters = models.JSONField(default=dict, blank=True, help_text="JSON parameters for rule constraints")
     is_system_preset = models.BooleanField(default=False, help_text="Protected system default preset rule")
     is_active = models.BooleanField(default=True)
@@ -59,7 +59,7 @@ class BacktestTask(BaseModel):
     max_lots_cap = models.PositiveIntegerField(default=10, help_text="Hard ceiling on concurrent lots count")
 
     # Strategy Input Configuration
-    strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.TENSORTRADE_RL)
+    strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.QUANT_ENGINE)
     index_name = models.CharField(max_length=50, choices=IndexChoices.choices + ForexInstrumentChoices.choices, default=IndexChoices.NIFTY)
     start_date = models.DateField()
     end_date = models.DateField()

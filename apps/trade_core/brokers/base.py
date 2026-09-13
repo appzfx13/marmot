@@ -46,6 +46,7 @@ class BaseBrokerAdapter(ABC):
         order_type: str = 'MARKET', 
         price: float = 0.0, 
         stop_loss: float = 0.0,
+        take_profit: float = 0.0,
         account_type: str = 'SANDBOX'
     ) -> Dict[str, Any]:
         """Place an order in LIVE or SANDBOX account mode."""
