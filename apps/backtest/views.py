@@ -138,9 +138,13 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
         max_cap_util_pct = float(form.cleaned_data.get('max_capital_utilization_pct') or 60.0)
         max_lots_cap = int(form.cleaned_data.get('max_lots_cap') or 10)
 
+        compounding_profile = form.cleaned_data.get('compounding_profile') or 'MODERATE'
+
         params["use_macro_assist"] = use_macro
         params["macro_timeframe"] = macro_tf
         params["enable_ai_lot_sizing"] = enable_ai_lot_sizing
+        params["enable_ai_compounding"] = enable_ai_lot_sizing
+        params["compounding_profile"] = compounding_profile
         params["auto_risk_management"] = auto_risk_management
         params["max_risk_per_trade_pct"] = max_risk_pct
         params["max_capital_utilization_pct"] = max_cap_util_pct
@@ -1158,7 +1162,21 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
         except Exception:
             order_placed_epoch = decision_epoch
 
-        exit_type = 'TARGET' if (pnl >= 0 or 'Target' in exit_reason or 'TP' in exit_reason) else ('TRAILING_SL' if 'Trailing' in exit_reason else 'STOP_LOSS')
+        is_bearish_spot = ('PE' in trade_type or 'PUT' in trade_type or 'PE' in strike or 'PUT' in strike or 'SHORT' in trade_type or 'SELL' in trade_type)
+
+        raw_exit_reason = str(target_trade.get('exit_reason') or '').upper()
+        if 'TRAILING' in raw_exit_reason:
+            exit_type = 'TRAILING_SL'
+        elif 'TARGET' in raw_exit_reason:
+            exit_type = 'TARGET'
+        elif 'STOP_LOSS' in raw_exit_reason or 'SL' in raw_exit_reason:
+            exit_type = 'STOP_LOSS'
+        elif pnl > 0 and exit_price < (target_price - 0.5):
+            exit_type = 'TRAILING_SL'
+        elif pnl >= 0:
+            exit_type = 'TARGET'
+        else:
+            exit_type = 'STOP_LOSS'
 
         return JsonResponse({
             'success': True,
@@ -1169,6 +1187,7 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
             'strike': strike,
             'trade_num': trade_num,
             'trade_type': trade_type,
+            'is_bearish_spot': is_bearish_spot,
             'status': status,
             'pnl': round(pnl, 2),
             'quantity': quantity,
@@ -1813,6 +1832,14 @@ class BacktestControlView(LoginRequiredMixin, AdminRequiredMixin, View):
     def post(self, request, pk, *args, **kwargs):
         action = request.POST.get('action', 'start')
         task = BacktestTask.objects.filter(pk=pk).first()
+
+        if action in ['start', 'resume'] and task:
+            use_macro = request.POST.get('use_macro_assist') in ['true', 'True', '1', 'on']
+            task.use_macro_assist = use_macro
+            if not isinstance(task.parameters, dict):
+                task.parameters = {}
+            task.parameters['use_macro_assist'] = use_macro
+            task.save(update_fields=['use_macro_assist', 'parameters'])
 
         if action == 'start' and task:
             params = task.parameters if isinstance(task.parameters, dict) else {}

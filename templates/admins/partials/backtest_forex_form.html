@@ -231,6 +231,49 @@
         </div>
     </div>
 
+    {# Section 6: AI Dynamic Lot Sizing & Compounding #}
+    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+        <span class="material-icons text-success fs-5">trending_up</span>
+        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">AI Dynamic Sizing &amp; Compounding</h6>
+        <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Compounding Profiles</span>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" style="min-width: 180px;">
+            Compounding Mode
+        </label>
+        <div class="flex-grow-1 w-100">
+            <div class="form-check form-switch d-flex align-items-center gap-2">
+                {{ forex_form.enable_ai_lot_sizing }}
+                <label class="form-check-label theme-text-main fw-semibold small" for="{{ forex_form.enable_ai_lot_sizing.id_for_label }}">
+                    ENABLE AI DYNAMIC SIZING &amp; REINVESTMENT
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3" id="forexCompoundingProfileRow">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.compounding_profile.id_for_label }}" style="min-width: 180px;">
+            Compounding Profile
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.compounding_profile }}
+            <small class="form-text theme-text-muted mt-1 d-block">
+                Choose risk appetite formula: Calm (25% cap), Moderate (50% step-up), Aggressive (70% Kelly), Beast (85% exponential), or Ultra (100% full velocity).
+            </small>
+        </div>
+    </div>
+
+    <div class="mb-3 d-flex flex-column flex-md-row align-items-start align-items-md-center gap-1 gap-md-3">
+        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-md-0" for="{{ forex_form.max_lots_cap.id_for_label }}" style="min-width: 180px;">
+            Max Lots Cap
+        </label>
+        <div class="flex-grow-1 w-100">
+            {{ forex_form.max_lots_cap }}
+            <small class="form-text theme-text-muted mt-1 d-block">Hard safety ceiling for maximum CME micro contracts.</small>
+        </div>
+    </div>
+
     <div class="d-flex align-items-center justify-content-end gap-3 pt-4 border-top" style="border-color: var(--border-color) !important;">
         <a href="{% url 'backtest:backtest_dashboard' %}" class="btn btn-outline-secondary rounded-pill px-4">Cancel</a>
         <button type="submit" class="btn btn-primary rounded-pill px-4 fw-semibold text-white d-inline-flex align-items-center gap-2" style="background: linear-gradient(135deg, #0d6efd 0%, #0b5ed7 100%);">

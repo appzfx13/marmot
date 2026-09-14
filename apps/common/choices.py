@@ -152,6 +152,20 @@ class MacroTimeframeChoices(models.TextChoices):
     D1 = '1d', '1 Day (EOD)'
 
 
+# Compounding & Risk Sizing Profile Choices
+class CompoundingProfileChoices(models.TextChoices):
+    CALM = 'CALM', 'Calm (Conservative · 25% Cap · Drawdown Throttled)'
+    MODERATE = 'MODERATE', 'Moderate (Balanced · 50% Cap · Step-Up Milestones)'
+    AGGRESSIVE = 'AGGRESSIVE', 'Aggressive (Growth · 70% Cap · Kelly Fractional)'
+    BEAST = 'BEAST', 'Beast (High Velocity · 85% Cap · Rapid Scaling)'
+    ULTRA = 'ULTRA', 'Ultra (Max Velocity · 100% Cap · Full Reinvestment)'
+    STEP_UP = 'STEP_UP', 'Step-Up (Milestone Batch)'
+    FIXED_FRACTION = 'FIXED_FRACTION', 'Fixed Fraction (Kelly)'
+    DRAWDOWN_THROTTLED = 'DRAWDOWN_THROTTLED', 'Drawdown Throttled'
+    EOD = 'EOD', 'EOD Compounding'
+    FULL = 'FULL', 'Full Compounding'
+
+
 class PermanentLogTargets:
     """Defines target tuples (app, log_type) that should never be cleaned up."""
     ALL = [

@@ -12,19 +12,29 @@ type OptionSnap struct {
 	IV     float64 `json:"iv"`
 }
 
+// MacroSnapshot captures macro sentiment, institutional flow bias, and event risk regime.
+type MacroSnapshot struct {
+	SentimentScore float64 `json:"sentiment_score"`
+	FIIDIIFlowBias float64 `json:"fii_dii_flow_bias"`
+	GlobalRisk     float64 `json:"global_risk"`
+	EventRiskFlag  bool    `json:"event_risk_flag"`
+	MacroSummary   string  `json:"macro_summary"`
+}
+
 // MarketTick is a per-minute complete market snapshot — spot OHLCV + full option chain.
 // Options key format: "{strike} {optionType}" e.g. "ATM CALL", "ATM+1 PUT".
 // Equivalent to one broker WebSocket broadcast per minute.
 type MarketTick struct {
-	Timestamp int64                `json:"timestamp"`
-	Datetime  string               `json:"datetime"`
-	Date      string               `json:"date"`
-	IndexName string               `json:"index_name"`
-	SpotOpen  float64              `json:"spot_open"`
-	SpotHigh  float64              `json:"spot_high"`
-	SpotLow   float64              `json:"spot_low"`
-	SpotClose float64              `json:"spot_close"`
+	Timestamp int64                 `json:"timestamp"`
+	Datetime  string                `json:"datetime"`
+	Date      string                `json:"date"`
+	IndexName string                `json:"index_name"`
+	SpotOpen  float64               `json:"spot_open"`
+	SpotHigh  float64               `json:"spot_high"`
+	SpotLow   float64               `json:"spot_low"`
+	SpotClose float64               `json:"spot_close"`
 	Options   map[string]OptionSnap `json:"options"`
+	Macro     *MacroSnapshot        `json:"macro,omitempty"`
 }
 
 // StrategyInput carries the full tick feed and parameters for strategy execution.
@@ -50,13 +60,15 @@ type TradeSignal struct {
 	ExitPrice           float64 `json:"exit_price"`        // Option premium at exit
 	TargetPrice         float64 `json:"target_price"`      // Current/Trailing target
 	StopLossPrice       float64 `json:"stop_loss_price"`   // Current/Trailing SL
-	InitialTargetPrice  float64 `json:"initial_target_price"` // Original Option premium target at entry
+	InitialTargetPrice   float64 `json:"initial_target_price"`   // Original Option premium target at entry
 	InitialStopLossPrice float64 `json:"initial_stop_loss_price"` // Original Option premium SL at entry
-	Quantity            int     `json:"quantity"`
-	UtilizedCapital float64 `json:"utilized_capital"`
-	PnL             float64 `json:"pnl"`
-	Status          string  `json:"status"`            // WIN, LOSS, OPEN
-	Reason          string  `json:"reason"`
+	TrailingStopLossPrice float64 `json:"trailing_stop_loss_price,omitempty"` // Trailed Stop Loss level
+	ExitReason           string  `json:"exit_reason,omitempty"`            // TARGET_HIT, TRAILING_SL_HIT, STOP_LOSS_HIT, EOD_SQUAREOFF
+	Quantity             int     `json:"quantity"`
+	UtilizedCapital      float64 `json:"utilized_capital"`
+	PnL                  float64 `json:"pnl"`
+	Status               string  `json:"status"` // WIN, LOSS, OPEN
+	Reason               string  `json:"reason"`
 }
 
 // StrategyResult holds aggregated performance metrics and trade logs.

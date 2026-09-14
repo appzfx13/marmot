@@ -139,6 +139,7 @@ def send_backtest_control_command(task_id, command):
         # Sync task.parameters['rules'] from current M2M so Go always receives
         # the latest attached rules, not the stale snapshot from task creation.
         current_params = dict(task.parameters or {})
+        current_params['use_macro_assist'] = bool(task.use_macro_assist)
         current_params['rules'] = [
             {
                 'id': r.id,

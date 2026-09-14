@@ -128,6 +128,62 @@ func (j *BacktestJob) Run(ctx context.Context) {
 		log.Printf("⚠️  [Backtest #%s] No dataset.parquet found, will use synthetic ticks\n", taskID)
 	}
 
+	// ── AI Macro Assist Loading ───────────────────────────────────────────────
+	useMacroAssist := false
+	if val, ok := params.Params["use_macro_assist"]; ok {
+		switch v := val.(type) {
+		case bool:
+			useMacroAssist = v
+		case string:
+			useMacroAssist = strings.EqualFold(v, "true") || v == "1" || strings.EqualFold(v, "on")
+		}
+	}
+
+	var macroHourly map[string]strategies.MacroSnapshot
+	var macroDaily map[string]strategies.MacroSnapshot
+	if useMacroAssist {
+		macroPath := ""
+		// 1. Check directory of current dataset.parquet for macro_1h_{INDEX}.parquet
+		if parquetFilePath != "" {
+			cand := filepath.Join(filepath.Dir(parquetFilePath), fmt.Sprintf("macro_1h_%s.parquet", indexName))
+			if isFile(cand) {
+				macroPath = cand
+			}
+		}
+		// 2. Fallback: scan /app/backup/{userID}/ for any macro_1h_{INDEX}.parquet or macro backup
+		if macroPath == "" {
+			userBackupDir := fmt.Sprintf("/app/backup/%s", userID)
+			entries, _ := os.ReadDir(userBackupDir)
+			for _, e := range entries {
+				if e.IsDir() {
+					cand1 := filepath.Join(userBackupDir, e.Name(), fmt.Sprintf("macro_1h_%s.parquet", indexName))
+					if isFile(cand1) {
+						macroPath = cand1
+						break
+					}
+					cand2 := filepath.Join(userBackupDir, e.Name(), "macro_1h_NIFTY.parquet")
+					if isFile(cand2) {
+						macroPath = cand2
+						break
+					}
+				}
+			}
+		}
+
+		if macroPath != "" {
+			hMap, dMap, mErr := pqreader.LoadMacroSnapshots(macroPath)
+			if mErr != nil {
+				log.Printf("⚠️  [Backtest #%s] AI Macro load failed (%v)\n", taskID, mErr)
+			} else {
+				macroHourly = hMap
+				macroDaily = dMap
+				log.Printf("🧠 [Backtest #%s] AI Macro Assist ENABLED: %d hourly snapshots from %s\n", taskID, len(macroHourly), macroPath)
+			}
+		} else {
+			log.Printf("ℹ️  [Backtest #%s] AI Macro Assist enabled but no macro parquet file found\n", taskID)
+		}
+	}
+
 	compounding := NewCompoundingEngine(params.InitialCapital, params.Params)
 	allTrades := make([]strategies.TradeSignal, 0)
 	var totalPnL, peakPnL, maxDD, totalProfit, totalLoss float64
@@ -151,6 +207,26 @@ func (j *BacktestJob) Run(ctx context.Context) {
 		dayTicks, hasReal := candlesByDate[dateStr]
 		if !hasReal || len(dayTicks) == 0 {
 			dayTicks = j.syntheticDayTicks(dateStr)
+		}
+
+		// Attach AI Macro Snapshot to each tick if enabled
+		if useMacroAssist && (len(macroHourly) > 0 || len(macroDaily) > 0) {
+			for idx := range dayTicks {
+				t := &dayTicks[idx]
+				var snap *strategies.MacroSnapshot
+				if len(t.Datetime) >= 13 {
+					hourKey := strings.Replace(t.Datetime[:13], "T", " ", 1)
+					if s, ok := macroHourly[hourKey]; ok {
+						snap = &s
+					}
+				}
+				if snap == nil && len(macroDaily) > 0 {
+					if s, ok := macroDaily[dateStr]; ok {
+						snap = &s
+					}
+				}
+				t.Macro = snap
+			}
 		}
 
 		input := strategies.StrategyInput{

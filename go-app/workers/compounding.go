@@ -9,6 +9,7 @@ import (
 type RiskProfile string
 
 const (
+	RiskProfileUltra      RiskProfile = "ULTRA"
 	RiskProfileBeast      RiskProfile = "BEAST"
 	RiskProfileExtreme    RiskProfile = "EXTREME"
 	RiskProfileAggressive RiskProfile = "AGGRESSIVE"
@@ -21,6 +22,11 @@ type CompoundingProfile string
 
 const (
 	CompoundingFixed             CompoundingProfile = "FIXED"              // No compounding: fixed lot size
+	CompoundingCalm              CompoundingProfile = "CALM"               // Calm: Conservative, Drawdown Throttled, 25% max-cap
+	CompoundingModerate          CompoundingProfile = "MODERATE"           // Moderate: Balanced, Milestone Step-Up, 50% max-cap
+	CompoundingAggressive        CompoundingProfile = "AGGRESSIVE"         // Aggressive: Kelly Fractional, 70% max-cap
+	CompoundingBeast             CompoundingProfile = "BEAST"              // Beast: High Velocity, Rapid Multiplier, 85% max-cap
+	CompoundingUltra             CompoundingProfile = "ULTRA"              // Ultra: Max Velocity, Full Reinvestment, 100% max-cap
 	CompoundingFull              CompoundingProfile = "FULL"               // Reinvest all net profits immediately
 	CompoundingEOD               CompoundingProfile = "EOD"                // Reinvest once daily after market close
 	CompoundingFixedFraction     CompoundingProfile = "FIXED_FRACTION"     // Kelly/Fixed fractional risk per trade
@@ -33,6 +39,8 @@ const (
 func ResolveRiskProfile(profileStr string, maxLotsCap int, maxRiskPct float64) RiskProfile {
 	cleaned := strings.ToUpper(strings.TrimSpace(profileStr))
 	switch cleaned {
+	case "ULTRA":
+		return RiskProfileUltra
 	case "BEAST":
 		return RiskProfileBeast
 	case "EXTREME":
@@ -47,11 +55,13 @@ func ResolveRiskProfile(profileStr string, maxLotsCap int, maxRiskPct float64) R
 
 	// Fallback dynamic threshold evaluation
 	switch {
-	case maxLotsCap >= 50 || maxRiskPct >= 8.0:
+	case maxLotsCap >= 75 || maxRiskPct >= 7.0:
+		return RiskProfileUltra
+	case maxLotsCap >= 50 || maxRiskPct >= 5.0:
 		return RiskProfileBeast
-	case maxLotsCap >= 25 || maxRiskPct >= 5.0:
+	case maxLotsCap >= 25 || maxRiskPct >= 3.5:
 		return RiskProfileExtreme
-	case maxLotsCap >= 15 || maxRiskPct >= 3.5:
+	case maxLotsCap >= 15 || maxRiskPct >= 2.5:
 		return RiskProfileAggressive
 	case maxLotsCap <= 5 && maxRiskPct <= 1.5:
 		return RiskProfileCalm
@@ -145,6 +155,16 @@ func NewCompoundingEngine(initialCapital float64, params map[string]interface{})
 	if enableCompounding {
 		if cpStr, ok := params["compounding_profile"].(string); ok && cpStr != "" {
 			switch strings.ToUpper(strings.TrimSpace(cpStr)) {
+			case "CALM":
+				profile = CompoundingCalm
+			case "MODERATE":
+				profile = CompoundingModerate
+			case "AGGRESSIVE":
+				profile = CompoundingAggressive
+			case "BEAST":
+				profile = CompoundingBeast
+			case "ULTRA":
+				profile = CompoundingUltra
 			case "FULL":
 				profile = CompoundingFull
 			case "EOD":
@@ -156,10 +176,10 @@ func NewCompoundingEngine(initialCapital float64, params map[string]interface{})
 			case "STEP_UP", "BATCH":
 				profile = CompoundingStepUp
 			default:
-				profile = CompoundingStepUp
+				profile = CompoundingModerate
 			}
 		} else {
-			profile = CompoundingStepUp
+			profile = CompoundingModerate
 		}
 	}
 
@@ -194,50 +214,91 @@ func (c *CompoundingConfig) CalculateLotSize(estimatedPremium float64) int {
 	}
 
 	switch c.Profile {
-	case CompoundingFull:
-		// Sizing grows strictly proportional to percentage capital growth
-		lots = int(math.Floor(float64(c.BaseLots) * capitalRatio))
+	case CompoundingCalm:
+		// Calm Profile: Conservative growth with continuous drawdown dampening
+		// 1. Scales lot size with capital growth dampened by peak-drawdown
+		ddPct := 0.0
+		if c.PeakCapital > 0 && c.CurrentCapital < c.PeakCapital {
+			ddPct = (c.PeakCapital - c.CurrentCapital) / c.PeakCapital
+		}
+		retentionRatio := math.Max(0.10, 1.0-(ddPct*1.5)) // 1.5x penalty on drawdown
+		scaledLots := float64(c.BaseLots) * capitalRatio * retentionRatio
+		lots = int(math.Max(1, math.Floor(scaledLots)))
 
-	case CompoundingStepUp:
-		// Step up lots based on percentage milestones
+		// Hard Calm limit: 25% of MaxLotsCap
+		calmCap := math.Max(1.0, math.Floor(float64(c.MaxLotsCap)*0.25))
+		if float64(lots) > calmCap {
+			lots = int(calmCap)
+		}
+
+	case CompoundingModerate, CompoundingStepUp:
+		// Moderate Profile: Balanced Milestone Step-Up (every profitStep milestone gains 1 lot)
 		netProfit := c.CurrentCapital - c.InitialCapital
 		if netProfit > 0 && c.CompoundingProfitStep > 0 {
 			stepIncrements := int(math.Floor(netProfit / c.CompoundingProfitStep))
 			lots = c.BaseLots + stepIncrements
 		}
+		// Moderate limit: 50% of MaxLotsCap
+		moderateCap := math.Max(float64(c.BaseLots), math.Floor(float64(c.MaxLotsCap)*0.50))
+		if float64(lots) > moderateCap {
+			lots = int(moderateCap)
+		}
 
-	case CompoundingFixedFraction:
-		// Dynamic Risk Percentage model:
-		// Max allowed risk = CurrentCapital * (MaxRiskPerTradePct / 100)
-		// Max capital committed = CurrentCapital * (MaxCapitalUtilPct / 100)
+	case CompoundingAggressive, CompoundingFixedFraction:
+		// Aggressive Profile: Dynamic Kelly Fractional Risk per trade
 		if estimatedPremium > 0 && c.LotSize > 0 {
-			allowedRiskCapital := c.CurrentCapital * (c.MaxRiskPerTradePct / 100.0)
+			riskPct := math.Max(c.MaxRiskPerTradePct, 3.0) // baseline 3% for Aggressive
+			allowedRiskCapital := c.CurrentCapital * (riskPct / 100.0)
 			maxUtilizedCapital := c.CurrentCapital * (c.MaxCapitalUtilPct / 100.0)
 			costPerLot := estimatedPremium * float64(c.LotSize)
 
-			// Max lots allowed by capital utilization percentage
 			lotsByUtil := int(math.Floor(maxUtilizedCapital / costPerLot))
-
-			// Max lots allowed by risk percentage (assuming standard 25% option premium stoploss risk)
-			riskPerLot := costPerLot * (c.MaxRiskPerTradePct / 100.0)
+			riskPerLot := costPerLot * (riskPct / 100.0)
 			if riskPerLot <= 0 {
 				riskPerLot = costPerLot * 0.25
 			}
 			lotsByRisk := int(math.Floor(allowedRiskCapital / riskPerLot))
-
 			calculatedLots := int(math.Min(float64(lotsByUtil), float64(lotsByRisk)))
 			if calculatedLots > 0 {
 				lots = calculatedLots
 			}
 		}
+		// Aggressive limit: 70% of MaxLotsCap
+		aggCap := math.Max(float64(c.BaseLots), math.Floor(float64(c.MaxLotsCap)*0.70))
+		if float64(lots) > aggCap {
+			lots = int(aggCap)
+		}
+
+	case CompoundingBeast:
+		// Beast Profile: High-Velocity Exponential Compounding
+		// Base lots grow directly with capital ratio, with bonus allocation when on winning runs
+		rawLots := float64(c.BaseLots) * math.Pow(capitalRatio, 1.15)
+		lots = int(math.Max(1, math.Floor(rawLots)))
+
+		// Beast limit: 85% of MaxLotsCap
+		beastCap := math.Max(float64(c.BaseLots), math.Floor(float64(c.MaxLotsCap)*0.85))
+		if float64(lots) > beastCap {
+			lots = int(beastCap)
+		}
+
+	case CompoundingUltra, CompoundingFull:
+		// Ultra Profile: Max Velocity, 100% Capital Reinvestment to Hard Ceiling
+		rawLots := float64(c.BaseLots) * capitalRatio
+		lots = int(math.Max(1, math.Floor(rawLots)))
+
+		// Ultra limit: Full 100% of MaxLotsCap
+		if c.MaxLotsCap > 0 && lots > c.MaxLotsCap {
+			lots = c.MaxLotsCap
+		}
+
+	case CompoundingEOD:
+		// Reinvest proportional to current capital
+		lots = int(math.Floor(float64(c.BaseLots) * capitalRatio))
 
 	case CompoundingDrawdownThrottled:
-		// Continuous percentage-based drawdown dampening:
-		// Sizing scales down smoothly with the percentage drawdown from peak capital
 		if c.PeakCapital > 0 {
 			ddPct := (c.PeakCapital - c.CurrentCapital) / c.PeakCapital
 			if ddPct > 0 {
-				// Retention ratio: 1.0 - ddPct (e.g. 10% DD retains 90% lot sizing capacity)
 				retentionRatio := math.Max(0.10, 1.0-ddPct)
 				scaledLots := float64(c.BaseLots) * capitalRatio * retentionRatio
 				lots = int(math.Max(1, math.Floor(scaledLots)))
@@ -245,6 +306,7 @@ func (c *CompoundingConfig) CalculateLotSize(estimatedPremium float64) int {
 				lots = int(math.Floor(float64(c.BaseLots) * capitalRatio))
 			}
 		}
+
 	default:
 		lots = c.BaseLots
 	}

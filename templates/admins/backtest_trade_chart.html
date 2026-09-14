@@ -1294,21 +1294,11 @@
             let targetP = origTargetP;
             let exitP = origExitP;
 
-            if (origEntryP > 0 && candleEntryOpen > 0 && Math.abs(candleEntryOpen - origEntryP) / origEntryP > 0.08) {
-                const scale = candleEntryOpen / origEntryP;
-                entryP = Number(candleEntryOpen.toFixed(2));
-                const origRisk = Math.abs(origEntryP - origStopP);
-                const origReward = Math.abs(origTargetP - origEntryP);
-                stopP = Number((isBuy ? (entryP - (origRisk * scale)) : (entryP + (origRisk * scale))).toFixed(2));
-                targetP = Number((isBuy ? (entryP + (origReward * scale)) : (entryP - (origReward * scale))).toFixed(2));
-                exitP = Number(candleExitClose.toFixed(2));
-            }
-
             if (isBuy && stopP >= entryP) {
-                stopP = Number((entryP - 5.0).toFixed(2));
+                stopP = Number((entryP - 10.0).toFixed(2));
                 if (stopP <= 0) stopP = Number((entryP * 0.85).toFixed(2));
             } else if (!isBuy && stopP <= entryP) {
-                stopP = Number((entryP + 5.0).toFixed(2));
+                stopP = Number((entryP + 10.0).toFixed(2));
             }
 
             if (!targetP || targetP <= 0) targetP = isBuy ? (entryP * 1.15) : (entryP * 0.85);
@@ -1348,7 +1338,10 @@
             clearPriceLines(spotCandleSeries, spotPriceLines);
             const spotEntryP = Number(rawTradeData.entry.index_price || rawTradeData.entry.price);
             const tradeType = (rawTradeData.trade_type || '').toUpperCase();
-            const isBearishSpot = tradeType.includes('PE') || tradeType.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL');
+            const strikeStr = (rawTradeData.strike || '').toUpperCase();
+            const isBearishSpot = (typeof rawTradeData.is_bearish_spot !== 'undefined') ?
+                Boolean(rawTradeData.is_bearish_spot) :
+                (tradeType.includes('PE') || tradeType.includes('PUT') || strikeStr.includes('PE') || strikeStr.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL'));
             const idxPts = Math.abs(Number(rawTradeData.index_points || 30));
             const spotTargetP = Number((isBearishSpot ? (spotEntryP - idxPts * 1.5) : (spotEntryP + idxPts * 1.5)).toFixed(2));
             const spotStopP = Number((isBearishSpot ? (spotEntryP + idxPts * 0.8) : (spotEntryP - idxPts * 0.8)).toFixed(2));
@@ -1424,7 +1417,10 @@
             const signalEpoch = tl.signal_epoch || (entryEpoch ? entryEpoch - 60 : 0);
             const spotExitP = Number(rawTradeData.exit.index_price || rawTradeData.exit.price);
             const tradeType = (rawTradeData.trade_type || '').toUpperCase();
-            const isBearishSpot = tradeType.includes('PE') || tradeType.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL');
+            const strikeStr = (rawTradeData.strike || '').toUpperCase();
+            const isBearishSpot = (typeof rawTradeData.is_bearish_spot !== 'undefined') ?
+                Boolean(rawTradeData.is_bearish_spot) :
+                (tradeType.includes('PE') || tradeType.includes('PUT') || strikeStr.includes('PE') || strikeStr.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL'));
             const markers = [];
 
             // 1. Signal Generated Marker
@@ -1454,8 +1450,16 @@
             // 3. Exit Marker (TP or SL Hit)
             if (exitEpoch) {
                 const isWin = (rawTradeData.pnl >= 0);
-                const exitColor = isWin ? '#10b981' : '#ef4444';
-                const exitTag = isWin ? '🎯 TP HIT' : '🛑 SL HIT';
+                const exitType = (rawTradeData.exit && rawTradeData.exit.exit_type) || '';
+                let exitColor = isWin ? '#10b981' : '#ef4444';
+                let exitTag = '🎯 TP HIT';
+                if (exitType === 'TRAILING_SL') {
+                    exitTag = '🛡️ TRAIL SL';
+                    exitColor = '#38bdf8';
+                } else if (!isWin) {
+                    exitTag = '🛑 SL HIT';
+                }
+
                 markers.push({
                     time: findNearestCandleTime(activeSpotCandles, exitEpoch),
                     position: isBearishSpot ? 'belowBar' : 'aboveBar',
@@ -1516,12 +1520,25 @@
                 });
             }
 
-            // 4. Exit Marker (TP or SL Hit)
+            // 4. Exit Marker (TP, Trailing SL, or SL Hit)
             if (exitEpoch) {
                 const isWin = (rawTradeData.pnl >= 0);
-                const exitColor = isWin ? '#10b981' : '#ef4444';
+                const exitType = (rawTradeData.exit && rawTradeData.exit.exit_type) || '';
                 const diffPts = Math.abs(optLevels.exitP - optLevels.entryP).toFixed(1);
-                const exitLabel = isWin ? `🎯 TP HIT (+₹${diffPts})` : `🛑 SL HIT (-₹${diffPts})`;
+                let exitColor = isWin ? '#10b981' : '#ef4444';
+                let exitLabel = '';
+
+                if (exitType === 'TRAILING_SL' || (isWin && optLevels.exitP < (optLevels.targetP - 0.5))) {
+                    exitLabel = `🛡️ TRAIL SL (+₹${diffPts})`;
+                    exitColor = '#38bdf8';
+                } else if (isWin) {
+                    exitLabel = `🎯 TP HIT (+₹${diffPts})`;
+                    exitColor = '#10b981';
+                } else {
+                    exitLabel = `🛑 SL HIT (-₹${diffPts})`;
+                    exitColor = '#ef4444';
+                }
+
                 markers.push({
                     time: findNearestCandleTime(activeOptCandles, exitEpoch),
                     position: 'aboveBar',
@@ -1541,7 +1558,10 @@
             if (!rawTradeData || !rawTradeData.entry) return;
             const spotEntryP = Number(rawTradeData.entry.index_price || rawTradeData.entry.price);
             const tradeType = (rawTradeData.trade_type || '').toUpperCase();
-            const isBearishSpot = tradeType.includes('PE') || tradeType.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL');
+            const strikeStr = (rawTradeData.strike || '').toUpperCase();
+            const isBearishSpot = (typeof rawTradeData.is_bearish_spot !== 'undefined') ?
+                Boolean(rawTradeData.is_bearish_spot) :
+                (tradeType.includes('PE') || tradeType.includes('PUT') || strikeStr.includes('PE') || strikeStr.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL'));
             const idxPts = Math.abs(Number(rawTradeData.index_points || 30));
             const spotTargetP = Number((isBearishSpot ? (spotEntryP - idxPts * 1.5) : (spotEntryP + idxPts * 1.5)).toFixed(2));
             const spotStopP = Number((isBearishSpot ? (spotEntryP + idxPts * 0.8) : (spotEntryP - idxPts * 0.8)).toFixed(2));

@@ -7,8 +7,8 @@ var GammaBlastPreset = StrategyConfig{
 	EMASlow:          9,
 	RR:               3.5,
 	SLPts:            8.0,
-	MinDisplacement:  0.70,
-	EntryWindowFrom:  14*60 + 15, // 14:15 IST (2:15 PM)
+	MinDisplacement:  0.55,
+	EntryWindowFrom:  13*60 + 30, // 13:30 IST (1:30 PM - post 13:30 IST)
 	EntryWindowTo:    15*60 + 15, // 15:15 IST (3:15 PM)
 	UseORBFilter:     false,      // Afternoon momentum breakout ignores opening morning range
 	RequireExpiryDay: true,       // Strictly executes on exchange expiry days only

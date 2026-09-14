@@ -95,12 +95,15 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			exitOptPrice := optClose
 			exitSpotPrice := tick.SpotClose
 			status := "WIN"
+			exitReason := "TARGET_HIT"
 
 			// Trailing stop loss to breakeven once option reaches +1.2R gain
-			initialRisk := activeTrade.EntryPrice - activeTrade.StopLossPrice
+			initialRisk := activeTrade.EntryPrice - activeTrade.InitialStopLossPrice
 			if initialRisk > 0 && optHigh >= activeTrade.EntryPrice+(initialRisk*1.2) {
-				if activeTrade.StopLossPrice < activeTrade.EntryPrice+1.0 {
-					activeTrade.StopLossPrice = activeTrade.EntryPrice + 1.0 // Lock in entry + slippage buffer
+				trailedPrice := activeTrade.EntryPrice + 1.0 // Lock in entry + slippage buffer
+				if activeTrade.StopLossPrice < trailedPrice {
+					activeTrade.StopLossPrice = trailedPrice
+					activeTrade.TrailingStopLossPrice = trailedPrice
 				}
 			}
 
@@ -109,13 +112,16 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 				exitOptPrice = activeTrade.StopLossPrice
 				if exitOptPrice >= activeTrade.EntryPrice {
 					status = "WIN"
+					exitReason = "TRAILING_SL_HIT"
 				} else {
 					status = "LOSS"
+					exitReason = "STOP_LOSS_HIT"
 				}
 				isClosed = true
 			} else if optHigh >= activeTrade.TargetPrice {
 				exitOptPrice = activeTrade.TargetPrice
 				status = "WIN"
+				exitReason = "TARGET_HIT"
 				isClosed = true
 			}
 
@@ -127,6 +133,7 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 				} else {
 					status = "LOSS"
 				}
+				exitReason = "EOD_SQUAREOFF"
 				isClosed = true
 			}
 
@@ -135,6 +142,7 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 				activeTrade.IndexExitPrice = exitSpotPrice
 				activeTrade.ExitTimestamp = tick.Datetime
 				activeTrade.Status = status
+				activeTrade.ExitReason = exitReason
 				activeTrade.PnL = math.Round((activeTrade.ExitPrice-activeTrade.EntryPrice)*float64(activeTrade.Quantity)*100) / 100
 				trades = append(trades, *activeTrade)
 				activeTrade = nil
@@ -156,9 +164,49 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			optionType = "PUT"
 		}
 
-		// Prefer ATM; cascade to ATM+1 if premium is zero/missing
+		// ── 2b. AI Macro Assist Directional Filter ────────────────────────────
+		macroTag := ""
+		if tick.Macro != nil {
+			// Skip trades conflicting strongly with institutional / sentiment bias:
+			// If Macro is Bearish (score < -0.15 or FII/DII flow < -0.20), block CALL entries
+			if optionType == "CALL" && (tick.Macro.SentimentScore < -0.15 || tick.Macro.FIIDIIFlowBias < -0.20) {
+				continue // Blocked by Bearish AI Macro
+			}
+			// If Macro is Bullish (score > +0.15 or FII/DII flow > +0.20), block PUT entries
+			if optionType == "PUT" && (tick.Macro.SentimentScore > 0.15 || tick.Macro.FIIDIIFlowBias > 0.20) {
+				continue // Blocked by Bullish AI Macro
+			}
+			macroTag = fmt.Sprintf(" [Macro: Sent=%.2f, Flow=%.2f]", tick.Macro.SentimentScore, tick.Macro.FIIDIIFlowBias)
+		}
+
+		// Strike step resolution
+		strikeStep := 50
+		if input.Params != nil {
+			if step, ok := input.Params["strike_step"].(float64); ok && step > 0 {
+				strikeStep = int(step)
+			} else if stepInt, ok := input.Params["strike_step"].(int); ok && stepInt > 0 {
+				strikeStep = stepInt
+			}
+		}
+		if strikeStep <= 0 {
+			if strings.EqualFold(input.IndexName, "BANKNIFTY") || strings.EqualFold(input.IndexName, "SENSEX") {
+				strikeStep = 100
+			} else if strings.EqualFold(input.IndexName, "MIDCPNIFTY") {
+				strikeStep = 25
+			} else {
+				strikeStep = 50
+			}
+		}
+
+		// Calculate ATM strike dynamically from current Spot Close
+		atmNum := int(math.Round(tick.SpotClose/float64(strikeStep))) * strikeStep
+
+		// Prefer ATM; cascade to ATM+1 / ATM-1 if premium is zero/missing.
+		// Supports both relative keys ("ATM CALL") and absolute keys ("24500 CALL").
 		strikeKey := ""
 		entryOptPrice := 0.0
+
+		// 1. Try relative keys first (e.g. datasets with ATM, ATM+1)
 		for _, label := range []string{"ATM", "ATM+1", "ATM-1", "ATM+2", "ATM-2"} {
 			candidate := label + " " + optionType
 			if snap, ok := tick.Options[candidate]; ok && snap.Close > 0 {
@@ -167,6 +215,20 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 				break
 			}
 		}
+
+		// 2. Fallback to absolute numeric strike keys (e.g. "26200 CALL")
+		if strikeKey == "" || entryOptPrice <= 0 {
+			for _, offset := range []int{0, 1, -1, 2, -2, 3, -3} {
+				numStrike := atmNum + (offset * strikeStep)
+				candidate := fmt.Sprintf("%d %s", numStrike, optionType)
+				if snap, ok := tick.Options[candidate]; ok && snap.Close > 0 {
+					strikeKey = candidate
+					entryOptPrice = snap.Close
+					break
+				}
+			}
+		}
+
 		if strikeKey == "" || entryOptPrice <= 0 {
 			continue // No valid option premium for entry — skip tick
 		}
@@ -190,20 +252,21 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 		}
 
 		activeTrade = &TradeSignal{
-			Timestamp:            tick.Datetime,
-			Strike:               strikeKey,
-			Symbol:               input.IndexName,
-			TradeType:            "BUY",
-			IndexEntryPrice:      tick.SpotClose,
-			EntryPrice:           entryOptPrice,
-			TargetPrice:          targetOptPrice,
-			StopLossPrice:        slOptPrice,
-			InitialTargetPrice:   targetOptPrice,
-			InitialStopLossPrice: slOptPrice,
-			Quantity:             sig.Quantity,
-			UtilizedCapital:      math.Round(entryOptPrice * float64(sig.Quantity)),
-			Status:               "OPEN",
-			Reason:               sig.TriggerReason,
+			Timestamp:             tick.Datetime,
+			Strike:                strikeKey,
+			Symbol:                input.IndexName,
+			TradeType:             "BUY",
+			IndexEntryPrice:       tick.SpotClose,
+			EntryPrice:            entryOptPrice,
+			TargetPrice:           targetOptPrice,
+			StopLossPrice:         slOptPrice,
+			InitialTargetPrice:    targetOptPrice,
+			InitialStopLossPrice:  slOptPrice,
+			TrailingStopLossPrice: slOptPrice,
+			Quantity:              sig.Quantity,
+			UtilizedCapital:       math.Round(entryOptPrice * float64(sig.Quantity)),
+			Status:                "OPEN",
+			Reason:                sig.TriggerReason + macroTag,
 		}
 		activeStrikeKey = strikeKey
 	}

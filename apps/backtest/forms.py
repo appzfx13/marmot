@@ -2,7 +2,7 @@ from django import forms
 import json
 from .models import BacktestTask, BacktestRule
 from apps.market.models import MarketBackupTask
-from apps.common.choices import StrikeSelectionChoices, IndexChoices, ForexInstrumentChoices, MarketTypeChoices, MacroTimeframeChoices
+from apps.common.choices import StrikeSelectionChoices, IndexChoices, ForexInstrumentChoices, MarketTypeChoices, MacroTimeframeChoices, CompoundingProfileChoices
 
 
 class BacktestRuleForm(forms.ModelForm):
@@ -115,6 +115,7 @@ class IndexBacktestTaskForm(forms.ModelForm):
     stop_loss_points = forms.FloatField(initial=30.0, required=False, help_text="Stop Loss in Index/Option Points (e.g. 30 pts)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_stop_loss_points', 'step': '0.5'}))
     lots_count = forms.IntegerField(initial=1, min_value=1, required=False, help_text="Number of option lots (e.g. 1, 2, 5)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'min': '1'}))
     enable_ai_lot_sizing = forms.BooleanField(required=False, initial=False, label="ENABLE AI DYNAMIC LOT SIZING", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_index_enable_ai_lot_sizing'}))
+    compounding_profile = forms.ChoiceField(choices=CompoundingProfileChoices.choices, initial=CompoundingProfileChoices.MODERATE, required=False, widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace fw-bold', 'id': 'id_index_compounding_profile'}))
     auto_risk_management = forms.BooleanField(required=False, initial=True, label="AUTO RISK MANAGEMENT", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_index_auto_risk_management'}))
     max_risk_per_trade_pct = forms.DecimalField(initial=2.00, min_value=0.1, max_value=10.0, decimal_places=2, required=False, widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace', 'id': 'id_index_max_risk_pct', 'step': '0.1'}))
     max_capital_utilization_pct = forms.DecimalField(initial=60.00, min_value=5.0, max_value=100.0, decimal_places=2, required=False, widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace', 'id': 'id_index_max_capital_util_pct', 'step': '1'}))
@@ -165,6 +166,7 @@ class ForexBacktestTaskForm(forms.ModelForm):
     stop_loss_points = forms.FloatField(initial=25.0, required=False, help_text="Stop Loss in Pips or Ticks (e.g. 25 pips)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_stop_loss_points', 'step': '0.1'}))
     lots_count = forms.IntegerField(initial=1, min_value=1, required=False, help_text="Number of CME Micro Contracts / Lots (e.g. 1, 2, 5)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'min': '1'}))
     enable_ai_lot_sizing = forms.BooleanField(required=False, initial=False, label="ENABLE AI DYNAMIC LOT SIZING", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_forex_enable_ai_lot_sizing'}))
+    compounding_profile = forms.ChoiceField(choices=CompoundingProfileChoices.choices, initial=CompoundingProfileChoices.MODERATE, required=False, widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace fw-bold', 'id': 'id_forex_compounding_profile'}))
     auto_risk_management = forms.BooleanField(required=False, initial=True, label="AUTO RISK MANAGEMENT", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_forex_auto_risk_management'}))
     max_risk_per_trade_pct = forms.DecimalField(initial=2.00, min_value=0.1, max_value=10.0, decimal_places=2, required=False, widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace', 'id': 'id_forex_max_risk_pct', 'step': '0.1'}))
     max_capital_utilization_pct = forms.DecimalField(initial=60.00, min_value=5.0, max_value=100.0, decimal_places=2, required=False, widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace', 'id': 'id_forex_max_capital_util_pct', 'step': '1'}))
