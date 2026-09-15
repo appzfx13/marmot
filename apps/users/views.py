@@ -965,6 +965,19 @@ class UserBacktestView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
         return context
 
 
+class UserStrategyCheckView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+    """View for user dynamic parameter optimizer (Strategy Check)."""
+    template_name = 'users/dashboard.html'
+    partial_template_name = 'users/partials/strategy_check_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        populate_account_context(context, user, self.request)
+        context['active_tab'] = 'strategy-check'
+        return context
+
+
 class UserBacktestCreateView(HtmxModalMixin, LoginRequiredMixin, FormView):
     """Modal view for user to trigger a new backtest simulation."""
     form_class = UserBacktestTaskForm

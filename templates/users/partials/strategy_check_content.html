@@ -1,0 +1,100 @@
+{% load static %}
+<div class="container-fluid px-3 py-3" id="mainContentBody" style="max-width: 1400px; margin: 0 auto;">
+    <!-- Header Section -->
+    <div class="d-flex align-items-center justify-content-between mb-4">
+        <div>
+            <h1 class="h3 mb-1 theme-text-main fw-bold d-flex align-items-center gap-2">
+                <i class="bi bi-gear-wide-connected text-success"></i> Strategy Optimizer
+                <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25" style="font-size: 0.7rem;">BETA</span>
+            </h1>
+            <p class="theme-text-muted mb-0 small">Dynamic Parameter Optimizer / Genetic Algorithm using Go Engine</p>
+        </div>
+        <div class="d-flex gap-2">
+            <button class="btn btn-outline-secondary d-flex align-items-center gap-2" onclick="window.history.back()">
+                <i class="bi bi-arrow-left"></i> Back
+            </button>
+        </div>
+    </div>
+
+    <div class="row g-4">
+        <!-- Configuration Panel -->
+        <div class="col-xl-4 col-lg-5">
+            <div class="glass-card p-4 h-100">
+                <h5 class="theme-text-main fw-bold mb-3 d-flex align-items-center gap-2">
+                    <i class="bi bi-sliders"></i> Optimizer Configuration
+                </h5>
+                
+                <form id="optimizerForm" hx-post="#" hx-target="#optimizerConsole" hx-swap="innerHTML">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label theme-text-muted fw-bold">Optimization Method</label>
+                        <select class="form-select" name="method">
+                            <option value="grid">Grid Search (Brute Force)</option>
+                            <option value="genetic">Genetic Algorithm (Smart Evolution)</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label theme-text-muted fw-bold">Target Metric</label>
+                        <select class="form-select" name="target_metric">
+                            <option value="total_profit">Highest Total Profit</option>
+                            <option value="win_rate">Highest Win Rate</option>
+                            <option value="lowest_drawdown">Lowest Max Drawdown</option>
+                        </select>
+                    </div>
+                    
+                    <hr class="border-secondary opacity-25 my-4">
+                    
+                    <h6 class="theme-text-main fw-bold mb-3">Indicator Ranges</h6>
+                    
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small">RSI Min</label>
+                            <input type="number" class="form-control" name="rsi_min" value="20" min="0" max="100">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small">RSI Max</label>
+                            <input type="number" class="form-control" name="rsi_max" value="40" min="0" max="100">
+                        </div>
+                    </div>
+                    
+                    <div class="row g-2 mb-4">
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small">EMA Min</label>
+                            <input type="number" class="form-control" name="ema_min" value="5" min="1">
+                        </div>
+                        <div class="col-6">
+                            <label class="form-label theme-text-muted small">EMA Max</label>
+                            <input type="number" class="form-control" name="ema_max" value="200" min="1">
+                        </div>
+                    </div>
+                    
+                    <button type="submit" class="btn btn-success w-100 fw-bold d-flex align-items-center justify-content-center gap-2" style="height: 44px !important;">
+                        <i class="bi bi-play-fill fs-5"></i> START OPTIMIZATION
+                    </button>
+                </form>
+            </div>
+        </div>
+
+        <!-- Terminal Output / Results -->
+        <div class="col-xl-8 col-lg-7">
+            <div class="glass-card p-4 h-100 d-flex flex-column">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5 class="theme-text-main fw-bold mb-0 d-flex align-items-center gap-2">
+                        <i class="bi bi-terminal"></i> Go Engine Console
+                    </h5>
+                    <div class="d-flex align-items-center gap-2 text-muted small">
+                        <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 8px; height: 8px;"></span>
+                        Engine Ready
+                    </div>
+                </div>
+                
+                <div id="optimizerConsole" class="flex-grow-1 p-3 rounded font-monospace" style="background: #020617; border: 1px solid rgba(255,255,255,0.1); color: #10B981; font-size: 0.85rem; overflow-y: auto; max-height: 600px; min-height: 400px;">
+                    $ Waiting for user to configure optimizer...<br>
+                    $ The Go engine will utilize all available CPU cores for maximum throughput.
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

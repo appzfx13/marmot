@@ -14,6 +14,7 @@
 
 ### Core Value Proposition
 - **High-Throughput Parallel Backtesting:** Eliminates analytical bottlenecks by executing multi-year intraday options strategies across hundreds of millions of ticks and 1-minute bars in seconds using a compiled Go multi-core worker engine.
+- **Dynamic Parameter Optimization (Grid & GA):** Employs Go-based multi-threaded Grid Search and Genetic Algorithms (Smart Evolution) to automatically backtest tens of thousands of strategy configurations and isolate the absolute most profitable settings.
 - **Continuous Contract Simulation:** Resolves historical options trading anomalies by binding position tracking directly to the exact underlying strike contract throughout its trade lifecycle, eliminating rolling ATM discontinuities and synthetic price jumps.
 - **Institutional Market Simulation:** Models dynamic bid-ask spreads, order-size slippage, exchange queue latencies, and the full Indian regulatory tax matrix (Brokerage, STT, Exchange turnover, Stamp duty, GST, and SEBI charges).
 - **Dual-Engine Architecture:** Unites Django 5.x (domain modeling, ORM, HTMX Single Page Application, and REST APIs) with Go 1.22+ (low-latency WebSockets, zero-copy Apache Parquet processing, and parallel worker pools).
@@ -39,6 +40,7 @@ graph TD
     
     GoWorkers -->|ZSTD Zero-Copy Reader/Writer| Datasets[(Date-Partitioned Parquet Files)]
     GoWorkers -->|Live Progress Broadcast| Redis
+    GoWorkers -->|Strategy Genetic Optimizer| Redis
     Redis -->|Relay Stream| GoApp
     
     CoreLogic <-->|Broker REST & Webhooks| DhanHQ[Dhan HQ / Fyers Broker Adapters]
@@ -78,7 +80,7 @@ marmot/
 │   ├── models/           # Parquet schemas and Redis IPC command payloads
 │   ├── services/         # DB connection, Parquet reader/writer, and chart handlers
 │   ├── strategies/       # Algorithmic strategies (ICT/SMC, Gamma Blast, 3PM Breakout)
-│   ├── workers/          # Parallel backtest and historical data backup worker pools
+│   ├── workers/          # Parallel backtest, data backup, and Genetic Optimizer worker pools
 │   ├── ws/               # High-concurrency WebSocket Hub (`hub.go`)
 │   └── main.go           # Go microservice entry point
 └── templates/            # HTMX dynamic templates and responsive modal layouts
@@ -221,6 +223,23 @@ Django communicates with Go background workers by publishing JSON payloads to Re
     "index_name": "NIFTY",
     "start_date": "2024-01-01",
     "end_date": "2024-12-31"
+  }
+}
+```
+
+### Dynamic Strategy Optimizer (`START_OPTIMIZER`)
+```json
+{
+  "command": "START_OPTIMIZER",
+  "task_id": "4e1a6c11-92f3-4d2c-80a1-432d64a2b161",
+  "params": {
+    "user_id": "1",
+    "method": "genetic",
+    "target_metric": "total_profit",
+    "indicators": {
+      "rsi": {"min": 20, "max": 40},
+      "ema": {"min": 5, "max": 200}
+    }
   }
 }
 ```
