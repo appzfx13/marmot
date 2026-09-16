@@ -19,6 +19,13 @@ type TaskParams struct {
 	ExecutionMode   string                 `json:"execution_mode,omitempty"`
 	AccountID       int                    `json:"account_id,omitempty"`
 	InitialCapital  float64                `json:"initial_capital"`
+	
+	// Optimizer parameters
+	TargetMetric    string                 `json:"target_metric,omitempty"`
+	RsiMin          int                    `json:"rsi_min,omitempty"`
+	RsiMax          int                    `json:"rsi_max,omitempty"`
+	EmaMin          int                    `json:"ema_min,omitempty"`
+	EmaMax          int                    `json:"ema_max,omitempty"`
 	// Dhan authentication: access token generated from API Key + Secret (24h TTL, injected by Django)
 	DhanClientID    string                 `json:"dhan_client_id"`
 	DhanAccessToken string                 `json:"dhan_access_token"`

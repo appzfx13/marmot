@@ -965,17 +965,111 @@ class UserBacktestView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
         return context
 
 
-class UserStrategyCheckView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView):
+class UserStrategyCheckView(HTMXPartialMixin, MarmotRoleRequiredMixin, View):
     """View for user dynamic parameter optimizer (Strategy Check)."""
     template_name = 'users/dashboard.html'
     partial_template_name = 'users/partials/strategy_check_content.html'
 
+    def get(self, request, *args, **kwargs):
+        context = self.get_context_data(**kwargs)
+        if request.headers.get('HX-Request') and not request.headers.get('HX-History-Restore-Request'):
+            return render(request, self.partial_template_name, context)
+        return render(request, self.template_name, context)
+
     def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
+        context = {}
         user = self.request.user
         populate_account_context(context, user, self.request)
         context['active_tab'] = 'strategy-check'
+        context['backup_tasks'] = MarketBackupTask.objects.filter(is_deleted=False).order_by('-id')
         return context
+
+    def post(self, request, *args, **kwargs):
+        """Handle optimization start request."""
+        method = request.POST.get('method', 'grid')
+        target_metric = request.POST.get('target_metric', 'total_profit')
+        backup_task_id = request.POST.get('backup_task', '')
+        strategy_name = request.POST.get('method', 'grid')
+
+        import json
+        import time
+        from apps.common.constants import REDIS_CHANNEL
+        from apps.backtest.services import redis_client
+
+        user_id = str(request.user.id) if request.user else "1"
+        task_id = "optimizer_" + str(int(time.time()))
+
+        rsi_min = int(request.POST.get('rsi_min', 20))
+        rsi_max = int(request.POST.get('rsi_max', 40))
+        ema_min = int(request.POST.get('ema_min', 5))
+        ema_max = int(request.POST.get('ema_max', 200))
+
+        payload = {
+            "task_id": task_id,
+            "command": "START_OPTIMIZER",
+            "params": {
+                "strategy_name": strategy_name,
+                "user_id": user_id,
+                "backup_task_id": backup_task_id,
+                "target_metric": target_metric,
+                "rsi_min": rsi_min,
+                "rsi_max": rsi_max,
+                "ema_min": ema_min,
+                "ema_max": ema_max,
+            }
+        }
+        
+        try:
+            redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
+        except Exception as e:
+            pass
+            
+        html = f"""
+        <div class="text-info">$ Dispatched optimization task using {method.upper()} method...</div>
+        <div class="text-secondary">$ Target Metric: {target_metric}</div>
+        <div class="text-secondary">$ Dataset ID: {backup_task_id or 'Not selected'}</div>
+        <div class="text-warning">$ Engine spinning up worker pools...</div>
+        <script>
+            (function() {{
+                const consoleDiv = document.getElementById('optimizerConsole');
+                let wsUrl = '';
+                if (window.MarmotWS && window.MarmotWS.url) {{
+                    wsUrl = window.MarmotWS.url;
+                }} else {{
+                    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+                    if (window.location.hostname.includes('ngrok')) {{
+                        wsUrl = protocol + '//' + window.location.host + '/ws';
+                    }} else {{
+                        wsUrl = protocol + '//' + window.location.hostname + ':8082/ws';
+                    }}
+                }}
+                const socket = new WebSocket(wsUrl);
+                
+                socket.onopen = function() {{
+                    consoleDiv.innerHTML += '<br><span class="text-success">$ Connected to Go Engine WebSocket.</span>';
+                    socket.send(JSON.stringify({{ type: "subscribe", task_id: "{user_id}" }}));
+                }};
+                
+                socket.onmessage = function(event) {{
+                    try {{
+                        const data = JSON.parse(event.data);
+                        if(data.type === 'progress') {{
+                            consoleDiv.innerHTML += '<br><span class="text-light">$ ' + data.status + '</span>';
+                            consoleDiv.scrollTop = consoleDiv.scrollHeight;
+                        }}
+                    }} catch(e) {{
+                        consoleDiv.innerHTML += '<br><span class="text-light">' + event.data + '</span>';
+                        consoleDiv.scrollTop = consoleDiv.scrollHeight;
+                    }}
+                }};
+                
+                socket.onerror = function(error) {{
+                    consoleDiv.innerHTML += '<br><span class="text-danger">$ WebSocket error. Go Engine might not be running.</span>';
+                }};
+            }})();
+        </script>
+        """
+        return HttpResponse(html)
 
 
 class UserBacktestCreateView(HtmxModalMixin, LoginRequiredMixin, FormView):

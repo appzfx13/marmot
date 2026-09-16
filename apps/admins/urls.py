@@ -86,6 +86,7 @@ from .views import (
     AdminJournalCalendarView,
     AdminJournalChartView,
     AdminJournalTradesView,
+    AdminStrategyCheckView,
 )
 
 from apps.market.views import MarketBackupListView, MarketBackupChartView, MarketBackupBulkDeleteView
@@ -144,6 +145,7 @@ urlpatterns = [
     path('journal/calendar/', AdminJournalCalendarView.as_view(), name='admin-journal-calendar'),
     path('journal/chart/', AdminJournalChartView.as_view(), name='admin-journal-chart'),
     path('journal/trades/', AdminJournalTradesView.as_view(), name='admin-journal-trades'),
+    path('strategy-check/', AdminStrategyCheckView.as_view(), name='admin-strategy-check'),
 
     # Control Routes for Market Backup & Backtest
     path('market-backup/', MarketBackupListView.as_view(), name='market_backup_list'),

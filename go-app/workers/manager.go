@@ -86,7 +86,7 @@ func (m *TaskManager) handleMessage(parentCtx context.Context, payloadStr string
 	log.Printf("📩 Received Command: [%s] for Task ID: %s\n", payload.Command, payload.TaskID)
 
 	switch payload.Command {
-	case "START", "RESUME", "START_BACKTEST", "START_STRATEGY", "RERUN", "RESTART":
+	case "START", "RESUME", "START_BACKTEST", "START_STRATEGY", "RERUN", "RESTART", "START_OPTIMIZER":
 		m.startOrResumeTask(parentCtx, payload)
 	case "PAUSE", "PAUSE_STRATEGY":
 		m.pauseTask(payload.TaskID)
@@ -154,9 +154,12 @@ func (m *TaskManager) runWorkerWrapper(ctx context.Context, payload models.Comma
 		m.mu.Unlock()
 	}()
 
-	// Dispatch StrategySignalJob, BacktestJob, or BackupJob based on command / params
+	// Dispatch StrategySignalJob, BacktestJob, BackupJob, or OptimizerJob based on command / params
 	if payload.Command == "START_STRATEGY" {
 		job := NewStrategySignalJob(m.dbService, m.config, payload, m.hub, m.redisService)
+		job.Run(ctx)
+	} else if payload.Command == "START_OPTIMIZER" {
+		job := NewOptimizerJob(m.dbService, m.config, payload, m.hub)
 		job.Run(ctx)
 	} else if payload.Command == "START_BACKTEST" || payload.Command == "RERUN" || payload.Command == "RESTART" || payload.Params.StrategyName != "" {
 		job := NewBacktestJob(m.dbService, m.config, payload, m.hub)

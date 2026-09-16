@@ -233,8 +233,17 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			continue // No valid option premium for entry — skip tick
 		}
 
-		// SL/TP in option premium points with 1:2.5 default Risk:Reward
-		slPts := 12.0
+		// SL/TP in option premium points with dynamic default based on index
+		slPts := 15.0
+		switch strings.ToUpper(input.IndexName) {
+		case "BANKNIFTY", "SENSEX", "BANKEX":
+			slPts = 30.0 // Premium points (approx 60 spot pts)
+		case "NIFTY", "FINNIFTY":
+			slPts = 12.0 // Premium points (approx 24 spot pts)
+		case "MIDCPNIFTY":
+			slPts = 8.0
+		}
+		
 		rrRatio := 2.5
 		if p, ok := input.Params["sl_pts"].(float64); ok && p > 0 {
 			slPts = p
@@ -409,6 +418,17 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 				preset = GetStrategyPreset(ruleType)
 			}
 		}
+		// Optimizer overrides
+		if emaF, ok := params["ema_fast"].(int); ok && emaF > 0 {
+			preset.EMAFast = emaF
+		} else if emaF2, ok := params["ema_fast"].(float64); ok && emaF2 > 0 {
+			preset.EMAFast = int(emaF2)
+		}
+		if emaS, ok := params["ema_slow"].(int); ok && emaS > 0 {
+			preset.EMASlow = emaS
+		} else if emaS2, ok := params["ema_slow"].(float64); ok && emaS2 > 0 {
+			preset.EMASlow = int(emaS2)
+		}
 	}
 	minDisplacement := preset.MinDisplacement
 	ruleID := 0
@@ -417,6 +437,27 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	// 4. Calculate Exponential Moving Averages using preset EMA periods
 	emaFast := s.calculateEMA(s.candleBuffer, preset.EMAFast)
 	emaSlow := s.calculateEMA(s.candleBuffer, preset.EMASlow)
+
+	// Compute RSI (period 14) — used as optional confirmation filter
+	rsiBuy, rsiSell := 35.0, 65.0
+	if params != nil {
+		if v, ok := params["rsi_buy"].(float64); ok && v > 0 {
+			rsiBuy = v
+		} else if v2, ok := params["rsi_buy"].(int); ok && v2 > 0 {
+			rsiBuy = float64(v2)
+		}
+		if v, ok := params["rsi_sell"].(float64); ok && v > 0 {
+			rsiSell = v
+		} else if v2, ok := params["rsi_sell"].(int); ok && v2 > 0 {
+			rsiSell = float64(v2)
+		}
+	}
+	rsiValue := s.calculateRSI(s.candleBuffer, 14)
+	useRSIFilter := len(s.candleBuffer) >= 14 && rsiValue > 0
+
+	// Compute MACD (12, 26, 9) — used as momentum crossover confirmation
+	macdLine, signalLine, _ := s.calculateMACD(s.candleBuffer, 12, 26, 9)
+	useMACDFilter := len(s.candleBuffer) >= 26 && (macdLine != 0 || signalLine != 0)
 
 	// 5. Calculate Price Action Momentum Metrics:
 	// - candBody: real directional body (require >= 3.5 index pts to avoid flat chop candles)
@@ -443,8 +484,12 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		orbMid = (s.orbHigh + s.orbLow) / 2.0
 	}
 	isBullishTrend := emaFast >= (emaSlow + 0.3)
-	isBullishCandle := closePrice > openPrice && candBody >= 3.0 && (closePrice >= (highPrice - candRange*0.35))
+	isBullishCandle := closePrice > openPrice && candBody >= 3.0 && (closePrice >= (highPrice-candRange*0.35))
 	isBullishORB := !preset.UseORBFilter || (orbMid == 0.0 || closePrice >= orbMid)
+	// RSI confirmation: for Calls, RSI should show bullish momentum (> 50) but not be overbought (<= rsiSell)
+	isBullishRSI := !useRSIFilter || (rsiValue > 50 && rsiValue <= rsiSell)
+	// MACD confirmation: MACD line must be above or crossing signal for bullish
+	isBullishMACD := !useMACDFilter || macdLine >= signalLine
 
 	// Bearish Criteria:
 	// 1. EMA divergence
@@ -452,8 +497,12 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	// 3. Directional close in bottom 35% of candle range (sellers in full control)
 	// 4. Below ORB Midpoint / ORB Low (if UseORBFilter is enabled)
 	isBearishTrend := emaFast <= (emaSlow - 0.3)
-	isBearishCandle := closePrice < openPrice && candBody >= 3.0 && (closePrice <= (lowPrice + candRange*0.35))
+	isBearishCandle := closePrice < openPrice && candBody >= 3.0 && (closePrice <= (lowPrice+candRange*0.35))
 	isBearishORB := !preset.UseORBFilter || (orbMid == 0.0 || closePrice <= orbMid)
+	// RSI confirmation: for Puts, RSI should show bearish momentum (< 50) but not be oversold (>= rsiBuy)
+	isBearishRSI := !useRSIFilter || (rsiValue < 50 && rsiValue >= rsiBuy)
+	// MACD confirmation: MACD line must be below or crossing signal for bearish
+	isBearishMACD := !useMACDFilter || macdLine <= signalLine
 
 	// Apply preset entry time window filter
 	if minuteOfDay < preset.EntryWindowFrom || minuteOfDay > preset.EntryWindowTo {
@@ -465,17 +514,17 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		return nil
 	}
 
-	if isBullishTrend && isBullishCandle && isBullishORB && displacementRatio >= minDisplacement {
+	if isBullishTrend && isBullishCandle && isBullishORB && isBullishRSI && isBullishMACD && displacementRatio >= minDisplacement {
 		isBullishSignal = true
 		triggerReason = fmt.Sprintf(
-			"⚡ [%s] EMA %d/%d Bullish Expansion (%.1f > %.1f) + Bullish Close (%.1f) & Displacement %.1f%%",
-			preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, closePrice, displacementPct,
+			"⚡ [%s] EMA %d/%d Bull (%.1f>%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
+			preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, rsiValue, macdLine, displacementPct,
 		)
-	} else if isBearishTrend && isBearishCandle && isBearishORB && displacementRatio >= minDisplacement {
+	} else if isBearishTrend && isBearishCandle && isBearishORB && isBearishRSI && isBearishMACD && displacementRatio >= minDisplacement {
 		isBearishSignal = true
 		triggerReason = fmt.Sprintf(
-			"⚡ [%s] EMA %d/%d Bearish Expansion (%.1f < %.1f) + Bearish Close (%.1f) & Displacement %.1f%%",
-			preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, closePrice, displacementPct,
+			"⚡ [%s] EMA %d/%d Bear (%.1f<%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
+			preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, rsiValue, macdLine, displacementPct,
 		)
 	}
 
@@ -542,7 +591,16 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 
 	slPts := preset.SLPts
 	if slPts <= 0 {
-		slPts = 12.0
+		switch indexName {
+		case "BANKNIFTY", "SENSEX", "BANKEX":
+			slPts = 60.0
+		case "NIFTY", "FINNIFTY":
+			slPts = 25.0
+		case "MIDCPNIFTY":
+			slPts = 15.0
+		default:
+			slPts = 25.0
+		}
 	}
 	rrRatio := preset.RR
 	if rrRatio <= 0 {
@@ -561,14 +619,18 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	stopLossPrice := math.Round((closePrice-slPts)*100) / 100
 
 	indicators := map[string]interface{}{
-		"ema_fast":         9,
-		"ema_slow":         21,
-		"ema_fast_val":     math.Round(emaFast*100) / 100,
-		"ema_slow_val":     math.Round(emaSlow*100) / 100,
-		"displacement_pct": displacementPct,
-		"orb_high":         math.Round(s.orbHigh*100) / 100,
-		"orb_low":          math.Round(s.orbLow*100) / 100,
-		"spot_price":       closePrice,
+		"ema_fast":          preset.EMAFast,
+		"ema_slow":          preset.EMASlow,
+		"ema_fast_val":      math.Round(emaFast*100) / 100,
+		"ema_slow_val":      math.Round(emaSlow*100) / 100,
+		"rsi":               math.Round(rsiValue*100) / 100,
+		"macd":              math.Round(macdLine*1000) / 1000,
+		"macd_signal":       math.Round(signalLine*1000) / 1000,
+		"macd_histogram":    math.Round((macdLine-signalLine)*1000) / 1000,
+		"displacement_pct":  displacementPct,
+		"orb_high":          math.Round(s.orbHigh*100) / 100,
+		"orb_low":           math.Round(s.orbLow*100) / 100,
+		"spot_price":        closePrice,
 	}
 
 	orderType := preset.OrderType
@@ -616,6 +678,67 @@ func (s *QuantEngineStrategy) calculateEMA(candles []map[string]interface{}, per
 		}
 	}
 	return ema
+}
+
+// calculateRSI computes RSI over the candle buffer using Wilder's smoothing method.
+func (s *QuantEngineStrategy) calculateRSI(candles []map[string]interface{}, period int) float64 {
+	if len(candles) < period+1 {
+		return 50.0
+	}
+	var gains, losses float64
+	for i := 1; i <= period; i++ {
+		prev, _ := candles[i-1]["close"].(float64)
+		curr, _ := candles[i]["close"].(float64)
+		change := curr - prev
+		if change > 0 {
+			gains += change
+		} else {
+			losses -= change
+		}
+	}
+	avgGain := gains / float64(period)
+	avgLoss := losses / float64(period)
+	for i := period + 1; i < len(candles); i++ {
+		prev, _ := candles[i-1]["close"].(float64)
+		curr, _ := candles[i]["close"].(float64)
+		change := curr - prev
+		if change > 0 {
+			avgGain = (avgGain*float64(period-1) + change) / float64(period)
+			avgLoss = (avgLoss * float64(period-1)) / float64(period)
+		} else {
+			avgGain = (avgGain * float64(period-1)) / float64(period)
+			avgLoss = (avgLoss*float64(period-1) - change) / float64(period)
+		}
+	}
+	if avgLoss == 0 {
+		return 100.0
+	}
+	rs := avgGain / avgLoss
+	return 100.0 - (100.0 / (1.0 + rs))
+}
+
+// calculateMACD returns (macdLine, signalLine, histogram) using standard 12/26/9 periods.
+func (s *QuantEngineStrategy) calculateMACD(candles []map[string]interface{}, fastP, slowP, signalP int) (float64, float64, float64) {
+	if len(candles) < slowP {
+		return 0, 0, 0
+	}
+	ema12 := s.calculateEMA(candles, fastP)
+	ema26 := s.calculateEMA(candles, slowP)
+	macdLine := ema12 - ema26
+
+	// Build synthetic MACD series for the signal EMA (approximate using last N candles)
+	macdSeries := make([]map[string]interface{}, 0, len(candles)-slowP+1)
+	for i := slowP - 1; i < len(candles); i++ {
+		slice := candles[:i+1]
+		e12 := s.calculateEMA(slice, fastP)
+		e26 := s.calculateEMA(slice, slowP)
+		macdSeries = append(macdSeries, map[string]interface{}{"close": e12 - e26})
+	}
+	var signalLine float64
+	if len(macdSeries) >= signalP {
+		signalLine = s.calculateEMA(macdSeries, signalP)
+	}
+	return macdLine, signalLine, macdLine - signalLine
 }
 
 // isIndexExpiryDay checks if the given time corresponds to the regulatory exchange expiry day for the index.

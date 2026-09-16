@@ -24,7 +24,7 @@
                     <i class="bi bi-sliders"></i> Optimizer Configuration
                 </h5>
                 
-                <form id="optimizerForm" hx-post="#" hx-target="#optimizerConsole" hx-swap="innerHTML">
+                <form id="optimizerForm" hx-post="." hx-target="#optimizerConsole" hx-swap="innerHTML">
                     {% csrf_token %}
                     
                     <div class="mb-3">
@@ -41,6 +41,16 @@
                             <option value="total_profit">Highest Total Profit</option>
                             <option value="win_rate">Highest Win Rate</option>
                             <option value="lowest_drawdown">Lowest Max Drawdown</option>
+                        </select>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label theme-text-muted fw-bold">Parquet Dataset (Backtest Data)</label>
+                        <select class="form-select" name="backup_task" required>
+                            <option value="">-- Select Parquet Dataset --</option>
+                            {% for task in backup_tasks %}
+                                <option value="{{ task.id }}">{{ task.index_name }} | {{ task.start_date|date:"d M Y" }} to {{ task.end_date|date:"d M Y" }}</option>
+                            {% endfor %}
                         </select>
                     </div>
                     
