@@ -1,10 +1,29 @@
 import json
+import redis
+import time
+from django.conf import settings
 from django.http import JsonResponse
 from django.views import View
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
-from .services import PostbackService
 
+def push_webhook_to_stream(payload, user_id=None, broker_hint='dhan', ip_address=None, execution_mode='LIVE'):
+    """Push the raw webhook to a Redis Stream for async worker processing."""
+    try:
+        r = redis.Redis.from_url(settings.REDIS_URL)
+        stream_name = 'marmot:webhooks:stream'
+        data = {
+            'payload': json.dumps(payload),
+            'user_id': str(user_id) if user_id else '',
+            'broker_hint': str(broker_hint),
+            'ip_address': str(ip_address) if ip_address else '',
+            'execution_mode': str(execution_mode),
+            'timestamp': str(time.time())
+        }
+        r.xadd(stream_name, data)
+    except Exception as e:
+        import logging
+        logging.getLogger(__name__).error(f"Failed to push webhook to Redis Stream: {e}")
 
 @method_decorator(csrf_exempt, name='dispatch')
 class DhanPostbackWebhookView(View):
@@ -26,20 +45,11 @@ class DhanPostbackWebhookView(View):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         ip_address = x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.META.get('REMOTE_ADDR')
 
-        log = PostbackService.process_postback(
-            payload=payload,
-            user_id=user_id,
-            broker_hint='dhan',
-            ip_address=ip_address
-        )
+        push_webhook_to_stream(payload, user_id=user_id, broker_hint='dhan', ip_address=ip_address, execution_mode='LIVE')
 
         return JsonResponse({
             "status": "success",
-            "message": "DhanHQ Postback received and backed up successfully",
-            "log_id": log.id,
-            "order_id": log.order_id,
-            "order_status": log.order_status,
-            "client_id": log.broker_client_id
+            "message": "DhanHQ Postback received and queued successfully"
         }, status=200)
 
     def get(self, request, *args, **kwargs):
@@ -66,20 +76,11 @@ class GenericBrokerPostbackWebhookView(View):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         ip_address = x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.META.get('REMOTE_ADDR')
 
-        log = PostbackService.process_postback(
-            payload=payload,
-            user_id=user_id,
-            broker_hint=broker,
-            ip_address=ip_address
-        )
+        push_webhook_to_stream(payload, user_id=user_id, broker_hint=broker, ip_address=ip_address, execution_mode='LIVE')
 
         return JsonResponse({
             "status": "success",
-            "message": f"{broker.upper()} Postback received and backed up successfully",
-            "log_id": log.id,
-            "broker": log.broker,
-            "order_id": log.order_id,
-            "order_status": log.order_status
+            "message": f"{broker.upper()} Postback received and queued successfully"
         }, status=200)
 
     def get(self, request, broker='dhan', *args, **kwargs):
@@ -105,20 +106,12 @@ class MockDhanPostbackWebhookView(View):
         x_forwarded_for = request.META.get('HTTP_X_FORWARDED_FOR')
         ip_address = x_forwarded_for.split(',')[0].strip() if x_forwarded_for else request.META.get('REMOTE_ADDR')
 
-        log = PostbackService.process_postback(
-            payload=payload,
-            broker_hint='dhan',
-            ip_address=ip_address
-        )
+        push_webhook_to_stream(payload, broker_hint='dhan', ip_address=ip_address, execution_mode='MOCK')
 
         return JsonResponse({
             "status": "success",
             "environment": "MOCK",
-            "message": "Dhan Emulator Mock Postback received and backed up successfully",
-            "log_id": log.id,
-            "order_id": log.order_id,
-            "order_status": log.order_status,
-            "client_id": log.broker_client_id
+            "message": "Dhan Emulator Mock Postback received and queued successfully"
         }, status=200)
 
     def get(self, request, *args, **kwargs):

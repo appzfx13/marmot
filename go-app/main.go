@@ -30,21 +30,21 @@ func main() {
 	// 2. Load Configuration from Environment Variables
 	cfg := config.LoadConfig()
 
-	// 3. Connect to Shared PostgreSQL DB (State Layer)
-	dbService, err := services.NewDBService(ctx, cfg.DatabaseURL, cfg.DBTableName)
-	if err != nil {
-		goLogger.Exception(err, "❌ DB Connection Error")
-		log.Fatalf("❌ DB Connection Error: %v\n", err)
-	}
-	defer dbService.Close()
-
-	// 4. Connect to Redis Broker (Pub/Sub IPC Layer)
+	// 3. Connect to Redis Broker (Pub/Sub IPC Layer)
 	redisService, err := services.NewRedisService(ctx, cfg.RedisURL)
 	if err != nil {
 		goLogger.Exception(err, "❌ Redis Connection Error")
 		log.Fatalf("❌ Redis Connection Error: %v\n", err)
 	}
 	defer redisService.Close()
+
+	// 4. Connect to Shared PostgreSQL DB (State Layer) and inject Redis for IPC broadcasts
+	dbService, err := services.NewDBService(ctx, cfg.DatabaseURL, cfg.DBTableName, redisService.Client)
+	if err != nil {
+		goLogger.Exception(err, "❌ DB Connection Error")
+		log.Fatalf("❌ DB Connection Error: %v\n", err)
+	}
+	defer dbService.Close()
 
 	// 5. Initialize WebSocket Hub & Market Data Broadcaster
 	hub := ws.NewHub()

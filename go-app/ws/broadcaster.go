@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 
+	"go-app/parquet"
 	"go-app/services"
 )
 
@@ -62,11 +63,15 @@ func StartMarketDataBroadcaster(ctx context.Context, redisService *services.Redi
 		var wsConnected atomic.Bool
 		var lastWSTickUnix atomic.Int64
 
+		// Initialize Parquet Tick Writer for in-memory buffering (10k items or 60 seconds)
+		tickWriter := parquet.NewTickWriter("/app/backup", 10000, 60*time.Second)
+		defer tickWriter.Close()
+
 		// Primary: Real-time WebSocket streaming for sub-10ms spot price updates
-		go StreamFyersTicks(ctx, redisService, dbService, hub, &wsConnected, &lastWSTickUnix)
+		go StreamFyersTicks(ctx, redisService, dbService, hub, &wsConnected, &lastWSTickUnix, tickWriter)
 
 		// Fallback: Automated REST poller watchdog if WS fails or is disconnected > 5 seconds
-		go PollFyersLiveQuotes(ctx, redisService, dbService, hub, &wsConnected, &lastWSTickUnix)
+		go PollFyersLiveQuotes(ctx, redisService, dbService, hub, &wsConnected, &lastWSTickUnix, tickWriter)
 
 		// Targeted: Multi-strike heavy option chain REST fetcher (on ATM shift or 5s interval)
 		go TargetedOptionChainPoller(ctx, redisService, dbService)
@@ -170,7 +175,7 @@ func fetchLatestTickFromRedis(ctx context.Context, redisService *services.RedisS
 }
 
 // StreamFyersTicks maintains a WebSocket connection to FYERS DataSocket V3 for sub-10ms spot updates.
-func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, dbService *services.DBService, hub *Hub, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64) {
+func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, dbService *services.DBService, hub *Hub, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64, tickWriter *parquet.TickWriter) {
 	log.Println("⚡ [FYERS WS Streamer] Starting Primary WebSocket V3 Streamer...")
 	backoff := 1 * time.Second
 	maxBackoff := 30 * time.Second
@@ -196,11 +201,31 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 			continue
 		}
 
-		appID, token, err := dbService.GetBrokerCredentials(ctx)
-		if err != nil || strings.TrimSpace(appID) == "" || strings.TrimSpace(token) == "" {
-			log.Printf("⚠️ [FYERS WS Streamer] Broker credentials unavailable: %v. Retrying in %v...\n", err, backoff)
+		appID, token, isActive, tokenDate, err := dbService.GetBrokerCredentials(ctx)
+		if err != nil {
+			log.Printf("⚠️ [FYERS WS Streamer] Broker credentials read error: %v. Retrying in %v...\n", err, backoff)
 			time.Sleep(backoff)
 			backoff = minDuration(backoff*2, maxBackoff)
+			continue
+		}
+
+		if !isActive {
+			wsConnected.Store(false)
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		now := time.Now().In(istMarketLoc)
+		if tokenDate == nil || tokenDate.In(istMarketLoc).Format("2006-01-02") != now.Format("2006-01-02") {
+			// Token not generated today, wait quietly
+			wsConnected.Store(false)
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		if strings.TrimSpace(appID) == "" || strings.TrimSpace(token) == "" {
+			wsConnected.Store(false)
+			time.Sleep(30 * time.Second)
 			continue
 		}
 
@@ -309,7 +334,7 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 			lastWSTickUnix.Store(time.Now().Unix())
 			wsConnected.Store(true)
 
-			parseAndPublishFyersFrame(ctx, msgType, msgBytes, redisService, symbolToIndex, prevLTP)
+			parseAndPublishFyersFrame(ctx, msgType, msgBytes, redisService, symbolToIndex, prevLTP, tickWriter)
 		}
 
 		close(doneChan)
@@ -322,7 +347,7 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 }
 
 // parseAndPublishFyersFrame processes incoming WebSocket frames (JSON text or binary packets) into Redis.
-func parseAndPublishFyersFrame(ctx context.Context, msgType int, msgBytes []byte, redisService *services.RedisService, symbolToIndex map[string]string, prevLTP map[string]float64) {
+func parseAndPublishFyersFrame(ctx context.Context, msgType int, msgBytes []byte, redisService *services.RedisService, symbolToIndex map[string]string, prevLTP map[string]float64, tickWriter *parquet.TickWriter) {
 	if len(msgBytes) == 0 {
 		return
 	}
@@ -331,13 +356,13 @@ func parseAndPublishFyersFrame(ctx context.Context, msgType int, msgBytes []byte
 	if msgType == websocket.TextMessage || msgBytes[0] == '{' || msgBytes[0] == '[' {
 		var rawMap map[string]interface{}
 		if err := json.Unmarshal(msgBytes, &rawMap); err == nil {
-			processFyersJSONMap(ctx, rawMap, redisService, symbolToIndex, prevLTP)
+			processFyersJSONMap(ctx, rawMap, redisService, symbolToIndex, prevLTP, tickWriter)
 			return
 		}
 		var rawList []map[string]interface{}
 		if err := json.Unmarshal(msgBytes, &rawList); err == nil {
 			for _, item := range rawList {
-				processFyersJSONMap(ctx, item, redisService, symbolToIndex, prevLTP)
+				processFyersJSONMap(ctx, item, redisService, symbolToIndex, prevLTP, tickWriter)
 			}
 			return
 		}
@@ -345,12 +370,12 @@ func parseAndPublishFyersFrame(ctx context.Context, msgType int, msgBytes []byte
 
 	// 2. Binary frame unpack (symbolUpdate 72-byte or lite packet)
 	if msgType == websocket.BinaryMessage && len(msgBytes) >= 24 {
-		processFyersBinaryPacket(ctx, msgBytes, redisService, symbolToIndex, prevLTP)
+		processFyersBinaryPacket(ctx, msgBytes, redisService, symbolToIndex, prevLTP, tickWriter)
 	}
 }
 
 // processFyersJSONMap normalizes JSON quote dicts and publishes to Redis.
-func processFyersJSONMap(ctx context.Context, data map[string]interface{}, redisService *services.RedisService, symbolToIndex map[string]string, prevLTP map[string]float64) {
+func processFyersJSONMap(ctx context.Context, data map[string]interface{}, redisService *services.RedisService, symbolToIndex map[string]string, prevLTP map[string]float64, tickWriter *parquet.TickWriter) {
 	sym, _ := data["symbol"].(string)
 	if sym == "" {
 		sym, _ = data["n"].(string)
@@ -365,7 +390,7 @@ func processFyersJSONMap(ctx context.Context, data map[string]interface{}, redis
 		if dArr, isD := data["d"].([]interface{}); isD {
 			for _, item := range dArr {
 				if itemMap, ok := item.(map[string]interface{}); ok {
-					processFyersJSONMap(ctx, itemMap, redisService, symbolToIndex, prevLTP)
+					processFyersJSONMap(ctx, itemMap, redisService, symbolToIndex, prevLTP, tickWriter)
 				}
 			}
 			return
@@ -396,11 +421,11 @@ func processFyersJSONMap(ctx context.Context, data map[string]interface{}, redis
 		return
 	}
 
-	publishIndexQuoteToRedis(ctx, redisService, idxName, sym, ltp, ch, chp, high, low, open, prevClose, "WS_V3", prevLTP)
+	publishIndexQuoteToRedis(ctx, redisService, idxName, sym, ltp, ch, chp, high, low, open, prevClose, "WS_V3", prevLTP, tickWriter)
 }
 
 // processFyersBinaryPacket unpacks raw binary symbolUpdate frames.
-func processFyersBinaryPacket(ctx context.Context, msgBytes []byte, redisService *services.RedisService, symbolToIndex map[string]string, prevLTP map[string]float64) {
+func processFyersBinaryPacket(ctx context.Context, msgBytes []byte, redisService *services.RedisService, symbolToIndex map[string]string, prevLTP map[string]float64, tickWriter *parquet.TickWriter) {
 	// Offset 0-2: Packet length or header
 	// Inspect ASCII symbol prefix in header if available
 	strRepr := string(msgBytes)
@@ -411,7 +436,7 @@ func processFyersBinaryPacket(ctx context.Context, msgBytes []byte, redisService
 				bits := binary.BigEndian.Uint32(msgBytes[len(msgBytes)-8 : len(msgBytes)-4])
 				ltp := float64(math.Float32frombits(bits))
 				if ltp > 1000 && ltp < 100000 {
-					publishIndexQuoteToRedis(ctx, redisService, idxName, sym, ltp, 0, 0, ltp, ltp, ltp, ltp, "WS_BINARY", prevLTP)
+					publishIndexQuoteToRedis(ctx, redisService, idxName, sym, ltp, 0, 0, ltp, ltp, ltp, ltp, "WS_BINARY", prevLTP, tickWriter)
 					return
 				}
 			}
@@ -420,7 +445,7 @@ func processFyersBinaryPacket(ctx context.Context, msgBytes []byte, redisService
 }
 
 // publishIndexQuoteToRedis writes normalized spot quote and calculated ATM strike to Redis.
-func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisService, idxName, sym string, ltp, ch, chp, high, low, open, prevClose float64, source string, prevLTP map[string]float64) {
+func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisService, idxName, sym string, ltp, ch, chp, high, low, open, prevClose float64, source string, prevLTP map[string]float64, tickWriter *parquet.TickWriter) {
 	step := 50
 	if idxName == "BANKNIFTY" || idxName == "SENSEX" {
 		step = 100
@@ -456,6 +481,27 @@ func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisS
 	_ = redisService.Client.Set(ctx, fmt.Sprintf("marmot:fyers:option_chain:%s", idxName), chainBytes, 10*time.Second).Err()
 	_ = redisService.Client.Set(ctx, fmt.Sprintf("marmot:fyers_quote:%s", sym), chainBytes, 24*time.Hour).Err()
 
+	// XAdd to Redis Streams for native decoupling
+	_ = redisService.Client.XAdd(ctx, &redis.XAddArgs{
+		Stream: "marmot:ticks",
+		Values: map[string]interface{}{
+			"payload": string(chainBytes),
+		},
+	}).Err()
+
+	// Write to Memory Buffer for Chunked Parquet disk writing
+	tickWriter.Write(parquet.Tick{
+		Timestamp: time.Now().Unix(),
+		Datetime:  nowStr,
+		IndexName: idxName,
+		Symbol:    sym,
+		SpotPrice: ltp,
+		Change:    ch,
+		ChangePct: chp,
+		High:      high,
+		Low:       low,
+	})
+
 	if prevLTP[idxName] != ltp {
 		log.Printf("⚡ [FYERS Sub-10ms Tick: %s] %s: ₹%.2f (Chg: %.2f | %.2f%%) | ATM: %d\n",
 			source, idxName, ltp, ch, chp, atmStrike)
@@ -483,7 +529,7 @@ type fyersQuoteResponse struct {
 }
 
 // PollFyersLiveQuotes acts as the REST fallback and watchdog when the primary WebSocket is disconnected >5s.
-func PollFyersLiveQuotes(ctx context.Context, redisService *services.RedisService, dbService *services.DBService, hub *Hub, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64) {
+func PollFyersLiveQuotes(ctx context.Context, redisService *services.RedisService, dbService *services.DBService, hub *Hub, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64, tickWriter *parquet.TickWriter) {
 	log.Println("🛡️ [FYERS Fallback Manager] Initialized 5-second WS failover watchdog.")
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
@@ -520,10 +566,17 @@ func PollFyersLiveQuotes(ctx context.Context, redisService *services.RedisServic
 
 			// Fallback triggered: Primary WS is down or silent > 5 seconds
 			if time.Since(lastCredsCheck) > 60*time.Second || cachedAppID == "" || cachedToken == "" {
-				appID, token, err := dbService.GetBrokerCredentials(ctx)
+				appID, token, isActive, tokenDate, err := dbService.GetBrokerCredentials(ctx)
 				if err != nil {
 					log.Printf("⚠️ [FYERS REST Fallback] DB Credentials read error: %v\n", err)
 				} else {
+					if !isActive {
+						continue
+					}
+					now := time.Now().In(istMarketLoc)
+					if tokenDate == nil || tokenDate.In(istMarketLoc).Format("2006-01-02") != now.Format("2006-01-02") {
+						continue
+					}
 					cachedAppID = strings.TrimSpace(appID)
 					cachedToken = strings.TrimSpace(token)
 					lastCredsCheck = time.Now()
@@ -565,7 +618,7 @@ func PollFyersLiveQuotes(ctx context.Context, redisService *services.RedisServic
 				}
 
 				v := item.V
-				publishIndexQuoteToRedis(ctx, redisService, idxName, item.N, v.Lp, v.Ch, v.Chp, v.HighPrice, v.LowPrice, v.OpenPrice, v.PrevClosePrice, "REST_FALLBACK", prevLTP)
+				publishIndexQuoteToRedis(ctx, redisService, idxName, item.N, v.Lp, v.Ch, v.Chp, v.HighPrice, v.LowPrice, v.OpenPrice, v.PrevClosePrice, "REST_FALLBACK", prevLTP, tickWriter)
 			}
 		}
 	}
@@ -597,8 +650,15 @@ func TargetedOptionChainPoller(ctx context.Context, redisService *services.Redis
 			}
 
 			if time.Since(lastCredsCheck) > 60*time.Second || cachedAppID == "" || cachedToken == "" {
-				appID, token, err := dbService.GetBrokerCredentials(ctx)
+				appID, token, isActive, tokenDate, err := dbService.GetBrokerCredentials(ctx)
 				if err == nil {
+					if !isActive {
+						continue
+					}
+					now := time.Now().In(istMarketLoc)
+					if tokenDate == nil || tokenDate.In(istMarketLoc).Format("2006-01-02") != now.Format("2006-01-02") {
+						continue
+					}
 					cachedAppID = strings.TrimSpace(appID)
 					cachedToken = strings.TrimSpace(token)
 					lastCredsCheck = time.Now()

@@ -13,14 +13,16 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/redis/go-redis/v9"
 )
 
 type DBService struct {
 	Pool      *pgxpool.Pool
 	TableName string
+	Rdb       *redis.Client
 }
 
-func NewDBService(ctx context.Context, dbURL, tableName string) (*DBService, error) {
+func NewDBService(ctx context.Context, dbURL, tableName string, rdb *redis.Client) (*DBService, error) {
 	var pool *pgxpool.Pool
 	var err error
 	maxRetries := 10
@@ -30,7 +32,7 @@ func NewDBService(ctx context.Context, dbURL, tableName string) (*DBService, err
 		if err == nil {
 			if pingErr := pool.Ping(ctx); pingErr == nil {
 				log.Println("✅ Connected to PostgreSQL (Shared State Layer)")
-				return &DBService{Pool: pool, TableName: tableName}, nil
+				return &DBService{Pool: pool, TableName: tableName, Rdb: rdb}, nil
 			} else {
 				err = pingErr
 			}
@@ -46,33 +48,55 @@ func NewDBService(ctx context.Context, dbURL, tableName string) (*DBService, err
 	return nil, fmt.Errorf("unable to connect to postgres after %d attempts: %w", maxRetries, err)
 }
 
-// UpdateTaskProgress updates status and progress percentage (0 to 100)
-func (s *DBService) UpdateTaskProgress(ctx context.Context, taskID string, status string, progress int) error {
-	query := fmt.Sprintf(`
-		UPDATE %s 
-		SET status = $1, progress = $2, updated_at = $3 
-		WHERE id = $4
-	`, s.TableName)
-
-	_, err := s.Pool.Exec(ctx, query, status, progress, time.Now(), taskID)
+// broadcastTaskEvent serializes the event into JSON and pushes it to Redis streams
+func (s *DBService) broadcastTaskEvent(ctx context.Context, taskID, eventType string, payload map[string]interface{}) error {
+	if s.Rdb == nil {
+		log.Printf("⚠️ Redis client not initialized in DBService, cannot broadcast %s for task %s", eventType, taskID)
+		return nil
+	}
+	
+	msg := map[string]interface{}{
+		"task_id":    taskID,
+		"event_type": eventType,
+		"timestamp":  time.Now().Unix(),
+		"payload":    payload,
+	}
+	
+	jsonBytes, err := json.Marshal(msg)
 	if err != nil {
-		log.Printf("❌ DB Update Error [Task %s]: %v\n", taskID, err)
+		return err
+	}
+	
+	return s.Rdb.XAdd(ctx, &redis.XAddArgs{
+		Stream: "marmot:tasks:control",
+		Values: map[string]interface{}{
+			"data": string(jsonBytes),
+		},
+	}).Err()
+}
+
+// UpdateTaskProgress updates status and progress percentage (0 to 100) via Redis
+func (s *DBService) UpdateTaskProgress(ctx context.Context, taskID string, status string, progress int) error {
+	payload := map[string]interface{}{
+		"status":   status,
+		"progress": progress,
+	}
+	err := s.broadcastTaskEvent(ctx, taskID, "progress_update", payload)
+	if err != nil {
+		log.Printf("❌ Redis Broadcast Error [Task %s]: %v\n", taskID, err)
 		return err
 	}
 	return nil
 }
 
-// UpdateTaskStatus updates only the status
+// UpdateTaskStatus updates only the status via Redis
 func (s *DBService) UpdateTaskStatus(ctx context.Context, taskID string, status string) error {
-	query := fmt.Sprintf(`
-		UPDATE %s 
-		SET status = $1, updated_at = $2 
-		WHERE id = $3
-	`, s.TableName)
-
-	_, err := s.Pool.Exec(ctx, query, status, time.Now(), taskID)
+	payload := map[string]interface{}{
+		"status": status,
+	}
+	err := s.broadcastTaskEvent(ctx, taskID, "status_update", payload)
 	if err != nil {
-		log.Printf("❌ DB Update Status Error [Task %s]: %v\n", taskID, err)
+		log.Printf("❌ Redis Broadcast Error [Task %s]: %v\n", taskID, err)
 		return err
 	}
 	return nil
@@ -90,40 +114,31 @@ func (s *DBService) GetTaskProgress(ctx context.Context, taskID string) (int, er
 	return progress, nil
 }
 
-// MarkTaskComplete marks job as completed, sets progress to 100%, and updates file details
+// MarkTaskComplete marks job as completed, sets progress to 100%, and updates file details via Redis
 func (s *DBService) MarkTaskComplete(ctx context.Context, taskID string, filePath string, fileSizeMB float64) error {
-	query := fmt.Sprintf(`
-		UPDATE %s 
-		SET status = 'completed', progress = 100, parquet_file_path = $1, file_size_mb = $2, updated_at = $3 
-		WHERE id = $4
-	`, s.TableName)
-
-	_, err := s.Pool.Exec(ctx, query, filePath, fileSizeMB, time.Now(), taskID)
+	payload := map[string]interface{}{
+		"status":            "completed",
+		"progress":          100,
+		"parquet_file_path": filePath,
+		"file_size_mb":      fileSizeMB,
+	}
+	err := s.broadcastTaskEvent(ctx, taskID, "task_completed", payload)
 	if err != nil {
-		log.Printf("❌ DB Completion Update Error [Task %s]: %v\n", taskID, err)
+		log.Printf("❌ Redis Broadcast Error [Task %s]: %v\n", taskID, err)
 		return err
 	}
 	return nil
 }
 
-// RecordError updates task status to 'error', resets file path/size to NULL/0.0, and appends timestamped error details
+// RecordError updates task status to 'error', resets file path/size to NULL/0.0, and appends error details via Redis
 func (s *DBService) RecordError(ctx context.Context, taskID string, errorMsg string) error {
-	query := fmt.Sprintf(`
-		UPDATE %s 
-		SET status = 'error', 
-		    parquet_file_path = NULL,
-		    file_size_mb = 0.0,
-		    error_logs = CASE 
-		        WHEN error_logs IS NULL OR error_logs = '' THEN $1 
-		        ELSE error_logs || E'\n' || $1 
-		    END, 
-		    updated_at = $2 
-		WHERE id = $3
-	`, s.TableName)
-
-	_, err := s.Pool.Exec(ctx, query, errorMsg, time.Now(), taskID)
+	payload := map[string]interface{}{
+		"status":     "error",
+		"error_logs": errorMsg,
+	}
+	err := s.broadcastTaskEvent(ctx, taskID, "task_error", payload)
 	if err != nil {
-		log.Printf("❌ DB Error Log Update Error [Task %s]: %v\n", taskID, err)
+		log.Printf("❌ Redis Broadcast Error [Task %s]: %v\n", taskID, err)
 		return err
 	}
 	return nil
@@ -221,13 +236,15 @@ func readLastCloseFromParquetDir(dirPath string) (float64, error) {
 	return closeVal, nil
 }
 
-// GetBrokerCredentials retrieves FYERS App ID and Access Token from common_sitesettings.
-func (s *DBService) GetBrokerCredentials(ctx context.Context) (string, string, error) {
+// GetBrokerCredentials retrieves FYERS App ID, Access Token, Token Date, and active status from common_sitesettings.
+func (s *DBService) GetBrokerCredentials(ctx context.Context) (string, string, bool, *time.Time, error) {
 	var appID, token string
-	query := `SELECT COALESCE(fyers_app_id, ''), COALESCE(fyers_access_token, '') FROM common_sitesettings ORDER BY id LIMIT 1`
-	err := s.Pool.QueryRow(ctx, query).Scan(&appID, &token)
+	var isActive bool
+	var tokenDate *time.Time
+	query := `SELECT COALESCE(fyers_app_id, ''), COALESCE(fyers_access_token, ''), fyers_feed_is_active, fyers_token_generated_date FROM common_sitesettings ORDER BY id LIMIT 1`
+	err := s.Pool.QueryRow(ctx, query).Scan(&appID, &token, &isActive, &tokenDate)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to fetch broker credentials: %w", err)
+		return "", "", false, nil, fmt.Errorf("failed to fetch broker credentials: %w", err)
 	}
-	return appID, token, nil
+	return appID, token, isActive, tokenDate, nil
 }

@@ -35,17 +35,7 @@ services:
     networks:
       - app_network
 
-  # --- Adminer Database UI ---
-  adminer:
-    image: adminer:latest
-    container_name: adminer_ui
-    restart: always
-    ports:
-      - "8081:8080"
-    depends_on:
-      - db
-    networks:
-      - app_network
+
 
   # --- Django Web App ---
   web:
@@ -65,6 +55,26 @@ services:
       - POSTGRES_HOST=db
     stdin_open: true
     tty: true
+    depends_on:
+      db:
+        condition: service_healthy
+      redis_broker:
+        condition: service_healthy
+    networks:
+      - app_network
+
+  # --- Django Webhook Async Worker ---
+  webhook_worker:
+    build: .
+    container_name: django_webhook_worker
+    command: python manage.py run_webhook_worker
+    volumes:
+      - .:/app
+    env_file:
+      - .env
+    environment:
+      - DB_ENGINE=django.db.backends.postgresql
+      - POSTGRES_HOST=db
     depends_on:
       db:
         condition: service_healthy
@@ -114,16 +124,11 @@ services:
       - app_network
 
   # --- Ngrok Tunnel Container ---
-  ngrok:
+  ngrok_tunnel:
     image: ngrok/ngrok:latest
     container_name: ngrok_tunnel
     restart: always
-    command:
-      - "http"
-      - "nginx_proxy:80"
-      - "--authtoken=${NGROK_AUTHTOKEN}"
-    ports:
-      - "4040:4040"
+    command: http nginx_proxy:80
     environment:
       - NGROK_AUTHTOKEN=${NGROK_AUTHTOKEN}
     depends_on:
@@ -149,7 +154,7 @@ services:
       - PORT=8088
       - REDIS_HOST=redis_broker
       - REDIS_PORT=6379
-      - MARMOT_POSTBACK_URL=http://web:8000/api/mock/dhan/postback/
+      - MARMOT_POSTBACK_URL=http://django_app:8000/api/mock/dhan/postback/
       - PARQUET_DIR=/app/backup
     networks:
       - app_network

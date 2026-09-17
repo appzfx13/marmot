@@ -2,6 +2,7 @@ package streamer
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -17,11 +18,12 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/gorilla/websocket"
-	"github.com/parquet-go/parquet-go"
-	"github.com/redis/go-redis/v9"
 	"dhan-emulator/engine"
 	"dhan-emulator/models"
+	"github.com/gorilla/websocket"
+	_ "github.com/marcboeker/go-duckdb"
+	"github.com/parquet-go/parquet-go"
+	"github.com/redis/go-redis/v9"
 )
 
 var upgrader = websocket.Upgrader{
@@ -739,54 +741,37 @@ func (ps *ParquetStreamer) streamLoop() {
 	}
 }
 
-// streamParquetFile reads binary Parquet records and streams all strikes concurrently for each timestamp.
+// streamParquetFile reads Parquet records using DuckDB and streams all strikes concurrently for each timestamp.
 func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
-	log.Printf("[STREAMER] Starting Parquet replay from: %s", fullPath)
+	log.Printf("[STREAMER] Starting Parquet replay via DuckDB from: %s", fullPath)
 
-	file, err := os.Open(fullPath)
+	db, err := sql.Open("duckdb", "")
 	if err != nil {
-		log.Printf("[STREAMER] Error opening parquet %s: %v", fullPath, err)
+		log.Printf("[STREAMER] Error opening DuckDB: %v", err)
 		return
 	}
-	defer file.Close()
+	defer db.Close()
 
-	reader := parquet.NewGenericReader[models.MarketCandleRecord](file)
-	defer reader.Close()
+	var totalRows int64
+	err = db.QueryRow(`SELECT COUNT(*) FROM read_parquet('` + fullPath + `')`).Scan(&totalRows)
+	if err != nil {
+		log.Printf("[STREAMER] Error getting row count from DuckDB: %v", err)
+		return
+	}
 
-	totalRows := reader.NumRows()
 	ps.mu.Lock()
 	ps.totalRows = totalRows
 	atomic.StoreInt64(&ps.currentRow, 0)
 	ps.mu.Unlock()
 
-	var allRecords []models.MarketCandleRecord
-	if totalRows <= 5000000 && totalRows > 0 {
-		allRecords = make([]models.MarketCandleRecord, totalRows)
-		var totalRead int64
-		for totalRead < totalRows {
-			n, readErr := reader.Read(allRecords[totalRead:])
-			totalRead += int64(n)
-			if readErr != nil {
-				break
-			}
-		}
-		allRecords = allRecords[:totalRead]
-		sort.SliceStable(allRecords, func(i, j int) bool {
-			if allRecords[i].Timestamp != allRecords[j].Timestamp {
-				return allRecords[i].Timestamp < allRecords[j].Timestamp
-			}
-			iIsSpot := allRecords[i].Strike == "SPOT" || allRecords[i].OptionType == "INDEX"
-			jIsSpot := allRecords[j].Strike == "SPOT" || allRecords[j].OptionType == "INDEX"
-			if iIsSpot != jIsSpot {
-				return iIsSpot
-			}
-			return false
-		})
+	rows, err := db.Query(`SELECT Timestamp, Datetime, IndexName, InstrumentType, Strike, OptionType, Open, High, Low, Close, Volume, OI, IV, SpotPrice FROM read_parquet('` + fullPath + `') ORDER BY Timestamp ASC, OptionType ASC`)
+	if err != nil {
+		log.Printf("[STREAMER] DuckDB query error: %v", err)
+		return
 	}
+	defer rows.Close()
 
 	var pendingRecord *models.MarketCandleRecord
-	singleBuf := make([]models.MarketCandleRecord, 1)
-	recIdx := 0
 
 	for {
 		ps.mu.RLock()
@@ -801,86 +786,56 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 		var currentBucket []models.MarketCandleRecord
 		var currentBucketTime string
 
-		if len(allRecords) > 0 {
-			if recIdx >= len(allRecords) {
-				log.Printf("[STREAMER] Reached EOF on %s. Replay session COMPLETED.", fullPath)
-				ps.mu.Lock()
-				ps.isPlaying = false
-				ps.isCompleted = true
-				if ps.totalRows > 0 {
-					atomic.StoreInt64(&ps.currentRow, ps.totalRows)
-				}
-				ps.mu.Unlock()
-				ps.BroadcastRawMessage([]byte(`{"type":"replay_completed"}`))
+		if pendingRecord != nil {
+			currentBucket = append(currentBucket, *pendingRecord)
+			currentBucketTime = pendingRecord.Datetime
+			if currentBucketTime == "" && pendingRecord.Timestamp > 0 {
+				currentBucketTime = time.Unix(pendingRecord.Timestamp, 0).Format("2006-01-02 15:04:05")
+			}
+			pendingRecord = nil
+		}
+
+		eofReached := false
+		for {
+			if !rows.Next() {
+				eofReached = true
+				break
+			}
+			var rec models.MarketCandleRecord
+			if err := rows.Scan(&rec.Timestamp, &rec.Datetime, &rec.IndexName, &rec.InstrumentType, &rec.Strike, &rec.OptionType, &rec.Open, &rec.High, &rec.Low, &rec.Close, &rec.Volume, &rec.OI, &rec.IV, &rec.SpotPrice); err != nil {
+				log.Printf("[STREAMER] DuckDB row scan error: %v", err)
 				return
 			}
-			ts := allRecords[recIdx].Timestamp
-			currentBucketTime = allRecords[recIdx].Datetime
-			if currentBucketTime == "" && ts > 0 {
-				currentBucketTime = time.Unix(ts, 0).Format("2006-01-02 15:04:05")
-			}
-			for recIdx < len(allRecords) && allRecords[recIdx].Timestamp == ts {
-				currentBucket = append(currentBucket, allRecords[recIdx])
-				recIdx++
-			}
-			atomic.StoreInt64(&ps.currentRow, int64(recIdx))
-		} else {
-			if pendingRecord != nil {
-				currentBucket = append(currentBucket, *pendingRecord)
-				currentBucketTime = pendingRecord.Datetime
-				if currentBucketTime == "" && pendingRecord.Timestamp > 0 {
-					currentBucketTime = time.Unix(pendingRecord.Timestamp, 0).Format("2006-01-02 15:04:05")
-				}
-				pendingRecord = nil
+
+			atomic.AddInt64(&ps.currentRow, 1)
+			recTime := rec.Datetime
+			if recTime == "" && rec.Timestamp > 0 {
+				recTime = time.Unix(rec.Timestamp, 0).Format("2006-01-02 15:04:05")
 			}
 
-			eofReached := false
-			for {
-				n, readErr := reader.Read(singleBuf)
-				if readErr == io.EOF {
-					eofReached = true
-					break
-				}
-				if readErr != nil {
-					log.Printf("[STREAMER] Parquet read error: %v", readErr)
-					return
-				}
-				if n == 0 {
-					continue
-				}
-
-				rec := singleBuf[0]
-				atomic.AddInt64(&ps.currentRow, 1)
-
-				recTime := rec.Datetime
-				if recTime == "" && rec.Timestamp > 0 {
-					recTime = time.Unix(rec.Timestamp, 0).Format("2006-01-02 15:04:05")
-				}
-
-				if currentBucketTime == "" {
-					currentBucketTime = recTime
-				}
-
-				if recTime == currentBucketTime {
-					currentBucket = append(currentBucket, rec)
-				} else {
-					pendingRecord = &rec
-					break
-				}
+			if currentBucketTime == "" {
+				currentBucketTime = recTime
 			}
 
-			if eofReached {
-				log.Printf("[STREAMER] Reached EOF on %s. Replay session COMPLETED.", fullPath)
-				ps.mu.Lock()
-				ps.isPlaying = false
-				ps.isCompleted = true
-				if ps.totalRows > 0 {
-					atomic.StoreInt64(&ps.currentRow, ps.totalRows)
-				}
-				ps.mu.Unlock()
-				ps.BroadcastRawMessage([]byte(`{"type":"replay_completed"}`))
-				return
+			if recTime == currentBucketTime {
+				currentBucket = append(currentBucket, rec)
+			} else {
+				pendingRecord = &rec
+				break
 			}
+		}
+
+		if len(currentBucket) == 0 && eofReached {
+			log.Printf("[STREAMER] Reached EOF on %s. Replay session COMPLETED.", fullPath)
+			ps.mu.Lock()
+			ps.isPlaying = false
+			ps.isCompleted = true
+			if ps.totalRows > 0 {
+				atomic.StoreInt64(&ps.currentRow, ps.totalRows)
+			}
+			ps.mu.Unlock()
+			ps.BroadcastRawMessage([]byte(`{"type":"replay_completed"}`))
+			return
 		}
 
 		// 2. Broadcast all strikes and spot index for timestamp T concurrently
@@ -1127,45 +1082,35 @@ var (
 	datasetMetaCache   = make(map[string]ParquetFileInfo)
 )
 
-// readParquetMeta extracts index_name and date range from the first and last record of a parquet dataset.
+// readParquetMeta extracts index_name and date range from the first and last record of a parquet dataset using DuckDB.
 func readParquetMeta(filePath string) (string, string, string) {
-	f, err := os.Open(filePath)
+	db, err := sql.Open("duckdb", "")
 	if err != nil {
 		return "", "", ""
 	}
-	defer f.Close()
-
-	reader := parquet.NewGenericReader[models.MarketCandleRecord](f)
-	defer reader.Close()
-
-	numRows := reader.NumRows()
-	if numRows <= 0 {
-		return "", "", ""
-	}
+	defer db.Close()
 
 	var idx, start, end string
-	firstBuf := make([]models.MarketCandleRecord, 1)
-	n, err := reader.Read(firstBuf)
-	if err == nil && n > 0 {
-		idx = strings.TrimSpace(firstBuf[0].IndexName)
-		start = strings.TrimSpace(firstBuf[0].Datetime)
-		if start == "" && firstBuf[0].Timestamp > 0 {
-			start = time.Unix(firstBuf[0].Timestamp, 0).Format("2006-01-02 15:04:05")
+	
+	// Get first record metadata
+	err = db.QueryRow(`SELECT IndexName, Datetime, Timestamp FROM read_parquet('` + filePath + `') ORDER BY Timestamp ASC LIMIT 1`).Scan(&idx, &start, &end) // Temporarily using end to hold Timestamp to avoid unused variables
+	if err == nil {
+		// Just in case Datetime is empty but Timestamp exists
+		if start == "" {
+			var ts int64
+			if err := db.QueryRow(`SELECT Timestamp FROM read_parquet('` + filePath + `') ORDER BY Timestamp ASC LIMIT 1`).Scan(&ts); err == nil && ts > 0 {
+				start = time.Unix(ts, 0).Format("2006-01-02 15:04:05")
+			}
 		}
 	}
 
-	if numRows > 1 {
-		if err := reader.SeekToRow(numRows - 1); err == nil {
-			lastBuf := make([]models.MarketCandleRecord, 1)
-			n2, err2 := reader.Read(lastBuf)
-			if err2 == nil && n2 > 0 {
-				end = strings.TrimSpace(lastBuf[0].Datetime)
-				if end == "" && lastBuf[0].Timestamp > 0 {
-					end = time.Unix(lastBuf[0].Timestamp, 0).Format("2006-01-02 15:04:05")
-				}
-				if idx == "" {
-					idx = strings.TrimSpace(lastBuf[0].IndexName)
-				}
+	// Get last record metadata
+	err = db.QueryRow(`SELECT Datetime FROM read_parquet('` + filePath + `') ORDER BY Timestamp DESC LIMIT 1`).Scan(&end)
+	if err == nil {
+		if end == "" {
+			var ts int64
+			if err := db.QueryRow(`SELECT Timestamp FROM read_parquet('` + filePath + `') ORDER BY Timestamp DESC LIMIT 1`).Scan(&ts); err == nil && ts > 0 {
+				end = time.Unix(ts, 0).Format("2006-01-02 15:04:05")
 			}
 		}
 	}
