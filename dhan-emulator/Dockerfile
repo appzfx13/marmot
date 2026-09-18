@@ -1,6 +1,8 @@
-FROM golang:1.25-alpine AS builder
+FROM golang:1.25-bookworm AS builder
 
 ENV GOTOOLCHAIN=auto
+
+RUN apt-get update && apt-get install -y build-essential && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
 
@@ -11,12 +13,12 @@ RUN go mod download || true
 # Copy source code
 COPY . .
 RUN go mod tidy
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o dhan-emulator main.go
+RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-w -s" -o dhan-emulator main.go
 
 # Production minimal runtime
-FROM alpine:3.20
+FROM debian:bookworm-slim
 
-RUN apk add --no-cache ca-certificates tzdata
+RUN apt-get update && apt-get install -y ca-certificates tzdata && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
 

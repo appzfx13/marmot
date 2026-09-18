@@ -7,7 +7,7 @@ services:
     env_file:
       - .env
     ports:
-      - "${POSTGRES_PORT}:5432"
+      - "8052:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -24,7 +24,7 @@ services:
     container_name: redis_broker
     restart: always
     ports:
-      - "6379:6379"
+      - "8051:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -43,7 +43,7 @@ services:
     container_name: django_app
     command: python manage.py runserver 0.0.0.0:8000
     ports:
-      - "8005:8000"
+      - "8050:8000"
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -144,7 +144,7 @@ services:
     container_name: dhan_mock_broker
     restart: always
     ports:
-      - "8088:8088"
+      - "8054:8088"
     volumes:
       - ./dhan-emulator/templates:/app/templates
       - ./backup:/app/backup:ro

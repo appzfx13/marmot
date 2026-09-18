@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+	"github.com/redis/go-redis/v9"
 
 	"go-app/parquet"
 	"go-app/services"
@@ -70,8 +71,7 @@ func StartMarketDataBroadcaster(ctx context.Context, redisService *services.Redi
 		// Primary: Real-time WebSocket streaming for sub-10ms spot price updates
 		go StreamFyersTicks(ctx, redisService, dbService, hub, &wsConnected, &lastWSTickUnix, tickWriter)
 
-		// Fallback: Automated REST poller watchdog if WS fails or is disconnected > 5 seconds
-		go PollFyersLiveQuotes(ctx, redisService, dbService, hub, &wsConnected, &lastWSTickUnix, tickWriter)
+		// Fallback: Automated REST poller watchdog removed due to strict WebSocket rules
 
 		// Targeted: Multi-strike heavy option chain REST fetcher (on ATM shift or 5s interval)
 		go TargetedOptionChainPoller(ctx, redisService, dbService)
@@ -528,101 +528,6 @@ type fyersQuoteResponse struct {
 	D []fyersQuoteData `json:"d"`
 }
 
-// PollFyersLiveQuotes acts as the REST fallback and watchdog when the primary WebSocket is disconnected >5s.
-func PollFyersLiveQuotes(ctx context.Context, redisService *services.RedisService, dbService *services.DBService, hub *Hub, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64, tickWriter *parquet.TickWriter) {
-	log.Println("🛡️ [FYERS Fallback Manager] Initialized 5-second WS failover watchdog.")
-	ticker := time.NewTicker(1 * time.Second)
-	defer ticker.Stop()
-
-	httpClient := &http.Client{Timeout: 3 * time.Second}
-	var cachedAppID, cachedToken string
-	lastCredsCheck := time.Time{}
-	prevLTP := make(map[string]float64)
-
-	symbolToIndex := map[string]string{
-		"NSE:NIFTY50-INDEX":   "NIFTY",
-		"NSE:NIFTYBANK-INDEX": "BANKNIFTY",
-		"BSE:SENSEX-INDEX":    "SENSEX",
-	}
-
-	for {
-		select {
-		case <-ctx.Done():
-			log.Println("🛑 [FYERS Fallback Manager] Stopped.")
-			return
-		case <-ticker.C:
-			if !IsMarketSessionActive() {
-				continue
-			}
-
-			// Check if primary WebSocket is actively streaming
-			lastTick := lastWSTickUnix.Load()
-			wsActive := wsConnected.Load() && (time.Since(time.Unix(lastTick, 0)) < 5*time.Second)
-
-			if wsActive {
-				// WebSocket is healthy, fallback yields to conserve REST rate limits
-				continue
-			}
-
-			// Fallback triggered: Primary WS is down or silent > 5 seconds
-			if time.Since(lastCredsCheck) > 60*time.Second || cachedAppID == "" || cachedToken == "" {
-				appID, token, isActive, tokenDate, err := dbService.GetBrokerCredentials(ctx)
-				if err != nil {
-					log.Printf("⚠️ [FYERS REST Fallback] DB Credentials read error: %v\n", err)
-				} else {
-					if !isActive {
-						continue
-					}
-					now := time.Now().In(istMarketLoc)
-					if tokenDate == nil || tokenDate.In(istMarketLoc).Format("2006-01-02") != now.Format("2006-01-02") {
-						continue
-					}
-					cachedAppID = strings.TrimSpace(appID)
-					cachedToken = strings.TrimSpace(token)
-					lastCredsCheck = time.Now()
-				}
-			}
-
-			if cachedAppID == "" || cachedToken == "" {
-				continue
-			}
-
-			url := "https://api-t1.fyers.in/data/quotes?symbols=NSE:NIFTY50-INDEX,NSE:NIFTYBANK-INDEX,BSE:SENSEX-INDEX"
-			req, err := http.NewRequestWithContext(ctx, "GET", url, nil)
-			if err != nil {
-				continue
-			}
-			req.Header.Set("Authorization", fmt.Sprintf("%s:%s", cachedAppID, cachedToken))
-
-			resp, err := httpClient.Do(req)
-			if err != nil {
-				continue
-			}
-
-			if resp.StatusCode != http.StatusOK {
-				resp.Body.Close()
-				continue
-			}
-
-			var quoteResp fyersQuoteResponse
-			err = json.NewDecoder(resp.Body).Decode(&quoteResp)
-			resp.Body.Close()
-			if err != nil || quoteResp.S != "ok" {
-				continue
-			}
-
-			for _, item := range quoteResp.D {
-				idxName, recognized := symbolToIndex[item.N]
-				if !recognized || item.V.Lp <= 0 {
-					continue
-				}
-
-				v := item.V
-				publishIndexQuoteToRedis(ctx, redisService, idxName, item.N, v.Lp, v.Ch, v.Chp, v.HighPrice, v.LowPrice, v.OpenPrice, v.PrevClosePrice, "REST_FALLBACK", prevLTP, tickWriter)
-			}
-		}
-	}
-}
 
 // TargetedOptionChainPoller fetches heavy 31-strike option chains on demand or throttled 5-second interval.
 func TargetedOptionChainPoller(ctx context.Context, redisService *services.RedisService, dbService *services.DBService) {

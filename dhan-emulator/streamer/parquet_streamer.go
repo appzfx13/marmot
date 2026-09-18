@@ -5,7 +5,6 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"math"
 	"net/http"
@@ -22,7 +21,6 @@ import (
 	"dhan-emulator/models"
 	"github.com/gorilla/websocket"
 	_ "github.com/marcboeker/go-duckdb"
-	"github.com/parquet-go/parquet-go"
 	"github.com/redis/go-redis/v9"
 )
 

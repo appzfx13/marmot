@@ -203,10 +203,12 @@ func (j *BacktestJob) Run(ctx context.Context) {
 
 		dateStr := currDate.Format("2006-01-02")
 
-		// Retrieve pre-loaded real ticks for this date, fallback to synthetic spot-only ticks
+		// Retrieve pre-loaded real ticks for this date. Skip if data is absent.
 		dayTicks, hasReal := candlesByDate[dateStr]
 		if !hasReal || len(dayTicks) == 0 {
-			dayTicks = j.syntheticDayTicks(dateStr)
+			log.Printf("⚠️ [Backtest #%s] Missing Parquet data for date %s. Skipping day.", taskID, dateStr)
+			currDate = currDate.AddDate(0, 0, 1)
+			continue
 		}
 
 		// Attach AI Macro Snapshot to each tick if enabled
@@ -358,44 +360,6 @@ func (j *BacktestJob) Run(ctx context.Context) {
 	log.Printf("✅ [Backtest #%s] Complete! Net PnL: ₹%.2f, Win Rate: %.1f%%, Total Trades: %d\n",
 		taskID, totalPnL, winRate, totalTrades)
 	j.broadcastBacktestProgress(ctx, taskID, 100, "completed", totalPnL, totalTrades)
-}
-
-// syntheticDayTicks generates deterministic synthetic 1-min broker ticks when no real data exists.
-// Ticks include a simulated spot OHLCV and a minimal ATM CALL/PUT option chain.
-func (j *BacktestJob) syntheticDayTicks(dateStr string) []strategies.MarketTick {
-	var dateHash float64
-	for _, ch := range dateStr {
-		dateHash += float64(ch)
-	}
-	basePrice := 22000.0 + math.Sin(dateHash)*350.0
-	direction := 1.0
-	if int(dateHash)%2 == 0 {
-		direction = -1.0
-	}
-	ticks := make([]strategies.MarketTick, 0, 375)
-	for minute := 0; minute < 375; minute++ {
-		t := time.Date(2024, 1, 1, 9, 15, 0, 0, time.UTC).Add(time.Duration(minute) * time.Minute)
-		p := basePrice + math.Sin(float64(minute)/12.0)*30.0 + (float64(minute) * 0.1 * direction)
-		optCall := math.Max(1.0, 80.0-float64(minute)*0.05)
-		optPut := math.Max(1.0, 80.0+float64(minute)*0.05*direction)
-		dtStr := fmt.Sprintf("%s %s", dateStr, t.Format("15:04:00"))
-		tick := strategies.MarketTick{
-			Timestamp: int64(t.Unix()),
-			Datetime:  dtStr,
-			Date:      dateStr,
-			IndexName: "NIFTY",
-			SpotOpen:  p - 2.0,
-			SpotHigh:  p + 6.0,
-			SpotLow:   p - 5.0,
-			SpotClose: p + (2.5 * direction),
-			Options: map[string]strategies.OptionSnap{
-				"ATM CALL": {Open: optCall - 2, High: optCall + 5, Low: optCall - 4, Close: optCall},
-				"ATM PUT":  {Open: optPut - 2, High: optPut + 5, Low: optPut - 4, Close: optPut},
-			},
-		}
-		ticks = append(ticks, tick)
-	}
-	return ticks
 }
 
 func (j *BacktestJob) updateBacktestProgress(ctx context.Context, taskID string, status string, progress int) error {

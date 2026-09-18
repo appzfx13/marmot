@@ -19,8 +19,6 @@ from .views import (
     BacktestRuleUpdateView,
     BacktestRuleDeleteView,
     BacktestRuleToggleView,
-    RLTrainingIndexView,
-    RLTrainingForexView,
     BacktestExportExcelView,
     BacktestTradeCandlesView,
     BacktestTradeChartView,
@@ -41,9 +39,6 @@ from .views import (
 app_name = 'backtest'
 
 urlpatterns = [
-    # RL AI Engine Dedicated Portals
-    path('rl-training/index-fo/', RLTrainingIndexView.as_view(), name='rl_training_index_fo'),
-    path('rl-training/forex-futures/', RLTrainingForexView.as_view(), name='rl_training_forex_futures'),
     path('list/', BacktestDashboardView.as_view(), name='backtest_dashboard'),
     path('scroll/', BacktestDashboardScrollView.as_view(), name='backtest_dashboard_scroll'),
     path('bulk-delete/', BacktestBulkDeleteView.as_view(), name='backtest_bulk_delete'),
