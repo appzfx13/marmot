@@ -2811,11 +2811,9 @@ class BacktestDeployModalView(LoginRequiredMixin, View):
         ]
 
         default_account = next((a for a in user_accounts if a.is_default), None) or (user_accounts[0] if user_accounts else None)
-        default_mode = default_account.account_type if default_account else AccountTypeChoices.SANDBOX
+        default_mode = default_account.account_type if default_account else AccountTypeChoices.MOCK
         if default_mode == AccountTypeChoices.MOCK:
             mode_prefix = "Mock"
-        elif default_mode == AccountTypeChoices.SANDBOX:
-            mode_prefix = "Sandbox"
         else:
             mode_prefix = "Live"
 
@@ -2841,21 +2839,17 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
         raw_mode = request.POST.get('execution_mode', 'LIVE').strip().upper()
         if raw_mode == 'MOCK':
             execution_mode = AccountTypeChoices.MOCK
-        elif raw_mode == 'SANDBOX':
-            execution_mode = AccountTypeChoices.SANDBOX
         else:
             execution_mode = AccountTypeChoices.LIVE
 
         target_account = None
         if trading_account_id:
             target_account = request.user.trading_accounts.filter(id=trading_account_id, is_active=True).first()
-            if target_account and target_account.account_type in [AccountTypeChoices.LIVE, AccountTypeChoices.SANDBOX, AccountTypeChoices.MOCK]:
+            if target_account and target_account.account_type in [AccountTypeChoices.LIVE, AccountTypeChoices.MOCK]:
                 execution_mode = target_account.account_type
 
         if execution_mode == AccountTypeChoices.MOCK:
             mode_prefix = "Mock"
-        elif execution_mode == AccountTypeChoices.SANDBOX:
-            mode_prefix = "Sandbox"
         else:
             mode_prefix = "Live"
         raw_name = request.POST.get('name', '').strip()

@@ -95,7 +95,6 @@ class TestLogEventChoices(models.TextChoices):
 # Account Type Choices
 class AccountTypeChoices(models.TextChoices):
     LIVE = "LIVE", "Live Account"
-    SANDBOX = "SANDBOX", "Sandbox Account"
     MOCK = "MOCK", "Mock Emulator Account"
 
 

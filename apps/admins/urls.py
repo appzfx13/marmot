@@ -3,6 +3,7 @@ from .views import (
     AdminLoginView,
     AdminDashboardView,
     AdminTerminalView,
+    AdminTerminalHistoricalDataView,
     AdminLogoutView,
     AdminTraderListView,
     AdminTraderScrollView,
@@ -137,6 +138,7 @@ urlpatterns = [
     path('dashboard/sandbox/account-delete/<int:pk>/', AdminSandboxAccountDeleteView.as_view(), name='sandbox-account-delete'),
     path('dashboard/ai/', AdminAIDashboardView.as_view(), name='admin-ai-dashboard'),
     path('terminal/', AdminTerminalView.as_view(), name='admin-terminal'),
+    path('terminal/historical-data/', AdminTerminalHistoricalDataView.as_view(), name='admin-terminal-historical-data'),
     path('logout/', AdminLogoutView.as_view(), name='admin-logout'),
 
     # Trading Journal & Analytics Routes

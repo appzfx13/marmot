@@ -51,16 +51,31 @@
          TOP HERO CHART SECTION: TRADINGVIEW LIGHTWEIGHT CANVAS ENGINE
          ═══════════════════════════════════════════════════════════════════ -->
     <div class="col-12">
-        <div class="glass-card p-3 p-sm-4 rounded-4 border overflow-hidden"
-             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
-            
-            <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between mb-3 gap-2 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-                <div class="d-flex flex-wrap align-items-center gap-2">
-                    <span class="material-icons text-danger fs-5">show_chart</span>
-                    <h5 class="fw-bold theme-text-main mb-0" id="adminChartTitle">NIFTY 50</h5>
-                    <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small font-monospace fs-6 px-2.5 py-1" id="adminChartLtp">
-                        ₹ 24,450.00 <span class="smaller" id="adminPriceDelta">+125.40 (+0.52%)</span>
-                    </span>
+        <div class="row g-2 h-100">
+        <!-- Main Chart Area -->
+        <div class="col-lg-9 col-12 d-flex flex-column" style="min-height: 550px;">
+            <div class="glass-card rounded-4 border flex-grow-1 d-flex flex-column overflow-hidden position-relative" 
+                 style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+                
+                <!-- Chart Header Toolbar (Dense) -->
+                <div class="px-3 py-2 border-bottom d-flex align-items-center justify-content-between" style="border-color: var(--border-color) !important; background: rgba(0,0,0,0.2);">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-white fs-5">stacked_line_chart</span>
+                        <h5 class="fw-bold mb-0 text-white tracking-wider m-0" id="adminChartTitle" style="font-size: 1.1rem;">NIFTY 50</h5>
+                        <div class="vr mx-2 bg-secondary bg-opacity-50" style="height: 20px;"></div>
+                        <div class="d-flex align-items-center gap-3 font-monospace small">
+                            <span class="theme-text-muted">O <span id="adminOhlcO" class="text-white fw-bold">...</span></span>
+                            <span class="theme-text-muted">H <span id="adminOhlcH" class="text-success fw-bold">...</span></span>
+                            <span class="theme-text-muted">L <span id="adminOhlcL" class="text-danger fw-bold">...</span></span>
+                            <span class="theme-text-muted">C <span id="adminOhlcC" class="text-white fw-bold">...</span></span>
+                        </div>
+                    </div>
+                    <div class="d-flex align-items-center gap-1">
+                        <div class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 font-monospace" id="adminChartLtp" style="font-size: 0.85rem;">
+                            FETCHING...
+                        </div>
+                    </div>
+                </div>
                     
                     <!-- Live OHLC Legend -->
                     <div class="d-none d-lg-flex align-items-center gap-2 ms-2 font-monospace theme-text-muted" style="font-size:0.75rem;">
@@ -148,6 +163,23 @@
                     </span>
                 </div>
 
+                <!-- Live / Mock Execution Mode Toggle -->
+                <div class="mb-3">
+                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Execution Mode</label>
+                    <div class="nav nav-pills nav-fill p-1 rounded-3 d-flex flex-row flex-nowrap w-100 gap-2"
+                        style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);" role="tablist">
+                        <button class="nav-link active rounded-pill flex-fill text-nowrap fw-bold py-1.5" id="mode-live-btn" type="button"
+                            onclick="setAdminExecutionMode('LIVE')" style="font-size: 0.8rem;">
+                            <span class="material-icons fs-6 align-middle me-1">bolt</span>LIVE
+                        </button>
+                        <button class="nav-link rounded-pill flex-fill text-nowrap fw-bold py-1.5 text-secondary" id="mode-mock-btn" type="button"
+                            onclick="setAdminExecutionMode('MOCK')" style="font-size: 0.8rem;">
+                            <span class="material-icons fs-6 align-middle me-1">science</span>MOCK (Simulator)
+                        </button>
+                    </div>
+                    <input type="hidden" id="adminExecutionMode" value="LIVE">
+                </div>
+
                 <!-- Target User / Multi-Trader Broadcast Selector -->
                 <div class="mb-3">
                     <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Execution Target</label>
@@ -217,7 +249,7 @@
                 <button type="button" class="btn btn-danger w-100 py-3 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2"
                         onclick="triggerAdminMasterOrder()">
                     <span class="material-icons fs-5">bolt</span>
-                    <span>DISPATCH MASTER ORDER</span>
+                    <span id="adminExecuteBtnText">DISPATCH LIVE MASTER ORDER</span>
                 </button>
             </div>
         {% else %}
@@ -296,44 +328,42 @@
 </div>
 </div>
 
-<!-- Load Lightweight Charts Open Source Library -->
-<script src="https://unpkg.com/lightweight-charts/dist/lightweight-charts.standalone.production.js"></script>
+<!-- Load Lightweight Charts Open Source Library v4 to prevent v5 API breakage -->
+<script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 <script>
     let adminChartInstance = null;
     let adminCandleSeries = null;
     let adminEmaSeries = null;
     let adminLiveTickInterval = null;
     
-    let adminActiveSymbol = 'NIFTY 50';
-    let adminBaseLtp = 24450.00;
+    let adminActiveSymbol = 'NSE:NIFTY50-INDEX';
+    let adminBaseLtp = 0;
     let adminOrderSide = 'BUY';
 
-    function generateAdminOHLCData(basePrice, count) {
-        const data = [];
-        const now = new Date();
-        now.setMinutes(now.getMinutes() - count * 5);
-        
-        let price = basePrice * 0.985;
-        for (let i = 0; i < count; i++) {
-            const time = Math.floor(now.getTime() / 1000) + (i * 300);
-            const open = price + (Math.random() - 0.48) * (basePrice * 0.003);
-            const high = open + Math.random() * (basePrice * 0.005);
-            const low = open - Math.random() * (basePrice * 0.005);
-            const close = (low + high) / 2 + (Math.random() - 0.49) * (basePrice * 0.002);
-            price = close;
+    async function fetchHistoricalData(symbol) {
+        try {
+            // Correct format mapping if needed
+            let fyersSymbol = symbol;
+            if (symbol === 'NIFTY 50') fyersSymbol = 'NSE:NIFTY50-INDEX';
+            if (symbol === 'BANKNIFTY') fyersSymbol = 'NSE:NIFTYBANK-INDEX';
             
-            data.push({
-                time: time,
-                open: parseFloat(open.toFixed(2)),
-                high: parseFloat(Math.max(open, close, high).toFixed(2)),
-                low: parseFloat(Math.min(open, close, low).toFixed(2)),
-                close: parseFloat(close.toFixed(2))
-            });
+            const url = `/admins/terminal/historical-data/?symbol=${encodeURIComponent(fyersSymbol)}&resolution=1`;
+            const response = await fetch(url);
+            const res = await response.json();
+            
+            if (res.success && res.data.length > 0) {
+                return res.data;
+            } else {
+                console.warn('No historical data returned from Fyers:', res.message);
+                return [];
+            }
+        } catch (e) {
+            console.error('Error fetching historical data:', e);
+            return [];
         }
-        return data;
     }
 
-    function initAdminMarmotChartCanvas() {
+    async function initAdminMarmotChartCanvas() {
         const container = document.getElementById('admin_marmot_chart_canvas');
         if (!container) return;
         
@@ -346,7 +376,7 @@
 
         adminChartInstance = LightweightCharts.createChart(container, {
             width: container.clientWidth,
-            height: 440,
+            height: 500,
             layout: {
                 background: { type: 'solid', color: '#0d0e15' },
                 textColor: '#a1a5b7',
@@ -382,12 +412,12 @@
         // Add EMA 20 Line Series
         adminEmaSeries = adminChartInstance.addLineSeries({
             color: '#ef4444',
-            lineWidth: 2,
+            lineWidth: 1,
             title: 'EMA 20'
         });
 
         // Load initial data
-        loadAdminSymbolChartData(adminBaseLtp);
+        await loadAdminSymbolChartData(adminActiveSymbol);
 
         // Resize handler
         window.addEventListener('resize', () => {
@@ -399,23 +429,33 @@
         startAdminLiveTickStream();
     }
 
-    function loadAdminSymbolChartData(price) {
+    async function loadAdminSymbolChartData(symbol) {
         if (!adminCandleSeries) return;
-        const ohlc = generateAdminOHLCData(price, 80);
+        
+        const ohlc = await fetchHistoricalData(symbol);
+        if (ohlc.length === 0) {
+            // Strict rule: no dummy data fallback
+            adminCandleSeries.setData([]);
+            if (adminEmaSeries) adminEmaSeries.setData([]);
+            updateAdminOHLCHeader('-', '-', '-', '-');
+            return;
+        }
+        
         adminCandleSeries.setData(ohlc);
 
-        // EMA 20
+        // Calculate EMA 20
         const emaData = [];
         for (let i = 0; i < ohlc.length; i++) {
-            if (i >= 5) {
+            if (i >= 19) {
                 let sum = 0;
-                for (let j = i - 5; j <= i; j++) sum += ohlc[j].close;
-                emaData.push({ time: ohlc[i].time, value: parseFloat((sum / 6).toFixed(2)) });
+                for (let j = i - 19; j <= i; j++) sum += ohlc[j].close;
+                emaData.push({ time: ohlc[i].time, value: parseFloat((sum / 20).toFixed(2)) });
             }
         }
         if (adminEmaSeries) adminEmaSeries.setData(emaData);
 
         const last = ohlc[ohlc.length - 1];
+        adminBaseLtp = last.close;
         updateAdminOHLCHeader(last.open, last.high, last.low, last.close);
     }
 
@@ -432,30 +472,65 @@
 
     function startAdminLiveTickStream() {
         if (adminLiveTickInterval) clearInterval(adminLiveTickInterval);
-        adminLiveTickInterval = setInterval(() => {
+        
+        // Listen to the global WebSocket for MarmotWS
+        // Assume global window.MarmotWS is already established in base.html
+        window.addEventListener('marmot:live_tick', function(e) {
             if (!adminCandleSeries) return;
-            const delta = (Math.random() - 0.49) * (adminBaseLtp * 0.001);
-            adminBaseLtp = Math.max(1, adminBaseLtp + delta);
+            const data = e.detail;
+            
+            // Example live_tick payload: { symbol: "NIFTY 50", ltp: 24450.5, ... }
+            // Only update if symbol matches
+            // We use simple fallback parsing here
+            let tickSymbol = data.symbol || (data.data && data.data.symbol);
+            let ltp = data.ltp || (data.data && data.data.ltp);
+            
+            // If the tick symbol isn't strictly provided in our format, we'll just update based on the LTP if we're connected
+            if (!ltp) return;
+            
+            // Convert to number
+            if (typeof ltp === 'string') {
+                ltp = parseFloat(ltp.replace(/,/g, ''));
+            }
+            
+            // For now, if we don't have symbol matching, we just assume it's for the active symbol
+            // since the user wants real-time WebSocket data.
+            adminBaseLtp = ltp;
 
             const nowSec = Math.floor(Date.now() / 1000);
             const roundedTime = Math.floor(nowSec / 300) * 300;
 
-            const updatedCandle = {
-                time: roundedTime,
-                open: parseFloat((adminBaseLtp - delta).toFixed(2)),
-                high: parseFloat((adminBaseLtp + Math.abs(delta) * 1.5).toFixed(2)),
-                low: parseFloat((adminBaseLtp - Math.abs(delta) * 1.5).toFixed(2)),
-                close: parseFloat(adminBaseLtp.toFixed(2))
-            };
+            // Generate a synthetic candle update since we only have LTP
+            // In a real historical/tick system, the server sends OHLC
+            const currentCandle = adminCandleSeries.options().data ? adminCandleSeries.options().data.slice(-1)[0] : null;
+            
+            let updatedCandle = null;
+            if (currentCandle && currentCandle.time === roundedTime) {
+                updatedCandle = {
+                    time: roundedTime,
+                    open: currentCandle.open,
+                    high: Math.max(currentCandle.high, adminBaseLtp),
+                    low: Math.min(currentCandle.low, adminBaseLtp),
+                    close: adminBaseLtp
+                };
+            } else {
+                updatedCandle = {
+                    time: roundedTime,
+                    open: adminBaseLtp,
+                    high: adminBaseLtp,
+                    low: adminBaseLtp,
+                    close: adminBaseLtp
+                };
+            }
 
             adminCandleSeries.update(updatedCandle);
 
             const ltpEl = document.getElementById('adminChartLtp');
             if (ltpEl) {
-                ltpEl.innerHTML = `₹ ${adminBaseLtp.toLocaleString('en-IN', {minimumFractionDigits:2})} <span class="${delta >= 0 ? 'text-success' : 'text-danger'} smaller">${delta >= 0 ? '+' : ''}${delta.toFixed(2)}</span>`;
+                ltpEl.innerHTML = `₹ ${adminBaseLtp.toLocaleString('en-IN', {minimumFractionDigits:2})} <span class="text-success smaller">LIVE</span>`;
             }
             updateAdminOHLCHeader(updatedCandle.open, updatedCandle.high, updatedCandle.low, updatedCandle.close);
-        }, 1500);
+        });
     }
 
     function switchAdminSystemSymbol(name, price, type, btnEl) {
@@ -516,7 +591,34 @@
         const sym = document.getElementById('adminTerminalSymbolInput').value;
         const qty = document.getElementById('adminQtyInput').value;
         const scope = document.getElementById('adminTargetScope').value;
-        alert(`Master Order Dispatched via ${adminOrderSide}!\nTarget: ${scope}\nSymbol: ${sym}\nQty per Account: ${qty} units`);
+        const mode = document.getElementById('adminExecutionMode').value;
+        alert(`Master Order Dispatched via ${adminOrderSide} in ${mode} mode!\nTarget: ${scope}\nSymbol: ${sym}\nQty per Account: ${qty} units`);
+    }
+
+    function setAdminExecutionMode(mode) {
+        document.getElementById('adminExecutionMode').value = mode;
+        const liveBtn = document.getElementById('mode-live-btn');
+        const mockBtn = document.getElementById('mode-mock-btn');
+        const executeBtnText = document.getElementById('adminExecuteBtnText');
+        const executeBtn = executeBtnText.parentElement;
+
+        if (mode === 'LIVE') {
+            liveBtn.classList.add('active', 'bg-primary', 'text-white');
+            liveBtn.classList.remove('text-secondary');
+            mockBtn.classList.remove('active', 'bg-warning', 'text-dark');
+            mockBtn.classList.add('text-secondary');
+            executeBtn.classList.remove('btn-warning', 'text-dark');
+            executeBtn.classList.add('btn-danger', 'text-white');
+            executeBtnText.innerText = 'DISPATCH LIVE MASTER ORDER';
+        } else {
+            mockBtn.classList.add('active', 'bg-warning', 'text-dark');
+            mockBtn.classList.remove('text-secondary');
+            liveBtn.classList.remove('active', 'bg-primary', 'text-white');
+            liveBtn.classList.add('text-secondary');
+            executeBtn.classList.remove('btn-danger', 'text-white');
+            executeBtn.classList.add('btn-warning', 'text-dark');
+            executeBtnText.innerText = 'DISPATCH MOCK MASTER ORDER';
+        }
     }
 
     setTimeout(initAdminMarmotChartCanvas, 150);

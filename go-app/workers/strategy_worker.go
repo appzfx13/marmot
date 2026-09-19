@@ -39,9 +39,9 @@ type DhanOrderPayload struct {
 	BoProfitValue   float64 `json:"boProfitValue,omitempty"`
 }
 
-// isMockOrSandbox returns true if the execution mode corresponds to paper trading, sandbox, or simulation.
-func isMockOrSandbox(mode string) bool {
-	return strings.EqualFold(mode, "SANDBOX") || strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE")
+// isMockMode returns true if the execution mode corresponds to paper trading, sandbox, or simulation.
+func isMockMode(mode string) bool {
+	return strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE")
 }
 
 // getActiveMockAccountID queries the active mock broker account ID dynamically.
@@ -283,7 +283,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			}
 
 			// In SANDBOX / MOCK mode, sync open positions with mock broker matching engine
-			if isMockOrSandbox(params.ExecutionMode) && len(positions) > 0 {
+			if isMockMode(params.ExecutionMode) && len(positions) > 0 {
 				mockPositions := j.fetchMockBrokerPositions()
 				for i := range positions {
 					if positions[i].Status == "OPEN" {
@@ -451,7 +451,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						log.Printf("🚀 [StrategyWorker #%s] EVENT-DRIVEN ENTRY BUY: %s @ ₹%.2f (Rule #%d: %s | SL=%.1f TP=%.1f)\n",
 							taskID, sig.TradingSymbol, fillPrice, sig.RuleID, sig.RuleName, stopLoss, target)
 
-						if isMockOrSandbox(params.ExecutionMode) {
+						if isMockMode(params.ExecutionMode) {
 							j.dispatchOrderToMockBroker(DhanOrderPayload{
 								DhanClientID:    "1000000001",
 								CorrelationID:   sig.TradingSymbol,
@@ -492,7 +492,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				segment = "FOREX"
 			}
 			isMarketOpen := isSegmentMarketOpen(segment)
-			if isMockOrSandbox(params.ExecutionMode) {
+			if isMockMode(params.ExecutionMode) {
 				isMarketOpen = true
 			} else if !isMarketOpen && j.redisService != nil && j.redisService.Client != nil {
 				if val, err := j.redisService.Client.Get(ctx, "marmot:mock_feed:active").Result(); err == nil && val == "true" {
@@ -547,7 +547,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						positions = append([]SimulatedPosition{newPos}, positions...)
 						log.Printf("⚡ [StrategyWorker #%s] PENDING LIMIT EXECUTED: BUY %s @ ₹%.2f\n", taskID, orders[k].TradingSymbol, orders[k].CurrentLTP)
 
-						if isMockOrSandbox(params.ExecutionMode) {
+						if isMockMode(params.ExecutionMode) {
 							j.dispatchOrderToMockBroker(DhanOrderPayload{
 								DhanClientID:    "1000000001",
 								CorrelationID:   orders[k].TradingSymbol,
@@ -589,7 +589,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						}
 					}
 
-					if isMockOrSandbox(params.ExecutionMode) {
+					if isMockMode(params.ExecutionMode) {
 						// In SANDBOX / MOCK mode, the Mock Broker Matching Engine autonomously monitors ticks and squares off
 						// positions on SL/TP breach. Marmot strictly relies on the broker OMS and never dispatches duplicate sells.
 						if tickCounter%2 == 0 {
@@ -811,7 +811,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								positions = append([]SimulatedPosition{newPos}, positions...)
 								log.Printf("⚡ [StrategyWorker #%s] MARKET EXECUTED: %s %s @ ₹%.2f\n", taskID, sig.Transaction, sig.TradingSymbol, fillPrice)
 
-								if isMockOrSandbox(params.ExecutionMode) {
+								if isMockMode(params.ExecutionMode) {
 									j.dispatchOrderToMockBroker(DhanOrderPayload{
 										DhanClientID:    "1000000001",
 										CorrelationID:   sig.TradingSymbol,
@@ -1002,7 +1002,7 @@ func (j *StrategySignalJob) fetchOptionLTP(ctx context.Context, indexName, tradi
 	}
 
 	// 1. In SANDBOX / MOCK mode, query local mock broker emulator directly for live advancing Parquet replay ticks
-	if isMockOrSandbox(j.payload.Params.ExecutionMode) {
+	if isMockMode(j.payload.Params.ExecutionMode) {
 		resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
 		if err == nil && resp.StatusCode == http.StatusOK {
 			var ocPayload struct {
@@ -1152,7 +1152,7 @@ func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName stri
 	res := LiveQuoteMetrics{}
 
 	// 1. In SANDBOX / MOCK mode, query local mock broker emulator directly for live advancing Parquet replay spot
-	if isMockOrSandbox(j.payload.Params.ExecutionMode) {
+	if isMockMode(j.payload.Params.ExecutionMode) {
 		resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
 		if err == nil && resp.StatusCode == http.StatusOK {
 			var mockData map[string]interface{}
@@ -1337,17 +1337,17 @@ func (j *StrategySignalJob) saveTelemetry(
 	}
 
 	// 1. User-level sandbox telemetry
-	userKey := fmt.Sprintf("marmot:sandbox:telemetry:%s", userID)
+	userKey := fmt.Sprintf("marmot:mock:telemetry:%s", userID)
 	_ = j.redisService.Client.Set(ctx, userKey, bytes, 30*time.Minute).Err()
 
 	// 2. Strategy-level telemetry
-	stratKey := fmt.Sprintf("marmot:sandbox:telemetry:strategy:%d", strategyID)
+	stratKey := fmt.Sprintf("marmot:mock:telemetry:strategy:%d", strategyID)
 	_ = j.redisService.Client.Set(ctx, stratKey, bytes, 30*time.Minute).Err()
 
 	// 3. WS Broadcast to active subscribers & general hub
 	if j.hub != nil {
 		wsPayload, _ := json.Marshal(map[string]interface{}{
-			"type":       "sandbox_telemetry",
+			"type":       "mock_telemetry",
 			"task_id":    j.payload.TaskID,
 			"spot_price": spotPrice,
 			"data":       telemetry,

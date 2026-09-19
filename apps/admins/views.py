@@ -13,7 +13,7 @@ from django.contrib.auth.views import LoginView
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.contrib import messages
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import redirect, render, get_object_or_404
 from django.urls import reverse, reverse_lazy
 from django.views import View
@@ -2440,6 +2440,33 @@ class AdminAIDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMi
         return context
 
 
+class AdminTerminalHistoricalDataView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Fetches real historical OHLCV data from Fyers API."""
+    def get(self, request, *args, **kwargs):
+        symbol = request.GET.get('symbol', 'NSE:NIFTY50-INDEX')
+        resolution = request.GET.get('resolution', '1')
+        range_from = request.GET.get('range_from')
+        range_to = request.GET.get('range_to')
+        
+        # Get active master broker
+        from apps.trade_config.models import BrokerMaster
+        from apps.trade_core.brokers.fyers import FyersBrokerAdapter
+        
+        master = BrokerMaster.objects.filter(is_active=True, broker_code='fyers').first()
+        if not master:
+            return JsonResponse({'success': False, 'message': 'No active Fyers Master Broker configured.'}, status=400)
+            
+        adapter = FyersBrokerAdapter(
+            api_key=master.api_key,
+            api_secret=master.api_secret,
+            client_id=master.client_id,
+            user=request.user
+        )
+        
+        data = adapter.get_historical_data(symbol, resolution, range_from, range_to)
+        return JsonResponse({'success': True, 'data': data})
+
+
 class AdminTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
     """Protected Admin View for absolute trading terminal supporting Dhan & Fyers."""
     template_name = 'admins/terminal.html'
@@ -2797,7 +2824,7 @@ class AdminTradeExecConfigCreateView(HTMXPartialMixin, HtmxMessageMixin, LoginRe
             accounts = UserTradingAccount.objects.filter(user_id=target_user, is_active=True).select_related('broker')
             default_account = accounts.filter(is_default=True).first() or accounts.first()
         context['default_account'] = default_account
-        context['selected_mode'] = default_account.account_type if default_account else AccountTypeChoices.SANDBOX
+        context['selected_mode'] = default_account.account_type if default_account else AccountTypeChoices.MOCK
         context['trading_account_id'] = default_account.pk if default_account else ''
         context['account_type_choices'] = AccountTypeChoices.choices
         return context
@@ -2899,7 +2926,7 @@ class AdminTradeExecUserAccountInfoView(LoginRequiredMixin, AdminRequiredMixin, 
             accounts = UserTradingAccount.objects.filter(user_id=user_id, is_active=True).select_related('broker')
             default_account = accounts.filter(is_default=True).first() or accounts.first()
 
-        selected_mode = current_account_type or (default_account.account_type if default_account else AccountTypeChoices.SANDBOX)
+        selected_mode = current_account_type or (default_account.account_type if default_account else AccountTypeChoices.MOCK)
 
         context = {
             'default_account': default_account,

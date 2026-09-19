@@ -393,7 +393,7 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	// Enforce trade cooldown (default 5 minutes in backtest/quant mode to avoid churning)
 	cooldown := 5 * time.Minute
 	if params != nil {
-		if mode, ok := params["execution_mode"].(string); ok && (strings.EqualFold(mode, "SANDBOX") || strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE")) {
+		if mode, ok := params["execution_mode"].(string); ok && (strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE")) {
 			cooldown = 15 * time.Second
 		} else if cdSec, ok := params["cooldown_seconds"].(float64); ok && cdSec > 0 {
 			cooldown = time.Duration(cdSec) * time.Second

@@ -1677,15 +1677,7 @@
                             <span>Trading Journal</span>
                         </a>
                     </li>
-                    <li class="sidebar-menu-item">
-                        <a href="{% url 'users:user-sandbox-dashboard' %}"
-                            class="sidebar-menu-link {% if active_tab == 'sandbox-dashboard' or request.resolver_match.url_name == 'user-sandbox-dashboard' or request.resolver_match.url_name == 'admin-sandbox-dashboard' %}active{% endif %}"
-                            id="menu-sandbox-dashboard" hx-get="{% url 'users:user-sandbox-dashboard' %}"
-                            hx-target="#user-portal-container" hx-swap="innerHTML" hx-push-url="true">
-                            <i class="bi bi-cpu-fill text-info"></i>
-                            <span>Sandbox Dashboard</span>
-                        </a>
-                    </li>
+
                     <li class="sidebar-menu-item">
                         <a href="{% url 'users:user-ai-dashboard' %}"
                             class="sidebar-menu-link {% if active_tab == 'ai-dashboard' or request.resolver_match.url_name == 'user-ai-dashboard' %}active{% endif %}"
@@ -2105,8 +2097,6 @@
             const modalEl = getGlobalModalEl();
             if (!modalEl) return;
             try {
-                const existing = bootstrap.Modal.getInstance(modalEl);
-                if (existing) existing.dispose();
                 const modal = bootstrap.Modal.getOrCreateInstance(modalEl, { backdrop: 'static', keyboard: true });
                 modal.show();
             } catch (err) {
@@ -2120,13 +2110,17 @@
             try {
                 const instance = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
                 if (instance) instance.hide();
-                setTimeout(function () {
-                    document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
-                    document.body.classList.remove('modal-open');
-                    document.body.style.removeProperty('overflow');
-                    document.body.style.removeProperty('padding-right');
-                }, 150);
             } catch (err) { }
+            setTimeout(function () {
+                if (modalEl) {
+                    modalEl.classList.remove('show');
+                    modalEl.style.display = 'none';
+                }
+                document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
+                document.body.classList.remove('modal-open');
+                document.body.style.removeProperty('overflow');
+                document.body.style.removeProperty('padding-right');
+            }, 150);
         }
 
         document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
@@ -2181,7 +2175,7 @@
 
         document.body.addEventListener('htmx:afterSwap', function (evt) {
             var target = (evt.detail && evt.detail.target) ? evt.detail.target : evt.target;
-            if (target && (target.id === 'globalHtmxModalDialog' || (target.closest && target.closest('#globalHtmxModal')))) {
+            if (target && target.id === 'globalHtmxModalDialog') {
                 requestAnimationFrame(function () {
                     showGlobalModal();
                 });
@@ -2587,13 +2581,13 @@
                         this.ws.onmessage = function (event) {
                             try {
                                 const data = JSON.parse(event.data);
-                                if (data.type === 'sandbox_telemetry' || data.type === 'live_tick') {
+                                if (data.type === 'mock_telemetry' || data.type === 'live_tick') {
                                     const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
                                     if (spot && window.updateLiveSpotDOM) {
                                         window.updateLiveSpotDOM(spot, data.data || data);
                                     }
                                 }
-                                if (data.type === 'sandbox_telemetry') {
+                                if (data.type === 'mock_telemetry') {
                                     const t = data.data || data;
                                     console.log('📊 [MarmotWS:Telemetry] Received for Task #' + (data.task_id || t.strategy_id) + ':', {
                                         net_pnl: t.live_net_pnl,
@@ -2603,7 +2597,7 @@
                                         positions: (t.positions || []).length,
                                         latency_ms: t.processing_latency_ms
                                     });
-                                    window.dispatchEvent(new CustomEvent('marmot:sandbox-telemetry', { detail: data }));
+                                    window.dispatchEvent(new CustomEvent('marmot:mock-telemetry', { detail: data }));
                                     const stratKey = data.task_id || (data.data && data.data.strategy_id ? 'strategy_' + data.data.strategy_id : null);
                                     if (stratKey && window.MarmotWS.callbacks[String(stratKey)]) {
                                         window.MarmotWS.callbacks[String(stratKey)].forEach(function (cb) {

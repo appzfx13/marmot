@@ -101,20 +101,7 @@ class User(AbstractUser, BaseModel):
         if account:
             return account
 
-        # Fallback: auto-seed Sandbox Broker Master and default account
-        sandbox_broker, _ = BrokerMaster.objects.get_or_create(
-            code='sandbox',
-            defaults={'name': 'SANDBOX', 'description': 'Default Paper Trading Broker Platform'}
-        )
-        return UserTradingAccount.objects.create(
-            user=self,
-            broker=sandbox_broker,
-            account_name='Default Sandbox Account',
-            account_type=AccountTypeChoices.SANDBOX,
-            is_default=True,
-            is_active=True,
-            is_configured=True
-        )
+        return None
 
     def get_role_prefix(self):
         role_str = str(self.role).upper()

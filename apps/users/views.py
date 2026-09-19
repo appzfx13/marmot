@@ -262,7 +262,7 @@ def populate_account_context(context, user, request):
     
     context['active_trading_account'] = active_acc
     context['user_trading_accounts'] = accounts
-    context['watching_on'] = active_acc.account_type if active_acc else 'SANDBOX'
+        # We no longer rely on watching_on for the dashboard UI
     return active_acc
 
 
@@ -439,7 +439,7 @@ class UserLiveMockDashboardView(UserLiveDashboardView):
         context['is_mock_mode'] = True
         context['dashboard_title'] = 'Live Mock Dashboard'
 
-        mock_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default').first()
+        mock_account = user.trading_accounts.filter(is_active=True, account_type='MOCK').order_by('-is_default').first()
         if not mock_account:
             mock_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
 
@@ -1200,29 +1200,6 @@ class UserEnvironmentToggleModalView(HtmxModalMixin, LoginRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         return render(request, self.modal_template_name)
-
-
-class UserEnvironmentToggleView(LoginRequiredMixin, View):
-    """Toggle trading environment watching_on mode between LIVE and SANDBOX."""
-    def post(self, request, *args, **kwargs):
-        user = request.user
-        current_mode = getattr(user, 'watching_on', 'SANDBOX') or 'SANDBOX'
-        new_mode = 'LIVE' if current_mode == 'SANDBOX' else 'SANDBOX'
-        
-        user.watching_on = new_mode
-        user.save(update_fields=['watching_on'])
-        request.session['user_trading_env'] = new_mode
-
-        msg = f"Watching environment switched to {new_mode} mode."
-        messages.success(request, msg)
-
-        response = HttpResponse()
-        response['HX-Trigger'] = json.dumps({
-            'closeGlobalModal': True,
-            'showToast': {'message': msg, 'level': 'success'},
-            'reloadPage': True
-        })
-        return response
 
 
 class UserAccountSelectView(LoginRequiredMixin, View):

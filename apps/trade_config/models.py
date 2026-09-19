@@ -36,7 +36,7 @@ class UserTradingAccount(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='trading_accounts', verbose_name="Trader")
     broker = models.ForeignKey(BrokerMaster, on_delete=models.CASCADE, related_name='user_accounts', verbose_name="Broker Platform")
     account_name = models.CharField(max_length=150, help_text="Account Nickname (e.g. Primary Dhan Live, Fyers Alpha, Sandbox Demo)")
-    account_type = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.SANDBOX, help_text="Account environment mode (LIVE / SANDBOX)")
+    account_type = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.MOCK, help_text="Account environment mode (LIVE / MOCK)")
 
     # Broker Credentials & API Keys
     broker_client_id = models.CharField(max_length=255, blank=True, null=True, help_text="Broker Client ID / User ID")
@@ -72,7 +72,7 @@ class TradeExecConfig(BaseModel):
     admins_user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='trade_configs_exec', verbose_name="Marmot User")
     trading_account = models.ForeignKey(UserTradingAccount, on_delete=models.CASCADE, related_name='strategy_configs', null=True, blank=True, verbose_name="Target Trading Account")
     # Account Mode
-    account_type = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.SANDBOX, help_text="Target execution account mode (LIVE / SANDBOX)")
+    account_type = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.MOCK, help_text="Target execution account mode (LIVE / MOCK)")
 
     # ─── Market Type ────────────────────────────────────────────────────────
     market_type = models.CharField(max_length=20, choices=MarketTypeChoices.choices, default=MarketTypeChoices.INDEX_FO, help_text="Market segment")
@@ -172,7 +172,7 @@ class LiveStrategy(BaseModel):
 class DailyPortfolioSnapshot(BaseModel):
     user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='daily_portfolio_snapshots', verbose_name="Trader")
     trading_account = models.ForeignKey(UserTradingAccount, on_delete=models.CASCADE, related_name='portfolio_snapshots', verbose_name="Trading Account")
-    account_type = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.SANDBOX, help_text="Execution Mode")
+    account_type = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.MOCK, help_text="Execution Mode")
     date = models.DateField(db_index=True, help_text="Calendar trading date")
     opening_balance = models.DecimalField(max_digits=12, decimal_places=2, default=100000.00, help_text="Starting day balance")
     closing_balance = models.DecimalField(max_digits=12, decimal_places=2, default=100000.00, help_text="Ending day balance")
