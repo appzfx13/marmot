@@ -2108,20 +2108,33 @@
             const modalEl = getGlobalModalEl();
             if (!modalEl) return;
             try {
-                const instance = bootstrap.Modal.getInstance(modalEl) || bootstrap.Modal.getOrCreateInstance(modalEl);
+                const instance = bootstrap.Modal.getInstance(modalEl);
                 if (instance) instance.hide();
-            } catch (err) { }
+            } catch (err) {
+                console.warn('Bootstrap modal hide error:', err);
+            }
             setTimeout(function () {
                 if (modalEl) {
                     modalEl.classList.remove('show');
+                    modalEl.setAttribute('aria-hidden', 'true');
+                    modalEl.removeAttribute('aria-modal');
+                    modalEl.removeAttribute('role');
                     modalEl.style.display = 'none';
+                }
+                const dialog = document.getElementById('globalHtmxModalDialog');
+                if (dialog) {
+                    dialog.style.removeProperty('max-width');
+                    dialog.style.removeProperty('width');
+                    dialog.style.removeProperty('margin');
                 }
                 document.querySelectorAll('.modal-backdrop').forEach(function (el) { el.remove(); });
                 document.body.classList.remove('modal-open');
                 document.body.style.removeProperty('overflow');
                 document.body.style.removeProperty('padding-right');
-            }, 150);
+            }, 100);
         }
+        window.hideGlobalModal = hideGlobalModal;
+        window.showGlobalModal = showGlobalModal;
 
         document.body.addEventListener('htmx:beforeOnLoad', function (evt) {
             if (evt.detail.xhr.status === 422 || evt.detail.xhr.status === 500) {
@@ -2176,6 +2189,7 @@
         document.body.addEventListener('htmx:afterSwap', function (evt) {
             var target = (evt.detail && evt.detail.target) ? evt.detail.target : evt.target;
             if (target && target.id === 'globalHtmxModalDialog') {
+                if (evt.detail && evt.detail.xhr && evt.detail.xhr.status === 204) return;
                 requestAnimationFrame(function () {
                     showGlobalModal();
                 });

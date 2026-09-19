@@ -2447,28 +2447,192 @@ class AdminTerminalHistoricalDataView(LoginRequiredMixin, AdminRequiredMixin, Vi
         resolution = request.GET.get('resolution', '1')
         range_from = request.GET.get('range_from')
         range_to = request.GET.get('range_to')
-        
-        # Get active master broker
-        from apps.trade_config.models import BrokerMaster
+
+        symbol_map = {
+            'NIFTY': 'NSE:NIFTY50-INDEX',
+            'NIFTY 50': 'NSE:NIFTY50-INDEX',
+            'BANKNIFTY': 'NSE:NIFTYBANK-INDEX',
+            'BANK NIFTY': 'NSE:NIFTYBANK-INDEX',
+            'FINNIFTY': 'NSE:FINNIFTY-INDEX',
+            'FIN NIFTY': 'NSE:FINNIFTY-INDEX',
+            'MIDCPNIFTY': 'NSE:MIDCPNIFTY-INDEX',
+            'MIDCP NIFTY': 'NSE:MIDCPNIFTY-INDEX',
+            'SENSEX': 'BSE:SENSEX-INDEX',
+            'BSE SENSEX': 'BSE:SENSEX-INDEX',
+            'GIFTNIFTY': 'NSE:GIFTNIFTY-INDEX',
+            'GIFT NIFTY': 'NSE:GIFTNIFTY-INDEX',
+            'INDIAVIX': 'NSE:INDIAVIX-INDEX',
+            'INDIA VIX': 'NSE:INDIAVIX-INDEX',
+        }
+        symbol = symbol_map.get(symbol, symbol)
+
+        if symbol == 'NSE:GIFTNIFTY-INDEX':
+            symbol = 'NSE:NIFTY50-INDEX'
+
+        from apps.common.models import SiteSettings
+        from apps.trade_config.models import UserTradingAccount
         from apps.trade_core.brokers.fyers import FyersBrokerAdapter
-        
-        master = BrokerMaster.objects.filter(is_active=True, broker_code='fyers').first()
-        if not master:
-            return JsonResponse({'success': False, 'message': 'No active Fyers Master Broker configured.'}, status=400)
-            
-        adapter = FyersBrokerAdapter(
-            api_key=master.api_key,
-            api_secret=master.api_secret,
-            client_id=master.client_id,
-            user=request.user
-        )
-        
+
+        settings_obj = SiteSettings.load()
+        app_id = (settings_obj.fyers_app_id or '').strip()
+        api_key = (settings_obj.fyers_access_token or '').strip()
+
+        if app_id and api_key:
+            adapter = FyersBrokerAdapter(app_id=app_id, api_key=api_key, client_id=app_id)
+        else:
+            fyers_account = (
+                UserTradingAccount.objects.filter(
+                    user=request.user,
+                    broker__code='fyers',
+                    is_active=True,
+                    is_deleted=False
+                ).exclude(api_key__isnull=True).exclude(api_key='').first()
+                or UserTradingAccount.objects.filter(
+                    broker__code='fyers',
+                    is_active=True,
+                    is_deleted=False
+                ).exclude(api_key__isnull=True).exclude(api_key='').first()
+            )
+
+            if not fyers_account or not fyers_account.api_key:
+                return JsonResponse({
+                    'success': False,
+                    'message': 'No configured Fyers credentials found in SiteSettings or Trading Accounts.',
+                    'data': []
+                })
+
+            adapter = FyersBrokerAdapter(fyers_account)
+
         data = adapter.get_historical_data(symbol, resolution, range_from, range_to)
         return JsonResponse({'success': True, 'data': data})
 
 
-class AdminTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
-    """Protected Admin View for absolute trading terminal supporting Dhan & Fyers."""
+class AdminTerminalOptionChainAPIView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Ultra-low-latency JSON API delivering ATM ±4 strikes option chain for terminal modal."""
+
+    def get(self, request, *args, **kwargs):
+        index_name = request.GET.get('index', 'NIFTY').upper().strip()
+        index_name = (
+            index_name.replace('NSE:', '').replace('BSE:', '').replace('-INDEX', '')
+            .replace('50', '').replace('BANK', 'BANKNIFTY').replace('FIN', 'FINNIFTY').replace('MIDCP', 'MIDCPNIFTY')
+        )
+        if 'BANKNIFTY' in index_name:
+            index_name = 'BANKNIFTY'
+        elif 'FINNIFTY' in index_name:
+            index_name = 'FINNIFTY'
+        elif 'MIDCPNIFTY' in index_name:
+            index_name = 'MIDCPNIFTY'
+        elif 'SENSEX' in index_name:
+            index_name = 'SENSEX'
+        elif 'VIX' in index_name:
+            index_name = 'INDIAVIX'
+        elif 'NIFTY' in index_name:
+            index_name = 'NIFTY'
+
+        from apps.common.services.live_feed_service import get_live_index_option_chain
+        chain_data = get_live_index_option_chain(index_name=index_name, is_mock=False)
+
+        raw_strikes = chain_data.get('strikes', [])
+        atm_idx = -1
+        for idx, s in enumerate(raw_strikes):
+            if s.get('is_atm'):
+                atm_idx = idx
+                break
+
+        window = int(request.GET.get('window', 4))
+        if atm_idx >= 0 and raw_strikes:
+            start_idx = max(0, atm_idx - window)
+            end_idx = min(len(raw_strikes), atm_idx + window + 1)
+            sliced_strikes = raw_strikes[start_idx:end_idx]
+        else:
+            sliced_strikes = raw_strikes[:9]
+
+        return JsonResponse({
+            'success': True,
+            'index_name': chain_data.get('index_name', index_name),
+            'spot_symbol': chain_data.get('spot_symbol', index_name),
+            'spot_ltp': chain_data.get('spot_ltp', '0.00'),
+            'spot_change': chain_data.get('spot_change', '0.00'),
+            'spot_change_pct': chain_data.get('spot_change_pct', '0.00%'),
+            'is_positive': chain_data.get('is_positive', True),
+            'atm_strike': chain_data.get('atm_strike', '-'),
+            'strike_step': chain_data.get('strike_step', 50),
+            'expiry_date': chain_data.get('expiry_date', ''),
+            'pcr': chain_data.get('pcr', 0.0),
+            'india_vix': chain_data.get('india_vix', 0.0),
+            'last_updated': chain_data.get('last_updated', ''),
+            'strikes': sliced_strikes,
+        })
+
+
+def get_initial_watchlist_indices(is_sandbox: bool = False):
+    """Resolves initial authentic quotes for the 7 index choices."""
+    from apps.common.models import SiteSettings
+    from apps.trade_core.brokers.fyers import FyersBrokerAdapter
+
+    index_defs = [
+        {'symbol': 'NIFTY 50', 'index': 'NIFTY', 'fyers_sym': 'NSE:NIFTY50-INDEX', 'quote_sym': 'NSE:NIFTY50-INDEX', 'lot': 25},
+        {'symbol': 'BANK NIFTY', 'index': 'BANKNIFTY', 'fyers_sym': 'NSE:NIFTYBANK-INDEX', 'quote_sym': 'NSE:NIFTYBANK-INDEX', 'lot': 15},
+        {'symbol': 'FIN NIFTY', 'index': 'FINNIFTY', 'fyers_sym': 'NSE:FINNIFTY-INDEX', 'quote_sym': 'NSE:FINNIFTY-INDEX', 'lot': 25},
+        {'symbol': 'MIDCP NIFTY', 'index': 'MIDCPNIFTY', 'fyers_sym': 'NSE:MIDCPNIFTY-INDEX', 'quote_sym': 'NSE:MIDCPNIFTY-INDEX', 'lot': 50},
+        {'symbol': 'BSE SENSEX', 'index': 'SENSEX', 'fyers_sym': 'BSE:SENSEX-INDEX', 'quote_sym': 'BSE:SENSEX-INDEX', 'lot': 10},
+        {'symbol': 'GIFT NIFTY', 'index': 'GIFTNIFTY', 'fyers_sym': 'NSE:GIFTNIFTY-INDEX', 'quote_sym': 'NSE:NIFTY50-INDEX', 'lot': 25},
+        {'symbol': 'INDIA VIX', 'index': 'INDIAVIX', 'fyers_sym': 'NSE:INDIAVIX-INDEX', 'quote_sym': 'NSE:INDIAVIX-INDEX', 'lot': 1},
+    ]
+
+    quotes = {}
+    try:
+        settings_obj = SiteSettings.load()
+        app_id = (settings_obj.fyers_app_id or '').strip()
+        token = (settings_obj.fyers_access_token or '').strip()
+        if app_id and token:
+            adapter = FyersBrokerAdapter(app_id=app_id, api_key=token, client_id=app_id)
+            query_syms = list({item['quote_sym'] for item in index_defs})
+            quotes = adapter.get_quotes(query_syms)
+    except Exception as e:
+        logger.error(f"Failed to fetch initial index quotes: {e}")
+
+    watchlist_indices = []
+    for d in index_defs:
+        q = quotes.get(d['quote_sym'], {})
+        ltp = q.get('ltp', 0.0)
+        ch = q.get('ch', 0.0)
+        chp = q.get('chp', 0.0)
+
+        ltp_str = f"₹{ltp:,.2f}" if ltp > 0 else "—"
+        if chp > 0:
+            chp_str = f"+{chp:.2f}%"
+            chp_class = "bg-success text-success"
+        elif chp < 0:
+            chp_str = f"{chp:.2f}%"
+            chp_class = "bg-danger text-danger"
+        else:
+            chp_str = "0.00%" if ltp > 0 else "—"
+            chp_class = "bg-secondary text-muted"
+
+        spread = round(ltp * 0.0001, 2) if ltp > 0 else 0.0
+        bid_str = f"{(ltp - spread / 2):,.2f}" if ltp > 0 else "—"
+        ask_str = f"{(ltp + spread / 2):,.2f}" if ltp > 0 else "—"
+
+        watchlist_indices.append({
+            'symbol': d['symbol'],
+            'index': d['index'],
+            'fyers_sym': d['fyers_sym'],
+            'lot': d['lot'],
+            'ltp': ltp,
+            'ltp_str': ltp_str,
+            'ch': ch,
+            'chp': chp,
+            'chp_str': chp_str,
+            'chp_class': chp_class,
+            'bid_str': bid_str,
+            'ask_str': ask_str,
+        })
+    return watchlist_indices
+
+
+class AdminLiveTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Protected Admin View for LIVE trading terminal supporting Fyers."""
     template_name = 'admins/terminal.html'
     partial_template_name = 'admins/partials/terminal_content.html'
 
@@ -2480,11 +2644,34 @@ class AdminTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin
         has_configured_master = BrokerMaster.objects.filter(is_active=True).exists() or TradeExecConfig.objects.filter(is_deleted=False).exists()
         context['has_configured_master'] = has_configured_master
 
-        context['broker_code'] = 'dhan'
-        context['broker_name'] = 'DHAN HQ'
-        context['account_type'] = 'ADMIN MASTER'
+        context['broker_code'] = 'fyers'
+        context['broker_name'] = 'FYERS LIVE'
+        context['account_type'] = 'ADMIN MASTER LIVE'
         context['account_id_display'] = getattr(user, 'broker_client_id', '') or 'ADMIN-MASTER-01'
         context['is_token_active'] = True
+        context['is_sandbox'] = False
+        context['watchlist_indices'] = get_initial_watchlist_indices(is_sandbox=False)
+        return context
+
+
+class AdminSandboxTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Protected Admin View for SANDBOX trading terminal (Mock Broker)."""
+    template_name = 'admins/terminal.html'
+    partial_template_name = 'admins/partials/terminal_content.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        user = self.request.user
+        context['user'] = user
+
+        context['has_configured_master'] = True # Mock always ready
+        context['broker_code'] = 'mock'
+        context['broker_name'] = 'MOCK BROKER ENGINE'
+        context['account_type'] = 'ADMIN SANDBOX'
+        context['account_id_display'] = 'SANDBOX-SIM-01'
+        context['is_token_active'] = True
+        context['is_sandbox'] = True
+        context['watchlist_indices'] = get_initial_watchlist_indices(is_sandbox=True)
         return context
 
 

@@ -575,10 +575,12 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
                         strikes_map[sp] = {
                             'strike': sp,
                             'is_atm': False,
+                            'ce_symbol': '',
                             'ce_ltp': 0.0,
                             'ce_chg': 0.0,
                             'ce_chg_pct': 0.0,
                             'ce_oi': '0',
+                            'pe_symbol': '',
                             'pe_ltp': 0.0,
                             'pe_chg': 0.0,
                             'pe_chg_pct': 0.0,
@@ -589,13 +591,16 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
                     chg_val = float(item.get('ltpch', 0.0))
                     chgp_val = float(item.get('ltpchp', 0.0))
                     oi_val = int(item.get('oi', 0))
+                    item_sym = item.get('symbol') or ''
 
                     if opt_type == 'CE':
+                        strikes_map[sp]['ce_symbol'] = item_sym
                         strikes_map[sp]['ce_ltp'] = ltp_val
                         strikes_map[sp]['ce_chg'] = chg_val
                         strikes_map[sp]['ce_chg_pct'] = chgp_val
                         strikes_map[sp]['ce_oi'] = format_indian_number(oi_val)
                     elif opt_type == 'PE':
+                        strikes_map[sp]['pe_symbol'] = item_sym
                         strikes_map[sp]['pe_ltp'] = ltp_val
                         strikes_map[sp]['pe_chg'] = chg_val
                         strikes_map[sp]['pe_chg_pct'] = chgp_val

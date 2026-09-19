@@ -14,7 +14,7 @@
                 <small class="theme-text-muted">Configure a new Live or Mock Broker Account.</small>
             </div>
         </div>
-        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" onclick="hideGlobalModal()" aria-label="Close"></button>
     </div>
 
     <form id="accountCreateForm" action="{% url 'users:user-account-create' %}" method="POST"
@@ -139,18 +139,25 @@
 
             </div>
 
-            <div class="form-check mt-2">
-                <input class="form-check-input" type="checkbox" name="is_default" id="is_default_check">
-                <label class="form-check-label theme-text-muted small fw-bold" for="is_default_check">
-                    Set as my Primary Default Account
-                </label>
+            <div class="p-2 rounded-3 mt-3 mb-0 d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color);">
+                <div class="d-flex flex-column pe-2">
+                    <div class="d-flex align-items-center gap-1">
+                        <span class="material-icons text-warning fs-6">star</span>
+                        <span class="theme-text-main small fw-bold">Primary Default Account</span>
+                        <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0" style="font-size: 0.65rem;">DEFAULT</span>
+                    </div>
+                    <small class="theme-text-muted" style="font-size: 0.73rem;">Set this account as your primary default for new strategies and quick trades.</small>
+                </div>
+                <div class="form-check form-switch mb-0">
+                    <input class="form-check-input" type="checkbox" role="switch" name="is_default" id="is_default_check" style="cursor: pointer; width: 2.25rem; height: 1.25rem;">
+                </div>
             </div>
         </div>
 
         <div class="modal-footer border-0 pt-0">
             <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3"
-                data-bs-dismiss="modal">Cancel</button>
-            <button type="submit"
+                data-bs-dismiss="modal" onclick="hideGlobalModal()">Cancel</button>
+            <button type="submit" id="saveAccountBtn"
                 class="btn btn-sm btn-primary rounded-pill px-4 fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
                 <span class="material-icons fs-6">save</span>
                 <span>Save & Test Auth</span>

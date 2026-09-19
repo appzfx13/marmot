@@ -183,7 +183,11 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 	symbolToIndex := map[string]string{
 		"NSE:NIFTY50-INDEX":   "NIFTY",
 		"NSE:NIFTYBANK-INDEX": "BANKNIFTY",
+		"NSE:FINNIFTY-INDEX":  "FINNIFTY",
+		"NSE:MIDCPNIFTY-INDEX": "MIDCPNIFTY",
 		"BSE:SENSEX-INDEX":    "SENSEX",
+		"NSE:GIFTNIFTY-INDEX": "GIFTNIFTY",
+		"NSE:INDIAVIX-INDEX":  "INDIAVIX",
 	}
 
 	for {
@@ -269,18 +273,27 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 		backoff = 1 * time.Second
 
 		// Authenticate and subscribe over socket
+		fyersIndexSymbols := []string{
+			"NSE:NIFTY50-INDEX",
+			"NSE:NIFTYBANK-INDEX",
+			"NSE:FINNIFTY-INDEX",
+			"NSE:MIDCPNIFTY-INDEX",
+			"BSE:SENSEX-INDEX",
+			"NSE:GIFTNIFTY-INDEX",
+			"NSE:INDIAVIX-INDEX",
+		}
 		authMsg := map[string]interface{}{
 			"T":            "SUB_DATA",
 			"SUB_T":        1,
 			"access_token": authHeader,
-			"symbols":      []string{"NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "BSE:SENSEX-INDEX"},
+			"symbols":      fyersIndexSymbols,
 		}
 		if authBytes, err := json.Marshal(authMsg); err == nil {
 			_ = conn.WriteMessage(websocket.TextMessage, authBytes)
 		}
 
 		subMsg := map[string]interface{}{
-			"symbol": []string{"NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "BSE:SENSEX-INDEX"},
+			"symbol": fyersIndexSymbols,
 			"type":   "symbolUpdate",
 		}
 		if subBytes, err := json.Marshal(subMsg); err == nil {
@@ -291,7 +304,7 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 		legacySub := map[string]interface{}{
 			"T":       "SUB_DATA",
 			"SUB_T":   1,
-			"symbols": []string{"NSE:NIFTY50-INDEX", "NSE:NIFTYBANK-INDEX", "BSE:SENSEX-INDEX"},
+			"symbols": fyersIndexSymbols,
 		}
 		if legBytes, err := json.Marshal(legacySub); err == nil {
 			_ = conn.WriteMessage(websocket.TextMessage, legBytes)

@@ -2,8 +2,10 @@ from django.urls import path
 from .views import (
     AdminLoginView,
     AdminDashboardView,
-    AdminTerminalView,
+    AdminLiveTerminalView,
+    AdminSandboxTerminalView,
     AdminTerminalHistoricalDataView,
+    AdminTerminalOptionChainAPIView,
     AdminLogoutView,
     AdminTraderListView,
     AdminTraderScrollView,
@@ -137,8 +139,10 @@ urlpatterns = [
     path('dashboard/sandbox/account-delete-modal/<int:pk>/', AdminSandboxAccountDeleteModalView.as_view(), name='sandbox-account-delete-modal'),
     path('dashboard/sandbox/account-delete/<int:pk>/', AdminSandboxAccountDeleteView.as_view(), name='sandbox-account-delete'),
     path('dashboard/ai/', AdminAIDashboardView.as_view(), name='admin-ai-dashboard'),
-    path('terminal/', AdminTerminalView.as_view(), name='admin-terminal'),
+    path('live/terminal/', AdminLiveTerminalView.as_view(), name='admin-live-terminal'),
+    path('sandbox/terminal/', AdminSandboxTerminalView.as_view(), name='admin-sandbox-terminal'),
     path('terminal/historical-data/', AdminTerminalHistoricalDataView.as_view(), name='admin-terminal-historical-data'),
+    path('terminal/option-chain/', AdminTerminalOptionChainAPIView.as_view(), name='admin-terminal-option-chain'),
     path('logout/', AdminLogoutView.as_view(), name='admin-logout'),
 
     # Trading Journal & Analytics Routes

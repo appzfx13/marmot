@@ -13,6 +13,24 @@ class FyersBrokerAdapter(BaseBrokerAdapter):
     Implements standard execution contracts for FYERS REST API.
     """
 
+    def __init__(self, account_or_user=None, app_id: str = '', api_key: str = '', client_id: str = ''):
+        if account_or_user:
+            super().__init__(account_or_user)
+            if app_id:
+                self.app_id = app_id
+            if api_key:
+                self.api_key = api_key
+            if client_id:
+                self.client_id = client_id
+        else:
+            self.account = None
+            self.user = None
+            self.broker_name = 'fyers'
+            self.app_id = app_id
+            self.api_key = api_key
+            self.client_id = client_id or app_id
+            self.account_type = 'LIVE'
+
     def test_connection(self) -> Dict[str, Any]:
         if not self.api_key or not self.client_id:
             return {
@@ -113,19 +131,21 @@ class FyersBrokerAdapter(BaseBrokerAdapter):
         Fetches true historical OHLCV data from Fyers API.
         No dummy data is returned.
         """
-        if not self.api_key or not self.client_id:
+        app_id = self.app_id or self.client_id
+        if not self.api_key or not app_id:
             logger.error("FYERS Historical Data Fetch Failed: Missing API credentials.")
             return []
             
         if not range_from or not range_to:
             now = datetime.now()
-            # Default to last 3 days to ensure data if today is a weekend
+            # Default to last 7 days to ensure data across weekends and holidays
             range_to = now.strftime('%Y-%m-%d')
-            range_from = (now - timedelta(days=3)).strftime('%Y-%m-%d')
+            range_from = (now - timedelta(days=7)).strftime('%Y-%m-%d')
             
-        url = "https://api.fyers.in/data-rest/v3/history/"
+        url = "https://api-t1.fyers.in/data/history"
         headers = {
-            "Authorization": f"{self.client_id}:{self.api_key}"
+            "Authorization": f"{app_id}:{self.api_key}",
+            "Accept": "application/json"
         }
         params = {
             "symbol": symbol,
@@ -160,4 +180,53 @@ class FyersBrokerAdapter(BaseBrokerAdapter):
         except Exception as e:
             logger.error(f"Failed to fetch Fyers historical data: {str(e)}")
             return []
+
+    def get_quotes(self, symbols: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Fetches authentic multi-symbol quotes from Fyers API v3 with short Redis cache."""
+        app_id = self.app_id or self.client_id
+        if not self.api_key or not app_id or not symbols:
+            return {}
+
+        from django.core.cache import cache
+
+        symbols_str = ",".join(symbols)
+        cache_key = f"marmot:fyers_quotes_batch:{hash(symbols_str)}"
+        cached = cache.get(cache_key)
+        if cached:
+            return cached
+
+        url = f"https://api-t1.fyers.in/data/quotes?symbols={symbols_str}"
+        headers = {
+            "Authorization": f"{app_id}:{self.api_key}",
+            "Accept": "application/json"
+        }
+        try:
+            response = requests.get(url, headers=headers, timeout=5)
+            response.raise_for_status()
+            data = response.json()
+            results = {}
+            if data.get('s') == 'ok' and 'd' in data:
+                for item in data['d']:
+                    sym_name = item.get('n', '')
+                    v = item.get('v', {})
+                    results[sym_name] = {
+                        'symbol': sym_name,
+                        'ltp': v.get('lp', 0.0),
+                        'ch': v.get('ch', 0.0),
+                        'chp': v.get('chp', 0.0),
+                        'open': v.get('open_price', 0.0),
+                        'high': v.get('high_price', 0.0),
+                        'low': v.get('low_price', 0.0),
+                        'prev_close': v.get('prev_close_price', 0.0),
+                        'volume': v.get('volume', 0),
+                    }
+                cache.set(cache_key, results, timeout=5)
+                return results
+            else:
+                logger.error(f"FYERS Quotes API Error: {data.get('message', 'Unknown error')}")
+                return {}
+        except Exception as e:
+            logger.error(f"Failed to fetch Fyers quotes: {str(e)}")
+            return {}
+
 

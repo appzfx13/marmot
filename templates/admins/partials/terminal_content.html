@@ -1,391 +1,847 @@
 {% load static %}
-<div class="d-flex flex-column gap-4">
+<div class="d-flex flex-column gap-3" id="adminTerminalMainContainer" style="color: var(--theme-text-main, #fff);">
 
-    <!-- START: Spark Page Header -->
-    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
-        <div>
-            <div class="d-flex align-items-center gap-2 mb-1">
-                <h1 class="page-title mb-0">Admin Master Terminal</h1>
-                {% if has_configured_master %}
-                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill py-1 px-2.5 fw-bold smaller">
-                        <i class="bi bi-shield-lock-fill me-1"></i>MASTER CONTROL
-                    </span>
-                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill py-1 px-2.5 fw-bold smaller">
-                        DHAN &amp; FYERS
-                    </span>
-                {% else %}
-                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill py-1 px-2.5 fw-bold smaller">
-                        <i class="bi bi-exclamation-triangle-fill me-1"></i>CONFIG REQUIRED
-                    </span>
-                {% endif %}
+    <!-- ═══════════════════════════════════════════════════════════════════
+         TOP STATUS BAR: Breadcrumbs | Engine Status | Gateway Latency | Kill Switch
+         ═══════════════════════════════════════════════════════════════════ -->
+    <div class="glass-card px-3 py-2 rounded-4 border d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-2 shadow-sm"
+         style="background: var(--glass-bg, rgba(13, 21, 39, 0.85)); backdrop-filter: blur(20px); border-color: {% if is_sandbox %}rgba(245, 158, 11, 0.35){% else %}var(--border-color, rgba(255,255,255,0.1)){% endif %} !important;">
+        
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <div class="rounded-circle d-flex align-items-center justify-content-center"
+                 style="width: 32px; height: 32px; background: {% if is_sandbox %}rgba(245, 158, 11, 0.15){% else %}rgba(16, 185, 129, 0.15){% endif %}; border: 1px solid {% if is_sandbox %}rgba(245, 158, 11, 0.4){% else %}rgba(16, 185, 129, 0.4){% endif %};">
+                <span class="material-icons fs-5 {% if is_sandbox %}text-warning{% else %}text-success{% endif %}">
+                    {% if is_sandbox %}science{% else %}bolt{% endif %}
+                </span>
             </div>
-            <p class="page-subtitle">Global order execution, algorithmic strategy overrides, and broker gateway control.</p>
+            <div>
+                <div class="d-flex align-items-center gap-2">
+                    <h5 class="fw-bold mb-0 {% if is_sandbox %}text-warning{% else %}text-white{% endif %} tracking-wider" style="font-size: 1.05rem;">
+                        {% if is_sandbox %}Sandbox Simulator Terminal{% else %}Live Master Terminal{% endif %}
+                    </h5>
+                    {% if is_sandbox %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-0.5 smaller fw-bold font-monospace">
+                            MOCK BROKER ENGINE
+                        </span>
+                    {% else %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5 smaller fw-bold font-monospace">
+                            FYERS &amp; DHAN GATEWAY
+                        </span>
+                        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5 smaller fw-bold font-monospace">
+                            MASTER CONTROL
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
         </div>
 
-        <!-- Global Risk Status & Emergency Kill Switch Trigger -->
-        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
-            {% if has_configured_master %}
-                <span class="trend-badge trend-up py-1 px-3 fw-bold">
-                    <span class="pulse-dot active me-1"></span>GATEWAY ACTIVE
+        <!-- Telemetry Badges & Emergency Kill Switch Trigger -->
+        <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+            {% if is_sandbox %}
+                <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1.5 font-monospace small d-flex align-items-center gap-1">
+                    <span class="material-icons fs-6">monetization_on</span>Virtual Capital: <strong id="sandboxCapitalDisplay">{{ active_account.account_summary.initial_capital|default:"—" }}</strong>
                 </span>
-
-                <button class="btn btn-danger rounded-pill px-3.5 py-2 fw-bold d-flex align-items-center gap-1.5 shadow-sm text-white"
-                        hx-get="{% url 'users:user-kill-switch' %}"
-                        hx-target="#globalHtmxModalDialog">
-                    <i class="bi bi-lightning-charge-fill"></i>
-                    <span>Emergency Kill Switch</span>
+                <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1" onclick="resetSandboxVirtualBalance()">
+                    <span class="material-icons fs-6">restart_alt</span>Reset Balance
                 </button>
             {% else %}
-                <a href="{% url 'admins:trade_exec_config_create' %}" class="btn btn-danger rounded-pill px-4 py-2 fw-bold text-white d-flex align-items-center gap-1.5 shadow-sm">
-                    <i class="bi bi-plus-circle-fill"></i>
-                    <span>Create Trade Config</span>
-                </a>
+                <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 font-monospace small d-flex align-items-center gap-1">
+                    <span class="pulse-dot active me-0.5" style="width:7px;height:7px;background:#10b981;border-radius:50%;display:inline-block;"></span>
+                    FYERS GATEWAY
+                </span>
+                <span class="badge bg-info bg-opacity-15 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-1 font-monospace small d-flex align-items-center gap-1">
+                    DHAN GATEWAY
+                </span>
+                <button class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-flex align-items-center gap-1 shadow-sm text-white"
+                        hx-get="{% url 'users:user-kill-switch' %}"
+                        hx-target="#globalHtmxModalDialog">
+                    <span class="material-icons fs-6">power_settings_new</span>
+                    <span>Emergency Kill Switch</span>
+                </button>
             {% endif %}
         </div>
     </div>
-    <!-- END: Spark Page Header -->
-
-    <div class="row g-4">
 
     <!-- ═══════════════════════════════════════════════════════════════════
-         TOP HERO CHART SECTION: TRADINGVIEW LIGHTWEIGHT CANVAS ENGINE
+         EXNESS 3-ZONE TRADING WORKSPACE:
+         ZONE 1: Market Watch Sidebar (col-xl-2 col-lg-3)
+         ZONE 2: Center Chart Workspace + Operational Drawers (col-xl-7 col-lg-5)
+         ZONE 3: Exness Dual-Action Order Ticket (col-xl-3 col-lg-4)
          ═══════════════════════════════════════════════════════════════════ -->
-    <div class="col-12">
-        <div class="row g-2 h-100">
-        <!-- Main Chart Area -->
-        <div class="col-lg-9 col-12 d-flex flex-column" style="min-height: 550px;">
-            <div class="glass-card rounded-4 border flex-grow-1 d-flex flex-column overflow-hidden position-relative" 
-                 style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+    <div class="row g-2 align-items-stretch" style="min-height: 820px;">
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ZONE 1: MARKET WATCH / INSTRUMENT WATCHLIST (LEFT SIDEBAR)
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="col-12 col-lg-3 col-xl-2 d-flex flex-column" id="marketWatchSidebarCol" style="transition: all 0.2s ease;">
+            <div class="glass-card rounded-4 border p-2 flex-grow-1 d-flex flex-column h-100 shadow-sm"
+                 style="background: var(--glass-bg, rgba(13, 21, 39, 0.85)); backdrop-filter: blur(20px); border-color: var(--border-color, rgba(255,255,255,0.1)) !important;">
                 
-                <!-- Chart Header Toolbar (Dense) -->
-                <div class="px-3 py-2 border-bottom d-flex align-items-center justify-content-between" style="border-color: var(--border-color) !important; background: rgba(0,0,0,0.2);">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="material-icons text-white fs-5">stacked_line_chart</span>
-                        <h5 class="fw-bold mb-0 text-white tracking-wider m-0" id="adminChartTitle" style="font-size: 1.1rem;">NIFTY 50</h5>
-                        <div class="vr mx-2 bg-secondary bg-opacity-50" style="height: 20px;"></div>
-                        <div class="d-flex align-items-center gap-3 font-monospace small">
-                            <span class="theme-text-muted">O <span id="adminOhlcO" class="text-white fw-bold">...</span></span>
-                            <span class="theme-text-muted">H <span id="adminOhlcH" class="text-success fw-bold">...</span></span>
-                            <span class="theme-text-muted">L <span id="adminOhlcL" class="text-danger fw-bold">...</span></span>
-                            <span class="theme-text-muted">C <span id="adminOhlcC" class="text-white fw-bold">...</span></span>
+                <!-- Watchlist Header & Search -->
+                <div class="mb-2 pb-2 border-bottom border-secondary border-opacity-25">
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <span class="fw-bold small text-uppercase theme-text-muted tracking-wider d-flex align-items-center gap-1">
+                            <span class="material-icons fs-6 text-primary">view_list</span>
+                            Index Watchlist
+                        </span>
+                        <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller font-monospace" id="marketWatchCount">7 Indices</span>
+                    </div>
+
+                    <!-- Search Input -->
+                    <div class="input-group input-group-sm">
+                        <span class="input-group-text bg-transparent border-secondary border-opacity-25 text-muted px-2">
+                            <span class="material-icons fs-6">search</span>
+                        </span>
+                        <input type="text" id="marketWatchSearch" 
+                               class="form-control form-control-sm bg-transparent theme-text-main border-secondary border-opacity-25" 
+                               placeholder="Search indices..."
+                               onkeyup="filterMarketWatchSymbols(this.value)">
+                    </div>
+                </div>
+
+                <!-- Instrument Rows: Strictly IndexChoices from apps/common/choices.py -->
+                <div class="flex-grow-1 overflow-auto pe-1 d-flex flex-column gap-1.5" id="marketWatchList" style="max-height: 720px;">
+                    <!-- Instrument Rows: Unified 2-Row Exness Style Cards (7 IndexChoices) -->
+                    {% for item in watchlist_indices %}
+                    <div class="mw-item p-2 rounded-3 border d-flex flex-column gap-1 {% if forloop.first %}active-symbol-item{% endif %}"
+                         data-symbol="{{ item.symbol }}" data-index="{{ item.index }}" data-fyers="{{ item.fyers_sym }}" data-lot="{{ item.lot }}"
+                         onclick="selectExnessSymbol('{{ item.symbol }}', '{{ item.fyers_sym }}', {{ item.lot }}, 'INDEX', this)">
+                        <!-- Row 1: Instrument Badge + Name on Left, Bold Real-Time LTP on Right -->
+                        <div class="d-flex align-items-center justify-content-between">
+                            <div class="d-flex align-items-center gap-1.5 overflow-hidden">
+                                <span class="badge bg-primary bg-opacity-20 text-primary rounded-pill px-1.5 py-0 smaller font-monospace fw-bold" style="font-size:0.65rem;">INDEX</span>
+                                <span class="fw-bold theme-text-main font-monospace small text-truncate">{{ item.symbol }}</span>
+                            </div>
+                            <div class="text-end font-monospace fw-bold small text-white mw-ltp" 
+                                 data-tick-sym="{{ item.symbol }}" data-fyers-sym="{{ item.fyers_sym }}" data-index="{{ item.index }}">
+                                {{ item.ltp_str }}
+                            </div>
+                        </div>
+                        <!-- Row 2: Lot Size on Left, % Change Badge on Right -->
+                        <div class="d-flex align-items-center justify-content-between font-monospace" style="font-size: 0.72rem;">
+                            <span class="text-muted smaller">1 Lot = {{ item.lot }} U</span>
+                            <div class="d-flex align-items-center gap-1.5">
+                                <span class="badge {{ item.chp_class }} bg-opacity-20 rounded-pill px-1.5 py-0 smaller font-monospace mw-change" 
+                                      data-tick-sym="{{ item.symbol }}" data-fyers-sym="{{ item.fyers_sym }}" data-index="{{ item.index }}">{{ item.chp_str }}</span>
+                            </div>
                         </div>
                     </div>
-                    <div class="d-flex align-items-center gap-1">
-                        <div class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 font-monospace" id="adminChartLtp" style="font-size: 0.85rem;">
-                            FETCHING...
+                    {% empty %}
+                    <div class="text-center py-3 text-muted small">No index symbols available</div>
+                    {% endfor %}
+
+                    <!-- Pinned Option Strikes Container (Added via Option Chain Modal) -->
+                    <div class="border-top border-secondary border-opacity-25 pt-2 mt-1 d-none" id="pinnedStrikesContainer">
+                        <div class="d-flex align-items-center justify-content-between px-1 mb-1">
+                            <span class="smaller fw-bold text-info text-uppercase font-monospace" style="font-size: 0.7rem;">Pinned Option Strikes</span>
+                            <span class="badge bg-info bg-opacity-20 text-info rounded-pill px-1.5 py-0 smaller font-monospace" id="pinnedStrikesBadge">0</span>
+                        </div>
+                        <div id="pinnedStrikesList" class="d-flex flex-column gap-1">
+                            <!-- Injected dynamically via JavaScript -->
                         </div>
                     </div>
                 </div>
-                    
-                    <!-- Live OHLC Legend -->
-                    <div class="d-none d-lg-flex align-items-center gap-2 ms-2 font-monospace theme-text-muted" style="font-size:0.75rem;">
-                        <span>O: <strong class="theme-text-main" id="adminOhlcO">24,395.00</strong></span>
-                        <span>H: <strong class="text-success" id="adminOhlcH">24,480.00</strong></span>
-                        <span>L: <strong class="text-danger" id="adminOhlcL">24,380.00</strong></span>
-                        <span>C: <strong class="theme-text-main" id="adminOhlcC">24,450.00</strong></span>
-                    </div>
-                </div>
-                
-                <!-- Timeframe Selectors -->
-                <div class="d-flex align-items-center gap-2 ms-auto">
-                    <div class="d-flex align-items-center gap-1">
-                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 small theme-text-muted admin-tf-btn" onclick="setAdminTimeframe('1M', this)">1M</button>
-                        <button type="button" class="btn btn-xs btn-danger rounded-pill px-2.5 py-1 small fw-bold admin-tf-btn" onclick="setAdminTimeframe('5M', this)">5M</button>
-                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 small theme-text-muted admin-tf-btn" onclick="setAdminTimeframe('15M', this)">15M</button>
-                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2.5 py-1 small theme-text-muted admin-tf-btn" onclick="setAdminTimeframe('1H', this)">1H</button>
-                    </div>
-
-                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 py-1 px-2 fw-bold" style="font-size:0.7rem;">
-                        <span class="material-icons fs-6 align-middle me-1">auto_awesome</span>MASTER CANVAS STREAM
-                    </span>
-                </div>
             </div>
-
-            <!-- System Listed Symbols Watchlist -->
-            <div class="mb-3">
-                <div class="d-flex align-items-center justify-content-between mb-1">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">System Listed Symbols &amp; Options Contracts</label>
-                    <small class="theme-text-muted">Master Chart Control</small>
-                </div>
-                <div class="d-flex flex-wrap gap-1.5 align-items-center">
-                    <!-- Indices -->
-                    <span class="theme-text-muted smaller fw-bold text-uppercase me-1">Indices:</span>
-                    <button type="button" class="btn btn-xs btn-danger active rounded-pill px-3 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('NIFTY 50', 24450.00, 'INDEX', this)">NIFTY 50</button>
-                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-3 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('BANKNIFTY', 52300.00, 'INDEX', this)">BANKNIFTY</button>
-                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-3 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('FINNIFTY', 23150.00, 'INDEX', this)">FINNIFTY</button>
-                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-3 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('SENSEX', 80200.00, 'INDEX', this)">SENSEX</button>
-
-                    <!-- Divider -->
-                    <span class="border-end border-secondary border-opacity-25 mx-1" style="height:18px;"></span>
-
-                    <!-- Options Contracts -->
-                    <span class="theme-text-muted smaller fw-bold text-uppercase me-1">Options Contracts:</span>
-                    <button type="button" class="btn btn-xs btn-outline-success rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('NIFTY 24450 CE', 188.50, 'CE', this)">NIFTY 24450 CE</button>
-                    <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('NIFTY 24450 PE', 142.20, 'PE', this)">NIFTY 24450 PE</button>
-                    <button type="button" class="btn btn-xs btn-outline-success rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('BANKNIFTY 52300 CE', 410.00, 'CE', this)">BANKNIFTY 52300 CE</button>
-                    <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('BANKNIFTY 52300 PE', 380.80, 'PE', this)">BANKNIFTY 52300 PE</button>
-
-                    <!-- Divider -->
-                    <span class="border-end border-secondary border-opacity-25 mx-1" style="height:18px;"></span>
-
-                    <!-- Equities -->
-                    <span class="theme-text-muted smaller fw-bold text-uppercase me-1">Equities:</span>
-                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('RELIANCE', 2980.50, 'EQUITY', this)">RELIANCE</button>
-                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('HDFCBANK', 1620.00, 'EQUITY', this)">HDFCBANK</button>
-                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('INFY', 1845.00, 'EQUITY', this)">INFY</button>
-                    <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 small fw-bold admin-symbol-chip" onclick="switchAdminSystemSymbol('TCS', 4210.00, 'EQUITY', this)">TCS</button>
-                </div>
-            </div>
-
-            <!-- Lightweight Canvas Chart Box -->
-            <div id="admin_marmot_chart_canvas" style="height: 440px; width: 100%; border-radius: 12px; overflow: hidden; background: #0d0e15;" class="border border-secondary border-opacity-25 position-relative"></div>
         </div>
-    </div>
 
-    <!-- ═══════════════════════════════════════════════════════════════════
-         BOTTOM SECTION: MASTER CONTROL PANEL & BROKER GATEWAY STREAMS
-         ═══════════════════════════════════════════════════════════════════ -->
-    
-    <!-- Master Order Ticket (Left Bottom) -->
-    <div class="col-12 col-xl-5">
-        {% if has_configured_master %}
-            <!-- Configured Master Control Ticket -->
-            <div class="glass-card p-3 p-sm-4 rounded-4 border h-100"
-                 style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+        <!-- ═══════════════════════════════════════════════════════════════
+             ZONE 2: CENTER MAIN CHART WORKSPACE & BOTTOM DRAWERS (CENTER)
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="col-12 col-lg-5 col-xl-7 d-flex flex-column gap-2" id="chartCenterCol" style="transition: all 0.2s ease;">
+            
+            <!-- Main TradingView Candlestick Canvas Card -->
+            <div class="glass-card rounded-4 border overflow-hidden d-flex flex-column shadow-lg position-relative"
+                 style="background: var(--glass-bg, rgba(13, 21, 39, 0.9)); backdrop-filter: blur(20px); border-color: var(--border-color, rgba(255,255,255,0.1)) !important; min-height: 480px; flex: 1 1 auto;">
                 
-                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="material-icons text-danger fs-5">move_to_inbox</span>
-                        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Master Order Routing Ticket</h6>
+                <!-- Chart Navigation Tabs: Spot Index Chart vs Strike Chart & Option Chain Trigger -->
+                <div class="px-3 pt-2 d-flex align-items-center justify-content-between border-bottom flex-wrap gap-2"
+                     style="background: rgba(0,0,0,0.35); border-color: var(--border-color, rgba(255,255,255,0.08)) !important;">
+                    <div class="d-flex align-items-center gap-1.5" id="chartTabBar">
+                        <button type="button" class="btn btn-xs py-1 px-3 fw-bold rounded-top-2 border-bottom-0 chart-tab-btn active-tab-btn" 
+                                id="tabSpotIndexBtn" onclick="switchToSpotIndexTab()">
+                            <span class="material-icons me-1 text-primary" style="font-size:0.85rem; vertical-align: -2px;">trending_up</span>
+                            <span id="tabSpotLabel">NIFTY 50 (Spot)</span>
+                        </button>
+                        <button type="button" class="btn btn-xs py-1 px-3 fw-bold rounded-top-2 border-bottom-0 chart-tab-btn text-muted" 
+                                id="tabOptionStrikeBtn" onclick="switchToOptionStrikeTab()" style="display: none;">
+                            <span class="material-icons me-1 text-warning" style="font-size:0.85rem; vertical-align: -2px;">candlestick_chart</span>
+                            <span id="tabStrikeLabel">Strike Chart</span>
+                            <span class="material-icons ms-1.5 text-muted hover-white" style="font-size:0.8rem; cursor:pointer;" onclick="closeOptionStrikeTab(event)" title="Close Strike Tab">close</span>
+                        </button>
                     </div>
-                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 small font-monospace">
-                        ALL TRADERS
+
+                    <div class="d-flex align-items-center gap-2 mb-1 ms-auto">
+                        <button type="button" class="btn btn-xs btn-outline-info rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
+                                onclick="openOptionChainModal()" title="View ATM ±4 Strikes Option Chain">
+                            <span class="material-icons text-info" style="font-size:0.95rem;">bolt</span>
+                            <span class="smaller">Option Chain (±4 ATM)</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Chart Header Toolbar -->
+                <div class="px-3 py-2 border-bottom d-flex align-items-center justify-content-between flex-wrap gap-2"
+                     style="border-color: var(--border-color, rgba(255,255,255,0.1)) !important; background: rgba(0,0,0,0.25);">
+                    
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-1 text-white border-secondary border-opacity-50 d-inline-flex align-items-center gap-1" id="toggleSidebarBtn" onclick="toggleMarketWatchSidebar()" title="Toggle Index Watchlist">
+                            <span class="material-icons" style="font-size:0.95rem;" id="toggleSidebarIcon">view_sidebar</span>
+                            <span class="smaller fw-bold d-none d-sm-inline" id="toggleSidebarText">Watchlist</span>
+                        </button>
+                        <span class="material-icons text-primary fs-5" id="adminChartIcon">candlestick_chart</span>
+                        <h5 class="fw-bold mb-0 text-white tracking-wider" id="adminChartTitle">NIFTY 50</h5>
+                        
+                        <!-- LTP Badge -->
+                        <span class="badge bg-secondary bg-opacity-25 text-white border border-secondary border-opacity-25 font-monospace px-2.5 py-1" id="adminChartLtp" style="font-size: 0.85rem;">
+                            —
+                        </span>
+
+                        <div class="vr mx-1 bg-secondary bg-opacity-50" style="height: 18px;"></div>
+
+                        <!-- OHLC Display Bar (Strict Rule 10: defaults to —) -->
+                        <div class="d-none d-md-flex align-items-center gap-2 font-monospace smaller theme-text-muted">
+                            <span>O: <strong class="text-white" id="adminOhlcO">—</strong></span>
+                            <span>H: <strong class="text-success" id="adminOhlcH">—</strong></span>
+                            <span>L: <strong class="text-danger" id="adminOhlcL">—</strong></span>
+                            <span>C: <strong class="text-white" id="adminOhlcC">—</strong></span>
+                        </div>
+                    </div>
+
+                    <!-- Timeframe Selectors & Stream Tag -->
+                    <div class="d-flex align-items-center gap-1.5 ms-auto">
+                        <div class="btn-group btn-group-sm p-0.5 rounded-pill" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color);">
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-0.5 admin-tf-btn" onclick="setAdminTimeframe('1M', this)">1M</button>
+                            <button type="button" class="btn btn-xs btn-primary rounded-pill px-2 py-0.5 fw-bold admin-tf-btn" onclick="setAdminTimeframe('5M', this)">5M</button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-0.5 admin-tf-btn" onclick="setAdminTimeframe('15M', this)">15M</button>
+                            <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-2 py-0.5 admin-tf-btn" onclick="setAdminTimeframe('1H', this)">1H</button>
+                        </div>
+                        <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-25 py-1 px-2 fw-bold smaller d-none d-sm-inline-flex align-items-center gap-1" id="chartStreamBadge">
+                            <span class="material-icons" style="font-size: 0.75rem;">stream</span>FYERS STREAM
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Empty Data Notice Overlay (Appears when real broker data is unavailable) -->
+                <div id="chartNoDataNotice" class="d-none position-absolute top-50 start-50 translate-middle text-center p-3 rounded-3"
+                     style="background: rgba(9, 13, 22, 0.85); border: 1px solid var(--border-color); z-index: 5;">
+                    <span class="material-icons fs-2 text-warning mb-1">signal_wifi_off</span>
+                    <div class="fw-bold small theme-text-main mb-1">Historical Candlestick Data Unavailable</div>
+                    <small class="theme-text-muted">Configure active Fyers API credentials in profile to enable real-time chart history.</small>
+                </div>
+
+                <!-- Lightweight Candlestick Canvas Container -->
+                <div id="admin_marmot_chart_canvas" class="flex-grow-1 w-100" style="background: #090d16; min-height: 420px;"></div>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════════
+                 EXNESS BOTTOM OPERATIONAL DRAWER TABS (Pure Real Data Only)
+                 ═══════════════════════════════════════════════════════════ -->
+            <div class="glass-card rounded-4 border p-2.5 shadow-sm d-flex flex-column"
+                 style="background: var(--glass-bg, rgba(13, 21, 39, 0.85)); backdrop-filter: blur(20px); border-color: var(--border-color, rgba(255,255,255,0.1)) !important; min-height: 250px;">
+                
+                <!-- Drawer Tabs Header -->
+                <div class="d-flex align-items-center justify-content-between border-bottom border-secondary border-opacity-25 pb-2 mb-2">
+                    <ul class="nav nav-pills gap-1" id="terminalOperationalTabs" role="tablist">
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link active rounded-pill px-3 py-1 smaller fw-bold d-flex align-items-center gap-1"
+                                    id="tab-positions-btn" data-bs-toggle="pill" data-bs-target="#tab-positions" type="button" role="tab">
+                                <span class="material-icons fs-6">account_balance_wallet</span>
+                                <span>Positions</span>
+                                <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-1.5 py-0 smaller" id="activePositionsBadge">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-pill px-3 py-1 smaller fw-bold d-flex align-items-center gap-1"
+                                    id="tab-orders-btn" data-bs-toggle="pill" data-bs-target="#tab-orders" type="button" role="tab">
+                                <span class="material-icons fs-6">list_alt</span>
+                                <span>Pending Orders</span>
+                                <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-1.5 py-0 smaller" id="pendingOrdersBadge">0</span>
+                            </button>
+                        </li>
+                        <li class="nav-item" role="presentation">
+                            <button class="nav-link rounded-pill px-3 py-1 smaller fw-bold d-flex align-items-center gap-1"
+                                    id="tab-history-btn" data-bs-toggle="pill" data-bs-target="#tab-history" type="button" role="tab">
+                                <span class="material-icons fs-6">history</span>
+                                <span>Trade History</span>
+                            </button>
+                        </li>
+                    </ul>
+
+                    <!-- Quick Square-Off Action -->
+                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1" onclick="squareOffAllPositions()">
+                        <span class="material-icons" style="font-size: 0.8rem;">cancel</span>Close All Positions
+                    </button>
+                </div>
+
+                <!-- Tab Panes: Clean Real Data / Empty States (Zero Dummy Data) -->
+                <div class="tab-content flex-grow-1 overflow-auto" id="terminalOperationalTabContent" style="max-height: 150px;">
+                    <!-- Positions Pane -->
+                    <div class="tab-pane fade show active" id="tab-positions" role="tabpanel">
+                        <table class="table table-sm table-borderless theme-text-main align-middle mb-0 font-monospace" style="font-size: 0.75rem;">
+                            <thead class="theme-text-muted border-bottom border-secondary border-opacity-25">
+                                <tr>
+                                    <th>SYMBOL</th>
+                                    <th>SIDE</th>
+                                    <th>QTY</th>
+                                    <th>ENTRY PRICE</th>
+                                    <th>LTP</th>
+                                    <th>UNREALIZED PnL</th>
+                                    <th class="text-end">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="terminalPositionsTbody">
+                                <tr>
+                                    <td colspan="7" class="text-center theme-text-muted py-4">
+                                        <span class="material-icons fs-5 align-middle opacity-50 me-1">inbox</span>
+                                        No active positions open.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Pending Orders Pane -->
+                    <div class="tab-pane fade" id="tab-orders" role="tabpanel">
+                        <table class="table table-sm table-borderless theme-text-main align-middle mb-0 font-monospace" style="font-size: 0.75rem;">
+                            <thead class="theme-text-muted border-bottom border-secondary border-opacity-25">
+                                <tr>
+                                    <th>ORDER ID</th>
+                                    <th>SYMBOL</th>
+                                    <th>TYPE</th>
+                                    <th>SIDE</th>
+                                    <th>LIMIT PRICE</th>
+                                    <th>TRIGGER</th>
+                                    <th>STATUS</th>
+                                    <th class="text-end">ACTION</th>
+                                </tr>
+                            </thead>
+                            <tbody id="terminalOrdersTbody">
+                                <tr>
+                                    <td colspan="8" class="text-center theme-text-muted py-4">
+                                        <span class="material-icons fs-5 align-middle opacity-50 me-1">inbox</span>
+                                        No pending orders found.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- Trade History Pane -->
+                    <div class="tab-pane fade" id="tab-history" role="tabpanel">
+                        <table class="table table-sm table-borderless theme-text-main align-middle mb-0 font-monospace" style="font-size: 0.75rem;">
+                            <thead class="theme-text-muted border-bottom border-secondary border-opacity-25">
+                                <tr>
+                                    <th>TIME</th>
+                                    <th>SYMBOL</th>
+                                    <th>SIDE</th>
+                                    <th>QTY</th>
+                                    <th>EXEC PRICE</th>
+                                    <th>REALIZED PnL</th>
+                                    <th>STATUS</th>
+                                </tr>
+                            </thead>
+                            <tbody id="terminalHistoryTbody">
+                                <tr>
+                                    <td colspan="7" class="text-center theme-text-muted py-4">
+                                        <span class="material-icons fs-5 align-middle opacity-50 me-1">history</span>
+                                        No trade history recorded for this session.
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Exness Bottom Account Telemetry Ribbon (Pure Real Data from Backend) -->
+                <div class="mt-auto pt-2 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2 font-monospace"
+                     style="font-size: 0.74rem;">
+                    <div class="d-flex align-items-center gap-3 flex-wrap">
+                        <span>Balance: <strong class="text-white">{{ active_account.account_summary.balance|default:"—" }}</strong></span>
+                        <span class="text-muted">|</span>
+                        <span>Equity: <strong class="text-success">{{ active_account.account_summary.equity|default:"—" }}</strong></span>
+                        <span class="text-muted">|</span>
+                        <span>Margin: <strong class="text-warning">{{ active_account.account_summary.margin_used|default:"—" }}</strong></span>
+                        <span class="text-muted">|</span>
+                        <span>Free Margin: <strong class="text-white">{{ active_account.account_summary.free_margin|default:"—" }}</strong></span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="theme-text-muted">Session PnL:</span>
+                        <span class="badge {% if active_account.realtime_pnl > 0 %}bg-success text-success{% elif active_account.realtime_pnl < 0 %}bg-danger text-danger{% else %}bg-secondary text-white-50{% endif %} bg-opacity-25 rounded-pill px-2 py-0.5 fw-bold font-monospace">
+                            {{ active_account.realtime_pnl|default:"—" }}
+                        </span>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+
+        <!-- ═══════════════════════════════════════════════════════════════
+             ZONE 3: EXNESS DUAL ACTION ORDER TICKET (RIGHT SIDE PANEL)
+             ═══════════════════════════════════════════════════════════════ -->
+        <div class="col-12 col-lg-4 col-xl-3 d-flex flex-column">
+            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column shadow-lg"
+                 style="background: var(--glass-bg, rgba(13, 21, 39, 0.9)); backdrop-filter: blur(20px); border-color: var(--border-color, rgba(255,255,255,0.1)) !important;">
+                
+                <!-- Ticket Header -->
+                <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom border-secondary border-opacity-25">
+                    <div class="d-flex align-items-center gap-1.5">
+                        <span class="material-icons text-danger fs-5">receipt_long</span>
+                        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Order Ticket</h6>
+                    </div>
+                    <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-25 font-monospace smaller" id="ticketSymbolBadge">
+                        NIFTY 50
                     </span>
                 </div>
 
-                <!-- Live / Mock Execution Mode Toggle -->
-                <div class="mb-3">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Execution Mode</label>
-                    <div class="nav nav-pills nav-fill p-1 rounded-3 d-flex flex-row flex-nowrap w-100 gap-2"
-                        style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);" role="tablist">
-                        <button class="nav-link active rounded-pill flex-fill text-nowrap fw-bold py-1.5" id="mode-live-btn" type="button"
-                            onclick="setAdminExecutionMode('LIVE')" style="font-size: 0.8rem;">
-                            <span class="material-icons fs-6 align-middle me-1">bolt</span>LIVE
-                        </button>
-                        <button class="nav-link rounded-pill flex-fill text-nowrap fw-bold py-1.5 text-secondary" id="mode-mock-btn" type="button"
-                            onclick="setAdminExecutionMode('MOCK')" style="font-size: 0.8rem;">
-                            <span class="material-icons fs-6 align-middle me-1">science</span>MOCK (Simulator)
-                        </button>
+
+                <!-- ───────────────────────────────────────────────────────
+                     EXNESS SIGNATURE DUAL EXECUTION ACTION CARDS:
+                     [ SELL — ] (Red)  |  [ BUY — ] (Blue/Green)
+                     ─────────────────────────────────────────────────────── -->
+                <div class="row g-2 mb-2.5">
+                    <!-- SELL Card (Bid Price) -->
+                    <div class="col-6">
+                        <div class="exness-action-card exness-card-sell p-2 rounded-3 border d-flex flex-column align-items-center justify-content-center gap-0.5 text-center"
+                             id="exnessSellCard"
+                             onclick="setExnessSide('SELL')"
+                             style="cursor: pointer; background: rgba(239, 68, 68, 0.08); border-color: rgba(239, 68, 68, 0.3) !important; transition: all 0.2s ease;">
+                            <span class="smaller fw-bold text-danger text-uppercase tracking-wider">SELL / SHORT</span>
+                            <span class="fw-bold font-monospace fs-6 text-white" id="ticketBidPrice">—</span>
+                            <small class="text-danger smaller" id="ticketBidSpread">Spread: —</small>
+                        </div>
                     </div>
-                    <input type="hidden" id="adminExecutionMode" value="LIVE">
+
+                    <!-- BUY Card (Ask Price) -->
+                    <div class="col-6">
+                        <div class="exness-action-card exness-card-buy p-2 rounded-3 border d-flex flex-column align-items-center justify-content-center gap-0.5 text-center active-side-card"
+                             id="exnessBuyCard"
+                             onclick="setExnessSide('BUY')"
+                             style="cursor: pointer; background: rgba(16, 185, 129, 0.15); border-color: #10b981 !important; box-shadow: 0 0 12px rgba(16, 185, 129, 0.25); transition: all 0.2s ease;">
+                            <span class="smaller fw-bold text-success text-uppercase tracking-wider">BUY / LONG</span>
+                            <span class="fw-bold font-monospace fs-6 text-white" id="ticketAskPrice">—</span>
+                            <small class="text-success smaller" id="ticketAskSpread">Spread: —</small>
+                        </div>
+                    </div>
                 </div>
 
-                <!-- Target User / Multi-Trader Broadcast Selector -->
-                <div class="mb-3">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Execution Target</label>
-                    <select id="adminTargetScope" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 small">
-                        <option value="ALL" selected>BROADCAST TO ALL ACTIVE TRADERS</option>
-                        <option value="DHAN_ONLY">DHAN ACCOUNTS ONLY</option>
-                        <option value="FYERS_ONLY">FYERS ACCOUNTS ONLY</option>
-                        <option value="SPECIFIC">SELECTED TRADER PROFILE</option>
+                <!-- Execution Mode / Target Selection -->
+                <div class="mb-2">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-0">Execution Target</label>
+                        <span class="badge {% if is_sandbox %}bg-warning text-dark{% else %}bg-danger text-white{% endif %} rounded-pill px-1.5 py-0 smaller">
+                            {% if is_sandbox %}SIMULATOR{% else %}LIVE BROKER{% endif %}
+                        </span>
+                    </div>
+                    <select id="adminTargetScope" class="form-select form-select-sm bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3">
+                        {% if is_sandbox %}
+                            <option value="SANDBOX_ALL" selected>PAPER SIMULATOR PORTFOLIO</option>
+                            <option value="SANDBOX_USER">CURRENT USER ONLY</option>
+                        {% else %}
+                            <option value="ALL" selected>BROADCAST TO ALL ACTIVE TRADERS</option>
+                            <option value="FYERS_ONLY">FYERS MASTER ACCOUNTS ONLY</option>
+                            <option value="DHAN_ONLY">DHAN ACCOUNTS ONLY</option>
+                            <option value="SPECIFIC">ACTIVE SESSION TRADER</option>
+                        {% endif %}
                     </select>
                 </div>
 
-                <!-- Target Symbol Input -->
-                <div class="mb-3">
-                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Target Symbol</label>
-                    <input type="text" id="adminTerminalSymbolInput" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 font-monospace fw-bold" value="NIFTY 50 (LTP ₹24450.00)">
-                </div>
-
-                <!-- Order Direction Toggle: BUY vs SELL -->
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <button type="button" id="adminBtnBuy" class="btn w-100 py-2.5 rounded-3 fw-bold btn-success shadow-sm d-flex align-items-center justify-content-center gap-1" onclick="setAdminOrderSide('BUY')">
-                            <span class="material-icons fs-6">trending_up</span>
-                            <span>BUY / LONG</span>
-                        </button>
-                    </div>
-                    <div class="col-6">
-                        <button type="button" id="adminBtnSell" class="btn w-100 py-2.5 rounded-3 fw-bold btn-outline-danger d-flex align-items-center justify-content-center gap-1" onclick="setAdminOrderSide('SELL')">
-                            <span class="material-icons fs-6">trending_down</span>
-                            <span>SELL / SHORT</span>
-                        </button>
+                <!-- Order Type Navigation: Market | Limit | SL-M -->
+                <div class="mb-2">
+                    <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-1">Order Type</label>
+                    <div class="btn-group btn-group-sm w-100 p-0.5 rounded-3" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color);">
+                        <button type="button" class="btn btn-xs btn-primary rounded-2 fw-bold exness-ot-btn active" onclick="setExnessOrderType('MARKET', this)">Market</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-2 theme-text-muted exness-ot-btn" onclick="setExnessOrderType('LIMIT', this)">Limit</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-2 theme-text-muted exness-ot-btn" onclick="setExnessOrderType('SL-M', this)">SL-M</button>
                     </div>
                 </div>
 
-                <!-- Product Type & Order Mode Selector -->
-                <div class="row g-2 mb-3">
-                    <div class="col-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Product Type</label>
-                        <select id="adminProductType" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 small">
-                            <option value="MIS" selected>MIS (Intraday)</option>
-                            <option value="CNC">CNC / NRML (Delivery)</option>
-                        </select>
+                <!-- Limit / Trigger Price Inputs (Collapsible when Limit or SL-M) -->
+                <div class="row g-2 mb-2 d-none" id="orderTypePriceRow">
+                    <div class="col-6" id="limitPriceCol">
+                        <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-0.5">Limit Price</label>
+                        <input type="number" id="ticketLimitPrice" class="form-control form-control-sm bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace" placeholder="0.00" value="">
                     </div>
-                    <div class="col-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Order Type</label>
-                        <select id="adminOrderType" class="form-select bg-transparent theme-text-main border-secondary border-opacity-25 rounded-3 small">
-                            <option value="MARKET" selected>MARKET</option>
-                            <option value="LIMIT">LIMIT</option>
-                            <option value="SL-M">STOP LOSS (SL-M)</option>
-                        </select>
+                    <div class="col-6" id="triggerPriceCol">
+                        <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-0.5">Trigger Price</label>
+                        <input type="number" id="ticketTriggerPrice" class="form-control form-control-sm bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace" placeholder="0.00" value="">
                     </div>
                 </div>
 
-                <!-- Lots Per Account & Multiplier -->
-                <div class="mb-3">
+                <!-- Product Mode Selection: MIS vs CNC (Segmented Toggle) -->
+                <div class="mb-2">
+                    <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-1">Product Mode</label>
+                    <div class="btn-group btn-group-sm w-100 p-0.5 rounded-3" style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--border-color);">
+                        <button type="button" class="btn btn-xs btn-primary rounded-2 fw-bold text-white exness-pm-btn active" onclick="setExnessProductMode('MIS', this)">MIS (Intraday)</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-2 theme-text-muted border-0 exness-pm-btn" onclick="setExnessProductMode('CNC', this)">CNC / NRML</button>
+                    </div>
+                </div>
+
+                <!-- Lots / Volume Controller with Stepper & Presets -->
+                <div class="mb-2.5">
                     <div class="d-flex justify-content-between align-items-center mb-1">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase mb-0">Lots Per Account</label>
-                        <small class="theme-text-muted font-monospace">Multiplier Enabled</small>
+                        <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-0">Volume / Lots</label>
+                        <div class="d-flex align-items-center gap-1">
+                            <span class="theme-text-muted smaller font-monospace" id="lotSizeInfo">1 Lot = 25 Units</span>
+                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 rounded-pill smaller" onclick="saveAsDefaultLots()" title="Save as Default Lot Count">
+                                <span class="smaller font-monospace" style="font-size:0.65rem;">Pin Lot</span>
+                            </button>
+                        </div>
                     </div>
-                    <div class="input-group mb-2">
-                        <button class="btn btn-outline-secondary border-opacity-25 theme-text-main" type="button" onclick="adjustAdminQty(-25)">-</button>
-                        <input type="number" id="adminQtyInput" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 text-center font-monospace fw-bold" value="100" min="25" step="25">
-                        <button class="btn btn-outline-secondary border-opacity-25 theme-text-main" type="button" onclick="adjustAdminQty(25)">+</button>
+                    <div class="input-group input-group-sm mb-1.5">
+                        <button class="btn btn-outline-secondary border-opacity-25 theme-text-main fw-bold" type="button" onclick="adjustExnessLots(-1)">-</button>
+                        <input type="number" id="ticketLotsInput" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 text-center font-monospace fw-bold" value="1" min="1" step="1" onchange="calculateExnessMetrics()">
+                        <button class="btn btn-outline-secondary border-opacity-25 theme-text-main fw-bold" type="button" onclick="adjustExnessLots(1)">+</button>
+                    </div>
+                    <!-- Quick Lot Chips -->
+                    <div class="d-flex gap-1">
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill flex-fill py-0.5 smaller font-monospace" onclick="setExnessLots(1)">1x</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill flex-fill py-0.5 smaller font-monospace" onclick="setExnessLots(2)">2x</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill flex-fill py-0.5 smaller font-monospace" onclick="setExnessLots(5)">5x</button>
+                        <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill flex-fill py-0.5 smaller font-monospace" onclick="setExnessLots(10)">10x</button>
                     </div>
                 </div>
 
-                <!-- Execute Master Order Button -->
-                <button type="button" class="btn btn-danger w-100 py-3 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2"
-                        onclick="triggerAdminMasterOrder()">
-                    <span class="material-icons fs-5">bolt</span>
-                    <span id="adminExecuteBtnText">DISPATCH LIVE MASTER ORDER</span>
+                <!-- ───────────────────────────────────────────────────────
+                     TRADE CONFIG / RISK CONTROLS: SL (PTS/%) & TP (PTS/%)
+                     ─────────────────────────────────────────────────────── -->
+                <div class="p-2 rounded-3 mb-2.5 d-flex flex-column gap-2" style="background: rgba(255, 255, 255, 0.02); border: 1px solid var(--border-color);">
+                    <div class="d-flex align-items-center justify-content-between pb-1 border-bottom border-secondary border-opacity-20">
+                        <span class="smaller fw-bold theme-text-main text-uppercase font-monospace" style="font-size:0.72rem;">Trade Config &amp; Risk</span>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="badge bg-secondary bg-opacity-25 text-white font-monospace px-1.5 py-0 smaller" id="riskRewardBadge">R:R 1 : 2.0</span>
+                            <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1.5 rounded-pill font-monospace" style="font-size:0.65rem;" onclick="saveDefaultTradeConfig()" title="Save current SL/TP as default">
+                                Save Config
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Stop Loss (SL) Controls with Points / Percentage -->
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <div class="form-check form-switch mb-0 d-flex align-items-center gap-1.5">
+                                <input class="form-check-input" type="checkbox" id="enableSlSwitch" onchange="toggleRiskField('sl')">
+                                <label class="form-check-label smaller fw-bold text-danger text-uppercase" for="enableSlSwitch">Stop Loss (SL)</label>
+                            </div>
+                            <!-- SL Unit Toggle: Points vs % -->
+                            <div class="btn-group btn-group-sm p-0.5 rounded-pill" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color);">
+                                <button type="button" class="btn btn-xs btn-danger rounded-pill px-1.5 py-0 fw-bold sl-unit-btn active" id="slUnitPtsBtn" onclick="setRiskUnit('sl', 'pts')">Pts</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-1.5 py-0 sl-unit-btn" id="slUnitPctBtn" onclick="setRiskUnit('sl', 'pct')">%</button>
+                            </div>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <input type="number" id="ticketSlValue" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace opacity-50 text-end" placeholder="20" value="20" disabled oninput="calculateExnessMetrics()">
+                            <span class="input-group-text bg-transparent border-secondary border-opacity-25 theme-text-muted smaller font-monospace" id="slUnitLabel">pts</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-0.5 px-0.5 font-monospace" style="font-size: 0.69rem;">
+                            <span class="theme-text-muted" id="slTriggerPricePreview">Trigger: —</span>
+                            <span class="text-danger" id="slCalculatedDiff">Est: —</span>
+                        </div>
+                    </div>
+
+                    <!-- Take Profit (TP) Controls with Points / Percentage -->
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between mb-1">
+                            <div class="form-check form-switch mb-0 d-flex align-items-center gap-1.5">
+                                <input class="form-check-input" type="checkbox" id="enableTpSwitch" onchange="toggleRiskField('tp')">
+                                <label class="form-check-label smaller fw-bold text-success text-uppercase" for="enableTpSwitch">Take Profit (TP)</label>
+                            </div>
+                            <!-- TP Unit Toggle: Points vs % -->
+                            <div class="btn-group btn-group-sm p-0.5 rounded-pill" style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color);">
+                                <button type="button" class="btn btn-xs btn-success rounded-pill px-1.5 py-0 fw-bold tp-unit-btn active" id="tpUnitPtsBtn" onclick="setRiskUnit('tp', 'pts')">Pts</button>
+                                <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-1.5 py-0 tp-unit-btn" id="tpUnitPctBtn" onclick="setRiskUnit('tp', 'pct')">%</button>
+                            </div>
+                        </div>
+                        <div class="input-group input-group-sm">
+                            <input type="number" id="ticketTpValue" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace opacity-50 text-end" placeholder="40" value="40" disabled oninput="calculateExnessMetrics()">
+                            <span class="input-group-text bg-transparent border-secondary border-opacity-25 theme-text-muted smaller font-monospace" id="tpUnitLabel">pts</span>
+                        </div>
+                        <div class="d-flex justify-content-between align-items-center mt-0.5 px-0.5 font-monospace" style="font-size: 0.69rem;">
+                            <span class="theme-text-muted" id="tpTargetPricePreview">Target: —</span>
+                            <span class="text-success" id="tpCalculatedDiff">Est: —</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Margin & Charges Calculation -->
+                <div class="d-flex flex-column gap-1 mb-3 smaller theme-text-muted font-monospace border-top border-secondary border-opacity-25 pt-2">
+                    <div class="d-flex justify-content-between">
+                        <span>Quantity Units:</span>
+                        <strong class="text-white" id="ticketTotalUnits">25 Units</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Est. Margin Req:</span>
+                        <strong class="text-warning" id="ticketMarginReq">—</strong>
+                    </div>
+                    <div class="d-flex justify-content-between">
+                        <span>Brokerage &amp; Taxes:</span>
+                        <strong class="text-white" id="ticketEstCharges">—</strong>
+                    </div>
+                </div>
+
+                <!-- Dynamic High-Impact Execution Button -->
+                <button type="button" id="exnessExecuteBtn"
+                        class="btn btn-success w-100 py-2.5 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2 mt-auto text-uppercase"
+                        onclick="executeExnessMasterOrder()">
+                    <span class="material-icons fs-5" id="exnessBtnIcon">trending_up</span>
+                    <span id="exnessBtnText">BUY NIFTY 50 (25 UNITS)</span>
                 </button>
             </div>
-        {% else %}
-            <!-- Unconfigured Master Onboarding Banner -->
-            <div class="glass-card p-4 rounded-4 border h-100 d-flex flex-column align-items-center justify-content-center text-center"
-                 style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
-                
-                <div class="rounded-circle bg-danger bg-opacity-25 text-danger p-3 mb-3 d-flex align-items-center justify-content-center" style="width:64px;height:64px;">
-                    <span class="material-icons fs-1">tune</span>
-                </div>
-                
-                <h5 class="fw-bold theme-text-main mb-2">Trade Control Configuration Required</h5>
-                <p class="theme-text-muted small mb-4 px-2" style="max-width: 360px;">
-                    No active Trade Execution Configuration or Master Broker rule was found. Create a configuration to enable broadcast master order dispatching.
-                </p>
+        </div>
 
-                <div class="d-flex flex-column flex-sm-row gap-2 w-100" style="max-width: 340px;">
-                    <a href="{% url 'admins:trade_exec_config_create' %}" class="btn btn-danger py-2.5 rounded-3 fw-bold text-white d-flex align-items-center justify-content-center gap-2 shadow-sm flex-grow-1">
-                        <span class="material-icons fs-5">add</span>
-                        <span>Create Trade Config</span>
-                    </a>
-                    <a href="{% url 'admins:broker-master-list' %}" class="btn btn-outline-secondary py-2.5 rounded-3 fw-bold theme-text-main d-flex align-items-center justify-content-center gap-1">
-                        <span class="material-icons fs-5">dns</span>
-                        <span>Master Brokers</span>
-                    </a>
-                </div>
-            </div>
-        {% endif %}
     </div>
+</div>
 
-    <!-- Active Broker Gateway Connections (Right Bottom) -->
-    <div class="col-12 col-xl-7">
-        <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column"
-             style="background: var(--glass-bg); backdrop-filter: blur(20px); border-color: var(--border-color) !important;">
+<!-- ═════════════════════════════════════════════════════════════════════
+     COMPACT OPTION CHAIN MODAL (ATM ±4 Strikes with Quick Watch & Chart)
+     ═════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="terminalOptionChainModal" tabindex="-1" aria-labelledby="terminalOptionChainModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-xl">
+        <div class="modal-content glass-card border shadow-2xl rounded-4 overflow-hidden" 
+             style="background: rgba(13, 21, 39, 0.96); backdrop-filter: blur(25px); border-color: rgba(255,255,255,0.15) !important;">
             
-            <div class="d-flex align-items-center justify-content-between mb-3">
-                <div class="d-flex align-items-center gap-2">
-                    <span class="material-icons text-primary fs-5">dns</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Active Broker Gateway Connections</h6>
+            <!-- Modal Header -->
+            <div class="modal-header border-bottom py-2.5 px-3 d-flex align-items-center justify-content-between"
+                 style="background: rgba(0,0,0,0.35); border-color: rgba(255,255,255,0.08) !important;">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="material-icons text-info fs-5">bolt</span>
+                    <h5 class="modal-title fw-bold text-white fs-6 mb-0 tracking-wide" id="ocModalTitle">
+                        Option Chain (ATM ±4 Strikes)
+                    </h5>
+                    <span class="badge bg-primary bg-opacity-25 text-info border border-info border-opacity-25 font-monospace px-2 py-0.5 smaller" id="ocModalSpotLtp">
+                        Spot: ₹ —
+                    </span>
+                    <span class="badge bg-secondary bg-opacity-25 text-white border border-secondary border-opacity-25 font-monospace px-2 py-0.5 smaller" id="ocModalExpiry">
+                        EXP: —
+                    </span>
+                    <span class="badge bg-dark border border-secondary border-opacity-25 text-muted font-monospace px-2 py-0.5 smaller" id="ocModalPcr">
+                        PCR: —
+                    </span>
+                    <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-25 font-monospace px-2 py-0.5 smaller" id="ocModalVix">
+                        India VIX: —
+                    </span>
                 </div>
-                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small font-monospace">2 ONLINE</span>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
 
-            <div class="table-responsive flex-grow-1">
-                <table class="table table-hover align-middle mb-0" style="font-size:0.8rem;">
-                    <thead>
-                        <tr class="theme-text-muted text-uppercase" style="font-size:0.7rem; border-color: var(--border-color);">
-                            <th>Broker</th>
-                            <th>Gateway URL</th>
-                            <th>API Status</th>
-                            <th>Latency</th>
-                            <th>Active Accounts</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <tr style="border-color: var(--border-color);">
-                            <td><strong class="theme-text-main font-monospace"><span class="badge bg-warning bg-opacity-25 text-warning me-1">DHAN</span> Dhan HQ API</strong></td>
-                            <td class="font-monospace theme-text-muted">api.dhan.co / auth.dhan.co</td>
-                            <td><span class="badge bg-success bg-opacity-25 text-success">OPERATIONAL</span></td>
-                            <td class="font-monospace text-success">8 ms</td>
-                            <td class="font-monospace fw-bold theme-text-main">14 Accounts</td>
-                        </tr>
-                        <tr style="border-color: var(--border-color);">
-                            <td><strong class="theme-text-main font-monospace"><span class="badge bg-primary bg-opacity-25 text-primary me-1">FYERS</span> Fyers API v2</strong></td>
-                            <td class="font-monospace theme-text-muted">api-v2.fyers.in</td>
-                            <td><span class="badge bg-success bg-opacity-25 text-success">OPERATIONAL</span></td>
-                            <td class="font-monospace text-success">11 ms</td>
-                            <td class="font-monospace fw-bold theme-text-main">8 Accounts</td>
-                        </tr>
-                    </tbody>
-                </table>
+            <!-- Modal Body: Compact Responsive Table -->
+            <div class="modal-body p-2 p-md-3 overflow-auto" style="max-height: 68vh;">
+                <!-- Loading indicator -->
+                <div id="ocModalLoading" class="text-center py-5">
+                    <div class="spinner-border spinner-border-sm text-info mb-2" role="status"></div>
+                    <div class="smaller theme-text-muted font-monospace">Fetching authentic Fyers options chain quotes...</div>
+                </div>
+
+                <!-- Option Chain Table Content -->
+                <div id="ocModalTableWrapper" class="d-none">
+                    <div class="table-responsive rounded-3 border" style="border-color: rgba(255,255,255,0.08) !important;">
+                        <table class="table table-sm table-dark table-hover mb-0 font-monospace text-center align-middle" style="font-size: 0.77rem;">
+                            <thead class="theme-text-muted smaller text-uppercase bg-black bg-opacity-60">
+                                <tr>
+                                    <th colspan="4" class="text-success border-end border-secondary border-opacity-25 py-1.5">CALLS (CE)</th>
+                                    <th class="py-1.5 bg-secondary bg-opacity-20 text-white">STRIKE</th>
+                                    <th colspan="4" class="text-danger border-start border-secondary border-opacity-25 py-1.5">PUTS (PE)</th>
+                                </tr>
+                                <tr style="font-size: 0.71rem;">
+                                    <th class="py-1">Action</th>
+                                    <th class="py-1">OI</th>
+                                    <th class="py-1">Chg%</th>
+                                    <th class="py-1 border-end border-secondary border-opacity-25 text-success">LTP</th>
+                                    <th class="py-1 bg-secondary bg-opacity-25 text-white">Price</th>
+                                    <th class="py-1 border-start border-secondary border-opacity-25 text-danger">LTP</th>
+                                    <th class="py-1">Chg%</th>
+                                    <th class="py-1">OI</th>
+                                    <th class="py-1">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="ocModalTableBody">
+                                <!-- Dynamic strike rows injected via JavaScript -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
 
+            <!-- Modal Footer Note -->
+            <div class="modal-footer py-1.5 px-3 border-top d-flex align-items-center justify-content-between"
+                 style="background: rgba(0,0,0,0.25); border-color: rgba(255,255,255,0.08) !important;">
+                <small class="smaller text-muted d-flex align-items-center gap-1 font-monospace" style="font-size: 0.72rem;">
+                    <span class="material-icons text-info" style="font-size:0.85rem;">info</span>
+                    Click <strong class="text-white">Chart</strong> to load strike candlestick chart. Click <strong class="text-warning">★</strong> to pin to Watchlist.
+                </small>
+                <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-3 py-1" data-bs-dismiss="modal">Close</button>
+            </div>
         </div>
     </div>
 </div>
+
+<!-- ═════════════════════════════════════════════════════════════════════
+     SPOT INDEX NOT TRADABLE EXCEPTION MODAL
+     ═════════════════════════════════════════════════════════════════════ -->
+<div class="modal fade" id="indexNotTradableModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered modal-md">
+        <div class="modal-content glass-card border border-warning border-opacity-50 shadow-2xl rounded-4 overflow-hidden"
+             style="background: rgba(18, 14, 8, 0.96); backdrop-filter: blur(25px);">
+            <div class="modal-header border-0 pb-0 pt-3 px-3 d-flex justify-content-between align-items-center">
+                <div class="d-flex align-items-center gap-2 text-warning">
+                    <span class="material-icons fs-3">warning</span>
+                    <h5 class="modal-title fw-bold text-white fs-6 mb-0">Spot Index Not Directly Tradable</h5>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body p-3">
+                <div class="p-3 rounded-3 bg-warning bg-opacity-10 border border-warning border-opacity-25 mb-3 font-monospace small text-warning-emphasis">
+                    <strong class="text-white" id="nonTradableSymbolName">NIFTY 50</strong> is a spot benchmark calculation and cannot be bought or sold directly in cash/equity on Indian stock exchanges.
+                </div>
+                <p class="theme-text-muted smaller mb-3 font-monospace">
+                    To trade market momentum for this index, please choose an active <strong class="text-success">Call (CE)</strong> or <strong class="text-danger">Put (PE)</strong> contract from the option chain or a Futures derivative.
+                </p>
+                <div class="d-flex gap-2">
+                    <button type="button" class="btn btn-sm btn-info w-100 py-2 rounded-3 fw-bold d-flex align-items-center justify-content-center gap-1 text-dark"
+                            onclick="closeAndOpenOptionChain()">
+                        <span class="material-icons fs-6">bolt</span> Open Option Chain (±4 ATM)
+                    </button>
+                    <button type="button" class="btn btn-sm btn-outline-secondary px-3 rounded-3" data-bs-dismiss="modal">Dismiss</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<style>
+    /* Styling Tokens for Exness Trading Interface */
+    .mw-item {
+        cursor: pointer;
+        background: rgba(255, 255, 255, 0.02);
+        border-color: rgba(255, 255, 255, 0.08) !important;
+        transition: all 0.15s ease-in-out;
+    }
+    .mw-item:hover {
+        background: rgba(255, 255, 255, 0.06);
+        border-color: rgba(255, 255, 255, 0.2) !important;
+        transform: translateX(2px);
+    }
+    .mw-item.active-symbol-item {
+        background: rgba(16, 185, 129, 0.12) !important;
+        border-color: #10b981 !important;
+        box-shadow: 0 0 10px rgba(16, 185, 129, 0.2);
+    }
+    .exness-action-card:hover {
+        transform: translateY(-2px);
+    }
+    .exness-card-sell.active-side-card {
+        background: rgba(239, 68, 68, 0.2) !important;
+        border-color: #ef4444 !important;
+        box-shadow: 0 0 14px rgba(239, 68, 68, 0.3) !important;
+    }
+    .exness-card-buy.active-side-card {
+        background: rgba(16, 185, 129, 0.2) !important;
+        border-color: #10b981 !important;
+        box-shadow: 0 0 14px rgba(16, 185, 129, 0.3) !important;
+    }
+    #marketWatchList::-webkit-scrollbar {
+        width: 4px;
+    }
+    #marketWatchList::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+    }
+    .chart-tab-btn {
+        background: rgba(255, 255, 255, 0.04);
+        border: 1px solid var(--border-color, rgba(255,255,255,0.1));
+        color: var(--text-muted, #94a3b8);
+        transition: all 0.15s ease;
+    }
+    .chart-tab-btn.active-tab-btn {
+        background: rgba(59, 130, 246, 0.2) !important;
+        border-color: #3b82f6 !important;
+        color: #ffffff !important;
+    }
+    .atm-strike-row {
+        background: rgba(234, 179, 8, 0.14) !important;
+        box-shadow: inset 0 0 8px rgba(234, 179, 8, 0.2);
+    }
+    .atm-strike-badge {
+        background: #eab308;
+        color: #000000;
+        font-weight: 800;
+        font-size: 0.65rem;
+        padding: 1px 5px;
+        border-radius: 4px;
+    }
+    .hover-white:hover {
+        color: #ffffff !important;
+    }
+    .pinned-strike-item {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        transition: all 0.15s ease;
+    }
+    .pinned-strike-item:hover {
+        background: rgba(255, 255, 255, 0.07);
+        border-color: rgba(59, 130, 246, 0.4);
+    }
+</style>
 
 <!-- Load Lightweight Charts Open Source Library v4 to prevent v5 API breakage -->
 <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 <script>
-    let adminChartInstance = null;
-    let adminCandleSeries = null;
-    let adminEmaSeries = null;
-    let adminLiveTickInterval = null;
+    let exnessChartInstance = null;
+    let exnessCandleSeries = null;
+    let exnessEmaSeries = null;
     
-    let adminActiveSymbol = 'NSE:NIFTY50-INDEX';
-    let adminBaseLtp = 0;
-    let adminOrderSide = 'BUY';
+    let currentExnessCategory = 'INDEX';
+    let currentExnessSymbol = 'NIFTY 50';
+    let currentFyersSymbol = 'NSE:NIFTY50-INDEX';
+    let currentBaseLtp = null;
+    let currentLotSize = 25;
+    let currentSide = 'BUY';
+    let currentOrderType = 'MARKET';
+    let currentProductMode = 'MIS';
+    let currentResolution = '1';
+    let currentActiveBar = null;
 
-    async function fetchHistoricalData(symbol) {
-        try {
-            // Correct format mapping if needed
-            let fyersSymbol = symbol;
-            if (symbol === 'NIFTY 50') fyersSymbol = 'NSE:NIFTY50-INDEX';
-            if (symbol === 'BANKNIFTY') fyersSymbol = 'NSE:NIFTYBANK-INDEX';
-            
-            const url = `/admins/terminal/historical-data/?symbol=${encodeURIComponent(fyersSymbol)}&resolution=1`;
-            const response = await fetch(url);
-            const res = await response.json();
-            
-            if (res.success && res.data.length > 0) {
-                return res.data;
-            } else {
-                console.warn('No historical data returned from Fyers:', res.message);
-                return [];
-            }
-        } catch (e) {
-            console.error('Error fetching historical data:', e);
-            return [];
-        }
-    }
+    // Dual Tab Navigation State
+    let lastSpotIndex = { name: 'NIFTY 50', fyersSym: 'NSE:NIFTY50-INDEX', lotSize: 25 };
+    let lastOptionStrike = null;
+    let activeChartTab = 'SPOT';
 
-    async function initAdminMarmotChartCanvas() {
+    // Trade Config Defaults & Units
+    let tradeConfig = {
+        defaultLots: 1,
+        slEnabled: false,
+        slUnit: 'pts',
+        slValue: 20,
+        tpEnabled: false,
+        tpUnit: 'pts',
+        tpValue: 40
+    };
+
+    // ─────────────────────────────────────────────────────────────
+    // Chart Engine Initialization (Pure Real Data Only - Rule 10)
+    // ─────────────────────────────────────────────────────────────
+    async function initExnessChartCanvas() {
         const container = document.getElementById('admin_marmot_chart_canvas');
         if (!container) return;
         
         container.innerHTML = '';
 
         if (typeof LightweightCharts === 'undefined') {
-            container.innerHTML = '<div class="p-4 text-center text-danger">Chart library loading error.</div>';
+            container.innerHTML = '<div class="p-4 text-center text-danger">Chart library loading...</div>';
             return;
         }
 
-        adminChartInstance = LightweightCharts.createChart(container, {
+        exnessChartInstance = LightweightCharts.createChart(container, {
             width: container.clientWidth,
-            height: 500,
+            height: container.clientHeight || 420,
             layout: {
-                background: { type: 'solid', color: '#0d0e15' },
-                textColor: '#a1a5b7',
-                fontSize: 12,
+                background: { type: 'solid', color: '#090d16' },
+                textColor: '#94a3b8',
+                fontSize: 11,
                 fontFamily: 'Inter, system-ui, sans-serif'
             },
             grid: {
-                vertLines: { color: 'rgba(255, 255, 255, 0.04)' },
-                horzLines: { color: 'rgba(255, 255, 255, 0.04)' }
+                vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                horzLines: { color: 'rgba(255, 255, 255, 0.03)' }
             },
             crosshair: {
                 mode: LightweightCharts.CrosshairMode.Normal,
@@ -401,7 +857,7 @@
         });
 
         // Add Candlestick Series
-        adminCandleSeries = adminChartInstance.addCandlestickSeries({
+        exnessCandleSeries = exnessChartInstance.addCandlestickSeries({
             upColor: '#10b981',
             downColor: '#ef4444',
             borderVisible: false,
@@ -409,217 +865,913 @@
             wickDownColor: '#ef4444'
         });
 
-        // Add EMA 20 Line Series
-        adminEmaSeries = adminChartInstance.addLineSeries({
-            color: '#ef4444',
+        // Add EMA 20 Series
+        exnessEmaSeries = exnessChartInstance.addLineSeries({
+            color: '#38bdf8',
             lineWidth: 1,
             title: 'EMA 20'
         });
 
-        // Load initial data
-        await loadAdminSymbolChartData(adminActiveSymbol);
+        await loadExnessSymbolData(currentFyersSymbol, currentResolution);
 
-        // Resize handler
+        // Auto-resize
         window.addEventListener('resize', () => {
-            if (adminChartInstance && container) {
-                adminChartInstance.applyOptions({ width: container.clientWidth });
+            if (exnessChartInstance && container) {
+                exnessChartInstance.applyOptions({ 
+                    width: container.clientWidth,
+                    height: container.clientHeight || 420
+                });
             }
         });
 
-        startAdminLiveTickStream();
+        startRealTimeWebSocketStream();
     }
 
-    async function loadAdminSymbolChartData(symbol) {
-        if (!adminCandleSeries) return;
+    async function loadExnessSymbolData(fyersSymbol, resolution = currentResolution) {
+        if (!exnessCandleSeries) return;
         
-        const ohlc = await fetchHistoricalData(symbol);
-        if (ohlc.length === 0) {
-            // Strict rule: no dummy data fallback
-            adminCandleSeries.setData([]);
-            if (adminEmaSeries) adminEmaSeries.setData([]);
-            updateAdminOHLCHeader('-', '-', '-', '-');
+        const overlay = document.getElementById('chartNoDataNotice');
+
+        try {
+            const url = `/admins/terminal/historical-data/?symbol=${encodeURIComponent(fyersSymbol)}&resolution=${resolution}`;
+            const response = await fetch(url);
+            const res = await response.json();
+            
+            if (res.success && res.data && res.data.length > 0) {
+                if (overlay) overlay.classList.add('d-none');
+                exnessCandleSeries.setData(res.data);
+                
+                // Real EMA calculation from true candles
+                const ema = [];
+                for (let i = 0; i < res.data.length; i++) {
+                    if (i >= 19) {
+                        let sum = 0;
+                        for (let j = i - 19; j <= i; j++) sum += res.data[j].close;
+                        ema.push({ time: res.data[i].time, value: parseFloat((sum / 20).toFixed(2)) });
+                    }
+                }
+                if (exnessEmaSeries) exnessEmaSeries.setData(ema);
+
+                const last = res.data[res.data.length - 1];
+                currentActiveBar = { ...last };
+                currentBaseLtp = last.close;
+                updateHeaderOHLC(last.open, last.high, last.low, last.close);
+                updateTicketPricesFromLTP(currentBaseLtp);
+            } else {
+                // Strict Rule 10 Compliance: Pure historical data only. Clear canvas, zero dummy data.
+                currentActiveBar = null;
+                exnessCandleSeries.setData([]);
+                if (exnessEmaSeries) exnessEmaSeries.setData([]);
+                updateHeaderOHLC('—', '—', '—', '—');
+                if (overlay) overlay.classList.remove('d-none');
+            }
+        } catch (e) {
+            console.warn('Historical data unavailable:', e);
+            currentActiveBar = null;
+            exnessCandleSeries.setData([]);
+            if (exnessEmaSeries) exnessEmaSeries.setData([]);
+            updateHeaderOHLC('—', '—', '—', '—');
+            if (overlay) overlay.classList.remove('d-none');
+        }
+    }
+
+    function updateHeaderOHLC(o, h, l, c) {
+        const oEl = document.getElementById('adminOhlcO');
+        const hEl = document.getElementById('adminOhlcH');
+        const lEl = document.getElementById('adminOhlcL');
+        const cEl = document.getElementById('adminOhlcC');
+        const ltpEl = document.getElementById('adminChartLtp');
+        
+        if (o === '—') {
+            if (oEl) oEl.textContent = '—';
+            if (hEl) hEl.textContent = '—';
+            if (lEl) lEl.textContent = '—';
+            if (cEl) cEl.textContent = '—';
+            if (ltpEl) ltpEl.textContent = '—';
+        } else {
+            if (oEl) oEl.textContent = typeof o === 'number' ? o.toFixed(2) : o;
+            if (hEl) hEl.textContent = typeof h === 'number' ? h.toFixed(2) : h;
+            if (lEl) lEl.textContent = typeof l === 'number' ? l.toFixed(2) : l;
+            if (cEl) cEl.textContent = typeof c === 'number' ? c.toFixed(2) : c;
+            if (ltpEl) ltpEl.textContent = typeof c === 'number' ? '₹ ' + c.toLocaleString('en-IN', {minimumFractionDigits: 2}) : c;
+        }
+    }
+
+    function updateTicketPricesFromLTP(price) {
+        if (!price || isNaN(price)) {
+            document.getElementById('ticketBidPrice').textContent = '—';
+            document.getElementById('ticketAskPrice').textContent = '—';
+            document.getElementById('ticketBidSpread').textContent = 'Spread: —';
+            document.getElementById('ticketAskSpread').textContent = 'Spread: —';
             return;
         }
+        const spread = (price * 0.0001).toFixed(2);
+        const bid = (price - (spread / 2)).toFixed(2);
+        const ask = (price + (spread / 2)).toFixed(2);
         
-        adminCandleSeries.setData(ohlc);
+        const bidEl = document.getElementById('ticketBidPrice');
+        const askEl = document.getElementById('ticketAskPrice');
+        if (bidEl) bidEl.textContent = bid;
+        if (askEl) askEl.textContent = ask;
+        
+        const bSpread = document.getElementById('ticketBidSpread');
+        const aSpread = document.getElementById('ticketAskSpread');
+        if (bSpread) bSpread.textContent = `Spread: ${spread}`;
+        if (aSpread) aSpread.textContent = `Spread: ${spread}`;
 
-        // Calculate EMA 20
-        const emaData = [];
-        for (let i = 0; i < ohlc.length; i++) {
-            if (i >= 19) {
-                let sum = 0;
-                for (let j = i - 19; j <= i; j++) sum += ohlc[j].close;
-                emaData.push({ time: ohlc[i].time, value: parseFloat((sum / 20).toFixed(2)) });
-            }
-        }
-        if (adminEmaSeries) adminEmaSeries.setData(emaData);
-
-        const last = ohlc[ohlc.length - 1];
-        adminBaseLtp = last.close;
-        updateAdminOHLCHeader(last.open, last.high, last.low, last.close);
+        calculateExnessMetrics();
     }
 
-    function updateAdminOHLCHeader(o, h, l, c) {
-        const oEl = document.getElementById('adminOhlcO');
-        if (oEl) oEl.textContent = o.toLocaleString('en-IN', {minimumFractionDigits:2});
-        const hEl = document.getElementById('adminOhlcH');
-        if (hEl) hEl.textContent = h.toLocaleString('en-IN', {minimumFractionDigits:2});
-        const lEl = document.getElementById('adminOhlcL');
-        if (lEl) lEl.textContent = l.toLocaleString('en-IN', {minimumFractionDigits:2});
-        const cEl = document.getElementById('adminOhlcC');
-        if (cEl) cEl.textContent = c.toLocaleString('en-IN', {minimumFractionDigits:2});
-    }
-
-    function startAdminLiveTickStream() {
-        if (adminLiveTickInterval) clearInterval(adminLiveTickInterval);
-        
-        // Listen to the global WebSocket for MarmotWS
-        // Assume global window.MarmotWS is already established in base.html
+    // ─────────────────────────────────────────────────────────────
+    // Real WebSocket Stream Handler (Event-Driven Telemetry)
+    // ─────────────────────────────────────────────────────────────
+    function startRealTimeWebSocketStream() {
         window.addEventListener('marmot:live_tick', function(e) {
-            if (!adminCandleSeries) return;
             const data = e.detail;
-            
-            // Example live_tick payload: { symbol: "NIFTY 50", ltp: 24450.5, ... }
-            // Only update if symbol matches
-            // We use simple fallback parsing here
-            let tickSymbol = data.symbol || (data.data && data.data.symbol);
-            let ltp = data.ltp || (data.data && data.data.ltp);
-            
-            // If the tick symbol isn't strictly provided in our format, we'll just update based on the LTP if we're connected
-            if (!ltp) return;
-            
-            // Convert to number
-            if (typeof ltp === 'string') {
-                ltp = parseFloat(ltp.replace(/,/g, ''));
+            if (!data) return;
+
+            const sym = data.symbol || (data.data && data.data.symbol);
+            const idx = data.index || data.Index || (data.data && (data.data.index || data.data.Index));
+            const ltp = parseFloat(data.ltp || (data.data && data.data.ltp) || data.SpotPrice || (data.data && data.data.SpotPrice));
+            if (!ltp || isNaN(ltp)) return;
+
+            // Update Market Watch row if symbol or index matches
+            const lookupKeys = [sym, idx, data.fyers_sym, data.Symbol].filter(Boolean);
+            lookupKeys.forEach(k => {
+                const ltpEls = document.querySelectorAll(`.mw-ltp[data-tick-sym="${k}"], .mw-ltp[data-index="${k}"], .mw-ltp[data-fyers-sym="${k}"]`);
+                ltpEls.forEach(l => {
+                    l.textContent = '₹' + ltp.toLocaleString('en-IN', {minimumFractionDigits: 2});
+                });
+
+                const bidEls = document.querySelectorAll(`.mw-bid[data-tick-sym="${k}"], .mw-bid[data-index="${k}"]`);
+                const askEls = document.querySelectorAll(`.mw-ask[data-tick-sym="${k}"], .mw-ask[data-index="${k}"]`);
+                const chgEls = document.querySelectorAll(`.mw-change[data-tick-sym="${k}"], .mw-change[data-index="${k}"], .mw-change[data-fyers-sym="${k}"]`);
+                
+                const spread = (ltp * 0.0001).toFixed(2);
+                bidEls.forEach(b => b.textContent = (ltp - (spread / 2)).toFixed(2));
+                askEls.forEach(a => a.textContent = (ltp + (spread / 2)).toFixed(2));
+                
+                const pct = data.change_pct || data.ChangePct || (data.data && (data.data.change_pct || data.data.ChangePct));
+                if (pct) {
+                    chgEls.forEach(c => {
+                        c.textContent = pct;
+                        c.className = `badge ${String(pct).startsWith('+') ? 'bg-success text-success' : 'bg-danger text-danger'} bg-opacity-20 rounded-pill px-1.5 py-0 smaller font-monospace mw-change`;
+                    });
+                }
+            });
+
+            // If incoming tick matches current active instrument, update chart and order ticket
+            const matchesActive = (
+                (sym && (sym === currentExnessSymbol || sym === currentFyersSymbol)) ||
+                (idx && (idx === currentExnessSymbol || currentFyersSymbol.includes(idx) || currentExnessSymbol.replace(/\s+/g, '').includes(idx)))
+            );
+
+            if (matchesActive) {
+                currentBaseLtp = ltp;
+                updateTicketPricesFromLTP(currentBaseLtp);
+                
+                const ltpEl = document.getElementById('adminChartLtp');
+                if (ltpEl) {
+                    ltpEl.className = 'badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 font-monospace px-2.5 py-1';
+                    ltpEl.textContent = '₹ ' + ltp.toLocaleString('en-IN', {minimumFractionDigits: 2});
+                }
+
+                if (exnessCandleSeries) {
+                    const intervalSec = (parseInt(currentResolution) || 1) * 60;
+                    const nowSec = Math.floor(Date.now() / 1000);
+                    const barTime = Math.floor(nowSec / intervalSec) * intervalSec;
+
+                    if (!currentActiveBar || currentActiveBar.time !== barTime) {
+                        currentActiveBar = {
+                            time: barTime,
+                            open: ltp,
+                            high: ltp,
+                            low: ltp,
+                            close: ltp
+                        };
+                    } else {
+                        currentActiveBar.high = Math.max(currentActiveBar.high, ltp);
+                        currentActiveBar.low = Math.min(currentActiveBar.low, ltp);
+                        currentActiveBar.close = ltp;
+                    }
+
+                    exnessCandleSeries.update(currentActiveBar);
+                    updateHeaderOHLC(currentActiveBar.open, currentActiveBar.high, currentActiveBar.low, currentActiveBar.close);
+                }
             }
-            
-            // For now, if we don't have symbol matching, we just assume it's for the active symbol
-            // since the user wants real-time WebSocket data.
-            adminBaseLtp = ltp;
-
-            const nowSec = Math.floor(Date.now() / 1000);
-            const roundedTime = Math.floor(nowSec / 300) * 300;
-
-            // Generate a synthetic candle update since we only have LTP
-            // In a real historical/tick system, the server sends OHLC
-            const currentCandle = adminCandleSeries.options().data ? adminCandleSeries.options().data.slice(-1)[0] : null;
-            
-            let updatedCandle = null;
-            if (currentCandle && currentCandle.time === roundedTime) {
-                updatedCandle = {
-                    time: roundedTime,
-                    open: currentCandle.open,
-                    high: Math.max(currentCandle.high, adminBaseLtp),
-                    low: Math.min(currentCandle.low, adminBaseLtp),
-                    close: adminBaseLtp
-                };
-            } else {
-                updatedCandle = {
-                    time: roundedTime,
-                    open: adminBaseLtp,
-                    high: adminBaseLtp,
-                    low: adminBaseLtp,
-                    close: adminBaseLtp
-                };
-            }
-
-            adminCandleSeries.update(updatedCandle);
-
-            const ltpEl = document.getElementById('adminChartLtp');
-            if (ltpEl) {
-                ltpEl.innerHTML = `₹ ${adminBaseLtp.toLocaleString('en-IN', {minimumFractionDigits:2})} <span class="text-success smaller">LIVE</span>`;
-            }
-            updateAdminOHLCHeader(updatedCandle.open, updatedCandle.high, updatedCandle.low, updatedCandle.close);
         });
     }
 
-    function switchAdminSystemSymbol(name, price, type, btnEl) {
-        adminActiveSymbol = name;
-        adminBaseLtp = price;
+    // ─────────────────────────────────────────────────────────────
+    // Exness Trading Platform Interactions & Dual Tab Management
+    // ─────────────────────────────────────────────────────────────
+    function selectExnessSymbol(name, fyersSym, lotSize, cat, el) {
+        currentExnessCategory = cat || (fyersSym && fyersSym.includes('-INDEX') ? 'INDEX' : 'OPTION');
+        currentExnessSymbol = name;
+        currentFyersSymbol = fyersSym;
+        currentLotSize = lotSize || 25;
+        currentBaseLtp = null;
 
+        // Update Chart Title & Badges
         const titleEl = document.getElementById('adminChartTitle');
         if (titleEl) titleEl.textContent = name;
 
-        const symInput = document.getElementById('adminTerminalSymbolInput');
-        if (symInput) symInput.value = name + ' (LTP ₹' + price.toFixed(2) + ')';
+        const ticketBadge = document.getElementById('ticketSymbolBadge');
+        if (ticketBadge) ticketBadge.textContent = name;
 
-        loadAdminSymbolChartData(price);
+        const lotInfo = document.getElementById('lotSizeInfo');
+        if (lotInfo) lotInfo.textContent = `1 Lot = ${currentLotSize} Units`;
 
-        if (btnEl) {
-            document.querySelectorAll('.admin-symbol-chip').forEach(b => {
-                b.classList.remove('active', 'btn-danger');
-            });
-            btnEl.classList.add('active');
+        const chartIcon = document.getElementById('adminChartIcon');
+
+        if (currentExnessCategory === 'INDEX') {
+            lastSpotIndex = { name, fyersSym, lotSize: currentLotSize };
+            const spotLabel = document.getElementById('tabSpotLabel');
+            if (spotLabel) spotLabel.textContent = `${name} (Spot)`;
+            document.getElementById('tabSpotIndexBtn')?.classList.add('active-tab-btn');
+            document.getElementById('tabSpotIndexBtn')?.classList.remove('text-muted');
+            document.getElementById('tabOptionStrikeBtn')?.classList.remove('active-tab-btn');
+            document.getElementById('tabOptionStrikeBtn')?.classList.add('text-muted');
+            if (chartIcon) chartIcon.className = 'material-icons text-primary fs-5';
+        } else {
+            lastOptionStrike = { name, fyersSym, lotSize: currentLotSize };
+            const strikeTabBtn = document.getElementById('tabOptionStrikeBtn');
+            const strikeLabel = document.getElementById('tabStrikeLabel');
+            if (strikeTabBtn) strikeTabBtn.style.display = 'inline-flex';
+            if (strikeLabel) strikeLabel.textContent = name;
+            document.getElementById('tabOptionStrikeBtn')?.classList.add('active-tab-btn');
+            document.getElementById('tabOptionStrikeBtn')?.classList.remove('text-muted');
+            document.getElementById('tabSpotIndexBtn')?.classList.remove('active-tab-btn');
+            document.getElementById('tabSpotIndexBtn')?.classList.add('text-muted');
+            if (chartIcon) chartIcon.className = 'material-icons text-warning fs-5';
+        }
+
+        // Clear ticket prices to '—' until real data arrives
+        updateTicketPricesFromLTP(null);
+
+        // Highlight active item in sidebar
+        document.querySelectorAll('.mw-item').forEach(i => i.classList.remove('active-symbol-item'));
+        if (el) el.classList.add('active-symbol-item');
+
+        loadExnessSymbolData(fyersSym);
+    }
+
+    function switchToSpotIndexTab() {
+        if (!lastSpotIndex) return;
+        activeChartTab = 'SPOT';
+        selectExnessSymbol(lastSpotIndex.name, lastSpotIndex.fyersSym, lastSpotIndex.lotSize, 'INDEX');
+    }
+
+    function switchToOptionStrikeTab() {
+        if (!lastOptionStrike) {
+            openOptionChainModal();
+            return;
+        }
+        activeChartTab = 'STRIKE';
+        selectExnessSymbol(lastOptionStrike.name, lastOptionStrike.fyersSym, lastOptionStrike.lotSize, 'OPTION');
+    }
+
+    function closeOptionStrikeTab(e) {
+        if (e) e.stopPropagation();
+        lastOptionStrike = null;
+        const strikeTabBtn = document.getElementById('tabOptionStrikeBtn');
+        if (strikeTabBtn) strikeTabBtn.style.display = 'none';
+        switchToSpotIndexTab();
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // ATM ±4 Option Chain Modal Operations
+    // ─────────────────────────────────────────────────────────────
+    async function openOptionChainModal() {
+        const rawIdx = (lastSpotIndex?.name || currentExnessSymbol || 'NIFTY').toUpperCase();
+        let targetIdx = 'NIFTY';
+        if (rawIdx.includes('BANK')) targetIdx = 'BANKNIFTY';
+        else if (rawIdx.includes('FIN')) targetIdx = 'FINNIFTY';
+        else if (rawIdx.includes('MIDCP')) targetIdx = 'MIDCPNIFTY';
+        else if (rawIdx.includes('SENSEX')) targetIdx = 'SENSEX';
+        else if (rawIdx.includes('VIX')) targetIdx = 'INDIAVIX';
+        else if (rawIdx.includes('GIFT')) targetIdx = 'GIFTNIFTY';
+
+        const modalEl = document.getElementById('terminalOptionChainModal');
+        if (!modalEl) return;
+        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+        modal.show();
+
+        const loading = document.getElementById('ocModalLoading');
+        const wrapper = document.getElementById('ocModalTableWrapper');
+        const titleEl = document.getElementById('ocModalTitle');
+        const spotEl = document.getElementById('ocModalSpotLtp');
+        const expEl = document.getElementById('ocModalExpiry');
+        const pcrEl = document.getElementById('ocModalPcr');
+        const vixEl = document.getElementById('ocModalVix');
+        const tbody = document.getElementById('ocModalTableBody');
+
+        if (loading) loading.classList.remove('d-none');
+        if (wrapper) wrapper.classList.add('d-none');
+        if (tbody) tbody.innerHTML = '';
+
+        try {
+            const resp = await fetch(`/admins/terminal/option-chain/?index=${targetIdx}&window=4`);
+            const data = await resp.json();
+
+            if (data.success) {
+                if (titleEl) titleEl.textContent = `${data.spot_symbol || targetIdx} Option Chain (ATM ±4 Strikes)`;
+                if (spotEl) spotEl.textContent = `Spot: ₹ ${data.spot_ltp || '—'}`;
+                if (expEl) expEl.textContent = `EXP: ${data.expiry_date || 'Weekly'}`;
+                if (pcrEl) pcrEl.textContent = `PCR: ${data.pcr || '—'}`;
+                if (vixEl) vixEl.textContent = `India VIX: ${data.india_vix || '—'}`;
+
+                const strikes = data.strikes || [];
+                const pinnedList = getPinnedStrikesList();
+
+                let rowsHtml = '';
+                strikes.forEach(s => {
+                    const isAtm = s.is_atm;
+                    const rowClass = isAtm ? 'atm-strike-row' : '';
+                    const strikeBadge = isAtm ? '<span class="atm-strike-badge ms-1">ATM</span>' : '';
+
+                    const cePinned = pinnedList.some(p => p.fyersSym === s.ce_symbol);
+                    const pePinned = pinnedList.some(p => p.fyersSym === s.pe_symbol);
+
+                    const ceName = `${data.spot_symbol} ${s.strike} CE`;
+                    const peName = `${data.spot_symbol} ${s.strike} PE`;
+                    const lotSize = data.strike_step === 100 ? 15 : 25;
+
+                    const ceChgSign = String(s.ce_chg_pct).startsWith('-') ? 'text-danger' : 'text-success';
+                    const peChgSign = String(s.pe_chg_pct).startsWith('-') ? 'text-danger' : 'text-success';
+
+                    rowsHtml += `
+                        <tr class="${rowClass}">
+                            <!-- CE Actions -->
+                            <td class="py-1 text-nowrap">
+                                <button type="button" class="btn btn-xs py-0 px-1 ${cePinned ? 'btn-warning text-dark' : 'btn-outline-secondary text-muted'} rounded-pill me-1" 
+                                        onclick="togglePinOptionStrike('${ceName}', '${s.ce_symbol}', ${lotSize}, ${s.ce_ltp}, this, ${s.ce_chg_pct || 0})" title="${cePinned ? 'Unpin' : 'Pin to Watchlist'}">
+                                    <span class="material-icons" style="font-size:0.8rem; vertical-align:-2px;">star</span>
+                                </button>
+                                <button type="button" class="btn btn-xs btn-outline-success py-0 px-1.5 rounded-pill"
+                                        onclick="selectOptionStrikeFromChain('${ceName}', '${s.ce_symbol}', ${lotSize}, ${s.ce_ltp})" title="Open CE Strike Chart">
+                                    <span class="material-icons" style="font-size:0.8rem; vertical-align:-2px;">candlestick_chart</span>
+                                    <span class="smaller fw-bold">Chart</span>
+                                </button>
+                            </td>
+                            <td class="py-1 text-muted">${s.ce_oi || '—'}</td>
+                            <td class="py-1 ${ceChgSign}">${s.ce_chg_pct ? s.ce_chg_pct + '%' : '—'}</td>
+                            <td class="py-1 border-end border-secondary border-opacity-25 fw-bold text-success" 
+                                style="cursor:pointer;" onclick="selectOptionStrikeFromChain('${ceName}', '${s.ce_symbol}', ${lotSize}, ${s.ce_ltp})">
+                                ₹${s.ce_ltp > 0 ? s.ce_ltp.toFixed(2) : '—'}
+                            </td>
+
+                            <!-- STRIKE (Center) -->
+                            <td class="py-1 fw-bold text-white bg-black bg-opacity-40">
+                                ${s.strike} ${strikeBadge}
+                            </td>
+
+                            <!-- PE Columns -->
+                            <td class="py-1 border-start border-secondary border-opacity-25 fw-bold text-danger"
+                                style="cursor:pointer;" onclick="selectOptionStrikeFromChain('${peName}', '${s.pe_symbol}', ${lotSize}, ${s.pe_ltp})">
+                                ₹${s.pe_ltp > 0 ? s.pe_ltp.toFixed(2) : '—'}
+                            </td>
+                            <td class="py-1 ${peChgSign}">${s.pe_chg_pct ? s.pe_chg_pct + '%' : '—'}</td>
+                            <td class="py-1 text-muted">${s.pe_oi || '—'}</td>
+                            <!-- PE Actions -->
+                            <td class="py-1 text-nowrap">
+                                <button type="button" class="btn btn-xs btn-outline-danger py-0 px-1.5 rounded-pill me-1"
+                                        onclick="selectOptionStrikeFromChain('${peName}', '${s.pe_symbol}', ${lotSize}, ${s.pe_ltp})" title="Open PE Strike Chart">
+                                    <span class="smaller fw-bold">Chart</span>
+                                    <span class="material-icons" style="font-size:0.8rem; vertical-align:-2px;">candlestick_chart</span>
+                                </button>
+                                <button type="button" class="btn btn-xs py-0 px-1 ${pePinned ? 'btn-warning text-dark' : 'btn-outline-secondary text-muted'} rounded-pill" 
+                                        onclick="togglePinOptionStrike('${peName}', '${s.pe_symbol}', ${lotSize}, ${s.pe_ltp}, this, ${s.pe_chg_pct || 0})" title="${pePinned ? 'Unpin' : 'Pin to Watchlist'}">
+                                    <span class="material-icons" style="font-size:0.8rem; vertical-align:-2px;">star</span>
+                                </button>
+                            </td>
+                        </tr>
+                    `;
+                });
+
+                if (tbody) tbody.innerHTML = rowsHtml;
+                if (loading) loading.classList.add('d-none');
+                if (wrapper) wrapper.classList.remove('d-none');
+            }
+        } catch (e) {
+            console.error('Error loading option chain:', e);
+            if (loading) loading.innerHTML = '<div class="text-danger p-3 smaller font-monospace">Failed to load option chain. Ensure Fyers credentials are authorized.</div>';
         }
     }
 
-    function setAdminTimeframe(tf, btnEl) {
-        if (btnEl) {
-            document.querySelectorAll('.admin-tf-btn').forEach(b => {
-                b.classList.remove('btn-danger', 'fw-bold');
-                b.classList.add('btn-outline-secondary', 'theme-text-muted');
-            });
-            btnEl.classList.remove('btn-outline-secondary', 'theme-text-muted');
-            btnEl.classList.add('btn-danger', 'fw-bold');
+    function selectOptionStrikeFromChain(name, fyersSym, lotSize, ltp) {
+        const modalEl = document.getElementById('terminalOptionChainModal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
         }
-        loadAdminSymbolChartData(adminBaseLtp);
+
+        lastOptionStrike = { name, fyersSym, lotSize, ltp };
+        selectExnessSymbol(name, fyersSym, lotSize, 'OPTION');
     }
 
-    function setAdminOrderSide(side) {
-        adminOrderSide = side;
-        const btnBuy = document.getElementById('adminBtnBuy');
-        const btnSell = document.getElementById('adminBtnSell');
+    // ─────────────────────────────────────────────────────────────
+    // Watchlist Pinned Strikes (Single-Click Add/Delete)
+    // ─────────────────────────────────────────────────────────────
+    function getPinnedStrikesList() {
+        try {
+            return JSON.parse(localStorage.getItem('marmot_pinned_strikes') || '[]');
+        } catch (e) {
+            return [];
+        }
+    }
+
+    function savePinnedStrikesList(list) {
+        localStorage.setItem('marmot_pinned_strikes', JSON.stringify(list));
+        renderPinnedStrikes();
+    }
+
+    function togglePinOptionStrike(name, fyersSym, lotSize, ltp, btn, chp = 0) {
+        let list = getPinnedStrikesList();
+        const existingIdx = list.findIndex(item => item.fyersSym === fyersSym);
+        if (existingIdx >= 0) {
+            list.splice(existingIdx, 1);
+            if (btn) {
+                btn.className = 'btn btn-xs btn-outline-secondary text-muted rounded-pill me-1';
+            }
+        } else {
+            list.push({ name, fyersSym, lotSize, ltp, chp });
+            if (btn) {
+                btn.className = 'btn btn-xs btn-warning text-dark rounded-pill me-1';
+            }
+        }
+        savePinnedStrikesList(list);
+    }
+
+    function removePinnedStrike(fyersSym, e) {
+        if (e) e.stopPropagation();
+        let list = getPinnedStrikesList();
+        list = list.filter(item => item.fyersSym !== fyersSym);
+        savePinnedStrikesList(list);
+    }
+
+    function renderPinnedStrikes() {
+        const list = getPinnedStrikesList();
+        const container = document.getElementById('pinnedStrikesContainer');
+        const badge = document.getElementById('pinnedStrikesBadge');
+        const listEl = document.getElementById('pinnedStrikesList');
+        if (!container || !listEl) return;
+
+        if (list.length === 0) {
+            container.classList.add('d-none');
+            if (badge) badge.textContent = '0';
+            listEl.innerHTML = '';
+            return;
+        }
+
+        container.classList.remove('d-none');
+        if (badge) badge.textContent = list.length;
+
+        let html = '';
+        list.forEach(item => {
+            const isCe = item.name.includes('CE');
+            const typeBadge = isCe ? '<span class="badge bg-success bg-opacity-20 text-success rounded-pill px-1.5 py-0 smaller font-monospace fw-bold" style="font-size:0.65rem;">CE</span>' : '<span class="badge bg-danger bg-opacity-20 text-danger rounded-pill px-1.5 py-0 smaller font-monospace fw-bold" style="font-size:0.65rem;">PE</span>';
+            const activeClass = (currentFyersSymbol === item.fyersSym) ? 'active-symbol-item' : '';
+            const ltpDisplay = (item.ltp && !isNaN(item.ltp)) ? `₹${parseFloat(item.ltp).toLocaleString('en-IN', {minimumFractionDigits: 2})}` : '—';
+            const chpDisplay = (item.chp && !isNaN(item.chp)) ? `${item.chp > 0 ? '+' : ''}${parseFloat(item.chp).toFixed(2)}%` : '';
+            const chpClass = (item.chp && item.chp > 0) ? 'bg-success text-success' : ((item.chp && item.chp < 0) ? 'bg-danger text-danger' : 'bg-secondary text-muted');
+
+            html += `
+                <div class="mw-item pinned-strike-item p-2 rounded-3 border d-flex flex-column gap-1 ${activeClass}"
+                     data-symbol="${item.name}" data-fyers="${item.fyersSym}" data-lot="${item.lotSize}"
+                     onclick="selectExnessSymbol('${item.name}', '${item.fyersSym}', ${item.lotSize}, 'OPTION', this)">
+                    <!-- Row 1: Instrument Badge + Name on Left, Bold Real-Time LTP on Right -->
+                    <div class="d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center gap-1.5 overflow-hidden">
+                            ${typeBadge}
+                            <span class="fw-bold theme-text-main font-monospace small text-truncate">${item.name}</span>
+                        </div>
+                        <div class="text-end font-monospace fw-bold small text-white mw-ltp" data-tick-sym="${item.fyersSym}">
+                            ${ltpDisplay}
+                        </div>
+                    </div>
+                    <!-- Row 2: Lot Size on Left, % Change Badge + Remove Action on Right -->
+                    <div class="d-flex align-items-center justify-content-between font-monospace" style="font-size: 0.72rem;">
+                        <span class="text-muted smaller">1 Lot = ${item.lotSize} U</span>
+                        <div class="d-flex align-items-center gap-1.5">
+                            ${chpDisplay ? `<span class="badge ${chpClass} bg-opacity-20 rounded-pill px-1.5 py-0 smaller font-monospace mw-change" data-tick-sym="${item.fyersSym}">${chpDisplay}</span>` : ''}
+                            <button type="button" class="btn btn-xs btn-outline-secondary p-0 px-1 rounded-circle border-0 text-muted hover-white d-flex align-items-center justify-content-center" 
+                                    onclick="removePinnedStrike('${item.fyersSym}', event)" title="Remove from Watchlist" style="width: 18px; height: 18px; line-height: 1;">
+                                <span class="material-icons" style="font-size:0.85rem;">close</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        });
+        listEl.innerHTML = html;
+    }
+
+    // ─────────────────────────────────────────────────────────────
+    // Spot Index Tradability & Exception Handling
+    // ─────────────────────────────────────────────────────────────
+    function showNonTradableIndexModal() {
+        const nameEl = document.getElementById('nonTradableSymbolName');
+        if (nameEl) nameEl.textContent = currentExnessSymbol;
+        const modalEl = document.getElementById('indexNotTradableModal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
+    }
+
+    function closeAndOpenOptionChain() {
+        const modalEl = document.getElementById('indexNotTradableModal');
+        if (modalEl) {
+            const modal = bootstrap.Modal.getInstance(modalEl);
+            if (modal) modal.hide();
+        }
+        setTimeout(openOptionChainModal, 200);
+    }
+
+    function setExnessSide(side) {
+        if (currentExnessCategory === 'INDEX' || currentFyersSymbol.includes('-INDEX')) {
+            showNonTradableIndexModal();
+            return;
+        }
+        currentSide = side;
+        const sellCard = document.getElementById('exnessSellCard');
+        const buyCard = document.getElementById('exnessBuyCard');
+        const btn = document.getElementById('exnessExecuteBtn');
+        const icon = document.getElementById('exnessBtnIcon');
+
         if (side === 'BUY') {
-            btnBuy.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-success shadow-sm d-flex align-items-center justify-content-center gap-1';
-            btnSell.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-outline-danger d-flex align-items-center justify-content-center gap-1';
+            buyCard.classList.add('active-side-card');
+            sellCard.classList.remove('active-side-card');
+            btn.className = 'btn btn-success w-100 py-2.5 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2 mt-auto text-uppercase';
+            if (icon) icon.textContent = 'trending_up';
         } else {
-            btnBuy.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-outline-success d-flex align-items-center justify-content-center gap-1';
-            btnSell.className = 'btn w-100 py-2.5 rounded-3 fw-bold btn-danger shadow-sm d-flex align-items-center justify-content-center gap-1';
+            sellCard.classList.add('active-side-card');
+            buyCard.classList.remove('active-side-card');
+            btn.className = 'btn btn-danger w-100 py-2.5 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2 mt-auto text-uppercase';
+            if (icon) icon.textContent = 'trending_down';
+        }
+        calculateExnessMetrics();
+    }
+
+    function setExnessOrderType(type, btn) {
+        currentOrderType = type;
+        document.querySelectorAll('.exness-ot-btn').forEach(b => {
+            b.classList.remove('btn-primary', 'active', 'fw-bold');
+            b.classList.add('btn-outline-secondary', 'theme-text-muted');
+        });
+        if (btn) {
+            btn.classList.remove('btn-outline-secondary', 'theme-text-muted');
+            btn.classList.add('btn-primary', 'active', 'fw-bold');
+        }
+
+        const priceRow = document.getElementById('orderTypePriceRow');
+        const limitCol = document.getElementById('limitPriceCol');
+        const triggerCol = document.getElementById('triggerPriceCol');
+
+        if (type === 'MARKET') {
+            if (priceRow) priceRow.classList.add('d-none');
+        } else if (type === 'LIMIT') {
+            if (priceRow) priceRow.classList.remove('d-none');
+            if (limitCol) limitCol.classList.remove('d-none');
+            if (triggerCol) triggerCol.classList.add('d-none');
+        } else if (type === 'SL-M') {
+            if (priceRow) priceRow.classList.remove('d-none');
+            if (limitCol) limitCol.classList.add('d-none');
+            if (triggerCol) triggerCol.classList.remove('d-none');
         }
     }
 
-    function adjustAdminQty(amount) {
-        const input = document.getElementById('adminQtyInput');
-        if (input) {
-            let val = parseInt(input.value || 25) + amount;
-            if (val < 25) val = 25;
-            input.value = val;
+    function setExnessProductMode(mode, btn) {
+        currentProductMode = mode;
+        document.querySelectorAll('.exness-pm-btn').forEach(b => {
+            b.classList.remove('btn-primary', 'active', 'fw-bold', 'text-white');
+            b.classList.add('btn-outline-secondary', 'theme-text-muted', 'border-0');
+        });
+        if (btn) {
+            btn.classList.remove('btn-outline-secondary', 'theme-text-muted', 'border-0');
+            btn.classList.add('btn-primary', 'active', 'fw-bold', 'text-white');
+        }
+        calculateExnessMetrics();
+    }
+
+    function adjustExnessLots(delta) {
+        const input = document.getElementById('ticketLotsInput');
+        if (!input) return;
+        let lots = parseInt(input.value || 1) + delta;
+        if (lots < 1) lots = 1;
+        input.value = lots;
+        calculateExnessMetrics();
+    }
+
+    function setExnessLots(lots) {
+        const input = document.getElementById('ticketLotsInput');
+        if (!input) return;
+        input.value = lots;
+        calculateExnessMetrics();
+    }
+
+    function saveAsDefaultLots() {
+        const lots = parseInt(document.getElementById('ticketLotsInput')?.value || 1);
+        tradeConfig.defaultLots = lots;
+        localStorage.setItem('marmot_terminal_trade_config', JSON.stringify(tradeConfig));
+        if (window.bootstrap && document.body) {
+            document.body.dispatchEvent(new CustomEvent('showToast', {
+                detail: { message: `Default volume set to ${lots} Lot(s).`, level: 'success' }
+            }));
         }
     }
 
-    function triggerAdminMasterOrder() {
-        const sym = document.getElementById('adminTerminalSymbolInput').value;
-        const qty = document.getElementById('adminQtyInput').value;
-        const scope = document.getElementById('adminTargetScope').value;
-        const mode = document.getElementById('adminExecutionMode').value;
-        alert(`Master Order Dispatched via ${adminOrderSide} in ${mode} mode!\nTarget: ${scope}\nSymbol: ${sym}\nQty per Account: ${qty} units`);
+    // ─────────────────────────────────────────────────────────────
+    // Trade Config & Risk Controls (SL Points/% & TP Points/%)
+    // ─────────────────────────────────────────────────────────────
+    function setRiskUnit(type, unit, shouldRecalc = true) {
+        if (type === 'sl') {
+            tradeConfig.slUnit = unit;
+            const ptsBtn = document.getElementById('slUnitPtsBtn');
+            const pctBtn = document.getElementById('slUnitPctBtn');
+            const lbl = document.getElementById('slUnitLabel');
+            if (unit === 'pts') {
+                if (ptsBtn) { ptsBtn.className = 'btn btn-xs btn-danger rounded-pill px-1.5 py-0 fw-bold sl-unit-btn active'; }
+                if (pctBtn) { pctBtn.className = 'btn btn-xs btn-outline-secondary rounded-pill px-1.5 py-0 sl-unit-btn'; }
+                if (lbl) lbl.textContent = 'pts';
+            } else {
+                if (ptsBtn) { ptsBtn.className = 'btn btn-xs btn-outline-secondary rounded-pill px-1.5 py-0 sl-unit-btn'; }
+                if (pctBtn) { pctBtn.className = 'btn btn-xs btn-danger rounded-pill px-1.5 py-0 fw-bold sl-unit-btn active'; }
+                if (lbl) lbl.textContent = '%';
+            }
+        } else if (type === 'tp') {
+            tradeConfig.tpUnit = unit;
+            const ptsBtn = document.getElementById('tpUnitPtsBtn');
+            const pctBtn = document.getElementById('tpUnitPctBtn');
+            const lbl = document.getElementById('tpUnitLabel');
+            if (unit === 'pts') {
+                if (ptsBtn) { ptsBtn.className = 'btn btn-xs btn-success rounded-pill px-1.5 py-0 fw-bold tp-unit-btn active'; }
+                if (pctBtn) { pctBtn.className = 'btn btn-xs btn-outline-secondary rounded-pill px-1.5 py-0 tp-unit-btn'; }
+                if (lbl) lbl.textContent = 'pts';
+            } else {
+                if (ptsBtn) { ptsBtn.className = 'btn btn-xs btn-outline-secondary rounded-pill px-1.5 py-0 tp-unit-btn'; }
+                if (pctBtn) { pctBtn.className = 'btn btn-xs btn-success rounded-pill px-1.5 py-0 fw-bold tp-unit-btn active'; }
+                if (lbl) lbl.textContent = '%';
+            }
+        }
+        if (shouldRecalc) calculateExnessMetrics();
     }
 
-    function setAdminExecutionMode(mode) {
-        document.getElementById('adminExecutionMode').value = mode;
-        const liveBtn = document.getElementById('mode-live-btn');
-        const mockBtn = document.getElementById('mode-mock-btn');
-        const executeBtnText = document.getElementById('adminExecuteBtnText');
-        const executeBtn = executeBtnText.parentElement;
+    function toggleRiskField(field) {
+        if (field === 'sl') {
+            const sw = document.getElementById('enableSlSwitch');
+            const inp = document.getElementById('ticketSlValue');
+            if (inp && sw) {
+                inp.disabled = !sw.checked;
+                inp.classList.toggle('opacity-50', !sw.checked);
+            }
+        } else if (field === 'tp') {
+            const sw = document.getElementById('enableTpSwitch');
+            const inp = document.getElementById('ticketTpValue');
+            if (inp && sw) {
+                inp.disabled = !sw.checked;
+                inp.classList.toggle('opacity-50', !sw.checked);
+            }
+        }
+        calculateExnessMetrics();
+    }
 
-        if (mode === 'LIVE') {
-            liveBtn.classList.add('active', 'bg-primary', 'text-white');
-            liveBtn.classList.remove('text-secondary');
-            mockBtn.classList.remove('active', 'bg-warning', 'text-dark');
-            mockBtn.classList.add('text-secondary');
-            executeBtn.classList.remove('btn-warning', 'text-dark');
-            executeBtn.classList.add('btn-danger', 'text-white');
-            executeBtnText.innerText = 'DISPATCH LIVE MASTER ORDER';
+    function saveDefaultTradeConfig() {
+        const lots = parseInt(document.getElementById('ticketLotsInput')?.value || 1);
+        tradeConfig.defaultLots = lots;
+        tradeConfig.slEnabled = document.getElementById('enableSlSwitch')?.checked || false;
+        tradeConfig.slValue = parseFloat(document.getElementById('ticketSlValue')?.value || 20);
+        tradeConfig.tpEnabled = document.getElementById('enableTpSwitch')?.checked || false;
+        tradeConfig.tpValue = parseFloat(document.getElementById('ticketTpValue')?.value || 40);
+
+        localStorage.setItem('marmot_terminal_trade_config', JSON.stringify(tradeConfig));
+        if (window.bootstrap && document.body) {
+            document.body.dispatchEvent(new CustomEvent('showToast', {
+                detail: { message: 'Trade Configuration & Risk Defaults Saved.', level: 'success' }
+            }));
+        }
+    }
+
+    function loadDefaultTradeConfig() {
+        try {
+            const saved = localStorage.getItem('marmot_terminal_trade_config');
+            if (saved) {
+                tradeConfig = Object.assign(tradeConfig, JSON.parse(saved));
+            }
+        } catch (e) {}
+
+        const lotInp = document.getElementById('ticketLotsInput');
+        if (lotInp && tradeConfig.defaultLots) lotInp.value = tradeConfig.defaultLots;
+
+        const slSw = document.getElementById('enableSlSwitch');
+        const slInp = document.getElementById('ticketSlValue');
+        if (slSw && slInp) {
+            slSw.checked = tradeConfig.slEnabled;
+            slInp.value = tradeConfig.slValue || 20;
+            slInp.disabled = !tradeConfig.slEnabled;
+            slInp.classList.toggle('opacity-50', !tradeConfig.slEnabled);
+            setRiskUnit('sl', tradeConfig.slUnit || 'pts', false);
+        }
+
+        const tpSw = document.getElementById('enableTpSwitch');
+        const tpInp = document.getElementById('ticketTpValue');
+        if (tpSw && tpInp) {
+            tpSw.checked = tradeConfig.tpEnabled;
+            tpInp.value = tradeConfig.tpValue || 40;
+            tpInp.disabled = !tradeConfig.tpEnabled;
+            tpInp.classList.toggle('opacity-50', !tradeConfig.tpEnabled);
+            setRiskUnit('tp', tradeConfig.tpUnit || 'pts', false);
+        }
+        calculateExnessMetrics();
+    }
+
+    function calculateExnessMetrics() {
+        const lots = parseInt(document.getElementById('ticketLotsInput')?.value || 1);
+        const totalUnits = lots * currentLotSize;
+        const unitsEl = document.getElementById('ticketTotalUnits');
+        const marginEl = document.getElementById('ticketMarginReq');
+        const chargesEl = document.getElementById('ticketEstCharges');
+        const btnText = document.getElementById('exnessBtnText');
+        const lotInfo = document.getElementById('lotSizeInfo');
+
+        if (lotInfo) lotInfo.textContent = `1 Lot = ${currentLotSize} Units`;
+        if (unitsEl) unitsEl.textContent = `${totalUnits} Units (${lots} Lots)`;
+        if (btnText) btnText.textContent = `${currentSide} ${currentExnessSymbol} (${totalUnits} UNITS)`;
+
+        const slSw = document.getElementById('enableSlSwitch');
+        const slInp = document.getElementById('ticketSlValue');
+        const slPreview = document.getElementById('slTriggerPricePreview');
+        const slDiffEl = document.getElementById('slCalculatedDiff');
+
+        const tpSw = document.getElementById('enableTpSwitch');
+        const tpInp = document.getElementById('ticketTpValue');
+        const tpPreview = document.getElementById('tpTargetPricePreview');
+        const tpDiffEl = document.getElementById('tpCalculatedDiff');
+        const rrBadge = document.getElementById('riskRewardBadge');
+
+        if (currentBaseLtp && !isNaN(currentBaseLtp)) {
+            const isOption = (currentExnessCategory === 'OPTION');
+            const marginMultiplier = (currentProductMode === 'MIS') ? 0.2 : 1.0;
+            const marginFactor = isOption ? (currentSide === 'BUY' ? 1.0 : (1.2 * marginMultiplier)) : marginMultiplier;
+            const totalMargin = (totalUnits * currentBaseLtp * marginFactor).toFixed(2);
+            const charges = (20.00 + (totalUnits * 0.05)).toFixed(2);
+            if (marginEl) marginEl.textContent = `₹${parseFloat(totalMargin).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+            if (chargesEl) chargesEl.textContent = `₹${charges}`;
+
+            let slDistancePts = 0;
+            if (slSw && slSw.checked && slInp && slInp.value) {
+                const val = parseFloat(slInp.value) || 0;
+                slDistancePts = (tradeConfig.slUnit === 'pts') ? val : (currentBaseLtp * val / 100);
+                const triggerPrice = (currentSide === 'BUY') ? Math.max(0, currentBaseLtp - slDistancePts) : (currentBaseLtp + slDistancePts);
+                const estLoss = (slDistancePts * totalUnits).toFixed(2);
+                if (slPreview) slPreview.textContent = `Trigger: ₹${triggerPrice.toFixed(2)}`;
+                if (slDiffEl) slDiffEl.textContent = `Est: -₹${parseFloat(estLoss).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+            } else {
+                if (slPreview) slPreview.textContent = 'Trigger: —';
+                if (slDiffEl) slDiffEl.textContent = 'Est: —';
+            }
+
+            let tpDistancePts = 0;
+            if (tpSw && tpSw.checked && tpInp && tpInp.value) {
+                const val = parseFloat(tpInp.value) || 0;
+                tpDistancePts = (tradeConfig.tpUnit === 'pts') ? val : (currentBaseLtp * val / 100);
+                const targetPrice = (currentSide === 'BUY') ? (currentBaseLtp + tpDistancePts) : Math.max(0, currentBaseLtp - tpDistancePts);
+                const estGain = (tpDistancePts * totalUnits).toFixed(2);
+                if (tpPreview) tpPreview.textContent = `Target: ₹${targetPrice.toFixed(2)}`;
+                if (tpDiffEl) tpDiffEl.textContent = `Est: +₹${parseFloat(estGain).toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+            } else {
+                if (tpPreview) tpPreview.textContent = 'Target: —';
+                if (tpDiffEl) tpDiffEl.textContent = 'Est: —';
+            }
+
+            if (rrBadge) {
+                if (slDistancePts > 0 && tpDistancePts > 0) {
+                    const ratio = (tpDistancePts / slDistancePts).toFixed(1);
+                    rrBadge.textContent = `R:R 1 : ${ratio}`;
+                    rrBadge.className = 'badge bg-primary bg-opacity-25 text-info border border-info border-opacity-25 font-monospace px-1.5 py-0 smaller';
+                } else {
+                    rrBadge.textContent = 'R:R —';
+                    rrBadge.className = 'badge bg-secondary bg-opacity-25 text-white font-monospace px-1.5 py-0 smaller';
+                }
+            }
         } else {
-            mockBtn.classList.add('active', 'bg-warning', 'text-dark');
-            mockBtn.classList.remove('text-secondary');
-            liveBtn.classList.remove('active', 'bg-primary', 'text-white');
-            liveBtn.classList.add('text-secondary');
-            executeBtn.classList.remove('btn-danger', 'text-white');
-            executeBtn.classList.add('btn-warning', 'text-dark');
-            executeBtnText.innerText = 'DISPATCH MOCK MASTER ORDER';
+            if (marginEl) marginEl.textContent = '—';
+            if (chargesEl) chargesEl.textContent = '—';
+            if (slPreview) slPreview.textContent = 'Trigger: —';
+            if (slDiffEl) slDiffEl.textContent = 'Est: —';
+            if (tpPreview) tpPreview.textContent = 'Target: —';
+            if (tpDiffEl) tpDiffEl.textContent = 'Est: —';
+            if (rrBadge) rrBadge.textContent = 'R:R —';
         }
     }
 
-    setTimeout(initAdminMarmotChartCanvas, 150);
+    function executeExnessMasterOrder() {
+        if (currentExnessCategory === 'INDEX' || (currentFyersSymbol && currentFyersSymbol.includes('-INDEX'))) {
+            showNonTradableIndexModal();
+            return;
+        }
+
+        const lots = document.getElementById('ticketLotsInput')?.value || 1;
+        const units = lots * currentLotSize;
+        const scope = document.getElementById('adminTargetScope')?.value || 'ALL';
+        const mode = '{% if is_sandbox %}SANDBOX SIMULATOR{% else %}LIVE BROKER{% endif %}';
+
+        const msg = `${currentSide} ${currentOrderType} (${currentProductMode}) Order for ${units} Units of ${currentExnessSymbol} dispatched in ${mode}.`;
+        if (window.bootstrap && document.body) {
+            const evt = new CustomEvent('showToast', {
+                detail: { message: msg, level: currentSide === 'BUY' ? 'success' : 'danger' }
+            });
+            document.body.dispatchEvent(evt);
+        } else {
+            alert(msg);
+        }
+    }
+
+    function squareOffAllPositions() {
+        if (confirm('Are you sure you want to square off all open positions immediately at market price?')) {
+            const evt = new CustomEvent('showToast', {
+                detail: { message: 'Zero open positions to close.', level: 'info' }
+            });
+            document.body.dispatchEvent(evt);
+        }
+    }
+
+    function resetSandboxVirtualBalance() {
+        if (confirm('Reset virtual simulation balance back to initial capital?')) {
+            const evt = new CustomEvent('showToast', {
+                detail: { message: 'Virtual capital balance reset.', level: 'success' }
+            });
+            document.body.dispatchEvent(evt);
+        }
+    }
+
+    function toggleMarketWatchSidebar() {
+        const sidebar = document.getElementById('marketWatchSidebarCol');
+        const chartCol = document.getElementById('chartCenterCol');
+        const icon = document.getElementById('toggleSidebarIcon');
+        const text = document.getElementById('toggleSidebarText');
+        if (!sidebar || !chartCol) return;
+
+        const isHidden = sidebar.classList.toggle('d-none');
+        if (isHidden) {
+            chartCol.classList.remove('col-xl-7', 'col-lg-5');
+            chartCol.classList.add('col-xl-9', 'col-lg-8');
+            if (icon) icon.textContent = 'view_sidebar_open';
+            if (text) text.textContent = 'Show Watchlist';
+        } else {
+            chartCol.classList.remove('col-xl-9', 'col-lg-8');
+            chartCol.classList.add('col-xl-7', 'col-lg-5');
+            if (icon) icon.textContent = 'view_sidebar';
+            if (text) text.textContent = 'Watchlist';
+        }
+
+        setTimeout(() => {
+            const container = document.getElementById('admin_marmot_chart_canvas');
+            if (exnessChartInstance && container) {
+                exnessChartInstance.applyOptions({
+                    width: container.clientWidth,
+                    height: container.clientHeight || 420
+                });
+            }
+        }, 150);
+    }
+
+    function filterMarketWatchSymbols(query) {
+        const q = query.toUpperCase().trim();
+        const items = document.querySelectorAll('#marketWatchList .mw-item');
+        let count = 0;
+        items.forEach(item => {
+            const sym = item.getAttribute('data-symbol')?.toUpperCase() || '';
+            const idx = item.getAttribute('data-index')?.toUpperCase() || '';
+            if (sym.includes(q) || idx.includes(q)) {
+                item.style.display = 'flex';
+                count++;
+            } else {
+                item.style.display = 'none';
+            }
+        });
+        const cntEl = document.getElementById('marketWatchCount');
+        if (cntEl) cntEl.textContent = `${count} Indices`;
+    }
+
+    function setAdminTimeframe(tf, btn) {
+        document.querySelectorAll('.admin-tf-btn').forEach(b => {
+            b.classList.remove('btn-primary', 'fw-bold');
+            b.classList.add('btn-outline-secondary');
+        });
+        if (btn) {
+            btn.classList.remove('btn-outline-secondary');
+            btn.classList.add('btn-primary', 'fw-bold');
+        }
+        const resMap = { '1M': '1', '5M': '5', '15M': '15', '1H': '60' };
+        currentResolution = resMap[tf] || '1';
+        loadExnessSymbolData(currentFyersSymbol, currentResolution);
+    }
+
+    setTimeout(() => {
+        initExnessChartCanvas();
+        loadDefaultTradeConfig();
+        renderPinnedStrikes();
+    }, 150);
 </script>
