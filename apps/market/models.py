@@ -68,10 +68,10 @@ class MarketBackupTask(BaseModel):
 
     @property
     def provider_name(self):
-        """Returns the market data provider (DhanHQ vs Databento)."""
+        """Returns the market data provider (FYERS vs Databento)."""
         if self.market_type == MarketTypeChoices.FOREX_FUTURES:
             return "Databento"
-        return "DhanHQ"
+        return "FYERS"
 
     def delete_dataset_files(self):
         """Removes task backup dataset folder from disk."""

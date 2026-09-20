@@ -55,7 +55,7 @@ func main() {
 	taskManager := workers.NewTaskManager(dbService, cfg, hub, redisService)
 
 	// 7. Start Listening for Django IPC Commands on Redis Channel & Auto-Resume Active Strategies
-	redisChannel := "market_backup_commands"
+	redisChannel := "marmot:tasks:control"
 	go taskManager.StartListener(ctx, redisService, redisChannel)
 	go taskManager.AutoResumeActiveStrategies(ctx)
 

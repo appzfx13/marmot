@@ -1,7 +1,7 @@
 # apps/common/constants.py
 
 # Task Control & Redis Configuration
-REDIS_CHANNEL = 'market_backup_commands'
+REDIS_CHANNEL = 'marmot:tasks:control'
 
 # Market Index Instruments Map
 INDEX_INSTRUMENT_MAP = {

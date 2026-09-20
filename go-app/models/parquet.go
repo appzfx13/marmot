@@ -7,6 +7,7 @@ type MarketCandleRecord struct {
 	Datetime       string  `parquet:"datetime,string" json:"datetime"`
 	IndexName      string  `parquet:"index_name,string" json:"index_name"`
 	InstrumentType string  `parquet:"instrument_type,string" json:"instrument_type"` // INDEX or OPTION
+	TradingSymbol  string  `parquet:"trading_symbol,string" json:"trading_symbol"`   // e.g. NSE:NIFTY2692223300CE
 	Strike         string  `parquet:"strike,string" json:"strike"`                   // SPOT, ATM, ATM+1, 24500, etc.
 	OptionType     string  `parquet:"option_type,string" json:"option_type"`         // INDEX, CALL, PUT
 	Open           float64 `parquet:"open,double" json:"open"`
@@ -16,6 +17,12 @@ type MarketCandleRecord struct {
 	Volume         int64   `parquet:"volume,int(64)" json:"volume"`
 	OI             int64   `parquet:"oi,int(64)" json:"oi"`
 	IV             float64 `parquet:"iv,double" json:"iv"`
+	Delta          float64 `parquet:"delta,double" json:"delta"`
+	Gamma          float64 `parquet:"gamma,double" json:"gamma"`
+	Theta          float64 `parquet:"theta,double" json:"theta"`
+	Vega           float64 `parquet:"vega,double" json:"vega"`
+	Bid            float64 `parquet:"bid,double" json:"bid"`
+	Ask            float64 `parquet:"ask,double" json:"ask"`
 	SpotPrice      float64 `parquet:"spot_price,double" json:"spot_price"`
 }
 

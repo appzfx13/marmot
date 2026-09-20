@@ -75,29 +75,28 @@ func (s *DBService) broadcastTaskEvent(ctx context.Context, taskID, eventType st
 	}).Err()
 }
 
-// UpdateTaskProgress updates status and progress percentage (0 to 100) via Redis
+// UpdateTaskProgress writes status and progress to Postgres and broadcasts via Redis.
 func (s *DBService) UpdateTaskProgress(ctx context.Context, taskID string, status string, progress int) error {
-	payload := map[string]interface{}{
-		"status":   status,
-		"progress": progress,
+	query := fmt.Sprintf(`UPDATE %s SET status=$1, progress=$2, updated_at=NOW() WHERE id=$3`, s.TableName)
+	if _, dbErr := s.Pool.Exec(ctx, query, status, progress, taskID); dbErr != nil {
+		log.Printf("⚠️ [DB] UpdateTaskProgress PG write error [Task %s]: %v\n", taskID, dbErr)
 	}
-	err := s.broadcastTaskEvent(ctx, taskID, "progress_update", payload)
-	if err != nil {
+	payload := map[string]interface{}{"status": status, "progress": progress}
+	if err := s.broadcastTaskEvent(ctx, taskID, "progress_update", payload); err != nil {
 		log.Printf("❌ Redis Broadcast Error [Task %s]: %v\n", taskID, err)
-		return err
 	}
 	return nil
 }
 
-// UpdateTaskStatus updates only the status via Redis
+// UpdateTaskStatus writes status to Postgres and broadcasts via Redis.
 func (s *DBService) UpdateTaskStatus(ctx context.Context, taskID string, status string) error {
-	payload := map[string]interface{}{
-		"status": status,
+	query := fmt.Sprintf(`UPDATE %s SET status=$1, updated_at=NOW() WHERE id=$2`, s.TableName)
+	if _, dbErr := s.Pool.Exec(ctx, query, status, taskID); dbErr != nil {
+		log.Printf("⚠️ [DB] UpdateTaskStatus PG write error [Task %s]: %v\n", taskID, dbErr)
 	}
-	err := s.broadcastTaskEvent(ctx, taskID, "status_update", payload)
-	if err != nil {
+	payload := map[string]interface{}{"status": status}
+	if err := s.broadcastTaskEvent(ctx, taskID, "status_update", payload); err != nil {
 		log.Printf("❌ Redis Broadcast Error [Task %s]: %v\n", taskID, err)
-		return err
 	}
 	return nil
 }
@@ -114,32 +113,33 @@ func (s *DBService) GetTaskProgress(ctx context.Context, taskID string) (int, er
 	return progress, nil
 }
 
-// MarkTaskComplete marks job as completed, sets progress to 100%, and updates file details via Redis
+// MarkTaskComplete writes completed state, 100% progress, and file details to Postgres and broadcasts via Redis.
 func (s *DBService) MarkTaskComplete(ctx context.Context, taskID string, filePath string, fileSizeMB float64) error {
+	query := fmt.Sprintf(`UPDATE %s SET status='completed', progress=100, parquet_file_path=$1, file_size_mb=$2, updated_at=NOW() WHERE id=$3`, s.TableName)
+	if _, dbErr := s.Pool.Exec(ctx, query, filePath, fileSizeMB, taskID); dbErr != nil {
+		log.Printf("⚠️ [DB] MarkTaskComplete PG write error [Task %s]: %v\n", taskID, dbErr)
+	}
 	payload := map[string]interface{}{
 		"status":            "completed",
 		"progress":          100,
 		"parquet_file_path": filePath,
 		"file_size_mb":      fileSizeMB,
 	}
-	err := s.broadcastTaskEvent(ctx, taskID, "task_completed", payload)
-	if err != nil {
+	if err := s.broadcastTaskEvent(ctx, taskID, "task_completed", payload); err != nil {
 		log.Printf("❌ Redis Broadcast Error [Task %s]: %v\n", taskID, err)
-		return err
 	}
 	return nil
 }
 
-// RecordError updates task status to 'error', resets file path/size to NULL/0.0, and appends error details via Redis
+// RecordError writes error state and message to Postgres and broadcasts via Redis.
 func (s *DBService) RecordError(ctx context.Context, taskID string, errorMsg string) error {
-	payload := map[string]interface{}{
-		"status":     "error",
-		"error_logs": errorMsg,
+	query := fmt.Sprintf(`UPDATE %s SET status='error', error_logs=$1, updated_at=NOW() WHERE id=$2`, s.TableName)
+	if _, dbErr := s.Pool.Exec(ctx, query, errorMsg, taskID); dbErr != nil {
+		log.Printf("⚠️ [DB] RecordError PG write error [Task %s]: %v\n", taskID, dbErr)
 	}
-	err := s.broadcastTaskEvent(ctx, taskID, "task_error", payload)
-	if err != nil {
+	payload := map[string]interface{}{"status": "error", "error_logs": errorMsg}
+	if err := s.broadcastTaskEvent(ctx, taskID, "task_error", payload); err != nil {
 		log.Printf("❌ Redis Broadcast Error [Task %s]: %v\n", taskID, err)
-		return err
 	}
 	return nil
 }

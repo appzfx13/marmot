@@ -3,13 +3,20 @@ package strategies
 // OptionSnap captures one option contract's OHLCV at a single timestamp.
 // Mirrors a broker WebSocket option chain tick for one strike+type.
 type OptionSnap struct {
-	Open   float64 `json:"open"`
-	High   float64 `json:"high"`
-	Low    float64 `json:"low"`
-	Close  float64 `json:"close"`
-	Volume int64   `json:"volume"`
-	OI     int64   `json:"oi"`
-	IV     float64 `json:"iv"`
+	TradingSymbol string  `json:"trading_symbol,omitempty"`
+	Open          float64 `json:"open"`
+	High          float64 `json:"high"`
+	Low           float64 `json:"low"`
+	Close         float64 `json:"close"`
+	Volume        int64   `json:"volume"`
+	OI            int64   `json:"oi"`
+	IV            float64 `json:"iv"`
+	Delta         float64 `json:"delta,omitempty"`
+	Gamma         float64 `json:"gamma,omitempty"`
+	Theta         float64 `json:"theta,omitempty"`
+	Vega          float64 `json:"vega,omitempty"`
+	Bid           float64 `json:"bid,omitempty"`
+	Ask           float64 `json:"ask,omitempty"`
 }
 
 // MacroSnapshot captures macro sentiment, institutional flow bias, and event risk regime.

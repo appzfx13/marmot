@@ -3,6 +3,7 @@ package parquet
 import (
 	"fmt"
 	"log"
+	"math"
 	"sort"
 	"strings"
 
@@ -17,6 +18,7 @@ type optionRow struct {
 	Datetime       string  `parquet:"datetime"`
 	IndexName      string  `parquet:"index_name"`
 	InstrumentType string  `parquet:"instrument_type"`
+	TradingSymbol  string  `parquet:"trading_symbol"`
 	Strike         string  `parquet:"strike"`
 	OptionType     string  `parquet:"option_type"`
 	Open           float64 `parquet:"open"`
@@ -26,6 +28,12 @@ type optionRow struct {
 	Volume         int64   `parquet:"volume"`
 	OI             int64   `parquet:"oi"`
 	IV             float64 `parquet:"iv"`
+	Delta          float64 `parquet:"delta"`
+	Gamma          float64 `parquet:"gamma"`
+	Theta          float64 `parquet:"theta"`
+	Vega           float64 `parquet:"vega"`
+	Bid            float64 `parquet:"bid"`
+	Ask            float64 `parquet:"ask"`
 	SpotPrice      float64 `parquet:"spot_price"`
 }
 
@@ -114,13 +122,20 @@ func LoadTicksByDate(filePath string) (map[string][]strategies.MarketTick, error
 				lo = cl
 			}
 			bucket.options[key] = strategies.OptionSnap{
-				Open:   op,
-				High:   hi,
-				Low:    lo,
-				Close:  cl,
-				Volume: row.Volume,
-				OI:     row.OI,
-				IV:     row.IV,
+				TradingSymbol: row.TradingSymbol,
+				Open:          op,
+				High:          hi,
+				Low:           lo,
+				Close:         cl,
+				Volume:        row.Volume,
+				OI:            row.OI,
+				IV:            row.IV,
+				Delta:         row.Delta,
+				Gamma:         row.Gamma,
+				Theta:         row.Theta,
+				Vega:          row.Vega,
+				Bid:           row.Bid,
+				Ask:           row.Ask,
 			}
 		}
 	}
@@ -136,6 +151,30 @@ func LoadTicksByDate(filePath string) (map[string][]strategies.MarketTick, error
 		b := buckets[ts]
 		if !b.hasSpot || b.spotClose <= 0 {
 			continue // skip ticks with no valid spot data
+		}
+
+		// Automatically create ATM, ATM±N aliases for numeric strikes to ensure all strategies match
+		step := strikeStepForIndex(b.indexName)
+		if step > 0 {
+			atmNum := int(math.Round(b.spotClose/float64(step))) * step
+			for _, optType := range []string{"CALL", "PUT"} {
+				for offset := -6; offset <= 6; offset++ {
+					numStrike := atmNum + (offset * step)
+					numKey := fmt.Sprintf("%d %s", numStrike, optType)
+					if snap, ok := b.options[numKey]; ok {
+						label := "ATM"
+						if offset > 0 {
+							label = fmt.Sprintf("ATM+%d", offset)
+						} else if offset < 0 {
+							label = fmt.Sprintf("ATM-%d", -offset)
+						}
+						relKey := label + " " + optType
+						if _, exists := b.options[relKey]; !exists {
+							b.options[relKey] = snap
+						}
+					}
+				}
+			}
 		}
 
 		dateStr := ""
@@ -162,4 +201,15 @@ func LoadTicksByDate(filePath string) (map[string][]strategies.MarketTick, error
 
 	log.Printf("📦 [Parquet] %d ticks | %d trading days | %s", totalTicks, len(byDate), filePath)
 	return byDate, nil
+}
+
+func strikeStepForIndex(indexName string) int {
+	switch strings.ToUpper(indexName) {
+	case "BANKNIFTY", "SENSEX", "BANKEX":
+		return 100
+	case "MIDCPNIFTY":
+		return 25
+	default:
+		return 50
+	}
 }

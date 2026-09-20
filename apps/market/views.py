@@ -100,14 +100,12 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
     def form_valid(self, form):
         # Override standard save to use our Service Layer
         # This creates the DB record AND fires the 'START' command to Redis
-        token = form.cleaned_data.get('dhan_access_token', '').strip()
         self.object = create_and_start_backup_task(
             start_date=form.cleaned_data['start_date'],
             end_date=form.cleaned_data['end_date'],
             index_name=form.cleaned_data.get('index_name'),
             strike_count=form.cleaned_data.get('strike_count'),
             user=self.request.user,
-            dhan_access_token=token if token else None,
             market_type=form.cleaned_data.get('market_type'),
             forex_instrument=form.cleaned_data.get('forex_instrument'),
             databento_schema=form.cleaned_data.get('databento_schema'),
@@ -600,9 +598,8 @@ class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         if not task:
             return JsonResponse({'error': 'Task not found'}, status=404)
 
-        # Get the requested action and optional access token from HTMX/Frontend
+        # Get the requested action from HTMX/Frontend
         action = request.POST.get('action', '').upper()
-        dhan_token = request.POST.get('dhan_access_token', '').strip()
         
         # Map frontend actions to Go Engine commands
         command_map = {
@@ -618,7 +615,7 @@ class MarketBackupControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         if command:
             try:
                 # Dispatch the command through the Service Layer
-                send_control_command(task.id, command, dhan_access_token=dhan_token if dhan_token else None)
+                send_control_command(task.id, command)
                 
                 # Setup UI response
                 msg = f'Task command {command} sent to engine.'

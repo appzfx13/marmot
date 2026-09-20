@@ -6,7 +6,6 @@ import redis
 from django.conf import settings
 from apps.common.constants import REDIS_CHANNEL, INDEX_INSTRUMENT_MAP
 from apps.common.choices import MarketTypeChoices
-from apps.trade_core.services.dhan_token_service import AdminDhanClient
 from .models import MarketBackupTask
 
 logger = logging.getLogger(__name__)
@@ -14,8 +13,8 @@ logger = logging.getLogger(__name__)
 REDIS_URL = settings.REDIS_URL
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
-def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, dhan_access_token=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None):
-    """Creates the backup record in Postgres with pre-stored path and caches token if provided."""
+def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None):
+    """Creates the backup record in Postgres with pre-stored path and dispatches to Go engine."""
     task = MarketBackupTask.objects.create(
         market_type=market_type or MarketTypeChoices.INDEX_FO,
         start_date=start_date,
@@ -31,12 +30,8 @@ def create_and_start_backup_task(start_date, end_date, index_name=None, strike_c
     task.parquet_file_path = f"/app/backup/{user_id}/{task.id}"
     task.save(update_fields=['parquet_file_path'])
 
-    # If direct access token was entered in form, cache it in Redis for the master Dhan client
-    if dhan_access_token and dhan_access_token.strip():
-        client_id = getattr(settings, 'DHAN_CLIENT_ID', '')
-        if client_id:
-            redis_client.setex(f"dhan_token:{client_id}", 82800, dhan_access_token.strip())
-            logger.info("Direct Dhan access token cached in Redis for admin client_id=%s (len=%d)", client_id, len(dhan_access_token.strip()))
+    # Send the START command to the Go Engine
+    send_control_command(str(task.id), 'START')
 
     return task
 
@@ -160,12 +155,10 @@ def create_and_start_macro_backup_task(start_date, end_date, market_type='INDEX_
 
     return task
 
-def send_control_command(task_id, command, dhan_access_token=None):
+def send_control_command(task_id, command):
     """
     Sends a PAUSE, RESUME, or CANCEL command to the Go Engine for a specific task.
-    For START/RESUME, generates a live Dhan access token and injects it into the payload.
-    If a direct dhan_access_token is provided, it is cached and prioritized.
-    The Go engine uses: access-token + client-id headers for all DhanHQ API calls.
+    Injects active FYERS API v3 credentials from SiteSettings into the Redis control payload.
     """
     task = MarketBackupTask.objects.get(id=task_id)
 
@@ -189,19 +182,10 @@ def send_control_command(task_id, command, dhan_access_token=None):
     }
 
     if command.upper() in ['START', 'RESUME']:
-        client_id = getattr(settings, 'DHAN_CLIENT_ID', '')
-
-        # Direct token override if provided
-        if dhan_access_token and dhan_access_token.strip():
-            access_token = dhan_access_token.strip()
-            if client_id:
-                redis_client.setex(f"dhan_token:{client_id}", 82800, access_token)
-        else:
-            try:
-                access_token = AdminDhanClient.get_access_token()
-            except ValueError as e:
-                logger.error("Failed to obtain Dhan access token for backup task #%s: %s", task_id, e)
-                access_token = ''
+        from apps.common.models import SiteSettings
+        site_settings = SiteSettings.load()
+        fyers_app_id = (site_settings.fyers_app_id or '').strip()
+        fyers_access_token = (site_settings.fyers_access_token or '').strip()
 
         payload["params"] = {
             "start_date": task.start_date.isoformat(),
@@ -215,9 +199,9 @@ def send_control_command(task_id, command, dhan_access_token=None):
             "exchange_segment": index_params.get("exchange_segment", ""),
             "instrument": index_params.get("instrument", ""),
             "user_id": str(task.created_by.id if getattr(task, 'created_by', None) else 1),
-            # Dhan auth: client_id + live access_token
-            "dhan_client_id": client_id,
-            "dhan_access_token": access_token,
+            # FYERS API v3 Auth
+            "fyers_app_id": fyers_app_id,
+            "fyers_access_token": fyers_access_token,
             "databento_schema": task.databento_schema or 'ohlcv-1m',
             # Databento auth: API key from settings/env
             "databento_api_key": getattr(settings, 'DATABENTO_API_KEY', ''),

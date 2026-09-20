@@ -199,8 +199,10 @@
                             <span class="material-icons" style="font-size:0.95rem;" id="toggleSidebarIcon">view_sidebar</span>
                             <span class="smaller fw-bold d-none d-sm-inline" id="toggleSidebarText">Watchlist</span>
                         </button>
-                        <span class="material-icons text-primary fs-5" id="adminChartIcon">candlestick_chart</span>
-                        <h5 class="fw-bold mb-0 text-white tracking-wider" id="adminChartTitle">NIFTY 50</h5>
+                        <h5 class="fw-bold mb-0 text-white tracking-wider d-inline-flex align-items-center gap-2">
+                            <span class="material-icons text-primary fs-5" id="adminChartIcon">candlestick_chart</span>
+                            <span id="adminChartTitle">NIFTY 50</span>
+                        </h5>
                         
                         <!-- LTP Badge -->
                         <span class="badge bg-secondary bg-opacity-25 text-white border border-secondary border-opacity-25 font-monospace px-2.5 py-1" id="adminChartLtp" style="font-size: 0.85rem;">
@@ -279,7 +281,10 @@
                     </ul>
 
                     <!-- Quick Square-Off Action -->
-                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1" onclick="squareOffAllPositions()">
+                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1" 
+                            hx-get="{% url 'admins:admin-terminal-close-all-positions' %}?mode={% if is_sandbox %}SANDBOX{% else %}LIVE{% endif %}"
+                            hx-target="#globalHtmxModalDialog"
+                            data-bs-toggle="modal" data-bs-target="#globalHtmxModal">
                         <span class="material-icons" style="font-size: 0.8rem;">cancel</span>Close All Positions
                     </button>
                 </div>
@@ -367,17 +372,17 @@
                 <div class="mt-auto pt-2 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2 font-monospace"
                      style="font-size: 0.74rem;">
                     <div class="d-flex align-items-center gap-3 flex-wrap">
-                        <span>Balance: <strong class="text-white">{{ active_account.account_summary.balance|default:"—" }}</strong></span>
+                        <span>Balance: <strong class="text-white" id="telemetryBalance">{{ active_account.account_summary.balance|default:"—" }}</strong></span>
                         <span class="text-muted">|</span>
-                        <span>Equity: <strong class="text-success">{{ active_account.account_summary.equity|default:"—" }}</strong></span>
+                        <span>Equity: <strong class="text-success" id="telemetryEquity">{{ active_account.account_summary.equity|default:"—" }}</strong></span>
                         <span class="text-muted">|</span>
-                        <span>Margin: <strong class="text-warning">{{ active_account.account_summary.margin_used|default:"—" }}</strong></span>
+                        <span>Margin: <strong class="text-warning" id="telemetryMargin">{{ active_account.account_summary.margin_used|default:"—" }}</strong></span>
                         <span class="text-muted">|</span>
-                        <span>Free Margin: <strong class="text-white">{{ active_account.account_summary.free_margin|default:"—" }}</strong></span>
+                        <span>Free Margin: <strong class="text-white" id="telemetryFreeMargin">{{ active_account.account_summary.free_margin|default:"—" }}</strong></span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <span class="theme-text-muted">Session PnL:</span>
-                        <span class="badge {% if active_account.realtime_pnl > 0 %}bg-success text-success{% elif active_account.realtime_pnl < 0 %}bg-danger text-danger{% else %}bg-secondary text-white-50{% endif %} bg-opacity-25 rounded-pill px-2 py-0.5 fw-bold font-monospace">
+                        <span class="badge {% if active_account.realtime_pnl > 0 %}bg-success text-success{% elif active_account.realtime_pnl < 0 %}bg-danger text-danger{% else %}bg-secondary text-white-50{% endif %} bg-opacity-25 rounded-pill px-2 py-0.5 fw-bold font-monospace" id="telemetrySessionPnl">
                             {{ active_account.realtime_pnl|default:"—" }}
                         </span>
                     </div>
@@ -636,9 +641,9 @@
             <div class="modal-header border-bottom py-2.5 px-3 d-flex align-items-center justify-content-between"
                  style="background: rgba(0,0,0,0.35); border-color: rgba(255,255,255,0.08) !important;">
                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                    <span class="material-icons text-info fs-5">bolt</span>
-                    <h5 class="modal-title fw-bold text-white fs-6 mb-0 tracking-wide" id="ocModalTitle">
-                        Option Chain (ATM ±4 Strikes)
+                    <h5 class="modal-title fw-bold text-white fs-6 mb-0 tracking-wide d-inline-flex align-items-center gap-2" id="ocModalTitle">
+                        <span class="material-icons text-info fs-5">bolt</span>
+                        <span>Option Chain (ATM ±4 Strikes)</span>
                     </h5>
                     <span class="badge bg-primary bg-opacity-25 text-info border border-info border-opacity-25 font-monospace px-2 py-0.5 smaller" id="ocModalSpotLtp">
                         Spot: ₹ —
@@ -846,30 +851,30 @@
 <!-- Load Lightweight Charts Open Source Library v4 to prevent v5 API breakage -->
 <script src="https://unpkg.com/lightweight-charts@4.1.1/dist/lightweight-charts.standalone.production.js"></script>
 <script>
-    let exnessChartInstance = null;
-    let exnessCandleSeries = null;
-    let exnessEmaSeries = null;
+    var exnessChartInstance = window.exnessChartInstance || null;
+    var exnessCandleSeries = window.exnessCandleSeries || null;
+    var exnessEmaSeries = window.exnessEmaSeries || null;
     
-    let currentExnessCategory = 'INDEX';
-    let currentExnessSymbol = '{{ default_symbol|default:"NIFTY 50" }}';
-    let currentFyersSymbol = '{{ default_fyers_sym|default:"NSE:NIFTY50-INDEX" }}';
-    let currentSecurityId = '';
-    let currentBaseLtp = null;
-    let currentLotSize = {{ default_lot_size|default:65 }};
-    let currentSide = 'BUY';
-    let currentOrderType = 'MARKET';
-    let currentProductMode = 'MIS';
-    let currentResolution = '1';
-    let currentActiveBar = null;
+    var currentExnessCategory = 'INDEX';
+    var currentExnessSymbol = '{{ default_symbol|default:"NIFTY 50" }}';
+    var currentFyersSymbol = '{{ default_fyers_sym|default:"NSE:NIFTY50-INDEX" }}';
+    var currentSecurityId = '';
+    var currentBaseLtp = null;
+    var currentLotSize = {{ default_lot_size|default:65 }};
+    var currentSide = 'BUY';
+    var currentOrderType = 'MARKET';
+    var currentProductMode = 'MIS';
+    var currentResolution = '1';
+    var currentActiveBar = null;
 
     // Dual Tab Navigation State
-    let lastSpotIndex = { name: '{{ default_symbol|default:"NIFTY 50" }}', fyersSym: '{{ default_fyers_sym|default:"NSE:NIFTY50-INDEX" }}', lotSize: {{ default_lot_size|default:65 }} };
-    let lastOptionStrike = null;
-    let activeChartTab = 'SPOT';
+    var lastSpotIndex = { name: '{{ default_symbol|default:"NIFTY 50" }}', fyersSym: '{{ default_fyers_sym|default:"NSE:NIFTY50-INDEX" }}', lotSize: {{ default_lot_size|default:65 }} };
+    var lastOptionStrike = null;
+    var activeChartTab = 'SPOT';
 
     // Trade Config Defaults & Units
-    let currentRiskReward = 2.0;
-    let tradeConfig = {
+    var currentRiskReward = 2.0;
+    var tradeConfig = {
         defaultLots: 1,
         slEnabled: true,
         slUnit: 'pts',
@@ -989,6 +994,11 @@
                 }
                 if (exnessEmaSeries) exnessEmaSeries.setData(ema);
 
+                if (exnessChartInstance) {
+                    exnessChartInstance.priceScale('right').applyOptions({ autoScale: true });
+                    exnessChartInstance.timeScale().fitContent();
+                }
+
                 const last = res.data[res.data.length - 1];
                 currentActiveBar = { ...last };
                 currentBaseLtp = last.close;
@@ -999,6 +1009,10 @@
                 currentActiveBar = null;
                 exnessCandleSeries.setData([]);
                 if (exnessEmaSeries) exnessEmaSeries.setData([]);
+                if (exnessChartInstance) {
+                    exnessChartInstance.priceScale('right').applyOptions({ autoScale: true });
+                    exnessChartInstance.timeScale().fitContent();
+                }
                 updateHeaderOHLC('—', '—', '—', '—');
                 if (overlay) overlay.classList.remove('d-none');
             }
@@ -1007,6 +1021,10 @@
             currentActiveBar = null;
             exnessCandleSeries.setData([]);
             if (exnessEmaSeries) exnessEmaSeries.setData([]);
+            if (exnessChartInstance) {
+                exnessChartInstance.priceScale('right').applyOptions({ autoScale: true });
+                exnessChartInstance.timeScale().fitContent();
+            }
             updateHeaderOHLC('—', '—', '—', '—');
             if (overlay) overlay.classList.remove('d-none');
         }
@@ -1118,7 +1136,9 @@
                     const nowSec = Math.floor(Date.now() / 1000);
                     const barTime = Math.floor(nowSec / intervalSec) * intervalSec;
 
+                    let isFirstBar = false;
                     if (!currentActiveBar || currentActiveBar.time !== barTime) {
+                        isFirstBar = !currentActiveBar;
                         currentActiveBar = {
                             time: barTime,
                             open: ltp,
@@ -1133,21 +1153,42 @@
                     }
 
                     exnessCandleSeries.update(currentActiveBar);
+                    if (isFirstBar && exnessChartInstance) {
+                        exnessChartInstance.priceScale('right').applyOptions({ autoScale: true });
+                        exnessChartInstance.timeScale().fitContent();
+                    }
                     updateHeaderOHLC(currentActiveBar.open, currentActiveBar.high, currentActiveBar.low, currentActiveBar.close);
                 }
             }
+        });
+
+        window.addEventListener('marmot:portfolio_tick', function(e) {
+            loadTerminalOperationalData();
         });
     }
 
     // ─────────────────────────────────────────────────────────────
     // Exness Trading Platform Interactions & Dual Tab Management
     // ─────────────────────────────────────────────────────────────
+    function resolveSymbolLotSize(symName, fallbackLot) {
+        if (fallbackLot && fallbackLot > 0) return parseInt(fallbackLot);
+        let defaultLotContext = parseInt('{{ default_lot_size|default:0 }}');
+        if (defaultLotContext > 0) return defaultLotContext;
+        if (!symName) return 65;
+        const clean = String(symName).toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (clean.includes('BANKNIFTY') || clean.includes('NIFTYBANK') || clean.includes('BANKEX')) return 30;
+        if (clean.includes('FINNIFTY') || clean.includes('MIDCPNIFTY') || clean.includes('MIDCAP')) return 50;
+        if (clean.includes('SENSEX')) return 20;
+        if (clean.includes('NIFTY')) return 75;
+        return 65;
+    }
+
     function selectExnessSymbol(name, fyersSym, lotSize, cat, el, secId) {
         currentExnessCategory = cat || (fyersSym && fyersSym.includes('-INDEX') ? 'INDEX' : 'OPTION');
         currentExnessSymbol = name;
         currentFyersSymbol = fyersSym;
         currentSecurityId = secId || '';
-        currentLotSize = lotSize || 65;
+        currentLotSize = resolveSymbolLotSize(name || fyersSym, lotSize || 65);
         currentBaseLtp = null;
 
         // Update Chart Title & Badges
@@ -1348,22 +1389,44 @@
     }
 
     function selectOptionStrikeFromChain(name, fyersSym, lotSize, ltp) {
+        if (document.activeElement && typeof document.activeElement.blur === 'function') {
+            document.activeElement.blur();
+        }
         const modalEl = document.getElementById('terminalOptionChainModal');
         if (modalEl) {
             const modal = bootstrap.Modal.getInstance(modalEl);
             if (modal) modal.hide();
         }
 
-        lastOptionStrike = { name, fyersSym, lotSize, ltp };
-        selectExnessSymbol(name, fyersSym, lotSize, 'OPTION');
+        const resolvedLot = resolveSymbolLotSize(name || fyersSym, lotSize || 65);
+        lastOptionStrike = { name, fyersSym, lotSize: resolvedLot, ltp };
+        selectExnessSymbol(name, fyersSym, resolvedLot, 'OPTION');
     }
 
     // ─────────────────────────────────────────────────────────────
     // Watchlist Pinned Strikes (Single-Click Add/Delete)
     // ─────────────────────────────────────────────────────────────
+    // ─────────────────────────────────────────────────────────────
+    // Watchlist Pinned Strikes (Single-Click Add/Delete)
+    // ─────────────────────────────────────────────────────────────
     function getPinnedStrikesList() {
         try {
-            return JSON.parse(localStorage.getItem('marmot_pinned_strikes') || '[]');
+            const raw = JSON.parse(localStorage.getItem('marmot_pinned_strikes') || '[]');
+            if (Array.isArray(raw)) {
+                let modified = false;
+                raw.forEach(item => {
+                    const correctLot = resolveSymbolLotSize(item.name || item.fyersSym, item.lotSize);
+                    if (item.lotSize !== correctLot) {
+                        item.lotSize = correctLot;
+                        modified = true;
+                    }
+                });
+                if (modified) {
+                    localStorage.setItem('marmot_pinned_strikes', JSON.stringify(raw));
+                }
+                return raw;
+            }
+            return [];
         } catch (e) {
             return [];
         }
@@ -1376,6 +1439,7 @@
 
     function togglePinOptionStrike(name, fyersSym, lotSize, ltp, btn, chp = 0) {
         let list = getPinnedStrikesList();
+        lotSize = resolveSymbolLotSize(name || fyersSym, lotSize || 65);
         const existingIdx = list.findIndex(item => item.fyersSym === fyersSym);
         if (existingIdx >= 0) {
             list.splice(existingIdx, 1);
@@ -1417,6 +1481,7 @@
 
         let html = '';
         list.forEach(item => {
+            item.lotSize = resolveSymbolLotSize(item.name || item.fyersSym, item.lotSize);
             const isCe = item.name.includes('CE');
             const typeBadge = isCe ? '<span class="badge bg-success bg-opacity-20 text-success rounded-pill px-1.5 py-0 smaller font-monospace fw-bold" style="font-size:0.65rem;">CE</span>' : '<span class="badge bg-danger bg-opacity-20 text-danger rounded-pill px-1.5 py-0 smaller font-monospace fw-bold" style="font-size:0.65rem;">PE</span>';
             const activeClass = (currentFyersSymbol === item.fyersSym) ? 'active-symbol-item' : '';
@@ -1881,14 +1946,14 @@
                     detail: { message: toastMsg, level: 'success' }
                 }));
 
-                // Trigger live orders and positions reload
-                document.body.dispatchEvent(new CustomEvent('reloadLiveOrders'));
-                document.body.dispatchEvent(new CustomEvent('reloadLivePositions'));
+                // Trigger live orders, positions, and telemetry reload
+                setTimeout(loadTerminalOperationalData, 500);
             } else {
                 const errMsg = data.message || 'Broker order rejected.';
                 document.body.dispatchEvent(new CustomEvent('showToast', {
                     detail: { message: errMsg, level: 'danger' }
                 }));
+                setTimeout(loadTerminalOperationalData, 500);
             }
         } catch (err) {
             document.body.dispatchEvent(new CustomEvent('showToast', {
@@ -1901,14 +1966,232 @@
         }
     }
 
-    function squareOffAllPositions() {
-        if (confirm('Are you sure you want to square off all open positions immediately at market price?')) {
-            const evt = new CustomEvent('showToast', {
-                detail: { message: 'Zero open positions to close.', level: 'info' }
+    async function loadTerminalOperationalData() {
+        const isSandbox = {% if is_sandbox %}true{% else %}false{% endif %};
+        const mode = isSandbox ? 'SANDBOX' : 'LIVE';
+        try {
+            const resp = await fetch(`/admins/terminal/operational-data/?mode=${mode}`, {
+                headers: { 'Accept': 'application/json' }
             });
-            document.body.dispatchEvent(evt);
+            if (!resp.ok) return;
+            const data = await resp.json();
+            if (!data.success) return;
+
+            // 1. Account Telemetry Ribbon
+            if (data.telemetry) {
+                const balEl = document.getElementById('telemetryBalance');
+                const eqEl = document.getElementById('telemetryEquity');
+                const marEl = document.getElementById('telemetryMargin');
+                const freeEl = document.getElementById('telemetryFreeMargin');
+                const pnlEl = document.getElementById('telemetrySessionPnl');
+
+                if (balEl) balEl.textContent = data.telemetry.balance || '—';
+                if (eqEl) eqEl.textContent = data.telemetry.equity || '—';
+                if (marEl) marEl.textContent = data.telemetry.margin || '—';
+                if (freeEl) freeEl.textContent = data.telemetry.free_margin || '—';
+                if (pnlEl) {
+                    pnlEl.textContent = data.telemetry.session_pnl || '—';
+                    pnlEl.className = `badge ${data.telemetry.is_pnl_positive ? 'bg-success text-success' : 'bg-danger text-danger'} bg-opacity-25 rounded-pill px-2 py-0.5 fw-bold font-monospace`;
+                }
+            }
+
+            // 2. Positions Tab & Badge
+            const posBadge = document.getElementById('activePositionsBadge');
+            if (posBadge) posBadge.textContent = data.open_positions_count || 0;
+
+            const posTbody = document.getElementById('terminalPositionsTbody');
+            if (posTbody) {
+                if (!data.positions || data.positions.length === 0) {
+                    posTbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center theme-text-muted py-4">
+                                <span class="material-icons fs-5 align-middle opacity-50 me-1">inbox</span>
+                                No active positions open.
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    let rowsHtml = '';
+                    data.positions.forEach(p => {
+                        const isLong = (p.side === 'LONG' || p.side === 'BUY');
+                        const sideBadge = isLong 
+                            ? '<span class="badge bg-success bg-opacity-20 text-success rounded-pill px-2 py-0.5 smaller fw-bold">LONG</span>' 
+                            : '<span class="badge bg-danger bg-opacity-20 text-danger rounded-pill px-2 py-0.5 smaller fw-bold">SHORT</span>';
+                        const pnlVal = parseFloat(p.unrealized_pnl || p.total_pnl || 0);
+                        const pnlColor = pnlVal >= 0 ? 'text-success' : 'text-danger';
+                        const pnlStr = (pnlVal >= 0 ? '+' : '') + `₹${pnlVal.toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}`;
+                        const entryPriceStr = p.entry_price ? `₹${parseFloat(p.entry_price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '—';
+                        const ltpStr = p.ltp ? `₹${parseFloat(p.ltp).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '—';
+
+                        rowsHtml += `
+                            <tr class="border-bottom border-secondary border-opacity-10">
+                                <td class="fw-bold theme-text-main">${p.symbol}</td>
+                                <td>${sideBadge}</td>
+                                <td class="fw-bold">${p.qty}</td>
+                                <td>${entryPriceStr}</td>
+                                <td>${ltpStr}</td>
+                                <td class="fw-bold ${pnlColor}">${pnlStr}</td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-xs btn-outline-danger rounded-pill px-2 py-0.5 fw-bold"
+                                            onclick="exitSinglePosition('${p.symbol}', ${p.qty}, '${p.side}', '${p.product_type || 'INTRADAY'}', '${p.security_id || ''}')">
+                                        Exit
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    posTbody.innerHTML = rowsHtml;
+                }
+            }
+
+            // 3. Pending Orders Tab & Badge
+            const ordBadge = document.getElementById('pendingOrdersBadge');
+            if (ordBadge) ordBadge.textContent = data.open_orders_count || 0;
+
+            const ordTbody = document.getElementById('terminalOrdersTbody');
+            if (ordTbody) {
+                if (!data.orders || data.orders.length === 0) {
+                    ordTbody.innerHTML = `
+                        <tr>
+                            <td colspan="8" class="text-center theme-text-muted py-4">
+                                <span class="material-icons fs-5 align-middle opacity-50 me-1">inbox</span>
+                                No pending orders found.
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    let ordHtml = '';
+                    data.orders.forEach(o => {
+                        const isBuy = (o.side === 'BUY');
+                        const sideBadge = isBuy
+                            ? '<span class="badge bg-success bg-opacity-20 text-success rounded-pill px-2 py-0.5 smaller fw-bold">BUY</span>'
+                            : '<span class="badge bg-danger bg-opacity-20 text-danger rounded-pill px-2 py-0.5 smaller fw-bold">SELL</span>';
+                        const limitStr = o.price ? `₹${parseFloat(o.price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : 'MARKET';
+                        const trigStr = o.trigger_price ? `₹${parseFloat(o.trigger_price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '—';
+
+                        ordHtml += `
+                            <tr class="border-bottom border-secondary border-opacity-10">
+                                <td class="font-monospace text-muted">${o.order_id}</td>
+                                <td class="fw-bold theme-text-main">${o.symbol}</td>
+                                <td><span class="badge bg-secondary bg-opacity-20 text-white-50 rounded px-1.5 py-0.5 smaller">${o.order_type}</span></td>
+                                <td>${sideBadge}</td>
+                                <td>${limitStr}</td>
+                                <td>${trigStr}</td>
+                                <td><span class="badge bg-warning bg-opacity-20 text-warning rounded-pill px-2 py-0.5 smaller fw-bold">${o.status}</span></td>
+                                <td class="text-end">
+                                    <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2 py-0.5 fw-bold"
+                                            onclick="cancelSingleOrder('${o.order_id}')">
+                                        Cancel
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    ordTbody.innerHTML = ordHtml;
+                }
+            }
+
+            // 4. Trade History Tab
+            const histTbody = document.getElementById('terminalHistoryTbody');
+            if (histTbody) {
+                if (!data.history || data.history.length === 0) {
+                    histTbody.innerHTML = `
+                        <tr>
+                            <td colspan="7" class="text-center theme-text-muted py-4">
+                                <span class="material-icons fs-5 align-middle opacity-50 me-1">history</span>
+                                No trade history recorded for this session.
+                            </td>
+                        </tr>
+                    `;
+                } else {
+                    let histHtml = '';
+                    data.history.forEach(h => {
+                        const isBuy = (h.side === 'BUY');
+                        const sideBadge = isBuy
+                            ? '<span class="badge bg-success bg-opacity-20 text-success rounded-pill px-2 py-0.5 smaller fw-bold">BUY</span>'
+                            : '<span class="badge bg-danger bg-opacity-20 text-danger rounded-pill px-2 py-0.5 smaller fw-bold">SELL</span>';
+                        let stBadgeClass = 'bg-secondary text-white-50';
+                        if (h.status === 'TRADED') stBadgeClass = 'bg-success text-success';
+                        else if (h.status === 'REJECTED' || h.status === 'CANCELLED') stBadgeClass = 'bg-danger text-danger';
+
+                        const execPrice = h.price ? `₹${parseFloat(h.price).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2})}` : '—';
+                        const timeStr = h.time ? h.time.split('T')[1] || h.time : '—';
+
+                        histHtml += `
+                            <tr class="border-bottom border-secondary border-opacity-10">
+                                <td class="text-muted font-monospace">${timeStr}</td>
+                                <td class="fw-bold theme-text-main">${h.symbol}</td>
+                                <td>${sideBadge}</td>
+                                <td class="fw-bold">${h.qty}</td>
+                                <td>${execPrice}</td>
+                                <td>—</td>
+                                <td><span class="badge ${stBadgeClass} bg-opacity-20 rounded-pill px-2 py-0.5 smaller fw-bold">${h.status}</span></td>
+                            </tr>
+                        `;
+                    });
+                    histTbody.innerHTML = histHtml;
+                }
+            }
+        } catch (e) {
+            console.warn('Failed to load terminal operational data:', e);
         }
     }
+
+    async function exitSinglePosition(symbol, qty, side, productType, secId) {
+        if (!confirm(`Are you sure you want to exit position ${symbol} (${qty} units)?`)) return;
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                          (document.cookie.split('; ').find(row => row.startsWith('csrftoken=')) || '').split('=')[1] || '';
+        try {
+            const resp = await fetch('{% url "admins:admin-live-order-place" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({
+                    symbol: symbol,
+                    display_symbol: symbol,
+                    security_id: secId,
+                    side: (side === 'LONG' || side === 'BUY') ? 'SELL' : 'BUY',
+                    order_type: 'MARKET',
+                    product_type: productType || 'INTRADAY',
+                    quantity: Math.abs(qty),
+                    target_scope: 'ALL',
+                    execution_mode: '{% if is_sandbox %}SANDBOX{% else %}LIVE{% endif %}'
+                })
+            });
+            const resData = await resp.json();
+            document.body.dispatchEvent(new CustomEvent('showToast', {
+                detail: { message: resData.message || 'Exit order submitted.', level: resData.success ? 'success' : 'danger' }
+            }));
+            setTimeout(loadTerminalOperationalData, 1000);
+        } catch (e) {
+            alert('Error exiting position: ' + e);
+        }
+    }
+
+    async function cancelSingleOrder(orderId) {
+        if (!confirm(`Cancel order ${orderId}?`)) return;
+        const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                          (document.cookie.split('; ').find(row => row.startsWith('csrftoken=')) || '').split('=')[1] || '';
+        try {
+            const resp = await fetch('/admins/terminal/orders/cancel/', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify({ order_id: orderId })
+            });
+            const resData = await resp.json();
+            document.body.dispatchEvent(new CustomEvent('showToast', {
+                detail: { message: resData.message || `Order ${orderId} cancelled.`, level: resData.success ? 'success' : 'danger' }
+            }));
+            setTimeout(loadTerminalOperationalData, 1000);
+        } catch (e) {
+            alert('Error cancelling order: ' + e);
+        }
+    }
+
+    document.body.addEventListener('refreshTerminalData', function() {
+        if (typeof loadTerminalOperationalData === 'function') {
+            loadTerminalOperationalData();
+        }
+    });
 
     function resetSandboxVirtualBalance() {
         if (confirm('Reset virtual simulation balance back to initial capital?')) {
@@ -1986,5 +2269,11 @@
         initExnessChartCanvas();
         loadDefaultTradeConfig();
         renderPinnedStrikes();
+        loadTerminalOperationalData();
     }, 150);
+
+    // Tab switch event listeners to refresh operational drawer data
+    document.getElementById('tab-positions-btn')?.addEventListener('click', loadTerminalOperationalData);
+    document.getElementById('tab-orders-btn')?.addEventListener('click', loadTerminalOperationalData);
+    document.getElementById('tab-history-btn')?.addEventListener('click', loadTerminalOperationalData);
 </script>

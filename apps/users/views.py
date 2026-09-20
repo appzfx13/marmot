@@ -1724,18 +1724,22 @@ class UserKillSwitchView(HtmxModalMixin, LoginRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         user = request.user
         
-        user_broker = getattr(user, 'broker', '')
-        if user_broker and user_broker.lower() != 'dhan' and user_broker != BrokerChoices.DHAN:
-            response = HttpResponse()
-            msg = "Kill Switch trigger is currently implemented for Dhan broker users."
-            response['HX-Trigger'] = json.dumps({
-                'closeGlobalModal': True,
-                'showToast': {'message': msg, 'level': 'warning'}
-            })
-            return response
+        # Trigger emergency kill switch across all active accounts (Dhan priority)
+        trading_accounts = list(user.trading_accounts.filter(is_active=True))
+        if trading_accounts:
+            for acc in trading_accounts:
+                try:
+                    adapter = BrokerFactory.get_adapter(acc)
+                    adapter.emergency_kill_switch()
+                except Exception as e:
+                    logger.error(f"Kill switch execution error for {acc.account_name}: {e}")
+        else:
+            try:
+                adapter = BrokerFactory.get_adapter(user)
+                adapter.emergency_kill_switch()
+            except Exception as e:
+                logger.error(f"Kill switch execution error for user @{user.username}: {e}")
 
-        adapter = BrokerFactory.get_adapter(user)
-        adapter.emergency_kill_switch()
 
         user.primary_freeze = True
         user.final_freeze = True
@@ -1846,4 +1850,4 @@ class UserProfilePasswordChangeView(HtmxModalMixin, LoginRequiredMixin, FormView
         return response
 
     def form_invalid(self, form):
-        return self.render_to_response(self.get_context_data(form=form))
+        return self.render_to_response(self.get_context_data(form=form))

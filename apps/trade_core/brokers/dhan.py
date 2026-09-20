@@ -282,6 +282,97 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             'message': f"Dhan Order {order_id} cancelled successfully."
         }
 
+    def get_historical_data(
+        self,
+        symbol: str,
+        resolution: str = "1",
+        range_from: str = None,
+        range_to: str = None
+    ) -> list:
+        """
+        Fetches true historical OHLCV data from Dhan API.
+        No dummy data is returned.
+        """
+        import datetime
+        from datetime import timedelta
+        
+        if not self.client_id:
+            logger.error("DHAN Historical Data Fetch Failed: Missing API credentials.")
+            return []
+            
+        sec_id, resolved_sym, default_lot, seg = DhanScripResolver.resolve(symbol)
+        
+        target_base_url = self.get_base_url('LIVE') # Always fetch data from LIVE
+        token = str(self.get_access_token() or '').strip().strip('"').strip("'")
+        clean_cid = str(self.client_id).strip().strip('"').strip("'")
+        
+        if not range_from or not range_to:
+            now = datetime.datetime.now()
+            range_to = now.strftime('%Y-%m-%d')
+            range_from = (now - timedelta(days=7)).strftime('%Y-%m-%d')
+
+        res_map = { "1": "1", "5": "5", "15": "15", "25": "25", "60": "60", "D": "1D" }
+        mapped_res = res_map.get(str(resolution).upper(), "1")
+
+        instrument = 'INDEX'
+        if seg == 'NSE_FNO':
+            instrument = 'OPTIDX' if 'CE' in symbol or 'PE' in symbol else 'FUTIDX'
+        elif seg == 'NSE_EQ':
+            instrument = 'EQUITY'
+            
+        payload = {
+            "securityId": str(sec_id),
+            "exchangeSegment": seg,
+            "instrument": instrument,
+            "expiryCode": 0,
+            "fromDate": range_from,
+            "toDate": range_to
+        }
+        
+        url = f"{target_base_url}/charts/historical"
+        headers = {
+            "access-token": token,
+            "client-id": clean_cid,
+            "Content-Type": "application/json"
+        }
+        
+        try:
+            response = requests.post(url, json=payload, headers=headers, timeout=10)
+            if response.status_code != 200:
+                logger.error(f"DHAN API HTTP Error: {response.status_code} {response.text}")
+                return []
+            data = response.json()
+            
+            if data.get('status') == 'success' and 'data' in data:
+                chart_data = data['data']
+                formatted_data = []
+                times = chart_data.get('start_Time', [])
+                opens = chart_data.get('open', [])
+                highs = chart_data.get('high', [])
+                lows = chart_data.get('low', [])
+                closes = chart_data.get('close', [])
+                volumes = chart_data.get('volume', [])
+                
+                for i in range(len(times)):
+                    try:
+                        formatted_data.append({
+                            "time": times[i], 
+                            "open": opens[i],
+                            "high": highs[i],
+                            "low": lows[i],
+                            "close": closes[i],
+                            "volume": volumes[i] if i < len(volumes) else 0
+                        })
+                    except IndexError:
+                        continue
+                return formatted_data
+            else:
+                logger.error(f"DHAN API Error: {data.get('remarks', 'Unknown error')}")
+                return []
+        except Exception as e:
+            logger.error(f"Failed to fetch Dhan historical data: {str(e)}")
+            return []
+
     def get_fund_limits(self) -> Dict[str, Any]:
         """Fetches live available funds & margins from Dhan /v2/fundlimit."""
         import requests
@@ -608,7 +699,8 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             quantity=exit_qty,
             side=exit_side,
             order_type='MARKET',
-            account_type='LIVE'
+            account_type='LIVE',
+            security_id=security_id
         )
 
     def get_trade_book(self) -> Dict[str, Any]:
@@ -861,12 +953,53 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         return round(brokerage + stt_tax + 5.0, 2)
 
     def emergency_kill_switch(self) -> Dict[str, Any]:
-        logger.warning(f"DHAN EMERGENCY KILL SWITCH TRIGGERED for user @{self.user.username} (Client ID: {self.client_id})")
+        username = getattr(self.user, 'username', 'N/A')
+        logger.warning(f"DHAN EMERGENCY KILL SWITCH TRIGGERED for user @{username} (Client ID: {self.client_id})")
+        cancelled = 0
+        squared = 0
+        try:
+            orders_res = self.get_live_orders()
+            if orders_res.get('success'):
+                for ord_item in orders_res.get('orders', []):
+                    st = str(ord_item.get('order_status', '')).upper()
+                    if st in ['PENDING', 'TRANSIT', 'CONFIRM', 'TRIGGER_PENDING']:
+                        o_id = ord_item.get('order_id')
+                        if o_id:
+                            self.cancel_live_order(o_id)
+                            cancelled += 1
+            pos_res = self.get_live_positions()
+            if pos_res.get('success'):
+                for p in pos_res.get('positions', []):
+                    net_qty = int(p.get('net_qty', 0) or 0)
+                    if net_qty != 0:
+                        sym = p.get('trading_symbol') or p.get('security_id', '')
+                        side = p.get('position_type', 'LONG' if net_qty > 0 else 'SHORT')
+                        prod = p.get('product_type', 'INTRADAY')
+                        sec_id = p.get('security_id', '')
+                        self.square_off_position(symbol=sym, quantity=net_qty, side=side, product_type=prod, security_id=sec_id)
+                        squared += 1
+            
+            # Hit the Dhan Kill Switch API
+            token = str(self.get_access_token() or '').strip().strip('"').strip("'")
+            client_id = str(self.client_id or '').strip().strip('"').strip("'")
+            if token and client_id:
+                url = f"{self.base_url}/killswitch?killSwitchStatus=ACTIVATE"
+                headers = {"access-token": token, "client-id": client_id, "Accept": "application/json", "Content-Type": "application/json"}
+                kill_resp = requests.post(url, headers=headers, timeout=6)
+                if kill_resp.status_code == 200:
+                    logger.warning(f"Dhan HQ Kill Switch API activated successfully for {client_id}")
+                else:
+                    logger.error(f"Dhan HQ Kill Switch API failed for {client_id}: {kill_resp.text}")
+
+        except Exception as e:
+            logger.error(f"Error executing emergency kill actions: {e}")
+
         return {
             'success': True,
             'broker': 'DHAN',
             'client_id': self.client_id,
-            'cancelled_orders_count': 0,
-            'frozen_positions_count': 0,
-            'message': f"All Dhan orders and positions frozen for Client ID {self.client_id}."
+            'cancelled_orders_count': cancelled,
+            'frozen_positions_count': squared,
+            'message': f"All Dhan orders ({cancelled} cancelled) and positions ({squared} squared off) frozen for Client ID {self.client_id}. API Kill Switch Activated."
         }
+

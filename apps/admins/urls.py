@@ -6,6 +6,9 @@ from .views import (
     AdminSandboxTerminalView,
     AdminTerminalHistoricalDataView,
     AdminTerminalOptionChainAPIView,
+    AdminTerminalOperationalDataAPIView,
+    AdminTerminalCloseAllPositionsAPIView,
+    AdminTerminalCancelOrderAPIView,
     AdminLogoutView,
     AdminTraderListView,
     AdminTraderScrollView,
@@ -147,6 +150,9 @@ urlpatterns = [
     path('sandbox/terminal/', AdminSandboxTerminalView.as_view(), name='admin-sandbox-terminal'),
     path('terminal/historical-data/', AdminTerminalHistoricalDataView.as_view(), name='admin-terminal-historical-data'),
     path('terminal/option-chain/', AdminTerminalOptionChainAPIView.as_view(), name='admin-terminal-option-chain'),
+    path('terminal/operational-data/', AdminTerminalOperationalDataAPIView.as_view(), name='admin-terminal-operational-data'),
+    path('terminal/positions/close-all/', AdminTerminalCloseAllPositionsAPIView.as_view(), name='admin-terminal-close-all-positions'),
+    path('terminal/orders/cancel/', AdminTerminalCancelOrderAPIView.as_view(), name='admin-terminal-cancel-order'),
     path('logout/', AdminLogoutView.as_view(), name='admin-logout'),
 
     # Trading Journal & Analytics Routes

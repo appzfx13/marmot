@@ -2578,7 +2578,7 @@ class AdminAIDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMi
 
 
 class AdminTerminalHistoricalDataView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """Fetches real historical OHLCV data from Fyers API."""
+    """Fetches real historical OHLCV data from Dhan API."""
     def get(self, request, *args, **kwargs):
         symbol = request.GET.get('symbol', 'NSE:NIFTY50-INDEX')
         resolution = request.GET.get('resolution', '1')
@@ -2609,38 +2609,50 @@ class AdminTerminalHistoricalDataView(LoginRequiredMixin, AdminRequiredMixin, Vi
         from apps.common.models import SiteSettings
         from apps.trade_config.models import UserTradingAccount
         from apps.trade_core.brokers.fyers import FyersBrokerAdapter
+        from apps.trade_core.brokers.dhan import DhanBrokerAdapter
+        from types import SimpleNamespace
 
         settings_obj = SiteSettings.load()
-        app_id = (settings_obj.fyers_app_id or '').strip()
-        api_key = (settings_obj.fyers_access_token or '').strip()
+        fyers_app_id = (settings_obj.fyers_app_id or '').strip()
+        fyers_token = (settings_obj.fyers_access_token or '').strip()
 
-        if app_id and api_key:
-            adapter = FyersBrokerAdapter(app_id=app_id, api_key=api_key, client_id=app_id)
+        data = []
+        if fyers_app_id and fyers_token:
+            fyers_account = SimpleNamespace(
+                user=request.user,
+                broker=SimpleNamespace(code='fyers'),
+                broker_client_id=fyers_app_id,
+                api_key=fyers_token,
+                app_id=fyers_app_id,
+                account_type='LIVE'
+            )
+            adapter = FyersBrokerAdapter(fyers_account)
+            data = adapter.get_historical_data(symbol, resolution, range_from, range_to)
         else:
-            fyers_account = (
+            dhan_account = (
                 UserTradingAccount.objects.filter(
                     user=request.user,
-                    broker__code='fyers',
+                    broker__code='dhan',
                     is_active=True,
                     is_deleted=False
                 ).exclude(api_key__isnull=True).exclude(api_key='').first()
                 or UserTradingAccount.objects.filter(
-                    broker__code='fyers',
+                    broker__code='dhan',
                     is_active=True,
                     is_deleted=False
                 ).exclude(api_key__isnull=True).exclude(api_key='').first()
             )
 
-            if not fyers_account or not fyers_account.api_key:
+            if dhan_account and dhan_account.api_key:
+                adapter = DhanBrokerAdapter(dhan_account)
+                data = adapter.get_historical_data(symbol, resolution, range_from, range_to)
+            else:
                 return JsonResponse({
                     'success': False,
-                    'message': 'No configured Fyers credentials found in SiteSettings or Trading Accounts.',
+                    'message': 'No configured broker data credentials found in SiteSettings or Trading Accounts.',
                     'data': []
                 })
 
-            adapter = FyersBrokerAdapter(fyers_account)
-
-        data = adapter.get_historical_data(symbol, resolution, range_from, range_to)
         return JsonResponse({'success': True, 'data': data})
 
 
@@ -2825,7 +2837,273 @@ class AdminSandboxTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
         return context
 
 
+class AdminTerminalOperationalDataAPIView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """
+    Returns authentic live operational telemetry (Positions, Pending Orders, Trade History,
+    and Funds/Margins) from Dhan broker for the active terminal.
+    """
+
+    def get(self, request, *args, **kwargs):
+        from apps.trade_core.brokers.factory import BrokerFactory
+        user = request.user
+        mode = request.GET.get('mode', 'LIVE').upper()
+        is_sandbox = (mode == 'SANDBOX')
+
+        if is_sandbox:
+            acc = user.trading_accounts.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).first()
+            if not acc:
+                acc = UserTradingAccount.objects.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).first()
+        else:
+            acc = (
+                user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type='LIVE').first() or
+                user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first() or
+                UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+            )
+
+        positions_list = []
+        open_positions_count = 0
+        net_pnl = 0.00
+        realized_pnl = 0.00
+        unrealized_pnl = 0.00
+
+        pending_orders = []
+        open_orders_count = 0
+
+        trade_history = []
+
+        telemetry = {
+            'balance': '0.00',
+            'equity': '0.00',
+            'margin': '0.00',
+            'free_margin': '0.00',
+            'session_pnl': '0.00',
+            'is_pnl_positive': True
+        }
+
+        if acc:
+            try:
+                adapter = BrokerFactory.get_adapter(acc)
+
+                pos_data = adapter.get_live_positions()
+                if pos_data.get('success'):
+                    raw_pos = pos_data.get('positions', [])
+                    for p in raw_pos:
+                        positions_list.append({
+                            'symbol': p.get('trading_symbol', ''),
+                            'security_id': p.get('security_id', ''),
+                            'side': p.get('position_type', 'LONG'),
+                            'qty': p.get('net_qty', 0),
+                            'entry_price': p.get('buy_avg') if p.get('net_qty', 0) > 0 else p.get('sell_avg', 0.0),
+                            'ltp': p.get('buy_avg', 0.0),
+                            'unrealized_pnl': p.get('unrealized_profit', 0.0),
+                            'realized_pnl': p.get('realized_profit', 0.0),
+                            'total_pnl': p.get('total_pnl', 0.0),
+                            'status': p.get('status', 'OPEN'),
+                            'product_type': p.get('product_type', 'INTRADAY'),
+                        })
+                    open_positions_count = pos_data.get('open_positions_count', len([p for p in positions_list if p['status'] == 'OPEN']))
+                    net_pnl = pos_data.get('net_pnl', 0.00)
+                    realized_pnl = pos_data.get('realized_pnl', 0.00)
+                    unrealized_pnl = pos_data.get('unrealized_pnl', 0.00)
+
+                ord_data = adapter.get_live_orders()
+                if ord_data.get('success'):
+                    raw_orders = ord_data.get('orders', [])
+                    for o in raw_orders:
+                        st = str(o.get('order_status', '')).upper()
+                        order_repr = {
+                            'order_id': o.get('order_id', ''),
+                            'symbol': o.get('trading_symbol', ''),
+                            'security_id': o.get('security_id', ''),
+                            'side': o.get('transaction_type', 'BUY'),
+                            'order_type': o.get('order_type', 'MARKET'),
+                            'product_type': o.get('product_type', 'INTRADAY'),
+                            'qty': o.get('quantity', 0),
+                            'filled_qty': o.get('filled_qty', 0),
+                            'price': o.get('price', 0.0),
+                            'trigger_price': o.get('trigger_price', 0.0),
+                            'status': st,
+                            'time': o.get('create_time', ''),
+                            'reject_reason': o.get('oms_error_desc') or o.get('trigger_reason', ''),
+                        }
+                        if st in ['PENDING', 'TRANSIT', 'CONFIRM', 'TRIGGER_PENDING']:
+                            pending_orders.append(order_repr)
+                        else:
+                            trade_history.append(order_repr)
+                    open_orders_count = len(pending_orders)
+
+                if hasattr(adapter, 'get_trade_book'):
+                    tb_data = adapter.get_trade_book()
+                    if tb_data.get('success') and tb_data.get('trades'):
+                        for t in tb_data.get('trades', []):
+                            t_id = t.get('orderId') or t.get('tradeId')
+                            if not any(h.get('order_id') == t_id for h in trade_history):
+                                trade_history.append({
+                                    'order_id': t_id,
+                                    'symbol': t.get('tradingSymbol', ''),
+                                    'side': t.get('transactionType', 'BUY'),
+                                    'order_type': 'MARKET',
+                                    'product_type': t.get('productType', 'INTRADAY'),
+                                    'qty': t.get('tradedQuantity', 0),
+                                    'filled_qty': t.get('tradedQuantity', 0),
+                                    'price': t.get('tradedPrice', 0.0),
+                                    'trigger_price': 0.0,
+                                    'status': 'TRADED',
+                                    'time': t.get('tradeTime', ''),
+                                    'reject_reason': '',
+                                })
+
+                fund_data = adapter.get_fund_limits()
+                if fund_data.get('success'):
+                    avail = float(fund_data.get('available_balance', 0.0) or 0.0)
+                    utilized = float(fund_data.get('margin_utilized', 0.0) or 0.0)
+                    withdrawable = float(fund_data.get('withdrawable', avail) or avail)
+                    telemetry = {
+                        'balance': f"₹{avail:,.2f}",
+                        'equity': f"₹{(avail + net_pnl):,.2f}",
+                        'margin': f"₹{utilized:,.2f}",
+                        'free_margin': f"₹{withdrawable:,.2f}",
+                        'session_pnl': f"₹{net_pnl:+,.2f}",
+                        'is_pnl_positive': (net_pnl >= 0)
+                    }
+            except Exception as e:
+                logger.error(f"Error fetching terminal operational data from Dhan: {e}")
+
+        return JsonResponse({
+            'success': True,
+            'broker': acc.broker.code.upper() if acc and acc.broker else 'DHAN',
+            'account_name': acc.account_name if acc else 'No Account',
+            'positions': positions_list,
+            'open_positions_count': open_positions_count,
+            'net_pnl': net_pnl,
+            'realized_pnl': realized_pnl,
+            'unrealized_pnl': unrealized_pnl,
+            'orders': pending_orders,
+            'open_orders_count': open_orders_count,
+            'history': trade_history,
+            'trades_count': len(trade_history),
+            'telemetry': telemetry,
+        })
+
+
+class AdminTerminalCloseAllPositionsAPIView(HtmxModalMixin, LoginRequiredMixin, AdminRequiredMixin, View):
+    """
+    Squares off all open positions for the user's active Dhan trading account (or across active accounts).
+    """
+    modal_template_name = 'admins/partials/close_all_positions_modal.html'
+    template_name = 'admins/partials/close_all_positions_modal.html'
+
+    def get(self, request, *args, **kwargs):
+        from django.shortcuts import render
+        return render(request, self.modal_template_name)
+
+    def post(self, request, *args, **kwargs):
+        import json
+        from apps.trade_core.brokers.factory import BrokerFactory
+        try:
+            body = json.loads(request.body.decode('utf-8')) if request.body else {}
+        except Exception:
+            body = {}
+            
+        user = request.user
+        mode = str(body.get('mode') or request.POST.get('mode') or request.GET.get('mode', 'LIVE')).upper()
+        is_sandbox = (mode == 'SANDBOX')
+
+        if is_sandbox:
+            accounts = list(user.trading_accounts.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']))
+        else:
+            dhan_acc = user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type='LIVE').first()
+            if dhan_acc:
+                accounts = [dhan_acc]
+            else:
+                accounts = list(user.trading_accounts.filter(is_active=True, account_type='LIVE'))
+
+        if not accounts:
+            return JsonResponse({'success': False, 'message': 'No active trading accounts found.'}, status=404)
+
+        closed_count = 0
+        errors = []
+
+        for acc in accounts:
+            try:
+                adapter = BrokerFactory.get_adapter(acc)
+                pos_res = adapter.get_live_positions()
+                if not pos_res.get('success'):
+                    continue
+                positions = pos_res.get('positions', [])
+                for p in positions:
+                    net_qty = int(p.get('net_qty', 0) or 0)
+                    if net_qty != 0:
+                        symbol = p.get('trading_symbol') or p.get('security_id', '')
+                        pos_type = p.get('position_type', 'LONG' if net_qty > 0 else 'SHORT')
+                        prod = p.get('product_type', 'INTRADAY')
+                        sec_id = p.get('security_id', '')
+                        square_res = adapter.square_off_position(
+                            symbol=symbol,
+                            quantity=net_qty,
+                            side=pos_type,
+                            product_type=prod,
+                            security_id=sec_id
+                        )
+                        if square_res.get('success'):
+                            closed_count += 1
+                        else:
+                            errors.append(square_res.get('message', f"Failed to square off {symbol}"))
+            except Exception as e:
+                logger.error(f"Error squaring off positions for {acc.account_name}: {e}")
+                errors.append(str(e))
+
+        success = not bool(errors)
+        msg_str = f"Successfully initiated square-off for {closed_count} position(s)." if closed_count > 0 else ("No open positions to close." if not errors else "; ".join(errors))
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg_str, 'level': 'success' if success else 'danger'},
+            'refreshTerminalData': True
+        })
+        return response
+
+
+class AdminTerminalCancelOrderAPIView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """
+    Cancels a specific pending order on Dhan.
+    """
+
+    def post(self, request, *args, **kwargs):
+        import json
+        from apps.trade_core.brokers.factory import BrokerFactory
+        try:
+            body = json.loads(request.body.decode('utf-8')) if request.body else {}
+        except Exception:
+            body = {}
+        order_id = str(body.get('order_id') or request.POST.get('order_id') or request.GET.get('order_id') or '').strip()
+        if not order_id:
+            return JsonResponse({'success': False, 'message': 'Missing order_id'}, status=400)
+
+        user = request.user
+        acc = (
+            user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type='LIVE').first() or
+            user.trading_accounts.filter(is_active=True, account_type='LIVE').first() or
+            UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+        )
+        if not acc:
+            return JsonResponse({'success': False, 'message': 'No active Dhan trading account found.'}, status=404)
+
+        try:
+            adapter = BrokerFactory.get_adapter(acc)
+            if hasattr(adapter, 'cancel_live_order'):
+                res = adapter.cancel_live_order(order_id)
+            else:
+                res = adapter.cancel_order(order_id)
+            return JsonResponse(res)
+        except Exception as e:
+            logger.error(f"Error cancelling order {order_id}: {e}")
+            return JsonResponse({'success': False, 'message': str(e)}, status=500)
+
+
 class AdminLogoutView(View):
+
     """
     Logs out the admin user with HTMX client-side redirect support.
     """

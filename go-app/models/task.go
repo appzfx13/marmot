@@ -26,9 +26,9 @@ type TaskParams struct {
 	RsiMax          int                    `json:"rsi_max,omitempty"`
 	EmaMin          int                    `json:"ema_min,omitempty"`
 	EmaMax          int                    `json:"ema_max,omitempty"`
-	// Dhan authentication: access token generated from API Key + Secret (24h TTL, injected by Django)
-	DhanClientID    string                 `json:"dhan_client_id"`
-	DhanAccessToken string                 `json:"dhan_access_token"`
+	// FYERS authentication: app_id and access_token injected by Django
+	FyersAppID       string                 `json:"fyers_app_id"`
+	FyersAccessToken string                 `json:"fyers_access_token"`
 	// FOREX / Databento parameters
 	MarketType      string                 `json:"market_type"`
 	ForexInstrument string                 `json:"forex_instrument"`
