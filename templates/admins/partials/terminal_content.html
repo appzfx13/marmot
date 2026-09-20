@@ -68,13 +68,13 @@
          ZONE 2: Center Chart Workspace + Operational Drawers (col-xl-7 col-lg-5)
          ZONE 3: Exness Dual-Action Order Ticket (col-xl-3 col-lg-4)
          ═══════════════════════════════════════════════════════════════════ -->
-    <div class="row g-2 align-items-stretch" style="min-height: 820px;">
+    <div class="row g-2 align-items-stretch" style="min-height: calc(100vh - 165px); height: calc(100vh - 165px);">
 
         <!-- ═══════════════════════════════════════════════════════════════
              ZONE 1: MARKET WATCH / INSTRUMENT WATCHLIST (LEFT SIDEBAR)
              ═══════════════════════════════════════════════════════════════ -->
-        <div class="col-12 col-lg-3 col-xl-2 d-flex flex-column" id="marketWatchSidebarCol" style="transition: all 0.2s ease;">
-            <div class="glass-card rounded-4 border p-2 flex-grow-1 d-flex flex-column h-100 shadow-sm"
+        <div class="col-12 col-lg-auto d-flex flex-column" id="marketWatchSidebarCol" style="width: 230px; flex: 0 0 230px; max-width: 230px; transition: all 0.2s ease;">
+            <div class="glass-card rounded-4 border p-2 flex-grow-1 d-flex flex-column h-100 shadow-sm overflow-hidden"
                  style="background: var(--glass-bg, rgba(13, 21, 39, 0.85)); backdrop-filter: blur(20px); border-color: var(--border-color, rgba(255,255,255,0.1)) !important;">
                 
                 <!-- Watchlist Header & Search -->
@@ -82,9 +82,8 @@
                     <div class="d-flex align-items-center justify-content-between mb-2">
                         <span class="fw-bold small text-uppercase theme-text-muted tracking-wider d-flex align-items-center gap-1">
                             <span class="material-icons fs-6 text-primary">view_list</span>
-                            Index Watchlist
+                            Market Watch
                         </span>
-                        <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller font-monospace" id="marketWatchCount">7 Indices</span>
                     </div>
 
                     <!-- Search Input -->
@@ -99,45 +98,57 @@
                     </div>
                 </div>
 
-                <!-- Instrument Rows: Strictly IndexChoices from apps/common/choices.py -->
-                <div class="flex-grow-1 overflow-auto pe-1 d-flex flex-column gap-1.5" id="marketWatchList" style="max-height: 720px;">
-                    <!-- Instrument Rows: Unified 2-Row Exness Style Cards (7 IndexChoices) -->
-                    {% for item in watchlist_indices %}
-                    <div class="mw-item p-2 rounded-3 border d-flex flex-column gap-1 {% if forloop.first %}active-symbol-item{% endif %}"
-                         data-symbol="{{ item.symbol }}" data-index="{{ item.index }}" data-fyers="{{ item.fyers_sym }}" data-lot="{{ item.lot }}"
-                         onclick="selectExnessSymbol('{{ item.symbol }}', '{{ item.fyers_sym }}', {{ item.lot }}, 'INDEX', this)">
-                        <!-- Row 1: Instrument Badge + Name on Left, Bold Real-Time LTP on Right -->
-                        <div class="d-flex align-items-center justify-content-between">
-                            <div class="d-flex align-items-center gap-1.5 overflow-hidden">
-                                <span class="badge bg-primary bg-opacity-20 text-primary rounded-pill px-1.5 py-0 smaller font-monospace fw-bold" style="font-size:0.65rem;">INDEX</span>
-                                <span class="fw-bold theme-text-main font-monospace small text-truncate">{{ item.symbol }}</span>
-                            </div>
-                            <div class="text-end font-monospace fw-bold small text-white mw-ltp" 
-                                 data-tick-sym="{{ item.symbol }}" data-fyers-sym="{{ item.fyers_sym }}" data-index="{{ item.index }}">
-                                {{ item.ltp_str }}
-                            </div>
-                        </div>
-                        <!-- Row 2: Lot Size on Left, % Change Badge on Right -->
-                        <div class="d-flex align-items-center justify-content-between font-monospace" style="font-size: 0.72rem;">
-                            <span class="text-muted smaller">1 Lot = {{ item.lot }} U</span>
-                            <div class="d-flex align-items-center gap-1.5">
-                                <span class="badge {{ item.chp_class }} bg-opacity-20 rounded-pill px-1.5 py-0 smaller font-monospace mw-change" 
-                                      data-tick-sym="{{ item.symbol }}" data-fyers-sym="{{ item.fyers_sym }}" data-index="{{ item.index }}">{{ item.chp_str }}</span>
-                            </div>
-                        </div>
-                    </div>
-                    {% empty %}
-                    <div class="text-center py-3 text-muted small">No index symbols available</div>
-                    {% endfor %}
-
-                    <!-- Pinned Option Strikes Container (Added via Option Chain Modal) -->
-                    <div class="border-top border-secondary border-opacity-25 pt-2 mt-1 d-none" id="pinnedStrikesContainer">
-                        <div class="d-flex align-items-center justify-content-between px-1 mb-1">
-                            <span class="smaller fw-bold text-info text-uppercase font-monospace" style="font-size: 0.7rem;">Pinned Option Strikes</span>
-                            <span class="badge bg-info bg-opacity-20 text-info rounded-pill px-1.5 py-0 smaller font-monospace" id="pinnedStrikesBadge">0</span>
+                <!-- Dedicated Single Scrollable Section for Pinned Strikes + Indices Watchlist Tiles -->
+                <div class="flex-grow-1 overflow-auto pe-1 d-flex flex-column gap-2" id="sidebarMasterScrollArea" style="scrollbar-width: thin;">
+                    <!-- 1. Pinned Option Strikes Container (TOP OF SIDEBAR) -->
+                    <div class="border-bottom border-secondary border-opacity-25 pb-2 d-none" id="pinnedStrikesContainer">
+                        <div class="d-flex align-items-center justify-content-between px-1 mb-1.5">
+                            <span class="smaller fw-bold text-warning text-uppercase font-monospace d-flex align-items-center gap-1" style="font-size: 0.72rem;">
+                                <span class="material-icons text-warning" style="font-size:0.85rem;">star</span>
+                                Pinned Option Strikes
+                            </span>
+                            <span class="badge bg-warning bg-opacity-20 text-warning rounded-pill px-1.5 py-0 smaller font-monospace" id="pinnedStrikesBadge">0</span>
                         </div>
                         <div id="pinnedStrikesList" class="d-flex flex-column gap-1">
                             <!-- Injected dynamically via JavaScript -->
+                        </div>
+                    </div>
+
+                    <!-- 2. Indices Watchlist Header & Box Tiles -->
+                    <div>
+                        <div class="d-flex align-items-center justify-content-between px-1 mb-1">
+                            <span class="smaller fw-bold text-uppercase theme-text-muted tracking-wider" style="font-size: 0.68rem;">Indices Watchlist</span>
+                            <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller font-monospace" id="marketWatchCount">7 Indices</span>
+                        </div>
+                        <div class="d-flex flex-column gap-1.5" id="marketWatchList">
+                            <!-- Instrument Rows: Unified 2-Row Exness Style Cards (7 IndexChoices) -->
+                            {% for item in watchlist_indices %}
+                            <div class="mw-item p-2 rounded-3 border d-flex flex-column gap-1 {% if forloop.first %}active-symbol-item{% endif %}"
+                                 data-symbol="{{ item.symbol }}" data-index="{{ item.index }}" data-fyers="{{ item.fyers_sym }}" data-lot="{{ item.lot }}"
+                                 onclick="selectExnessSymbol('{{ item.symbol }}', '{{ item.fyers_sym }}', {{ item.lot }}, 'INDEX', this)">
+                                <!-- Row 1: Instrument Badge + Name on Left, Bold Real-Time LTP on Right -->
+                                <div class="d-flex align-items-center justify-content-between">
+                                    <div class="d-flex align-items-center gap-1.5 overflow-hidden">
+                                        <span class="badge bg-primary bg-opacity-20 text-primary rounded-pill px-1.5 py-0 smaller font-monospace fw-bold" style="font-size:0.65rem;">INDEX</span>
+                                        <span class="fw-bold theme-text-main font-monospace small text-truncate">{{ item.symbol }}</span>
+                                    </div>
+                                    <div class="text-end font-monospace fw-bold small text-white mw-ltp" 
+                                         data-tick-sym="{{ item.symbol }}" data-fyers-sym="{{ item.fyers_sym }}" data-index="{{ item.index }}">
+                                        {{ item.ltp_str }}
+                                    </div>
+                                </div>
+                                <!-- Row 2: Lot Size on Left, % Change Badge on Right -->
+                                <div class="d-flex align-items-center justify-content-between font-monospace" style="font-size: 0.72rem;">
+                                    <span class="text-muted smaller">1 Lot = {{ item.lot }} U</span>
+                                    <div class="d-flex align-items-center gap-1.5">
+                                        <span class="badge {{ item.chp_class }} bg-opacity-20 rounded-pill px-1.5 py-0 smaller font-monospace mw-change" 
+                                              data-tick-sym="{{ item.symbol }}" data-fyers-sym="{{ item.fyers_sym }}" data-index="{{ item.index }}">{{ item.chp_str }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                            {% empty %}
+                            <div class="text-center py-3 text-muted small">No index symbols available</div>
+                            {% endfor %}
                         </div>
                     </div>
                 </div>
@@ -147,7 +158,7 @@
         <!-- ═══════════════════════════════════════════════════════════════
              ZONE 2: CENTER MAIN CHART WORKSPACE & BOTTOM DRAWERS (CENTER)
              ═══════════════════════════════════════════════════════════════ -->
-        <div class="col-12 col-lg-5 col-xl-7 d-flex flex-column gap-2" id="chartCenterCol" style="transition: all 0.2s ease;">
+        <div class="col d-flex flex-column gap-2 flex-grow-1 h-100" id="chartCenterCol" style="min-width: 0; transition: all 0.2s ease;">
             
             <!-- Main TradingView Candlestick Canvas Card -->
             <div class="glass-card rounded-4 border overflow-hidden d-flex flex-column shadow-lg position-relative"
@@ -378,9 +389,9 @@
         <!-- ═══════════════════════════════════════════════════════════════
              ZONE 3: EXNESS DUAL ACTION ORDER TICKET (RIGHT SIDE PANEL)
              ═══════════════════════════════════════════════════════════════ -->
-        <div class="col-12 col-lg-4 col-xl-3 d-flex flex-column">
-            <div class="glass-card p-3 rounded-4 border h-100 d-flex flex-column shadow-lg"
-                 style="background: var(--glass-bg, rgba(13, 21, 39, 0.9)); backdrop-filter: blur(20px); border-color: var(--border-color, rgba(255,255,255,0.1)) !important;">
+        <div class="col-12 col-lg-4 col-xl-3 d-flex flex-column" id="orderTicketCol" style="transition: all 0.2s ease;">
+            <div class="glass-card p-2 rounded-4 border h-100 d-flex flex-column shadow-lg overflow-auto"
+                 style="background: var(--glass-bg, rgba(13, 21, 39, 0.9)); backdrop-filter: blur(20px); border-color: var(--border-color, rgba(255,255,255,0.1)) !important; scrollbar-width: thin;">
                 
                 <!-- Ticket Header -->
                 <div class="d-flex align-items-center justify-content-between pb-2 mb-2 border-bottom border-secondary border-opacity-25">
@@ -481,7 +492,7 @@
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <label class="form-label theme-text-muted smaller fw-bold text-uppercase mb-0">Volume / Lots</label>
                         <div class="d-flex align-items-center gap-1">
-                            <span class="theme-text-muted smaller font-monospace" id="lotSizeInfo">1 Lot = 25 Units</span>
+                            <span class="theme-text-muted smaller font-monospace" id="lotSizeInfo">1 Lot = {{ default_lot_size|default:65 }} Units</span>
                             <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1 rounded-pill smaller" onclick="saveAsDefaultLots()" title="Save as Default Lot Count">
                                 <span class="smaller font-monospace" style="font-size:0.65rem;">Pin Lot</span>
                             </button>
@@ -508,10 +519,22 @@
                     <div class="d-flex align-items-center justify-content-between pb-1 border-bottom border-secondary border-opacity-20">
                         <span class="smaller fw-bold theme-text-main text-uppercase font-monospace" style="font-size:0.72rem;">Trade Config &amp; Risk</span>
                         <div class="d-flex align-items-center gap-1.5">
-                            <span class="badge bg-secondary bg-opacity-25 text-white font-monospace px-1.5 py-0 smaller" id="riskRewardBadge">R:R 1 : 2.0</span>
+                            <span class="badge bg-primary bg-opacity-25 text-info border border-info border-opacity-25 font-monospace px-1.5 py-0 smaller" id="riskRewardBadge">R:R 1 : 2.0</span>
                             <button type="button" class="btn btn-xs btn-outline-secondary py-0 px-1.5 rounded-pill font-monospace" style="font-size:0.65rem;" onclick="saveDefaultTradeConfig()" title="Save current SL/TP as default">
                                 Save Config
                             </button>
+                        </div>
+                    </div>
+
+                    <!-- Risk:Reward Preset Selector -->
+                    <div class="d-flex align-items-center justify-content-between gap-1">
+                        <span class="theme-text-muted font-monospace" style="font-size:0.68rem;">Risk:Reward:</span>
+                        <div class="d-flex gap-1 flex-wrap" id="rrPresetGroup">
+                            <button type="button" class="btn btn-xs rounded-pill px-2 py-0 font-monospace rr-preset-btn active" onclick="setRiskRewardRatio(2, this)">2</button>
+                            <button type="button" class="btn btn-xs rounded-pill px-2 py-0 font-monospace rr-preset-btn" onclick="setRiskRewardRatio(2.5, this)">2.5</button>
+                            <button type="button" class="btn btn-xs rounded-pill px-2 py-0 font-monospace rr-preset-btn" onclick="setRiskRewardRatio(3, this)">3</button>
+                            <button type="button" class="btn btn-xs rounded-pill px-2 py-0 font-monospace rr-preset-btn" onclick="setRiskRewardRatio(3.5, this)">3.5</button>
+                            <button type="button" class="btn btn-xs rounded-pill px-2 py-0 font-monospace rr-preset-btn" onclick="setRiskRewardRatio(4, this)">4</button>
                         </div>
                     </div>
 
@@ -519,7 +542,7 @@
                     <div>
                         <div class="d-flex align-items-center justify-content-between mb-1">
                             <div class="form-check form-switch mb-0 d-flex align-items-center gap-1.5">
-                                <input class="form-check-input" type="checkbox" id="enableSlSwitch" onchange="toggleRiskField('sl')">
+                                <input class="form-check-input" type="checkbox" id="enableSlSwitch" checked onchange="toggleRiskField('sl')">
                                 <label class="form-check-label smaller fw-bold text-danger text-uppercase" for="enableSlSwitch">Stop Loss (SL)</label>
                             </div>
                             <!-- SL Unit Toggle: Points vs % -->
@@ -528,9 +551,18 @@
                                 <button type="button" class="btn btn-xs btn-outline-secondary rounded-pill px-1.5 py-0 sl-unit-btn" id="slUnitPctBtn" onclick="setRiskUnit('sl', 'pct')">%</button>
                             </div>
                         </div>
-                        <div class="input-group input-group-sm">
-                            <input type="number" id="ticketSlValue" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace opacity-50 text-end" placeholder="20" value="20" disabled oninput="calculateExnessMetrics()">
+                        <div class="input-group input-group-sm mb-1">
+                            <input type="number" id="ticketSlValue" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace text-end" placeholder="10" value="10" oninput="onSlInputChange()">
                             <span class="input-group-text bg-transparent border-secondary border-opacity-25 theme-text-muted smaller font-monospace" id="slUnitLabel">pts</span>
+                        </div>
+                        <!-- Quick SL Presets: 5, 10, 15, 20, 25, 30 -->
+                        <div class="d-flex gap-1 mb-1">
+                            <button type="button" class="btn btn-xs rounded-pill flex-fill py-0.5 smaller font-monospace sl-preset-btn" onclick="setSlPreset(5, this)">5</button>
+                            <button type="button" class="btn btn-xs rounded-pill flex-fill py-0.5 smaller font-monospace sl-preset-btn active" onclick="setSlPreset(10, this)">10</button>
+                            <button type="button" class="btn btn-xs rounded-pill flex-fill py-0.5 smaller font-monospace sl-preset-btn" onclick="setSlPreset(15, this)">15</button>
+                            <button type="button" class="btn btn-xs rounded-pill flex-fill py-0.5 smaller font-monospace sl-preset-btn" onclick="setSlPreset(20, this)">20</button>
+                            <button type="button" class="btn btn-xs rounded-pill flex-fill py-0.5 smaller font-monospace sl-preset-btn" onclick="setSlPreset(25, this)">25</button>
+                            <button type="button" class="btn btn-xs rounded-pill flex-fill py-0.5 smaller font-monospace sl-preset-btn" onclick="setSlPreset(30, this)">30</button>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mt-0.5 px-0.5 font-monospace" style="font-size: 0.69rem;">
                             <span class="theme-text-muted" id="slTriggerPricePreview">Trigger: —</span>
@@ -542,7 +574,7 @@
                     <div>
                         <div class="d-flex align-items-center justify-content-between mb-1">
                             <div class="form-check form-switch mb-0 d-flex align-items-center gap-1.5">
-                                <input class="form-check-input" type="checkbox" id="enableTpSwitch" onchange="toggleRiskField('tp')">
+                                <input class="form-check-input" type="checkbox" id="enableTpSwitch" checked onchange="toggleRiskField('tp')">
                                 <label class="form-check-label smaller fw-bold text-success text-uppercase" for="enableTpSwitch">Take Profit (TP)</label>
                             </div>
                             <!-- TP Unit Toggle: Points vs % -->
@@ -552,7 +584,7 @@
                             </div>
                         </div>
                         <div class="input-group input-group-sm">
-                            <input type="number" id="ticketTpValue" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace opacity-50 text-end" placeholder="40" value="40" disabled oninput="calculateExnessMetrics()">
+                            <input type="number" id="ticketTpValue" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace text-end" placeholder="20" value="20" oninput="calculateExnessMetrics()">
                             <span class="input-group-text bg-transparent border-secondary border-opacity-25 theme-text-muted smaller font-monospace" id="tpUnitLabel">pts</span>
                         </div>
                         <div class="d-flex justify-content-between align-items-center mt-0.5 px-0.5 font-monospace" style="font-size: 0.69rem;">
@@ -563,7 +595,7 @@
                 </div>
 
                 <!-- Margin & Charges Calculation -->
-                <div class="d-flex flex-column gap-1 mb-3 smaller theme-text-muted font-monospace border-top border-secondary border-opacity-25 pt-2">
+                <div class="d-flex flex-column gap-1 mb-0 smaller theme-text-muted font-monospace border-top border-secondary border-opacity-25 pt-2">
                     <div class="d-flex justify-content-between">
                         <span>Quantity Units:</span>
                         <strong class="text-white" id="ticketTotalUnits">25 Units</strong>
@@ -578,9 +610,10 @@
                     </div>
                 </div>
 
-                <!-- Dynamic High-Impact Execution Button -->
+                <!-- Dynamic High-Impact Execution Button (Just below Brokerage & Taxes with 10px gap) -->
                 <button type="button" id="exnessExecuteBtn"
-                        class="btn btn-success w-100 py-2.5 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2 mt-auto text-uppercase"
+                        class="btn btn-success w-100 py-2.5 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2 text-uppercase"
+                        style="margin-top: 10px;"
                         onclick="executeExnessMasterOrder()">
                     <span class="material-icons fs-5" id="exnessBtnIcon">trending_up</span>
                     <span id="exnessBtnText">BUY NIFTY 50 (25 UNITS)</span>
@@ -780,6 +813,34 @@
         background: rgba(255, 255, 255, 0.07);
         border-color: rgba(59, 130, 246, 0.4);
     }
+    .sl-preset-btn, .rr-preset-btn {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        color: var(--text-muted, #94a3b8);
+        transition: all 0.15s ease;
+    }
+    .sl-preset-btn:hover {
+        background: rgba(239, 68, 68, 0.15);
+        color: #ef4444;
+        border-color: rgba(239, 68, 68, 0.4);
+    }
+    .sl-preset-btn.active {
+        background: rgba(239, 68, 68, 0.25) !important;
+        border-color: #ef4444 !important;
+        color: #ffffff !important;
+        font-weight: bold;
+    }
+    .rr-preset-btn:hover {
+        background: rgba(56, 189, 248, 0.15);
+        color: #38bdf8;
+        border-color: rgba(56, 189, 248, 0.4);
+    }
+    .rr-preset-btn.active {
+        background: rgba(56, 189, 248, 0.25) !important;
+        border-color: #38bdf8 !important;
+        color: #ffffff !important;
+        font-weight: bold;
+    }
 </style>
 
 <!-- Load Lightweight Charts Open Source Library v4 to prevent v5 API breakage -->
@@ -790,10 +851,11 @@
     let exnessEmaSeries = null;
     
     let currentExnessCategory = 'INDEX';
-    let currentExnessSymbol = 'NIFTY 50';
-    let currentFyersSymbol = 'NSE:NIFTY50-INDEX';
+    let currentExnessSymbol = '{{ default_symbol|default:"NIFTY 50" }}';
+    let currentFyersSymbol = '{{ default_fyers_sym|default:"NSE:NIFTY50-INDEX" }}';
+    let currentSecurityId = '';
     let currentBaseLtp = null;
-    let currentLotSize = 25;
+    let currentLotSize = {{ default_lot_size|default:65 }};
     let currentSide = 'BUY';
     let currentOrderType = 'MARKET';
     let currentProductMode = 'MIS';
@@ -801,19 +863,21 @@
     let currentActiveBar = null;
 
     // Dual Tab Navigation State
-    let lastSpotIndex = { name: 'NIFTY 50', fyersSym: 'NSE:NIFTY50-INDEX', lotSize: 25 };
+    let lastSpotIndex = { name: '{{ default_symbol|default:"NIFTY 50" }}', fyersSym: '{{ default_fyers_sym|default:"NSE:NIFTY50-INDEX" }}', lotSize: {{ default_lot_size|default:65 }} };
     let lastOptionStrike = null;
     let activeChartTab = 'SPOT';
 
     // Trade Config Defaults & Units
+    let currentRiskReward = 2.0;
     let tradeConfig = {
         defaultLots: 1,
-        slEnabled: false,
+        slEnabled: true,
         slUnit: 'pts',
-        slValue: 20,
-        tpEnabled: false,
+        slValue: 10,
+        tpEnabled: true,
         tpUnit: 'pts',
-        tpValue: 40
+        tpValue: 20,
+        riskReward: 2.0
     };
 
     // ─────────────────────────────────────────────────────────────
@@ -874,15 +938,28 @@
 
         await loadExnessSymbolData(currentFyersSymbol, currentResolution);
 
-        // Auto-resize
-        window.addEventListener('resize', () => {
-            if (exnessChartInstance && container) {
-                exnessChartInstance.applyOptions({ 
-                    width: container.clientWidth,
-                    height: container.clientHeight || 420
-                });
-            }
-        });
+        // Dynamic Responsive Auto-Fill for Full HD & WQHD
+        if (window.ResizeObserver) {
+            const ro = new ResizeObserver(entries => {
+                for (let entry of entries) {
+                    const w = entry.contentRect.width;
+                    const h = entry.contentRect.height;
+                    if (exnessChartInstance && w > 0 && h > 0) {
+                        exnessChartInstance.applyOptions({ width: w, height: h });
+                    }
+                }
+            });
+            ro.observe(container);
+        } else {
+            window.addEventListener('resize', () => {
+                if (exnessChartInstance && container) {
+                    exnessChartInstance.applyOptions({ 
+                        width: container.clientWidth,
+                        height: container.clientHeight || 420
+                    });
+                }
+            });
+        }
 
         startRealTimeWebSocketStream();
     }
@@ -1021,10 +1098,10 @@
             });
 
             // If incoming tick matches current active instrument, update chart and order ticket
-            const matchesActive = (
-                (sym && (sym === currentExnessSymbol || sym === currentFyersSymbol)) ||
-                (idx && (idx === currentExnessSymbol || currentFyersSymbol.includes(idx) || currentExnessSymbol.replace(/\s+/g, '').includes(idx)))
-            );
+            // Strict Category Isolation: Option charts must NEVER accept Spot Index ticks!
+            const matchesActive = (currentExnessCategory === 'INDEX')
+                ? ((idx && (idx === currentExnessSymbol || currentFyersSymbol.includes(idx))) || (sym && (sym === currentExnessSymbol || sym === currentFyersSymbol)))
+                : (sym && (sym === currentExnessSymbol || sym === currentFyersSymbol || (data.fyers_sym && data.fyers_sym === currentFyersSymbol)));
 
             if (matchesActive) {
                 currentBaseLtp = ltp;
@@ -1065,11 +1142,12 @@
     // ─────────────────────────────────────────────────────────────
     // Exness Trading Platform Interactions & Dual Tab Management
     // ─────────────────────────────────────────────────────────────
-    function selectExnessSymbol(name, fyersSym, lotSize, cat, el) {
+    function selectExnessSymbol(name, fyersSym, lotSize, cat, el, secId) {
         currentExnessCategory = cat || (fyersSym && fyersSym.includes('-INDEX') ? 'INDEX' : 'OPTION');
         currentExnessSymbol = name;
         currentFyersSymbol = fyersSym;
-        currentLotSize = lotSize || 25;
+        currentSecurityId = secId || '';
+        currentLotSize = lotSize || 65;
         currentBaseLtp = null;
 
         // Update Chart Title & Badges
@@ -1081,6 +1159,7 @@
 
         const lotInfo = document.getElementById('lotSizeInfo');
         if (lotInfo) lotInfo.textContent = `1 Lot = ${currentLotSize} Units`;
+        calculateExnessMetrics();
 
         const chartIcon = document.getElementById('adminChartIcon');
 
@@ -1105,6 +1184,15 @@
             document.getElementById('tabSpotIndexBtn')?.classList.add('text-muted');
             if (chartIcon) chartIcon.className = 'material-icons text-warning fs-5';
         }
+
+        // Reset active bar, clear previous series & auto-fit price scale
+        currentActiveBar = null;
+        if (exnessCandleSeries) exnessCandleSeries.setData([]);
+        if (exnessEmaSeries) exnessEmaSeries.setData([]);
+        if (exnessChartInstance) {
+            exnessChartInstance.priceScale('right').applyOptions({ autoScale: true });
+        }
+        updateHeaderOHLC('—', '—', '—', '—');
 
         // Clear ticket prices to '—' until real data arrives
         updateTicketPricesFromLTP(null);
@@ -1195,7 +1283,7 @@
 
                     const ceName = `${data.spot_symbol} ${s.strike} CE`;
                     const peName = `${data.spot_symbol} ${s.strike} PE`;
-                    const lotSize = data.strike_step === 100 ? 15 : 25;
+                    const lotSize = data.lot_size || (data.strike_step === 100 ? 30 : (data.strike_step === 25 ? 120 : 65));
 
                     const ceChgSign = String(s.ce_chg_pct).startsWith('-') ? 'text-danger' : 'text-success';
                     const peChgSign = String(s.pe_chg_pct).startsWith('-') ? 'text-danger' : 'text-success';
@@ -1403,12 +1491,14 @@
         if (side === 'BUY') {
             buyCard.classList.add('active-side-card');
             sellCard.classList.remove('active-side-card');
-            btn.className = 'btn btn-success w-100 py-2.5 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2 mt-auto text-uppercase';
+            btn.className = 'btn btn-success w-100 py-2.5 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2 text-uppercase';
+            btn.style.marginTop = '10px';
             if (icon) icon.textContent = 'trending_up';
         } else {
             sellCard.classList.add('active-side-card');
             buyCard.classList.remove('active-side-card');
-            btn.className = 'btn btn-danger w-100 py-2.5 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2 mt-auto text-uppercase';
+            btn.className = 'btn btn-danger w-100 py-2.5 rounded-3 fw-bold fs-6 shadow-lg d-flex align-items-center justify-content-center gap-2 text-uppercase';
+            btn.style.marginTop = '10px';
             if (icon) icon.textContent = 'trending_down';
         }
         calculateExnessMetrics();
@@ -1518,6 +1608,53 @@
         if (shouldRecalc) calculateExnessMetrics();
     }
 
+    function setRiskRewardRatio(ratio, btn) {
+        currentRiskReward = parseFloat(ratio) || 2.0;
+        tradeConfig.riskReward = currentRiskReward;
+        document.querySelectorAll('.rr-preset-btn').forEach(b => {
+            b.classList.remove('active');
+        });
+        if (btn) {
+            btn.classList.add('active');
+        }
+        recalcTpFromSl();
+    }
+
+    function setSlPreset(val, btn) {
+        const slInp = document.getElementById('ticketSlValue');
+        if (slInp) {
+            slInp.value = val;
+        }
+        document.querySelectorAll('.sl-preset-btn').forEach(b => {
+            b.classList.remove('active');
+        });
+        if (btn) {
+            btn.classList.add('active');
+        }
+        recalcTpFromSl();
+    }
+
+    function onSlInputChange() {
+        const slInp = document.getElementById('ticketSlValue');
+        const val = parseFloat(slInp?.value || 0);
+        document.querySelectorAll('.sl-preset-btn').forEach(b => {
+            const btnVal = parseFloat(b.textContent.trim());
+            b.classList.toggle('active', btnVal === val);
+        });
+        recalcTpFromSl();
+    }
+
+    function recalcTpFromSl() {
+        const slInp = document.getElementById('ticketSlValue');
+        const tpInp = document.getElementById('ticketTpValue');
+        const slVal = parseFloat(slInp?.value || 0);
+        if (slVal > 0 && currentRiskReward > 0 && tpInp) {
+            const tpVal = parseFloat((slVal * currentRiskReward).toFixed(1));
+            tpInp.value = tpVal;
+        }
+        calculateExnessMetrics();
+    }
+
     function toggleRiskField(field) {
         if (field === 'sl') {
             const sw = document.getElementById('enableSlSwitch');
@@ -1541,9 +1678,10 @@
         const lots = parseInt(document.getElementById('ticketLotsInput')?.value || 1);
         tradeConfig.defaultLots = lots;
         tradeConfig.slEnabled = document.getElementById('enableSlSwitch')?.checked || false;
-        tradeConfig.slValue = parseFloat(document.getElementById('ticketSlValue')?.value || 20);
+        tradeConfig.slValue = parseFloat(document.getElementById('ticketSlValue')?.value || 10);
         tradeConfig.tpEnabled = document.getElementById('enableTpSwitch')?.checked || false;
-        tradeConfig.tpValue = parseFloat(document.getElementById('ticketTpValue')?.value || 40);
+        tradeConfig.tpValue = parseFloat(document.getElementById('ticketTpValue')?.value || 20);
+        tradeConfig.riskReward = currentRiskReward || 2.0;
 
         localStorage.setItem('marmot_terminal_trade_config', JSON.stringify(tradeConfig));
         if (window.bootstrap && document.body) {
@@ -1564,23 +1702,35 @@
         const lotInp = document.getElementById('ticketLotsInput');
         if (lotInp && tradeConfig.defaultLots) lotInp.value = tradeConfig.defaultLots;
 
+        if (tradeConfig.riskReward) {
+            currentRiskReward = parseFloat(tradeConfig.riskReward) || 2.0;
+            document.querySelectorAll('.rr-preset-btn').forEach(b => {
+                b.classList.toggle('active', parseFloat(b.textContent.trim()) === currentRiskReward);
+            });
+        }
+
         const slSw = document.getElementById('enableSlSwitch');
         const slInp = document.getElementById('ticketSlValue');
         if (slSw && slInp) {
-            slSw.checked = tradeConfig.slEnabled;
-            slInp.value = tradeConfig.slValue || 20;
-            slInp.disabled = !tradeConfig.slEnabled;
-            slInp.classList.toggle('opacity-50', !tradeConfig.slEnabled);
+            slSw.checked = (tradeConfig.slEnabled !== undefined) ? tradeConfig.slEnabled : true;
+            slInp.value = tradeConfig.slValue || 10;
+            slInp.disabled = !slSw.checked;
+            slInp.classList.toggle('opacity-50', !slSw.checked);
             setRiskUnit('sl', tradeConfig.slUnit || 'pts', false);
+            
+            // Highlight matching preset button
+            document.querySelectorAll('.sl-preset-btn').forEach(b => {
+                b.classList.toggle('active', parseFloat(b.textContent.trim()) === parseFloat(slInp.value));
+            });
         }
 
         const tpSw = document.getElementById('enableTpSwitch');
         const tpInp = document.getElementById('ticketTpValue');
         if (tpSw && tpInp) {
-            tpSw.checked = tradeConfig.tpEnabled;
-            tpInp.value = tradeConfig.tpValue || 40;
-            tpInp.disabled = !tradeConfig.tpEnabled;
-            tpInp.classList.toggle('opacity-50', !tradeConfig.tpEnabled);
+            tpSw.checked = (tradeConfig.tpEnabled !== undefined) ? tradeConfig.tpEnabled : true;
+            tpInp.value = tradeConfig.tpValue || 20;
+            tpInp.disabled = !tpSw.checked;
+            tpInp.classList.toggle('opacity-50', !tpSw.checked);
             setRiskUnit('tp', tradeConfig.tpUnit || 'pts', false);
         }
         calculateExnessMetrics();
@@ -1666,25 +1816,88 @@
         }
     }
 
-    function executeExnessMasterOrder() {
+    async function executeExnessMasterOrder() {
         if (currentExnessCategory === 'INDEX' || (currentFyersSymbol && currentFyersSymbol.includes('-INDEX'))) {
             showNonTradableIndexModal();
             return;
         }
 
-        const lots = document.getElementById('ticketLotsInput')?.value || 1;
+        const lots = parseInt(document.getElementById('ticketLotsInput')?.value || 1);
         const units = lots * currentLotSize;
         const scope = document.getElementById('adminTargetScope')?.value || 'ALL';
-        const mode = '{% if is_sandbox %}SANDBOX SIMULATOR{% else %}LIVE BROKER{% endif %}';
+        const isSandbox = {% if is_sandbox %}true{% else %}false{% endif %};
+        const mode = isSandbox ? 'SANDBOX' : 'LIVE';
 
-        const msg = `${currentSide} ${currentOrderType} (${currentProductMode}) Order for ${units} Units of ${currentExnessSymbol} dispatched in ${mode}.`;
-        if (window.bootstrap && document.body) {
-            const evt = new CustomEvent('showToast', {
-                detail: { message: msg, level: currentSide === 'BUY' ? 'success' : 'danger' }
+        const btn = document.getElementById('exnessExecuteBtn');
+        const originalText = document.getElementById('exnessBtnText')?.textContent || '';
+        const btnTextEl = document.getElementById('exnessBtnText');
+        const btnIconEl = document.getElementById('exnessBtnIcon');
+
+        // Loading state
+        if (btn) btn.disabled = true;
+        if (btnIconEl) btnIconEl.textContent = 'hourglass_empty';
+        if (btnTextEl) btnTextEl.textContent = 'DISPATCHING TO BROKER...';
+
+        const limitPrice = parseFloat(document.getElementById('ticketLimitPrice')?.value || 0.0);
+        const triggerPrice = parseFloat(document.getElementById('ticketTriggerPrice')?.value || 0.0);
+        const slValue = document.getElementById('enableSlSwitch')?.checked ? parseFloat(document.getElementById('ticketSlValue')?.value || 0.0) : 0.0;
+        const tpValue = document.getElementById('enableTpSwitch')?.checked ? parseFloat(document.getElementById('ticketTpValue')?.value || 0.0) : 0.0;
+
+        const payload = {
+            symbol: currentFyersSymbol || currentExnessSymbol,
+            display_symbol: currentExnessSymbol,
+            security_id: currentSecurityId || '',
+            side: currentSide,
+            order_type: currentOrderType,
+            product_type: currentProductMode === 'MIS' ? 'INTRADAY' : 'CNC',
+            lots: lots,
+            quantity: units,
+            price: currentOrderType === 'LIMIT' ? limitPrice : (currentBaseLtp || 0.0),
+            trigger_price: triggerPrice,
+            stop_loss: slValue,
+            take_profit: tpValue,
+            target_scope: scope,
+            execution_mode: mode
+        };
+
+        try {
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]')?.value || 
+                              (document.cookie.split('; ').find(row => row.startsWith('csrftoken=')) || '').split('=')[1] || '';
+
+            const response = await fetch('{% url "admins:admin-live-order-place" %}', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'X-CSRFToken': csrfToken
+                },
+                body: JSON.stringify(payload)
             });
-            document.body.dispatchEvent(evt);
-        } else {
-            alert(msg);
+
+            const data = await response.json();
+
+            if (response.ok && data.success) {
+                const toastMsg = data.message || `Order dispatched: ${currentSide} ${units} ${currentExnessSymbol}`;
+                document.body.dispatchEvent(new CustomEvent('showToast', {
+                    detail: { message: toastMsg, level: 'success' }
+                }));
+
+                // Trigger live orders and positions reload
+                document.body.dispatchEvent(new CustomEvent('reloadLiveOrders'));
+                document.body.dispatchEvent(new CustomEvent('reloadLivePositions'));
+            } else {
+                const errMsg = data.message || 'Broker order rejected.';
+                document.body.dispatchEvent(new CustomEvent('showToast', {
+                    detail: { message: errMsg, level: 'danger' }
+                }));
+            }
+        } catch (err) {
+            document.body.dispatchEvent(new CustomEvent('showToast', {
+                detail: { message: `Order Dispatch Error: ${err.message || err}`, level: 'danger' }
+            }));
+        } finally {
+            if (btn) btn.disabled = false;
+            if (btnIconEl) btnIconEl.textContent = 'trending_up';
+            if (btnTextEl) btnTextEl.textContent = originalText;
         }
     }
 

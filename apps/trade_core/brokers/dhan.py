@@ -1,14 +1,21 @@
-import logging
-import uuid
 import json
-from typing import Dict, Any, Tuple
+import logging
+import re
+import time
+import uuid
 from concurrent.futures import ThreadPoolExecutor
+from typing import Any, Dict, Tuple
+
 import requests
 from django.conf import settings
+
 from apps.trade_core.services.dhan_token_service import UserDhanClient, _get_redis
 from .base import BaseBrokerAdapter
+from .dhan_scrip import DhanScripResolver
+
 
 logger = logging.getLogger(__name__)
+
 
 class DhanBrokerAdapter(BaseBrokerAdapter):
     """
@@ -159,12 +166,14 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         price: float = 0.0, 
         stop_loss: float = 0.0,
         take_profit: float = 0.0,
-        account_type: str = 'SANDBOX'
+        account_type: str = 'SANDBOX',
+        **kwargs
     ) -> Dict[str, Any]:
         order_id = f"DHAN-{'SANDBOX' if account_type == 'SANDBOX' else 'LIVE'}-{uuid.uuid4().hex[:8].upper()}"
         estimated_brokerage = self.calculate_estimated_brokerage(quantity, price, side)
 
         telemetry = {
+            'success': True,
             'order_id': order_id,
             'broker': 'DHAN',
             'account_type': account_type,
@@ -177,6 +186,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             'take_profit': take_profit,
             'status': 'EXECUTED',
             'estimated_brokerage': estimated_brokerage,
+            'message': f"Order {order_id} placed successfully in {account_type} mode.",
             'api_response': {
                 'status': 'success',
                 'dhan_client_id': self.client_id,
@@ -188,19 +198,34 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         # Forward order to Dhan API (Live or Mock Emulator Sandbox)
         if account_type == 'LIVE' or getattr(settings, 'DHAN_EMULATOR_ENABLED', False):
             try:
-                import requests
                 target_base_url = self.get_base_url(account_type)
                 token = str(self.get_access_token() or '').strip().strip('"').strip("'")
                 clean_cid = str(self.client_id or '1000000001').strip().strip('"').strip("'")
+                clean_corr_id = re.sub(r'[^a-zA-Z0-9]', '', f"MMT{int(time.time()*1000)}{uuid.uuid4().hex[:6]}")[:25]
+
+                # Resolve numeric securityId and trading symbol via DhanScripResolver
+                sec_id, resolved_sym, default_lot, seg = DhanScripResolver.resolve(symbol, security_id=kwargs.get('security_id'))
+
+                # Align quantity with verified contract lot units to eliminate DH-905 "Invalid Quantity"
+                if default_lot and default_lot > 0:
+                    order_lots = kwargs.get('lots')
+                    if order_lots and int(order_lots) > 0:
+                        quantity = int(order_lots) * default_lot
+                    elif quantity % default_lot != 0:
+                        num_lots = max(1, round(quantity / default_lot))
+                        quantity = num_lots * default_lot
+                telemetry['quantity'] = quantity
+
                 payload = {
                     "dhanClientId": clean_cid,
-                    "correlationId": symbol,
+                    "correlationId": clean_corr_id,
                     "transactionType": side.upper(),
-                    "exchangeSegment": "NSE_FNO" if any(idx in symbol.upper() for idx in ['NIFTY', 'BANKNIFTY']) else "NSE_EQ",
+                    "exchangeSegment": seg,
                     "productType": "INTRADAY",
                     "orderType": order_type.upper(),
                     "validity": "DAY",
-                    "securityId": symbol,
+                    "securityId": str(sec_id),
+                    "tradingSymbol": str(resolved_sym)[:25],
                     "quantity": quantity,
                     "price": price,
                     "triggerPrice": stop_loss,
@@ -208,18 +233,36 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                     "boProfitValue": take_profit
                 }
                 headers = {"access-token": token, "client-id": clean_cid, "Content-Type": "application/json"}
-                resp = requests.post(f"{target_base_url}/orders", json=payload, headers=headers, timeout=6)
+                resp = requests.post(f"{target_base_url}/orders", json=payload, headers=headers, timeout=8)
                 if resp.status_code in (200, 201, 202):
                     dhan_data = resp.json()
                     order_id = dhan_data.get("orderId", order_id)
+                    order_status = dhan_data.get("orderStatus", "TRADED")
                     telemetry['order_id'] = order_id
+                    telemetry['status'] = order_status
+                    telemetry['success'] = order_status not in ('REJECTED', 'CANCELLED', 'FAILED')
+                    telemetry['message'] = f"Dhan {order_status}: Order #{order_id} placed."
                     telemetry['api_response'] = dhan_data
+                else:
+                    err_text = resp.text
+                    try:
+                        err_json = resp.json()
+                        err_text = err_json.get("remarks", {}).get("error_message") or err_json.get("errorMessage") or err_json.get("message") or resp.text
+                    except Exception:
+                        pass
+                    telemetry['success'] = False
+                    telemetry['status'] = 'REJECTED'
+                    telemetry['message'] = f"Dhan Rejection: {err_text}"
+                    telemetry['api_response'] = {'status': 'failed', 'error': err_text, 'http_code': resp.status_code}
             except Exception as ex:
                 logger.warning(f"Dhan gateway order dispatch exception: {ex}")
+                telemetry['success'] = False
+                telemetry['status'] = 'NETWORK_ERROR'
+                telemetry['message'] = f"Dhan API network error: {ex}"
 
-        logger.info(f"Dhan Order Executed [{account_type}]: {order_id} for user @{self.user.username}")
+        logger.info(f"Dhan Order Result [{account_type}]: {telemetry.get('order_id')} status={telemetry.get('status')} user=@{self.user.username}")
         try:
-            _get_redis().publish('marmot:orders', json.dumps({'type': 'order_update', 'broker': 'DHAN', 'order_id': order_id}))
+            _get_redis().publish('marmot:orders', json.dumps({'type': 'order_update', 'broker': 'DHAN', 'order_id': order_id, 'status': telemetry.get('status')}))
             _get_redis().publish('marmot:positions', json.dumps({'type': 'position_update', 'broker': 'DHAN'}))
         except Exception:
             pass

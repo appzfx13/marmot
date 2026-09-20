@@ -448,6 +448,44 @@ class AdminLiveMockDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequ
 AdminMockBrokerDashboardView = AdminLiveMockDashboardView
 
 
+class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Admin Dhan Broker Gateway Emulator View running inside Marmot Admin SPA."""
+
+    template_name = 'admins/gateway_emulator.html'
+    partial_template_name = 'admins/partials/gateway_emulator_content.html'
+
+    def get_context_data(self, **kwargs):
+        import requests
+        context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'gateway-emulator'
+        context['dashboard_title'] = 'Broker Gateway Emulator'
+
+        mock_online = False
+        active_account = {'active_account_id': '1000000001', 'account_name': 'Primary Algorithmic Trading'}
+
+        try:
+            r_health = requests.get('http://mock_broker:8088/health', timeout=1.0)
+            if r_health.status_code == 200:
+                mock_online = True
+        except Exception:
+            mock_online = False
+
+        if mock_online:
+            try:
+                r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=1.0)
+                if r_acc.status_code == 200:
+                    active_account = r_acc.json()
+            except Exception:
+                pass
+
+        host_name = self.request.get_host().split(':')[0]
+        context['mock_online'] = mock_online
+        context['active_account'] = active_account
+        context['emulator_url'] = f"http://{host_name}:8088/mock/dashboard?embedded=1"
+        context['emulator_external_url'] = f"http://{host_name}:8088/mock/dashboard"
+        return context
+
+
 class AdminMockBrokerStatsView(LoginRequiredMixin, AdminRequiredMixin, View):
     """HTMX partial view returning live KPI cards."""
 
@@ -833,6 +871,105 @@ class AdminLiveOrderCancelView(LoginRequiredMixin, AdminRequiredMixin, View):
             'closeGlobalModal': True,
         })
         return response
+
+
+class AdminLiveOrderPlaceView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Executes live or sandbox orders dispatched from the Terminal order ticket."""
+
+    def post(self, request, *args, **kwargs):
+        import json
+        user = request.user
+
+        try:
+            if request.content_type == 'application/json':
+                body = json.loads(request.body.decode('utf-8'))
+            else:
+                body = request.POST.dict()
+        except Exception:
+            body = request.POST.dict()
+
+        symbol = str(body.get('symbol') or '').strip()
+        display_symbol = str(body.get('display_symbol') or symbol).strip()
+        security_id = str(body.get('security_id') or '').strip()
+        side = str(body.get('side', 'BUY')).upper().strip()
+        order_type = str(body.get('order_type', 'MARKET')).upper().strip()
+        product_type = str(body.get('product_type', 'INTRADAY')).upper().strip()
+        quantity = int(body.get('quantity', 0) or 0)
+        price = float(body.get('price', 0.0) or 0.0)
+        stop_loss = float(body.get('stop_loss', 0.0) or 0.0)
+        take_profit = float(body.get('take_profit', 0.0) or 0.0)
+        target_scope = str(body.get('target_scope', 'ALL')).upper().strip()
+        execution_mode = str(body.get('execution_mode') or body.get('account_type') or 'LIVE').upper().strip()
+
+        if not symbol or quantity <= 0:
+            return JsonResponse({'success': False, 'message': 'Invalid symbol or quantity.'}, status=400)
+
+        # 1. Master Risk Check
+        if getattr(user, 'is_blocked', False) or getattr(user, 'primary_freeze', False):
+            return JsonResponse({'success': False, 'message': 'Account is currently frozen or blocked from trading.'}, status=403)
+
+        # 2. Resolve Target Trading Accounts
+        accounts = []
+        if execution_mode == 'SANDBOX':
+            accounts = list(user.trading_accounts.filter(is_active=True, account_type='MOCK'))
+            if not accounts:
+                accounts = list(user.trading_accounts.filter(is_active=True).order_by('-is_default'))[:1]
+        elif target_scope == 'DHAN_ONLY':
+            accounts = list(user.trading_accounts.filter(is_active=True, account_type='LIVE', broker__code='dhan'))
+        elif target_scope == 'FYERS_ONLY':
+            accounts = list(user.trading_accounts.filter(is_active=True, account_type='LIVE', broker__code='fyers'))
+        elif target_scope == 'SPECIFIC':
+            default_acc = user.trading_accounts.filter(is_active=True, account_type='LIVE', is_default=True).first()
+            accounts = [default_acc] if default_acc else list(user.trading_accounts.filter(is_active=True, account_type='LIVE')[:1])
+        else:  # 'ALL'
+            accounts = list(user.trading_accounts.filter(is_active=True, account_type='LIVE'))
+            if not accounts:
+                accounts = list(user.trading_accounts.filter(is_active=True).order_by('-is_default'))[:1]
+
+        if not accounts:
+            return JsonResponse({'success': False, 'message': f'No active {execution_mode} trading accounts found for scope {target_scope}.'}, status=404)
+
+        results = []
+        for acc in accounts:
+            try:
+                adapter = BrokerFactory.get_adapter(acc)
+                res = adapter.place_order(
+                    symbol=symbol,
+                    quantity=quantity,
+                    side=side,
+                    order_type=order_type,
+                    price=price,
+                    stop_loss=stop_loss,
+                    take_profit=take_profit,
+                    account_type=execution_mode,
+                    security_id=security_id,
+                    display_symbol=display_symbol,
+                    lots=int(body.get('lots', 0) or 0)
+                )
+                results.append({
+                    'account_name': acc.account_name,
+                    'broker': acc.broker.name if acc.broker else 'Broker',
+                    'client_id': acc.broker_client_id,
+                    'result': res
+                })
+            except Exception as e:
+                logger.error("Order placement exception for account %s: %s", acc.account_name, e)
+                results.append({
+                    'account_name': acc.account_name,
+                    'broker': acc.broker.name if acc.broker else 'Broker',
+                    'client_id': acc.broker_client_id,
+                    'result': {'success': False, 'status': 'ERROR', 'message': str(e)}
+                })
+
+        overall_success = any(r['result'].get('success', False) for r in results)
+        primary_msg = results[0]['result'].get('message', 'Order processed.') if results else 'No orders dispatched.'
+
+        return JsonResponse({
+            'success': overall_success,
+            'message': primary_msg,
+            'results': results,
+            'dispatched_count': len(results)
+        }, status=200 if overall_success else 400)
 
 
 class AdminLivePositionSquareOffView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -2530,6 +2667,7 @@ class AdminTerminalOptionChainAPIView(LoginRequiredMixin, AdminRequiredMixin, Vi
             index_name = 'NIFTY'
 
         from apps.common.services.live_feed_service import get_live_index_option_chain
+        from apps.common.constants import get_historical_lot_size
         chain_data = get_live_index_option_chain(index_name=index_name, is_mock=False)
 
         raw_strikes = chain_data.get('strikes', [])
@@ -2557,6 +2695,7 @@ class AdminTerminalOptionChainAPIView(LoginRequiredMixin, AdminRequiredMixin, Vi
             'is_positive': chain_data.get('is_positive', True),
             'atm_strike': chain_data.get('atm_strike', '-'),
             'strike_step': chain_data.get('strike_step', 50),
+            'lot_size': chain_data.get('lot_size') or get_historical_lot_size(index_name),
             'expiry_date': chain_data.get('expiry_date', ''),
             'pcr': chain_data.get('pcr', 0.0),
             'india_vix': chain_data.get('india_vix', 0.0),
@@ -2568,15 +2707,16 @@ class AdminTerminalOptionChainAPIView(LoginRequiredMixin, AdminRequiredMixin, Vi
 def get_initial_watchlist_indices(is_sandbox: bool = False):
     """Resolves initial authentic quotes for the 7 index choices."""
     from apps.common.models import SiteSettings
+    from apps.common.constants import get_historical_lot_size
     from apps.trade_core.brokers.fyers import FyersBrokerAdapter
 
     index_defs = [
-        {'symbol': 'NIFTY 50', 'index': 'NIFTY', 'fyers_sym': 'NSE:NIFTY50-INDEX', 'quote_sym': 'NSE:NIFTY50-INDEX', 'lot': 25},
-        {'symbol': 'BANK NIFTY', 'index': 'BANKNIFTY', 'fyers_sym': 'NSE:NIFTYBANK-INDEX', 'quote_sym': 'NSE:NIFTYBANK-INDEX', 'lot': 15},
-        {'symbol': 'FIN NIFTY', 'index': 'FINNIFTY', 'fyers_sym': 'NSE:FINNIFTY-INDEX', 'quote_sym': 'NSE:FINNIFTY-INDEX', 'lot': 25},
-        {'symbol': 'MIDCP NIFTY', 'index': 'MIDCPNIFTY', 'fyers_sym': 'NSE:MIDCPNIFTY-INDEX', 'quote_sym': 'NSE:MIDCPNIFTY-INDEX', 'lot': 50},
-        {'symbol': 'BSE SENSEX', 'index': 'SENSEX', 'fyers_sym': 'BSE:SENSEX-INDEX', 'quote_sym': 'BSE:SENSEX-INDEX', 'lot': 10},
-        {'symbol': 'GIFT NIFTY', 'index': 'GIFTNIFTY', 'fyers_sym': 'NSE:GIFTNIFTY-INDEX', 'quote_sym': 'NSE:NIFTY50-INDEX', 'lot': 25},
+        {'symbol': 'NIFTY 50', 'index': 'NIFTY', 'fyers_sym': 'NSE:NIFTY50-INDEX', 'quote_sym': 'NSE:NIFTY50-INDEX', 'lot': get_historical_lot_size('NIFTY')},
+        {'symbol': 'BANK NIFTY', 'index': 'BANKNIFTY', 'fyers_sym': 'NSE:NIFTYBANK-INDEX', 'quote_sym': 'NSE:NIFTYBANK-INDEX', 'lot': get_historical_lot_size('BANKNIFTY')},
+        {'symbol': 'FIN NIFTY', 'index': 'FINNIFTY', 'fyers_sym': 'NSE:FINNIFTY-INDEX', 'quote_sym': 'NSE:FINNIFTY-INDEX', 'lot': get_historical_lot_size('FINNIFTY')},
+        {'symbol': 'MIDCP NIFTY', 'index': 'MIDCPNIFTY', 'fyers_sym': 'NSE:MIDCPNIFTY-INDEX', 'quote_sym': 'NSE:MIDCPNIFTY-INDEX', 'lot': get_historical_lot_size('MIDCPNIFTY')},
+        {'symbol': 'BSE SENSEX', 'index': 'SENSEX', 'fyers_sym': 'BSE:SENSEX-INDEX', 'quote_sym': 'BSE:SENSEX-INDEX', 'lot': get_historical_lot_size('SENSEX')},
+        {'symbol': 'GIFT NIFTY', 'index': 'GIFTNIFTY', 'fyers_sym': 'NSE:GIFTNIFTY-INDEX', 'quote_sym': 'NSE:NIFTY50-INDEX', 'lot': get_historical_lot_size('GIFTNIFTY')},
         {'symbol': 'INDIA VIX', 'index': 'INDIAVIX', 'fyers_sym': 'NSE:INDIAVIX-INDEX', 'quote_sym': 'NSE:INDIAVIX-INDEX', 'lot': 1},
     ]
 
@@ -2650,7 +2790,12 @@ class AdminLiveTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredM
         context['account_id_display'] = getattr(user, 'broker_client_id', '') or 'ADMIN-MASTER-01'
         context['is_token_active'] = True
         context['is_sandbox'] = False
-        context['watchlist_indices'] = get_initial_watchlist_indices(is_sandbox=False)
+        watchlist = get_initial_watchlist_indices(is_sandbox=False)
+        context['watchlist_indices'] = watchlist
+        first_idx = watchlist[0] if watchlist else {}
+        context['default_lot_size'] = first_idx.get('lot') or 65
+        context['default_symbol'] = first_idx.get('symbol') or 'NIFTY 50'
+        context['default_fyers_sym'] = first_idx.get('fyers_sym') or 'NSE:NIFTY50-INDEX'
         return context
 
 
@@ -2671,7 +2816,12 @@ class AdminSandboxTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
         context['account_id_display'] = 'SANDBOX-SIM-01'
         context['is_token_active'] = True
         context['is_sandbox'] = True
-        context['watchlist_indices'] = get_initial_watchlist_indices(is_sandbox=True)
+        watchlist = get_initial_watchlist_indices(is_sandbox=True)
+        context['watchlist_indices'] = watchlist
+        first_idx = watchlist[0] if watchlist else {}
+        context['default_lot_size'] = first_idx.get('lot') or 65
+        context['default_symbol'] = first_idx.get('symbol') or 'NIFTY 50'
+        context['default_fyers_sym'] = first_idx.get('fyers_sym') or 'NSE:NIFTY50-INDEX'
         return context
 
 

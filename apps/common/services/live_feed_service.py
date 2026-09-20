@@ -292,7 +292,7 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
     """Fetch real-time option chain directly from Dhan Mock Broker Gateway emulator."""
     import time
     import requests
-    from apps.common.constants import get_option_expiry_analysis
+    from apps.common.constants import get_option_expiry_analysis, get_historical_lot_size
 
     mock_urls = [
         f"http://mock_broker:8088/mock/v2/optionchain?index={idx_clean}",
@@ -320,6 +320,7 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
                 data['emulator_connected'] = True
                 data['latency_ms'] = latency_ms
                 data['emulator_url'] = url
+                data['lot_size'] = get_historical_lot_size(idx_clean, trade_date)
 
                 # Evaluate active streaming state from emulator
                 f_status = data.get('feed_status', 'STANDBY').upper()
@@ -438,6 +439,7 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
         'prev_close': '0.00',
         'atm_strike': '-',
         'strike_step': strike_step,
+        'lot_size': get_historical_lot_size(idx_clean, today),
         'pcr': 0.0,
         'india_vix': 0.0,
         'expiry_info': get_option_expiry_analysis(idx_clean, today),
@@ -451,7 +453,7 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
     """Retrieve genuine real-time option chain and quotes from FYERS API or Dhan Mock Emulator."""
     import requests
     from apps.common.models import SiteSettings
-    from apps.common.constants import INDEX_STRIKE_INTERVAL, FYERS_INDEX_SYMBOLS, get_option_expiry_analysis
+    from apps.common.constants import INDEX_STRIKE_INTERVAL, FYERS_INDEX_SYMBOLS, get_option_expiry_analysis, get_historical_lot_size
 
     idx_clean = (index_name or 'NIFTY').upper().strip()
     strike_step = INDEX_STRIKE_INTERVAL.get(idx_clean, 50)
@@ -511,6 +513,7 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
             'prev_close': '0.00',
             'atm_strike': '-',
             'strike_step': strike_step,
+            'lot_size': get_historical_lot_size(idx_clean, today),
             'pcr': 0.0,
             'india_vix': 0.0,
             'expiry_info': get_option_expiry_analysis(idx_clean, today),
@@ -729,6 +732,7 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
             'prev_close': '0.00',
             'atm_strike': '-',
             'strike_step': strike_step,
+            'lot_size': get_historical_lot_size(idx_clean, today),
             'pcr': 0.0,
             'india_vix': 0.0,
             'expiry_info': get_option_expiry_analysis(idx_clean, today),
@@ -762,6 +766,7 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
         'prev_close': f"{prev_close:,.2f}",
         'atm_strike': atm_strike_val,
         'strike_step': strike_step,
+        'lot_size': get_historical_lot_size(idx_clean, today),
         'pcr': pcr,
         'india_vix': f"{india_vix:.2f}" if india_vix else "-",
         'expiry_info': expiry_info,

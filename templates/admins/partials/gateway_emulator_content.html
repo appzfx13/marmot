@@ -1,0 +1,104 @@
+{% load static %}
+
+<!-- Top Header Navigation & Live Cockpit Controls -->
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+    <div class="d-flex align-items-center gap-3">
+        <button type="button"
+           class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 page-header-back-btn flex-shrink-0"
+           style="border-color: var(--border-default, rgba(255, 255, 255, 0.1)) !important; background: var(--bg-surface, rgba(255, 255, 255, 0.03));"
+           onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='{% url 'admins:admin-dashboard' %}'; }"
+           title="Go Back">
+            <span class="material-icons" style="font-size: 1.1rem;">arrow_back</span>
+            <span class="fw-medium">Back</span>
+        </button>
+        <div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h4 class="fw-bold mb-0 text-white tracking-tight">Broker Gateway Emulator</h4>
+                {% if mock_online %}
+                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace" style="font-size: 0.72rem;">
+                    <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.5rem; height: 0.5rem;" role="status"></span>
+                    ONLINE :8088
+                </span>
+                {% else %}
+                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace" style="font-size: 0.72rem;">
+                    <span class="material-icons" style="font-size: 0.8rem;">error_outline</span>
+                    OFFLINE
+                </span>
+                {% endif %}
+                <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                    EMULATOR COCKPIT
+                </span>
+            </div>
+            <div class="theme-text-muted small mt-0.5" style="font-size: 0.8rem;">
+                Dhan Gateway v2 Emulator &bull; Microsecond Matcher &bull; Active Account: <strong class="text-info font-monospace">{{ active_account.active_account_id|default:"1000000001" }}</strong>
+            </div>
+        </div>
+    </div>
+
+    <!-- Live Header Action Buttons -->
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <a href="{% url 'admins:admin-live-mock-dashboard' %}"
+           class="btn btn-outline-info btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+           hx-get="{% url 'admins:admin-live-mock-dashboard' %}"
+           hx-target="#app-main-container"
+           hx-swap="innerHTML"
+           hx-push-url="true">
+            <span class="material-icons" style="font-size: 1rem;">insights</span>
+            <span>Session Analytics</span>
+        </a>
+
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                onclick="var ifr = document.getElementById('emulator-cockpit-frame'); if (ifr) ifr.src = ifr.src;"
+                title="Reload Cockpit Frame">
+            <span class="material-icons" style="font-size: 1rem;">refresh</span>
+            <span>Reload Cockpit</span>
+        </button>
+
+        <a href="{{ emulator_external_url }}"
+           target="_blank"
+           class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+           title="Open standalone emulator in new window">
+            <span class="material-icons" style="font-size: 1rem;">open_in_new</span>
+            <span>Pop Out</span>
+        </a>
+    </div>
+</div>
+
+<!-- Main Emulator Cockpit Container (col-12 Full Width) -->
+<div class="col-12 px-0">
+    {% if mock_online %}
+    <div class="glass-card position-relative overflow-hidden rounded-3 shadow-lg"
+         style="background: #09090b; border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08)) !important; min-height: calc(100vh - 150px);">
+        <iframe id="emulator-cockpit-frame"
+                src="{{ emulator_url }}"
+                title="Dhan Broker Gateway Emulator"
+                style="width: 100%; height: calc(100vh - 150px); border: none; display: block; background: #09090b;"
+                allow="clipboard-read; clipboard-write">
+        </iframe>
+    </div>
+    {% else %}
+    <div class="glass-card p-5 text-center rounded-3 my-4 shadow-sm"
+         style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08)) !important;">
+        <div class="mb-3">
+            <span class="material-icons text-danger" style="font-size: 3rem;">portable_wifi_off</span>
+        </div>
+        <h5 class="fw-bold text-white mb-2">Dhan Broker Gateway Emulator (:8088) Offline</h5>
+        <p class="theme-text-muted small mx-auto mb-4" style="max-width: 520px;">
+            The Dhan Emulator service is currently unreachable on <code>http://localhost:8088</code>. Please verify that the <code>dhan_mock_broker</code> Docker container is running and port 8088 is mapped.
+        </p>
+        <div class="d-flex align-items-center justify-content-center gap-2">
+            <button type="button"
+                    class="btn btn-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+                    hx-get="{% url 'admins:admin-gateway-emulator' %}"
+                    hx-target="#gateway-emulator-container"
+                    hx-swap="innerHTML">
+                <span class="material-icons" style="font-size: 1.1rem;">replay</span>
+                <span>Retry Connection</span>
+            </button>
+            <a href="{{ emulator_external_url }}" target="_blank" class="btn btn-outline-secondary rounded-pill px-3 py-2">
+                <span>Check Standalone URL</span>
+            </a>
+        </div>
+    </div>
+    {% endif %}
+</div>

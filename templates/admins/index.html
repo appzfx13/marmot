@@ -1785,8 +1785,13 @@
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
-                        <a href="http://localhost:8088/mock/dashboard" class="sidebar-menu-link"
-                            id="admin-menu-gateway-emulator" target="_blank">
+                        <a href="{% url 'admins:admin-gateway-emulator' %}"
+                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-gateway-emulator' or '/admins/dashboard/gateway-emulator/' in request.path or '/gateway-emulator/' in request.path %}active{% endif %}"
+                            id="admin-menu-gateway-emulator"
+                            hx-get="{% url 'admins:admin-gateway-emulator' %}"
+                            hx-target="#app-main-container"
+                            hx-swap="innerHTML"
+                            hx-push-url="true">
                             <i class="bi bi-motherboard-fill text-warning"></i>
                             <span>Gateway Emulator</span>
                             <span

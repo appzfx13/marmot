@@ -55,7 +55,8 @@ class FyersBrokerAdapter(BaseBrokerAdapter):
         price: float = 0.0, 
         stop_loss: float = 0.0,
         take_profit: float = 0.0,
-        account_type: str = 'SANDBOX'
+        account_type: str = 'SANDBOX',
+        **kwargs
     ) -> Dict[str, Any]:
         order_id = f"FYERS-{'SANDBOX' if account_type == 'SANDBOX' else 'LIVE'}-{uuid.uuid4().hex[:8].upper()}"
         estimated_brokerage = self.calculate_estimated_brokerage(quantity, price, side)

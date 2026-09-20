@@ -131,11 +131,32 @@ HISTORICAL_INDEX_EXPIRY_DAYS = {
 
 import datetime
 import calendar
+import re
 
 
 def get_historical_lot_size(index_name: str, trade_date=None) -> int:
     """Returns the regulatory exchange lot size for the given index symbol on a specific date."""
-    sym = (index_name or 'NIFTY').upper().strip()
+    raw = (index_name or 'NIFTY').upper().strip()
+    clean = re.sub(r'^(NSE:|BSE:)', '', raw).replace('-INDEX', '').replace(' ', '').replace('_', '')
+    if 'BANKEX' in clean:
+        sym = 'BANKEX'
+    elif 'BANK' in clean:
+        sym = 'BANKNIFTY'
+    elif 'FIN' in clean:
+        sym = 'FINNIFTY'
+    elif 'MID' in clean:
+        sym = 'MIDCPNIFTY'
+    elif 'SENSEX' in clean:
+        sym = 'SENSEX'
+    elif 'GIFT' in clean:
+        sym = 'GIFTNIFTY'
+    elif 'VIX' in clean:
+        return 1
+    elif 'NIFTY' in clean:
+        sym = 'NIFTY'
+    else:
+        sym = clean
+
     timeline = HISTORICAL_INDEX_LOT_SIZES.get(sym)
     if not timeline:
         return 65 if 'NIFTY' in sym else 30
@@ -158,7 +179,25 @@ def get_historical_lot_size(index_name: str, trade_date=None) -> int:
 
 def get_index_expiry_info(index_name: str, trade_date=None) -> dict:
     """Returns the active weekly/monthly expiry weekday and schedule for the index on a given date."""
-    sym = (index_name or 'NIFTY').upper().strip()
+    raw = (index_name or 'NIFTY').upper().strip()
+    clean = re.sub(r'^(NSE:|BSE:)', '', raw).replace('-INDEX', '').replace(' ', '').replace('_', '')
+    if 'BANKEX' in clean:
+        sym = 'BANKEX'
+    elif 'BANK' in clean:
+        sym = 'BANKNIFTY'
+    elif 'FIN' in clean:
+        sym = 'FINNIFTY'
+    elif 'MID' in clean:
+        sym = 'MIDCPNIFTY'
+    elif 'SENSEX' in clean:
+        sym = 'SENSEX'
+    elif 'GIFT' in clean:
+        sym = 'GIFTNIFTY'
+    elif 'NIFTY' in clean:
+        sym = 'NIFTY'
+    else:
+        sym = clean
+
     timeline = HISTORICAL_INDEX_EXPIRY_DAYS.get(sym)
     if not timeline:
         return {"day_name": "Thursday", "weekday": 3}
