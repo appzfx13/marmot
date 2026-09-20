@@ -60,12 +60,16 @@
                 <i class="bi bi-trash3"></i>
                 <span>Clear Mock Session</span>
             </button>
-            <a href="http://127.0.0.1:8088/mock/dashboard" target="_blank" 
-               class="btn btn-outline-info rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
-               style="font-size: 0.8rem; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08); color: #38bdf8;">
+            <a href="{% url 'admins:admin-gateway-emulator' %}" 
+               class="btn btn-outline-info rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none"
+               style="font-size: 0.8rem; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08); color: #38bdf8;"
+               hx-get="{% url 'admins:admin-gateway-emulator' %}"
+               hx-target="#app-main-container"
+               hx-swap="innerHTML"
+               hx-push-url="true">
                 <i class="bi bi-sliders"></i>
-                <span>Sandbox Controls</span>
-                <i class="bi bi-box-arrow-up-right ms-1 smaller opacity-75"></i>
+                <span>Gateway Emulator &amp; Replay</span>
+                <i class="bi bi-chevron-right ms-1 smaller opacity-75"></i>
             </a>
             {% else %}
             {% include 'admins/partials/master_live_switch_badge.html' %}
@@ -485,8 +489,8 @@
     <!-- START: Deployed Algorithmic Strategy Orchestrator (Top Strategy Cockpit) -->
     <div class="card shadow-sm overflow-hidden mb-0 p-0"
          id="live-deployed-strategies-card"
-         hx-get="{% url 'admins:admin-live-dashboard' %}"
-         hx-trigger="reloadLiveStrategies from:body, reloadLiveDashboard from:body, reloadSandboxDashboard from:body"
+         hx-get="{% if env_mode == 'MOCK' %}{% url 'admins:admin-live-mock-dashboard' %}{% else %}{% url 'admins:admin-live-dashboard' %}{% endif %}"
+         hx-trigger="reloadLiveStrategies from:body, reloadLiveDashboard from:body, reloadSandboxDashboard from:body, reloadMockBroker from:body"
          hx-target="#live-deployed-strategies-card"
          hx-select="#live-deployed-strategies-card"
          hx-swap="outerHTML">
@@ -502,7 +506,7 @@
                             {{ live_strategies|length }} ACTIVE DEPLOYMENTS
                         </span>
                         <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 fs-xs fw-bold">
-                            LIVE EXECUTION
+                            {% if env_mode == 'MOCK' %}MOCK EXECUTION{% else %}LIVE EXECUTION{% endif %}
                         </span>
                     </div>
                     <small class="theme-text-muted" style="font-size: 0.74rem;">Go Quant Engine &amp; quantitative strategy execution registry with isolated rulebook snapshots</small>

@@ -59,83 +59,167 @@
 
 <!-- Tab Contents -->
 <div class="tab-content">
-    <!-- Tab 1: Web UI Code & Parameters Editor -->
+    <!-- Tab 1: Visual Strategy Parameters & Tuning Editor -->
     <div class="tab-pane fade show active" id="code-editor-pane" role="tabpanel">
         <form method="POST" hx-post="{% url 'backtest:strategy_save_code' strategy.pk %}" hx-swap="none" class="mb-4">
             {% csrf_token %}
-            <div class="row g-4">
-                <!-- Left Column: Go Code Editor -->
-                <div class="col-12 col-lg-8">
-                    <div class="glass-card p-0 overflow-hidden h-100 border-0">
-                        <div class="p-3 bg-dark border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between">
-                            <div class="d-flex align-items-center gap-2">
-                                <span class="material-icons text-warning fs-5">terminal</span>
-                                <h6 class="fw-bold text-light mb-0 font-monospace">{{ strategy.go_file_path }}</h6>
-                            </div>
-                            {% if can_edit %}
-                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Admin Editable</span>
-                            {% else %}
-                            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1">Read-Only (Admin Only Edit)</span>
-                            {% endif %}
+
+            <!-- Top Action Ribbon -->
+            <div class="d-flex align-items-center justify-content-between p-3 mb-4 rounded-3" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color);">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons text-primary fs-5">tune</span>
+                    <div>
+                        <h6 class="fw-bold theme-text-main mb-0">Strategy Parameters &amp; Risk Guardrails</h6>
+                        <small class="theme-text-muted" style="font-size: 0.78rem;">Adjust indicators, stop-loss points, and execution filters without modifying Go source code</small>
+                    </div>
+                </div>
+                <div class="d-flex align-items-center gap-2">
+                    {% if can_edit %}
+                    <button type="submit" class="btn btn-success rounded-pill px-4 py-2 d-flex align-items-center gap-2 shadow fw-bold">
+                        <span class="material-icons fs-5">save</span>
+                        <span>Save Strategy Parameters</span>
+                    </button>
+                    {% else %}
+                    <span class="badge bg-warning bg-opacity-25 text-warning px-3 py-2 rounded-pill">Read-Only</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            <!-- Parameters Grid -->
+            <div class="row g-4 mb-4">
+                <!-- Column 1: Trend & Indicators -->
+                <div class="col-12 col-lg-4">
+                    <div class="glass-card p-4 h-100">
+                        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary border-opacity-20">
+                            <span class="material-icons text-info fs-5">show_chart</span>
+                            <h6 class="fw-bold theme-text-main mb-0">Trend &amp; Moving Averages</h6>
                         </div>
 
-                        <div class="position-relative">
-                            <textarea name="go_code" 
-                                      id="go-code-textarea" 
-                                      class="form-control font-monospace text-light p-3 border-0 rounded-0" 
-                                      style="background: #0d1117; color: #58a6ff !important; min-height: 520px; font-size: 0.88rem; line-height: 1.5; resize: vertical;" 
-                                      {% if not can_edit %}readonly{% endif %}>{{ go_code }}</textarea>
+                        <div class="mb-3">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Fast EMA Period</label>
+                            <input type="number" name="ema_fast" value="{{ params.ema_fast|default:9 }}" min="1" max="100" class="form-control font-monospace" {% if not can_edit %}readonly{% endif %}>
+                            <small class="theme-text-muted" style="font-size: 0.72rem;">Default 9. Fast trend line for crossover signal.</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Slow EMA Period</label>
+                            <input type="number" name="ema_slow" value="{{ params.ema_slow|default:21 }}" min="2" max="200" class="form-control font-monospace" {% if not can_edit %}readonly{% endif %}>
+                            <small class="theme-text-muted" style="font-size: 0.72rem;">Default 21. Slow baseline directional filter.</small>
+                        </div>
+
+                        <div class="mb-0">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Minimum Displacement Ratio</label>
+                            <input type="number" step="0.05" name="min_displacement" value="{{ params.min_displacement|default:0.50 }}" min="0.1" max="1.0" class="form-control font-monospace" {% if not can_edit %}readonly{% endif %}>
+                            <small class="theme-text-muted" style="font-size: 0.72rem;">Minimum candle body to range ratio (0.50 = 50%).</small>
                         </div>
                     </div>
                 </div>
 
-                <!-- Right Column: Default Parameters & Controls -->
+                <!-- Column 2: Risk Management & Order Bracket -->
                 <div class="col-12 col-lg-4">
-                    <div class="glass-card p-4 mb-4">
-                        <h6 class="fw-bold theme-text-main mb-3 d-flex align-items-center gap-2">
-                            <span class="material-icons text-primary fs-5">settings</span>
-                            Default Parameters (JSON)
-                        </h6>
-                        <p class="theme-text-muted small mb-3">Modify default lot sizes, risk ratio, stop loss %, and strike selection rules.</p>
-
-                        <textarea name="parameters_json" 
-                                  class="form-control font-monospace theme-text-main bg-transparent border-secondary border-opacity-25 p-3 mb-3" 
-                                  style="min-height: 220px; font-size: 0.85rem;" 
-                                  {% if not can_edit %}readonly{% endif %}>{{ params_json_str }}</textarea>
-
-                        {% if can_edit %}
-                        <button type="submit" class="btn btn-success w-100 rounded-pill py-2 d-flex align-items-center justify-content-center gap-2 shadow">
-                            <span class="material-icons fs-5">save</span>
-                            <span>Save Code & Parameters</span>
-                        </button>
-                        <small class="form-text theme-text-muted d-block text-center mt-2" style="font-size: 0.72rem;">
-                            Saving will recompile the Go execution container in the background.
-                        </small>
-                        {% else %}
-                        <div class="alert alert-warning py-2 small mb-0 d-flex align-items-center gap-2">
-                            <span class="material-icons fs-5">lock</span>
-                            <span>Only system administrators can save code changes.</span>
+                    <div class="glass-card p-4 h-100">
+                        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary border-opacity-20">
+                            <span class="material-icons text-warning fs-5">security</span>
+                            <h6 class="fw-bold theme-text-main mb-0">Risk Management &amp; Sizing</h6>
                         </div>
-                        {% endif %}
-                    </div>
 
-                    <!-- Info Card -->
-                    <div class="glass-card p-4">
-                        <h6 class="fw-bold theme-text-main mb-2">Strategy Specifications</h6>
-                        <ul class="list-unstyled theme-text-muted small mb-0 d-flex flex-column gap-2">
-                            <li class="d-flex justify-content-between">
-                                <span>Code Identifier:</span>
-                                <strong class="font-monospace text-primary">{{ strategy.code_name }}</strong>
-                            </li>
-                            <li class="d-flex justify-content-between">
-                                <span>Target Index:</span>
-                                <strong class="theme-text-main">{{ strategy.target_index }}</strong>
-                            </li>
-                            <li class="d-flex justify-content-between">
-                                <span>Execution Latency:</span>
-                                <strong class="text-success">&lt; 10 Microseconds</strong>
-                            </li>
-                        </ul>
+                        <div class="mb-3">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Option Stop-Loss (Points)</label>
+                            <input type="number" step="0.5" name="sl_pts" value="{{ params.sl_pts|default:params.stop_loss_points|default:15.0 }}" min="1" class="form-control font-monospace text-danger fw-bold" {% if not can_edit %}readonly{% endif %}>
+                            <small class="theme-text-muted" style="font-size: 0.72rem;">Risk per contract in premium points (e.g. 15.0 pts).</small>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Risk-Reward Target Ratio (1:X)</label>
+                            <input type="number" step="0.1" name="rr_ratio" value="{{ params.rr_ratio|default:params.risk_reward_ratio|default:2.5 }}" min="1.0" class="form-control font-monospace text-success fw-bold" {% if not can_edit %}readonly{% endif %}>
+                            <small class="theme-text-muted" style="font-size: 0.72rem;">Target multiple (2.5 = 1:2.5 RR ratio).</small>
+                        </div>
+
+                        <div class="row g-2 mb-0">
+                            <div class="col-6">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Lots Count</label>
+                                <input type="number" name="lots_count" value="{{ params.lots_count|default:1 }}" min="1" max="50" class="form-control font-monospace" {% if not can_edit %}readonly{% endif %}>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Strike Selection</label>
+                                <select name="strike_selection" class="form-select font-monospace" {% if not can_edit %}disabled{% endif %}>
+                                    <option value="ATM" {% if params.strike_selection == 'ATM' or not params.strike_selection %}selected{% endif %}>ATM (At the Money)</option>
+                                    <option value="ITM" {% if params.strike_selection == 'ITM' %}selected{% endif %}>ITM (In the Money)</option>
+                                    <option value="OTM" {% if params.strike_selection == 'OTM' %}selected{% endif %}>OTM (Out of Money)</option>
+                                </select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Column 3: Execution Rules & Session Filters -->
+                <div class="col-12 col-lg-4">
+                    <div class="glass-card p-4 h-100">
+                        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom border-secondary border-opacity-20">
+                            <span class="material-icons text-primary fs-5">filter_list</span>
+                            <h6 class="fw-bold theme-text-main mb-0">Execution Filters &amp; Timing</h6>
+                        </div>
+
+                        <!-- ORB Filter Toggle -->
+                        <div class="form-check form-switch mb-3 d-flex align-items-center justify-content-between ps-0">
+                            <label class="form-check-label theme-text-main fw-semibold small" for="use_orb_switch">
+                                15-Minute Opening Range (ORB) Filter
+                            </label>
+                            <input class="form-check-input ms-2" type="checkbox" role="switch" id="use_orb_switch" name="use_orb_filter" {% if params.use_orb_filter or params.use_orb %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
+                        </div>
+
+                        <!-- Trailing SL Toggle -->
+                        <div class="form-check form-switch mb-3 d-flex align-items-center justify-content-between ps-0">
+                            <label class="form-check-label theme-text-main fw-semibold small" for="trail_breakeven_switch">
+                                Trail Stop-Loss to Breakeven (+1.2R)
+                            </label>
+                            <input class="form-check-input ms-2" type="checkbox" role="switch" id="trail_breakeven_switch" name="trail_breakeven" {% if params.trail_breakeven %}checked{% endif %} {% if not can_edit %}disabled{% endif %}>
+                        </div>
+
+                        <!-- Session Entry Window -->
+                        <div class="row g-2 mb-3">
+                            <div class="col-6">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Entry Start</label>
+                                <input type="text" name="entry_window_from" value="{{ params.entry_window_from|default:'09:20' }}" class="form-control font-monospace" placeholder="09:20" {% if not can_edit %}readonly{% endif %}>
+                            </div>
+                            <div class="col-6">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Entry End</label>
+                                <input type="text" name="entry_window_to" value="{{ params.entry_window_to|default:'15:00' }}" class="form-control font-monospace" placeholder="15:00" {% if not can_edit %}readonly{% endif %}>
+                            </div>
+                        </div>
+
+                        <!-- Trade Cooldown -->
+                        <div class="mb-0">
+                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Trade Cooldown (Seconds)</label>
+                            <input type="number" name="cooldown_seconds" value="{{ params.cooldown_seconds|default:300 }}" min="0" step="30" class="form-control font-monospace" {% if not can_edit %}readonly{% endif %}>
+                            <small class="theme-text-muted" style="font-size: 0.72rem;">Prevents overtrading after an exit (default 300s = 5m).</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Advanced Developer Drawer (Collapsible) -->
+            <div class="accordion mb-4" id="advancedDeveloperAccordion">
+                <div class="accordion-item glass-card border-0 overflow-hidden">
+                    <h2 class="accordion-header" id="headingDeveloper">
+                        <button class="accordion-button collapsed bg-dark bg-opacity-25 text-light fw-bold py-3 px-4 shadow-none" type="button" data-bs-toggle="collapse" data-bs-target="#collapseDeveloper" aria-expanded="false" aria-controls="collapseDeveloper">
+                            <span class="material-icons fs-5 me-2 text-primary">code</span>
+                            <span>Advanced Developer Tools: Go Source Code &amp; Raw JSON</span>
+                        </button>
+                    </h2>
+                    <div id="collapseDeveloper" class="accordion-collapse collapse" aria-labelledby="headingDeveloper" data-bs-parent="#advancedDeveloperAccordion">
+                        <div class="accordion-body p-4 bg-transparent">
+                            <div class="row g-4">
+                                <div class="col-12 col-lg-8">
+                                    <h6 class="fw-bold theme-text-main mb-2">Go Source Code File: <code class="text-info">{{ strategy.go_file_path }}</code></h6>
+                                    <textarea name="go_code" id="go-code-textarea" class="form-control font-monospace text-light p-3 border-0 rounded-3" style="background: #0d1117; color: #58a6ff !important; min-height: 400px; font-size: 0.85rem; line-height: 1.5; resize: vertical;" {% if not can_edit %}readonly{% endif %}>{{ go_code }}</textarea>
+                                </div>
+                                <div class="col-12 col-lg-4">
+                                    <h6 class="fw-bold theme-text-main mb-2">Raw JSON Parameters</h6>
+                                    <textarea name="parameters_json" class="form-control font-monospace theme-text-main bg-transparent border-secondary border-opacity-25 p-3" style="min-height: 400px; font-size: 0.82rem;" {% if not can_edit %}readonly{% endif %}>{{ params_json_str }}</textarea>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -147,7 +231,7 @@
         <div class="glass-card p-4 p-md-5">
             <div class="d-flex align-items-center gap-2 mb-4 pb-3 border-bottom border-secondary border-opacity-25">
                 <span class="material-icons text-primary fs-3">menu_book</span>
-                <h5 class="fw-bold theme-text-main mb-0">Strategy User Manual & Operational Rules</h5>
+                <h5 class="fw-bold theme-text-main mb-0">Strategy User Manual &amp; Operational Rules</h5>
             </div>
 
             <div class="theme-text-main user-manual-content" style="line-height: 1.8; font-size: 0.95rem;">

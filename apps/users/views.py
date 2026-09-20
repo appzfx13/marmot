@@ -1136,8 +1136,12 @@ class UserBackupCreateView(HtmxModalMixin, LoginRequiredMixin, FormView):
     def form_valid(self, form):
         task = form.save(commit=False)
         task.created_by = self.request.user
-        task.status = MarketBackupTask.StatusChoices.CREATED
         task.save()
+        try:
+            from apps.market.services import send_control_command
+            send_control_command(str(task.id), 'START')
+        except Exception as e:
+            logger.warning(f"Failed to auto-start backup task #{task.id}: {e}")
 
         response = HttpResponse(status=204)
         msg = f"Market backup task #{task.id} requested successfully!"

@@ -132,9 +132,12 @@ func NewCompoundingEngine(initialCapital float64, params map[string]interface{})
 	riskProfile := ResolveRiskProfile(riskStr, maxLotsCap, maxRiskPct)
 
 	enableCompounding := false
-	if ec, ok := params["enable_ai_compounding"].(bool); ok {
-		enableCompounding = ec
+	if ec, ok := params["enable_ai_compounding"].(bool); ok && ec {
+		enableCompounding = true
+	} else if el, ok := params["enable_ai_lot_sizing"].(bool); ok && el {
+		enableCompounding = true
 	}
+
 
 	batchTrades := 30
 	if bt, ok := params["compounding_batch_trades"].(float64); ok && bt > 0 {

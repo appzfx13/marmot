@@ -125,7 +125,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 		log.Printf("ℹ️ [Task #%s] Skipping Option Strikes Download for %s (Index Spot only).", taskID, indexName)
 	} else {
 		log.Printf("📥 [Task #%s] [Step 2/2] Downloading Option Strikes (ATM±%d CE & PE)...", taskID, strikeCount)
-		optionFiles = j.runOptionsDownload(ctx, taskID, stagingDir, indexName, startDate, endDate, strikeCount, 45, fyersAppID, fyersAccessToken, spotMap)
+		optionFiles = j.runOptionsDownload(ctx, taskID, stagingDir, indexName, startDate, endDate, strikeCount, 45, fyersAppID, fyersAccessToken, spotMap, params.Use30Days5s)
 		if optionFiles == nil && ctx.Err() != nil {
 			log.Printf("⏸️ [Task #%s] Option strikes download interrupted by context cancellation.", taskID)
 			return
@@ -271,7 +271,19 @@ func parseOptionSymbolExpiry(symbol string) int64 {
 	return time.Now().In(ist).AddDate(0, 0, 7).Unix()
 }
 
-// downloadIndexSpot downloads 1-minute OHLCV candles for Index spot into staging Parquet chunks
+// isShortRange returns true when the date range is ≤35 calendar days (30-day preset).
+// FYERS seconds-resolution data is only available for the last 30 trading days.
+func isShortRange(startDate, endDate string) bool {
+	start, err1 := time.Parse("2006-01-02", startDate)
+	end, err2 := time.Parse("2006-01-02", endDate)
+	if err1 != nil || err2 != nil {
+		return false
+	}
+	return end.Sub(start).Hours() <= 35*24
+}
+
+// downloadIndexSpot downloads OHLCV candles for Index spot into staging Parquet chunks.
+// Uses 5S (5-second) resolution for ≤35-day ranges; 1-minute for longer ranges.
 func (j *BackupJob) downloadIndexSpot(
 	ctx context.Context,
 	taskID, stagingDir, indexName, startDate, endDate string,
@@ -293,7 +305,16 @@ func (j *BackupJob) downloadIndexSpot(
 		return nil, spotMap
 	}
 
+	// Short range → 5S resolution with 1-day chunks (FYERS seconds data limit: 30 trading days)
+	shortRange := isShortRange(startDate, endDate)
+	resolution := "1"
 	chunkDays := 30
+	if shortRange {
+		resolution = "5S"
+		chunkDays = 1
+		log.Printf("⚡ [Task #%s] Short range detected — using 5S resolution for spot data", taskID)
+	}
+
 	totalDays := int(end.Sub(start).Hours()/24) + 1
 	if totalDays <= 0 {
 		totalDays = 1
@@ -361,9 +382,9 @@ func (j *BackupJob) downloadIndexSpot(
 
 		var records []models.MarketCandleRecord
 
-		// FYERS API v3 Spot History
-		reqURL := fmt.Sprintf("https://api-t1.fyers.in/data/history?symbol=%s&resolution=1&date_format=1&range_from=%s&range_to=%s&cont_flag=1",
-			url.QueryEscape(fyersIndexSym), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
+		// FYERS API v3 Spot History (resolution=5S for short ranges, 1 for long ranges)
+		reqURL := fmt.Sprintf("https://api-t1.fyers.in/data/history?symbol=%s&resolution=%s&date_format=1&range_from=%s&range_to=%s&cont_flag=1",
+			url.QueryEscape(fyersIndexSym), resolution, chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
 
 		for attempt := 0; attempt < 3; attempt++ {
 			req, reqErr := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
@@ -462,159 +483,89 @@ func (j *BackupJob) downloadIndexSpot(
 	return createdFiles, spotMap
 }
 
-// runOptionsDownload fetches historical options data via FYERS API v3 into staging Parquet chunks
+// runOptionsDownload fetches options via FYERS API v3 and calculates exact Black-Scholes Greeks
 func (j *BackupJob) runOptionsDownload(
 	ctx context.Context,
 	taskID, stagingDir, indexName, startDate, endDate string,
 	strikeCount, startProgress int,
 	fyersAppID, fyersAccessToken string,
 	spotMap map[int64]float64,
-) []string {
-	return j.runFyersOptionsDownload(ctx, taskID, stagingDir, indexName, startDate, endDate, strikeCount, startProgress, fyersAppID, fyersAccessToken, spotMap)
-}
-
-// runFyersOptionsDownload fetches options via FYERS API v3 and calculates exact Black-Scholes Greeks
-func (j *BackupJob) runFyersOptionsDownload(
-	ctx context.Context,
-	taskID, stagingDir, indexName, startDate, endDate string,
-	strikeCount, startProgress int,
-	fyersAppID, fyersAccessToken string,
-	spotMap map[int64]float64,
+	use30Days5s bool,
 ) []string {
 	createdFiles := make([]string, 0)
 	var filesMutex sync.Mutex
 
 	tr := &http.Transport{
-		MaxIdleConns:        100,
-		MaxIdleConnsPerHost: 20,
-		IdleConnTimeout:     90 * time.Second,
+		MaxIdleConns:        config.HTTPMaxIdleConns,
+		MaxIdleConnsPerHost: config.HTTPMaxIdleConnsPerHost,
+		IdleConnTimeout:     config.HTTPIdleConnTimeout,
 	}
-	client := &http.Client{Transport: tr, Timeout: 35 * time.Second}
+	client := &http.Client{Transport: tr, Timeout: config.HTTPClientTimeout}
 	ist, _ := time.LoadLocation("Asia/Kolkata")
 
-	// Discover contracts via options-chain-v3
-	/*
-	fyersSymbol := getFyersIndexSymbol(indexName)
-	chainURL := fmt.Sprintf("https://api-t1.fyers.in/data/options-chain-v3?symbol=%s&strikecount=%d",
-		url.QueryEscape(fyersSymbol), strikeCount)
-
-	req, _ := http.NewRequestWithContext(ctx, "GET", chainURL, nil)
-	req.Header.Set("Authorization", fyersAppID+":"+fyersAccessToken)
-	req.Header.Set("Accept", "application/json")
-
+	// ── Multi-expiry contract generation ─────────────────────────────────────
 	var contracts []OptionContractMetadata
-	var expiryDataMap = make(map[string]int64)
 
-	resp, err := client.Do(req)
-	if err == nil && resp.StatusCode == 200 {
-		var chainResp struct {
-			Code int `json:"code"`
-			Data struct {
-				ExpiryData []struct {
-					Date   string `json:"date"`
-					Expiry string `json:"expiry"`
-				} `json:"expiryData"`
-				OptionsChain []struct {
-					Symbol      string  `json:"symbol"`
-					OptionType  string  `json:"option_type"`
-					StrikePrice float64 `json:"strike_price"`
-					OI          int64   `json:"oi"`
-				} `json:"optionsChain"`
-			} `json:"data"`
-		}
-		if jsonErr := json.NewDecoder(resp.Body).Decode(&chainResp); jsonErr == nil {
-			for _, ed := range chainResp.Data.ExpiryData {
-				if ep, parseErr := strconv.ParseInt(ed.Expiry, 10, 64); parseErr == nil {
-					expiryDataMap[ed.Date] = ep
+	expiries := generateIndexExpiries(indexName, startDate, endDate, ist)
+	log.Printf("📅 [Task #%s] Found %d %s expiries in [%s → %s] (5S Toggle: %v)", taskID, len(expiries), indexName, startDate, endDate, use30Days5s)
+
+	step := StrikeIntervalForIndex(indexName)
+
+	for _, expiryDay := range expiries {
+		expiryAt1530 := time.Date(expiryDay.Year(), expiryDay.Month(), expiryDay.Day(), 15, 30, 0, 0, ist)
+		expiryEpoch := expiryAt1530.Unix()
+
+		// Get ATM nearest to this expiry from the spot price map
+		atm := spotNearExpiry(spotMap, expiryAt1530)
+		if atm <= 0 {
+			if len(spotMap) > 0 {
+				var sum float64
+				for _, v := range spotMap {
+					sum += v
 				}
-			}
-			for _, item := range chainResp.Data.OptionsChain {
-				if item.StrikePrice > 0 && (strings.EqualFold(item.OptionType, "CE") || strings.EqualFold(item.OptionType, "PE")) {
-					optType := "CALL"
-					if strings.EqualFold(item.OptionType, "PE") {
-						optType = "PUT"
-					}
-					expEpoch := parseOptionSymbolExpiry(item.Symbol)
-					contracts = append(contracts, OptionContractMetadata{
-						Symbol:      item.Symbol,
-						OptionType:  optType,
-						StrikePrice: item.StrikePrice,
-						ExpiryEpoch: expEpoch,
-						OI:          item.OI,
-					})
+				atm = sum / float64(len(spotMap))
+			} else {
+				switch strings.ToUpper(indexName) {
+				case "BANKNIFTY":
+					atm = config.DefaultBankNiftyATM
+				case "FINNIFTY":
+					atm = config.DefaultFinNiftyATM
+				case "SENSEX":
+					atm = config.DefaultSensexATM
+				default:
+					atm = config.DefaultNiftyATM
 				}
 			}
 		}
-		resp.Body.Close()
-	} else if resp != nil {
-		resp.Body.Close()
-	}
-	*/
-	var contracts []OptionContractMetadata
-
-	// Fallback dynamic generation if chain discovery is empty
-	if len(contracts) == 0 {
-		log.Printf("ℹ️ [Task #%s] Options chain returned 0 active contracts; generating ATM±%d strike contracts dynamically...", taskID, strikeCount)
-		step := StrikeIntervalForIndex(indexName)
-		avgSpot := 0.0
-		if len(spotMap) > 0 {
-			var sum float64
-			for _, v := range spotMap {
-				sum += v
-			}
-			avgSpot = sum / float64(len(spotMap))
-		}
-		if avgSpot <= 0 {
-			switch strings.ToUpper(indexName) {
-			case "BANKNIFTY":
-				avgSpot = 51000
-			case "FINNIFTY":
-				avgSpot = 24000
-			case "SENSEX":
-				avgSpot = 82000
-			default:
-				avgSpot = 23500
-			}
-		}
-		atm := math.Round(avgSpot/float64(step)) * float64(step)
-		endT, _ := time.Parse("2006-01-02", endDate)
-		expiryEpoch := time.Date(endT.Year(), endT.Month(), endT.Day(), 15, 30, 0, 0, ist).Unix()
+		atmRounded := math.Round(atm/float64(step)) * float64(step)
 
 		for i := -strikeCount; i <= strikeCount; i++ {
-			strikeVal := atm + float64(i*step)
-			for _, optType := range []string{"CALL", "PUT"} {
-				cePe := "CE"
-				if optType == "PUT" {
-					cePe = "PE"
+			strikeVal := atmRounded + float64(i*step)
+			for _, cepe := range []string{"CE", "PE"} {
+				optType := "CALL"
+				if cepe == "PE" {
+					optType = "PUT"
 				}
-				
-				// Weekly format: YY + M (1-9,O,N,D) + DD + STRIKE + CE/PE
-				mStr := []string{"", "1", "2", "3", "4", "5", "6", "7", "8", "9", "O", "N", "D"}[int(endT.Month())]
-				weeklySym := fmt.Sprintf("NSE:%s%s%s%02d%.0f%s", strings.ToUpper(indexName), endT.Format("06"), mStr, endT.Day(), strikeVal, cePe)
-				
-				// Monthly format: YY + MMM + STRIKE + CE/PE
-				monthlySym := fmt.Sprintf("NSE:%s%s%s%.0f%s", strings.ToUpper(indexName), endT.Format("06"), strings.ToUpper(endT.Format("Jan")), strikeVal, cePe)
-
+				sym := buildFyersOptionSymbol(indexName, expiryDay, strikeVal, cepe)
 				contracts = append(contracts, OptionContractMetadata{
-					Symbol:      weeklySym,
+					Symbol:      sym,
 					OptionType:  optType,
 					StrikePrice: strikeVal,
 					ExpiryEpoch: expiryEpoch,
-					OI:          100000,
-				})
-				contracts = append(contracts, OptionContractMetadata{
-					Symbol:      monthlySym,
-					OptionType:  optType,
-					StrikePrice: strikeVal,
-					ExpiryEpoch: expiryEpoch,
-					OI:          100000,
+					OI:          config.DefaultOptionOI,
 				})
 			}
 		}
+	}
+
+	if len(contracts) == 0 {
+		log.Printf("⚠️ [Task #%s] No Thursday expiries found in range [%s → %s]", taskID, startDate, endDate)
+		return createdFiles
 	}
 
 	totalContracts := len(contracts)
-	log.Printf("🔍 [Task #%s] Discovered %d option contracts to download from FYERS", taskID, totalContracts)
+	log.Printf("🔍 [Task #%s] Discovered %d option contracts to download from FYERS (Resolution Mode: %s)",
+		taskID, totalContracts, map[bool]string{true: "5S", false: "1-Min"}[use30Days5s])
 
 	tasksChan := make(chan OptionContractMetadata, totalContracts)
 	for _, c := range contracts {
@@ -622,12 +573,12 @@ func (j *BackupJob) runFyersOptionsDownload(
 	}
 	close(tasksChan)
 
-	workerCount := 4
+	workerCount := config.DefaultWorkerCount
 	if workerCount > totalContracts {
 		workerCount = totalContracts
 	}
 
-	rateLimiter := time.NewTicker(150 * time.Millisecond)
+	rateLimiter := time.NewTicker(config.RateLimiterInterval)
 	defer rateLimiter.Stop()
 
 	var completedContracts int64 = 0
@@ -647,12 +598,13 @@ func (j *BackupJob) runFyersOptionsDownload(
 				}
 
 				cleanStrike := fmt.Sprintf("%.0f", contract.StrikePrice)
-				chunkFileName := fmt.Sprintf("opt_%s_%s_%s_%s_%s.parquet",
-					strings.ToLower(indexName), strings.ToLower(contract.OptionType), cleanStrike,
-					startDate, endDate)
+				expiryDateStr := time.Unix(contract.ExpiryEpoch, 0).In(ist).Format("2006-01-02")
+				chunkFileName := fmt.Sprintf("opt_%s_%s_%s_exp%s.parquet",
+					strings.ToLower(indexName), strings.ToLower(contract.OptionType),
+					cleanStrike, expiryDateStr)
 				chunkFilePath := filepath.Join(stagingDir, chunkFileName)
 
-				// Checkpoint resume check
+				// Checkpoint resume: skip if already downloaded with data
 				if rows, _, statErr := services.VerifyParquetFile(chunkFilePath); statErr == nil && rows > 0 {
 					filesMutex.Lock()
 					createdFiles = append(createdFiles, chunkFilePath)
@@ -676,9 +628,24 @@ func (j *BackupJob) runFyersOptionsDownload(
 					continue
 				}
 
-				// Download 1-minute historical candles from FYERS Expired API
-				reqURL := fmt.Sprintf("https://api-t1.fyers.in/data/history/fno/expired/historical-data?symbol=%s&resolution=1&date_format=1&range_from=%s&range_to=%s&include_greeks=1&include_oi=1",
-					url.QueryEscape(contract.Symbol), startDate, endDate)
+				// ── STRICT RESOLUTION LOGIC & ZERO FALLBACKS ───────────────────
+				// If use30Days5s is TRUE -> strictly fetch 5S interval via standard history API
+				// If use30Days5s is FALSE -> strictly fetch 1-min interval via expired history API
+				contractStartT := time.Unix(contract.ExpiryEpoch, 0).In(ist).AddDate(0, 0, -30)
+				globalStartT, _ := time.ParseInLocation("2006-01-02", startDate, ist)
+				if contractStartT.Before(globalStartT) {
+					contractStartT = globalStartT
+				}
+				contractStart := contractStartT.Format("2006-01-02")
+
+				var reqURL string
+				if use30Days5s {
+					reqURL = fmt.Sprintf("%s?symbol=%s&resolution=%s&date_format=1&range_from=%s&range_to=%s&cont_flag=1",
+						config.FyersBaseHistoryURL, url.QueryEscape(contract.Symbol), config.Resolution5S, contractStart, endDate)
+				} else {
+					reqURL = fmt.Sprintf("%s?symbol=%s&resolution=%s&date_format=1&range_from=%s&range_to=%s&include_greeks=1&include_oi=1",
+						config.FyersExpiredHistoryURL, url.QueryEscape(contract.Symbol), config.Resolution1Min, contractStart, expiryDateStr)
+				}
 
 				select {
 				case <-ctx.Done():
@@ -695,12 +662,18 @@ func (j *BackupJob) runFyersOptionsDownload(
 
 				hResp, doErr := client.Do(hReq)
 				if doErr != nil {
+					log.Printf("⚠️ [Task #%s] HTTP request error for %s: %v", taskID, contract.Symbol, doErr)
 					continue
 				}
 				bodyBytes, _ := io.ReadAll(hResp.Body)
 				hResp.Body.Close()
 
-				if hResp.StatusCode == http.StatusOK {
+				if hResp.StatusCode != http.StatusOK {
+					log.Printf("⚠️ [Task #%s] HTTP %d for %s", taskID, hResp.StatusCode, contract.Symbol)
+					continue
+				}
+
+				if len(bodyBytes) > 0 {
 					var candleResp struct {
 						S       string      `json:"s"`
 						Candles [][]float64 `json:"candles"`
@@ -723,11 +696,11 @@ func (j *BackupJob) runFyersOptionsDownload(
 							}
 
 							T := float64(contract.ExpiryEpoch-epoch) / (365.0 * 86400.0)
-							if T <= 0.00002 {
-								T = 0.00002
+							if T <= config.MinTimeFormatFloor {
+								T = config.MinTimeFormatFloor
 							}
 
-							metrics := services.ComputeCompleteOptionMetrics(spotPrice, contract.StrikePrice, T, 0.07, closeVal, isCall, volumeVal)
+							metrics := services.ComputeCompleteOptionMetrics(spotPrice, contract.StrikePrice, T, config.DefaultRiskFreeRate, closeVal, isCall, volumeVal)
 							candleTime := time.Unix(epoch, 0).In(ist)
 
 							rec := models.MarketCandleRecord{
@@ -1000,4 +973,82 @@ func generateForexCandleRecords(symbol, startDate, endDate string) []models.Mark
 		curr = curr.AddDate(0, 0, 1)
 	}
 	return records
+}
+
+// ── Option Symbol & Expiry Helpers ────────────────────────────────────────────
+
+// weeklyMonthCode returns FYERS single-char month encoding (1-9 for Jan-Sep, O/N/D for Oct-Dec)
+func weeklyMonthCode(m time.Month) string {
+	return [...]string{"", "1", "2", "3", "4", "5", "6", "7", "8", "9", "O", "N", "D"}[m]
+}
+
+// isMonthlyExpiry returns true if t is the last Thursday of its month (monthly contract)
+func isMonthlyExpiry(t time.Time) bool {
+	return t.AddDate(0, 0, 7).Month() != t.Month()
+}
+
+// buildFyersOptionSymbol constructs the correct FYERS option symbol.
+// Monthly expiry (last Thu of month): NSE:NIFTY25JAN23500CE
+// Weekly expiry: NSE:NIFTY2420121450CE  (YY + M-code + DD with 2-digit day)
+func buildFyersOptionSymbol(indexName string, expiry time.Time, strike float64, cepe string) string {
+	yy := expiry.Format("06")
+	strikeStr := fmt.Sprintf("%.0f", strike)
+	if isMonthlyExpiry(expiry) {
+		mmm := strings.ToUpper(expiry.Format("Jan"))
+		return fmt.Sprintf("NSE:%s%s%s%s%s", strings.ToUpper(indexName), yy, mmm, strikeStr, cepe)
+	}
+	mCode := weeklyMonthCode(expiry.Month())
+	return fmt.Sprintf("NSE:%s%s%s%02d%s%s", strings.ToUpper(indexName), yy, mCode, expiry.Day(), strikeStr, cepe)
+}
+
+// getExpiryWeekdayForIndex resolves the correct exchange weekly expiry day
+func getExpiryWeekdayForIndex(indexName string) time.Weekday {
+	switch strings.ToUpper(indexName) {
+	case "BANKNIFTY":
+		return time.Wednesday
+	case "FINNIFTY":
+		return time.Tuesday
+	case "MIDCPNIFTY":
+		return time.Monday
+	case "SENSEX":
+		return time.Friday
+	default:
+		return time.Thursday
+	}
+}
+
+// generateIndexExpiries returns every weekly expiry day in [startDate, endDate] (IST) for the specified index
+func generateIndexExpiries(indexName, startDate, endDate string, ist *time.Location) []time.Time {
+	start, _ := time.ParseInLocation("2006-01-02", startDate, ist)
+	end, _ := time.ParseInLocation("2006-01-02", endDate, ist)
+	targetWeekday := getExpiryWeekdayForIndex(indexName)
+	var result []time.Time
+	curr := start
+	for curr.Weekday() != targetWeekday {
+		curr = curr.AddDate(0, 0, 1)
+	}
+	for !curr.After(end) {
+		result = append(result, curr)
+		curr = curr.AddDate(0, 0, 7)
+	}
+	return result
+}
+
+// spotNearExpiry returns the closest spot price from spotMap within 24 hours before expiry.
+// Falls back to the global average if no entry is found in that window.
+func spotNearExpiry(spotMap map[int64]float64, expiry time.Time) float64 {
+	expiryEpoch := expiry.Unix()
+	oneDayBefore := expiry.Add(-24 * time.Hour).Unix()
+	best := 0.0
+	bestDiff := int64(math.MaxInt64)
+	for ts, price := range spotMap {
+		if ts >= oneDayBefore && ts <= expiryEpoch {
+			diff := expiryEpoch - ts
+			if diff < bestDiff {
+				bestDiff = diff
+				best = price
+			}
+		}
+	}
+	return best
 }

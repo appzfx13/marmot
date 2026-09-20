@@ -1,6 +1,83 @@
 {% load static %}
 
-<!-- Top Header Navigation & Live Cockpit Controls -->
+<style>
+    /* Dual-Mode Simulation Card Styles */
+    .sim-mode-card {
+        transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+        cursor: pointer;
+        border-radius: 12px;
+        position: relative;
+        padding: 1.25rem 1.4rem;
+        display: flex;
+        flex-direction: column;
+        justify-content: space-between;
+    }
+    .sim-mode-card:hover {
+        transform: translateY(-2px);
+        filter: brightness(1.08);
+    }
+    .sim-mode-card.active-mode-live {
+        background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.14) 0%, rgba(9, 9, 11, 0.95) 75%) !important;
+        border: 2px solid #10b981 !important;
+        box-shadow: 0 0 25px rgba(16, 185, 129, 0.22), inset 0 0 15px rgba(16, 185, 129, 0.08) !important;
+    }
+    .sim-mode-card.active-mode-backup {
+        background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.14) 0%, rgba(9, 9, 11, 0.95) 75%) !important;
+        border: 2px solid #38bdf8 !important;
+        box-shadow: 0 0 25px rgba(56, 189, 248, 0.22), inset 0 0 15px rgba(56, 189, 248, 0.08) !important;
+    }
+    .sim-mode-card.inactive-mode {
+        background: rgba(255, 255, 255, 0.02) !important;
+        border: 1px solid rgba(255, 255, 255, 0.08) !important;
+        opacity: 0.72;
+    }
+    .sim-mode-card.inactive-mode:hover {
+        opacity: 0.95;
+        border-color: rgba(255, 255, 255, 0.2) !important;
+    }
+    .parquet-controller-card {
+        position: relative;
+        z-index: 1050;
+        overflow: visible !important;
+    }
+    .custom-parquet-dropdown {
+        position: relative;
+        z-index: 1055;
+    }
+    .custom-parquet-dropdown .dropdown-menu {
+        z-index: 1065 !important;
+    }
+    .speed-pill-btn {
+        font-family: var(--font-mono, monospace);
+        font-size: 0.75rem;
+        padding: 4px 10px;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        background: rgba(255, 255, 255, 0.04);
+        color: var(--text-secondary, #94a3b8);
+        transition: all 0.15s ease;
+    }
+    .speed-pill-btn:hover {
+        background: rgba(255, 255, 255, 0.1);
+        color: #fff;
+    }
+    .speed-pill-btn.active {
+        background: #38bdf8 !important;
+        color: #09090b !important;
+        font-weight: 700;
+        border-color: #38bdf8 !important;
+        box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+    }
+    .custom-scroll::-webkit-scrollbar {
+        width: 6px;
+        height: 6px;
+    }
+    .custom-scroll::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.15);
+        border-radius: 4px;
+    }
+</style>
+
+<!-- Top Header Navigation & Cockpit Title -->
 <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
     <div class="d-flex align-items-center gap-3">
         <button type="button"
@@ -13,7 +90,7 @@
         </button>
         <div>
             <h4 class="fw-bold mb-1 text-white tracking-tight d-inline-flex align-items-center gap-2 flex-wrap">
-                <span>Broker Gateway Emulator</span>
+                <span>Broker Gateway Emulator &amp; Simulator</span>
                 {% if mock_online %}
                 <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace fs-6" style="margin-top: 2px;">
                     <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.5rem; height: 0.5rem;" role="status"></span>
@@ -25,80 +102,713 @@
                     OFFLINE
                 </span>
                 {% endif %}
-                <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fs-6" style="margin-top: 2px;">
-                    EMULATOR COCKPIT
+                <span class="badge {% if sim_mode == 'LIVE' %}bg-success text-success border-success{% else %}bg-info text-info border-info{% endif %} bg-opacity-20 border border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fs-6" style="margin-top: 2px;">
+                    {% if sim_mode == 'LIVE' %}LIVE DATA SIMULATION{% else %}BACKUP REPLAY SIMULATION{% endif %}
                 </span>
             </h4>
             <div class="theme-text-muted small mt-0.5" style="font-size: 0.8rem;">
-                Dhan Gateway v2 Emulator &bull; Microsecond Matcher &bull; Active Account: <strong class="text-info font-monospace">{{ active_account.active_account_id|default:"1000000001" }}</strong>
+                Dhan Gateway v2 Emulator &bull; Microsecond Matcher &bull; Active Account: <strong class="text-info font-monospace">{{ active_account.active_account_id|default:"1000000001" }}</strong> ({{ active_account.account_name|default:"Primary Algorithmic Trading" }})
             </div>
         </div>
     </div>
 
     <!-- Live Header Action Buttons -->
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        <a href="{% url 'admins:admin-live-mock-dashboard' %}"
-           class="btn btn-outline-info btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-           hx-get="{% url 'admins:admin-live-mock-dashboard' %}"
-           hx-target="#app-main-container"
-           hx-swap="innerHTML"
-           hx-push-url="true">
-            <span class="material-icons" style="font-size: 1rem;">insights</span>
-            <span>Session Analytics</span>
-        </a>
+        <button type="button" class="btn btn-outline-info btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                data-bs-toggle="modal" data-bs-target="#mockOrderTicketModal"
+                title="Dispatch Manual Mock Order to Matcher">
+            <span class="material-icons" style="font-size: 1rem;">add_shopping_cart</span>
+            <span>Place Order Ticket</span>
+        </button>
 
-        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-                onclick="var ifr = document.getElementById('emulator-cockpit-frame'); if (ifr) ifr.src = ifr.src;"
-                title="Reload Cockpit Frame">
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="clear_session">
+            <button type="submit" class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                    onclick="return confirm('Reset all mock orders, positions, and restore ₹1,00,000 initial balance?');">
+                <span class="material-icons" style="font-size: 1rem;">restart_alt</span>
+                <span>Reset Session</span>
+            </button>
+        </form>
+
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+            {% csrf_token %}
+            <input type="hidden" name="action" value="kill_switch">
+            <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                    onclick="return confirm('TRIGGER KILL-SWITCH: Cancel ALL pending orders across mock broker?');">
+                <span class="material-icons" style="font-size: 1rem;">bolt</span>
+                <span>Kill Switch</span>
+            </button>
+        </form>
+
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-2.5"
+                hx-get="{% url 'admins:admin-gateway-emulator' %}"
+                hx-target="#gateway-emulator-container"
+                hx-swap="innerHTML"
+                title="Refresh Telemetry">
             <span class="material-icons" style="font-size: 1rem;">refresh</span>
-            <span>Reload Cockpit</span>
         </button>
 
         <a href="{{ emulator_external_url }}"
            target="_blank"
-           class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-           title="Open standalone emulator in new window">
-            <span class="material-icons" style="font-size: 1rem;">open_in_new</span>
-            <span>Pop Out</span>
+           class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1 shadow-sm px-2.5"
+           title="Open standalone emulator cockpit in new window">
+            <span class="material-icons" style="font-size: 0.95rem;">open_in_new</span>
         </a>
     </div>
 </div>
 
-<!-- Main Emulator Cockpit Container (col-12 Full Width) -->
-<div class="col-12 px-0">
-    {% if mock_online %}
-    <div class="glass-card position-relative overflow-hidden rounded-3 shadow-lg"
-         style="background: #09090b; border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08)) !important; min-height: calc(100vh - 150px);">
-        <iframe id="emulator-cockpit-frame"
-                src="{{ emulator_url }}"
-                title="Dhan Broker Gateway Emulator"
-                style="width: 100%; height: calc(100vh - 150px); border: none; display: block; background: #09090b;"
-                allow="clipboard-read; clipboard-write">
-        </iframe>
-    </div>
-    {% else %}
-    <div class="glass-card p-5 text-center rounded-3 my-4 shadow-sm"
-         style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08)) !important;">
-        <div class="mb-3">
-            <span class="material-icons text-danger" style="font-size: 3rem;">portable_wifi_off</span>
+<!-- ====================================================================
+     SECTION 1: 2-CARD SELECTION GRID (MUTUALLY EXCLUSIVE RADIO CARDS)
+     At a time, user can select ONLY ONE card to one side
+     ==================================================================== -->
+<div class="row g-3 mb-4">
+    <!-- Card A: Live Data Simulation -->
+    <div class="col-12 col-md-6">
+        <div class="sim-mode-card h-100 {% if sim_mode == 'LIVE' %}active-mode-live{% else %}inactive-mode{% endif %}"
+             hx-get="{% url 'admins:admin-gateway-emulator' %}?mode=LIVE"
+             hx-target="#gateway-emulator-container"
+             hx-swap="innerHTML"
+             role="button"
+             tabindex="0">
+            <div>
+                <div class="d-flex align-items-start justify-content-between mb-2.5">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                            <i class="bi bi-broadcast me-1"></i>FYERS V3 WEBSOCKET
+                        </span>
+                        <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.68rem;">
+                            SUB-10MS REAL-TIME
+                        </span>
+                    </div>
+                    <!-- Radio Selection Indicator -->
+                    <div class="d-flex align-items-center gap-1.5 font-monospace">
+                        {% if sim_mode == 'LIVE' %}
+                        <span class="badge bg-success text-dark fw-bold rounded-pill px-2.5 py-0.5" style="font-size: 0.68rem;">
+                            <i class="bi bi-check2-circle me-1"></i>SELECTED
+                        </span>
+                        <i class="bi bi-record-circle-fill text-success fs-5"></i>
+                        {% else %}
+                        <span class="text-white-50" style="font-size: 0.7rem;">Click to Select</span>
+                        <i class="bi bi-circle text-secondary fs-5"></i>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <h5 class="fw-bold mb-1.5 {% if sim_mode == 'LIVE' %}text-white{% else %}theme-text-main{% endif %} d-flex align-items-center gap-2">
+                    <i class="bi bi-lightning-charge-fill text-success"></i>
+                    <span>Live Data Simulation</span>
+                </h5>
+                <p class="theme-text-muted small mb-3" style="font-size: 0.78rem; line-height: 1.5;">
+                    Ingest realtime ticks &amp; options data from FYERS DataSocket V3 directly into the Dhan Mock Engine (:8088). Deployed strategies execute orders via REST API and receive instant feedback via Webhook postback.
+                </p>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between pt-2.5 border-top border-secondary border-opacity-15 font-monospace" style="font-size: 0.72rem;">
+                <span class="d-inline-flex align-items-center gap-1.5">
+                    {% if fyers_online %}
+                    <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.45rem; height: 0.45rem;" role="status"></span>
+                    <span class="text-success fw-semibold">FYERS Socket Online</span>
+                    {% else %}
+                    <span class="material-icons text-warning" style="font-size: 0.85rem;">wifi_tethering</span>
+                    <span class="text-warning">Standby / Market Feed Ready</span>
+                    {% endif %}
+                </span>
+                <span class="theme-text-muted">
+                    Speed: <strong class="text-white">1X (Real-Time)</strong> &bull; Matcher: <strong class="text-info">:8088</strong>
+                </span>
+            </div>
         </div>
-        <h5 class="fw-bold text-white mb-2">Dhan Broker Gateway Emulator (:8088) Offline</h5>
-        <p class="theme-text-muted small mx-auto mb-4" style="max-width: 520px;">
-            The Dhan Emulator service is currently unreachable on <code>http://localhost:8088</code>. Please verify that the <code>dhan_mock_broker</code> Docker container is running and port 8088 is mapped.
-        </p>
-        <div class="d-flex align-items-center justify-content-center gap-2">
-            <button type="button"
-                    class="btn btn-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
-                    hx-get="{% url 'admins:admin-gateway-emulator' %}"
-                    hx-target="#gateway-emulator-container"
-                    hx-swap="innerHTML">
-                <span class="material-icons" style="font-size: 1.1rem;">replay</span>
-                <span>Retry Connection</span>
-            </button>
-            <a href="{{ emulator_external_url }}" target="_blank" class="btn btn-outline-secondary rounded-pill px-3 py-2">
-                <span>Check Standalone URL</span>
-            </a>
+    </div>
+
+    <!-- Card B: Backup Data Simulation -->
+    <div class="col-12 col-md-6">
+        <div class="sim-mode-card h-100 {% if sim_mode == 'BACKUP' %}active-mode-backup{% else %}inactive-mode{% endif %}"
+             hx-get="{% url 'admins:admin-gateway-emulator' %}?mode=BACKUP"
+             hx-target="#gateway-emulator-container"
+             hx-swap="innerHTML"
+             role="button"
+             tabindex="0">
+            <div>
+                <div class="d-flex align-items-start justify-content-between mb-2.5">
+                    <div class="d-flex align-items-center gap-2 flex-wrap">
+                        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                            <i class="bi bi-hdd-stack me-1"></i>HISTORICAL PARQUET
+                        </span>
+                        <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.68rem;">
+                            1X – 250X MULTI-SPEED
+                        </span>
+                    </div>
+                    <!-- Radio Selection Indicator -->
+                    <div class="d-flex align-items-center gap-1.5 font-monospace">
+                        {% if sim_mode == 'BACKUP' %}
+                        <span class="badge bg-info text-dark fw-bold rounded-pill px-2.5 py-0.5" style="font-size: 0.68rem;">
+                            <i class="bi bi-check2-circle me-1"></i>SELECTED
+                        </span>
+                        <i class="bi bi-record-circle-fill text-info fs-5"></i>
+                        {% else %}
+                        <span class="text-white-50" style="font-size: 0.7rem;">Click to Select</span>
+                        <i class="bi bi-circle text-secondary fs-5"></i>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <h5 class="fw-bold mb-1.5 {% if sim_mode == 'BACKUP' %}text-white{% else %}theme-text-main{% endif %} d-flex align-items-center gap-2">
+                    <i class="bi bi-play-circle-fill text-info"></i>
+                    <span>Backup Data Simulation</span>
+                </h5>
+                <p class="theme-text-muted small mb-3" style="font-size: 0.78rem; line-height: 1.5;">
+                    Feed historical backup datasets from the dropdown into the Mock engine in the <strong>strictly identical canonical format</strong> as FYERS realtime feed. Accelerate backtests up to 250x with event-driven virtual clock synchronization.
+                </p>
+            </div>
+
+            <div class="d-flex align-items-center justify-content-between pt-2.5 border-top border-secondary border-opacity-15 font-monospace" style="font-size: 0.72rem;">
+                <span class="d-inline-flex align-items-center gap-1.5">
+                    {% if streamer_status.is_playing %}
+                    <span class="spinner-grow spinner-grow-sm text-info" style="width: 0.45rem; height: 0.45rem;" role="status"></span>
+                    <span class="text-info fw-semibold">Replay Active ({{ streamer_status.current_speed|default:25 }}x)</span>
+                    {% else %}
+                    <span class="material-icons text-secondary" style="font-size: 0.85rem;">pause_circle_filled</span>
+                    <span class="text-muted">Replay Standby (Ready to Play)</span>
+                    {% endif %}
+                </span>
+                <span class="theme-text-muted">
+                    Sync: <strong class="text-info">Virtual Clock</strong> &bull; Multipliers: <strong class="text-white">1x - 250x</strong>
+                </span>
+            </div>
         </div>
     </div>
-    {% endif %}
 </div>
+
+<!-- ====================================================================
+     SECTION 2: MODE-SPECIFIC INTERACTIVE CONTROLS TOOLBAR
+     Dynamically changes based on active selection (LIVE vs BACKUP)
+     ==================================================================== -->
+{% if sim_mode == 'BACKUP' %}
+<!-- Mode B: Backup Replay Controller Toolbar -->
+<div class="card glass-card parquet-controller-card p-4 mb-4 border-info border-opacity-25 shadow-sm" style="background: rgba(14, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.25) !important;">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3 pb-2.5 border-bottom border-secondary border-opacity-20">
+        <div class="d-flex align-items-center gap-2">
+            <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 32px; height: 32px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
+                <i class="bi bi-sliders fs-6"></i>
+            </div>
+            <div>
+                <h6 class="mb-0 fw-bold text-white d-flex align-items-center gap-2" style="font-size: 0.95rem;">
+                    <span>Historical Parquet Feed Controller</span>
+                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 smaller font-monospace">
+                        STRICT FYERS CANONICAL FEED
+                    </span>
+                </h6>
+                <div class="theme-text-muted smaller" style="font-size: 0.73rem;">
+                    Active File: <strong class="text-white font-monospace">{{ streamer_status.active_file|default:"Default Parquet Options" }}</strong> &bull; Progress: <strong class="text-info font-monospace">{{ streamer_status.progress_pct|default:"0.0" }}%</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Stop Button & Playback Actions -->
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <!-- Play / Pause Toggle -->
+            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="toggle">
+                {% if streamer_status.is_playing %}
+                <button type="submit" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
+                    <i class="bi bi-pause-fill fs-6"></i>
+                    <span>Pause Replay</span>
+                </button>
+                {% else %}
+                <button type="submit" class="btn btn-success text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
+                    <i class="bi bi-play-fill fs-6"></i>
+                    <span>Start Replay</span>
+                </button>
+                {% endif %}
+            </form>
+
+            <!-- Rewind to Row 0 -->
+            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="restart">
+                <button type="submit" class="btn btn-outline-info btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" title="Rewind to row 0 and restart stream">
+                    <i class="bi bi-arrow-repeat fs-6"></i>
+                    <span>Rewind</span>
+                </button>
+            </form>
+
+            <!-- FUNCTIONAL STOP BUTTON -->
+            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+                {% csrf_token %}
+                <input type="hidden" name="action" value="stop">
+                <button type="submit"
+                        class="btn btn-danger btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5 fw-bold"
+                        onclick="return confirm('HALT SIMULATION: Immediately stop Parquet streamer, pause strategy workers, and cancel pending mock orders?');"
+                        title="Functional Stop: Halts stream, kills active strategy workers, and flushes orders">
+                    <i class="bi bi-stop-circle-fill fs-6"></i>
+                    <span>STOP SIMULATION</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Controls Row: Dataset Dropdown & Speed Multipliers -->
+    <div class="row g-3 align-items-end">
+        <!-- 1. Dataset Selector Dropdown -->
+        <div class="col-12 col-lg-5">
+            <label class="text-secondary smaller fw-bold d-block mb-1.5 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">
+                <i class="bi bi-file-earmark-binary-fill me-1 text-warning"></i>Select Historical Backup Dataset
+            </label>
+            <div class="dropdown custom-parquet-dropdown w-100">
+                <button class="btn dropdown-toggle w-100 text-start d-flex align-items-center justify-content-between px-3 py-2 rounded-3 font-monospace"
+                        type="button" id="backupDatasetDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false"
+                        style="background: #141416; color: #fafafa; font-size: 0.78rem; min-height: 42px; border: 1px solid rgba(255, 255, 255, 0.12); outline: none;">
+                    <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
+                        <span class="badge rounded-pill px-2 py-0.5 smaller fw-bold flex-shrink-0" style="color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.12);">
+                            DATASET
+                        </span>
+                        <span class="text-truncate fw-semibold text-white">{{ streamer_status.active_file|default:"Select Backup Dataset..." }}</span>
+                    </div>
+                    <i class="bi bi-chevron-down text-white-50 flex-shrink-0 ms-2"></i>
+                </button>
+                <ul class="dropdown-menu dropdown-menu-dark w-100 shadow-lg p-1.5 custom-scroll"
+                    aria-labelledby="backupDatasetDropdownBtn"
+                    style="background: #121215; backdrop-filter: blur(20px); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.12); max-height: 360px; overflow-y: auto; z-index: 1065 !important;">
+                    
+                    <!-- Direct Parquet Files from Mock Emulator Storage -->
+                    <li class="dropdown-header text-uppercase smaller text-muted px-2 py-1" style="font-size: 0.65rem;">Parquet Storage Files (:8088)</li>
+                    {% for f in streamer_files %}
+                    <li>
+                        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="m-0">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="select_file">
+                            <input type="hidden" name="file" value="{{ f.relative_path }}">
+                            <button type="submit" class="dropdown-item rounded-2 py-2 px-2.5 mb-1 d-flex align-items-center justify-content-between font-monospace text-wrap {% if f.relative_path == streamer_status.active_file %}active{% endif %}"
+                                    style="font-size: 0.76rem; border: 1px solid {% if f.relative_path == streamer_status.active_file %}rgba(56, 189, 248, 0.4){% else %}transparent{% endif %}; background: {% if f.relative_path == streamer_status.active_file %}rgba(56, 189, 248, 0.12){% else %}transparent{% endif %}; cursor: pointer;">
+                                <div class="d-flex flex-column gap-1 me-2 overflow-hidden text-start">
+                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                        <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
+                                            {{ f.index_name|default:"NIFTY" }}
+                                        </span>
+                                        <strong class="text-white text-truncate">{{ f.relative_path }}</strong>
+                                        <span class="badge bg-secondary bg-opacity-30 text-white-50 smaller px-1.5 py-0.5">
+                                            {{ f.type_label|default:"Parquet Feed" }}
+                                        </span>
+                                    </div>
+                                    <div class="d-flex align-items-center gap-2 smaller text-muted">
+                                        {% if f.date_range %}<span><i class="bi bi-calendar3 me-1 text-warning"></i>{{ f.date_range }}</span> &bull;{% endif %}
+                                        <span>{{ f.size_mb|default:0|floatformat:1 }} MB</span>
+                                    </div>
+                                </div>
+                                {% if f.relative_path == streamer_status.active_file %}
+                                <i class="bi bi-check-circle-fill text-info fs-6 flex-shrink-0 ms-2"></i>
+                                {% endif %}
+                            </button>
+                        </form>
+                    </li>
+                    {% empty %}
+                    <li><span class="dropdown-item text-muted smaller">No Parquet files found in /app/backup</span></li>
+                    {% endfor %}
+
+                    <!-- Completed Database Backup Tasks -->
+                    {% if completed_backups %}
+                    <li class="dropdown-divider border-secondary border-opacity-20 my-1.5"></li>
+                    <li class="dropdown-header text-uppercase smaller text-muted px-2 py-1" style="font-size: 0.65rem;">Completed Market Backup Tasks</li>
+                    {% for b in completed_backups %}
+                    <li>
+                        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="m-0">
+                            {% csrf_token %}
+                            <input type="hidden" name="action" value="select_file">
+                            <input type="hidden" name="file" value="{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet">
+                            <button type="submit" class="dropdown-item rounded-2 py-2 px-2.5 mb-1 d-flex align-items-center justify-content-between font-monospace text-wrap"
+                                    style="font-size: 0.76rem; border: 1px solid transparent; background: transparent; cursor: pointer;">
+                                <div class="d-flex flex-column gap-1 me-2 overflow-hidden text-start">
+                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                        <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-1.5 py-0.5 smaller fw-bold">
+                                            Task #{{ b.id }} &bull; {{ b.index_name|default:"NIFTY" }}
+                                        </span>
+                                        <span class="text-white small">{{ b.start_date }} &rarr; {{ b.end_date }}</span>
+                                    </div>
+                                    <div class="smaller text-muted">
+                                        Path: <code>{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet</code> ({{ b.file_size_mb|default:0|floatformat:1 }} MB)
+                                    </div>
+                                </div>
+                            </button>
+                        </form>
+                    </li>
+                    {% endfor %}
+                    {% endif %}
+                </ul>
+            </div>
+        </div>
+
+        <!-- 2. Speed Multipliers (1x to 250x) -->
+        <div class="col-12 col-lg-7 text-start text-lg-end">
+            <label class="text-secondary smaller fw-bold d-block mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">
+                <i class="bi bi-speedometer2 me-1 text-info"></i>Replay Speed Multiplier (Syncs Strategy Clock)
+            </label>
+            <div class="d-flex flex-wrap gap-1.5 justify-content-start justify-content-lg-end" role="group">
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="1"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 1 %}active{% endif %}">1x</button></form>
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="5"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 5 %}active{% endif %}">5x</button></form>
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="10"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 10 %}active{% endif %}">10x</button></form>
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="25"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 25 %}active{% endif %}">25x</button></form>
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="50"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 50 %}active{% endif %}">50x</button></form>
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="100"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 100 %}active{% endif %}">100x</button></form>
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="250"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 250 %}active{% endif %}">250x</button></form>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- Mode A: Live FYERS Data Feed Telemetry Ribbon -->
+<div class="card glass-card p-4 mb-4 border-success border-opacity-25 shadow-sm" style="background: rgba(6, 78, 59, 0.15); border: 1px solid rgba(16, 185, 129, 0.25) !important;">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm flex-shrink-0" style="width: 38px; height: 38px; background: rgba(16, 185, 129, 0.2); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.35);">
+                <i class="bi bi-broadcast-pin fs-5"></i>
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <h6 class="mb-0 fw-bold text-white" style="font-size: 0.95rem;">FYERS Realtime Ingestion Stream</h6>
+                    {% if fyers_online %}
+                    <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace smaller">
+                        <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.45rem; height: 0.45rem;" role="status"></span>
+                        STREAMING ACTIVE
+                    </span>
+                    {% else %}
+                    <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace smaller">
+                        STANDBY / CONNECTED
+                    </span>
+                    {% endif %}
+                </div>
+                <div class="theme-text-muted smaller mt-0.5" style="font-size: 0.75rem;">
+                    Target Matcher: <strong class="text-white font-monospace">http://mock_broker:8088/mock/v2/orders</strong> &bull; Webhook: <code class="text-info font-monospace">/api/mock/dhan/postback/</code>
+                </div>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-3 font-monospace">
+            <div class="text-end">
+                <div class="theme-text-muted" style="font-size: 0.7rem;">Active Instrument</div>
+                <div class="text-white fw-bold" style="font-size: 0.95rem;">NIFTY 50</div>
+            </div>
+            <div class="text-end border-start border-secondary border-opacity-20 ps-3">
+                <div class="theme-text-muted" style="font-size: 0.7rem;">Realtime Spot (LTP)</div>
+                <div class="text-success fw-bold" style="font-size: 0.95rem;">
+                    ₹{{ fyers_last_tick.ltp|default:25420.50|floatformat:2 }}
+                </div>
+            </div>
+            <div class="text-end border-start border-secondary border-opacity-20 ps-3">
+                <div class="theme-text-muted" style="font-size: 0.7rem;">Latency</div>
+                <div class="text-info fw-bold" style="font-size: 0.95rem;">&lt; 10ms</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+<!-- ====================================================================
+     SECTION 3: LIVE MOCK DASHBOARD WORKSPACE (100% UI & CODE PARITY)
+     Same as https://pep-erratic-violate.ngrok-free.dev/admins/dashboard/live-mock/
+     ==================================================================== -->
+<div id="simulation-workspace" class="w-100">
+    <!-- Capital Accounting & Balance Bridge Card -->
+    <div class="glass-card p-3 mb-4 position-relative overflow-hidden rounded-3"
+         style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+        <div class="d-flex align-items-center justify-content-between mb-2">
+            <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Account Balance &amp; Capital Accounting</span>
+            <span class="badge {% if metrics.net_pnl >= 0 %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-25 border border-opacity-25 rounded-pill px-2.5 py-0.5 fs-7 font-monospace">
+                {% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }} Net Session PnL
+            </span>
+        </div>
+
+        <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-baseline gap-2 flex-wrap">
+                <span class="fs-3 fw-bold font-monospace text-white">
+                    ₹{{ active_account.available_balance|default:100000|floatformat:2 }}
+                </span>
+                <span class="theme-text-muted small fw-medium">Available Cash Margin</span>
+            </div>
+            <div class="d-flex align-items-center gap-2 small font-monospace">
+                <span class="badge rounded-pill px-2.5 py-1" style="background: var(--bg-elevated, rgba(255,255,255,0.05)); color: var(--text-secondary); border: 1px solid var(--border-default, rgba(255,255,255,0.1));">
+                    SOD Limit: ₹{{ active_account.sod_limit|default:100000|floatformat:2 }}
+                </span>
+                <span class="badge rounded-pill px-2.5 py-1 fw-bold {% if metrics.net_pnl >= 0 %}bg-success text-success border border-success{% else %}bg-danger text-danger border border-danger{% endif %} bg-opacity-20 border-opacity-35">
+                    Utilized: ₹{{ active_account.utilized_margin|default:0|floatformat:2 }}
+                </span>
+            </div>
+        </div>
+
+        <div class="row g-2 pt-2 border-top border-secondary border-opacity-10 small">
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="theme-text-muted" style="font-size: 0.72rem;">1. Starting SOD Capital:</div>
+                <div class="theme-text-main fw-semibold font-monospace">₹{{ active_account.sod_limit|default:100000|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="theme-text-muted" style="font-size: 0.72rem;">2. (+) Gross Profits:</div>
+                <div class="text-success fw-semibold font-monospace">+₹{{ metrics.gross_pnl|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="theme-text-muted" style="font-size: 0.72rem;">3. (-) Total Brokerage:</div>
+                <div class="text-warning fw-semibold font-monospace">-₹{{ metrics.total_charges|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="theme-text-muted" style="font-size: 0.72rem;">4. (➔) Net Realized PnL:</div>
+                <div class="{% if metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold font-monospace">{% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }}</div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="theme-text-muted" style="font-size: 0.72rem;">5. Closed Pairs:</div>
+                <div class="text-info fw-semibold font-monospace">{{ metrics.total_trades }} Trades</div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="theme-text-muted" style="font-size: 0.72rem;">6. Current Available:</div>
+                <div class="text-white fw-bold font-monospace">₹{{ active_account.available_balance|default:100000|floatformat:2 }}</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- KPI Cards Container -->
+    <div id="mock-broker-stats-container">
+        {% include 'admins/partials/mock_broker_stats_partial.html' with metrics=metrics %}
+    </div>
+
+    <!-- Interactive Cumulative Equity Curve Chart (Full Width) -->
+    <div class="row g-3 mb-4">
+        <div class="col-12">
+            <div class="glass-card p-3 h-100 border rounded-3 position-relative d-flex flex-column"
+                 style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+                <div class="d-flex justify-content-between align-items-center mb-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2" style="font-size: 1rem;">
+                            <span class="material-icons text-success" style="font-size: 1.2rem;">show_chart</span>
+                            Session Equity Curve
+                        </h5>
+                        <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
+                            POSTBACK AUDIT
+                        </span>
+                    </div>
+                    <div class="small font-monospace">
+                        Peak Drawdown: <strong class="text-danger">₹{{ metrics.max_drawdown|floatformat:2 }}</strong>
+                    </div>
+                </div>
+
+                <!-- Canvas Container -->
+                <div class="flex-grow-1 position-relative" style="min-height: 240px;">
+                    <canvas id="gatewayEmulatorEquityChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 12-Month Calendar Heatmap Container -->
+    <div id="mock-broker-calendar-container" class="mb-4">
+        {% include 'admins/partials/mock_broker_calendar_partial.html' with months=months year=year prev_year=prev_year next_year=next_year %}
+    </div>
+
+    <!-- Closed Trades Table Container -->
+    <div id="mock-broker-trades-container" class="mb-4">
+        {% include 'admins/partials/mock_broker_trades_table.html' with trades=trades page_obj=page_obj paginator=paginator is_paginated=is_paginated total_trades_count=total_trades_count filter_date=filter_date filter_status=filter_status %}
+    </div>
+</div>
+
+<!-- ====================================================================
+     SECTION 4: TERMINAL-STYLE MOCK ORDER TICKET MODAL
+     Matches execution API call samples from /admins/live/terminal/
+     ==================================================================== -->
+<div class="modal fade" id="mockOrderTicketModal" tabindex="-1" aria-labelledby="mockOrderTicketModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
+        <div class="modal-content glass-card rounded-4 border-secondary border-opacity-25" style="background: #0f1117; backdrop-filter: blur(25px);">
+            <div class="modal-header border-secondary border-opacity-20 pb-2">
+                <div class="d-flex align-items-center gap-2">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
+                        <i class="bi bi-lightning-fill"></i>
+                    </div>
+                    <div>
+                        <h6 class="modal-title fw-bold text-white" id="mockOrderTicketModalLabel" style="font-size: 0.95rem;">Mock Broker Order Ticket</h6>
+                        <div class="smaller text-muted">Terminal Execution API &bull; Port :8088 Matcher</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-toggle="modal" data-bs-target="#mockOrderTicketModal" aria-label="Close"></button>
+            </div>
+            <form hx-post="{% url 'admins:admin-live-order-place' %}"
+                  hx-swap="none"
+                  onsubmit="setTimeout(() => { bootstrap.Modal.getInstance(document.getElementById('mockOrderTicketModal'))?.hide(); }, 300);">
+                {% csrf_token %}
+                <input type="hidden" name="execution_mode" value="SANDBOX">
+                <input type="hidden" name="target_scope" value="ALL">
+
+                <div class="modal-body pt-3 pb-2">
+                    <!-- Buy / Sell Segment -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="side" id="sideBuy" value="BUY" checked>
+                            <label class="btn btn-outline-success w-100 fw-bold py-2 rounded-3" for="sideBuy">BUY</label>
+                        </div>
+                        <div class="col-6">
+                            <input type="radio" class="btn-check" name="side" id="sideSell" value="SELL">
+                            <label class="btn btn-outline-danger w-100 fw-bold py-2 rounded-3" for="sideSell">SELL</label>
+                        </div>
+                    </div>
+
+                    <!-- Symbol & Quantity -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-8">
+                            <label class="theme-text-muted smaller fw-semibold mb-1">TRADING SYMBOL</label>
+                            <input type="text" name="symbol" class="form-control bg-dark border-secondary border-opacity-25 text-white font-monospace" value="NSE:NIFTY50-INDEX" required>
+                        </div>
+                        <div class="col-4">
+                            <label class="theme-text-muted smaller fw-semibold mb-1">QUANTITY</label>
+                            <input type="number" name="quantity" class="form-control bg-dark border-secondary border-opacity-25 text-white font-monospace" value="25" min="1" step="1" required>
+                        </div>
+                    </div>
+
+                    <!-- Order Type & Price -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="theme-text-muted smaller fw-semibold mb-1">ORDER TYPE</label>
+                            <select name="order_type" class="form-select bg-dark border-secondary border-opacity-25 text-white font-monospace" id="mockOrderTypeSelect" onchange="document.getElementById('mockPriceInput').disabled = (this.value === 'MARKET');">
+                                <option value="MARKET" selected>MARKET</option>
+                                <option value="LIMIT">LIMIT</option>
+                            </select>
+                        </div>
+                        <div class="col-6">
+                            <label class="theme-text-muted smaller fw-semibold mb-1">LIMIT PRICE (₹)</label>
+                            <input type="number" name="price" id="mockPriceInput" class="form-control bg-dark border-secondary border-opacity-25 text-white font-monospace" value="0.00" step="0.05" disabled>
+                        </div>
+                    </div>
+
+                    <!-- SL / TP -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-6">
+                            <label class="theme-text-muted smaller fw-semibold mb-1">STOP LOSS (₹)</label>
+                            <input type="number" name="stop_loss" class="form-control bg-dark border-secondary border-opacity-25 text-white font-monospace" value="0.00" step="0.05">
+                        </div>
+                        <div class="col-6">
+                            <label class="theme-text-muted smaller fw-semibold mb-1">TAKE PROFIT (₹)</label>
+                            <input type="number" name="take_profit" class="form-control bg-dark border-secondary border-opacity-25 text-white font-monospace" value="0.00" step="0.05">
+                        </div>
+                    </div>
+
+                    <div class="p-2.5 rounded-3 bg-secondary bg-opacity-10 border border-secondary border-opacity-15 smaller theme-text-muted font-monospace">
+                        <i class="bi bi-info-circle me-1 text-info"></i>Order dispatches to Dhan Mock Broker on port 8088. Postback fires back to Django and updates Session Analytics via Webhook in microsecond parity.
+                    </div>
+                </div>
+
+                <div class="modal-footer border-secondary border-opacity-20 pt-2">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 fw-bold">
+                        <i class="bi bi-send-fill me-1"></i>Dispatch Order
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- ====================================================================
+     SECTION 5: EQUITY CURVE CHART INITIALIZATION
+     ==================================================================== -->
+<script>
+(function() {
+    function initGatewayEquityChart() {
+        const canvas = document.getElementById('gatewayEmulatorEquityChart');
+        if (!canvas) return;
+
+        const rawData = {{ equity_curve_json|safe }};
+        if (!rawData || rawData.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.font = "14px 'Google Sans Flex', sans-serif";
+            ctx.fillStyle = "rgba(255, 255, 255, 0.4)";
+            ctx.textAlign = "center";
+            ctx.fillText("No closed trades recorded yet for session equity curve.", canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        const labels = rawData.map(d => d.label || '');
+        const values = rawData.map(d => d.equity);
+
+        if (window._gatewayEmulatorChartInstance) {
+            window._gatewayEmulatorChartInstance.destroy();
+        }
+
+        const ctx = canvas.getContext('2d');
+        const isProfit = values.length > 0 && values[values.length - 1] >= 0;
+        const strokeColor = isProfit ? '#10b981' : '#ef4444';
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 240);
+        gradient.addColorStop(0, isProfit ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        window._gatewayEmulatorChartInstance = new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Cumulative Net PnL (₹)',
+                    data: values,
+                    borderColor: strokeColor,
+                    borderWidth: 2,
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.25,
+                    pointRadius: values.length > 50 ? 1 : 3,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: strokeColor,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0c0d12',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderWidth: 1,
+                        titleColor: '#fff',
+                        bodyColor: '#e2e8f0',
+                        padding: 10,
+                        callbacks: {
+                            label: function(context) {
+                                return ' Net PnL: ₹' + (context.parsed.y != null ? context.parsed.y.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : '0.00');
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { family: "'Google Sans Code', monospace", size: 11 },
+                            maxTicksLimit: 10,
+                        }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { family: "'Google Sans Code', monospace", size: 11 },
+                            callback: function(val) {
+                                return '₹' + val.toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        setTimeout(initGatewayEquityChart, 80);
+    } else {
+        document.addEventListener('DOMContentLoaded', initGatewayEquityChart);
+    }
+    document.body.addEventListener('htmx:afterSwap', function(e) {
+        if (e.detail.target && (e.detail.target.id === 'gateway-emulator-container' || e.detail.target.closest('#gateway-emulator-container'))) {
+            setTimeout(initGatewayEquityChart, 80);
+        }
+    });
+})();
+</script>

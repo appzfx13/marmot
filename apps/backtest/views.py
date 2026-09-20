@@ -71,13 +71,56 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+        strategy_code = self.request.GET.get('strategy', '').strip()
+        index_initial = {}
+        forex_initial = {}
+        if strategy_code:
+            strat_obj = TradingStrategy.objects.filter(code_name=strategy_code, is_deleted=False).first()
+            if strat_obj:
+                sp = dict(strat_obj.default_parameters or {})
+                index_initial = {
+                    'strategy_name': strat_obj.code_name,
+                    'stop_loss_points': sp.get('sl_pts') or sp.get('stop_loss_points', 15.0),
+                    'risk_reward_ratio': sp.get('rr_ratio') or sp.get('risk_reward_ratio', 2.0),
+                    'lots_count': sp.get('lots_count', 1),
+                    'strike_selection': sp.get('strike_selection', 'ATM'),
+                }
+                forex_initial = {
+                    'strategy_name': strat_obj.code_name,
+                    'stop_loss_points': sp.get('sl_pts') or sp.get('stop_loss_points', 25.0),
+                    'risk_reward_ratio': sp.get('rr_ratio') or sp.get('risk_reward_ratio', 2.0),
+                    'lots_count': sp.get('lots_count', 1),
+                }
+
         if 'index_form' not in context:
-            context['index_form'] = IndexBacktestTaskForm()
+            context['index_form'] = IndexBacktestTaskForm(initial=index_initial)
         if 'forex_form' not in context:
-            context['forex_form'] = ForexBacktestTaskForm()
+            context['forex_form'] = ForexBacktestTaskForm(initial=forex_initial)
         active_tab = self.request.GET.get('market_type', 'INDEX_FO')
         context['active_market_type'] = active_tab
+
+        # Build JSON dictionary of all strategies & tuned parameters for real-time frontend syncing
+        all_strats = TradingStrategy.objects.filter(is_deleted=False)
+        strat_map = {}
+        for s in all_strats:
+            params = dict(s.default_parameters or {})
+            strat_map[s.code_name] = {
+                'name': s.name,
+                'category': s.category,
+                'sl_pts': params.get('sl_pts') or params.get('stop_loss_points', 15.0),
+                'rr_ratio': params.get('rr_ratio') or params.get('risk_reward_ratio', 2.0),
+                'lots_count': params.get('lots_count', 1),
+                'strike_selection': params.get('strike_selection', 'ATM'),
+                'ema_fast': params.get('ema_fast', 9),
+                'ema_slow': params.get('ema_slow', 21),
+                'use_orb_filter': params.get('use_orb_filter', False),
+                'trail_breakeven': params.get('trail_breakeven', True),
+                'breakeven_at_r': params.get('breakeven_at_r', 1.0),
+            }
+        context['strategies_json'] = json.dumps(strat_map)
+        context['selected_strategy_code'] = strategy_code
         return context
+
 
     def post(self, request, *args, **kwargs):
         self.object = None
@@ -114,14 +157,19 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
                     'parameters': r.parameters or {}
                 })
 
-        params = {
-            "rr_ratio": form.cleaned_data.get('risk_reward_ratio', 2.0),
-            "stop_loss_points": form.cleaned_data.get('stop_loss_points', 30.0),
-            "sl_pts": form.cleaned_data.get('stop_loss_points', 30.0),
-            "lots_count": form.cleaned_data.get('lots_count', 1),
+        strategy_name = form.cleaned_data.get('strategy_name')
+        strat_obj = TradingStrategy.objects.filter(code_name=strategy_name).first()
+        strat_params = dict(strat_obj.default_parameters or {}) if strat_obj else {}
+
+        params = dict(strat_params)
+        params.update({
+            "rr_ratio": form.cleaned_data.get('risk_reward_ratio') or strat_params.get('rr_ratio', 2.5),
+            "stop_loss_points": form.cleaned_data.get('stop_loss_points') or strat_params.get('sl_pts', 15.0),
+            "sl_pts": form.cleaned_data.get('stop_loss_points') or strat_params.get('sl_pts', 15.0),
+            "lots_count": form.cleaned_data.get('lots_count') or strat_params.get('lots_count', 1),
             "rules": rule_list,
             "prompt_directives": prompt_directives,
-        }
+        })
 
         # Strike selection & step interval
         index_sym = str(form.cleaned_data.get('index_name') or 'NIFTY').upper()
@@ -183,7 +231,10 @@ from django.core.paginator import Paginator
 
 def get_backtest_trades_context(backtest, request):
     trades = []
-    if backtest.results and isinstance(backtest.results, dict) and 'trades' in backtest.results:
+    # If task is actively running, pending, or created, do not load stale trades from old disk files
+    if str(backtest.status).lower() in ['running', 'pending', 'in_progress', 'created']:
+        trades = []
+    elif backtest.results and isinstance(backtest.results, dict) and 'trades' in backtest.results:
         trades = backtest.results['trades']
     else:
         possible_paths = []
@@ -1841,18 +1892,6 @@ class BacktestControlView(LoginRequiredMixin, AdminRequiredMixin, View):
             task.parameters['use_macro_assist'] = use_macro
             task.save(update_fields=['use_macro_assist', 'parameters'])
 
-        if action == 'start' and task:
-            params = task.parameters if isinstance(task.parameters, dict) else {}
-            task_rules = params.get('rules', []) or list(task.rules.all())
-            prompt_dir = (params.get('prompt_directives') or '').strip()
-            if not task_rules and not prompt_dir:
-                response = HttpResponse(status=400)
-                response['HX-Trigger'] = json.dumps({
-                    'showToast': {'message': '⚠️ Execution blocked: Please select at least one Strategy Rule or prompt directive first.', 'level': 'warning'},
-                    'closeGlobalModal': True,
-                })
-                return response
-
         send_backtest_control_command(pk, action)
         msg = f"Backtest command '{action.upper()}' sent successfully."
         response = HttpResponse(status=204)
@@ -1940,9 +1979,6 @@ class BacktestBulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
 from .models import TradingStrategy
 
 def ensure_default_strategies():
-    if TradingStrategy.objects.filter(is_deleted=False).exists():
-        return
-    
     defaults = [
         {
             "name": "Go Quantitative Rule Engine (ORB / SMC / Momentum)",
@@ -1954,8 +1990,19 @@ def ensure_default_strategies():
             "default_parameters": {
                 "lots_count": 1,
                 "strike_selection": "ATM",
-                "risk_reward_ratio": 2.0,
+                "risk_reward_ratio": 2.5,
+                "rr_ratio": 2.5,
                 "stop_loss_points": 15.0,
+                "sl_pts": 15.0,
+                "ema_fast": 9,
+                "ema_slow": 21,
+                "use_orb_filter": True,
+                "use_orb": True,
+                "trail_breakeven": True,
+                "breakeven_at_r": 1.2,
+                "entry_window_from": "09:20",
+                "entry_window_to": "15:00",
+                "cooldown_seconds": 300,
             },
             "user_manual": """# Go Quantitative Rule Engine Strategy Manual
 
@@ -1968,7 +2015,7 @@ The **Go Quantitative Strategy Engine** executes deterministic, auditable rule-b
 - EMA 9 / EMA 21 trend direction filter.
 - 15-Minute Opening Range Breakout (ORB 9:15–9:30 IST) high/low breakout confirmation.
 - ICT Smart Money Concepts (SMC v3): Institutional Displacement body-to-range ratio ≥ 60%.
-- Dynamic ATM strike selection, lot sizing, stop-loss, and 2R profit target.
+- Dynamic ATM strike selection, lot sizing, stop-loss, and 2.5R profit target with trailing stop to breakeven.
 """
         },
         {
@@ -1978,7 +2025,23 @@ The **Go Quantitative Strategy Engine** executes deterministic, auditable rule-b
             "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
             "description": "Pure 15-minute Opening Range Breakout with momentum EMA filter.",
             "go_file_path": "go-app/strategies/quant_engine.go",
-            "default_parameters": {"lots_count": 1, "strike_selection": "ATM", "risk_reward_ratio": 2.0, "stop_loss_points": 15.0},
+            "default_parameters": {
+                "lots_count": 1,
+                "strike_selection": "ATM",
+                "risk_reward_ratio": 2.0,
+                "rr_ratio": 2.0,
+                "stop_loss_points": 15.0,
+                "sl_pts": 15.0,
+                "ema_fast": 9,
+                "ema_slow": 21,
+                "use_orb_filter": True,
+                "use_orb": True,
+                "trail_breakeven": True,
+                "breakeven_at_r": 1.2,
+                "entry_window_from": "09:20",
+                "entry_window_to": "15:00",
+                "cooldown_seconds": 300,
+            },
             "user_manual": "# ORB Momentum Strategy\n\nBreakout above/below the 15-minute opening range with EMA trend confirmation.",
         },
         {
@@ -1988,13 +2051,65 @@ The **Go Quantitative Strategy Engine** executes deterministic, auditable rule-b
             "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
             "description": "ICT SMC v3: Institutional displacement, CHoCH, and liquidity sweep retest setups.",
             "go_file_path": "go-app/strategies/quant_engine.go",
-            "default_parameters": {"lots_count": 1, "strike_selection": "ATM", "risk_reward_ratio": 2.0, "stop_loss_points": 15.0},
+            "default_parameters": {
+                "lots_count": 1,
+                "strike_selection": "ATM",
+                "risk_reward_ratio": 2.5,
+                "rr_ratio": 2.5,
+                "stop_loss_points": 15.0,
+                "sl_pts": 15.0,
+                "ema_fast": 9,
+                "ema_slow": 21,
+                "use_orb_filter": True,
+                "use_orb": True,
+                "trail_breakeven": True,
+                "breakeven_at_r": 1.2,
+                "entry_window_from": "09:20",
+                "entry_window_to": "15:00",
+                "cooldown_seconds": 300,
+            },
             "user_manual": "# ICT SMC Strategy\n\nEvaluates institutional displacement candles (body/range ≥ 60%) with EMA 9/21 trend lock.",
+        },
+        {
+            "name": "High-Frequency Micro-Scalp (HFT 1:2.0)",
+            "code_name": "hft_scalp",
+            "category": "High-Frequency Trading",
+            "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
+            "description": "Ultra-fast EMA 3/8 institutional micro-scalp with tight 8pt SL, 1:2.0 RR, and aggressive 0.8R trailing breakeven shield for high winrate.",
+            "go_file_path": "go-app/strategies/preset_scalp.go",
+            "default_parameters": {
+                "lots_count": 1,
+                "strike_selection": "ATM",
+                "risk_reward_ratio": 2.0,
+                "rr_ratio": 2.0,
+                "stop_loss_points": 8.0,
+                "sl_pts": 8.0,
+                "ema_fast": 3,
+                "ema_slow": 8,
+                "use_orb_filter": False,
+                "use_orb": False,
+                "trail_breakeven": True,
+                "breakeven_at_r": 0.8,
+                "entry_window_from": "09:20",
+                "entry_window_to": "15:00",
+                "cooldown_seconds": 60,
+            },
+            "user_manual": "# High-Frequency Micro-Scalp (HFT)\n\nUltra-fast EMA 3/8 micro-scalp with tight 8pt SL, 1:2.0 RR, and 0.8R trailing breakeven shield to achieve high win rates.",
         },
     ]
 
     for item in defaults:
-        TradingStrategy.objects.get_or_create(code_name=item["code_name"], defaults=item)
+        strat, created = TradingStrategy.objects.get_or_create(code_name=item["code_name"], defaults=item)
+        if not created:
+            existing_params = dict(strat.default_parameters or {})
+            updated = False
+            for k, v in item["default_parameters"].items():
+                if k not in existing_params:
+                    existing_params[k] = v
+                    updated = True
+            if updated:
+                strat.default_parameters = existing_params
+                strat.save(update_fields=['default_parameters'])
 
 
 class StrategyListView(HTMXPartialMixin, LoginRequiredMixin, ListView):
@@ -2051,10 +2166,12 @@ class StrategyDetailView(HTMXPartialMixin, LoginRequiredMixin, DetailView):
         else:
             go_code = f"// File {strategy.go_file_path} not found on server."
 
+        params = dict(strategy.default_parameters or {})
         context['go_code'] = go_code
         context['can_edit'] = is_admin
         context['can_delete'] = is_admin
-        context['params_json_str'] = json.dumps(strategy.default_parameters, indent=2)
+        context['params'] = params
+        context['params_json_str'] = json.dumps(params, indent=2)
         return context
 
 
@@ -2067,41 +2184,75 @@ class StrategySaveCodeView(LoginRequiredMixin, View):
             return HttpResponseForbidden("Permission Denied: Only administrators can modify strategy code.")
 
         strategy = get_object_or_404(TradingStrategy, pk=pk, is_deleted=False)
-        new_code = request.POST.get('go_code', '')
-        new_params_str = request.POST.get('parameters_json', '{}')
+        params = dict(strategy.default_parameters or {})
 
-        # Update Go code file
-        full_path = os.path.join(settings.BASE_DIR, strategy.go_file_path)
-        try:
-            os.makedirs(os.path.dirname(full_path), exist_ok=True)
-            with open(full_path, 'w', encoding='utf-8') as f:
-                f.write(new_code)
-        except Exception as e:
-            response = HttpResponse(status=400)
-            response['HX-Trigger'] = json.dumps({
-                'showToast': {'message': f"Failed to save Go file: {e}", 'level': 'error'}
-            })
-            return response
+        # Parse individual form input fields if submitted from visual parameter editor
+        if 'ema_fast' in request.POST or 'sl_pts' in request.POST or 'rr_ratio' in request.POST:
+            try:
+                if 'ema_fast' in request.POST:
+                    params['ema_fast'] = int(request.POST.get('ema_fast', 9))
+                if 'ema_slow' in request.POST:
+                    params['ema_slow'] = int(request.POST.get('ema_slow', 21))
+                if 'sl_pts' in request.POST:
+                    params['sl_pts'] = float(request.POST.get('sl_pts', 15.0))
+                    params['stop_loss_points'] = params['sl_pts']
+                if 'rr_ratio' in request.POST:
+                    params['rr_ratio'] = float(request.POST.get('rr_ratio', 2.5))
+                    params['risk_reward_ratio'] = params['rr_ratio']
+                if 'lots_count' in request.POST:
+                    params['lots_count'] = int(request.POST.get('lots_count', 1))
+                if 'strike_selection' in request.POST:
+                    params['strike_selection'] = request.POST.get('strike_selection', 'ATM')
+                params['use_orb_filter'] = request.POST.get('use_orb_filter') in ['true', 'on', '1', True]
+                params['use_orb'] = params['use_orb_filter']
+                params['trail_breakeven'] = request.POST.get('trail_breakeven') in ['true', 'on', '1', True]
+                if 'breakeven_at_r' in request.POST:
+                    params['breakeven_at_r'] = float(request.POST.get('breakeven_at_r', 1.2))
+                if 'entry_window_from' in request.POST:
+                    params['entry_window_from'] = request.POST.get('entry_window_from', '09:20').strip()
+                if 'entry_window_to' in request.POST:
+                    params['entry_window_to'] = request.POST.get('entry_window_to', '15:00').strip()
+                if 'cooldown_seconds' in request.POST:
+                    params['cooldown_seconds'] = int(request.POST.get('cooldown_seconds', 300))
+            except Exception as e:
+                logger.warning("Error parsing visual strategy form parameters: %s", e)
+        elif 'parameters_json' in request.POST:
+            try:
+                parsed_params = json.loads(request.POST.get('parameters_json', '{}'))
+                if isinstance(parsed_params, dict):
+                    params.update(parsed_params)
+            except Exception:
+                pass
 
-        # Parse & update parameters JSON
-        try:
-            parsed_params = json.loads(new_params_str)
-            strategy.default_parameters = parsed_params
-            strategy.save()
-        except Exception as e:
-            pass
+        strategy.default_parameters = params
+        strategy.save()
 
-        # Trigger background docker build for go_app
-        import subprocess
-        try:
-            subprocess.Popen(["docker", "compose", "build", "go_app"], cwd=settings.BASE_DIR)
-        except Exception:
-            pass
+        # Update Go code file if code was sent
+        new_code = request.POST.get('go_code', '').strip()
+        if new_code:
+            full_path = os.path.join(settings.BASE_DIR, strategy.go_file_path)
+            try:
+                os.makedirs(os.path.dirname(full_path), exist_ok=True)
+                with open(full_path, 'w', encoding='utf-8') as f:
+                    f.write(new_code)
+            except Exception as e:
+                response = HttpResponse(status=400)
+                response['HX-Trigger'] = json.dumps({
+                    'showToast': {'message': f"Failed to save Go file: {e}", 'level': 'error'}
+                })
+                return response
 
-        msg = f"Strategy '{strategy.name}' code & parameters saved successfully!"
+            import subprocess
+            try:
+                subprocess.Popen(["docker", "compose", "build", "go_app"], cwd=settings.BASE_DIR)
+            except Exception:
+                pass
+
+        msg = f"Strategy '{strategy.name}' parameters updated and saved successfully!"
         response = HttpResponse(status=200)
         response['HX-Trigger'] = json.dumps({
-            'showToast': {'message': msg, 'level': 'success'}
+            'showToast': {'message': msg, 'level': 'success'},
+            'reloadStrategyTable': True
         })
         return response
 
@@ -2350,8 +2501,8 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             ),
             'order_slice_size_val': int(params.get('order_slice_size', 30)),
             'max_sliced_orders_val': int(params.get('max_sliced_orders', 2)),
-            'enable_ai_lot_sizing_val': bool(task.enable_ai_lot_sizing or params.get('enable_ai_lot_sizing', False)),
-            'enable_ai_compounding_val': bool(params.get('enable_ai_compounding', False)),
+            'enable_ai_lot_sizing_val': bool(task.enable_ai_lot_sizing or params.get('enable_ai_lot_sizing', False) or params.get('enable_ai_compounding', False)),
+            'enable_ai_compounding_val': bool(params.get('enable_ai_compounding', False) or params.get('enable_ai_lot_sizing', False)),
             'compounding_batch_trades_val': int(params.get('compounding_batch_trades', 30)),
             'compounding_profit_step_val': float(params.get('compounding_profit_step', 25000.0 if not is_forex else 500.0)),
             'compounding_profile_val': str(params.get('compounding_profile', 'STEP_UP')),
@@ -2403,7 +2554,7 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             lots_count = 1
 
         enable_ai_lot_sizing = ('enable_ai_lot_sizing' in request.POST)
-        enable_ai_compounding = ('enable_ai_compounding' in request.POST)
+        enable_ai_compounding = enable_ai_lot_sizing or ('enable_ai_compounding' in request.POST)
         try:
             compounding_batch_trades = max(1, min(500, int(request.POST.get('compounding_batch_trades', '30').strip() or 30)))
         except ValueError:

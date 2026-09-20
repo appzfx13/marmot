@@ -28,6 +28,7 @@ class StrategyChoices(models.TextChoices):
     QUANT_ENGINE = 'quant_engine', 'Go Quantitative Rule Engine (ORB / SMC / Momentum)'
     ORB_MOMENTUM = 'orb_momentum', 'Opening Range Breakout (ORB 15m) & Momentum'
     ICT_SMC = 'ict_smc', 'ICT Smart Money Concepts (SMC v3)'
+    HFT_SCALP = 'hft_scalp', 'High-Frequency Micro-Scalp (HFT 1:2.0)'
 
 
 # Strike Selection Choices

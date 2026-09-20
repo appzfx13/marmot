@@ -128,12 +128,20 @@ class IndexBacktestTaskForm(forms.ModelForm):
         model = BacktestTask
         fields = ['market_type', 'backup_task', 'macro_backup_task', 'use_macro_assist', 'macro_timeframe', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
         widgets = {
-            'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25'}),
+            'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_strategy_name'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_index_name'}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_start_date'}),
             'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_end_date'}),
             'initial_capital': forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'step': '1000'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import TradingStrategy
+        strategies = list(TradingStrategy.objects.filter(is_deleted=False).order_by('id'))
+        if strategies:
+            self.fields['strategy_name'].choices = [(s.code_name, s.name) for s in strategies]
+
 
 
 class ForexBacktestTaskForm(forms.ModelForm):
@@ -179,12 +187,20 @@ class ForexBacktestTaskForm(forms.ModelForm):
         model = BacktestTask
         fields = ['market_type', 'backup_task', 'macro_backup_task', 'use_macro_assist', 'macro_timeframe', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
         widgets = {
-            'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25'}),
+            'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_strategy_name'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_index_name'}),
             'start_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_start_date'}),
             'end_date': forms.DateInput(attrs={'type': 'date', 'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_end_date'}),
             'initial_capital': forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'step': '100'}),
         }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        from .models import TradingStrategy
+        strategies = list(TradingStrategy.objects.filter(is_deleted=False).order_by('id'))
+        if strategies:
+            self.fields['strategy_name'].choices = [(s.code_name, s.name) for s in strategies]
+
 
 
 # Backward compatibility alias

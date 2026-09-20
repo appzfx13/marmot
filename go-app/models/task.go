@@ -26,6 +26,7 @@ type TaskParams struct {
 	RsiMax          int                    `json:"rsi_max,omitempty"`
 	EmaMin          int                    `json:"ema_min,omitempty"`
 	EmaMax          int                    `json:"ema_max,omitempty"`
+	Use30Days5s      bool                   `json:"use_30_days_5s"`
 	// FYERS authentication: app_id and access_token injected by Django
 	FyersAppID       string                 `json:"fyers_app_id"`
 	FyersAccessToken string                 `json:"fyers_access_token"`

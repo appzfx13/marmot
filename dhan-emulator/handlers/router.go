@@ -92,6 +92,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/mock/api/funds/adjust", h.handleAdjustFunds)
 	mux.HandleFunc("/mock/api/chaos", h.handleUpdateChaos)
 	mux.HandleFunc("/mock/api/streamer/toggle", h.handleStreamerToggle)
+	mux.HandleFunc("/mock/api/streamer/stop", h.handleStreamerStop)
 	mux.HandleFunc("/mock/api/streamer/restart", h.handleStreamerRestart)
 	mux.HandleFunc("/mock/api/streamer/speed", h.handleStreamerSpeed)
 	mux.HandleFunc("/mock/api/streamer/select", h.handleStreamerSelect)
@@ -474,6 +475,8 @@ func (h *Handler) handleDashboardControls(w http.ResponseWriter, r *http.Request
 	} else if isPlaying {
 		toggleBtn = `<button class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2" hx-post="/mock/api/streamer/toggle" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML"><i class="bi bi-pause-fill fs-5"></i> <span>Pause Replay</span></button>`
 	}
+	stopBtn := `<button class="btn btn-outline-danger fw-bold btn-sm rounded-pill px-3 py-2 shadow-sm d-inline-flex align-items-center gap-1.5 ms-1.5" hx-post="/mock/api/streamer/stop" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML" title="Stop & Halt Simulation"><i class="bi bi-stop-circle-fill"></i> <span>STOP</span></button>`
+	controlsActionGroup := fmt.Sprintf(`<div class="d-inline-flex align-items-center gap-1">%s%s</div>`, toggleBtn, stopBtn)
 
 	var dropdownItems strings.Builder
 	if len(files) == 0 {
@@ -604,7 +607,7 @@ func (h *Handler) handleDashboardControls(w http.ResponseWriter, r *http.Request
 				</div>
 			</div>
 		</div>
-	</div>`, engineBadge, dropdownHtml, toggleBtn, speedPills.String())
+	</div>`, engineBadge, dropdownHtml, controlsActionGroup, speedPills.String())
 }
 
 // handleDashboardOptionChain renders the complete option chain HTML partial matching Marmot's live_mini_option_chain_card.html
@@ -1088,6 +1091,13 @@ func (h *Handler) handleStreamerToggle(w http.ResponseWriter, r *http.Request) {
 		h.streamer.Start()
 	}
 	w.Header().Set("HX-Trigger", "reloadMockOptionChain")
+	h.handleDashboardControls(w, r)
+}
+
+// handleStreamerStop immediately pauses and halts market feed playback.
+func (h *Handler) handleStreamerStop(w http.ResponseWriter, r *http.Request) {
+	h.streamer.Stop()
+	w.Header().Set("HX-Trigger", `{"reloadMockOptionChain": true, "replayStopped": true}`)
 	h.handleDashboardControls(w, r)
 }
 

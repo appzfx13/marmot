@@ -87,6 +87,49 @@
     }
     .market-section.hidden { display: none !important; }
 
+    /* ── 30-Day Preset Toggle ────────────────────────────────────────────── */
+    .preset-30d-btn {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        padding: 5px 14px;
+        border-radius: 20px;
+        border: 1px solid var(--border-color);
+        background: rgba(255,255,255,0.04);
+        color: var(--text-muted);
+        font-size: 0.75rem;
+        font-weight: 600;
+        cursor: pointer;
+        transition: all 0.2s ease;
+        user-select: none;
+        letter-spacing: 0.02em;
+    }
+    .preset-30d-btn.active {
+        background: rgba(99,102,241,0.18);
+        border-color: rgba(99,102,241,0.5);
+        color: #a5b4fc;
+    }
+    [data-theme="light"] .preset-30d-btn.active {
+        background: rgba(99,102,241,0.12);
+        border-color: rgba(99,102,241,0.4);
+        color: #4f46e5;
+    }
+    .date-locked {
+        opacity: 0.65;
+        pointer-events: none;
+        cursor: not-allowed !important;
+    }
+    .date-lock-badge {
+        display: none;
+        align-items: center;
+        gap: 4px;
+        font-size: 0.7rem;
+        color: #a5b4fc;
+        margin-top: 4px;
+    }
+    .date-lock-badge.visible { display: inline-flex; }
+    [data-theme="light"] .date-lock-badge { color: #4f46e5; }
+
     .forex-badge {
         display: inline-flex;
         align-items: center;
@@ -197,6 +240,10 @@
         <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-2" style="border-color:var(--border-color)!important;">
             <span class="material-icons text-primary fs-5">date_range</span>
             <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Timeframe Selection</h6>
+            <button type="button" id="preset30dBtn" class="preset-30d-btn ms-2" onclick="toggle30DayPreset()">
+                <span class="material-icons" style="font-size:0.9rem;">bolt</span>
+                Previous 30 Days
+            </button>
         </div>
 
         <div class="row g-3 mb-4">
@@ -204,8 +251,9 @@
                 <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.start_date.id_for_label }}">
                     Start Date{% if form.start_date.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
                 </label>
-                {{ form.start_date }}
-                <div class="theme-text-muted small mt-1">Beginning date for the dataset history.</div>
+                <div id="startDateWrap">{{ form.start_date }}</div>
+                <div class="date-lock-badge" id="startLockBadge"><span class="material-icons" style="font-size:0.8rem;">lock</span>Auto-set · 30-day preset</div>
+                <div class="theme-text-muted small mt-1" id="startDateHint">Beginning date for the dataset history.</div>
                 {% for error in form.start_date.errors %}
                     <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
                 {% endfor %}
@@ -214,8 +262,9 @@
                 <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.end_date.id_for_label }}">
                     End Date{% if form.end_date.field.required %}<span class="text-danger ms-1">*</span>{% endif %}
                 </label>
-                {{ form.end_date }}
-                <div class="theme-text-muted small mt-1">Ending date for the dataset history.</div>
+                <div id="endDateWrap">{{ form.end_date }}</div>
+                <div class="date-lock-badge" id="endLockBadge"><span class="material-icons" style="font-size:0.8rem;">lock</span>Auto-set · 30-day preset</div>
+                <div class="theme-text-muted small mt-1" id="endDateHint">Ending date for the dataset history.</div>
                 {% for error in form.end_date.errors %}
                     <div class="text-danger small mt-1 d-flex align-items-center gap-1"><span class="material-icons fs-6">error_outline</span>{{ error }}</div>
                 {% endfor %}
@@ -367,6 +416,8 @@ document.addEventListener('DOMContentLoaded', function () {
     const indexSelect    = document.querySelector('select[name="index_name"]');
     const strikeCountRow = document.getElementById('strikeCountRow');
     const strikeInput    = document.querySelector('input[name="strike_count"]');
+    const startInput     = document.querySelector('input[name="start_date"]');
+    const endInput       = document.querySelector('input[name="end_date"]');
 
     // ── Market type toggle ────────────────────────────────────────────────
     function applyMarketType(val) {
@@ -396,10 +447,54 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (indexSelect) { indexSelect.addEventListener('change', toggleStrikeField); toggleStrikeField(); }
 
+    // ── Previous 30 Days Preset Toggle ───────────────────────────────────
+    let preset30dActive = false;
+
+    function toLocalDateStr(d) {
+        // Returns YYYY-MM-DD in local timezone (avoids UTC offset shift)
+        const yyyy = d.getFullYear();
+        const mm   = String(d.getMonth() + 1).padStart(2, '0');
+        const dd   = String(d.getDate()).padStart(2, '0');
+        return `${yyyy}-${mm}-${dd}`;
+    }
+
+    window.toggle30DayPreset = function () {
+        preset30dActive = !preset30dActive;
+        const btn         = document.getElementById('preset30dBtn');
+        const startWrap   = document.getElementById('startDateWrap');
+        const endWrap     = document.getElementById('endDateWrap');
+        const startBadge  = document.getElementById('startLockBadge');
+        const endBadge    = document.getElementById('endLockBadge');
+
+        if (preset30dActive) {
+            const today    = new Date();
+            const thirtyAgo = new Date(today);
+            thirtyAgo.setDate(today.getDate() - 30);
+
+            startInput.value    = toLocalDateStr(thirtyAgo);
+            endInput.value      = toLocalDateStr(today);
+            startInput.readOnly = true;
+            endInput.readOnly   = true;
+            startWrap.classList.add('date-locked');
+            endWrap.classList.add('date-locked');
+            startBadge.classList.add('visible');
+            endBadge.classList.add('visible');
+            btn.classList.add('active');
+        } else {
+            startInput.readOnly = false;
+            endInput.readOnly   = false;
+            startWrap.classList.remove('date-locked');
+            endWrap.classList.remove('date-locked');
+            startBadge.classList.remove('visible');
+            endBadge.classList.remove('visible');
+            btn.classList.remove('active');
+        }
+    };
+
     // ── Init button: validate dates then open modal ───────────────────────
     document.getElementById('initBackupBtn').addEventListener('click', function () {
-        const startDateStr = document.querySelector('input[name="start_date"]').value;
-        const endDateStr   = document.querySelector('input[name="end_date"]').value;
+        const startDateStr = startInput.value;
+        const endDateStr   = endInput.value;
         const prevError = document.getElementById('date-validation-error');
         if (prevError) prevError.remove();
 
@@ -408,9 +503,12 @@ document.addEventListener('DOMContentLoaded', function () {
             errorDiv.id = 'date-validation-error';
             errorDiv.className = 'text-danger small mt-1 d-flex align-items-center gap-1';
             errorDiv.innerHTML = '<span class="material-icons fs-6">error_outline</span>Start date must be earlier than end date.';
-            document.querySelector('input[name="end_date"]').parentElement.appendChild(errorDiv);
+            endInput.parentElement.appendChild(errorDiv);
             return;
         }
+        // Ensure readonly inputs are NOT disabled so they submit with the form
+        startInput.readOnly = false;
+        endInput.readOnly   = false;
         new bootstrap.Modal(document.getElementById('confirmInitModal')).show();
     });
 

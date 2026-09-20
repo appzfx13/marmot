@@ -36,3 +36,4 @@ class BacktestRuleTypeChoices(models.TextChoices):
     MOMENTUM_GUARDRAIL = 'momentum_guardrail', 'Professional Intraday Trend & Momentum Guardrails'
     ALGO_MICRO_SCALP = 'algo_micro_scalp', 'Institutional Micro-Scalp & Dynamic Risk Guard'
     MOMENTUM_SCALP = 'momentum_scalp', 'Momentum Scalp 1:2.5 (EMA 9/21 + ORB)'
+    HFT_SCALP = 'hft_scalp', 'High-Frequency Micro-Scalp (HFT 1:2.0)'

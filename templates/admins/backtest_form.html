@@ -229,3 +229,87 @@
     </div>
 </div>
 {% endblock %}
+
+{% block extra_js %}
+{{ block.super }}
+<script>
+(function() {
+    function initStrategyAutoSync() {
+        let strategiesData = {};
+        try {
+            strategiesData = {{ strategies_json|safe|default:'{}' }};
+        } catch (e) {
+            console.warn("Failed to parse strategies JSON:", e);
+        }
+
+        function updateFormFields(selectEl, prefix) {
+            if (!selectEl) return;
+            const stratCode = selectEl.value;
+            const strat = strategiesData[stratCode];
+            if (!strat) return;
+
+            const slInput = document.getElementById(`id_${prefix}_stop_loss_points`);
+            const rrInput = document.getElementById(`id_${prefix}_risk_reward_ratio`);
+            const lotsInput = document.getElementById(`id_${prefix}_lots_count`);
+            const strikeInput = document.getElementById(`id_${prefix}_strike_selection`);
+            const badgesContainer = document.getElementById(`${prefix}-strat-badges`);
+
+            if (slInput && strat.sl_pts !== undefined) {
+                slInput.value = strat.sl_pts;
+            }
+            if (rrInput && strat.rr_ratio !== undefined) {
+                rrInput.value = strat.rr_ratio;
+            }
+            if (lotsInput && strat.lots_count !== undefined) {
+                lotsInput.value = strat.lots_count;
+            }
+            if (strikeInput && strat.strike_selection) {
+                strikeInput.value = strat.strike_selection;
+            }
+
+            if (badgesContainer) {
+                let badgesHtml = '';
+                if (strat.ema_fast && strat.ema_slow) {
+                    badgesHtml += `<span class="badge bg-primary bg-opacity-10 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.72rem;"><i class="bi bi-graph-up me-1"></i>EMA ${strat.ema_fast}/${strat.ema_slow}</span> `;
+                }
+                if (strat.sl_pts) {
+                    badgesHtml += `<span class="badge bg-danger bg-opacity-10 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.72rem;">SL ${strat.sl_pts} pts</span> `;
+                }
+                if (strat.rr_ratio) {
+                    badgesHtml += `<span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.72rem;">R:R 1:${strat.rr_ratio}</span> `;
+                }
+                if (strat.use_orb_filter) {
+                    badgesHtml += `<span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.72rem;"><i class="bi bi-clock me-1"></i>15m ORB</span> `;
+                }
+                if (strat.trail_breakeven) {
+                    badgesHtml += `<span class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 rounded-pill px-2 py-0.5" style="font-size: 0.72rem;"><i class="bi bi-shield-check me-1"></i>${strat.breakeven_at_r}R Breakeven Shield</span> `;
+                }
+                badgesContainer.innerHTML = badgesHtml;
+            }
+        }
+
+        const indexStratSelect = document.getElementById('id_index_strategy_name');
+        if (indexStratSelect && !indexStratSelect.dataset.syncBound) {
+            indexStratSelect.dataset.syncBound = "true";
+            indexStratSelect.addEventListener('change', () => updateFormFields(indexStratSelect, 'index'));
+            updateFormFields(indexStratSelect, 'index');
+        }
+
+        const forexStratSelect = document.getElementById('id_forex_strategy_name');
+        if (forexStratSelect && !forexStratSelect.dataset.syncBound) {
+            forexStratSelect.dataset.syncBound = "true";
+            forexStratSelect.addEventListener('change', () => updateFormFields(forexStratSelect, 'forex'));
+            updateFormFields(forexStratSelect, 'forex');
+        }
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initStrategyAutoSync);
+    } else {
+        initStrategyAutoSync();
+    }
+    document.body.addEventListener('htmx:afterSwap', initStrategyAutoSync);
+})();
+</script>
+{% endblock %}
+

@@ -143,21 +143,68 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
     """Standalone Admin Live Trading Dashboard with live broker API telemetry."""
     template_name = 'admins/live_dashboard.html'
     partial_template_name = 'admins/partials/live_dashboard_content.html'
+    is_mock_view = False
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
+        is_mock = getattr(self, 'is_mock_view', False)
 
-        live_accounts = list(user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name'))
-        live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
-        if not live_account:
-            dhan_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
-            if dhan_account:
-                live_account = dhan_account
-                if dhan_account not in live_accounts:
-                    live_accounts.append(dhan_account)
+        if is_mock:
+            account_type = AccountTypeChoices.MOCK
+            active_tab = 'live-mock'
+            env_mode = 'MOCK'
+            dashboard_title = 'Live Mock Dashboard — Dhan Emulator'
+            mock_broker = BrokerMaster.objects.filter(code='dhan').first()
+            if not mock_broker:
+                mock_broker = BrokerMaster.objects.create(
+                    code='dhan',
+                    name='DHAN',
+                    api_base_url='http://mock_broker:8088/mock/v2',
+                    description='DhanHQ Broker Gateway / Emulator',
+                )
+            live_accounts = list(user.trading_accounts.filter(is_active=True, account_type=AccountTypeChoices.MOCK).order_by('-is_default', 'account_name'))
+            live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
+            if not live_account:
+                live_account, _ = UserTradingAccount.objects.get_or_create(
+                    user=user,
+                    broker=mock_broker,
+                    account_type=AccountTypeChoices.MOCK,
+                    defaults={
+                        'account_name': 'Dhan Mock Gateway (Emulator :8088)',
+                        'broker_client_id': '1000000001',
+                        'api_key': 'mock_token_jwt',
+                        'app_id': 'mock_dhan_app',
+                        'is_active': True,
+                        'is_configured': True,
+                        'account_summary': {
+                            'initial_capital': 100000.0,
+                            'balance': 100000.0,
+                            'available_margin': '100,000.00',
+                            'cash': '100,000.00',
+                            'margin_utilized': '0.00',
+                        },
+                    },
+                )
+                live_accounts.append(live_account)
+        else:
+            account_type = AccountTypeChoices.LIVE
+            active_tab = 'live-dashboard'
+            env_mode = 'LIVE'
+            dashboard_title = 'Live Trading Dashboard — Dhan Production'
+            live_accounts = list(user.trading_accounts.filter(is_active=True, account_type=AccountTypeChoices.LIVE).order_by('-is_default', 'account_name'))
+            live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
+            if not live_account:
+                dhan_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+                if dhan_account:
+                    live_account = dhan_account
+                    if dhan_account not in live_accounts:
+                        live_accounts.append(dhan_account)
 
-        context['active_tab'] = 'live-dashboard'
+        context['active_tab'] = active_tab
+        context['env_mode'] = env_mode
+        context['is_mock_mode'] = is_mock
+        context['dashboard_title'] = dashboard_title
         context['live_account'] = live_account
         context['live_accounts'] = live_accounts
         context['has_live_account'] = bool(live_account)
@@ -165,13 +212,23 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
 
         context['live_strategy_configs'] = TradeExecConfig.objects.filter(
             admins_user=user,
-            account_type='LIVE',
+            account_type=account_type,
             is_deleted=False
         ).select_related('trading_account')
 
+        mock_online = False
+        if is_mock:
+            try:
+                import requests
+                r_health = requests.get('http://mock_broker:8088/health', timeout=1.0)
+                mock_online = (r_health.status_code == 200)
+            except Exception:
+                mock_online = False
+            context['mock_online'] = mock_online
+
         is_token_active = False
         needs_consent = False
-        broker_name = 'Dhan HQ'
+        broker_name = 'Dhan Emulator (:8088)' if is_mock else 'Dhan HQ'
         available_margin = "0.00"
         cash_balance = "0.00"
         collateral = "0.00"
@@ -197,11 +254,11 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         raw_ord = []
 
         if live_account:
-            broker_name = live_account.broker.name if live_account.broker else 'DHAN'
+            broker_name = 'Dhan Emulator (:8088)' if is_mock else (live_account.broker.name if live_account.broker else 'DHAN')
             try:
                 adapter = BrokerFactory.get_adapter(live_account)
                 if hasattr(adapter, 'get_live_dashboard_summary'):
-                    summary = adapter.get_live_dashboard_summary()
+                    summary = adapter.get_live_dashboard_summary(account_type=account_type)
                     is_token_active = summary.get('is_token_active', False)
                     needs_consent = summary.get('needs_consent', False)
                     available_margin = summary.get('available_margin', '0.00')
@@ -245,6 +302,30 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
                 is_token_active = False
                 needs_consent = True
 
+        if is_mock:
+            from apps.postback.services import MockBrokerPnLService
+            metrics = MockBrokerPnLService.get_session_metrics(user=None)
+            context['metrics'] = metrics
+            if mock_online:
+                is_token_active = True
+                needs_consent = False
+                if available_margin in ('0.00', '0', 0.0):
+                    try:
+                        import requests
+                        r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=1.0)
+                        if r_acc.status_code == 200:
+                            acc_info = r_acc.json() or {}
+                            available_margin = f"{float(acc_info.get('available_balance', 100000.0)):,.2f}"
+                            cash_balance = f"{float(acc_info.get('available_balance', 100000.0)):,.2f}"
+                            margin_utilized = f"{float(acc_info.get('utilized_margin', 0.0)):,.2f}"
+                    except Exception:
+                        pass
+                if live_net_pnl == 0.0 and metrics.get('net_pnl'):
+                    live_net_pnl = float(metrics.get('net_pnl', 0.0))
+                    realized_pnl = float(metrics.get('gross_pnl', 0.0))
+                if closed_positions_count == 0 and metrics.get('total_trades'):
+                    closed_positions_count = int(metrics.get('total_trades', 0))
+
         context['broker_name'] = broker_name
         context['is_token_active'] = is_token_active
         context['needs_consent'] = needs_consent
@@ -270,7 +351,11 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         site_settings = SiteSettings.load()
         context['site_settings'] = site_settings
         context['master_live_switch'] = site_settings.live_execution_master_switch
-        context['live_strategies'] = user.live_strategies.filter(is_deleted=False, execution_mode=AccountTypeChoices.LIVE).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
+        strat_modes = [AccountTypeChoices.MOCK, 'SANDBOX'] if is_mock else [AccountTypeChoices.LIVE]
+        strat_qs = user.live_strategies.filter(is_deleted=False, execution_mode__in=strat_modes).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
+        if is_mock and not strat_qs.exists():
+            strat_qs = user.live_strategies.filter(is_deleted=False).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
+        context['live_strategies'] = strat_qs
         context['market_clock'] = get_ist_market_clock()
         if is_token_active:
             context['calendar_pnl'] = get_current_month_calendar_pnl(live_account or user, trades=raw_ord)
@@ -297,8 +382,9 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context['macro_ai_cards'] = macro_ribbon.get('macro_cards')
         context['macro_market_cards'] = get_live_macro_market_cards()
         context['is_sandbox'] = False
-        context['positions_partial_url'] = reverse('admins:admin-live-positions-partial')
-        context['orders_partial_url'] = reverse('admins:admin-live-orders-partial')
+        env_suffix = '?env=MOCK' if is_mock else ''
+        context['positions_partial_url'] = reverse('admins:admin-live-positions-partial') + env_suffix
+        context['orders_partial_url'] = reverse('admins:admin-live-orders-partial') + env_suffix
 
         pos_labels = [p.get('trading_symbol', p.get('tradingSymbol', 'Position')) for p in raw_pos]
         pos_pnls = [
@@ -352,23 +438,44 @@ def _build_mock_broker_calendar(daily_map: dict, selected_year: int = 2026):
     return months_data
 
 
-class AdminLiveMockDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
-    """Admin Mock Broker Live Connection Setup & Performance Analytics Dashboard."""
-
+class AdminLiveMockDashboardView(AdminLiveDashboardView):
+    """Admin Mock Broker Live Trading Dashboard running on Dhan Mock Emulator (:8088) with 100% Live UI parity."""
     template_name = 'admins/mock_broker_dashboard.html'
-    partial_template_name = 'admins/partials/mock_broker_dashboard_content.html'
+    partial_template_name = 'admins/partials/live_dashboard_content.html'
+    is_mock_view = True
+
+
+AdminMockBrokerDashboardView = AdminLiveMockDashboardView
+
+
+class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+    """Admin Dhan Broker Gateway Emulator View running inside Marmot Admin SPA with Dual Simulation Modes."""
+
+    template_name = 'admins/gateway_emulator.html'
+    partial_template_name = 'admins/partials/gateway_emulator_content.html'
 
     def get_context_data(self, **kwargs):
+        from apps.market.models import MarketBackupTask
         from apps.postback.services import MockBrokerPnLService
         from datetime import datetime
         import requests
-        context = super().get_context_data(**kwargs)
-        user = self.request.user
-        context['active_tab'] = 'live-mock'
-        context['env_mode'] = 'MOCK'
-        context['is_mock_mode'] = True
-        context['dashboard_title'] = 'Dhan Mock Broker — Connection & Performance'
+        import json
+        from apps.market.services import redis_client
 
+        context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'gateway-emulator'
+        context['dashboard_title'] = 'Broker Gateway Emulator'
+
+        # 1. Resolve Simulation Mode (LIVE vs BACKUP) - mutually exclusive radio toggle
+        req_mode = self.request.GET.get('mode', '').upper().strip()
+        if req_mode in ['LIVE', 'BACKUP']:
+            sim_mode = req_mode
+            self.request.session['gateway_emulator_mode'] = sim_mode
+        else:
+            sim_mode = self.request.session.get('gateway_emulator_mode', 'BACKUP')
+        context['sim_mode'] = sim_mode
+
+        # 2. Check Dhan Mock Broker Emulator (:8088) Health & Active Account
         mock_online = False
         active_account = {'active_account_id': '1000000001', 'account_name': 'Primary Algorithmic Trading', 'available_balance': 100000.0, 'sod_limit': 100000.0}
         streamer_files = []
@@ -401,11 +508,47 @@ class AdminLiveMockDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequ
             except Exception:
                 pass
 
+        host_name = self.request.get_host().split(':')[0]
         context['mock_online'] = mock_online
         context['active_account'] = active_account
         context['streamer_files'] = streamer_files
         context['streamer_status'] = streamer_status
+        context['emulator_url'] = f"http://{host_name}:8088/mock/dashboard?embedded=1"
+        context['emulator_external_url'] = f"http://{host_name}:8088/mock/dashboard"
 
+        # 3. Check FYERS Live Data Streaming State in Redis
+        fyers_online = False
+        fyers_last_tick = None
+        fyers_chain_info = None
+        try:
+            r_redis = redis_client
+            quote_raw = r_redis.get("marmot:fyers_quote:NSE:NIFTY50-INDEX")
+            if quote_raw:
+                try:
+                    fyers_last_tick = json.loads(quote_raw.decode('utf-8') if isinstance(quote_raw, bytes) else quote_raw)
+                    fyers_online = True
+                except Exception:
+                    pass
+            chain_raw = r_redis.get("marmot:fyers:last_known_option_chain:NIFTY")
+            if chain_raw:
+                try:
+                    fyers_chain_info = json.loads(chain_raw.decode('utf-8') if isinstance(chain_raw, bytes) else chain_raw)
+                except Exception:
+                    pass
+        except Exception:
+            pass
+
+        context['fyers_online'] = fyers_online
+        context['fyers_last_tick'] = fyers_last_tick
+        context['fyers_chain_info'] = fyers_chain_info
+
+        # 4. Pull Completed Market Backup Tasks for Dataset Dropdown
+        completed_backups = MarketBackupTask.objects.filter(
+            is_deleted=False, status=MarketBackupTask.StatusChoices.COMPLETED
+        ).order_by('-id')
+        context['completed_backups'] = completed_backups
+
+        # 5. Load Session PnL, Metrics & Calendar for Live Mock Workspace Parity
         metrics = MockBrokerPnLService.get_session_metrics(user=None)
         context['metrics'] = metrics
         context['equity_curve_json'] = json.dumps(metrics.get('equity_curve', []))
@@ -442,47 +585,7 @@ class AdminLiveMockDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequ
         context['total_trades_count'] = len(all_trades)
         context['filter_date'] = filter_date
         context['filter_status'] = filter_status
-        return context
 
-
-AdminMockBrokerDashboardView = AdminLiveMockDashboardView
-
-
-class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
-    """Admin Dhan Broker Gateway Emulator View running inside Marmot Admin SPA."""
-
-    template_name = 'admins/gateway_emulator.html'
-    partial_template_name = 'admins/partials/gateway_emulator_content.html'
-
-    def get_context_data(self, **kwargs):
-        import requests
-        context = super().get_context_data(**kwargs)
-        context['active_tab'] = 'gateway-emulator'
-        context['dashboard_title'] = 'Broker Gateway Emulator'
-
-        mock_online = False
-        active_account = {'active_account_id': '1000000001', 'account_name': 'Primary Algorithmic Trading'}
-
-        try:
-            r_health = requests.get('http://mock_broker:8088/health', timeout=1.0)
-            if r_health.status_code == 200:
-                mock_online = True
-        except Exception:
-            mock_online = False
-
-        if mock_online:
-            try:
-                r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=1.0)
-                if r_acc.status_code == 200:
-                    active_account = r_acc.json()
-            except Exception:
-                pass
-
-        host_name = self.request.get_host().split(':')[0]
-        context['mock_online'] = mock_online
-        context['active_account'] = active_account
-        context['emulator_url'] = f"http://{host_name}:8088/mock/dashboard?embedded=1"
-        context['emulator_external_url'] = f"http://{host_name}:8088/mock/dashboard"
         return context
 
 
@@ -581,6 +684,26 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
                 requests.post('http://mock_broker:8088/mock/api/session/clear', timeout=3)
                 toast_title = 'Session Cleared'
                 toast_msg = 'Mock orders, positions, and balances reset to default.'
+            elif action == 'stop':
+                try:
+                    requests.post('http://mock_broker:8088/mock/api/streamer/stop', timeout=3)
+                except Exception:
+                    try:
+                        requests.post('http://mock_broker:8088/mock/api/streamer/toggle', timeout=3)
+                    except Exception:
+                        pass
+                try:
+                    r_stop = redis_client
+                    r_stop.publish("marmot:tasks:control", json.dumps({"action": "stop", "task_id": "all", "reason": "user_stop_button"}))
+                except Exception:
+                    pass
+                try:
+                    requests.post('http://mock_broker:8088/mock/api/kill-switch', timeout=3)
+                except Exception:
+                    pass
+                toast_title = 'Simulation Halted'
+                toast_msg = 'Replay streamer paused, strategy workers notified, and pending mock orders cancelled.'
+                toast_type = 'warning'
         except Exception as e:
             toast_title = 'Connection Warning'
             toast_msg = f'Mock broker signal sent, but service took longer to reply: {e}'
@@ -589,6 +712,7 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         resp = HttpResponse(status=200)
         resp['HX-Trigger'] = json.dumps({
             'reloadMockBroker': True,
+            'reloadGatewayEmulator': True,
             'showToast': {
                 'title': toast_title,
                 'message': toast_msg,
@@ -720,7 +844,17 @@ class AdminLiveHoldingsPartialView(LoginRequiredMixin, AdminRequiredMixin, View)
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first() or UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+        is_mock = request.GET.get('env') == 'MOCK' or request.session.get('active_tab') == 'live-mock' or 'live-mock' in request.META.get('HTTP_REFERER', '')
+        if is_mock:
+            live_account = user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type__in=['MOCK', 'SANDBOX']).first()
+            if not live_account:
+                live_account = user.trading_accounts.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).order_by('-is_default').first()
+            if not live_account:
+                live_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True, account_type__in=['MOCK', 'SANDBOX']).first()
+            if not live_account:
+                live_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+        else:
+            live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first() or UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
         holdings_res = {'holdings': [], 'total_invested': 0.00, 'current_value': 0.00, 'total_pnl': 0.00, 'pnl_pct': 0.00, 'holdings_count': 0}
 
         if live_account:
@@ -4148,20 +4282,6 @@ class LiveStrategyToggleView(LoginRequiredMixin, View):
     def post(self, request, pk, *args, **kwargs):
         import json as _json
         strategy = _get_live_strategy(request.user, pk)
-
-        # Execution safety guard: check rules before activation
-        if not strategy.is_active:
-            rules_snap = strategy.frozen_rules_snapshot or []
-            params_snap = strategy.frozen_parameters or {}
-            strat_params = params_snap.get('strategy_parameters') or {}
-            has_prompt = bool((strat_params.get('prompt_directives') if isinstance(strat_params, dict) else '') or '')
-            if not rules_snap and not has_prompt:
-                response = HttpResponse(status=400)
-                response['HX-Trigger'] = _json.dumps({
-                    'showToast': {'message': '⚠️ Execution blocked: Strategy has no configured rules or directives.', 'level': 'warning'},
-                    'closeGlobalModal': True,
-                })
-                return response
 
         strategy.is_active = not strategy.is_active
         strategy.status = LiveStrategyStatusChoices.ACTIVE if strategy.is_active else LiveStrategyStatusChoices.PAUSED

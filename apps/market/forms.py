@@ -22,7 +22,7 @@ class MarketBackupForm(forms.ModelForm):
             'market_type',
             'start_date', 'end_date',
             # INDEX / F&O
-            'index_name', 'strike_count',
+            'index_name', 'strike_count', 'use_30_days_5s',
             # FOREX / CME
             'forex_instrument', 'databento_schema',
         ]
@@ -31,6 +31,7 @@ class MarketBackupForm(forms.ModelForm):
             'start_date':       forms.DateInput(attrs={'type': 'date', 'class': _FIELD_CSS}),
             'end_date':         forms.DateInput(attrs={'type': 'date', 'class': _FIELD_CSS}),
             'index_name':       forms.Select(attrs={'class': _SELECT_CSS}),
+            'use_30_days_5s':   forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_5s'}),
             'forex_instrument': forms.Select(attrs={'class': _SELECT_CSS}),
             'databento_schema': forms.Select(attrs={'class': _SELECT_CSS}),
         }

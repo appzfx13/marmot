@@ -408,10 +408,17 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		return nil
 	}
 
-	// Load strategy preset from the first attached BacktestRule's rule_type.
-	// Falls back to "momentum_scalp" default if no rule is attached or key is unrecognised.
-	preset := GetStrategyPreset("momentum_scalp")
+	// Load strategy preset from strategy name or first attached BacktestRule rule_type.
+	// Falls back to "momentum_scalp" default if no specific preset key matches.
+	presetKey := "momentum_scalp"
+	if s.GetName() != "" && s.GetName() != "quant_engine" {
+		presetKey = s.GetName()
+	}
+	preset := GetStrategyPreset(presetKey)
 	if params != nil {
+		if stratName, ok := params["strategy_name"].(string); ok && stratName != "" {
+			preset = GetStrategyPreset(stratName)
+		}
 		if rawRules, ok := params["rules"].([]interface{}); ok && len(rawRules) > 0 {
 			if rMap, isMap := rawRules[0].(map[string]interface{}); isMap {
 				ruleType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
@@ -572,6 +579,18 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		}
 	}
 
+	lotsCount := 1
+	if params != nil {
+		if lc, ok := params["lots_count"].(float64); ok && lc > 0 {
+			lotsCount = int(lc)
+		} else if lcInt, ok := params["lots_count"].(int); ok && lcInt > 0 {
+			lotsCount = lcInt
+		}
+	}
+	if lotsCount <= 0 {
+		lotsCount = 1
+	}
+
 	optionType := "CALL"
 	transaction := "BUY"
 	if isBearishSignal {
@@ -650,7 +669,7 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		Transaction:   transaction,
 		OrderType:     orderType,
 		LimitPrice:    limitPrice,
-		Quantity:      lotSize * 2,
+		Quantity:      lotSize * lotsCount,
 		TargetPrice:   targetPrice,
 		StopLossPrice: stopLossPrice,
 		StrategyName:  s.GetName(),

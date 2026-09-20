@@ -156,7 +156,25 @@ def send_backtest_control_command(task_id, command):
         task.error_logs = ""
         task.results = {}
         task.metrics = {}
-        task.save(update_fields=['status', 'progress', 'error_logs', 'results', 'metrics', 'parameters'])
+
+        # Cleanly purge stale trade result file on disk from previous runs
+        user_id = str(task.created_by_id or '1')
+        candidate_files = [
+            task.result_file_path,
+            f"/app/go-app/data/users/{user_id}/backtests/backtest_{task.id}.json",
+            f"/app/data/users/{user_id}/backtests/backtest_{task.id}.json",
+            os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', user_id, 'backtests', f'backtest_{task.id}.json'),
+            os.path.join(settings.BASE_DIR, 'data', 'users', user_id, 'backtests', f'backtest_{task.id}.json'),
+        ]
+        for c_file in candidate_files:
+            if c_file and os.path.exists(c_file):
+                try:
+                    os.remove(c_file)
+                except Exception:
+                    pass
+        task.result_file_path = ""
+
+        task.save(update_fields=['status', 'progress', 'error_logs', 'results', 'metrics', 'parameters', 'result_file_path'])
         broadcast_backtest_progress(task.id, 5, BacktestTask.StatusChoices.RUNNING, step_info="Starting Go Quantitative Rule Engine backtest execution...")
     elif cmd == 'RESUME':
         BacktestControlRegistry.resume(task.id)

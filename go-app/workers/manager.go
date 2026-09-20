@@ -136,6 +136,15 @@ func (m *TaskManager) pauseTask(taskID string) {
 // cancelTask cancels the task's context, cleans up map, and updates DB state
 func (m *TaskManager) cancelTask(taskID string) {
 	m.mu.Lock()
+	if taskID == "all" || taskID == "" {
+		for tid, cancel := range m.activeCtx {
+			cancel()
+			log.Printf("🛑 Task #%s context cancelled (CANCELLED ALL).\n", tid)
+		}
+		m.activeCtx = make(map[string]context.CancelFunc)
+		m.mu.Unlock()
+		return
+	}
 	if cancel, exists := m.activeCtx[taskID]; exists {
 		cancel()
 		delete(m.activeCtx, taskID)

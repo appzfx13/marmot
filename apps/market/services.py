@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 REDIS_URL = settings.REDIS_URL
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
-def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None):
+def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None, use_30_days_5s=False):
     """Creates the backup record in Postgres with pre-stored path and dispatches to Go engine."""
     task = MarketBackupTask.objects.create(
         market_type=market_type or MarketTypeChoices.INDEX_FO,
@@ -21,6 +21,7 @@ def create_and_start_backup_task(start_date, end_date, index_name=None, strike_c
         end_date=end_date,
         index_name=index_name,
         strike_count=strike_count,
+        use_30_days_5s=use_30_days_5s,
         forex_instrument=forex_instrument,
         databento_schema=databento_schema or MarketBackupTask.DatabentoSchemaChoices.OHLCV_1M,
         status=MarketBackupTask.StatusChoices.CREATED,
@@ -195,6 +196,7 @@ def send_control_command(task_id, command):
             "forex_instrument": task.forex_instrument or '',
             "provider_name": task.provider_name,
             "strike_count": task.strike_count or 5,
+            "use_30_days_5s": task.use_30_days_5s,
             "security_id": index_params.get("security_id", ""),
             "exchange_segment": index_params.get("exchange_segment", ""),
             "instrument": index_params.get("instrument", ""),

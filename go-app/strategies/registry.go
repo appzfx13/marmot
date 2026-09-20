@@ -26,6 +26,7 @@ var StrategyPresets = map[string]StrategyConfig{
 	"momentum_scalp":     MomentumScalpPreset,
 	"orb_breakout":       ORBBreakoutPreset,
 	"algo_micro_scalp":   MicroScalpPreset,
+	"hft_scalp":          HFTScalpPreset,
 	"ict_smc_matrix":     ICTSMCPreset,
 	"gamma_blast":        GammaBlastPreset,
 	"intraday":           IntradayMomentumPreset,
@@ -48,14 +49,23 @@ var strategyRegistry = map[string]Strategy{
 	"quant_engine": NewQuantEngineStrategy("quant_engine"),
 	"orb_momentum": NewQuantEngineStrategy("orb_momentum"),
 	"ict_smc":      NewQuantEngineStrategy("ict_smc"),
+	"hft_scalp":    NewQuantEngineStrategy("hft_scalp"),
 }
 
 // GetStrategy resolves a plug-and-play strategy instance by its strategy_name.
+// If the key is not in strategyRegistry, it falls back to a dynamically instantiated QuantEngineStrategy.
 func GetStrategy(name string) (Strategy, bool) {
 	key := strings.ToLower(strings.TrimSpace(name))
+	if key == "" {
+		key = "quant_engine"
+	}
 	strat, ok := strategyRegistry[key]
-	return strat, ok
+	if ok {
+		return strat, true
+	}
+	return NewQuantEngineStrategy(key), true
 }
+
 
 // ListRegisteredStrategies returns a slice of all available strategy names.
 func ListRegisteredStrategies() []string {
