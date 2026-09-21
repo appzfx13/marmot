@@ -29,7 +29,6 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
   python manage.py makemigrations --noinput
 
   echo "Applying database migrations..."
-  python manage.py migrate market 0003_marketbackuptask_use_30_days_5s --fake 2>/dev/null || true
   python manage.py migrate --noinput
 
   # --- Static Files ---
