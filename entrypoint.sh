@@ -22,24 +22,26 @@ fi
 
 echo "PostgreSQL started successfully!"
 
-# --- Migrations ---
-echo "Making migrations for core and dependent apps..."
-python manage.py makemigrations users common admins api market masters notifications trade_config trade_core --noinput
-python manage.py makemigrations --noinput
+if [ "$RUN_MIGRATIONS" = "true" ]; then
+  # --- Migrations ---
+  echo "Making migrations for core and dependent apps..."
+  python manage.py makemigrations users common admins api market masters notifications trade_config trade_core --noinput
+  python manage.py makemigrations --noinput
 
-echo "Applying database migrations..."
-python manage.py migrate market 0003_marketbackuptask_use_30_days_5s --fake 2>/dev/null || true
-python manage.py migrate --noinput
+  echo "Applying database migrations..."
+  python manage.py migrate market 0003_marketbackuptask_use_30_days_5s --fake 2>/dev/null || true
+  python manage.py migrate --noinput
 
-# --- Static Files ---
-echo "Collecting static files..."
-python manage.py collectstatic --noinput
+  # --- Static Files ---
+  echo "Collecting static files..."
+  python manage.py collectstatic --noinput
 
-# --- Setup Admin & Dummy Data ---
-echo "Checking/Creating Superuser and Sample Users..."
-python manage.py initadmin
+  # --- Setup Admin & Dummy Data ---
+  echo "Checking/Creating Superuser and Sample Users..."
+  python manage.py initadmin
 
-echo "Seeding/Verifying Backtest Strategy Rules..."
+  echo "Seeding/Verifying Backtest Strategy Rules..."
+fi
 
 # Execute main container process
 exec "$@"
