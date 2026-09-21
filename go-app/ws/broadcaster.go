@@ -245,9 +245,13 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 			HandshakeTimeout: 5 * time.Second,
 		}
 
+		headers := http.Header{}
+		headers.Add("Authorization", authHeader)
+		headers.Add("User-Agent", "Mozilla/5.0")
+
 		for _, wsURL := range endpoints {
 			log.Printf("⚡ [FYERS WS Streamer] Attempting connection to %s ...\n", wsURL)
-			c, resp, err := dialer.DialContext(ctx, wsURL, nil)
+			c, resp, err := dialer.DialContext(ctx, wsURL, headers)
 			if err == nil {
 				conn = c
 				connectedURL = wsURL
