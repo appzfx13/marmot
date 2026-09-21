@@ -21,7 +21,6 @@ type StrategyConfig struct {
 	Description      string
 }
 
-// StrategyPresets maps BacktestRule.rule_type values → hardcoded Go strategy configs.
 var StrategyPresets = map[string]StrategyConfig{
 	"momentum_scalp":     MomentumScalpPreset,
 	"orb_breakout":       ORBBreakoutPreset,
@@ -32,6 +31,7 @@ var StrategyPresets = map[string]StrategyConfig{
 	"intraday":           IntradayMomentumPreset,
 	"morning_trend":      MorningTrendPreset,
 	"momentum_guardrail": MomentumGuardrailPreset,
+	"macd_crossover":     MACDCrossoverPreset,
 }
 
 // GetStrategyPreset returns a StrategyConfig by rule_type key (case-insensitive).

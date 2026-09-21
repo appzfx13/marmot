@@ -14,6 +14,7 @@ import (
 
 	"github.com/gorilla/websocket"
 	"github.com/redis/go-redis/v9"
+	fyersgosdk "github.com/FyersDev/fyers-go-sdk/websocket"
 
 	"go-app/parquet"
 	"go-app/services"
@@ -174,20 +175,20 @@ func fetchLatestTickFromRedis(ctx context.Context, redisService *services.RedisS
 	return nil
 }
 
-// StreamFyersTicks maintains a WebSocket connection to FYERS DataSocket V3 for sub-10ms spot updates.
+// StreamFyersTicks maintains a WebSocket connection to FYERS DataSocket V3 via HSM binary protocol.
 func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, dbService *services.DBService, hub *Hub, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64, tickWriter *parquet.TickWriter) {
-	log.Println("⚡ [FYERS WS Streamer] Starting Primary WebSocket V3 Streamer...")
+	log.Println("⚡ [FYERS WS Streamer] Starting Primary WebSocket V3 Streamer (HSM Protocol)...")
 	backoff := 1 * time.Second
 	maxBackoff := 30 * time.Second
 
 	symbolToIndex := map[string]string{
-		"NSE:NIFTY50-INDEX":   "NIFTY",
-		"NSE:NIFTYBANK-INDEX": "BANKNIFTY",
-		"NSE:FINNIFTY-INDEX":  "FINNIFTY",
+		"NSE:NIFTY50-INDEX":    "NIFTY",
+		"NSE:NIFTYBANK-INDEX":  "BANKNIFTY",
+		"NSE:FINNIFTY-INDEX":   "FINNIFTY",
 		"NSE:MIDCPNIFTY-INDEX": "MIDCPNIFTY",
-		"BSE:SENSEX-INDEX":    "SENSEX",
-		"NSE:GIFTNIFTY-INDEX": "GIFTNIFTY",
-		"NSE:INDIAVIX-INDEX":  "INDIAVIX",
+		"BSE:SENSEX-INDEX":     "SENSEX",
+		"NSE:GIFTNIFTY-INDEX":  "GIFTNIFTY",
+		"NSE:INDIAVIX-INDEX":   "INDIAVIX",
 	}
 
 	for {
@@ -221,13 +222,6 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 
 		now := time.Now().In(istMarketLoc)
 		if tokenDate == nil || tokenDate.In(istMarketLoc).Format("2006-01-02") != now.Format("2006-01-02") {
-			// Token not generated today, wait quietly
-			wsConnected.Store(false)
-			time.Sleep(30 * time.Second)
-			continue
-		}
-
-		if strings.TrimSpace(appID) == "" || strings.TrimSpace(token) == "" {
 			wsConnected.Store(false)
 			time.Sleep(30 * time.Second)
 			continue
@@ -235,48 +229,15 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 
 		cleanAppID := strings.TrimSpace(appID)
 		cleanToken := strings.TrimSpace(token)
-		authHeader := fmt.Sprintf("%s:%s", cleanAppID, cleanToken)
-
-		endpoints := []string{"wss://api.fyers.in/socket/v2/data/", "wss://socket.fyers.in/data/v3"}
-		var conn *websocket.Conn
-		var connectedURL string
-
-		dialer := websocket.Dialer{
-			HandshakeTimeout: 5 * time.Second,
-		}
-
-		headers := http.Header{}
-		headers.Add("Authorization", authHeader)
-		headers.Add("User-Agent", "Mozilla/5.0")
-
-		for _, wsURL := range endpoints {
-			log.Printf("⚡ [FYERS WS Streamer] Attempting connection to %s ...\n", wsURL)
-			c, resp, err := dialer.DialContext(ctx, wsURL, headers)
-			if err == nil {
-				conn = c
-				connectedURL = wsURL
-				break
-			}
-			if resp != nil {
-				log.Printf("⚠️ [FYERS WS Streamer] Dial to %s failed (status %d): %v\n", wsURL, resp.StatusCode, err)
-			} else {
-				log.Printf("⚠️ [FYERS WS Streamer] Dial to %s failed: %v\n", wsURL, err)
-			}
-		}
-
-		if conn == nil {
+		if cleanAppID == "" || cleanToken == "" {
 			wsConnected.Store(false)
-			time.Sleep(backoff)
-			backoff = minDuration(backoff*2, maxBackoff)
+			time.Sleep(30 * time.Second)
 			continue
 		}
 
-		log.Printf("✅ [FYERS WS Streamer] Connected successfully to %s\n", connectedURL)
-		wsConnected.Store(true)
-		lastWSTickUnix.Store(time.Now().Unix())
-		backoff = 1 * time.Second
+		authHeader := fmt.Sprintf("%s:%s", cleanAppID, cleanToken)
+		prevLTP := make(map[string]float64)
 
-		// Authenticate and subscribe over socket
 		fyersIndexSymbols := []string{
 			"NSE:NIFTY50-INDEX",
 			"NSE:NIFTYBANK-INDEX",
@@ -286,80 +247,115 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 			"NSE:GIFTNIFTY-INDEX",
 			"NSE:INDIAVIX-INDEX",
 		}
-		authMsg := map[string]interface{}{
-			"T":            "SUB_DATA",
-			"SUB_T":        1,
-			"access_token": authHeader,
-			"symbols":      fyersIndexSymbols,
-		}
-		if authBytes, err := json.Marshal(authMsg); err == nil {
-			_ = conn.WriteMessage(websocket.TextMessage, authBytes)
+
+		var fyersSocket interface{}
+
+		log.Printf("⚡ [FYERS WS Streamer] Initializing Fyers DataSocket HSM connection ...")
+
+		// Import the fyersgosdk dynamically by instantiating it
+		// We'll use reflection or direct calls once imported
+		fyersSocket = initFyersSocket(ctx, authHeader, fyersIndexSymbols, symbolToIndex, prevLTP, redisService, tickWriter, wsConnected, lastWSTickUnix)
+
+		if fyersSocket == nil {
+			log.Printf("⚠️ [FYERS WS Streamer] Could not init socket. Retrying in %v\n", backoff)
+			wsConnected.Store(false)
+			time.Sleep(backoff)
+			backoff = minDuration(backoff*2, maxBackoff)
+			continue
 		}
 
-		subMsg := map[string]interface{}{
-			"symbol": fyersIndexSymbols,
-			"type":   "symbolUpdate",
-		}
-		if subBytes, err := json.Marshal(subMsg); err == nil {
-			_ = conn.WriteMessage(websocket.TextMessage, subBytes)
-		}
+		log.Printf("✅ [FYERS WS Streamer] Connected successfully using HSM Protocol\n")
+		wsConnected.Store(true)
+		backoff = 1 * time.Second
 
-		// Also send legacy SUB_DATA payload for v2/v3 cross-compatibility
-		legacySub := map[string]interface{}{
-			"T":       "SUB_DATA",
-			"SUB_T":   1,
-			"symbols": fyersIndexSymbols,
-		}
-		if legBytes, err := json.Marshal(legacySub); err == nil {
-			_ = conn.WriteMessage(websocket.TextMessage, legBytes)
-		}
-
-		conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-		conn.SetPongHandler(func(string) error {
-			conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-			return nil
-		})
-
+		// Keep alive until ctx is done or socket drops
 		doneChan := make(chan struct{})
 		go func() {
-			pingTicker := time.NewTicker(15 * time.Second)
-			defer pingTicker.Stop()
-			for {
-				select {
-				case <-doneChan:
-					return
-				case <-ctx.Done():
-					return
-				case <-pingTicker.C:
-					if err := conn.WriteControl(websocket.PingMessage, []byte("ping"), time.Now().Add(5*time.Second)); err != nil {
-						return
-					}
-				}
+			select {
+			case <-ctx.Done():
+				closeFyersSocket(fyersSocket)
+				close(doneChan)
 			}
 		}()
 
-		prevLTP := make(map[string]float64)
-
-		for {
-			msgType, msgBytes, err := conn.ReadMessage()
-			if err != nil {
-				log.Printf("⚠️ [FYERS WS Streamer] Socket read error or connection lost: %v\n", err)
-				break
-			}
-
-			conn.SetReadDeadline(time.Now().Add(30 * time.Second))
-			lastWSTickUnix.Store(time.Now().Unix())
-			wsConnected.Store(true)
-
-			parseAndPublishFyersFrame(ctx, msgType, msgBytes, redisService, symbolToIndex, prevLTP, tickWriter)
-		}
-
+		// KeepRunning blocks until connection closes
+		runFyersSocket(fyersSocket)
 		close(doneChan)
-		conn.Close()
+
 		wsConnected.Store(false)
 		log.Printf("🔄 [FYERS WS Streamer] Disconnected. Reconnecting in %v...\n", backoff)
 		time.Sleep(backoff)
 		backoff = minDuration(backoff*2, maxBackoff)
+	}
+}
+
+func initFyersSocket(ctx context.Context, authHeader string, symbols []string, symbolToIndex map[string]string, prevLTP map[string]float64, redisService *services.RedisService, tickWriter *parquet.TickWriter, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64) interface{} {
+	return startFyersV3HSMStream(ctx, authHeader, symbols, symbolToIndex, prevLTP, redisService, tickWriter, wsConnected, lastWSTickUnix)
+}
+
+func startFyersV3HSMStream(ctx context.Context, authHeader string, symbols []string, symbolToIndex map[string]string, prevLTP map[string]float64, redisService *services.RedisService, tickWriter *parquet.TickWriter, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64) interface{} {
+	var fyersSocket *fyersgosdk.FyersDataSocket
+
+	onConnect := func() {
+		log.Println("✅ [FYERS WS] HSM Socket Connected. Subscribing to symbols...")
+		if fyersSocket != nil {
+			fyersSocket.Subscribe(symbols, fyersgosdk.FULL_MODE_TYPE)
+		}
+	}
+
+	onClose := func(closeMsg fyersgosdk.DataClose) {
+		log.Printf("⚠️ [FYERS WS] HSM Socket Closed: %+v\n", closeMsg)
+	}
+
+	onError := func(errMsg fyersgosdk.DataError) {
+		log.Printf("⚠️ [FYERS WS] HSM Socket Error: %+v\n", errMsg)
+	}
+
+	onMessage := func(msg fyersgosdk.DataResponse) {
+		lastWSTickUnix.Store(time.Now().Unix())
+		wsConnected.Store(true)
+
+		// Convert to map via JSON for robust extraction using existing functions
+		jsonBytes, err := json.Marshal(msg)
+		if err == nil {
+			var rawMap map[string]interface{}
+			if err := json.Unmarshal(jsonBytes, &rawMap); err == nil {
+				processFyersJSONMap(ctx, rawMap, redisService, symbolToIndex, prevLTP, tickWriter)
+			}
+		}
+	}
+
+	fyersSocket = fyersgosdk.NewFyersDataSocket(
+		authHeader, // which is appId:token
+		"",         // logPath
+		false,      // liteMode
+		false,      // writeToFile
+		true,       // reconnect
+		5,          // reconnectRetry
+		onConnect,
+		onClose,
+		onError,
+		onMessage,
+	)
+
+	err := fyersSocket.Connect()
+	if err != nil {
+		log.Printf("⚠️ [FYERS WS] HSM Connection Failed: %v\n", err)
+		return nil
+	}
+
+	return fyersSocket
+}
+
+func runFyersSocket(fyersSocket interface{}) {
+	if s, ok := fyersSocket.(*fyersgosdk.FyersDataSocket); ok {
+		s.KeepRunning()
+	}
+}
+
+func closeFyersSocket(fyersSocket interface{}) {
+	if s, ok := fyersSocket.(*fyersgosdk.FyersDataSocket); ok {
+		s.CloseConnection()
 	}
 }
 
