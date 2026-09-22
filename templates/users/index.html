@@ -2555,7 +2555,8 @@
                 if (isTunnel) {
                     wsUrl = proto + '//' + window.location.host + '/ws';
                 } else {
-                    wsUrl = proto + '//' + host + ':8082/ws';
+                    const wsPort = window.MARMOT_WS_PORT || '{{ WS_PORT|default:"8053" }}';
+                    wsUrl = proto + '//' + host + ':' + wsPort + '/ws';
                 }
             }
 
@@ -2721,23 +2722,23 @@
             // Throttled Option Chain reload trigger for live and sandbox dashboards
             let _lastOcReloadTime = 0;
             let _ocReloadPendingTimer = null;
+            let _ocTickCounter = 0;
             window.triggerOptionChainReload = function (force) {
                 const now = Date.now();
-                if (!force && (now - _lastOcReloadTime < 5000)) {
-                    if (!_ocReloadPendingTimer) {
-                        _ocReloadPendingTimer = setTimeout(function () {
-                            _ocReloadPendingTimer = null;
-                            window.triggerOptionChainReload(true);
-                        }, 5000);
-                    }
-                    return;
+                if (!force && (now - _lastOcReloadTime < 2000)) {
+                    return false;
+                }
+                if (force && (now - _lastOcReloadTime < 600)) {
+                    return false; // Debounce rapid ATM crossings
                 }
                 _lastOcReloadTime = now;
                 const ocContainer = document.getElementById('live-option-chain-container');
                 if (ocContainer) {
                     console.log('🔄 [OptionChain] Dispatching reloadOptionChain event to HTMX');
                     document.body.dispatchEvent(new CustomEvent('reloadOptionChain'));
+                    return true;
                 }
+                return false;
             };
 
             window.updateLiveSpotDOM = function (spotPrice, payload) {
@@ -2850,8 +2851,13 @@
                         if (ocTimeEl) ocTimeEl.textContent = ts;
                     }
 
-                    // Periodic throttled option chain reload while user views the card
-                    window.triggerOptionChainReload(false);
+                    // Event-driven periodic refresh: trigger option chain reload every 5th WebSocket tick
+                    _ocTickCounter = (_ocTickCounter || 0) + 1;
+                    if (_ocTickCounter >= 5) {
+                        if (window.triggerOptionChainReload(false)) {
+                            _ocTickCounter = 0;
+                        }
+                    }
                 }
             };
 
