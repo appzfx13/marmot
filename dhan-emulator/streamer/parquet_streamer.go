@@ -298,14 +298,42 @@ func (ps *ParquetStreamer) Restart() {
 	ps.Start()
 }
 
-// SetSpeed sets tick replay multiplier.
+// SetSpeed sets tick replay multiplier and broadcasts immediate progress event.
 func (ps *ParquetStreamer) SetSpeed(speed int) {
 	ps.mu.Lock()
-	defer ps.mu.Unlock()
 	if speed <= 0 {
 		speed = 1
 	}
 	ps.speed = speed
+	cur := atomic.LoadInt64(&ps.currentRow)
+	tot := ps.totalRows
+	pct := 0.0
+	if tot > 0 {
+		pct = math.Round((float64(cur)/float64(tot)*100.0)*100) / 100.0
+		if pct > 100.0 {
+			pct = 100.0
+		}
+	}
+	file := ps.currentFile
+	date := ps.currentDateStr
+	dt := ps.currentDatetime
+	ticks := atomic.LoadInt64(&ps.ticksIngested)
+	ps.mu.Unlock()
+
+	pPayload := map[string]interface{}{
+		"type":         "streamer_progress",
+		"active_file":  file,
+		"date":         date,
+		"datetime":     dt,
+		"current_row":  cur,
+		"total_rows":   tot,
+		"progress_pct": pct,
+		"speed":        speed,
+		"ticks":        ticks,
+	}
+	if pBytes, err := json.Marshal(pPayload); err == nil {
+		ps.BroadcastRawMessage(pBytes)
+	}
 }
 
 // SelectParquetFile changes active dataset and restarts replay.
@@ -757,12 +785,63 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 		return
 	}
 
+	startRow := atomic.LoadInt64(&ps.currentRow)
 	ps.mu.Lock()
 	ps.totalRows = totalRows
-	atomic.StoreInt64(&ps.currentRow, 0)
+	if ps.isCompleted || startRow >= totalRows {
+		atomic.StoreInt64(&ps.currentRow, 0)
+		startRow = 0
+		ps.isCompleted = false
+	}
 	ps.mu.Unlock()
 
-	rows, err := db.Query(`SELECT Timestamp, Datetime, IndexName, InstrumentType, Strike, OptionType, Open, High, Low, Close, Volume, OI, IV, SpotPrice FROM read_parquet('` + fullPath + `') ORDER BY Timestamp ASC, OptionType ASC`)
+	colsMap := make(map[string]bool)
+	if dRows, err := db.Query(`DESCRIBE SELECT * FROM read_parquet('` + fullPath + `')`); err == nil {
+		for dRows.Next() {
+			var colName, colType string
+			var null, key, def, extra sql.NullString
+			if err := dRows.Scan(&colName, &colType, &null, &key, &def, &extra); err == nil {
+				colsMap[strings.ToLower(colName)] = true
+			}
+		}
+		dRows.Close()
+	}
+
+	colOr := func(primary, fallback, defVal string) string {
+		if colsMap[strings.ToLower(primary)] {
+			return primary
+		}
+		if colsMap[strings.ToLower(fallback)] {
+			return fallback
+		}
+		return defVal
+	}
+
+	tsCol := colOr("timestamp", "Timestamp", "0")
+	dtCol := colOr("datetime", "Datetime", "''")
+	idxCol := colOr("index_name", "IndexName", "'NIFTY'")
+	instCol := colOr("instrument_type", "InstrumentType", "'OPTIDX'")
+	stkCol := colOr("strike", "Strike", "'0'")
+	optCol := colOr("option_type", "OptionType", "'CE'")
+	openCol := colOr("open", "Open", "0.0")
+	highCol := colOr("high", "High", "0.0")
+	lowCol := colOr("low", "Low", "0.0")
+	closeCol := colOr("close", "Close", "0.0")
+	volCol := colOr("volume", "Volume", "0")
+	oiCol := colOr("oi", "OI", "0")
+	ivCol := colOr("iv", "IV", "0.0")
+	spotCol := colOr("spot_price", "SpotPrice", "0.0")
+
+	offsetClause := ""
+	if startRow > 0 {
+		offsetClause = fmt.Sprintf(" OFFSET %d", startRow)
+	}
+
+	queryStr := fmt.Sprintf(`SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM read_parquet('%s') ORDER BY %s ASC, %s ASC%s`,
+		tsCol, dtCol, idxCol, instCol, stkCol, optCol, openCol, highCol, lowCol, closeCol, volCol, oiCol, ivCol, spotCol,
+		fullPath, tsCol, optCol, offsetClause)
+
+	rows, err := db.Query(queryStr)
 	if err != nil {
 		log.Printf("[STREAMER] DuckDB query error: %v", err)
 		return
@@ -770,6 +849,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 	defer rows.Close()
 
 	var pendingRecord *models.MarketCandleRecord
+	lastProgressBroadcast := time.Now()
 
 	for {
 		ps.mu.RLock()
@@ -838,7 +918,17 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 
 		// 2. Broadcast all strikes and spot index for timestamp T concurrently
 		if len(currentBucket) > 0 {
-			now := time.Now()
+			parsedBucketTime := time.Now()
+			if len(currentBucketTime) >= 19 {
+				if t, err := time.Parse("2006-01-02 15:04:05", currentBucketTime[:19]); err == nil {
+					parsedBucketTime = t
+				}
+			} else if len(currentBucketTime) >= 10 {
+				if t, err := time.Parse("2006-01-02", currentBucketTime[:10]); err == nil {
+					parsedBucketTime = t
+				}
+			}
+
 			ps.mu.Lock()
 			if currentBucketTime != "" {
 				ps.currentDatetime = currentBucketTime
@@ -887,7 +977,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					secID = "25"
 				}
 				spotTick := models.MarketTick{
-					Timestamp:     now,
+					Timestamp:     parsedBucketTime,
 					SecurityID:    secID,
 					TradingSymbol: spotIndexName,
 					LTP:           spotPrice,
@@ -913,6 +1003,25 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					}
 					if cBytes, err := json.Marshal(candleMsg); err == nil {
 						_ = ps.rdb.Publish(context.Background(), "marmot:streamer:candles", cBytes).Err()
+					}
+
+					// Broadcast virtual clock tick to Marmot UI for real-time historical clock sync
+					tickMsg := map[string]interface{}{
+						"type":           "live_tick",
+						"index":          spotIndexName,
+						"symbol":         spotIndexName,
+						"spot_price":     spotPrice,
+						"ltp":            fmt.Sprintf("%.2f", spotPrice),
+						"open":           openPrice,
+						"high":           highPrice,
+						"low":            lowPrice,
+						"close":          closePrice,
+						"formatted_time": currentBucketTime,
+						"timestamp":      currentBucketTime,
+						"is_virtual":     true,
+					}
+					if tBytes, err := json.Marshal(tickMsg); err == nil {
+						_ = ps.rdb.Publish(context.Background(), "marmot:ticks", tBytes).Err()
 					}
 				}
 			}
@@ -986,7 +1095,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 				}
 
 				tick := models.MarketTick{
-					Timestamp:     now,
+					Timestamp:     parsedBucketTime,
 					SecurityID:    secID,
 					TradingSymbol: sym,
 					LTP:           price,
@@ -1016,7 +1125,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 				ps.mu.Unlock()
 
 				vixTick := models.MarketTick{
-					Timestamp:     now,
+					Timestamp:     parsedBucketTime,
 					SecurityID:    "INDIAVIX",
 					TradingSymbol: "INDIA VIX",
 					LTP:           avgVIX,
@@ -1027,6 +1136,33 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					Volume:        1,
 				}
 				ps.BroadcastTick(vixTick)
+			}
+		}
+
+		if time.Since(lastProgressBroadcast) >= 250*time.Millisecond {
+			lastProgressBroadcast = time.Now()
+			cur := atomic.LoadInt64(&ps.currentRow)
+			tot := ps.totalRows
+			pct := 0.0
+			if tot > 0 {
+				pct = math.Round((float64(cur)/float64(tot)*100.0)*100) / 100.0
+				if pct > 100.0 {
+					pct = 100.0
+				}
+			}
+			pPayload := map[string]interface{}{
+				"type":         "streamer_progress",
+				"active_file":  ps.currentFile,
+				"date":         ps.currentDateStr,
+				"datetime":     ps.currentDatetime,
+				"current_row":  cur,
+				"total_rows":   tot,
+				"progress_pct": pct,
+				"speed":        speed,
+				"ticks":        atomic.LoadInt64(&ps.ticksIngested),
+			}
+			if pBytes, err := json.Marshal(pPayload); err == nil {
+				ps.BroadcastRawMessage(pBytes)
 			}
 		}
 
@@ -1088,28 +1224,51 @@ func readParquetMeta(filePath string) (string, string, string) {
 	}
 	defer db.Close()
 
-	var idx, start, end string
-	
-	// Get first record metadata
-	err = db.QueryRow(`SELECT IndexName, Datetime, Timestamp FROM read_parquet('` + filePath + `') ORDER BY Timestamp ASC LIMIT 1`).Scan(&idx, &start, &end) // Temporarily using end to hold Timestamp to avoid unused variables
-	if err == nil {
-		// Just in case Datetime is empty but Timestamp exists
-		if start == "" {
-			var ts int64
-			if err := db.QueryRow(`SELECT Timestamp FROM read_parquet('` + filePath + `') ORDER BY Timestamp ASC LIMIT 1`).Scan(&ts); err == nil && ts > 0 {
-				start = time.Unix(ts, 0).Format("2006-01-02 15:04:05")
+	colsMap := make(map[string]bool)
+	if dRows, err := db.Query(`DESCRIBE SELECT * FROM read_parquet('` + filePath + `')`); err == nil {
+		for dRows.Next() {
+			var colName, colType string
+			var null, key, def, extra sql.NullString
+			if err := dRows.Scan(&colName, &colType, &null, &key, &def, &extra); err == nil {
+				colsMap[strings.ToLower(colName)] = true
 			}
+		}
+		dRows.Close()
+	}
+
+	idxCol := "'NIFTY'"
+	if colsMap["index_name"] {
+		idxCol = "index_name"
+	} else if colsMap["indexname"] {
+		idxCol = "IndexName"
+	}
+
+	dtCol := "''"
+	if colsMap["datetime"] {
+		dtCol = "datetime"
+	}
+
+	tsCol := "0"
+	if colsMap["timestamp"] {
+		tsCol = "timestamp"
+	}
+
+	var idx, start, end string
+	q1 := fmt.Sprintf(`SELECT %s, %s, %s FROM read_parquet('%s') ORDER BY %s ASC LIMIT 1`, idxCol, dtCol, tsCol, filePath, tsCol)
+	var tsVal int64
+	err = db.QueryRow(q1).Scan(&idx, &start, &tsVal)
+	if err == nil {
+		if start == "" && tsVal > 0 {
+			start = time.Unix(tsVal, 0).Format("2006-01-02 15:04:05")
 		}
 	}
 
-	// Get last record metadata
-	err = db.QueryRow(`SELECT Datetime FROM read_parquet('` + filePath + `') ORDER BY Timestamp DESC LIMIT 1`).Scan(&end)
+	q2 := fmt.Sprintf(`SELECT %s, %s FROM read_parquet('%s') ORDER BY %s DESC LIMIT 1`, dtCol, tsCol, filePath, tsCol)
+	var tsEndVal int64
+	err = db.QueryRow(q2).Scan(&end, &tsEndVal)
 	if err == nil {
-		if end == "" {
-			var ts int64
-			if err := db.QueryRow(`SELECT Timestamp FROM read_parquet('` + filePath + `') ORDER BY Timestamp DESC LIMIT 1`).Scan(&ts); err == nil && ts > 0 {
-				end = time.Unix(ts, 0).Format("2006-01-02 15:04:05")
-			}
+		if end == "" && tsEndVal > 0 {
+			end = time.Unix(tsEndVal, 0).Format("2006-01-02 15:04:05")
 		}
 	}
 

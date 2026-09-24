@@ -32,6 +32,7 @@ var StrategyPresets = map[string]StrategyConfig{
 	"morning_trend":      MorningTrendPreset,
 	"momentum_guardrail": MomentumGuardrailPreset,
 	"macd_crossover":     MACDCrossoverPreset,
+	"macd_ict_hybrid":    MACDICTHybridPreset,
 }
 
 // GetStrategyPreset returns a StrategyConfig by rule_type key (case-insensitive).
@@ -46,10 +47,11 @@ func GetStrategyPreset(ruleType string) StrategyConfig {
 
 // strategyRegistry holds all registered plug-and-play strategy instances.
 var strategyRegistry = map[string]Strategy{
-	"quant_engine": NewQuantEngineStrategy("quant_engine"),
-	"orb_momentum": NewQuantEngineStrategy("orb_momentum"),
-	"ict_smc":      NewQuantEngineStrategy("ict_smc"),
-	"hft_scalp":    NewQuantEngineStrategy("hft_scalp"),
+	"quant_engine":    NewQuantEngineStrategy("quant_engine"),
+	"orb_momentum":    NewQuantEngineStrategy("orb_momentum"),
+	"ict_smc":         NewQuantEngineStrategy("ict_smc"),
+	"hft_scalp":       NewQuantEngineStrategy("hft_scalp"),
+	"macd_ict_hybrid": NewQuantEngineStrategy("macd_ict_hybrid"),
 }
 
 // GetStrategy resolves a plug-and-play strategy instance by its strategy_name.

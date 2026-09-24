@@ -1,33 +1,38 @@
-import json
-import urllib.request
-import urllib.error
+import os
+import re
 import time
+from pathlib import Path
 
 
-def fetch_ngrok_url(timeout=2, retries=5, delay=1):
-    """Fetch public ngrok URL from local ngrok API endpoints."""
-    endpoints = [
-        "http://ngrok_tunnel:4040/api/tunnels",
-        "http://ngrok:4040/api/tunnels",
-        "http://127.0.0.1:4040/api/tunnels",
-        "http://localhost:4040/api/tunnels",
+def fetch_tunnel_url(timeout=2, retries=6, delay=1):
+    """Fetch public tunnel URL (Cloudflare Quick Tunnel or environment override)."""
+    env_url = os.environ.get("CLOUDFLARE_TUNNEL_URL") or os.environ.get("TUNNEL_URL")
+    if env_url:
+        return env_url
+
+    log_paths = [
+        Path("/app/logs/cloudflared.log"),
+        Path("/app/logs/cloudflared/cloudflared.log"),
+        Path("logs/cloudflared.log"),
+        Path(__file__).resolve().parent.parent.parent / "logs" / "cloudflared.log",
     ]
+
     for attempt in range(retries):
-        for endpoint in endpoints:
-            try:
-                req = urllib.request.Request(endpoint, headers={"User-Agent": "DjangoApp"})
-                with urllib.request.urlopen(req, timeout=timeout) as response:
-                    if response.status == 200:
-                        data = json.loads(response.read().decode("utf-8"))
-                        tunnels = data.get("tunnels", [])
-                        for tunnel in tunnels:
-                            public_url = tunnel.get("public_url")
-                            if public_url and public_url.startswith("https"):
-                                return public_url
-                        if tunnels and tunnels[0].get("public_url"):
-                            return tunnels[0].get("public_url")
-            except Exception:
-                pass
+        for log_path in log_paths:
+            if log_path.exists():
+                try:
+                    with open(log_path, "r", encoding="utf-8", errors="ignore") as f:
+                        content = f.read()
+                    matches = re.findall(r"https://[a-zA-Z0-9-]+\.trycloudflare\.com", content)
+                    if matches:
+                        return matches[-1]
+                except Exception:
+                    pass
         if attempt < retries - 1:
             time.sleep(delay)
     return None
+
+
+fetch_cloudflare_url = fetch_tunnel_url
+fetch_ngrok_url = fetch_tunnel_url
+

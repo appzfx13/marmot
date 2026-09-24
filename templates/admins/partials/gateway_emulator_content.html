@@ -49,23 +49,27 @@
     }
     .speed-pill-btn {
         font-family: var(--font-mono, monospace);
-        font-size: 0.75rem;
-        padding: 4px 10px;
-        border: 1px solid rgba(255, 255, 255, 0.12);
-        background: rgba(255, 255, 255, 0.04);
+        font-size: 0.76rem;
+        font-weight: 600;
+        padding: 5px 12px;
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.16)) !important;
+        background: rgba(255, 255, 255, 0.05);
         color: var(--text-secondary, #94a3b8);
-        transition: all 0.15s ease;
+        border-radius: 50rem;
+        margin: 1px 2px;
+        transition: all 0.18s ease;
     }
     .speed-pill-btn:hover {
-        background: rgba(255, 255, 255, 0.1);
-        color: #fff;
+        background: rgba(255, 255, 255, 0.14);
+        color: #ffffff;
+        border-color: rgba(56, 189, 248, 0.4) !important;
     }
     .speed-pill-btn.active {
-        background: #38bdf8 !important;
-        color: #09090b !important;
+        background: #0284c7 !important;
+        color: #ffffff !important;
         font-weight: 700;
         border-color: #38bdf8 !important;
-        box-shadow: 0 0 12px rgba(56, 189, 248, 0.45);
+        box-shadow: 0 0 14px rgba(56, 189, 248, 0.45);
     }
     .custom-scroll::-webkit-scrollbar {
         width: 6px;
@@ -85,7 +89,7 @@
            style="border-color: var(--border-default, rgba(255, 255, 255, 0.1)) !important; background: var(--bg-surface, rgba(255, 255, 255, 0.03));"
            onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='{% url 'admins:admin-dashboard' %}'; }"
            title="Go Back">
-            <span class="material-icons" style="font-size: 1.1rem;">arrow_back</span>
+            <i class="bi bi-arrow-left fs-6"></i>
             <span class="fw-medium">Back</span>
         </button>
         <div>
@@ -98,7 +102,7 @@
                 </span>
                 {% else %}
                 <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace fs-6" style="margin-top: 2px;">
-                    <span class="material-icons" style="font-size: 0.8rem;">error_outline</span>
+                    <i class="bi bi-exclamation-triangle fs-6"></i>
                     OFFLINE
                 </span>
                 {% endif %}
@@ -117,7 +121,7 @@
         <button type="button" class="btn btn-outline-info btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
                 data-bs-toggle="modal" data-bs-target="#mockOrderTicketModal"
                 title="Dispatch Manual Mock Order to Matcher">
-            <span class="material-icons" style="font-size: 1rem;">add_shopping_cart</span>
+            <i class="bi bi-cart-plus fs-6"></i>
             <span>Place Order Ticket</span>
         </button>
 
@@ -126,7 +130,7 @@
             <input type="hidden" name="action" value="clear_session">
             <button type="submit" class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
                     onclick="return confirm('Reset all mock orders, positions, and restore ₹1,00,000 initial balance?');">
-                <span class="material-icons" style="font-size: 1rem;">restart_alt</span>
+                <i class="bi bi-arrow-counterclockwise fs-6"></i>
                 <span>Reset Session</span>
             </button>
         </form>
@@ -136,7 +140,7 @@
             <input type="hidden" name="action" value="kill_switch">
             <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
                     onclick="return confirm('TRIGGER KILL-SWITCH: Cancel ALL pending orders across mock broker?');">
-                <span class="material-icons" style="font-size: 1rem;">bolt</span>
+                <i class="bi bi-lightning-charge-fill fs-6"></i>
                 <span>Kill Switch</span>
             </button>
         </form>
@@ -146,14 +150,14 @@
                 hx-target="#gateway-emulator-container"
                 hx-swap="innerHTML"
                 title="Refresh Telemetry">
-            <span class="material-icons" style="font-size: 1rem;">refresh</span>
+            <i class="bi bi-arrow-repeat fs-6"></i>
         </button>
 
         <a href="{{ emulator_external_url }}"
            target="_blank"
            class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1 shadow-sm px-2.5"
            title="Open standalone emulator cockpit in new window">
-            <span class="material-icons" style="font-size: 0.95rem;">open_in_new</span>
+            <i class="bi bi-box-arrow-up-right fs-6"></i>
         </a>
     </div>
 </div>
@@ -268,7 +272,7 @@
                     <span class="spinner-grow spinner-grow-sm text-info" style="width: 0.45rem; height: 0.45rem;" role="status"></span>
                     <span class="text-info fw-semibold">Replay Active ({{ streamer_status.current_speed|default:25 }}x)</span>
                     {% else %}
-                    <span class="material-icons text-secondary" style="font-size: 0.85rem;">pause_circle_filled</span>
+                    <i class="bi bi-pause-circle text-secondary fs-6"></i>
                     <span class="text-muted">Replay Standby (Ready to Play)</span>
                     {% endif %}
                 </span>
@@ -308,13 +312,18 @@
         <!-- Stop Button & Playback Actions -->
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <!-- Play / Pause Toggle -->
-            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline" id="gateway-toggle-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle">
                 {% if streamer_status.is_playing %}
-                <button type="submit" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
+                <button type="button" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#confirmPauseModal">
                     <i class="bi bi-pause-fill fs-6"></i>
                     <span>Pause Replay</span>
+                </button>
+                {% elif streamer_status.current_row > 0 and not streamer_status.is_completed %}
+                <button type="submit" class="btn btn-info text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
+                    <i class="bi bi-play-circle-fill fs-6"></i>
+                    <span>Resume Replay</span>
                 </button>
                 {% else %}
                 <button type="submit" class="btn btn-success text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
@@ -325,27 +334,61 @@
             </form>
 
             <!-- Rewind to Row 0 -->
-            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline" id="gateway-rewind-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="restart">
-                <button type="submit" class="btn btn-outline-info btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" title="Rewind to row 0 and restart stream">
+                <button type="button" class="btn btn-outline-info btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#confirmRewindModal" title="Rewind to row 0 and restart stream">
                     <i class="bi bi-arrow-repeat fs-6"></i>
                     <span>Rewind</span>
                 </button>
             </form>
 
             <!-- FUNCTIONAL STOP BUTTON -->
-            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline" id="gateway-stop-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="stop">
-                <button type="submit"
+                <button type="button"
                         class="btn btn-danger btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5 fw-bold"
-                        onclick="return confirm('HALT SIMULATION: Immediately stop Parquet streamer, pause strategy workers, and cancel pending mock orders?');"
+                        data-bs-toggle="modal" data-bs-target="#confirmStopModal"
                         title="Functional Stop: Halts stream, kills active strategy workers, and flushes orders">
                     <i class="bi bi-stop-circle-fill fs-6"></i>
                     <span>STOP SIMULATION</span>
                 </button>
             </form>
+        </div>
+    </div>
+
+    <!-- Real-Time Streamer Progress Card (Direct WebSocket Update) -->
+    <div id="gateway-streamer-progress-card" class="p-3 mb-3 rounded-3 border border-secondary border-opacity-20" style="background: rgba(15, 23, 42, 0.75);">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap font-monospace">
+                <span id="gateway-streamer-badge" class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-3 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                    <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                    <span id="gateway-streamer-status-text">STREAMING TICK FEED</span>
+                </span>
+                <span class="badge bg-dark border border-white border-opacity-10 text-warning px-2.5 py-1 smaller shadow-sm">
+                    <i class="bi bi-calendar3 me-1.5"></i><span id="gateway-progress-date">{{ streamer_status.current_date|default:"2024-01-01" }}</span>
+                </span>
+                <span class="badge bg-dark border border-white border-opacity-10 text-info px-2.5 py-1 smaller shadow-sm">
+                    <i class="bi bi-clock me-1.5"></i><span id="gateway-progress-time">{{ streamer_status.current_time|default:"09:15:00" }} IST</span>
+                </span>
+            </div>
+            <div class="d-flex align-items-center gap-3 font-monospace smaller text-secondary flex-wrap">
+                <span>Dataset: <strong id="gateway-progress-file" class="text-white">{{ streamer_status.active_file|default:"1/13/dataset.parquet" }}</strong></span>
+                <span class="opacity-25">|</span>
+                <span>Rows: <strong id="gateway-progress-rows" class="text-white">{{ streamer_status.current_row|default:0 }} / {{ streamer_status.total_rows|default:5678660 }}</strong></span>
+                <span class="opacity-25">|</span>
+                <span>Progress: <strong id="gateway-progress-pct" class="text-success">{{ streamer_status.progress_pct|default:0|floatformat:1 }}%</strong></span>
+                <span class="opacity-25">|</span>
+                <span>Speed: <strong id="gateway-progress-speed" class="text-warning">{{ streamer_status.current_speed|default:25 }}x</strong></span>
+                <span class="opacity-25">|</span>
+                <span>Ticks: <strong id="gateway-progress-ticks" class="text-white">{{ streamer_status.ticks_ingested|default:0 }}</strong></span>
+            </div>
+        </div>
+        <div class="progress rounded-pill bg-dark border border-white border-opacity-10" style="height: 9px;">
+            <div id="gateway-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar"
+                 style="width: {{ streamer_status.progress_pct|default:'0' }}%; transition: width 0.3s ease;"
+                 aria-valuenow="{{ streamer_status.progress_pct|default:'0' }}" aria-valuemin="0" aria-valuemax="100"></div>
         </div>
     </div>
 
@@ -440,18 +483,18 @@
         </div>
 
         <!-- 2. Speed Multipliers (1x to 250x) -->
-        <div class="col-12 col-lg-7 text-start text-lg-end">
+        <div class="col-12 col-lg-7 text-start text-lg-end" id="gateway-speed-multipliers-wrapper">
             <label class="text-secondary smaller fw-bold d-block mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">
                 <i class="bi bi-speedometer2 me-1 text-info"></i>Replay Speed Multiplier (Syncs Strategy Clock)
             </label>
             <div class="d-flex flex-wrap gap-1.5 justify-content-start justify-content-lg-end" role="group">
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="1"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 1 %}active{% endif %}">1x</button></form>
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="5"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 5 %}active{% endif %}">5x</button></form>
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="10"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 10 %}active{% endif %}">10x</button></form>
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="25"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 25 %}active{% endif %}">25x</button></form>
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="50"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 50 %}active{% endif %}">50x</button></form>
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="100"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 100 %}active{% endif %}">100x</button></form>
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">{% csrf_token %}<input type="hidden" name="action" value="speed"><input type="hidden" name="val" value="250"><button type="submit" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 250 %}active{% endif %}">250x</button></form>
+                <button type="button" onclick="setGatewaySpeed(1)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 1 %}active{% endif %}" data-speed="1">1x</button>
+                <button type="button" onclick="setGatewaySpeed(5)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 5 %}active{% endif %}" data-speed="5">5x</button>
+                <button type="button" onclick="setGatewaySpeed(10)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 10 %}active{% endif %}" data-speed="10">10x</button>
+                <button type="button" onclick="setGatewaySpeed(25)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 25 %}active{% endif %}" data-speed="25">25x</button>
+                <button type="button" onclick="setGatewaySpeed(50)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 50 %}active{% endif %}" data-speed="50">50x</button>
+                <button type="button" onclick="setGatewaySpeed(100)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 100 %}active{% endif %}" data-speed="100">100x</button>
+                <button type="button" onclick="setGatewaySpeed(250)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 250 %}active{% endif %}" data-speed="250">250x</button>
             </div>
         </div>
     </div>
@@ -515,14 +558,14 @@
          style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
         <div class="d-flex align-items-center justify-content-between mb-2">
             <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Account Balance &amp; Capital Accounting</span>
-            <span class="badge {% if metrics.net_pnl >= 0 %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-25 border border-opacity-25 rounded-pill px-2.5 py-0.5 fs-7 font-monospace">
+            <span id="gateway-net-pnl-badge" class="badge {% if metrics.net_pnl >= 0 %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-25 border border-opacity-25 rounded-pill px-2.5 py-0.5 fs-7 font-monospace">
                 {% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }} Net Session PnL
             </span>
         </div>
 
         <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 mb-2">
             <div class="d-flex align-items-baseline gap-2 flex-wrap">
-                <span class="fs-3 fw-bold font-monospace text-white">
+                <span id="gateway-available-balance" class="fs-3 fw-bold font-monospace text-white">
                     ₹{{ active_account.available_balance|default:100000|floatformat:2 }}
                 </span>
                 <span class="theme-text-muted small fw-medium">Available Cash Margin</span>
@@ -531,36 +574,48 @@
                 <span class="badge rounded-pill px-2.5 py-1" style="background: var(--bg-elevated, rgba(255,255,255,0.05)); color: var(--text-secondary); border: 1px solid var(--border-default, rgba(255,255,255,0.1));">
                     SOD Limit: ₹{{ active_account.sod_limit|default:100000|floatformat:2 }}
                 </span>
-                <span class="badge rounded-pill px-2.5 py-1 fw-bold {% if metrics.net_pnl >= 0 %}bg-success text-success border border-success{% else %}bg-danger text-danger border border-danger{% endif %} bg-opacity-20 border-opacity-35">
+                <span id="gateway-utilized-margin" class="badge rounded-pill px-2.5 py-1 fw-bold {% if metrics.net_pnl >= 0 %}bg-success text-success border border-success{% else %}bg-danger text-danger border border-danger{% endif %} bg-opacity-20 border-opacity-35">
                     Utilized: ₹{{ active_account.utilized_margin|default:0|floatformat:2 }}
                 </span>
             </div>
         </div>
 
-        <div class="row g-2 pt-2 border-top border-secondary border-opacity-10 small">
+        <div class="row g-2.5 pt-2.5 border-top border-secondary border-opacity-15 small">
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="theme-text-muted" style="font-size: 0.72rem;">1. Starting SOD Capital:</div>
-                <div class="theme-text-main fw-semibold font-monospace">₹{{ active_account.sod_limit|default:100000|floatformat:2 }}</div>
+                <div class="p-2.5 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
+                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">1. Starting SOD Capital</div>
+                    <div class="theme-text-main fw-semibold font-monospace mt-1">₹{{ active_account.sod_limit|default:100000|floatformat:2 }}</div>
+                </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="theme-text-muted" style="font-size: 0.72rem;">2. (+) Gross Profits:</div>
-                <div class="text-success fw-semibold font-monospace">+₹{{ metrics.gross_pnl|floatformat:2 }}</div>
+                <div class="p-2.5 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
+                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">2. (+) Gross Profits</div>
+                    <div class="text-success fw-semibold font-monospace mt-1">+₹{{ metrics.gross_pnl|floatformat:2 }}</div>
+                </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="theme-text-muted" style="font-size: 0.72rem;">3. (-) Total Brokerage:</div>
-                <div class="text-warning fw-semibold font-monospace">-₹{{ metrics.total_charges|floatformat:2 }}</div>
+                <div class="p-2.5 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
+                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">3. (-) Total Brokerage</div>
+                    <div class="text-warning fw-semibold font-monospace mt-1">-₹{{ metrics.total_charges|floatformat:2 }}</div>
+                </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="theme-text-muted" style="font-size: 0.72rem;">4. (➔) Net Realized PnL:</div>
-                <div class="{% if metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold font-monospace">{% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }}</div>
+                <div class="p-2.5 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
+                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">4. (➔) Net Realized PnL</div>
+                    <div class="{% if metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold font-monospace mt-1">{% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }}</div>
+                </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="theme-text-muted" style="font-size: 0.72rem;">5. Closed Pairs:</div>
-                <div class="text-info fw-semibold font-monospace">{{ metrics.total_trades }} Trades</div>
+                <div class="p-2.5 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
+                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">5. Closed Pairs</div>
+                    <div class="text-info fw-semibold font-monospace mt-1">{{ metrics.total_trades }} Trades</div>
+                </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="theme-text-muted" style="font-size: 0.72rem;">6. Current Available:</div>
-                <div class="text-white fw-bold font-monospace">₹{{ active_account.available_balance|default:100000|floatformat:2 }}</div>
+                <div class="p-2.5 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
+                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">6. Current Available</div>
+                    <div class="text-white fw-bold font-monospace mt-1">₹{{ active_account.available_balance|default:100000|floatformat:2 }}</div>
+                </div>
             </div>
         </div>
     </div>
@@ -578,8 +633,8 @@
                 <div class="d-flex justify-content-between align-items-center mb-2">
                     <div class="d-flex align-items-center gap-2">
                         <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2" style="font-size: 1rem;">
-                            <span class="material-icons text-success" style="font-size: 1.2rem;">show_chart</span>
-                            Session Equity Curve
+                            <i class="bi bi-graph-up text-success fs-5"></i>
+                            <span>Session Equity Curve</span>
                         </h5>
                         <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.7rem;">
                             POSTBACK AUDIT
@@ -800,10 +855,222 @@
         });
     }
 
+    // WebSocket setup for Real-Time Execution Logs & Balance Telemetry
+    function initGatewayWebSocket() {
+        if (window._gatewayWs && (window._gatewayWs.readyState === WebSocket.OPEN || window._gatewayWs.readyState === WebSocket.CONNECTING)) {
+            return;
+        }
+
+        const wsProto = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const hostName = window.location.hostname;
+        let wsUrl;
+        if (hostName === 'localhost' || hostName === '127.0.0.1') {
+            wsUrl = `${wsProto}//${hostName}:8088/mock/v2/marketfeed/ws`;
+        } else {
+            wsUrl = `${wsProto}//${window.location.host}/mock-ws`;
+        }
+
+        function connect() {
+            try {
+                if (window._gatewayWs && (window._gatewayWs.readyState === WebSocket.OPEN || window._gatewayWs.readyState === WebSocket.CONNECTING)) {
+                    return;
+                }
+                const ws = new WebSocket(wsUrl);
+                window._gatewayWs = ws;
+                ws.onopen = function() {
+                    console.log('[GatewayEmulator] Connected to Live Mock Marketfeed & Execution Socket via ' + wsUrl);
+                };
+                ws.onmessage = function(e) {
+                    try {
+                        const data = JSON.parse(e.data);
+                        // 1. Streamer Progress Event
+                        if (data.type === 'streamer_progress') {
+                            const bar = document.getElementById('gateway-progress-bar');
+                            if (bar && data.progress_pct != null) {
+                                bar.style.width = data.progress_pct + '%';
+                                bar.setAttribute('aria-valuenow', data.progress_pct);
+                            }
+                            const pctEl = document.getElementById('gateway-progress-pct');
+                            if (pctEl && data.progress_pct != null) {
+                                pctEl.innerText = data.progress_pct.toFixed(2) + '%';
+                            }
+                            const dateEl = document.getElementById('gateway-progress-date');
+                            if (dateEl && data.date) {
+                                dateEl.innerText = data.date;
+                            }
+                            const timeEl = document.getElementById('gateway-progress-time');
+                            if (timeEl && data.datetime) {
+                                timeEl.innerText = data.datetime.includes(' ') ? data.datetime.split(' ')[1] + ' IST' : data.datetime + ' IST';
+                            }
+                            const rowsEl = document.getElementById('gateway-progress-rows');
+                            if (rowsEl && data.current_row != null && data.total_rows != null) {
+                                rowsEl.innerText = Number(data.current_row).toLocaleString() + ' / ' + Number(data.total_rows).toLocaleString();
+                            }
+                            const ticksEl = document.getElementById('gateway-progress-ticks');
+                            if (ticksEl && data.ticks != null) {
+                                ticksEl.innerText = Number(data.ticks).toLocaleString();
+                            }
+                            const speedEl = document.getElementById('gateway-progress-speed');
+                            if (speedEl && data.speed != null) {
+                                speedEl.innerText = data.speed + 'x';
+                                document.querySelectorAll('.speed-pill-btn').forEach(btn => {
+                                    if (btn.getAttribute('data-speed') == data.speed || btn.innerText.trim() === data.speed + 'x') {
+                                        btn.classList.add('active');
+                                    } else {
+                                        btn.classList.remove('active');
+                                    }
+                                });
+                            }
+                            const fileEl = document.getElementById('gateway-progress-file');
+                            if (fileEl && data.active_file) {
+                                fileEl.innerText = data.active_file;
+                            }
+                        }
+                        // 2. Real-Time Spot Index Tick
+                        else if (data.TradingSymbol === 'NIFTY' || data.SecurityID === '13') {
+                            const spotEl = document.getElementById('gateway-spot-ltp');
+                            if (spotEl && data.LTP != null) {
+                                spotEl.innerText = '₹' + Number(data.LTP).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            }
+                        }
+                        // 3. Real-Time India VIX Tick
+                        else if (data.TradingSymbol === 'INDIA VIX' || data.SecurityID === 'INDIAVIX') {
+                            const vixEl = document.getElementById('gateway-india-vix');
+                            if (vixEl && data.LTP != null) {
+                                vixEl.innerText = Number(data.LTP).toFixed(2);
+                            }
+                        }
+                        // 4. Account Stats Update
+                        else if (data.type === 'broker_stats') {
+                            const balEl = document.getElementById('gateway-available-balance');
+                            if (balEl && data.availableBalance != null) {
+                                balEl.innerText = '₹' + Number(data.availableBalance).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            }
+                            const utilEl = document.getElementById('gateway-utilized-margin');
+                            if (utilEl && data.utilizedMargin != null) {
+                                utilEl.innerText = 'Utilized: ₹' + Number(data.utilizedMargin).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+                            }
+                            const pnlEl = document.getElementById('gateway-net-pnl-badge');
+                            if (pnlEl && data.liveNetPnl != null) {
+                                const sign = data.liveNetPnl >= 0 ? '+' : '';
+                                pnlEl.innerText = `${sign}₹${Number(data.liveNetPnl).toFixed(2)} Net Session PnL`;
+                            }
+                        }
+                        // 5. Order Traded Event -> Prepend Row to Table
+                        else if (data.type === 'broker_order_event' && data.status === 'TRADED') {
+                            prependOrderExecutionRow(data);
+                        }
+                    } catch (err) {}
+                };
+                ws.onerror = function() {};
+                ws.onclose = function() {
+                    window._gatewayWs = null;
+                    setTimeout(connect, 3000);
+                };
+            } catch (e) {}
+        }
+        connect();
+    }
+
+    function prependOrderExecutionRow(data) {
+        const tbody = document.querySelector('#mock-broker-trades-container table tbody');
+        if (!tbody) return;
+
+        const row = document.createElement('tr');
+        row.style.borderBottom = '1px solid var(--border-color)';
+        row.style.background = 'rgba(56, 189, 248, 0.12)';
+        row.style.transition = 'background 1.5s ease';
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-IN', {hour: '2-digit', minute: '2-digit', second: '2-digit'});
+
+        row.innerHTML = `
+            <td class="ps-2 font-monospace text-info fw-bold">NEW</td>
+            <td class="fw-bold theme-text-main"><span class="font-monospace">${data.tradingSymbol || data.orderId}</span></td>
+            <td class="font-monospace text-muted" style="font-size: 0.8rem;">${timeStr}</td>
+            <td class="font-monospace text-muted" style="font-size: 0.8rem;">${timeStr}</td>
+            <td class="text-end font-monospace theme-text-main">₹${(data.price || 0).toFixed(2)}</td>
+            <td class="text-end font-monospace theme-text-main">₹${(data.price || 0).toFixed(2)}</td>
+            <td class="text-center font-monospace"><span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2">${data.quantity || 0}</span></td>
+            <td class="text-end font-monospace text-info fw-semibold">${data.transactionType || 'TRADED'}</td>
+            <td class="text-end font-monospace text-warning">-₹20.00</td>
+            <td class="text-end font-monospace text-success fw-bold">FILLED</td>
+            <td class="text-center font-monospace"><span class="badge bg-success bg-opacity-20 text-success rounded-pill px-2">${data.legName || 'FILL'}</span></td>
+            <td class="text-center pe-2 font-monospace text-muted">&lt; 10ms</td>
+        `;
+
+        tbody.insertBefore(row, tbody.firstChild);
+
+        setTimeout(() => {
+            row.style.background = 'transparent';
+        }, 1200);
+
+        // Fetch authoritative server calculation via HTMX after fill
+        if (window.htmx) {
+            setTimeout(() => {
+                htmx.ajax('GET', '{% url "admins:admin-mock-broker-trades" %}', {target: '#mock-broker-trades-container', swap: 'innerHTML'});
+            }, 600);
+        }
+    }
+
+    window.confirmGatewayAction = function(formId, modalId) {
+        const modalEl = document.getElementById(modalId);
+        if (modalEl && window.bootstrap) {
+            const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            modalInstance.hide();
+        }
+        setTimeout(() => {
+            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+            const form = document.getElementById(formId);
+            if (form) {
+                if (window.htmx) {
+                    htmx.trigger(form, 'submit');
+                } else {
+                    form.submit();
+                }
+            }
+        }, 120);
+    };
+
+    window.setGatewaySpeed = function(val) {
+        document.querySelectorAll('.speed-pill-btn').forEach(btn => {
+            if (btn.getAttribute('data-speed') == val || btn.innerText.trim() === val + 'x') {
+                btn.classList.add('active');
+            } else {
+                btn.classList.remove('active');
+            }
+        });
+        const speedEl = document.getElementById('gateway-progress-speed');
+        if (speedEl) speedEl.innerText = val + 'x';
+
+        const formData = new FormData();
+        formData.append('action', 'speed');
+        formData.append('val', val);
+        const csrfEl = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        if (csrfEl) formData.append('csrfmiddlewaretoken', csrfEl.value);
+
+        fetch('{% url "admins:admin-mock-broker-control" %}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        }).then(res => res.json()).then(data => {
+            console.log('[GatewaySpeed] Set speed to ' + val + 'x successfully');
+        }).catch(err => console.error('[GatewaySpeed] Error setting speed:', err));
+    };
+
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
         setTimeout(initGatewayEquityChart, 80);
+        setTimeout(initGatewayWebSocket, 150);
     } else {
-        document.addEventListener('DOMContentLoaded', initGatewayEquityChart);
+        document.addEventListener('DOMContentLoaded', () => {
+            initGatewayEquityChart();
+            initGatewayWebSocket();
+        });
     }
     document.body.addEventListener('htmx:afterSwap', function(e) {
         if (e.detail.target && (e.detail.target.id === 'gateway-emulator-container' || e.detail.target.closest('#gateway-emulator-container'))) {
@@ -812,3 +1079,127 @@
     });
 })();
 </script>
+
+<!-- ================= MODALS FOR ACTION CONFIRMATION ================= -->
+<!-- 1. Confirm Pause Simulation Modal -->
+<div class="modal fade" id="confirmPauseModal" tabindex="-1" aria-labelledby="confirmPauseModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border border-warning border-opacity-30 shadow-lg" style="background: rgba(20, 20, 24, 0.95); backdrop-filter: blur(25px); color: #fafafa; border-radius: 14px;">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+                <h6 class="modal-title fw-bold text-white d-flex align-items-center gap-2" id="confirmPauseModalLabel">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">
+                        <i class="bi bi-pause-fill fs-5"></i>
+                    </span>
+                    <span>Pause Market Feed Replay?</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="text-white-50 small mb-3">You are about to pause playback for the active historical Parquet dataset. This will freeze simulated execution and virtual time:</p>
+                <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(255, 255, 255, 0.03);">
+                    <ul class="list-unstyled mb-0 smaller text-white-50 d-flex flex-column gap-1.5">
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-warning mt-0.5"></i>
+                            <span>Freezes Parquet candle tick streaming to WebSocket clients.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-warning mt-0.5"></i>
+                            <span>Virtual strategy clock and Dhan emulator matcher pacing will pause.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-warning mt-0.5"></i>
+                            <span>Current row index is preserved for seamless resume.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-toggle-form', 'confirmPauseModal')">
+                    <i class="bi bi-pause-fill me-1"></i>Yes, Pause Replay
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 2. Confirm Rewind Replay Modal -->
+<div class="modal fade" id="confirmRewindModal" tabindex="-1" aria-labelledby="confirmRewindModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border border-info border-opacity-30 shadow-lg" style="background: rgba(20, 20, 24, 0.95); backdrop-filter: blur(25px); color: #fafafa; border-radius: 14px;">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+                <h6 class="modal-title fw-bold text-white d-flex align-items-center gap-2" id="confirmRewindModalLabel">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
+                        <i class="bi bi-arrow-repeat fs-5"></i>
+                    </span>
+                    <span>Rewind Replay to Row 0?</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="text-white-50 small mb-3">Rewinding will restart playback of the dataset from the beginning of the market day:</p>
+                <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(255, 255, 255, 0.03);">
+                    <ul class="list-unstyled mb-0 smaller text-white-50 d-flex flex-column gap-1.5">
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-exclamation-triangle text-info mt-0.5"></i>
+                            <span>Current playback row resets to <strong>0 / 09:15:00 IST</strong>.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-exclamation-triangle text-info mt-0.5"></i>
+                            <span>Virtual clock restarts and historical ticks will be re-streamed from row 0.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-info text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-rewind-form', 'confirmRewindModal')">
+                    <i class="bi bi-arrow-repeat me-1"></i>Yes, Rewind Replay
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 3. Confirm Stop Simulation Modal -->
+<div class="modal fade" id="confirmStopModal" tabindex="-1" aria-labelledby="confirmStopModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border border-danger border-opacity-30 shadow-lg" style="background: rgba(20, 20, 24, 0.95); backdrop-filter: blur(25px); color: #fafafa; border-radius: 14px;">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+                <h6 class="modal-title fw-bold text-white d-flex align-items-center gap-2" id="confirmStopModalLabel">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
+                        <i class="bi bi-stop-circle-fill fs-5"></i>
+                    </span>
+                    <span>Halt Simulation Immediately?</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="text-white-50 small mb-3">You are about to execute a functional simulation stop. The following operations will be executed immediately:</p>
+                <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(255, 255, 255, 0.03);">
+                    <ul class="list-unstyled mb-0 smaller text-white-50 d-flex flex-column gap-1.5">
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-x-circle text-danger mt-0.5"></i>
+                            <span>Halts historical Parquet replay feed immediately.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-x-circle text-danger mt-0.5"></i>
+                            <span>Dispatches shutdown signal to strategy backtest worker pools via Redis.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-x-circle text-danger mt-0.5"></i>
+                            <span>Triggers mock broker kill switch to cancel all open orders.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Keep Running</button>
+                <button type="button" class="btn btn-danger fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-stop-form', 'confirmStopModal')">
+                    <i class="bi bi-stop-circle-fill me-1"></i>Yes, Halt Simulation
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+

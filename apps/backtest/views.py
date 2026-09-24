@@ -186,7 +186,7 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
         max_cap_util_pct = float(form.cleaned_data.get('max_capital_utilization_pct') or 60.0)
         max_lots_cap = int(form.cleaned_data.get('max_lots_cap') or 10)
 
-        compounding_profile = form.cleaned_data.get('compounding_profile') or 'MODERATE'
+        compounding_profile = form.cleaned_data.get('compounding_profile') or 'STEP_UP'
 
         params["use_macro_assist"] = use_macro
         params["macro_timeframe"] = macro_tf

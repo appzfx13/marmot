@@ -372,18 +372,18 @@
                 <div class="mt-auto pt-2 border-top border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2 font-monospace"
                      style="font-size: 0.74rem;">
                     <div class="d-flex align-items-center gap-3 flex-wrap">
-                        <span>Balance: <strong class="text-white" id="telemetryBalance">{{ active_account.account_summary.balance|default:"—" }}</strong></span>
+                        <span>Balance: <strong class="text-white" id="telemetryBalance">{{ initial_telemetry.balance|default:"—" }}</strong></span>
                         <span class="text-muted">|</span>
-                        <span>Equity: <strong class="text-success" id="telemetryEquity">{{ active_account.account_summary.equity|default:"—" }}</strong></span>
+                        <span>Equity: <strong class="text-success" id="telemetryEquity">{{ initial_telemetry.equity|default:"—" }}</strong></span>
                         <span class="text-muted">|</span>
-                        <span>Margin: <strong class="text-warning" id="telemetryMargin">{{ active_account.account_summary.margin_used|default:"—" }}</strong></span>
+                        <span>Margin: <strong class="text-warning" id="telemetryMargin">{{ initial_telemetry.margin|default:"—" }}</strong></span>
                         <span class="text-muted">|</span>
-                        <span>Free Margin: <strong class="text-white" id="telemetryFreeMargin">{{ active_account.account_summary.free_margin|default:"—" }}</strong></span>
+                        <span>Free Margin: <strong class="text-white" id="telemetryFreeMargin">{{ initial_telemetry.free_margin|default:"—" }}</strong></span>
                     </div>
                     <div class="d-flex align-items-center gap-2">
                         <span class="theme-text-muted">Session PnL:</span>
-                        <span class="badge {% if active_account.realtime_pnl > 0 %}bg-success text-success{% elif active_account.realtime_pnl < 0 %}bg-danger text-danger{% else %}bg-secondary text-white-50{% endif %} bg-opacity-25 rounded-pill px-2 py-0.5 fw-bold font-monospace" id="telemetrySessionPnl">
-                            {{ active_account.realtime_pnl|default:"—" }}
+                        <span class="badge {% if initial_telemetry.is_pnl_positive %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-25 rounded-pill px-2 py-0.5 fw-bold font-monospace" id="telemetrySessionPnl">
+                            {{ initial_telemetry.session_pnl|default:"—" }}
                         </span>
                     </div>
                 </div>
@@ -969,6 +969,57 @@
         startRealTimeWebSocketStream();
     }
 
+    function syncWatchlistStrikePrice(symKey, ltp, chp) {
+        if (!symKey || ltp === undefined || ltp === null || isNaN(ltp)) return;
+        const numLtp = parseFloat(ltp);
+
+        // 1. Update DOM elements in Market Watch / Pinned Strikes
+        const ltpEls = document.querySelectorAll(`.mw-ltp[data-tick-sym="${symKey}"], .mw-ltp[data-index="${symKey}"], .mw-ltp[data-fyers-sym="${symKey}"]`);
+        ltpEls.forEach(l => {
+            l.textContent = '₹' + numLtp.toLocaleString('en-IN', {minimumFractionDigits: 2});
+        });
+
+        const bidEls = document.querySelectorAll(`.mw-bid[data-tick-sym="${symKey}"], .mw-bid[data-index="${symKey}"]`);
+        const askEls = document.querySelectorAll(`.mw-ask[data-tick-sym="${symKey}"], .mw-ask[data-index="${symKey}"]`);
+        const chgEls = document.querySelectorAll(`.mw-change[data-tick-sym="${symKey}"], .mw-change[data-index="${symKey}"], .mw-change[data-fyers-sym="${symKey}"]`);
+
+        const spread = (numLtp * 0.0001).toFixed(2);
+        bidEls.forEach(b => b.textContent = (numLtp - (spread / 2)).toFixed(2));
+        askEls.forEach(a => a.textContent = (numLtp + (spread / 2)).toFixed(2));
+
+        if (chp !== undefined && chp !== null && chp !== '') {
+            const chpNum = parseFloat(chp);
+            const chpFormatted = !isNaN(chpNum) ? (chpNum > 0 ? `+${chpNum.toFixed(2)}%` : `${chpNum.toFixed(2)}%`) : String(chp);
+            const isPos = String(chpFormatted).startsWith('+');
+            const chpClass = isPos ? 'bg-success text-success' : 'bg-danger text-danger';
+            chgEls.forEach(c => {
+                c.textContent = chpFormatted;
+                c.className = `badge ${chpClass} bg-opacity-20 rounded-pill px-1.5 py-0 smaller font-monospace mw-change`;
+            });
+        }
+
+        // 2. Persist to localStorage pinned strikes
+        try {
+            let list = getPinnedStrikesList();
+            let updated = false;
+            list.forEach(item => {
+                if (item.fyersSym === symKey || item.name === symKey) {
+                    item.ltp = numLtp;
+                    if (chp !== undefined && chp !== null && chp !== '') {
+                        const parsedChp = parseFloat(chp);
+                        if (!isNaN(parsedChp)) item.chp = parsedChp;
+                    }
+                    updated = true;
+                }
+            });
+            if (updated) {
+                localStorage.setItem('marmot_pinned_strikes', JSON.stringify(list));
+            }
+        } catch (e) {
+            // ignore localStorage quota or parsing issues
+        }
+    }
+
     async function loadExnessSymbolData(fyersSymbol, resolution = currentResolution) {
         if (!exnessCandleSeries) return;
         
@@ -1004,6 +1055,15 @@
                 currentBaseLtp = last.close;
                 updateHeaderOHLC(last.open, last.high, last.low, last.close);
                 updateTicketPricesFromLTP(currentBaseLtp);
+
+                let chpVal = null;
+                if (res.data.length > 1) {
+                    const first = res.data[0];
+                    if (first.open && first.open > 0) {
+                        chpVal = ((last.close - first.open) / first.open) * 100;
+                    }
+                }
+                syncWatchlistStrikePrice(fyersSymbol, last.close, chpVal);
             } else {
                 // Strict Rule 10 Compliance: Pure historical data only. Clear canvas, zero dummy data.
                 currentActiveBar = null;
@@ -1093,26 +1153,8 @@
             // Update Market Watch row if symbol or index matches
             const lookupKeys = [sym, idx, data.fyers_sym, data.Symbol].filter(Boolean);
             lookupKeys.forEach(k => {
-                const ltpEls = document.querySelectorAll(`.mw-ltp[data-tick-sym="${k}"], .mw-ltp[data-index="${k}"], .mw-ltp[data-fyers-sym="${k}"]`);
-                ltpEls.forEach(l => {
-                    l.textContent = '₹' + ltp.toLocaleString('en-IN', {minimumFractionDigits: 2});
-                });
-
-                const bidEls = document.querySelectorAll(`.mw-bid[data-tick-sym="${k}"], .mw-bid[data-index="${k}"]`);
-                const askEls = document.querySelectorAll(`.mw-ask[data-tick-sym="${k}"], .mw-ask[data-index="${k}"]`);
-                const chgEls = document.querySelectorAll(`.mw-change[data-tick-sym="${k}"], .mw-change[data-index="${k}"], .mw-change[data-fyers-sym="${k}"]`);
-                
-                const spread = (ltp * 0.0001).toFixed(2);
-                bidEls.forEach(b => b.textContent = (ltp - (spread / 2)).toFixed(2));
-                askEls.forEach(a => a.textContent = (ltp + (spread / 2)).toFixed(2));
-                
                 const pct = data.change_pct || data.ChangePct || (data.data && (data.data.change_pct || data.data.ChangePct));
-                if (pct) {
-                    chgEls.forEach(c => {
-                        c.textContent = pct;
-                        c.className = `badge ${String(pct).startsWith('+') ? 'bg-success text-success' : 'bg-danger text-danger'} bg-opacity-20 rounded-pill px-1.5 py-0 smaller font-monospace mw-change`;
-                    });
-                }
+                syncWatchlistStrikePrice(k, ltp, pct);
             });
 
             // If incoming tick matches current active instrument, update chart and order ticket
@@ -1160,10 +1202,67 @@
                     updateHeaderOHLC(currentActiveBar.open, currentActiveBar.high, currentActiveBar.low, currentActiveBar.close);
                 }
             }
+
+            // Sync open Option Chain modal in real-time
+            const ocModal = document.getElementById('terminalOptionChainModal');
+            if (ocModal && ocModal.classList.contains('show')) {
+                const targetIdx = resolveUnderlyingIndexName();
+                if (!idx || idx === targetIdx || sym === targetIdx || (data.fyers_sym && data.fyers_sym.includes(targetIdx))) {
+                    const spotEl = document.getElementById('ocModalSpotLtp');
+                    if (spotEl) spotEl.textContent = `Spot: ₹ ${ltp.toLocaleString('en-IN', {minimumFractionDigits: 2})}`;
+                    const now = Date.now();
+                    const step = (targetIdx === 'BANKNIFTY' || targetIdx === 'SENSEX') ? 100 : ((targetIdx === 'MIDCPNIFTY') ? 25 : 50);
+                    const currentAtm = Math.round(ltp / step) * step;
+                    const atmShifted = (window._lastModalAtmStrike && window._lastModalAtmStrike !== currentAtm);
+                    if (atmShifted || !window._lastOcModalSync || (now - window._lastOcModalSync) > 3000) {
+                        window._lastModalAtmStrike = currentAtm;
+                        window._lastOcModalSync = now;
+                        openOptionChainModal(true);
+                    }
+                }
+            }
         });
 
-        window.addEventListener('marmot:portfolio_tick', function(e) {
+        // Helper to resolve clean underlying index name from spot or option
+        function resolveUnderlyingIndexName() {
+            const raw = (lastSpotIndex?.name || currentExnessSymbol || 'NIFTY').toUpperCase();
+            if (raw.includes('BANK')) return 'BANKNIFTY';
+            if (raw.includes('FIN')) return 'FINNIFTY';
+            if (raw.includes('MIDCP') || raw.includes('MIDCAP')) return 'MIDCPNIFTY';
+            if (raw.includes('SENSEX')) return 'SENSEX';
+            if (raw.includes('VIX')) return 'INDIAVIX';
+            if (raw.includes('GIFT')) return 'GIFTNIFTY';
+            return 'NIFTY';
+        }
+
+        // Reactive WebSocket listeners for operational data (positions, orders, telemetry)
+        window.addEventListener('marmot:portfolio_tick', function() {
             loadTerminalOperationalData();
+        });
+        window.addEventListener('marmot:telemetry', function() {
+            loadTerminalOperationalData();
+        });
+        window.addEventListener('marmot:mock-telemetry', function() {
+            loadTerminalOperationalData();
+        });
+        document.body.addEventListener('reloadLiveOrders', function() {
+            loadTerminalOperationalData();
+        });
+        document.body.addEventListener('reloadLivePositions', function() {
+            loadTerminalOperationalData();
+        });
+
+        // Re-subscribe active viewing symbol and pinned strikes whenever WebSocket connects/reconnects
+        window.addEventListener('marmot:ws_connected', function() {
+            if (currentFyersSymbol && window.MarmotWS && typeof window.MarmotWS.subscribeSymbol === 'function') {
+                window.MarmotWS.subscribeSymbol(currentFyersSymbol);
+            }
+            const pinned = getPinnedStrikesList();
+            pinned.forEach(p => {
+                if (p.fyersSym && window.MarmotWS && typeof window.MarmotWS.subscribeSymbol === 'function') {
+                    window.MarmotWS.subscribeSymbol(p.fyersSym);
+                }
+            });
         });
     }
 
@@ -1243,6 +1342,15 @@
         if (el) el.classList.add('active-symbol-item');
 
         loadExnessSymbolData(fyersSym);
+
+        // Dynamically subscribe to instrument ticks over WebSocket
+        if (fyersSym) {
+            if (window.MarmotWS && typeof window.MarmotWS.subscribeSymbol === 'function') {
+                window.MarmotWS.subscribeSymbol(fyersSym);
+            } else if (window.MarmotWS && window.MarmotWS.ws && window.MarmotWS.ws.readyState === WebSocket.OPEN) {
+                window.MarmotWS.ws.send(JSON.stringify({ type: 'subscribe_symbol', symbol: fyersSym }));
+            }
+        }
     }
 
     function switchToSpotIndexTab() {
@@ -1271,20 +1379,15 @@
     // ─────────────────────────────────────────────────────────────
     // ATM ±4 Option Chain Modal Operations
     // ─────────────────────────────────────────────────────────────
-    async function openOptionChainModal() {
-        const rawIdx = (lastSpotIndex?.name || currentExnessSymbol || 'NIFTY').toUpperCase();
-        let targetIdx = 'NIFTY';
-        if (rawIdx.includes('BANK')) targetIdx = 'BANKNIFTY';
-        else if (rawIdx.includes('FIN')) targetIdx = 'FINNIFTY';
-        else if (rawIdx.includes('MIDCP')) targetIdx = 'MIDCPNIFTY';
-        else if (rawIdx.includes('SENSEX')) targetIdx = 'SENSEX';
-        else if (rawIdx.includes('VIX')) targetIdx = 'INDIAVIX';
-        else if (rawIdx.includes('GIFT')) targetIdx = 'GIFTNIFTY';
+    async function openOptionChainModal(isSilent = false) {
+        const targetIdx = resolveUnderlyingIndexName();
 
         const modalEl = document.getElementById('terminalOptionChainModal');
         if (!modalEl) return;
-        const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
-        modal.show();
+        if (!isSilent) {
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
+        }
 
         const loading = document.getElementById('ocModalLoading');
         const wrapper = document.getElementById('ocModalTableWrapper');
@@ -1295,15 +1398,21 @@
         const vixEl = document.getElementById('ocModalVix');
         const tbody = document.getElementById('ocModalTableBody');
 
-        if (loading) loading.classList.remove('d-none');
-        if (wrapper) wrapper.classList.add('d-none');
-        if (tbody) tbody.innerHTML = '';
+        if (!isSilent) {
+            if (loading) loading.classList.remove('d-none');
+            if (wrapper) wrapper.classList.add('d-none');
+            if (tbody) tbody.innerHTML = '';
+        }
 
         try {
             const resp = await fetch(`/admins/terminal/option-chain/?index=${targetIdx}&window=4`);
+            if (!resp.ok) {
+                throw new Error(`HTTP ${resp.status}`);
+            }
             const data = await resp.json();
 
             if (data.success) {
+                window._lastModalAtmStrike = data.atm_strike;
                 if (titleEl) titleEl.textContent = `${data.spot_symbol || targetIdx} Option Chain (ATM ±4 Strikes)`;
                 if (spotEl) spotEl.textContent = `Spot: ₹ ${data.spot_ltp || '—'}`;
                 if (expEl) expEl.textContent = `EXP: ${data.expiry_date || 'Weekly'}`;
@@ -1312,6 +1421,13 @@
 
                 const strikes = data.strikes || [];
                 const pinnedList = getPinnedStrikesList();
+
+                if (strikes.length === 0) {
+                    if (tbody) tbody.innerHTML = '<tr><td colspan="9" class="text-center text-muted py-4 font-monospace smaller">No option chain strikes available at this moment.</td></tr>';
+                    if (loading) loading.classList.add('d-none');
+                    if (wrapper) wrapper.classList.remove('d-none');
+                    return;
+                }
 
                 let rowsHtml = '';
                 strikes.forEach(s => {
@@ -1384,7 +1500,7 @@
             }
         } catch (e) {
             console.error('Error loading option chain:', e);
-            if (loading) loading.innerHTML = '<div class="text-danger p-3 smaller font-monospace">Failed to load option chain. Ensure Fyers credentials are authorized.</div>';
+            if (!isSilent && loading) loading.innerHTML = '<div class="text-danger p-3 smaller font-monospace">Failed to load option chain. Ensure Fyers credentials are authorized.</div>';
         }
     }
 
@@ -1403,9 +1519,6 @@
         selectExnessSymbol(name, fyersSym, resolvedLot, 'OPTION');
     }
 
-    // ─────────────────────────────────────────────────────────────
-    // Watchlist Pinned Strikes (Single-Click Add/Delete)
-    // ─────────────────────────────────────────────────────────────
     // ─────────────────────────────────────────────────────────────
     // Watchlist Pinned Strikes (Single-Click Add/Delete)
     // ─────────────────────────────────────────────────────────────
@@ -1518,6 +1631,13 @@
             `;
         });
         listEl.innerHTML = html;
+
+        // Auto-subscribe to live ticks for all pinned strikes
+        if (window.MarmotWS && typeof window.MarmotWS.subscribeSymbol === 'function') {
+            list.forEach(item => {
+                if (item.fyersSym) window.MarmotWS.subscribeSymbol(item.fyersSym);
+            });
+        }
     }
 
     // ─────────────────────────────────────────────────────────────

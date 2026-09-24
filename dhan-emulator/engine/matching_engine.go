@@ -244,6 +244,47 @@ func (m *MatchingEngine) BroadcastOrderEvent(clientID string, ord *models.OrderR
 }
 
 
+// parseOptionKey extracts strike number and option type from arbitrary option symbols or IDs.
+func parseOptionKey(s string) (strike string, optType string) {
+	upper := strings.ToUpper(s)
+	if strings.Contains(upper, "PUT") || strings.Contains(upper, "_PE") || strings.Contains(upper, " PE") {
+		optType = "PE"
+	} else if strings.Contains(upper, "CALL") || strings.Contains(upper, "_CE") || strings.Contains(upper, " CE") {
+		optType = "CE"
+	}
+	var digits []rune
+	for _, r := range upper {
+		if r >= '0' && r <= '9' {
+			digits = append(digits, r)
+		} else {
+			if len(digits) >= 4 {
+				break
+			}
+			digits = digits[:0]
+		}
+	}
+	if len(digits) >= 4 {
+		strike = string(digits)
+	}
+	return strike, optType
+}
+
+// isContractMatch checks if two symbols represent the same underlying option contract or spot instrument.
+func isContractMatch(id1, sym1, id2, sym2 string) bool {
+	if id1 != "" && (id1 == id2 || id1 == sym2) {
+		return true
+	}
+	if sym1 != "" && (sym1 == id2 || sym1 == sym2) {
+		return true
+	}
+	st1, t1 := parseOptionKey(id1 + " " + sym1)
+	st2, t2 := parseOptionKey(id2 + " " + sym2)
+	if st1 != "" && st1 == st2 && t1 != "" && t1 == t2 {
+		return true
+	}
+	return false
+}
+
 // IngestTick updates internal LTP for symbols and recalculates MTM for all active accounts.
 func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 	m.mu.Lock()
@@ -258,7 +299,7 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 	hasOpenPos := false
 	for _, acc := range m.accounts {
 		for _, pos := range acc.Positions {
-			if pos.SecurityID == tick.SecurityID && pos.NetQty != 0 {
+			if isContractMatch(pos.SecurityID, pos.TradingSymbol, tick.SecurityID, tick.TradingSymbol) && pos.NetQty != 0 {
 				hasOpenPos = true
 				if pos.NetQty > 0 {
 					pos.UnrealizedProfit = (tick.LTP - pos.BuyAvg) * float64(pos.NetQty)
@@ -277,7 +318,7 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 	// Autonomous SL/TP Check on pending orders
 	for _, acc := range m.accounts {
 		for _, ord := range acc.Orders {
-			if ord.Status == "PENDING" && ord.Order.SecurityID == tick.SecurityID {
+			if ord.Status == "PENDING" && isContractMatch(ord.Order.SecurityID, ord.Order.TradingSymbol, tick.SecurityID, tick.TradingSymbol) {
 				isTriggered := false
 				if ord.Order.OrderType == "STOP_LOSS" || ord.Order.OrderType == "STOP_LOSS_MARKET" {
 					if ord.Order.TransactionType == "BUY" && tick.LTP >= ord.Order.TriggerPrice {
@@ -298,7 +339,7 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 	// Autonomous SL/TP Check on open positions
 	for _, acc := range m.accounts {
 		for _, pos := range acc.Positions {
-			if pos.SecurityID == tick.SecurityID && pos.NetQty != 0 && pos.PositionType != "CLOSED" {
+			if isContractMatch(pos.SecurityID, pos.TradingSymbol, tick.SecurityID, tick.TradingSymbol) && pos.NetQty != 0 && pos.PositionType != "CLOSED" {
 				if pos.NetQty > 0 {
 					// LONG position
 					if pos.StopLoss > 0 && tick.LTP <= pos.StopLoss {
@@ -327,6 +368,12 @@ func (m *MatchingEngine) PlaceOrder(req models.OrderRequest) (*models.OrderRespo
 	orderID := fmt.Sprintf("DHN%d%04d", now.Unix(), rand.Intn(10000))
 	exchangeID := fmt.Sprintf("NSE%d%04d", now.Unix(), rand.Intn(10000))
 
+	sl := req.BoStopLossValue
+	if sl <= 0 && req.TriggerPrice > 0 {
+		sl = req.TriggerPrice
+	}
+	tp := req.BoProfitValue
+
 	acc := m.getOrCreateAccountLocked(req.DhanClientID)
 	rec := &models.OrderRecord{
 		Order:       req,
@@ -335,6 +382,8 @@ func (m *MatchingEngine) PlaceOrder(req models.OrderRequest) (*models.OrderRespo
 		Status:      "PENDING",
 		FilledQty:   0,
 		FilledPrice: 0.0,
+		StopLoss:    sl,
+		TakeProfit:  tp,
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

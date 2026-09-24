@@ -16,7 +16,7 @@
             <div class="theme-text-muted smaller d-flex align-items-center gap-2">
                 <span id="live-exchange-clock-date">{{ market_clock.date_str }}</span>
                 <span>&bull;</span>
-                <span>NSE/BSE Exchange Zone</span>
+                <span id="live-exchange-clock-zone">NSE/BSE Exchange Zone</span>
             </div>
         </div>
     </div>
@@ -38,7 +38,9 @@
 
 <script>
     (function() {
+        window._isVirtualClock = false;
         function updateLiveClock() {
+            if (window._isVirtualClock) return; // Preserve historical replay clock
             const timeElem = document.getElementById('live-exchange-clock-time');
             if (!timeElem) return;
             const now = new Date();
@@ -52,5 +54,30 @@
         }
         if (window._liveClockInterval) clearInterval(window._liveClockInterval);
         window._liveClockInterval = setInterval(updateLiveClock, 1000);
+
+        // Bind directly to historical Parquet / Virtual Clock stream
+        window.addEventListener('marmot:virtual_clock', function(e) {
+            window._isVirtualClock = true;
+            const data = e.detail;
+            if (!data) return;
+            const timeElem = document.getElementById('live-exchange-clock-time');
+            const dateElem = document.getElementById('live-exchange-clock-date');
+            const statusElem = document.getElementById('live-exchange-clock-status');
+            const zoneElem = document.getElementById('live-exchange-clock-zone');
+
+            if (timeElem && data.time) {
+                timeElem.textContent = data.time;
+            }
+            if (dateElem && data.date) {
+                dateElem.textContent = data.date;
+            }
+            if (zoneElem) {
+                zoneElem.textContent = 'Historical Parquet Feed';
+            }
+            if (statusElem && !statusElem.classList.contains('virtual-clock-active')) {
+                statusElem.className = 'badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 virtual-clock-active';
+                statusElem.innerHTML = '<span class="spinner-grow spinner-grow-sm text-info" role="status" style="width: 0.45rem; height: 0.45rem;"></span><span>REPLAY CLOCK</span>';
+            }
+        });
     })();
 </script>

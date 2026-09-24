@@ -5,15 +5,23 @@
         <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backtest.id }}">
     </td>
 
-    <td class="py-2 bg-transparent font-monospace fw-bold theme-text-main">
-        #BT-{{ backtest.id|stringformat:"04d" }}
+    <td class="py-2 bg-transparent font-monospace fw-bold">
+        <a href="{% url 'backtest:backtest_detail' backtest.pk %}" class="text-decoration-none theme-text-main hover-primary" title="View Full Report for #BT-{{ backtest.id|stringformat:"04d" }}">
+            #BT-{{ backtest.id|stringformat:"04d" }}
+        </a>
     </td>
 
     <td class="py-2 bg-transparent">
-        <div class="fw-bold theme-text-main small">{{ backtest.get_strategy_name_display }}</div>
+        <a href="{% url 'backtest:backtest_detail' backtest.pk %}" class="text-decoration-none d-inline-block" title="Open Backtest Report">
+            <div class="fw-bold theme-text-main small hover-primary">{{ backtest.display_strategy_title }}</div>
+        </a>
         <div class="d-flex align-items-center gap-1 mt-0">
             <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">{{ backtest.index_name }}</span>
+            {% if backtest.parameters.strategy_name == 'macd_ict_hybrid' %}
+            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">MACD+ICT Hybrid</span>
+            {% else %}
             <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">RL Engine</span>
+            {% endif %}
         </div>
     </td>
 
@@ -108,10 +116,11 @@
             {% endif %}
 
             <a href="{% url 'backtest:backtest_detail' backtest.pk %}" 
-               class="glass-icon-btn rounded-circle d-inline-flex align-items-center justify-content-center text-primary text-decoration-none" 
-               style="width: 32px; height: 32px; min-width: 32px; min-height: 32px; aspect-ratio: 1 / 1; border-radius: 50% !important;" 
-               title="View Deep Analytics">
-                <span class="material-icons fs-6">analytics</span>
+               class="btn btn-sm btn-primary rounded-pill px-2 py-0 d-inline-flex align-items-center gap-1 text-decoration-none shadow-sm" 
+               style="height: 32px; font-size: 0.72rem;" 
+               title="View Deep Analytics & Trade Report">
+                <span class="material-icons" style="font-size: 0.85rem;">insights</span>
+                <span class="fw-bold">Report</span>
             </a>
 
             <!-- Expand / Collapse Button on the Right -->

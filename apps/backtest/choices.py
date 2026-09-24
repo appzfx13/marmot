@@ -28,6 +28,7 @@ class BacktestRuleTypeChoices(models.TextChoices):
     ICT_SMC_V4_LAYERING = 'ict_smc_v4_layering', 'ICT v4: Multi-Timeframe CHoCH & 0.5/0.705 Dual Layering OTE'
     MACD_CROSSOVER = 'macd_crossover', 'Simple MACD Crossover (12/26 EMA)'
     MORNING_MACD_RETEST = 'morning_macd_retest', 'Morning 3-Min HTF & Option MACD Retest'
+    MACD_ICT_HYBRID = 'macd_ict_hybrid', 'Advanced HTF MACD + ICT Smart Money Hybrid (1:2.0 High Winrate)'
     FOREX_CVD_DIVERGENCE = 'forex_cvd_divergence', 'Forex CVD (Cumulative Volume Delta) Divergence'
     FOREX_DOM_ABSORPTION = 'forex_dom_absorption', 'Forex Level-10 DOM Depth & Iceberg Absorption'
     FOREX_KILLZONE_DELTA = 'forex_killzone_delta', 'Forex London & NY Killzone Order Flow Surge'

@@ -2,7 +2,8 @@ package ws
 
 type SubscriptionMessage struct {
 	Type     string `json:"type"`
-	TaskID   string `json:"task_id"`
+	TaskID   string `json:"task_id,omitempty"`
+	Symbol   string `json:"symbol,omitempty"`
 }
 
 type ProgressMessage struct {

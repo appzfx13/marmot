@@ -26,6 +26,7 @@ import (
 type DhanOrderPayload struct {
 	DhanClientID    string  `json:"dhanClientId"`
 	CorrelationID   string  `json:"correlationId"`
+	TradingSymbol   string  `json:"tradingSymbol,omitempty"`
 	TransactionType string  `json:"transactionType"`
 	ExchangeSegment string  `json:"exchangeSegment"`
 	ProductType     string  `json:"productType"`
@@ -37,6 +38,30 @@ type DhanOrderPayload struct {
 	TriggerPrice    float64 `json:"triggerPrice,omitempty"`
 	BoStopLossValue float64 `json:"boStopLossValue,omitempty"`
 	BoProfitValue   float64 `json:"boProfitValue,omitempty"`
+}
+
+// deriveCanonicalOptionID extracts the canonical strike ID (e.g. 21700_PE) from arbitrary option symbols.
+func deriveCanonicalOptionID(symbol string) string {
+	upper := strings.ToUpper(symbol)
+	optType := "CE"
+	if strings.Contains(upper, "PUT") || strings.Contains(upper, "_PE") || strings.Contains(upper, " PE") {
+		optType = "PE"
+	}
+	var digits []rune
+	for _, r := range upper {
+		if r >= '0' && r <= '9' {
+			digits = append(digits, r)
+		} else {
+			if len(digits) >= 4 {
+				break
+			}
+			digits = digits[:0]
+		}
+	}
+	if len(digits) >= 4 {
+		return fmt.Sprintf("%s_%s", string(digits), optType)
+	}
+	return symbol
 }
 
 // isMockMode returns true if the execution mode corresponds to paper trading, sandbox, or simulation.
@@ -288,7 +313,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				for i := range positions {
 					if positions[i].Status == "OPEN" {
 						for _, mp := range mockPositions {
-							if (mp.TradingSymbol == positions[i].TradingSymbol || mp.SecurityID == positions[i].TradingSymbol) &&
+							if (mp.TradingSymbol == positions[i].TradingSymbol || mp.SecurityID == positions[i].TradingSymbol || mp.SecurityID == deriveCanonicalOptionID(positions[i].TradingSymbol)) &&
 								(mp.PositionType == "CLOSED" || mp.NetQty == 0) {
 								positions[i].Status = "CLOSED"
 								positions[i].RealizedProfit = mp.RealizedProfit
@@ -452,15 +477,17 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							taskID, sig.TradingSymbol, fillPrice, sig.RuleID, sig.RuleName, stopLoss, target)
 
 						if isMockMode(params.ExecutionMode) {
+							canonSecID := deriveCanonicalOptionID(sig.TradingSymbol)
 							j.dispatchOrderToMockBroker(DhanOrderPayload{
 								DhanClientID:    "1000000001",
 								CorrelationID:   sig.TradingSymbol,
+								TradingSymbol:   sig.TradingSymbol,
 								TransactionType: sig.Transaction,
 								ExchangeSegment: "NSE_FNO",
 								ProductType:     "INTRADAY",
 								OrderType:       "MARKET",
 								Validity:        "DAY",
-								SecurityID:      sig.TradingSymbol,
+								SecurityID:      canonSecID,
 								Quantity:        sig.Quantity,
 								Price:           fillPrice,
 								TriggerPrice:    stopLoss,

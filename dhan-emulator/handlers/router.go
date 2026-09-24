@@ -97,6 +97,8 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/mock/api/streamer/speed", h.handleStreamerSpeed)
 	mux.HandleFunc("/mock/api/streamer/select", h.handleStreamerSelect)
 	mux.HandleFunc("/mock/api/streamer/files", h.handleStreamerFiles)
+	mux.HandleFunc("/mock/api/streamer/status", h.handleStreamerStatus)
+	mux.HandleFunc("/mock/streamer/status", h.handleStreamerStatus)
 	mux.HandleFunc("/mock/api/kill-switch", h.handleKillSwitch)
 	mux.HandleFunc("/mock/api/session/clear", h.handleClearSession)
 	mux.HandleFunc("/mock/api/tick", h.handleManualTick)
@@ -411,14 +413,14 @@ func (h *Handler) handleDashboardProgress(w http.ResponseWriter, r *http.Request
 	isPlaying, speed, currentFile, ticks := h.streamer.GetStatus()
 	isCompleted := h.streamer.IsCompleted()
 
-	statusBadge := `<span class="badge bg-secondary bg-opacity-25 text-white-50 border border-white border-opacity-15 rounded-pill px-3 py-1 fs-xs fw-bold font-monospace shadow-sm"><i class="bi bi-pause-circle me-1"></i> FEED PAUSED (STANDBY)</span>`
+	statusBadge := `<span id="emulator-progress-badge" class="badge bg-secondary bg-opacity-25 text-white-50 border border-white border-opacity-15 rounded-pill px-3 py-1 fs-xs fw-bold font-monospace shadow-sm"><i class="bi bi-pause-circle me-1"></i> FEED PAUSED (STANDBY)</span>`
 	if isCompleted {
 		pct = 100.0
 		curRow = totRows
-		statusBadge = `<span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-3 py-1 fs-xs fw-bold font-monospace shadow-sm"><i class="bi bi-check2-circle me-1"></i> REPLAY COMPLETED (100%)</span>`
+		statusBadge = `<span id="emulator-progress-badge" class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-3 py-1 fs-xs fw-bold font-monospace shadow-sm"><i class="bi bi-check2-circle me-1"></i> REPLAY COMPLETED (100%)</span>`
 		w.Header().Set("HX-Trigger", "replayCompleted")
 	} else if isPlaying {
-		statusBadge = `<span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-3 py-1 fs-xs fw-bold font-monospace d-inline-flex align-items-center gap-1.5 shadow-sm"><span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span><span>STREAMING TICK FEED</span></span>`
+		statusBadge = `<span id="emulator-progress-badge" class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-3 py-1 fs-xs fw-bold font-monospace d-inline-flex align-items-center gap-1.5 shadow-sm"><span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span><span>STREAMING TICK FEED</span></span>`
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
@@ -428,26 +430,26 @@ func (h *Handler) handleDashboardProgress(w http.ResponseWriter, r *http.Request
 			<div class="d-flex align-items-center gap-2 flex-wrap">
 				%s
 				<span class="badge bg-dark border border-white border-opacity-10 text-warning px-2.5 py-1 font-monospace smaller shadow-sm">
-					<i class="bi bi-calendar3 me-1.5"></i> %s
+					<i class="bi bi-calendar3 me-1.5"></i> <span id="emulator-progress-date">%s</span>
 				</span>
 				<span class="badge bg-dark border border-white border-opacity-10 text-info px-2.5 py-1 font-monospace smaller shadow-sm">
-					<i class="bi bi-clock me-1.5"></i> %s IST
+					<i class="bi bi-clock me-1.5"></i> <span id="emulator-progress-time">%s IST</span>
 				</span>
 			</div>
 			<div class="d-flex align-items-center gap-3 font-monospace smaller text-secondary flex-wrap">
-				<span>Dataset: <strong class="text-white">%s</strong></span>
+				<span>Dataset: <strong id="emulator-progress-dataset" class="text-white">%s</strong></span>
 				<span class="opacity-25">|</span>
-				<span>Rows: <strong class="text-white">%d / %d</strong></span>
+				<span>Rows: <strong id="emulator-progress-rows" class="text-white">%d / %d</strong></span>
 				<span class="opacity-25">|</span>
-				<span>Progress: <strong class="text-success">%.1f%%</strong></span>
+				<span>Progress: <strong id="emulator-progress-pct" class="text-success">%.1f%%</strong></span>
 				<span class="opacity-25">|</span>
-				<span>Speed: <strong class="text-warning">%dx</strong></span>
+				<span>Speed: <strong id="emulator-progress-speed" class="text-warning">%dx</strong></span>
 				<span class="opacity-25">|</span>
-				<span>Ticks: <strong class="text-white">%d</strong></span>
+				<span>Ticks: <strong id="emulator-progress-ticks" class="text-white">%d</strong></span>
 			</div>
 		</div>
 		<div class="progress rounded-pill bg-dark border border-white border-opacity-10" style="height: 8px;">
-			<div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: %.2f%%; background-color: var(--brand-lime, #fafafa) !important;" aria-valuenow="%.1f" aria-valuemin="0" aria-valuemax="100"></div>
+			<div id="emulator-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" style="width: %.2f%%; background-color: var(--brand-lime, #fafafa) !important;" aria-valuenow="%.1f" aria-valuemin="0" aria-valuemax="100"></div>
 		</div>
 	</div>`, statusBadge, curDate, curDt, currentFile, curRow, totRows, pct, speed, ticks, pct, pct)
 }
@@ -456,6 +458,7 @@ func (h *Handler) handleDashboardProgress(w http.ResponseWriter, r *http.Request
 func (h *Handler) handleDashboardControls(w http.ResponseWriter, r *http.Request) {
 	isPlaying, speed, currentFile, _ := h.streamer.GetStatus()
 	isCompleted := h.streamer.IsCompleted()
+	curRow, _, _, _, _ := h.streamer.GetProgress()
 	files := h.streamer.ListParquetDetails()
 
 	var currentInfo streamer.ParquetFileInfo
@@ -469,11 +472,13 @@ func (h *Handler) handleDashboardControls(w http.ResponseWriter, r *http.Request
 		currentInfo.IndexName = "NIFTY"
 	}
 
-	toggleBtn := `<button class="btn btn-light text-dark fw-bold btn-sm rounded-pill px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2" hx-post="/mock/api/streamer/toggle" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML"><i class="bi bi-play-fill fs-5"></i> <span>Start Replay</span></button>`
+	toggleBtn := `<button class="btn btn-success text-dark fw-bold btn-sm rounded-pill px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2" hx-post="/mock/api/streamer/toggle" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML"><i class="bi bi-play-fill fs-5"></i> <span>Start Replay</span></button>`
 	if isCompleted {
 		toggleBtn = `<button class="btn btn-success text-dark fw-bold btn-sm rounded-pill px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2" hx-post="/mock/api/streamer/restart" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML"><i class="bi bi-arrow-repeat fs-5"></i> <span>Replay Again</span></button>`
 	} else if isPlaying {
 		toggleBtn = `<button class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2" hx-post="/mock/api/streamer/toggle" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML"><i class="bi bi-pause-fill fs-5"></i> <span>Pause Replay</span></button>`
+	} else if curRow > 0 {
+		toggleBtn = `<button class="btn btn-info text-dark fw-bold btn-sm rounded-pill px-4 py-2 shadow-sm d-inline-flex align-items-center gap-2" hx-post="/mock/api/streamer/toggle" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML"><i class="bi bi-play-circle-fill fs-5"></i> <span>Resume Replay</span></button><button class="btn btn-outline-success fw-bold btn-sm rounded-pill px-3 py-2 shadow-sm d-inline-flex align-items-center gap-1.5 ms-1.5" hx-post="/mock/api/streamer/restart" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML" title="Restart from Row 0"><i class="bi bi-arrow-repeat"></i> <span>Restart</span></button>`
 	}
 	stopBtn := `<button class="btn btn-outline-danger fw-bold btn-sm rounded-pill px-3 py-2 shadow-sm d-inline-flex align-items-center gap-1.5 ms-1.5" hx-post="/mock/api/streamer/stop" hx-target="#streamer-controls-wrapper" hx-swap="outerHTML" title="Stop & Halt Simulation"><i class="bi bi-stop-circle-fill"></i> <span>STOP</span></button>`
 	controlsActionGroup := fmt.Sprintf(`<div class="d-inline-flex align-items-center gap-1">%s%s</div>`, toggleBtn, stopBtn)
@@ -1111,8 +1116,18 @@ func (h *Handler) handleStreamerRestart(w http.ResponseWriter, r *http.Request) 
 // handleStreamerSpeed adjusts tick playback speed.
 func (h *Handler) handleStreamerSpeed(w http.ResponseWriter, r *http.Request) {
 	valStr := r.URL.Query().Get("val")
+	if valStr == "" {
+		_ = r.ParseForm()
+		valStr = r.FormValue("val")
+	}
 	if val, err := strconv.Atoi(valStr); err == nil {
 		h.streamer.SetSpeed(val)
+	}
+	if r.Header.Get("Accept") == "application/json" {
+		w.Header().Set("Content-Type", "application/json")
+		_, speed, _, _ := h.streamer.GetStatus()
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "speed": speed})
+		return
 	}
 	h.handleDashboardControls(w, r)
 }
@@ -1150,6 +1165,41 @@ func (h *Handler) handleStreamerFiles(w http.ResponseWriter, r *http.Request) {
 	files := h.streamer.ListParquetDetails()
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(files)
+}
+
+// handleStreamerStatus returns current operational status and progress metrics in JSON format.
+func (h *Handler) handleStreamerStatus(w http.ResponseWriter, r *http.Request) {
+	isPlaying, speed, currentFile, ticks := h.streamer.GetStatus()
+	curRow, totRows, pct, curDt, curDate := h.streamer.GetProgress()
+	isCompleted := h.streamer.IsCompleted()
+
+	curTime := "09:15:00"
+	if strings.Contains(curDt, " ") {
+		parts := strings.Split(curDt, " ")
+		if len(parts) >= 2 {
+			curTime = parts[1]
+		}
+	} else if curDt != "" {
+		curTime = curDt
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Access-Control-Allow-Origin", "*")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":        true,
+		"is_playing":     isPlaying,
+		"current_speed":  speed,
+		"speed":          speed,
+		"active_file":    currentFile,
+		"current_date":   curDate,
+		"current_time":   curTime,
+		"datetime":       curDt,
+		"current_row":    curRow,
+		"total_rows":     totRows,
+		"progress_pct":   pct,
+		"ticks_ingested": ticks,
+		"is_completed":   isCompleted,
+	})
 }
 
 // handleKillSwitch triggers emergency cancellation across all orders.

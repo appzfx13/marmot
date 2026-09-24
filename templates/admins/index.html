@@ -2656,6 +2656,13 @@
                 useFallback: false,
                 fallbackIntervals: {},
 
+                subscribeSymbol: function (symbol) {
+                    if (!symbol) return;
+                    if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+                        this.ws.send(JSON.stringify({ type: 'subscribe_symbol', symbol: String(symbol) }));
+                    }
+                },
+
                 connect: function () {
                     if (!this.url) return;
                     if (this.reconnectAttempts >= this.maxReconnectAttempts) {
@@ -2678,6 +2685,7 @@
                                     window.MarmotWS.ws.send(JSON.stringify({ type: 'subscribe', task_id: String(taskId) }));
                                 }
                             });
+                            window.dispatchEvent(new CustomEvent('marmot:ws_connected'));
                         };
                         this.ws.onmessage = function (event) {
                             try {
@@ -2716,6 +2724,10 @@
                                 if (data.type === 'position_update' || data.type === 'positions') {
                                     console.log('📑 [MarmotWS:Positions] Dispatching reloadLivePositions event');
                                     document.body.dispatchEvent(new CustomEvent('reloadLivePositions'));
+                                }
+                                if (data.type === 'telemetry' || data.type === 'portfolio_tick') {
+                                    window.dispatchEvent(new CustomEvent('marmot:telemetry', { detail: data }));
+                                    window.dispatchEvent(new CustomEvent('marmot:portfolio_tick', { detail: data }));
                                 }
                                 if (data.type === 'progress' || data.type === 'backtest_progress') {
                                     const taskIdStr = String(data.task_id);
@@ -2866,9 +2878,42 @@
                             if (chgEl) chgEl.innerHTML = (payload.is_positive ? '<i class="bi bi-caret-up-fill me-0.5"></i>' : '<i class="bi bi-caret-down-fill me-0.5"></i>') + payload.change + ' (' + payload.change_pct + ')';
                         }
                         if (payload && (payload.formatted_time || payload.timestamp)) {
-                            const ts = payload.formatted_time || payload.timestamp;
+                            let rawTs = payload.formatted_time || payload.timestamp;
+                            let dateStr = '';
+                            let timeStr = '';
+                            let displayTs = rawTs;
+                            if (typeof rawTs === 'string') {
+                                if (rawTs.includes('T')) {
+                                    try {
+                                        const d = new Date(rawTs);
+                                        if (!isNaN(d.getTime())) {
+                                            timeStr = d.toLocaleTimeString('en-IN', { hour12: false });
+                                            dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                                            displayTs = timeStr + ' IST';
+                                        }
+                                    } catch (e) {}
+                                } else if (rawTs.includes(' ')) {
+                                    const parts = rawTs.split(' ');
+                                    dateStr = parts[0];
+                                    timeStr = parts[1];
+                                    displayTs = timeStr + ' IST';
+                                } else {
+                                    timeStr = rawTs;
+                                    displayTs = timeStr + (rawTs.endsWith('IST') ? '' : ' IST');
+                                }
+                            }
                             const timeEl = document.getElementById('live-macro-spot-time');
-                            if (timeEl) timeEl.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + ts;
+                            if (timeEl) timeEl.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + displayTs;
+
+                            if (payload.is_virtual || window._isVirtualClock) {
+                                window.dispatchEvent(new CustomEvent('marmot:virtual_clock', {
+                                    detail: {
+                                        time: timeStr || displayTs.replace(' IST', ''),
+                                        date: dateStr,
+                                        timestamp: rawTs
+                                    }
+                                }));
+                            }
                         }
                     }
                 }
@@ -2940,9 +2985,22 @@
 
                     // Timestamp
                     if (payload && (payload.formatted_time || payload.timestamp)) {
-                        const ts = payload.formatted_time || payload.timestamp;
+                        let rawTs = payload.formatted_time || payload.timestamp;
+                        let displayTs = rawTs;
+                        if (typeof rawTs === 'string') {
+                            if (rawTs.includes('T')) {
+                                try {
+                                    const d = new Date(rawTs);
+                                    if (!isNaN(d.getTime())) {
+                                        displayTs = d.toLocaleTimeString('en-IN', { hour12: false }) + ' IST';
+                                    }
+                                } catch (e) {}
+                            } else if (rawTs.includes(' ')) {
+                                displayTs = rawTs.split(' ')[1] + ' IST';
+                            }
+                        }
                         const ocTimeEl = document.getElementById('live-option-chain-time');
-                        if (ocTimeEl) ocTimeEl.textContent = ts;
+                        if (ocTimeEl) ocTimeEl.textContent = displayTs;
                     }
 
                     // Event-driven periodic refresh: trigger option chain reload every 5th WebSocket tick
@@ -3092,10 +3150,42 @@
                 // Timestamp
                 var ts = payload.formatted_time || payload.timestamp || '';
                 if (ts) {
+                    var displayTs = ts;
+                    var dateStr = '';
+                    var timeStr = '';
+                    if (typeof ts === 'string') {
+                        if (ts.includes('T')) {
+                            try {
+                                var d = new Date(ts);
+                                if (!isNaN(d.getTime())) {
+                                    timeStr = d.toLocaleTimeString('en-IN', { hour12: false });
+                                    dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+                                    displayTs = timeStr + ' IST';
+                                }
+                            } catch (e) {}
+                        } else if (ts.includes(' ')) {
+                            var parts = ts.split(' ');
+                            dateStr = parts[0];
+                            timeStr = parts[1];
+                            displayTs = timeStr + ' IST';
+                        } else {
+                            timeStr = ts;
+                            displayTs = timeStr + (ts.endsWith('IST') ? '' : ' IST');
+                        }
+                    }
                     var tEl = document.getElementById('live-option-chain-time');
-                    if (tEl) tEl.textContent = ts;
+                    if (tEl) tEl.textContent = displayTs;
                     var tEl2 = document.getElementById('live-macro-spot-time');
-                    if (tEl2) tEl2.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + ts;
+                    if (tEl2) tEl2.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + displayTs;
+
+                    // Sync to Top HUD Exchange Clock Widget
+                    window.dispatchEvent(new CustomEvent('marmot:virtual_clock', {
+                        detail: {
+                            time: timeStr || displayTs.replace(' IST', ''),
+                            date: dateStr,
+                            timestamp: ts
+                        }
+                    }));
                 }
 
                 // ATM strike: recalculate and update badge

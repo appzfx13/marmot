@@ -709,7 +709,41 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
             toast_msg = f'Mock broker signal sent, but service took longer to reply: {e}'
             toast_type = 'warning'
 
-        resp = HttpResponse(status=200)
+        if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and action == 'speed':
+            from django.http import JsonResponse
+            return JsonResponse({'success': True, 'speed': request.POST.get('val', '25')})
+
+        hx_target = request.headers.get('HX-Target', '')
+        if hx_target == 'gateway-emulator-container':
+            from django.shortcuts import render
+            view = AdminGatewayEmulatorView()
+            view.request = request
+            ctx = view.get_context_data()
+            resp = render(request, 'admins/partials/gateway_emulator_content.html', ctx)
+            resp['HX-Trigger'] = json.dumps({
+                'showToast': {
+                    'title': toast_title,
+                    'message': toast_msg,
+                    'type': toast_type,
+                }
+            })
+            return resp
+        elif hx_target == 'mock-broker-dashboard-container':
+            from django.shortcuts import render
+            view = AdminMockBrokerDashboardView()
+            view.request = request
+            ctx = view.get_context_data()
+            resp = render(request, 'admins/partials/mock_broker_dashboard_content.html', ctx)
+            resp['HX-Trigger'] = json.dumps({
+                'showToast': {
+                    'title': toast_title,
+                    'message': toast_msg,
+                    'type': toast_type,
+                }
+            })
+            return resp
+
+        resp = HttpResponse(status=204)
         resp['HX-Trigger'] = json.dumps({
             'reloadMockBroker': True,
             'reloadGatewayEmulator': True,
@@ -2942,6 +2976,42 @@ class AdminLiveTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredM
         context['default_lot_size'] = first_idx.get('lot') or 65
         context['default_symbol'] = first_idx.get('symbol') or 'NIFTY 50'
         context['default_fyers_sym'] = first_idx.get('fyers_sym') or 'NSE:NIFTY50-INDEX'
+
+        acc = (
+            user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type='LIVE').first() or
+            user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first() or
+            UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+        )
+        context['active_account'] = acc
+
+        telemetry = {
+            'balance': '—',
+            'equity': '—',
+            'margin': '—',
+            'free_margin': '—',
+            'session_pnl': '—',
+            'is_pnl_positive': True
+        }
+        if acc:
+            try:
+                from apps.trade_core.brokers.factory import BrokerFactory
+                adapter = BrokerFactory.get_adapter(acc)
+                fund_data = adapter.get_fund_limits()
+                if fund_data.get('success'):
+                    avail = float(fund_data.get('available_balance', 0.0) or 0.0)
+                    utilized = float(fund_data.get('margin_utilized', 0.0) or 0.0)
+                    withdrawable = float(fund_data.get('withdrawable', avail) or avail)
+                    telemetry = {
+                        'balance': f"₹{avail:,.2f}",
+                        'equity': f"₹{avail:,.2f}",
+                        'margin': f"₹{utilized:,.2f}",
+                        'free_margin': f"₹{withdrawable:,.2f}",
+                        'session_pnl': "₹+0.00",
+                        'is_pnl_positive': True
+                    }
+            except Exception as e:
+                logger.warning("Could not load initial terminal funds: %s", e)
+        context['initial_telemetry'] = telemetry
         return context
 
 
@@ -2968,6 +3038,16 @@ class AdminSandboxTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
         context['default_lot_size'] = first_idx.get('lot') or 65
         context['default_symbol'] = first_idx.get('symbol') or 'NIFTY 50'
         context['default_fyers_sym'] = first_idx.get('fyers_sym') or 'NSE:NIFTY50-INDEX'
+        acc = user.trading_accounts.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).first() or UserTradingAccount.objects.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).first()
+        context['active_account'] = acc
+        context['initial_telemetry'] = {
+            'balance': '₹10,00,000.00',
+            'equity': '₹10,00,000.00',
+            'margin': '₹0.00',
+            'free_margin': '₹10,00,000.00',
+            'session_pnl': '₹+0.00',
+            'is_pnl_positive': True
+        }
         return context
 
 

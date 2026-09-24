@@ -29,6 +29,7 @@ class StrategyChoices(models.TextChoices):
     ORB_MOMENTUM = 'orb_momentum', 'Opening Range Breakout (ORB 15m) & Momentum'
     ICT_SMC = 'ict_smc', 'ICT Smart Money Concepts (SMC v3)'
     HFT_SCALP = 'hft_scalp', 'High-Frequency Micro-Scalp (HFT 1:2.0)'
+    MACD_ICT_HYBRID = 'macd_ict_hybrid', 'Advanced HTF MACD + ICT Hybrid (1:2.0 High Winrate)'
 
 
 # Strike Selection Choices

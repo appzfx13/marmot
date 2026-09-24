@@ -207,7 +207,8 @@ class MockBrokerPnLService:
             payload = log.payload or {}
             corr = payload.get('correlationId') or payload.get('correlation_id') or ''
             security_id = payload.get('securityId') or payload.get('security_id') or ''
-            key = corr if corr else f"{log.symbol}_{security_id}"
+            sym = log.symbol or payload.get('tradingSymbol') or ''
+            key = (security_id or corr or sym).upper().replace(' ', '_').strip()
             buckets.setdefault(key, []).append(log)
 
         trades = []

@@ -348,6 +348,8 @@ func (j *BacktestJob) Run(ctx context.Context) {
 			_, _ = resultFile.WriteString("\n")
 		}
 		resultFile.Close()
+	} else {
+		log.Printf("⚠️ [Backtest #%s] Failed to create result file %s: %v\n", taskID, resultFilePath, err)
 	}
 
 	// Update PostgreSQL with JSONB metrics & completion

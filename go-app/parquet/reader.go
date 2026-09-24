@@ -105,6 +105,28 @@ func LoadTicksByDate(filePath string) (map[string][]strategies.MarketTick, error
 		} else if instrUpper == "OPTION" && (optTypeUpper == "CALL" || optTypeUpper == "PUT") {
 			// Option chain entry — key: "{strike} {CALL|PUT}"
 			key := row.Strike + " " + optTypeUpper
+
+			// Filter to nearest active expiry: avoid far-dated or monthly expiries overwriting active weeklies
+			currDate := ""
+			if len(row.Datetime) >= 10 {
+				currDate = row.Datetime[:10]
+			}
+			if existing, exists := bucket.options[key]; exists {
+				newExp := parseExpiryFromSymbol(row.TradingSymbol)
+				oldExp := parseExpiryFromSymbol(existing.TradingSymbol)
+				if oldExp != "" && oldExp >= currDate {
+					if newExp == "" || newExp < currDate {
+						continue // keep current active expiry
+					}
+					if oldExp < newExp {
+						continue // old expiry is nearer to active trade date
+					}
+					if oldExp == newExp && existing.Volume >= row.Volume {
+						continue // prefer higher volume if expiry matches
+					}
+				}
+			}
+
 			cl := row.Close
 			if cl <= 0 {
 				cl = row.SpotPrice
@@ -212,4 +234,51 @@ func strikeStepForIndex(indexName string) int {
 	default:
 		return 50
 	}
+}
+
+// parseExpiryFromSymbol extracts the YYYY-MM-DD expiry date from standard NSE option symbols.
+func parseExpiryFromSymbol(sym string) string {
+	s := sym
+	if idx := strings.Index(s, ":"); idx != -1 {
+		s = s[idx+1:]
+	}
+	for _, prefix := range []string{"BANKNIFTY", "MIDCPNIFTY", "FINNIFTY", "NIFTY", "SENSEX", "BANKEX"} {
+		if strings.HasPrefix(s, prefix) {
+			rem := s[len(prefix):]
+			if len(rem) < 5 {
+				return ""
+			}
+			// Monthly check: e.g. 25JAN23600CE
+			if len(rem) >= 5 {
+				monStr := strings.ToUpper(rem[2:5])
+				monthMap := map[string]string{
+					"JAN": "01", "FEB": "02", "MAR": "03", "APR": "04",
+					"MAY": "05", "JUN": "06", "JUL": "07", "AUG": "08",
+					"SEP": "09", "OCT": "10", "NOV": "11", "DEC": "12",
+				}
+				if mo, ok := monthMap[monStr]; ok {
+					yr := "20" + rem[:2]
+					return fmt.Sprintf("%s-%s-30", yr, mo)
+				}
+			}
+			// Weekly check: e.g. 2510923650CE
+			if len(rem) >= 5 {
+				moChar := rem[2]
+				moMap := map[byte]string{
+					'1': "01", '2': "02", '3': "03", '4': "04",
+					'5': "05", '6': "06", '7': "07", '8': "08",
+					'9': "09", 'O': "10", 'N': "11", 'D': "12",
+				}
+				if mo, ok := moMap[moChar]; ok {
+					day := rem[3:5]
+					if day[0] >= '0' && day[0] <= '3' && day[1] >= '0' && day[1] <= '9' {
+						yr := "20" + rem[:2]
+						return fmt.Sprintf("%s-%s-%s", yr, mo, day)
+					}
+				}
+			}
+			break
+		}
+	}
+	return ""
 }

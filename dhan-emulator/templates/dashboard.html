@@ -1573,36 +1573,36 @@
                             </div>
                             <h6 class="mb-0 fw-bold theme-text-main" style="font-size: 0.95rem;">Real-time Replay Progress &amp; Timeline Telemetry</h6>
                         </div>
-                        <span class="text-secondary smaller"><i class="bi bi-clock-history me-1 text-info"></i> Auto-synced every 2s</span>
+                        <span class="text-secondary smaller"><i class="bi bi-broadcast text-info me-1"></i> Real-Time WebSocket Push (0ms)</span>
                     </div>
-                    <div id="replay-progress-container" hx-get="/mock/dashboard/progress" hx-trigger="load, replayCompleted from:body, replayRestarted from:body, accountChanged from:body, every 2s">
+                    <div id="replay-progress-container" hx-get="/mock/dashboard/progress" hx-trigger="load, replayCompleted from:body, replayRestarted from:body, accountChanged from:body">
                         <div class="d-flex flex-column gap-2.5">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-2">
                                 <div class="d-flex align-items-center gap-2 flex-wrap">
-                                    <span class="badge {{if .StreamerPlaying}}bg-success bg-opacity-20 text-success border border-success border-opacity-30{{else}}bg-secondary bg-opacity-25 text-white-50 border border-white border-opacity-15{{end}} rounded-pill px-3 py-1 fs-xs fw-bold font-monospace shadow-sm">
+                                    <span id="emulator-progress-badge" class="badge {{if .StreamerPlaying}}bg-success bg-opacity-20 text-success border border-success border-opacity-30{{else}}bg-secondary bg-opacity-25 text-white-50 border border-white border-opacity-15{{end}} rounded-pill px-3 py-1 fs-xs fw-bold font-monospace shadow-sm">
                                         {{if .StreamerPlaying}}<span class="spinner-grow spinner-grow-sm text-success me-1" role="status" style="width: 0.45rem; height: 0.45rem;"></span>STREAMING TICK FEED{{else}}<i class="bi bi-pause-circle me-1"></i>FEED PAUSED (STANDBY){{end}}
                                     </span>
                                     <span class="badge bg-dark border border-white border-opacity-10 text-warning px-2.5 py-1 font-monospace smaller shadow-sm">
-                                        <i class="bi bi-calendar3 me-1.5"></i> {{.CurrentDate}}
+                                        <i class="bi bi-calendar3 me-1.5"></i> <span id="emulator-progress-date">{{.CurrentDate}}</span>
                                     </span>
                                     <span class="badge bg-dark border border-white border-opacity-10 text-info px-2.5 py-1 font-monospace smaller shadow-sm">
-                                        <i class="bi bi-clock me-1.5"></i> {{.CurrentDatetime}} IST
+                                        <i class="bi bi-clock me-1.5"></i> <span id="emulator-progress-time">{{.CurrentDatetime}} IST</span>
                                     </span>
                                 </div>
                                 <div class="d-flex align-items-center gap-3 font-monospace smaller text-secondary flex-wrap">
-                                    <span>Dataset: <strong class="text-white">{{if .CurrentFile}}{{.CurrentFile}}{{else}}Synthetic Walk{{end}}</strong></span>
+                                    <span>Dataset: <strong id="emulator-progress-dataset" class="text-white">{{if .CurrentFile}}{{.CurrentFile}}{{else}}Synthetic Walk{{end}}</strong></span>
                                     <span class="opacity-25">|</span>
-                                    <span>Rows: <strong class="text-white">{{.CurrentRow}} / {{.TotalRows}}</strong></span>
+                                    <span>Rows: <strong id="emulator-progress-rows" class="text-white">{{.CurrentRow}} / {{.TotalRows}}</strong></span>
                                     <span class="opacity-25">|</span>
-                                    <span>Progress: <strong class="text-success">{{printf "%.1f" .ProgressPct}}%</strong></span>
+                                    <span>Progress: <strong id="emulator-progress-pct" class="text-success">{{printf "%.1f" .ProgressPct}}%</strong></span>
                                     <span class="opacity-25">|</span>
-                                    <span>Speed: <strong class="text-warning">{{.StreamerSpeed}}x</strong></span>
+                                    <span>Speed: <strong id="emulator-progress-speed" class="text-warning">{{.StreamerSpeed}}x</strong></span>
                                     <span class="opacity-25">|</span>
-                                    <span>Ticks: <strong class="text-white">{{.TicksIngested}}</strong></span>
+                                    <span>Ticks: <strong id="emulator-progress-ticks" class="text-white">{{.TicksIngested}}</strong></span>
                                 </div>
                             </div>
                             <div class="progress rounded-pill bg-dark border border-white border-opacity-10" style="height: 8px;">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" 
+                                <div id="emulator-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar" 
                                      style="width: {{printf "%.2f" .ProgressPct}}%; background-color: var(--brand-lime, #B4F105) !important;" 
                                      aria-valuenow="{{printf "%.1f" .ProgressPct}}" aria-valuemin="0" aria-valuemax="100"></div>
                             </div>
@@ -2228,6 +2228,45 @@
                     // Handle Broker Order Event
                     if (tick.type === 'broker_order_event') {
                         document.body.dispatchEvent(new CustomEvent('brokerOrderUpdate'));
+                        return;
+                    }
+
+                    // Handle Real-Time Streamer Progress WebSocket Push
+                    if (tick.type === 'streamer_progress') {
+                        var pBar = document.getElementById('emulator-progress-bar');
+                        if (pBar && tick.progress_pct != null) {
+                            pBar.style.width = tick.progress_pct + '%';
+                            pBar.setAttribute('aria-valuenow', tick.progress_pct);
+                        }
+                        var pPct = document.getElementById('emulator-progress-pct');
+                        if (pPct && tick.progress_pct != null) {
+                            pPct.textContent = tick.progress_pct.toFixed(1) + '%';
+                        }
+                        var pDate = document.getElementById('emulator-progress-date');
+                        if (pDate && tick.date) {
+                            pDate.textContent = tick.date;
+                        }
+                        var pTime = document.getElementById('emulator-progress-time');
+                        if (pTime && tick.datetime) {
+                            var dtStr = tick.datetime.includes(' ') ? tick.datetime.split(' ')[1] : tick.datetime;
+                            pTime.textContent = dtStr + ' IST';
+                        }
+                        var pRows = document.getElementById('emulator-progress-rows');
+                        if (pRows && tick.current_row != null && tick.total_rows != null) {
+                            pRows.textContent = Number(tick.current_row).toLocaleString() + ' / ' + Number(tick.total_rows).toLocaleString();
+                        }
+                        var pTicks = document.getElementById('emulator-progress-ticks');
+                        if (pTicks && tick.ticks != null) {
+                            pTicks.textContent = Number(tick.ticks).toLocaleString();
+                        }
+                        var pSpeed = document.getElementById('emulator-progress-speed');
+                        if (pSpeed && tick.speed != null) {
+                            pSpeed.textContent = tick.speed + 'x';
+                        }
+                        var pFile = document.getElementById('emulator-progress-dataset');
+                        if (pFile && tick.active_file) {
+                            pFile.textContent = tick.active_file;
+                        }
                         return;
                     }
 

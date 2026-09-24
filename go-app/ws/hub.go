@@ -12,6 +12,7 @@ type Hub struct {
 	Subscribe   chan *TaskSubscription
 	Unsubscribe chan *TaskSubscription
 	TaskMessage chan *TaskMessage
+	SubSymbol   chan string
 }
 
 // TaskSubscription represents a client subscribing to updates for a specific task.
@@ -37,6 +38,7 @@ func NewHub() *Hub {
 		Subscribe:   make(chan *TaskSubscription),
 		Unsubscribe: make(chan *TaskSubscription),
 		TaskMessage: make(chan *TaskMessage),
+		SubSymbol:   make(chan string, 100),
 	}
 }
 

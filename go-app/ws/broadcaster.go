@@ -23,7 +23,9 @@ import (
 // LiveTickPayload represents normalized tick telemetry pushed to frontend dashboards.
 type LiveTickPayload struct {
 	Type          string  `json:"type"`
-	Index         string  `json:"index"`
+	Index         string  `json:"index,omitempty"`
+	Symbol        string  `json:"symbol,omitempty"`
+	FyersSym      string  `json:"fyers_sym,omitempty"`
 	SpotPrice     float64 `json:"spot_price"`
 	LTP           string  `json:"ltp"`
 	Change        string  `json:"change"`
@@ -82,7 +84,7 @@ func StartMarketDataBroadcaster(ctx context.Context, redisService *services.Redi
 	ticker := time.NewTicker(1 * time.Second)
 	defer ticker.Stop()
 
-	indices := []string{"NIFTY", "BANKNIFTY", "SENSEX"}
+	indices := []string{"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX", "GIFTNIFTY", "INDIAVIX"}
 
 	tickCount := 0
 	for {
@@ -102,7 +104,7 @@ func StartMarketDataBroadcaster(ctx context.Context, redisService *services.Redi
 				if payload != nil {
 					data, err := json.Marshal(payload)
 					if err == nil {
-						if tickCount%5 == 0 {
+						if tickCount%5 == 0 && (idx == "NIFTY" || idx == "BANKNIFTY") {
 							log.Printf("📈 [WS Passing Value -> Clients] %s LTP: %.2f | Chg: %s (%s) | High: %s Low: %s | Time: %s\n",
 								idx, payload.SpotPrice, payload.Change, payload.ChangePct, payload.High, payload.Low, payload.Timestamp)
 						}
@@ -116,12 +118,26 @@ func StartMarketDataBroadcaster(ctx context.Context, redisService *services.Redi
 
 // fetchLatestTickFromRedis extracts the latest quote from Redis cache keys.
 func fetchLatestTickFromRedis(ctx context.Context, redisService *services.RedisService, indexName string) *LiveTickPayload {
+	fyersSymMap := map[string]string{
+		"NIFTY":      "NSE:NIFTY50-INDEX",
+		"BANKNIFTY":  "NSE:NIFTYBANK-INDEX",
+		"FINNIFTY":   "NSE:FINNIFTY-INDEX",
+		"MIDCPNIFTY": "NSE:MIDCPNIFTY-INDEX",
+		"SENSEX":     "BSE:SENSEX-INDEX",
+		"GIFTNIFTY":  "NSE:GIFTNIFTY-INDEX",
+		"INDIAVIX":   "NSE:INDIAVIX-INDEX",
+	}
+	fyersSym, ok := fyersSymMap[indexName]
+	if !ok {
+		fyersSym = fmt.Sprintf("NSE:%s50-INDEX", indexName)
+	}
+
 	keys := []string{
 		fmt.Sprintf("marmot:fyers:option_chain:%s", indexName),
 		fmt.Sprintf(":1:marmot:fyers:option_chain:%s", indexName),
 		fmt.Sprintf("marmot:fyers:last_known_option_chain:%s", indexName),
-		fmt.Sprintf("marmot:fyers_quote:NSE:%s50-INDEX", indexName),
-		fmt.Sprintf(":1:marmot:fyers_quote:NSE:%s50-INDEX", indexName),
+		fmt.Sprintf("marmot:fyers_quote:%s", fyersSym),
+		fmt.Sprintf(":1:marmot:fyers_quote:%s", fyersSym),
 	}
 
 	for _, k := range keys {
@@ -254,7 +270,7 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 
 		// Import the fyersgosdk dynamically by instantiating it
 		// We'll use reflection or direct calls once imported
-		fyersSocket = initFyersSocket(ctx, authHeader, fyersIndexSymbols, symbolToIndex, prevLTP, redisService, tickWriter, wsConnected, lastWSTickUnix)
+		fyersSocket = initFyersSocket(ctx, authHeader, fyersIndexSymbols, symbolToIndex, prevLTP, redisService, tickWriter, wsConnected, lastWSTickUnix, hub)
 
 		if fyersSocket == nil {
 			log.Printf("⚠️ [FYERS WS Streamer] Could not init socket. Retrying in %v\n", backoff)
@@ -289,11 +305,11 @@ func StreamFyersTicks(ctx context.Context, redisService *services.RedisService, 
 	}
 }
 
-func initFyersSocket(ctx context.Context, authHeader string, symbols []string, symbolToIndex map[string]string, prevLTP map[string]float64, redisService *services.RedisService, tickWriter *parquet.TickWriter, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64) interface{} {
-	return startFyersV3HSMStream(ctx, authHeader, symbols, symbolToIndex, prevLTP, redisService, tickWriter, wsConnected, lastWSTickUnix)
+func initFyersSocket(ctx context.Context, authHeader string, symbols []string, symbolToIndex map[string]string, prevLTP map[string]float64, redisService *services.RedisService, tickWriter *parquet.TickWriter, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64, hub *Hub) interface{} {
+	return startFyersV3HSMStream(ctx, authHeader, symbols, symbolToIndex, prevLTP, redisService, tickWriter, wsConnected, lastWSTickUnix, hub)
 }
 
-func startFyersV3HSMStream(ctx context.Context, authHeader string, symbols []string, symbolToIndex map[string]string, prevLTP map[string]float64, redisService *services.RedisService, tickWriter *parquet.TickWriter, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64) interface{} {
+func startFyersV3HSMStream(ctx context.Context, authHeader string, symbols []string, symbolToIndex map[string]string, prevLTP map[string]float64, redisService *services.RedisService, tickWriter *parquet.TickWriter, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64, hub *Hub) interface{} {
 	var fyersSocket *fyersgosdk.FyersDataSocket
 
 	onConnect := func() {
@@ -320,7 +336,7 @@ func startFyersV3HSMStream(ctx context.Context, authHeader string, symbols []str
 		if err == nil {
 			var rawMap map[string]interface{}
 			if err := json.Unmarshal(jsonBytes, &rawMap); err == nil {
-				processFyersJSONMap(ctx, rawMap, redisService, symbolToIndex, prevLTP, tickWriter)
+				processFyersJSONMap(ctx, rawMap, redisService, symbolToIndex, prevLTP, tickWriter, hub)
 			}
 		}
 	}
@@ -342,6 +358,25 @@ func startFyersV3HSMStream(ctx context.Context, authHeader string, symbols []str
 	if err != nil {
 		log.Printf("⚠️ [FYERS WS] HSM Connection Failed: %v\n", err)
 		return nil
+	}
+
+	if hub != nil {
+		go func() {
+			for {
+				select {
+				case <-ctx.Done():
+					return
+				case sym, ok := <-hub.SubSymbol:
+					if !ok {
+						return
+					}
+					if sym != "" && fyersSocket != nil {
+						log.Printf("⚡ [FYERS WS Dynamic Sub] Subscribing to symbol: %s\n", sym)
+						fyersSocket.Subscribe([]string{sym}, fyersgosdk.FULL_MODE_TYPE)
+					}
+				}
+			}
+		}()
 	}
 
 	return fyersSocket
@@ -369,13 +404,13 @@ func parseAndPublishFyersFrame(ctx context.Context, msgType int, msgBytes []byte
 	if msgType == websocket.TextMessage || msgBytes[0] == '{' || msgBytes[0] == '[' {
 		var rawMap map[string]interface{}
 		if err := json.Unmarshal(msgBytes, &rawMap); err == nil {
-			processFyersJSONMap(ctx, rawMap, redisService, symbolToIndex, prevLTP, tickWriter)
+			processFyersJSONMap(ctx, rawMap, redisService, symbolToIndex, prevLTP, tickWriter, nil)
 			return
 		}
 		var rawList []map[string]interface{}
 		if err := json.Unmarshal(msgBytes, &rawList); err == nil {
 			for _, item := range rawList {
-				processFyersJSONMap(ctx, item, redisService, symbolToIndex, prevLTP, tickWriter)
+				processFyersJSONMap(ctx, item, redisService, symbolToIndex, prevLTP, tickWriter, nil)
 			}
 			return
 		}
@@ -388,7 +423,7 @@ func parseAndPublishFyersFrame(ctx context.Context, msgType int, msgBytes []byte
 }
 
 // processFyersJSONMap normalizes JSON quote dicts and publishes to Redis.
-func processFyersJSONMap(ctx context.Context, data map[string]interface{}, redisService *services.RedisService, symbolToIndex map[string]string, prevLTP map[string]float64, tickWriter *parquet.TickWriter) {
+func processFyersJSONMap(ctx context.Context, data map[string]interface{}, redisService *services.RedisService, symbolToIndex map[string]string, prevLTP map[string]float64, tickWriter *parquet.TickWriter, hub *Hub) {
 	sym, _ := data["symbol"].(string)
 	if sym == "" {
 		sym, _ = data["n"].(string)
@@ -403,10 +438,14 @@ func processFyersJSONMap(ctx context.Context, data map[string]interface{}, redis
 		if dArr, isD := data["d"].([]interface{}); isD {
 			for _, item := range dArr {
 				if itemMap, ok := item.(map[string]interface{}); ok {
-					processFyersJSONMap(ctx, itemMap, redisService, symbolToIndex, prevLTP, tickWriter)
+					processFyersJSONMap(ctx, itemMap, redisService, symbolToIndex, prevLTP, tickWriter, hub)
 				}
 			}
 			return
+		}
+		// If sym is an option contract or custom instrument, process its tick directly
+		if sym != "" && (strings.Contains(sym, "CE") || strings.Contains(sym, "PE") || strings.HasPrefix(sym, "NSE:") || strings.HasPrefix(sym, "BSE:")) {
+			processOptionTick(ctx, sym, data, redisService, prevLTP, hub)
 		}
 		return
 	}
@@ -434,7 +473,79 @@ func processFyersJSONMap(ctx context.Context, data map[string]interface{}, redis
 		return
 	}
 
-	publishIndexQuoteToRedis(ctx, redisService, idxName, sym, ltp, ch, chp, high, low, open, prevClose, "WS_V3", prevLTP, tickWriter)
+	publishIndexQuoteToRedis(ctx, redisService, idxName, sym, ltp, ch, chp, high, low, open, prevClose, "WS_V3", prevLTP, tickWriter, hub)
+}
+
+// processOptionTick normalizes dynamic option contract ticks and broadcasts to clients and Redis.
+func processOptionTick(ctx context.Context, sym string, data map[string]interface{}, redisService *services.RedisService, prevLTP map[string]float64, hub *Hub) {
+	var ltp, ch, chp, high, low, open, prevClose float64
+	if vMap, isV := data["v"].(map[string]interface{}); isV {
+		ltp, _ = vMap["lp"].(float64)
+		ch, _ = vMap["ch"].(float64)
+		chp, _ = vMap["chp"].(float64)
+		high, _ = vMap["high_price"].(float64)
+		low, _ = vMap["low_price"].(float64)
+		open, _ = vMap["open_price"].(float64)
+		prevClose, _ = vMap["prev_close_price"].(float64)
+	} else {
+		ltp, _ = data["ltp"].(float64)
+		ch, _ = data["ch"].(float64)
+		chp, _ = data["chp"].(float64)
+		high, _ = data["high_price"].(float64)
+		low, _ = data["low_price"].(float64)
+		open, _ = data["open_price"].(float64)
+		prevClose, _ = data["prev_close_price"].(float64)
+	}
+
+	if ltp <= 0 {
+		return
+	}
+
+	nowStr := time.Now().Format("03:04:05 PM")
+	quotePayload := map[string]interface{}{
+		"symbol":           sym,
+		"fyers_symbol":     sym,
+		"lp":               ltp,
+		"ltp":              ltp,
+		"ch":               ch,
+		"chp":              chp,
+		"high_price":       high,
+		"low_price":        low,
+		"open_price":       open,
+		"prev_close_price": prevClose,
+		"last_updated":     nowStr,
+	}
+	if qBytes, err := json.Marshal(quotePayload); err == nil {
+		_ = redisService.Client.Set(ctx, fmt.Sprintf("marmot:fyers_quote:%s", sym), qBytes, 24*time.Hour).Err()
+	}
+
+	if prevLTP[sym] != ltp {
+		prevLTP[sym] = ltp
+		log.Printf("⚡ [FYERS Option Tick] %s: ₹%.2f (Chg: %.2f | %.2f%%)\n", sym, ltp, ch, chp)
+
+		if hub != nil && len(hub.clients) > 0 {
+			liveTick := &LiveTickPayload{
+				Type:          "live_tick",
+				Symbol:        sym,
+				FyersSym:      sym,
+				SpotPrice:     ltp,
+				LTP:           fmt.Sprintf("%.2f", ltp),
+				Change:        fmt.Sprintf("%.2f", ch),
+				ChangePct:     fmt.Sprintf("%.2f%%", chp),
+				High:          fmt.Sprintf("%.2f", high),
+				Low:           fmt.Sprintf("%.2f", low),
+				IsPositive:    ch >= 0,
+				FormattedTime: nowStr,
+				Timestamp:     nowStr,
+			}
+			if tickBytes, err := json.Marshal(liveTick); err == nil {
+				select {
+				case hub.Broadcast <- tickBytes:
+				default:
+				}
+			}
+		}
+	}
 }
 
 // processFyersBinaryPacket unpacks raw binary symbolUpdate frames.
@@ -449,7 +560,7 @@ func processFyersBinaryPacket(ctx context.Context, msgBytes []byte, redisService
 				bits := binary.BigEndian.Uint32(msgBytes[len(msgBytes)-8 : len(msgBytes)-4])
 				ltp := float64(math.Float32frombits(bits))
 				if ltp > 1000 && ltp < 100000 {
-					publishIndexQuoteToRedis(ctx, redisService, idxName, sym, ltp, 0, 0, ltp, ltp, ltp, ltp, "WS_BINARY", prevLTP, tickWriter)
+					publishIndexQuoteToRedis(ctx, redisService, idxName, sym, ltp, 0, 0, ltp, ltp, ltp, ltp, "WS_BINARY", prevLTP, tickWriter, nil)
 					return
 				}
 			}
@@ -458,7 +569,7 @@ func processFyersBinaryPacket(ctx context.Context, msgBytes []byte, redisService
 }
 
 // publishIndexQuoteToRedis writes normalized spot quote and calculated ATM strike to Redis.
-func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisService, idxName, sym string, ltp, ch, chp, high, low, open, prevClose float64, source string, prevLTP map[string]float64, tickWriter *parquet.TickWriter) {
+func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisService, idxName, sym string, ltp, ch, chp, high, low, open, prevClose float64, source string, prevLTP map[string]float64, tickWriter *parquet.TickWriter, hub *Hub) {
 	step := 50
 	if idxName == "BANKNIFTY" || idxName == "SENSEX" {
 		step = 100
@@ -519,6 +630,29 @@ func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisS
 		log.Printf("⚡ [FYERS Sub-10ms Tick: %s] %s: ₹%.2f (Chg: %.2f | %.2f%%) | ATM: %d\n",
 			source, idxName, ltp, ch, chp, atmStrike)
 		prevLTP[idxName] = ltp
+
+		if hub != nil && len(hub.clients) > 0 {
+			liveTick := &LiveTickPayload{
+				Type:          "live_tick",
+				Index:         idxName,
+				FyersSym:      sym,
+				SpotPrice:     ltp,
+				LTP:           fmt.Sprintf("%.2f", ltp),
+				Change:        fmt.Sprintf("%.2f", ch),
+				ChangePct:     fmt.Sprintf("%.2f%%", chp),
+				High:          fmt.Sprintf("%.2f", high),
+				Low:           fmt.Sprintf("%.2f", low),
+				IsPositive:    ch >= 0,
+				FormattedTime: nowStr,
+				Timestamp:     nowStr,
+			}
+			if tickBytes, err := json.Marshal(liveTick); err == nil {
+				select {
+				case hub.Broadcast <- tickBytes:
+				default:
+				}
+			}
+		}
 	}
 }
 

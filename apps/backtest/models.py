@@ -111,6 +111,18 @@ class BacktestTask(BaseModel):
         """Returns configured evaluation period in closed trades for dynamic compounding."""
         return int((self.parameters or {}).get('compounding_batch_trades', 30))
 
+    @property
+    def display_strategy_title(self):
+        """Returns specific preset or strategy title if configured in parameters or rules."""
+        params = self.parameters or {}
+        strat_key = params.get('strategy_name', '')
+        if strat_key == 'macd_ict_hybrid' or self.strategy_name == 'macd_ict_hybrid':
+            return 'Advanced HTF MACD + ICT Hybrid (1:2.0 High Winrate)'
+        rule = self.rules.first()
+        if rule and rule.name:
+            return rule.name
+        return self.get_strategy_name_display()
+
     def __str__(self):
         return f"Backtest #{self.id} | {self.get_strategy_name_display()} ({self.index_name}) - [{self.status.upper()}]"
 

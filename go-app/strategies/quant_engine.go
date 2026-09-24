@@ -200,36 +200,28 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 
 		// Calculate ATM strike dynamically from current Spot Close
 		atmNum := int(math.Round(tick.SpotClose/float64(strikeStep))) * strikeStep
-
-		// Prefer ATM; cascade to ATM+1 / ATM-1 if premium is zero/missing.
-		// Supports both relative keys ("ATM CALL") and absolute keys ("24500 CALL").
-		strikeKey := ""
+		concreteStrike := fmt.Sprintf("%d %s", atmNum, optionType)
 		entryOptPrice := 0.0
 
-		// 1. Try relative keys first (e.g. datasets with ATM, ATM+1)
-		for _, label := range []string{"ATM", "ATM+1", "ATM-1", "ATM+2", "ATM-2"} {
-			candidate := label + " " + optionType
-			if snap, ok := tick.Options[candidate]; ok && snap.Close > 0 {
-				strikeKey = candidate
-				entryOptPrice = snap.Close
-				break
-			}
-		}
-
-		// 2. Fallback to absolute numeric strike keys (e.g. "26200 CALL")
-		if strikeKey == "" || entryOptPrice <= 0 {
-			for _, offset := range []int{0, 1, -1, 2, -2, 3, -3} {
-				numStrike := atmNum + (offset * strikeStep)
-				candidate := fmt.Sprintf("%d %s", numStrike, optionType)
+		// Prioritize concrete absolute strike (e.g. "23650 CALL")
+		if snap, ok := tick.Options[concreteStrike]; ok && snap.Close > 0 {
+			entryOptPrice = snap.Close
+		} else if snap, ok := tick.Options["ATM "+optionType]; ok && snap.Close > 0 {
+			// Fallback to relative ATM alias
+			entryOptPrice = snap.Close
+		} else {
+			// Fallback to nearby numeric offsets
+			for _, offset := range []int{1, -1, 2, -2} {
+				candidate := fmt.Sprintf("%d %s", atmNum+(offset*strikeStep), optionType)
 				if snap, ok := tick.Options[candidate]; ok && snap.Close > 0 {
-					strikeKey = candidate
+					concreteStrike = candidate
 					entryOptPrice = snap.Close
 					break
 				}
 			}
 		}
 
-		if strikeKey == "" || entryOptPrice <= 0 {
+		if entryOptPrice <= 0 {
 			continue // No valid option premium for entry — skip tick
 		}
 
@@ -262,7 +254,7 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 
 		activeTrade = &TradeSignal{
 			Timestamp:             tick.Datetime,
-			Strike:                strikeKey,
+			Strike:                concreteStrike,
 			Symbol:                input.IndexName,
 			TradeType:             "BUY",
 			IndexEntryPrice:       tick.SpotClose,
@@ -277,7 +269,7 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			Status:                "OPEN",
 			Reason:                sig.TriggerReason + macroTag,
 		}
-		activeStrikeKey = strikeKey
+		activeStrikeKey = concreteStrike
 	}
 
 	totalPnL := 0.0
@@ -417,12 +409,19 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	preset := GetStrategyPreset(presetKey)
 	if params != nil {
 		if stratName, ok := params["strategy_name"].(string); ok && stratName != "" {
-			preset = GetStrategyPreset(stratName)
+			presetKey = strings.ToLower(strings.TrimSpace(stratName))
+			preset = GetStrategyPreset(presetKey)
 		}
-		if rawRules, ok := params["rules"].([]interface{}); ok && len(rawRules) > 0 {
-			if rMap, isMap := rawRules[0].(map[string]interface{}); isMap {
-				ruleType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
-				preset = GetStrategyPreset(ruleType)
+		// Only allow attached rules to define presetKey if strategy is generic "quant_engine"
+		if s.GetName() == "" || s.GetName() == "quant_engine" {
+			if rawRules, ok := params["rules"].([]interface{}); ok && len(rawRules) > 0 {
+				if rMap, isMap := rawRules[0].(map[string]interface{}); isMap {
+					ruleType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
+					if ruleType != "" && ruleType != "<nil>" {
+						presetKey = ruleType
+						preset = GetStrategyPreset(presetKey)
+					}
+				}
 			}
 		}
 		// Optimizer overrides
@@ -521,7 +520,48 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		return nil
 	}
 
-	if isBullishTrend && isBullishCandle && isBullishORB && isBullishRSI && isBullishMACD && displacementRatio >= minDisplacement {
+	if presetKey == "macd_ict_hybrid" && len(s.candleBuffer) >= 3 {
+		c1 := s.candleBuffer[len(s.candleBuffer)-3]
+		c2 := s.candleBuffer[len(s.candleBuffer)-2]
+		c3 := s.candleBuffer[len(s.candleBuffer)-1]
+
+		h1, _ := c1["high"].(float64)
+		l1, _ := c1["low"].(float64)
+		o2, _ := c2["open"].(float64)
+		c2Close, _ := c2["close"].(float64)
+		h2, _ := c2["high"].(float64)
+		l2, _ := c2["low"].(float64)
+		h3, _ := c3["high"].(float64)
+		l3, _ := c3["low"].(float64)
+
+		body2 := math.Abs(c2Close - o2)
+		range2 := math.Max(1.0, h2-l2)
+		disp2 := body2 / range2
+
+		// Bullish FVG with 50% CE Re-test + Bullish MACD
+		if l3 > h1 && c2Close > o2 && disp2 >= minDisplacement && isBullishMACD {
+			ce := (l3 + h1) / 2.0
+			if lowPrice <= (ce+2.0) && closePrice >= h1 {
+				isBullishSignal = true
+				triggerReason = fmt.Sprintf(
+					"⚡ [%s] Bullish FVG [CE=%.1f] Retest | MACD=%.3f | Disp=%.1f%%",
+					preset.Name, ce, macdLine, disp2*100,
+				)
+			}
+		}
+
+		// Bearish FVG with 50% CE Re-test + Bearish MACD
+		if !isBullishSignal && h3 < l1 && c2Close < o2 && disp2 >= minDisplacement && isBearishMACD {
+			ce := (h3 + l1) / 2.0
+			if highPrice >= (ce-2.0) && closePrice <= l1 {
+				isBearishSignal = true
+				triggerReason = fmt.Sprintf(
+					"⚡ [%s] Bearish FVG [CE=%.1f] Retest | MACD=%.3f | Disp=%.1f%%",
+					preset.Name, ce, macdLine, disp2*100,
+				)
+			}
+		}
+	} else if isBullishTrend && isBullishCandle && isBullishORB && isBullishRSI && isBullishMACD && displacementRatio >= minDisplacement {
 		isBullishSignal = true
 		triggerReason = fmt.Sprintf(
 			"⚡ [%s] EMA %d/%d Bull (%.1f>%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",

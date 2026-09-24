@@ -58,6 +58,14 @@ func (c *Client) readPump() {
 			case "unsubscribe":
 				log.Printf("📤 [WS] Client removed subscription for task: %s\n", subMsg.TaskID)
 				c.hub.Unsubscribe <- &TaskSubscription{TaskID: subMsg.TaskID, Client: c}
+			case "subscribe_symbol":
+				if subMsg.Symbol != "" {
+					log.Printf("📥 [WS] Client requested dynamic symbol subscription: %s\n", subMsg.Symbol)
+					select {
+					case c.hub.SubSymbol <- subMsg.Symbol:
+					default:
+					}
+				}
 			default:
 				c.hub.Broadcast <- message
 			}

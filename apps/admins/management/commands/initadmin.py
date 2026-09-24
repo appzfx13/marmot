@@ -2,7 +2,7 @@ import os
 from django.core.management.base import BaseCommand
 from django.contrib.auth import get_user_model
 from apps.common.choices import MemberRoleChoices
-from apps.common.utils import fetch_ngrok_url
+from apps.common.utils import fetch_tunnel_url
 
 
 class Command(BaseCommand):
@@ -96,8 +96,8 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("\nUser initialization completed successfully!"))
 
-        ngrok_url = fetch_ngrok_url()
-        if ngrok_url:
-            self.stdout.write(self.style.SUCCESS(f"NGROK Tunnel URL: {ngrok_url}"))
+        tunnel_url = fetch_tunnel_url()
+        if tunnel_url:
+            self.stdout.write(self.style.SUCCESS(f"CLOUDFLARE Tunnel URL: {tunnel_url}"))
         else:
-            self.stdout.write(self.style.WARNING("NGROK Tunnel URL: Not available or ngrok service offline."))
+            self.stdout.write(self.style.WARNING("CLOUDFLARE Tunnel URL: Not available or cloudflare tunnel offline."))
