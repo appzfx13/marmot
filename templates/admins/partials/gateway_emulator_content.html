@@ -82,37 +82,27 @@
 </style>
 
 <!-- Top Header Navigation & Cockpit Title -->
-<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4 mb-4" style="margin-bottom: 2rem !important; padding-top: 1rem;">
     <div class="d-flex align-items-center gap-3">
-        <button type="button"
-           class="btn btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 page-header-back-btn flex-shrink-0"
-           style="border-color: var(--border-default, rgba(255, 255, 255, 0.1)) !important; background: var(--bg-surface, rgba(255, 255, 255, 0.03));"
-           onclick="if (window.history.length > 1) { window.history.back(); } else { window.location.href='{% url 'admins:admin-dashboard' %}'; }"
-           title="Go Back">
-            <i class="bi bi-arrow-left fs-6"></i>
-            <span class="fw-medium">Back</span>
-        </button>
-        <div>
-            <h4 class="fw-bold mb-1 text-white tracking-tight d-inline-flex align-items-center gap-2 flex-wrap">
-                <span>Broker Gateway Emulator &amp; Simulator</span>
+        <div class="d-flex flex-column gap-2">
+            <h1 class="page-title m-0">Mock Broker</h1>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
                 {% if mock_online %}
-                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace fs-6" style="margin-top: 2px;">
+                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-2.5 py-1 d-flex align-items-center gap-1 font-monospace fw-bold" style="font-size: 0.75rem;">
                     <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.5rem; height: 0.5rem;" role="status"></span>
                     ONLINE :8088
                 </span>
                 {% else %}
-                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace fs-6" style="margin-top: 2px;">
+                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-2.5 py-1 d-flex align-items-center gap-1 font-monospace fw-bold" style="font-size: 0.75rem;">
                     <i class="bi bi-exclamation-triangle fs-6"></i>
                     OFFLINE
                 </span>
                 {% endif %}
-                <span class="badge {% if sim_mode == 'LIVE' %}bg-success text-success border-success{% else %}bg-info text-info border-info{% endif %} bg-opacity-20 border border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fs-6" style="margin-top: 2px;">
+                <span class="badge {% if sim_mode == 'LIVE' %}bg-success text-success border-success{% else %}bg-info text-info border-info{% endif %} bg-opacity-20 border border-opacity-30 px-2 py-1 font-monospace fw-bold" style="font-size: 0.75rem;">
                     {% if sim_mode == 'LIVE' %}LIVE DATA SIMULATION{% else %}BACKUP REPLAY SIMULATION{% endif %}
                 </span>
-            </h4>
-            <div class="theme-text-muted small mt-0.5" style="font-size: 0.8rem;">
-                Dhan Gateway v2 Emulator &bull; Microsecond Matcher &bull; Active Account: <strong class="text-info font-monospace">{{ active_account.active_account_id|default:"1000000001" }}</strong> ({{ active_account.account_name|default:"Primary Algorithmic Trading" }})
             </div>
+            <p class="page-subtitle m-0 text-muted">Dhan Gateway v2 Emulator &bull; Microsecond Matcher &bull; Active Account: <strong class="text-info font-monospace">{{ active_account.active_account_id|default:"1000000001" }}</strong> ({{ active_account.account_name|default:"Primary Algorithmic Trading" }})</p>
         </div>
     </div>
 
@@ -291,7 +281,7 @@
 {% if sim_mode == 'BACKUP' %}
 <!-- Mode B: Backup Replay Controller Toolbar -->
 <div class="card glass-card parquet-controller-card p-4 mb-4 border-info border-opacity-25 shadow-sm" style="background: rgba(14, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.25) !important;">
-    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3 pb-2.5 border-bottom border-secondary border-opacity-20">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4 pb-3 border-bottom border-secondary border-opacity-20" style="margin-bottom: 1.5rem !important;">
         <div class="d-flex align-items-center gap-2">
             <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 32px; height: 32px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
                 <i class="bi bi-sliders fs-6"></i>
@@ -359,8 +349,8 @@
     </div>
 
     <!-- Real-Time Streamer Progress Card (Direct WebSocket Update) -->
-    <div id="gateway-streamer-progress-card" class="p-3 mb-3 rounded-3 border border-secondary border-opacity-20" style="background: rgba(15, 23, 42, 0.75);">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+    <div id="gateway-streamer-progress-card" class="p-4 mb-4 rounded-3 border border-secondary border-opacity-20" style="background: rgba(15, 23, 42, 0.75);">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
             <div class="d-flex align-items-center gap-2 flex-wrap font-monospace">
                 <span id="gateway-streamer-badge" class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-3 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm">
                     <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
@@ -385,7 +375,7 @@
                 <span>Ticks: <strong id="gateway-progress-ticks" class="text-white">{{ streamer_status.ticks_ingested|default:0 }}</strong></span>
             </div>
         </div>
-        <div class="progress rounded-pill bg-dark border border-white border-opacity-10" style="height: 9px;">
+        <div class="progress rounded-pill bg-dark border border-white border-opacity-10 mt-4 mb-2" style="height: 9px;">
             <div id="gateway-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar"
                  style="width: {{ streamer_status.progress_pct|default:'0' }}%; transition: width 0.3s ease;"
                  aria-valuenow="{{ streamer_status.progress_pct|default:'0' }}" aria-valuemin="0" aria-valuemax="100"></div>
@@ -393,7 +383,7 @@
     </div>
 
     <!-- Controls Row: Dataset Dropdown & Speed Multipliers -->
-    <div class="row g-3 align-items-end">
+    <div class="row g-3 align-items-end pb-3 pt-2">
         <!-- 1. Dataset Selector Dropdown -->
         <div class="col-12 col-lg-5">
             <label class="text-secondary smaller fw-bold d-block mb-1.5 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">

@@ -41,8 +41,8 @@ type LiveTickPayload struct {
 func StartMarketDataBroadcaster(ctx context.Context, redisService *services.RedisService, dbService *services.DBService, hub *Hub) {
 	log.Println("🚀 [WS Broadcaster] Starting Hybrid Market Data Ingestion Pipeline (WS + REST)...")
 
-	// 1. Subscribe to real-time Redis Pub/Sub events (ticks, orders, positions, telemetry)
-	pubsub := redisService.Subscribe(ctx, "marmot:ticks", "marmot:orders", "marmot:positions", "marmot:telemetry")
+	// 1. Subscribe to real-time Redis Pub/Sub events (ticks, mock ticks, orders, positions, telemetry)
+	pubsub := redisService.Subscribe(ctx, "marmot:ticks", "marmot:mock_ticks", "marmot:orders", "marmot:positions", "marmot:telemetry")
 	defer pubsub.Close()
 
 	go func() {

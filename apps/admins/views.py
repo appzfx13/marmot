@@ -367,7 +367,7 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         available_indexes = get_available_backup_indexes()
         context['available_backup_indexes'] = available_indexes
         context['selected_index'] = selected_index
-        context['option_chain'] = get_live_index_option_chain(selected_index)
+        context['option_chain'] = get_live_index_option_chain(selected_index, is_mock=is_mock)
         today = timezone.localdate()
         is_fyers_token_valid = bool(site_settings.fyers_access_token and site_settings.fyers_token_generated_date == today)
         context['fyers_telemetry'] = {
@@ -376,7 +376,7 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
             'app_id': site_settings.fyers_app_id,
             'status': 'ONLINE' if (site_settings.fyers_feed_is_active and is_fyers_token_valid) else ('AUTH_REQUIRED' if not is_fyers_token_valid else 'STANDBY'),
         }
-        macro_ribbon = get_live_macro_ribbon_data(selected_index)
+        macro_ribbon = get_live_macro_ribbon_data(selected_index, is_mock=is_mock)
         context['macro_ribbon'] = macro_ribbon
         context['selected_macro_card'] = macro_ribbon.get('selected_card')
         context['macro_ai_cards'] = macro_ribbon.get('macro_cards')
@@ -782,12 +782,15 @@ class AdminLiveMacroRibbonView(LoginRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         selected_index = request.GET.get('index', 'NIFTY').upper().strip()
-        macro_ribbon = get_live_macro_ribbon_data(selected_index)
+        is_mock = request.GET.get('env') == 'MOCK' or request.session.get('active_tab') == 'live-mock' or 'live-mock' in request.META.get('HTTP_REFERER', '')
+        macro_ribbon = get_live_macro_ribbon_data(selected_index, is_mock=is_mock)
         context = {
             'macro_ribbon': macro_ribbon,
             'selected_macro_card': macro_ribbon.get('selected_card'),
             'macro_ai_cards': macro_ribbon.get('macro_cards'),
             'selected_index': selected_index,
+            'is_mock_mode': is_mock,
+            'env_mode': 'MOCK' if is_mock else 'LIVE',
         }
         return render(request, self.template_name, context)
 
@@ -798,7 +801,8 @@ class AdminLiveTickAPIView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         from django.http import JsonResponse
         selected_index = request.GET.get('index', 'NIFTY').upper().strip()
-        macro_ribbon = get_live_macro_ribbon_data(selected_index)
+        is_mock = request.GET.get('env') == 'MOCK' or 'live-mock' in request.META.get('HTTP_REFERER', '')
+        macro_ribbon = get_live_macro_ribbon_data(selected_index, is_mock=is_mock)
         sel_card = macro_ribbon.get('selected_card', {})
         return JsonResponse({
             'success': True,

@@ -354,9 +354,9 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
                     from django.core.cache import cache
                     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
                     mock_ex = 2 if is_active else 10
-                    r.set(f"marmot:fyers:option_chain:{idx_clean}", json.dumps(data), ex=mock_ex)
-                    r.set(f"marmot:fyers:last_known_option_chain:{idx_clean}", json.dumps(data), ex=30)
-                    cache.set(f"marmot:fyers:option_chain:{idx_clean}", data, timeout=mock_ex)
+                    r.set(f"marmot:mock:option_chain:{idx_clean}", json.dumps(data), ex=mock_ex)
+                    r.set(f"marmot:mock:last_known_option_chain:{idx_clean}", json.dumps(data), ex=30)
+                    cache.set(f"marmot:mock:option_chain:{idx_clean}", data, timeout=mock_ex)
 
                     if is_active:
                         r.set("marmot:mock_feed:active", "true", ex=mock_ex)
@@ -375,8 +375,7 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
                             'prev_close': float(data.get('prev_close') or spot_num),
                         }
                         quote_json = json.dumps(quote_payload)
-                        r.set(f"marmot:fyers_quote:NSE:{idx_clean}50-INDEX", quote_json, ex=mock_ex)
-                        r.set(f"marmot:fyers_quote:NSE:{idx_clean}-INDEX", quote_json, ex=mock_ex)
+                        r.set(f"marmot:mock_quote:{idx_clean}", quote_json, ex=mock_ex)
 
                     exp_tag = ''
                     if data.get('expiry_info') and data['expiry_info'].get('expiry_date'):
@@ -1012,7 +1011,7 @@ def get_live_macro_market_cards():
     return cards
 
 
-def get_live_macro_ribbon_data(selected_index: str = 'NIFTY') -> dict:
+def get_live_macro_ribbon_data(selected_index: str = 'NIFTY', is_mock: bool = False) -> dict:
     """Returns real-time selected index quote and hourly Gemini Macro AI intelligence."""
     import requests
     from django.core.cache import cache
@@ -1032,6 +1031,54 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY') -> dict:
         'SENSEX': {'name': 'SENSEX', 'fyers_sym': 'BSE:SENSEX-INDEX', 'exchange': 'BSE'},
     }
     cfg = index_map.get(idx_upper, index_map['NIFTY'])
+
+    if is_mock:
+        mock_oc = cache.get(f"marmot:mock:option_chain:{idx_upper}") or cache.get(f"marmot:mock:option_chain:{cfg['name']}") or {}
+        raw_ltp = float(mock_oc.get('raw_spot_ltp', 0.0) or 0.0)
+        now_time_str = timezone.localtime().strftime("%I:%M %p")
+        if raw_ltp > 0:
+            raw_ch = float(str(mock_oc.get('spot_change', '0')).replace('+', ''))
+            raw_chp = float(str(mock_oc.get('spot_change_pct', '0')).replace('%', '').replace('+', ''))
+            hp = float(str(mock_oc.get('high_price', raw_ltp)).replace(',', ''))
+            low_p = float(str(mock_oc.get('low_price', raw_ltp)).replace(',', ''))
+            formatted_high = f"{hp:,.2f}" if hp >= 100 else f"{hp:.2f}"
+            formatted_low = f"{low_p:,.2f}" if low_p >= 100 else f"{low_p:.2f}"
+            selected_card = {
+                'name': cfg['name'],
+                'fyers_sym': f"DHAN_MOCK:{cfg['name']}",
+                'exchange': 'MOCK',
+                'ltp': f"{raw_ltp:,.2f}" if raw_ltp >= 100 else f"{raw_ltp:.2f}",
+                'change': f"{'+' if raw_ch >= 0 else ''}{raw_ch:.2f}",
+                'change_pct': f"{'+' if raw_chp >= 0 else ''}{raw_chp:.2f}%",
+                'high': formatted_high,
+                'low': formatted_low,
+                'summary': f"Range: ₹{formatted_low} – ₹{formatted_high}",
+                'formatted_time': now_time_str,
+                'is_positive': raw_ch >= 0,
+                'is_live': True,
+                'is_cached': False,
+            }
+        else:
+            selected_card = {
+                'name': cfg['name'],
+                'fyers_sym': f"DHAN_MOCK:{cfg['name']}",
+                'exchange': 'MOCK',
+                'ltp': '-',
+                'change': '-',
+                'change_pct': '-',
+                'high': '-',
+                'low': '-',
+                'summary': 'Mock Emulator standby',
+                'formatted_time': now_time_str,
+                'is_positive': True,
+                'is_live': False,
+                'is_cached': False,
+            }
+        return {
+            'selected_card': selected_card,
+            'macro_cards': [],
+            'selected_index': cfg['name'],
+        }
 
     cache_key = f"marmot:fyers_quote:{cfg['fyers_sym']}"
     last_known_key = f"marmot:fyers_last_known_quote:{cfg['fyers_sym']}"

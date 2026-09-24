@@ -1,6 +1,6 @@
 {% load static %}
 <!DOCTYPE html>
-<html lang="en" data-theme="dark" data-ui-theme="{{ UI_THEME }}">
+<html lang="en" data-theme="dark" data-ui-theme="shadcn">
 
 <head>
     <meta charset="UTF-8">
@@ -1769,7 +1769,7 @@
                             id="admin-menu-live-dashboard" hx-get="{% url 'admins:admin-live-dashboard' %}"
                             hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-activity text-success"></i>
-                            <span>Live Dashboard</span>
+                            <span>Dashboard - Live</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
@@ -1778,7 +1778,7 @@
                             id="admin-menu-live-mock-dashboard" hx-get="{% url 'admins:admin-live-mock-dashboard' %}"
                             hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-cpu text-info"></i>
-                            <span>Live Mock</span>
+                            <span>Dashboard - Mock</span>
                             <span
                                 class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 ms-auto"
                                 style="font-size: 0.65rem; padding: 2px 6px;">MOCK</span>
@@ -1793,7 +1793,7 @@
                             hx-swap="innerHTML"
                             hx-push-url="true">
                             <i class="bi bi-motherboard-fill text-warning"></i>
-                            <span>Gateway Emulator</span>
+                            <span>Mock Broker</span>
                             <span
                                 class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 ms-auto"
                                 style="font-size: 0.65rem; padding: 2px 6px;">:8088</span>
@@ -2645,6 +2645,23 @@
                 }
             }
 
+            window.isLiveMockActive = function () {
+                const path = window.location.pathname || '';
+                if (path.includes('/dashboard/live-mock/')) return true;
+                if (document.getElementById('mockEnvInput')) return true;
+                const headerTitle = document.querySelector('.page-title');
+                if (headerTitle && headerTitle.textContent.toLowerCase().includes('live mock')) return true;
+                return false;
+            };
+
+            window.isLiveDashboardActive = function () {
+                const path = window.location.pathname || '';
+                if (path.includes('/dashboard/live/') && !path.includes('live-mock')) return true;
+                const headerTitle = document.querySelector('.page-title');
+                if (headerTitle && headerTitle.textContent.trim() === 'Live Dashboard') return true;
+                return false;
+            };
+
             window.MarmotWS = {
                 ws: null,
                 url: wsUrl,
@@ -2690,12 +2707,31 @@
                         this.ws.onmessage = function (event) {
                             try {
                                 const data = JSON.parse(event.data);
-                                if (data.type === 'mock_telemetry' || data.type === 'live_tick') {
-                                    const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
-                                    if (spot && window.updateLiveSpotDOM) {
-                                        window.updateLiveSpotDOM(spot, data.data || data);
+                                const isMockFeed = (
+                                    data.type === 'mock_telemetry' ||
+                                    data.type === 'mock_tick' ||
+                                    Boolean(data.is_mock) ||
+                                    Boolean(data.is_virtual) ||
+                                    data.source === 'EMULATOR' ||
+                                    (data.data && (data.data.is_mock || data.data.is_virtual))
+                                );
+
+                                if (isMockFeed) {
+                                    // STRICT ISOLATION: Mock broker feed ONLY feeds into Live Mock Dashboard
+                                    if (window.isLiveMockActive && window.isLiveMockActive()) {
+                                        const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
+                                        if (spot && window.updateLiveSpotDOM) {
+                                            window.updateLiveSpotDOM(spot, data.data || data);
+                                        }
                                     }
-                                    if (data.type === 'live_tick') {
+                                } else if (data.type === 'live_tick') {
+                                    // Pure Live Realtime FYERS Feed: ONLY feeds into Live Dashboard
+                                    const isMockView = window.isLiveMockActive ? window.isLiveMockActive() : false;
+                                    if (!isMockView) {
+                                        const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
+                                        if (spot && window.updateLiveSpotDOM) {
+                                            window.updateLiveSpotDOM(spot, data.data || data);
+                                        }
                                         window.dispatchEvent(new CustomEvent('marmot:live_tick', { detail: data }));
                                     }
                                 }
@@ -2849,6 +2885,14 @@
 
             window.updateLiveSpotDOM = function (spotPrice, payload) {
                 if (!spotPrice || isNaN(spotPrice) || spotPrice <= 0) return;
+                const isMockPayload = Boolean(payload && (payload.is_virtual || payload.is_mock || payload.source === 'EMULATOR'));
+                const isMockActive = window.isLiveMockActive ? window.isLiveMockActive() : false;
+                if (isMockPayload && !isMockActive) {
+                    return; // Refuse to update Live Dashboard with mock/emulator ticks
+                }
+                if (!isMockPayload && isMockActive && payload && payload.source === 'FYERS') {
+                    return; // Refuse to update Live Mock Dashboard with FYERS live market ticks
+                }
                 const numPrice = Number(spotPrice);
                 const formattedPrice = '₹' + numPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 const tickIndex = (payload && payload.index) ? String(payload.index).toUpperCase().trim() : '';
@@ -3089,6 +3133,7 @@
 
             // Update the NIFTY macro ribbon card (top card #1)
             function updateMacroRibbon(spot, payload) {
+                if (window.isLiveMockActive && !window.isLiveMockActive()) return;
                 var el = document.getElementById('live-macro-spot-ltp');
                 if (!el) return;
                 var cardIdx = (el.getAttribute('data-index') || 'NIFTY').toUpperCase();
@@ -3104,6 +3149,7 @@
 
             // Update option chain HUD (spot LTP, ATM, change, high, low, time)
             function updateOptionChainHUD(spot, payload) {
+                if (window.isLiveMockActive && !window.isLiveMockActive()) return;
                 var ocEl = document.getElementById('live-option-chain-spot-ltp');
                 if (!ocEl) return;
                 var activeIdx = ((document.getElementById('backupIndexSelect') || {}).value || ocEl.getAttribute('data-index') || 'NIFTY').toUpperCase();
@@ -3302,6 +3348,7 @@
 
             // Parse Dhan emulator tick payload and route updates
             function handleEmulatorTick(data) {
+                if (window.isLiveMockActive && !window.isLiveMockActive()) return;
                 var ltp = parseFloat(data.ltp || data.lastTradedPrice || 0);
                 if (!ltp || ltp <= 0) return;
 
@@ -3332,6 +3379,9 @@
 
                     var payload = {
                         index: idx,
+                        is_mock: true,
+                        is_virtual: true,
+                        source: 'EMULATOR',
                         change: data.change !== undefined ? data.change : '',
                         change_pct: data.changePercent !== undefined ? (data.changePercent + '%') : '',
                         is_positive: ltp >= _prevSpot,
@@ -3387,6 +3437,9 @@
 
             // Connect to dhan-emulator WS
             function connectEmulatorWS() {
+                if (window.isLiveMockActive && !window.isLiveMockActive()) {
+                    return;
+                }
                 if (window._DhanEmulatorWS && (window._DhanEmulatorWS.readyState === WebSocket.OPEN || window._DhanEmulatorWS.readyState === WebSocket.CONNECTING)) {
                     return;
                 }
@@ -3562,6 +3615,9 @@
 
             function updateDynamicPollers() {
                 if (ocTimer) clearInterval(ocTimer);
+                if (window.isLiveMockActive && !window.isLiveMockActive()) {
+                    return;
+                }
 
                 var activeSpeedBtn = document.querySelector('.speed-pill.active');
                 if (activeSpeedBtn) {
@@ -3576,6 +3632,10 @@
                 else if (currentSpeed >= 5) interval = 700;
 
                 ocTimer = setInterval(function () {
+                    if (window.isLiveMockActive && !window.isLiveMockActive()) {
+                        clearInterval(ocTimer);
+                        return;
+                    }
                     // Skip periodic HTTP reloading if emulator WebSocket is connected and streaming directly to DOM
                     if (window._DhanEmulatorWS && window._DhanEmulatorWS.readyState === WebSocket.OPEN) {
                         return;
@@ -3586,6 +3646,29 @@
                     }
                 }, interval);
             }
+
+            // Disconnect emulator WebSocket when navigating away to Live Dashboard in HTMX SPA
+            document.body.addEventListener('htmx:afterSwap', function () {
+                if (window.isLiveMockActive && !window.isLiveMockActive()) {
+                    if (window._DhanEmulatorWS) {
+                        try { window._DhanEmulatorWS.close(); } catch (e) {}
+                        window._DhanEmulatorWS = null;
+                    }
+                    if (_reconnectTimer) {
+                        clearTimeout(_reconnectTimer);
+                        _reconnectTimer = null;
+                    }
+                    if (ocTimer) {
+                        clearInterval(ocTimer);
+                        ocTimer = null;
+                    }
+                } else if (window.isLiveMockActive && window.isLiveMockActive()) {
+                    if (!window._DhanEmulatorWS || window._DhanEmulatorWS.readyState === WebSocket.CLOSED) {
+                        connectEmulatorWS();
+                    }
+                    updateDynamicPollers();
+                }
+            });
 
             document.addEventListener('click', function (e) {
                 var btn = e.target.closest('.speed-pill');

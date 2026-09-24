@@ -1281,7 +1281,7 @@ func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName stri
 				res.LowPrice = p
 				res.ATMStrike = int(math.Round(p/50.0) * 50.0)
 				if b, mErr := json.Marshal(mockData); mErr == nil && j.redisService != nil && j.redisService.Client != nil {
-					_ = j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:fyers:option_chain:%s", indexName), b, 1*time.Second).Err()
+					_ = j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:mock:option_chain:%s", indexName), b, 1*time.Second).Err()
 				}
 				return res
 			}

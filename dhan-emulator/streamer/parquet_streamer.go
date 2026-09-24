@@ -1007,7 +1007,9 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 
 					// Broadcast virtual clock tick to Marmot UI for real-time historical clock sync
 					tickMsg := map[string]interface{}{
-						"type":           "live_tick",
+						"type":           "mock_tick",
+						"source":         "EMULATOR",
+						"is_mock":        true,
 						"index":          spotIndexName,
 						"symbol":         spotIndexName,
 						"spot_price":     spotPrice,
@@ -1021,7 +1023,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 						"is_virtual":     true,
 					}
 					if tBytes, err := json.Marshal(tickMsg); err == nil {
-						_ = ps.rdb.Publish(context.Background(), "marmot:ticks", tBytes).Err()
+						_ = ps.rdb.Publish(context.Background(), "marmot:mock_ticks", tBytes).Err()
 					}
 				}
 			}
