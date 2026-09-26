@@ -96,7 +96,8 @@ HISTORICAL_INDEX_LOT_SIZES = {
 # Historical Index Expiry Timelines & Day-of-Week (2020 to Present)
 HISTORICAL_INDEX_EXPIRY_DAYS = {
     'NIFTY': [
-        ('2020-01-01', 'Thursday', 3), # 2020 to Present: Thursday
+        ('2025-09-01', 'Tuesday', 1),   # Shifted to Tuesday in Sept 2025
+        ('2020-01-01', 'Thursday', 3),  # 2020 to Aug 2025: Thursday
         ('1990-01-01', 'Thursday', 3),
     ],
     'BANKNIFTY': [
@@ -393,7 +394,7 @@ def calculate_trade_charges(entry_price: float, exit_price: float, quantity: int
 DEFAULT_INITIAL_CAPITAL = 100000.0
 DEFAULT_RISK_REWARD_RATIO = 2.0
 DEFAULT_STOP_LOSS_PCT = 0.5
-DEFAULT_STRIKE_COUNT = 5
+DEFAULT_STRIKE_COUNT = 15
 MAX_LOG_LINES = 200
 
 

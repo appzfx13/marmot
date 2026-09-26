@@ -10,10 +10,17 @@ class MarketBackupForm(forms.ModelForm):
     # ── INDEX / F&O fields ──────────────────────────────────────────────────
     strike_count = forms.IntegerField(
         required=False,
-        initial=5,
+        initial=15,
         min_value=0,
         max_value=50,
+        help_text="Number of strikes above & below ATM (15 = Full 31-strike option chain)",
         widget=forms.NumberInput(attrs={'class': _FIELD_CSS, 'min': 0, 'max': 50})
+    )
+    use_30_days_5s = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="Fetch 5-Second (5S) high-precision resolution candles (Recommended for algo backtesting)",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_5s'})
     )
 
     class Meta:

@@ -340,11 +340,19 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
                         except (ValueError, TypeError):
                             pass
 
+                valid_strikes = sum(1 for s in data.get('strikes', []) if (s.get('ce_ltp') and float(s.get('ce_ltp') or 0) > 0) or (s.get('pe_ltp') and float(s.get('pe_ltp') or 0) > 0))
+                total_chain_strikes = len(data.get('strikes', []))
+                if 0 < valid_strikes < total_chain_strikes:
+                    data['is_partial_dataset'] = True
+                    data['dataset_strike_count'] = valid_strikes
+
                 for row in data.get('strikes', []):
-                    if row.get('ce_oi') is not None:
-                        row['ce_oi'] = format_indian_number(row['ce_oi'])
-                    if row.get('pe_oi') is not None:
-                        row['pe_oi'] = format_indian_number(row['pe_oi'])
+                    for oi_key in ('ce_oi', 'pe_oi'):
+                        val = row.get(oi_key)
+                        if val is None or val in ('—', '-', '0', 0, 100000, '1,00,000', '100000'):
+                            row[oi_key] = '—'
+                        else:
+                            row[oi_key] = format_indian_number(val)
 
                 # Synchronize to Redis for Go strategy workers
                 try:

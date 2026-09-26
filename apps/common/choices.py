@@ -185,3 +185,11 @@ class LiveStrategyStatusChoices(models.TextChoices):
     PAUSED = "PAUSED", "Paused"
     STOPPED = "STOPPED", "Stopped"
 
+
+# Simulation Session Snapshot Rating Choices
+class SessionRatingChoices(models.IntegerChoices):
+    ONE_STAR = 1, '⭐ 1 Star'
+    TWO_STARS = 2, '⭐⭐ 2 Stars'
+    THREE_STARS = 3, '⭐⭐⭐ 3 Stars'
+
+

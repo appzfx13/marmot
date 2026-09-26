@@ -1,6 +1,7 @@
 import io
 import json
 import os
+import tempfile
 import zipfile
 from django.conf import settings
 from django.contrib import messages
@@ -109,7 +110,7 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
             market_type=form.cleaned_data.get('market_type'),
             forex_instrument=form.cleaned_data.get('forex_instrument'),
             databento_schema=form.cleaned_data.get('databento_schema'),
-            use_30_days_5s=form.cleaned_data.get('use_30_days_5s', False),
+            use_30_days_5s=form.cleaned_data.get('use_30_days_5s', True),
         )
         
         # Add success message and redirect back to the dashboard
@@ -542,6 +543,9 @@ class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
         target_path = None
         for p in candidate_paths:
             if p and os.path.exists(p):
+                # Ignore empty 0-byte placeholder files
+                if os.path.isfile(p) and os.path.getsize(p) == 0:
+                    continue
                 target_path = p
                 break
 
@@ -550,20 +554,54 @@ class MarketBackupDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
             redirect_url = reverse_lazy('market:market_macro_backup_list') if task.is_macro_assist else reverse_lazy('market:market_backup_list')
             return HttpResponseRedirect(redirect_url)
 
-        # 1. If directory of chunk parquet files exists, stream a ZIP archive
+        # 1. If directory of chunk parquet files exists, check for non-empty dataset.parquet first
         if os.path.isdir(target_path):
-            zip_buffer = io.BytesIO()
-            zip_filename = f"marmot_{user_slug}_{market_tag}_{asset_tag}_{provider_tag}_task_{task.id}_from_{task.start_date}_to_{task.end_date}.zip"
-
-            with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            consolidated = os.path.join(target_path, 'dataset.parquet')
+            if os.path.isfile(consolidated) and os.path.getsize(consolidated) > 0:
+                target_path = consolidated
+            else:
+                file_list = []
+                total_size = 0
                 for root, _, files in os.walk(target_path):
                     for file in files:
-                        full_path = os.path.join(root, file)
-                        rel_path = os.path.relpath(full_path, target_path)
+                        fpath = os.path.join(root, file)
+                        if os.path.isfile(fpath) and os.path.getsize(fpath) > 0:
+                            fsize = os.path.getsize(fpath)
+                            total_size += fsize
+                            file_list.append((fpath, os.path.relpath(fpath, target_path)))
+
+                if not file_list:
+                    messages.error(request, "Backup directory is empty or processing has not produced data yet.")
+                    redirect_url = reverse_lazy('market:market_macro_backup_list') if task.is_macro_assist else reverse_lazy('market:market_backup_list')
+                    return HttpResponseRedirect(redirect_url)
+
+                # Guard against freezing web server with multi-gigabyte in-flight zip creation
+                if total_size > 1500 * 1024 * 1024:  # > 1.5 GB
+                    size_mb = round(total_size / (1024 * 1024), 1)
+                    messages.error(
+                        request,
+                        f"Dataset is {size_mb} MB across {len(file_list)} files and too large for in-flight zipping. "
+                        "Please wait for consolidated dataset.parquet or use CLI data export."
+                    )
+                    redirect_url = reverse_lazy('market:market_macro_backup_list') if task.is_macro_assist else reverse_lazy('market:market_backup_list')
+                    return HttpResponseRedirect(redirect_url)
+
+                zip_filename = f"marmot_{user_slug}_{market_tag}_{asset_tag}_{provider_tag}_task_{task.id}_from_{task.start_date}_to_{task.end_date}.zip"
+
+                cached_zip = os.path.join(target_path, zip_filename)
+                if os.path.isfile(cached_zip) and os.path.getsize(cached_zip) > 0:
+                    response = FileResponse(open(cached_zip, 'rb'), as_attachment=True, filename=zip_filename)
+                    response['Content-Length'] = os.path.getsize(cached_zip)
+                    return response
+
+                # Use disk-backed TemporaryFile (never in-memory io.BytesIO) and ZIP_STORED to avoid CPU overhead
+                temp_zip = tempfile.TemporaryFile()
+                with zipfile.ZipFile(temp_zip, 'w', zipfile.ZIP_STORED) as zip_file:
+                    for full_path, rel_path in file_list:
                         zip_file.write(full_path, arcname=rel_path)
 
-            zip_buffer.seek(0)
-            return FileResponse(zip_buffer, as_attachment=True, filename=zip_filename)
+                temp_zip.seek(0)
+                return FileResponse(temp_zip, as_attachment=True, filename=zip_filename)
 
         # 2. Single consolidated parquet file
         if task.is_macro_assist:

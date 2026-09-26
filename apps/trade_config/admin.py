@@ -1,5 +1,12 @@
 from django.contrib import admin
-from .models import BrokerMaster, UserTradingAccount, TradeExecConfig, LiveStrategy, DailyPortfolioSnapshot
+from .models import (
+    BrokerMaster,
+    DailyPortfolioSnapshot,
+    LiveStrategy,
+    SimulationSessionSnapshot,
+    TradeExecConfig,
+    UserTradingAccount,
+)
 
 
 @admin.register(BrokerMaster)
@@ -35,4 +42,12 @@ class DailyPortfolioSnapshotAdmin(admin.ModelAdmin):
     list_filter = ('account_type', 'date')
     search_fields = ('user__username', 'trading_account__account_name')
     date_hierarchy = 'date'
+
+
+@admin.register(SimulationSessionSnapshot)
+class SimulationSessionSnapshotAdmin(admin.ModelAdmin):
+    list_display = ('name', 'user', 'rating', 'is_favorite', 'sim_mode', 'net_pnl', 'total_trades', 'win_rate', 'created_at')
+    list_filter = ('rating', 'is_favorite', 'sim_mode', 'created_at')
+    search_fields = ('name', 'user__username', 'notes', 'dataset_file')
+
 

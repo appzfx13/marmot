@@ -14,11 +14,11 @@ const (
 	// Black-Scholes & Option Calculation Constants
 	DefaultRiskFreeRate = 0.07
 	MinTimeFormatFloor  = 0.00002
-	DefaultOptionOI     = 100000
+	DefaultOptionOI     = 0
 
 	// Default Parameters
 	DefaultWorkerCount = 4
-	DefaultStrikeCount = 5
+	DefaultStrikeCount = 15
 
 	// Index ATM Fallbacks
 	DefaultBankNiftyATM = 51000.0

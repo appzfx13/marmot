@@ -115,24 +115,41 @@
             <span>Place Order Ticket</span>
         </button>
 
-        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+        <button type="button" class="btn btn-outline-success btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                data-bs-toggle="modal" data-bs-target="#saveSessionModal"
+                title="Save and snapshot current simulation session">
+            <i class="bi bi-bookmark-star fs-6"></i>
+            <span>Save Session</span>
+        </button>
+
+        <a href="{% url 'admins:admin-gateway-session-list' %}"
+           class="btn btn-outline-primary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+           title="View all saved simulation sessions">
+            <i class="bi bi-archive fs-6"></i>
+            <span>Saved Sessions</span>
+        </a>
+
+        <button type="button" class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                data-bs-toggle="modal" data-bs-target="#confirmResetSessionModal" title="Reset all mock orders and restore ₹1,00,000 balance">
+            <i class="bi bi-arrow-counterclockwise fs-6"></i>
+            <span>Reset Session</span>
+        </button>
+
+        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                data-bs-toggle="modal" data-bs-target="#confirmKillSwitchModal" title="Emergency kill switch across mock broker">
+            <i class="bi bi-lightning-charge-fill fs-6"></i>
+            <span>Kill Switch</span>
+        </button>
+
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-none" id="gateway-reset-session-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="clear_session">
-            <button type="submit" class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-                    onclick="return confirm('Reset all mock orders, positions, and restore ₹1,00,000 initial balance?');">
-                <i class="bi bi-arrow-counterclockwise fs-6"></i>
-                <span>Reset Session</span>
-            </button>
+            <input type="hidden" name="account" value="{{ active_account.active_account_id|default:'1000000001' }}">
         </form>
 
-        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline">
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-none" id="gateway-kill-switch-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="kill_switch">
-            <button type="submit" class="btn btn-outline-danger btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-                    onclick="return confirm('TRIGGER KILL-SWITCH: Cancel ALL pending orders across mock broker?');">
-                <i class="bi bi-lightning-charge-fill fs-6"></i>
-                <span>Kill Switch</span>
-            </button>
         </form>
 
         <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-2.5"
@@ -142,13 +159,6 @@
                 title="Refresh Telemetry">
             <i class="bi bi-arrow-repeat fs-6"></i>
         </button>
-
-        <a href="{{ emulator_external_url }}"
-           target="_blank"
-           class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1 shadow-sm px-2.5"
-           title="Open standalone emulator cockpit in new window">
-            <i class="bi bi-box-arrow-up-right fs-6"></i>
-        </a>
     </div>
 </div>
 
@@ -311,9 +321,13 @@
                     <span>Pause Replay</span>
                 </button>
                 {% elif streamer_status.current_row > 0 and not streamer_status.is_completed %}
-                <button type="submit" class="btn btn-info text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
+                <button type="submit" class="btn btn-info text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" title="Resume playback from current row">
                     <i class="bi bi-play-circle-fill fs-6"></i>
                     <span>Resume Replay</span>
+                </button>
+                <button type="button" class="btn btn-success text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" onclick="confirmGatewayAction('gateway-rewind-form', 'confirmRewindModal');" title="Start playback fresh from row 0">
+                    <i class="bi bi-play-fill fs-6"></i>
+                    <span>Start Replay</span>
                 </button>
                 {% else %}
                 <button type="submit" class="btn btn-success text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
@@ -405,69 +419,43 @@
                     aria-labelledby="backupDatasetDropdownBtn"
                     style="background: #121215; backdrop-filter: blur(20px); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.12); max-height: 360px; overflow-y: auto; z-index: 1065 !important;">
                     
-                    <!-- Direct Parquet Files from Mock Emulator Storage -->
-                    <li class="dropdown-header text-uppercase smaller text-muted px-2 py-1" style="font-size: 0.65rem;">Parquet Storage Files (:8088)</li>
-                    {% for f in streamer_files %}
-                    <li>
-                        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="m-0">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="select_file">
-                            <input type="hidden" name="file" value="{{ f.relative_path }}">
-                            <button type="submit" class="dropdown-item rounded-2 py-2 px-2.5 mb-1 d-flex align-items-center justify-content-between font-monospace text-wrap {% if f.relative_path == streamer_status.active_file %}active{% endif %}"
-                                    style="font-size: 0.76rem; border: 1px solid {% if f.relative_path == streamer_status.active_file %}rgba(56, 189, 248, 0.4){% else %}transparent{% endif %}; background: {% if f.relative_path == streamer_status.active_file %}rgba(56, 189, 248, 0.12){% else %}transparent{% endif %}; cursor: pointer;">
-                                <div class="d-flex flex-column gap-1 me-2 overflow-hidden text-start">
-                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
-                                        <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
-                                            {{ f.index_name|default:"NIFTY" }}
-                                        </span>
-                                        <strong class="text-white text-truncate">{{ f.relative_path }}</strong>
-                                        <span class="badge bg-secondary bg-opacity-30 text-white-50 smaller px-1.5 py-0.5">
-                                            {{ f.type_label|default:"Parquet Feed" }}
-                                        </span>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2 smaller text-muted">
-                                        {% if f.date_range %}<span><i class="bi bi-calendar3 me-1 text-warning"></i>{{ f.date_range }}</span> &bull;{% endif %}
-                                        <span>{{ f.size_mb|default:0|floatformat:1 }} MB</span>
-                                    </div>
-                                </div>
-                                {% if f.relative_path == streamer_status.active_file %}
-                                <i class="bi bi-check-circle-fill text-info fs-6 flex-shrink-0 ms-2"></i>
-                                {% endif %}
-                            </button>
-                        </form>
+                    <!-- Strictly Complete Market Backup Datasets Only -->
+                    <li class="dropdown-header text-uppercase smaller text-muted px-2 py-1" style="font-size: 0.65rem;">
+                        <i class="bi bi-check-all text-success me-1"></i>Completed Backup Datasets (Ready for Simulation)
                     </li>
-                    {% empty %}
-                    <li><span class="dropdown-item text-muted smaller">No Parquet files found in /app/backup</span></li>
-                    {% endfor %}
-
-                    <!-- Completed Database Backup Tasks -->
-                    {% if completed_backups %}
-                    <li class="dropdown-divider border-secondary border-opacity-20 my-1.5"></li>
-                    <li class="dropdown-header text-uppercase smaller text-muted px-2 py-1" style="font-size: 0.65rem;">Completed Market Backup Tasks</li>
                     {% for b in completed_backups %}
                     <li>
                         <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="m-0">
                             {% csrf_token %}
                             <input type="hidden" name="action" value="select_file">
                             <input type="hidden" name="file" value="{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet">
-                            <button type="submit" class="dropdown-item rounded-2 py-2 px-2.5 mb-1 d-flex align-items-center justify-content-between font-monospace text-wrap"
-                                    style="font-size: 0.76rem; border: 1px solid transparent; background: transparent; cursor: pointer;">
+                            <button type="submit" class="dropdown-item rounded-2 py-2 px-2.5 mb-1 d-flex align-items-center justify-content-between font-monospace text-wrap {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}active{% endif %}"
+                                    style="font-size: 0.76rem; border: 1px solid {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.4){% else %}transparent{% endif %}; background: {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.12){% else %}transparent{% endif %}; cursor: pointer;">
                                 <div class="d-flex flex-column gap-1 me-2 overflow-hidden text-start">
                                     <div class="d-flex align-items-center gap-1.5 flex-wrap">
-                                        <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-1.5 py-0.5 smaller fw-bold">
+                                        <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
                                             Task #{{ b.id }} &bull; {{ b.index_name|default:"NIFTY" }}
                                         </span>
-                                        <span class="text-white small">{{ b.start_date }} &rarr; {{ b.end_date }}</span>
+                                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-1.5 py-0.5 smaller">
+                                            100% COMPLETE
+                                        </span>
+                                        <strong class="text-white text-truncate">{{ b.start_date }} &rarr; {{ b.end_date }}</strong>
                                     </div>
-                                    <div class="smaller text-muted">
-                                        Path: <code>{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet</code> ({{ b.file_size_mb|default:0|floatformat:1 }} MB)
+                                    <div class="d-flex align-items-center gap-2 smaller text-muted">
+                                        <span>Path: <code class="text-info">{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet</code></span>
+                                        <span>&bull;</span>
+                                        <span>{{ b.file_size_mb|default:0|floatformat:1 }} MB</span>
                                     </div>
                                 </div>
+                                {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}
+                                <i class="bi bi-check-circle-fill text-info fs-6 flex-shrink-0 ms-2"></i>
+                                {% endif %}
                             </button>
                         </form>
                     </li>
+                    {% empty %}
+                    <li><span class="dropdown-item text-muted smaller">No 100% completed backup tasks found</span></li>
                     {% endfor %}
-                    {% endif %}
                 </ul>
             </div>
         </div>
@@ -1192,4 +1180,193 @@
         </div>
     </div>
 </div>
+
+<!-- 4. Save Simulation Session Modal -->
+<div class="modal fade" id="saveSessionModal" tabindex="-1" aria-labelledby="saveSessionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered" style="max-width: 520px;">
+        <div class="modal-content glass-card border border-success border-opacity-30 shadow-lg" style="background: rgba(18, 20, 26, 0.98); backdrop-filter: blur(25px); color: #fafafa; border-radius: 16px;">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3);">
+                        <i class="bi bi-bookmark-star-fill fs-5"></i>
+                    </span>
+                    <div>
+                        <h6 class="modal-title fw-bold text-white mb-0" id="saveSessionModalLabel">Save Simulation Session</h6>
+                        <div class="smaller text-muted">Snapshot &amp; Archive Current State into Dedicated Ledger</div>
+                    </div>
+                </div>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <form hx-post="{% url 'admins:admin-gateway-session-save' %}"
+                  hx-target="#gateway-emulator-container"
+                  hx-swap="innerHTML"
+                  onsubmit="setTimeout(() => { bootstrap.Modal.getInstance(document.getElementById('saveSessionModal'))?.hide(); }, 200);">
+                {% csrf_token %}
+                <div class="modal-body py-3">
+                    <!-- Session Summary Preview Card -->
+                    <div class="p-3 rounded-3 mb-3 border border-secondary border-opacity-25" style="background: rgba(255, 255, 255, 0.03);">
+                        <div class="d-flex justify-content-between align-items-center mb-2">
+                            <span class="smaller text-muted text-uppercase fw-bold">Live Session Snapshot Preview</span>
+                            <span class="badge {% if metrics.net_pnl >= 0 %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-20 border border-opacity-30 font-monospace">
+                                {% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }}
+                            </span>
+                        </div>
+                        <div class="row g-2 font-monospace small">
+                            <div class="col-4">
+                                <div class="theme-text-muted smaller">Gross PnL</div>
+                                <div class="{% if metrics.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">₹{{ metrics.gross_pnl|floatformat:2 }}</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="theme-text-muted smaller">Closed Pairs</div>
+                                <div class="text-info fw-semibold">{{ metrics.total_trades }} Trades</div>
+                            </div>
+                            <div class="col-4">
+                                <div class="theme-text-muted smaller">Win Rate</div>
+                                <div class="text-white fw-semibold">{{ metrics.win_rate|floatformat:1 }}%</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Session Name -->
+                    <div class="mb-3">
+                        <label class="form-label smaller fw-semibold text-white-50">SESSION NAME <span class="text-danger">*</span></label>
+                        <input type="text" name="name" class="form-control bg-dark border-secondary border-opacity-30 text-white font-monospace"
+                               placeholder="e.g. NIFTY 15m Momentum Replay 5x Multiplier" required>
+                    </div>
+
+                    <!-- Rating: 1, 2, 3 Stars -->
+                    <div class="mb-3">
+                        <label class="form-label smaller fw-semibold text-white-50">SESSION RATING (QUALITY &amp; PRIORITY)</label>
+                        <div class="d-flex gap-2">
+                            <input type="radio" class="btn-check" name="rating" id="rating1" value="1">
+                            <label class="btn btn-outline-secondary btn-sm flex-fill font-monospace" for="rating1">
+                                ⭐ 1 Star
+                            </label>
+
+                            <input type="radio" class="btn-check" name="rating" id="rating2" value="2" checked>
+                            <label class="btn btn-outline-warning btn-sm flex-fill font-monospace" for="rating2">
+                                ⭐⭐ 2 Stars
+                            </label>
+
+                            <input type="radio" class="btn-check" name="rating" id="rating3" value="3">
+                            <label class="btn btn-outline-info btn-sm flex-fill font-monospace" for="rating3">
+                                ⭐⭐⭐ 3 Stars
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Favorite Bookmark -->
+                    <div class="form-check form-switch mb-3">
+                        <input class="form-check-input" type="checkbox" name="is_favorite" id="isFavoriteSwitch" value="true">
+                        <label class="form-check-label small text-white" for="isFavoriteSwitch">
+                            <i class="bi bi-star-fill text-warning me-1"></i> Bookmark as Favorite Session
+                        </label>
+                    </div>
+
+                    <!-- Notes -->
+                    <div class="mb-3">
+                        <label class="form-label smaller fw-semibold text-white-50">TRADING NOTES &amp; OBSERVATIONS (OPTIONAL)</label>
+                        <textarea name="notes" class="form-control bg-dark border-secondary border-opacity-30 text-white smaller" rows="2"
+                                  placeholder="Strategy parameters used, market volatility, execution behavior..."></textarea>
+                    </div>
+
+                    <!-- Reset active session toggle -->
+                    <div class="form-check form-switch p-2 rounded-3 border border-secondary border-opacity-20" style="background: rgba(234, 179, 8, 0.05);">
+                        <input class="form-check-input ms-0 me-2" type="checkbox" name="reset_after_save" id="resetAfterSaveSwitch" value="true">
+                        <label class="form-check-label smaller text-warning fw-semibold" for="resetAfterSaveSwitch">
+                            Reset active session after saving (clear orders &amp; balance back to ₹1,00,000)
+                        </label>
+                    </div>
+                </div>
+                <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+                    <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-success fw-bold btn-sm rounded-pill px-4 shadow-sm">
+                        <i class="bi bi-check2-circle me-1"></i>Snapshot &amp; Save Session
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- 5. Confirm Reset Session Modal -->
+<div class="modal fade" id="confirmResetSessionModal" tabindex="-1" aria-labelledby="confirmResetSessionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border border-warning border-opacity-30 shadow-lg" style="background: var(--card-bg, #141720); backdrop-filter: blur(25px); color: var(--text-primary, #ffffff); border-radius: 16px;">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+                <h6 class="modal-title fw-bold theme-text-main d-flex align-items-center gap-2" id="confirmResetSessionModalLabel">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">
+                        <i class="bi bi-arrow-counterclockwise fs-5"></i>
+                    </span>
+                    <span>Reset Simulation Session?</span>
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="theme-text-muted small mb-3">You are about to reset the active simulation session. This will clear runtime state across the emulator and Django:</p>
+                <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(234, 179, 8, 0.05);">
+                    <ul class="list-unstyled mb-0 smaller theme-text-muted d-flex flex-column gap-1.5">
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-warning mt-0.5"></i>
+                            <span>Flushes all mock orders and positions from the Dhan mock broker engine (:8088).</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-warning mt-0.5"></i>
+                            <span>Restores available trading balance to default <strong class="theme-text-main">₹1,00,000.00</strong>.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-warning mt-0.5"></i>
+                            <span>Clears session PnL and soft-deletes mock postback logs in Django.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-reset-session-form', 'confirmResetSessionModal')">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Yes, Reset Session
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 6. Confirm Kill Switch Modal -->
+<div class="modal fade" id="confirmKillSwitchModal" tabindex="-1" aria-labelledby="confirmKillSwitchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border border-danger border-opacity-30 shadow-lg" style="background: var(--card-bg, #141720); backdrop-filter: blur(25px); color: var(--text-primary, #ffffff); border-radius: 16px;">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+                <h6 class="modal-title fw-bold theme-text-main d-flex align-items-center gap-2" id="confirmKillSwitchModalLabel">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
+                        <i class="bi bi-lightning-charge-fill fs-5"></i>
+                    </span>
+                    <span>Trigger Emergency Kill-Switch?</span>
+                </h6>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="theme-text-muted small mb-3">Emergency override command across all simulated algorithmic accounts:</p>
+                <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(239, 68, 68, 0.05);">
+                    <ul class="list-unstyled mb-0 smaller theme-text-muted d-flex flex-column gap-1.5">
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-x-circle text-danger mt-0.5"></i>
+                            <span>Immediately cancels <strong class="theme-text-main">ALL pending &amp; active orders</strong> in the engine.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-x-circle text-danger mt-0.5"></i>
+                            <span>Prevents further unmanaged order fills or unintended executions.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-kill-switch-form', 'confirmKillSwitchModal')">
+                    <i class="bi bi-lightning-charge-fill me-1"></i>Yes, Trigger Kill-Switch
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
 

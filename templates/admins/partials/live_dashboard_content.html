@@ -96,6 +96,59 @@
     <!-- Top Latest Macro Market Benchmark Cards Ribbon -->
     {% include 'admins/partials/live_macro_cards_ribbon.html' %}
 
+    {% if env_mode == 'MOCK' %}
+    <!-- Mock Replay Telemetry & Playback Control Status Card -->
+    <div class="card glass-card p-3.5 rounded-4 border border-info border-opacity-25 shadow-sm"
+         style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.06) 0%, rgba(14, 165, 233, 0.02) 100%);">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-info bg-opacity-15 text-info d-flex align-items-center justify-content-center flex-shrink-0" style="width: 46px; height: 46px; border: 1px solid rgba(56, 189, 248, 0.25);">
+                    <i class="bi bi-speedometer2 fs-4 text-info"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                        <span class="fw-bold fs-6 theme-text-main">Historical Replay Telemetry</span>
+                        <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold" id="mock-feed-speed-badge">
+                            <i class="bi bi-lightning-charge-fill me-1"></i><span id="mock-feed-speed-val">25</span>x Speed
+                        </span>
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold" id="mock-feed-status-badge">
+                            <span class="spinner-grow spinner-grow-sm text-success me-1" style="width: 0.38rem; height: 0.38rem;"></span><span id="mock-feed-status-text">REPLAYING</span>
+                        </span>
+                    </div>
+                    <div class="theme-text-muted smaller d-flex align-items-center gap-2 flex-wrap font-monospace">
+                        <span>Dataset: <strong class="text-white-50" id="mock-feed-file-val">Active Parquet Feed</strong></span>
+                        <span>&bull;</span>
+                        <span>Processed: <span id="mock-feed-rows-val" class="text-info fw-bold">--</span> ticks</span>
+                        <span>&bull;</span>
+                        <span>Progress: <span id="mock-feed-pct-val" class="text-warning fw-bold">--</span>%</span>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-3">
+                <div class="d-none d-lg-flex flex-column gap-1" style="min-width: 150px;">
+                    <div class="d-flex justify-content-between smaller theme-text-muted font-monospace">
+                        <span>Replay Stream</span>
+                        <span id="mock-feed-pct-text">0%</span>
+                    </div>
+                    <div class="progress" style="height: 6px; background: rgba(255,255,255,0.08); border-radius: 4px;">
+                        <div class="progress-bar bg-info progress-bar-striped progress-bar-animated" id="mock-feed-progress-bar" style="width: 0%;"></div>
+                    </div>
+                </div>
+                <a href="{% url 'admins:admin-gateway-emulator' %}"
+                   class="btn btn-sm btn-outline-info rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 text-nowrap"
+                   hx-get="{% url 'admins:admin-gateway-emulator' %}"
+                   hx-target="#app-main-container"
+                   hx-swap="innerHTML"
+                   hx-push-url="true">
+                    <i class="bi bi-sliders2-vertical"></i>
+                    <span>Adjust Speed</span>
+                    <i class="bi bi-chevron-right ms-0.5 smaller opacity-75"></i>
+                </a>
+            </div>
+        </div>
+    </div>
+    {% endif %}
+
     {% if not has_live_account and env_mode != 'MOCK' %}
     <!-- Onboarding Guide for Live Accounts -->
     <div class="card glass-card p-4 text-center border-warning border-opacity-25" 

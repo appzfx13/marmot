@@ -1786,7 +1786,7 @@
                     </li>
                     <li class="sidebar-menu-item">
                         <a href="{% url 'admins:admin-gateway-emulator' %}"
-                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-gateway-emulator' or '/admins/dashboard/gateway-emulator/' in request.path or '/gateway-emulator/' in request.path %}active{% endif %}"
+                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-gateway-emulator' %}active{% endif %}"
                             id="admin-menu-gateway-emulator"
                             hx-get="{% url 'admins:admin-gateway-emulator' %}"
                             hx-target="#app-main-container"
@@ -1796,7 +1796,22 @@
                             <span>Mock Broker</span>
                             <span
                                 class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 ms-auto"
-                                style="font-size: 0.65rem; padding: 2px 6px;">:8088</span>
+                                style="font-size: 0.65rem; padding: 2px 6px;">GATEWAY</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="{% url 'admins:admin-gateway-session-list' %}"
+                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-gateway-session-list' or request.resolver_match.url_name == 'admin-gateway-session-detail' %}active{% endif %}"
+                            id="admin-menu-gateway-sessions"
+                            hx-get="{% url 'admins:admin-gateway-session-list' %}"
+                            hx-target="#app-main-container"
+                            hx-swap="innerHTML"
+                            hx-push-url="true">
+                            <i class="bi bi-collection-play-fill text-info"></i>
+                            <span>Saved Sessions</span>
+                            <span
+                                class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25 ms-auto"
+                                style="font-size: 0.65rem; padding: 2px 6px;">ARCHIVE</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
@@ -1956,6 +1971,15 @@
                             hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-receipt"></i>
                             <span>Postback Logs</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="{% url 'admins:endpoints-directory' %}"
+                            class="sidebar-menu-link {% if '/admins/endpoints/' in request.path or request.resolver_match.url_name == 'endpoints-directory' %}active{% endif %}"
+                            id="admin-menu-endpoints" hx-get="{% url 'admins:endpoints-directory' %}"
+                            hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
+                            <i class="bi bi-hdd-network text-info"></i>
+                            <span>Endpoints &amp; Webhooks</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
@@ -2765,6 +2789,49 @@
                                     window.dispatchEvent(new CustomEvent('marmot:telemetry', { detail: data }));
                                     window.dispatchEvent(new CustomEvent('marmot:portfolio_tick', { detail: data }));
                                 }
+                                if (data.type === 'streamer_progress' || data.type === 'progress') {
+                                    const spd = data.speed || 1;
+                                    const pct = (data.progress_pct !== undefined) ? data.progress_pct : (data.pct || 0);
+                                    const curRow = data.current_row || 0;
+                                    const totRows = data.total_rows || 0;
+                                    const activeFile = data.active_file || data.file || '';
+
+                                    // Update Top Clock Speed Badge
+                                    const clkSpdBadge = document.getElementById('live-replay-speed-badge');
+                                    const clkSpdVal = document.getElementById('live-replay-speed-val');
+                                    if (clkSpdBadge && clkSpdVal) {
+                                        clkSpdVal.textContent = spd;
+                                        clkSpdBadge.style.display = 'inline-flex';
+                                    }
+
+                                    // Update Mock Telemetry Card Widget
+                                    const cardSpdVal = document.getElementById('mock-feed-speed-val');
+                                    if (cardSpdVal) cardSpdVal.textContent = spd;
+                                    const cardFileVal = document.getElementById('mock-feed-file-val');
+                                    if (cardFileVal && activeFile) {
+                                        const fname = activeFile.split('/').pop().split('\\').pop();
+                                        cardFileVal.textContent = fname || activeFile;
+                                    }
+                                    const cardRowsVal = document.getElementById('mock-feed-rows-val');
+                                    if (cardRowsVal) cardRowsVal.textContent = curRow.toLocaleString('en-IN') + ' / ' + totRows.toLocaleString('en-IN');
+                                    const cardPctVal = document.getElementById('mock-feed-pct-val');
+                                    if (cardPctVal) cardPctVal.textContent = Number(pct).toFixed(1);
+                                    const cardPctText = document.getElementById('mock-feed-pct-text');
+                                    if (cardPctText) cardPctText.textContent = Number(pct).toFixed(1) + '%';
+                                    const cardProgBar = document.getElementById('mock-feed-progress-bar');
+                                    if (cardProgBar) cardProgBar.style.width = Math.min(100, Math.max(0, Number(pct))) + '%';
+                                    const cardStatusText = document.getElementById('mock-feed-status-text');
+                                    const cardStatusBadge = document.getElementById('mock-feed-status-badge');
+                                    if (cardStatusText && cardStatusBadge) {
+                                        if (data.is_playing === false || curRow === 0) {
+                                            cardStatusText.textContent = 'STANDBY';
+                                            cardStatusBadge.className = 'badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold';
+                                        } else {
+                                            cardStatusText.textContent = 'REPLAYING';
+                                            cardStatusBadge.className = 'badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold';
+                                        }
+                                    }
+                                }
                                 if (data.type === 'progress' || data.type === 'backtest_progress') {
                                     const taskIdStr = String(data.task_id);
                                     const cbs = window.MarmotWS.callbacks[taskIdStr];
@@ -2927,34 +2994,51 @@
                             let timeStr = '';
                             let displayTs = rawTs;
                             if (typeof rawTs === 'string') {
-                                if (rawTs.includes('T')) {
-                                    try {
-                                        const d = new Date(rawTs);
-                                        if (!isNaN(d.getTime())) {
-                                            timeStr = d.toLocaleTimeString('en-IN', { hour12: false });
-                                            dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-                                            displayTs = timeStr + ' IST';
-                                        }
-                                    } catch (e) {}
-                                } else if (rawTs.includes(' ')) {
-                                    const parts = rawTs.split(' ');
+                                let cleanTs = rawTs.replace('Z', '').trim();
+                                if (cleanTs.includes('T')) {
+                                    const parts = cleanTs.split('T');
                                     dateStr = parts[0];
-                                    timeStr = parts[1];
-                                    displayTs = timeStr + ' IST';
+                                    timeStr = parts[1].split('.')[0];
+                                } else if (cleanTs.includes(' ')) {
+                                    const parts = cleanTs.split(' ');
+                                    dateStr = parts[0];
+                                    timeStr = parts[1].split('.')[0];
                                 } else {
-                                    timeStr = rawTs;
-                                    displayTs = timeStr + (rawTs.endsWith('IST') ? '' : ' IST');
+                                    timeStr = cleanTs;
                                 }
+                                if (dateStr.includes('-')) {
+                                    const dParts = dateStr.split('-');
+                                    if (dParts.length === 3) {
+                                        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                        const mIdx = parseInt(dParts[1], 10) - 1;
+                                        if (mIdx >= 0 && mIdx < 12) {
+                                            dateStr = dParts[2] + ' ' + months[mIdx] + ' ' + dParts[0];
+                                        }
+                                    }
+                                }
+                                displayTs = timeStr + (timeStr.endsWith('IST') ? '' : ' IST');
                             }
                             const timeEl = document.getElementById('live-macro-spot-time');
                             if (timeEl) timeEl.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + displayTs;
+
+                            if (payload.speed) {
+                                const clkSpdBadge = document.getElementById('live-replay-speed-badge');
+                                const clkSpdVal = document.getElementById('live-replay-speed-val');
+                                if (clkSpdBadge && clkSpdVal) {
+                                    clkSpdVal.textContent = payload.speed;
+                                    clkSpdBadge.style.display = 'inline-flex';
+                                }
+                                const cardSpdVal = document.getElementById('mock-feed-speed-val');
+                                if (cardSpdVal) cardSpdVal.textContent = payload.speed;
+                            }
 
                             if (payload.is_virtual || window._isVirtualClock) {
                                 window.dispatchEvent(new CustomEvent('marmot:virtual_clock', {
                                     detail: {
                                         time: timeStr || displayTs.replace(' IST', ''),
                                         date: dateStr,
-                                        timestamp: rawTs
+                                        timestamp: rawTs,
+                                        speed: payload.speed || null
                                     }
                                 }));
                             }
@@ -3047,13 +3131,8 @@
                         if (ocTimeEl) ocTimeEl.textContent = displayTs;
                     }
 
-                    // Event-driven periodic refresh: trigger option chain reload every 5th WebSocket tick
-                    _ocTickCounter = (_ocTickCounter || 0) + 1;
-                    if (_ocTickCounter >= 5) {
-                        if (window.triggerOptionChainReload(false)) {
-                            _ocTickCounter = 0;
-                        }
-                    }
+                    // Real-time telemetry is pushed directly to DOM via WebSocket (updateStrikeLTP & updateLiveSpotDOM).
+                    // Periodic HTMX polling removed to adhere strictly to Marmot Rule 7 (0 HTTP polling).
                 }
             };
 
@@ -3200,24 +3279,29 @@
                     var dateStr = '';
                     var timeStr = '';
                     if (typeof ts === 'string') {
-                        if (ts.includes('T')) {
-                            try {
-                                var d = new Date(ts);
-                                if (!isNaN(d.getTime())) {
-                                    timeStr = d.toLocaleTimeString('en-IN', { hour12: false });
-                                    dateStr = d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
-                                    displayTs = timeStr + ' IST';
-                                }
-                            } catch (e) {}
-                        } else if (ts.includes(' ')) {
-                            var parts = ts.split(' ');
+                        var cleanTs = ts.replace('Z', '').trim();
+                        if (cleanTs.includes('T')) {
+                            var parts = cleanTs.split('T');
                             dateStr = parts[0];
-                            timeStr = parts[1];
-                            displayTs = timeStr + ' IST';
+                            timeStr = parts[1].split('.')[0];
+                        } else if (cleanTs.includes(' ')) {
+                            var parts = cleanTs.split(' ');
+                            dateStr = parts[0];
+                            timeStr = parts[1].split('.')[0];
                         } else {
-                            timeStr = ts;
-                            displayTs = timeStr + (ts.endsWith('IST') ? '' : ' IST');
+                            timeStr = cleanTs;
                         }
+                        if (dateStr.includes('-')) {
+                            var dParts = dateStr.split('-');
+                            if (dParts.length === 3) {
+                                var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                var mIdx = parseInt(dParts[1], 10) - 1;
+                                if (mIdx >= 0 && mIdx < 12) {
+                                    dateStr = dParts[2] + ' ' + months[mIdx] + ' ' + dParts[0];
+                                }
+                            }
+                        }
+                        displayTs = timeStr + (timeStr.endsWith('IST') ? '' : ' IST');
                     }
                     var tEl = document.getElementById('live-option-chain-time');
                     if (tEl) tEl.textContent = displayTs;
@@ -3229,7 +3313,8 @@
                         detail: {
                             time: timeStr || displayTs.replace(' IST', ''),
                             date: dateStr,
-                            timestamp: ts
+                            timestamp: ts,
+                            speed: payload.speed || null
                         }
                     }));
                 }
@@ -3295,10 +3380,11 @@
                             }
                         });
 
-                        // In live mode, synchronize backend dataset; in mock mode, client-side sliding
-                        // handles pre-rendered strikes in 0ms without jarring HTTP page/widget reload
-                        if (!isMockMode && typeof window.triggerOptionChainReload === 'function') {
-                            window.triggerOptionChainReload(false);
+                        // Client-side sliding handles ±3 strikes dynamically without jarring HTTP reload.
+                        // Only reload from backend if the newly shifted ATM strike row does not exist in the DOM table.
+                        var targetAtmRow = document.querySelector('#live-option-chain-container tbody tr[data-strike="' + atm + '"]');
+                        if (!targetAtmRow && typeof window.triggerOptionChainReload === 'function') {
+                            window.triggerOptionChainReload(true);
                         }
                     }
                 }
@@ -3334,7 +3420,7 @@
                 }
                 if (!el) return;
                 var numOI = parseInt(String(oi).replace(/,/g, '').trim(), 10);
-                if (!isNaN(numOI) && numOI > 0) {
+                if (!isNaN(numOI) && numOI > 0 && numOI !== 100000) {
                     var prev = parseInt(String(el.getAttribute('data-tick-oi') || el.textContent).replace(/,/g, '').trim() || 0, 10);
                     el.setAttribute('data-tick-oi', numOI);
                     el.textContent = numOI.toLocaleString('en-IN');

@@ -93,6 +93,8 @@ services:
     command: go run main.go
     ports:
       - "${WS_PORT}:${WS_PORT}"
+    cpus: '2'
+    mem_limit: 2048m
     volumes:
       - ./go-app:/app
       - ./backup:/app/backup
@@ -103,6 +105,8 @@ services:
       # DB_* variables read directly from .env file
       - POSTGRES_HOST=db
       - DB_TABLE_NAME=${DB_TABLE_NAME}
+      # Cap Go runtime scheduler to 2 OS threads — prevents merge from using all 4 host cores
+      - GOMAXPROCS=2
     depends_on:
       db:
         condition: service_healthy
@@ -118,19 +122,21 @@ services:
     restart: always
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - static_volume:/app/staticfiles:ro
+      - ./media:/app/media:ro
     depends_on:
       - web
       - go_app
     networks:
       - app_network
 
-  # --- Cloudflare Quick Tunnel Container (Unlimited Bandwidth, Zero Domain) ---
+  # --- Cloudflare Ingress Tunnel (Named Permanent Token or Quick Fallback) ---
   cloudflare_tunnel:
     image: cloudflare/cloudflared:latest
     container_name: cloudflare_tunnel
     restart: always
     user: root
-    command: tunnel --no-autoupdate --logfile /var/log/cloudflared/cloudflared.log --url http://nginx_proxy:80
+    command: ${CLOUDFLARE_TUNNEL_CMD:-tunnel --logfile /var/log/cloudflared/cloudflared.log --url http://nginx_proxy:80}
     volumes:
       - ./logs:/var/log/cloudflared
     depends_on:
@@ -158,6 +164,7 @@ services:
       - REDIS_PORT=6379
       - MARMOT_POSTBACK_URL=http://web:8000/api/mock/dhan/postback/
       - PARQUET_DIR=/app/backup
+      - EMULATOR_AUTO_PLAY=false
     networks:
       - app_network
 

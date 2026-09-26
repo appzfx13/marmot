@@ -1,4 +1,5 @@
 
+from django.core.cache import cache
 from django.core.paginator import Paginator, EmptyPage, PageNotAnInteger
 from django.shortcuts import render, redirect
 from django.contrib import messages
@@ -476,45 +477,61 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
         context['sim_mode'] = sim_mode
 
         # 2. Check Dhan Mock Broker Emulator (:8088) Health & Active Account
-        mock_online = False
-        active_account = {'active_account_id': '1000000001', 'account_name': 'Primary Algorithmic Trading', 'available_balance': 100000.0, 'sod_limit': 100000.0}
-        streamer_files = []
-        streamer_status = {'is_playing': False, 'current_speed': 25, 'progress_pct': 0.0, 'active_file': ''}
-
-        try:
-            r_health = requests.get('http://mock_broker:8088/health', timeout=1.2)
-            if r_health.status_code == 200:
-                mock_online = True
-        except Exception:
+        cache_key = 'marmot:admins:mock_broker_meta'
+        meta = cache.get(cache_key)
+        if meta is None:
             mock_online = False
+            active_account = {'active_account_id': '1000000001', 'account_name': 'Primary Algorithmic Trading', 'available_balance': 100000.0, 'sod_limit': 100000.0}
+            streamer_files = []
+            streamer_status = {'is_playing': False, 'current_speed': 25, 'progress_pct': 0.0, 'active_file': ''}
 
-        if mock_online:
             try:
-                r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=1.2)
-                if r_acc.status_code == 200:
-                    active_account = r_acc.json()
+                r_health = requests.get('http://mock_broker:8088/health', timeout=0.8)
+                if r_health.status_code == 200:
+                    mock_online = True
             except Exception:
-                pass
-            try:
-                r_files = requests.get('http://mock_broker:8088/mock/api/streamer/files', timeout=1.2)
-                if r_files.status_code == 200:
-                    streamer_files = r_files.json() or []
-            except Exception:
-                pass
-            try:
-                r_st = requests.get('http://mock_broker:8088/mock/api/streamer/status', timeout=1.2)
-                if r_st.status_code == 200:
-                    streamer_status = r_st.json() or streamer_status
-            except Exception:
-                pass
+                mock_online = False
+
+            if mock_online:
+                try:
+                    r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=0.8)
+                    if r_acc.status_code == 200:
+                        active_account = r_acc.json()
+                except Exception:
+                    pass
+                try:
+                    r_files = requests.get('http://mock_broker:8088/mock/api/streamer/files', timeout=0.8)
+                    if r_files.status_code == 200:
+                        streamer_files = r_files.json() or []
+                except Exception:
+                    pass
+                try:
+                    r_st = requests.get('http://mock_broker:8088/mock/api/streamer/status', timeout=0.8)
+                    if r_st.status_code == 200:
+                        streamer_status = r_st.json() or streamer_status
+                except Exception:
+                    pass
+
+            meta = {
+                'mock_online': mock_online,
+                'active_account': active_account,
+                'streamer_files': streamer_files,
+                'streamer_status': streamer_status,
+            }
+            cache.set(cache_key, meta, timeout=3)
+        else:
+            mock_online = meta.get('mock_online', False)
+            active_account = meta.get('active_account')
+            streamer_files = meta.get('streamer_files', [])
+            streamer_status = meta.get('streamer_status', {})
 
         host_name = self.request.get_host().split(':')[0]
         context['mock_online'] = mock_online
         context['active_account'] = active_account
         context['streamer_files'] = streamer_files
         context['streamer_status'] = streamer_status
-        context['emulator_url'] = f"http://{host_name}:8088/mock/dashboard?embedded=1"
-        context['emulator_external_url'] = f"http://{host_name}:8088/mock/dashboard"
+        context['emulator_url'] = "/admins/dashboard/gateway-emulator/"
+        context['emulator_external_url'] = "/admins/dashboard/gateway-emulator/"
 
         # 3. Check FYERS Live Data Streaming State in Redis
         fyers_online = False
@@ -542,11 +559,23 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
         context['fyers_last_tick'] = fyers_last_tick
         context['fyers_chain_info'] = fyers_chain_info
 
-        # 4. Pull Completed Market Backup Tasks for Dataset Dropdown
+        # 4. Pull Completed Market Backup Tasks for Dataset Dropdown (Strictly Complete Backups Only)
         completed_backups = MarketBackupTask.objects.filter(
             is_deleted=False, status=MarketBackupTask.StatusChoices.COMPLETED
         ).order_by('-id')
         context['completed_backups'] = completed_backups
+
+        # Filter streamer_files to ONLY show complete backup files matching completed backup tasks
+        completed_task_ids = {str(b.id) for b in completed_backups}
+        filtered_files = []
+        for f in streamer_files:
+            rel_path = f.get('relativePath', '')
+            parts = rel_path.split('/')
+            if len(parts) >= 2 and parts[-1].endswith('.parquet') and not rel_path.startswith('ticks/'):
+                task_id_candidate = parts[-2]
+                if task_id_candidate in completed_task_ids:
+                    filtered_files.append(f)
+        context['streamer_files'] = filtered_files
 
         # 5. Load Session PnL, Metrics & Calendar for Live Mock Workspace Parity
         metrics = MockBrokerPnLService.get_session_metrics(user=None)
@@ -681,9 +710,22 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
                 toast_title = 'Kill Switch Triggered'
                 toast_msg = 'All pending orders cancelled across mock broker.'
             elif action == 'clear_session':
-                requests.post('http://mock_broker:8088/mock/api/session/clear', timeout=3)
+                active_client_id = request.POST.get('account', '1000000001')
+                try:
+                    requests.post(f'http://mock_broker:8088/mock/api/session/clear?account={active_client_id}', timeout=3)
+                except Exception:
+                    pass
+                from apps.common.models import PostbackLog
+                from apps.trade_config.models import UserTradingAccount
+                from django.core.cache import cache
+                # Soft-delete all mock postbacks so session metrics, trades table, and equity curve reset cleanly
+                PostbackLog.objects.filter(payload__execution_mode='MOCK').delete()
+                # Reset mock UserTradingAccount realtime_pnl if present
+                UserTradingAccount.objects.filter(account_type='MOCK').update(realtime_pnl=0.00)
+                # Invalidate cached mock broker metadata in Redis
+                cache.delete('marmot:admins:mock_broker_meta')
                 toast_title = 'Session Cleared'
-                toast_msg = 'Mock orders, positions, and balances reset to default.'
+                toast_msg = 'Mock orders, positions, balances, and session PnL reset to default.'
             elif action == 'stop':
                 try:
                     requests.post('http://mock_broker:8088/mock/api/streamer/stop', timeout=3)
@@ -755,6 +797,301 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         })
         return resp
 
+
+class AdminGatewaySessionSaveView(LoginRequiredMixin, View):
+    """Saves the current simulation session into SimulationSessionSnapshot."""
+    def post(self, request, *args, **kwargs):
+        from apps.trade_config.models import SimulationSessionSnapshot, UserTradingAccount
+        from apps.postback.services import MockBrokerPnLService
+        from django.core.cache import cache
+        from datetime import datetime
+        import requests, json
+
+        name = request.POST.get('name', '').strip()
+        if not name:
+            name = f"Simulation Session {datetime.now().strftime('%d-%b-%Y %H:%M')}"
+        notes = request.POST.get('notes', '').strip()
+        is_favorite = request.POST.get('is_favorite') in ['true', '1', 'on']
+        try:
+            rating = int(request.POST.get('rating', 1))
+        except (ValueError, TypeError):
+            rating = 1
+        if rating not in [1, 2, 3]:
+            rating = 1
+
+        reset_after_save = request.POST.get('reset_after_save') in ['true', '1', 'on']
+        sim_mode = request.session.get('gateway_emulator_mode', 'BACKUP')
+
+        metrics = MockBrokerPnLService.get_session_metrics(user=None)
+        trades = MockBrokerPnLService.get_session_trades(user=None)
+        daily_pnl = MockBrokerPnLService.get_daily_pnl_map(user=None)
+
+        ending_balance = 100000.00
+        dataset_file = ""
+        orders_snapshot = []
+        positions_snapshot = []
+
+        try:
+            r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=1.5)
+            if r_acc.status_code == 200:
+                acc_data = r_acc.json()
+                ending_balance = float(acc_data.get('available_balance', 100000.00))
+        except Exception:
+            pass
+
+        try:
+            r_st = requests.get('http://mock_broker:8088/mock/api/streamer/status', timeout=1.5)
+            if r_st.status_code == 200:
+                st_data = r_st.json() or {}
+                dataset_file = st_data.get('active_file', '')
+        except Exception:
+            pass
+
+        try:
+            r_orders = requests.get('http://mock_broker:8088/mock/api/orders', timeout=1.5)
+            if r_orders.status_code == 200:
+                orders_snapshot = r_orders.json() or []
+        except Exception:
+            pass
+
+        try:
+            r_pos = requests.get('http://mock_broker:8088/mock/api/positions', timeout=1.5)
+            if r_pos.status_code == 200:
+                positions_snapshot = r_pos.json() or []
+        except Exception:
+            pass
+
+        mock_account = UserTradingAccount.objects.filter(account_type='MOCK').first()
+
+        snapshot = SimulationSessionSnapshot.objects.create(
+            user=request.user,
+            trading_account=mock_account,
+            name=name,
+            notes=notes,
+            is_favorite=is_favorite,
+            rating=rating,
+            sim_mode=sim_mode,
+            dataset_file=dataset_file,
+            starting_balance=100000.00,
+            ending_balance=ending_balance,
+            gross_pnl=metrics.get('gross_pnl', 0.00),
+            net_pnl=metrics.get('net_pnl', 0.00),
+            total_charges=metrics.get('total_charges', 0.00),
+            total_trades=metrics.get('total_trades', 0),
+            winning_trades=metrics.get('winning_trades', 0),
+            losing_trades=metrics.get('losing_trades', 0),
+            win_rate=metrics.get('win_rate', 0.00),
+            max_drawdown=metrics.get('max_drawdown', 0.00),
+            peak_margin_utilized=metrics.get('peak_margin', 0.00),
+            closed_trades_snapshot=trades,
+            equity_curve_snapshot=metrics.get('equity_curve', []),
+            orders_snapshot=orders_snapshot,
+            positions_snapshot=positions_snapshot,
+            calendar_heatmap_snapshot=daily_pnl,
+        )
+
+        if reset_after_save:
+            try:
+                requests.post('http://mock_broker:8088/mock/api/session/clear?account=1000000001', timeout=2)
+            except Exception:
+                pass
+            from apps.common.models import PostbackLog
+            PostbackLog.objects.filter(payload__execution_mode='MOCK').delete()
+            if mock_account:
+                mock_account.realtime_pnl = 0.00
+                mock_account.save(update_fields=['realtime_pnl'])
+            cache.delete('marmot:admins:mock_broker_meta')
+
+        hx_target = request.headers.get('HX-Target', '')
+        toast_payload = {
+            'showToast': {
+                'title': 'Session Saved',
+                'message': f"Snapshot '{snapshot.name}' saved with {snapshot.get_rating_display()}.",
+                'type': 'success',
+            }
+        }
+
+        if hx_target == 'gateway-emulator-container':
+            view = AdminGatewayEmulatorView()
+            view.request = request
+            ctx = view.get_context_data()
+            resp = render(request, 'admins/partials/gateway_emulator_content.html', ctx)
+            resp['HX-Trigger'] = json.dumps(toast_payload)
+            return resp
+
+        from django.http import JsonResponse
+        resp = JsonResponse({'success': True, 'id': snapshot.id, 'name': snapshot.name})
+        resp['HX-Trigger'] = json.dumps(toast_payload)
+        return resp
+
+
+class AdminGatewaySessionListView(LoginRequiredMixin, TemplateView):
+    """Lists saved simulation session snapshots with filters and KPI totals."""
+    template_name = 'admins/gateway_session_list.html'
+    partial_template_name = 'admins/partials/gateway_session_list_content.html'
+
+    def get_context_data(self, **kwargs):
+        from apps.trade_config.models import SimulationSessionSnapshot
+        from django.core.paginator import Paginator
+        from django.db.models import Sum, Avg, Max, Count
+
+        context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'gateway-emulator'
+        context['dashboard_title'] = 'Saved Simulation Sessions'
+
+        qs = SimulationSessionSnapshot.objects.select_related('user', 'trading_account').order_by('-created_at')
+
+        query = self.request.GET.get('q', '').strip()
+        if query:
+            qs = qs.filter(name__icontains=query)
+        context['query'] = query
+
+        rating_filter = self.request.GET.get('rating', '').strip()
+        if rating_filter in ['1', '2', '3']:
+            qs = qs.filter(rating=int(rating_filter))
+        context['rating_filter'] = rating_filter
+
+        favorite_filter = self.request.GET.get('favorite', '').strip()
+        if favorite_filter in ['1', 'true', 'yes']:
+            qs = qs.filter(is_favorite=True)
+        context['favorite_filter'] = favorite_filter
+
+        mode_filter = self.request.GET.get('mode', '').strip().upper()
+        if mode_filter in ['LIVE', 'BACKUP']:
+            qs = qs.filter(sim_mode=mode_filter)
+        context['mode_filter'] = mode_filter
+
+        total_count = qs.count()
+        aggregates = qs.aggregate(
+            total_net_pnl=Sum('net_pnl'),
+            max_pnl=Max('net_pnl'),
+            avg_win_rate=Avg('win_rate'),
+            total_trades_count=Sum('total_trades')
+        )
+        context['total_count'] = total_count
+        context['total_net_pnl'] = aggregates.get('total_net_pnl') or 0.00
+        context['max_pnl'] = aggregates.get('max_pnl') or 0.00
+        context['avg_win_rate'] = aggregates.get('avg_win_rate') or 0.00
+        context['total_trades_count'] = aggregates.get('total_trades_count') or 0
+
+        paginator = Paginator(qs, 15)
+        page_number = self.request.GET.get('page')
+        page_obj = paginator.get_page(page_number)
+        context['page_obj'] = page_obj
+        context['snapshots'] = page_obj.object_list
+        return context
+
+    def get(self, request, *args, **kwargs):
+        if request.headers.get('HX-Request') and request.headers.get('HX-Target') == 'gateway-session-list-container':
+            context = self.get_context_data(**kwargs)
+            return render(request, self.partial_template_name, context)
+        return super().get(request, *args, **kwargs)
+
+
+class AdminGatewaySessionDetailView(LoginRequiredMixin, TemplateView):
+    """Detailed historical audit view of a specific saved session snapshot."""
+    template_name = 'admins/gateway_session_detail.html'
+    partial_template_name = 'admins/partials/gateway_session_detail_content.html'
+
+    def get_context_data(self, **kwargs):
+        from apps.trade_config.models import SimulationSessionSnapshot
+        from django.shortcuts import get_object_or_404
+        from datetime import datetime
+        import json
+
+        context = super().get_context_data(**kwargs)
+        context['active_tab'] = 'gateway-emulator'
+        context['dashboard_title'] = 'Session Snapshot Detail'
+
+        snapshot_id = self.kwargs.get('pk')
+        snapshot = get_object_or_404(SimulationSessionSnapshot.objects.select_related('user', 'trading_account'), pk=snapshot_id)
+        context['snapshot'] = snapshot
+
+        metrics = {
+            'net_pnl': float(snapshot.net_pnl),
+            'gross_pnl': float(snapshot.gross_pnl),
+            'total_charges': float(snapshot.total_charges),
+            'total_trades': snapshot.total_trades,
+            'winning_trades': snapshot.winning_trades,
+            'losing_trades': snapshot.losing_trades,
+            'win_rate': float(snapshot.win_rate),
+            'max_drawdown': float(snapshot.max_drawdown),
+            'peak_margin': float(snapshot.peak_margin_utilized),
+            'equity_curve': snapshot.equity_curve_snapshot or [],
+        }
+        context['metrics'] = metrics
+        context['equity_curve_json'] = json.dumps(snapshot.equity_curve_snapshot or [])
+        context['trades'] = snapshot.closed_trades_snapshot or []
+        context['orders'] = snapshot.orders_snapshot or []
+        context['positions'] = snapshot.positions_snapshot or []
+
+        selected_year = int(self.request.GET.get('year', snapshot.created_at.year))
+        daily_pnl = snapshot.calendar_heatmap_snapshot or {}
+        context['daily_pnl'] = daily_pnl
+        context['months'] = _build_mock_broker_calendar(daily_pnl, selected_year=selected_year)
+        context['year'] = selected_year
+        context['prev_year'] = selected_year - 1
+        context['next_year'] = selected_year + 1
+        return context
+
+    def get(self, request, *args, **kwargs):
+        if request.headers.get('HX-Request') and request.headers.get('HX-Target') == 'gateway-session-detail-container':
+            context = self.get_context_data(**kwargs)
+            return render(request, self.partial_template_name, context)
+        return super().get(request, *args, **kwargs)
+
+
+class AdminGatewaySessionToggleFavoriteView(LoginRequiredMixin, View):
+    """Toggles favorite state on a saved simulation session."""
+    def post(self, request, pk, *args, **kwargs):
+        from apps.trade_config.models import SimulationSessionSnapshot
+        from django.shortcuts import get_object_or_404
+        from django.http import HttpResponse
+        import json
+
+        snapshot = get_object_or_404(SimulationSessionSnapshot, pk=pk)
+        snapshot.is_favorite = not snapshot.is_favorite
+        snapshot.save(update_fields=['is_favorite'])
+
+        star_icon = '<i class="bi bi-star-fill text-warning fs-5"></i>' if snapshot.is_favorite else '<i class="bi bi-star text-muted fs-5"></i>'
+        resp = HttpResponse(star_icon)
+        toast_msg = "Marked as favorite" if snapshot.is_favorite else "Removed from favorites"
+        resp['HX-Trigger'] = json.dumps({
+            'showToast': {
+                'title': 'Favorite Updated',
+                'message': f"'{snapshot.name}' {toast_msg}.",
+                'type': 'info',
+            }
+        })
+        return resp
+
+
+class AdminGatewaySessionDeleteView(LoginRequiredMixin, View):
+    """Soft-deletes a saved simulation session."""
+    def post(self, request, pk, *args, **kwargs):
+        from apps.trade_config.models import SimulationSessionSnapshot
+        from django.shortcuts import get_object_or_404
+        from django.http import HttpResponseRedirect
+        from django.urls import reverse
+        import json
+
+        snapshot = get_object_or_404(SimulationSessionSnapshot, pk=pk)
+        name = snapshot.name
+        snapshot.delete()
+
+        if request.headers.get('HX-Request'):
+            from django.http import HttpResponse
+            resp = HttpResponse()
+            resp['HX-Redirect'] = reverse('admins:admin-gateway-session-list')
+            resp['HX-Trigger'] = json.dumps({
+                'showToast': {
+                    'title': 'Session Deleted',
+                    'message': f"Saved session '{name}' deleted.",
+                    'type': 'warning',
+                }
+            })
+            return resp
+        return HttpResponseRedirect(reverse('admins:admin-gateway-session-list'))
 
 
 class AdminLiveOptionChainPartialView(LoginRequiredMixin, View):
@@ -4130,6 +4467,39 @@ class PostbackLogBulkDeleteView(LoginRequiredMixin, DeveloperOrAdminRequiredMixi
         return response
 
 
+class PostbackLogClearView(LoginRequiredMixin, DeveloperOrAdminRequiredMixin, View):
+    """CBV for clearing postback logs by mode (MOCK, LIVE, ALL) via HTMX with confirmation."""
+
+    def post(self, request, *args, **kwargs):
+        mode = str(request.POST.get('mode', 'MOCK')).upper().strip()
+        if mode == 'MOCK':
+            qs = PostbackLog.objects.filter(is_deleted=False, payload__execution_mode='MOCK')
+            count = qs.count()
+            qs.delete()
+            msg = f"Successfully cleared {count} Mock Postback log{'s' if count != 1 else ''}."
+        elif mode == 'LIVE':
+            qs = PostbackLog.objects.filter(is_deleted=False).exclude(payload__execution_mode='MOCK')
+            count = qs.count()
+            qs.delete()
+            msg = f"Successfully cleared {count} Live Postback log{'s' if count != 1 else ''}."
+        elif mode == 'ALL':
+            qs = PostbackLog.objects.filter(is_deleted=False)
+            count = qs.count()
+            qs.delete()
+            msg = f"Successfully cleared all {count} Postback log{'s' if count != 1 else ''}."
+        else:
+            count = 0
+            msg = f"Invalid postback clear mode: {mode}."
+
+        response = HttpResponse()
+        response['HX-Trigger'] = json.dumps({
+            'closeGlobalModal': True,
+            'showToast': {'message': msg, 'level': 'success' if count > 0 else 'info'},
+            'reloadPostbackTable': True
+        })
+        return response
+
+
 class AdminBrokerMasterBulkDeleteView(LoginRequiredMixin, AdminRequiredMixin, View):
     """CBV for bulk soft-deletion of master brokers via HTMX."""
     def get(self, request, *args, **kwargs):
@@ -4238,9 +4608,21 @@ class LiveDataFeedView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin,
         today = timezone.localdate()
         is_token_valid = bool(settings_obj.fyers_access_token and settings_obj.fyers_token_generated_date == today)
 
+        current_callback_url = request.build_absolute_uri(reverse('admins:fyers-oauth-callback'))
+        if ('trycloudflare.com' in current_callback_url or 'ngrok' in current_callback_url) and current_callback_url.startswith('http://'):
+            current_callback_url = 'https://' + current_callback_url[7:]
+        saved_redirect = (settings_obj.fyers_redirect_uri or '').strip()
+        is_stale_tunnel = bool(
+            not saved_redirect or
+            ('trycloudflare.com' in saved_redirect and request.get_host() not in saved_redirect) or
+            ('ngrok' in saved_redirect and request.get_host() not in saved_redirect)
+        )
+        display_redirect_uri = current_callback_url if is_stale_tunnel else saved_redirect
+
         auth_url = ""
-        if settings_obj.fyers_app_id and settings_obj.fyers_redirect_uri:
-            encoded_redirect = urllib.parse.quote(settings_obj.fyers_redirect_uri.strip(), safe='')
+        effective_redirect = display_redirect_uri or current_callback_url
+        if settings_obj.fyers_app_id and effective_redirect:
+            encoded_redirect = urllib.parse.quote(effective_redirect.strip(), safe='')
             auth_url = f"{FYERS_AUTH_URL}?client_id={settings_obj.fyers_app_id}&redirect_uri={encoded_redirect}&response_type=code&state=marmot_live_feed"
 
         telemetry = {
@@ -4260,6 +4642,8 @@ class LiveDataFeedView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin,
             'auth_url': auth_url,
             'telemetry': telemetry,
             'today': today,
+            'current_callback_url': current_callback_url,
+            'display_redirect_uri': display_redirect_uri,
         }
         if request.headers.get('HX-Request'):
             return render(request, self.partial_template_name, context)
@@ -4271,7 +4655,10 @@ class LiveDataFeedView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin,
         secret_key = request.POST.get('fyers_secret_key', '').strip()
         if secret_key:
             settings_obj.fyers_secret_key = secret_key
-        settings_obj.fyers_redirect_uri = request.POST.get('fyers_redirect_uri', '').strip() or 'https://trade.marmot.com/fyers/callback'
+        current_callback_url = request.build_absolute_uri(reverse('admins:fyers-oauth-callback'))
+        if ('trycloudflare.com' in current_callback_url or 'ngrok' in current_callback_url) and current_callback_url.startswith('http://'):
+            current_callback_url = 'https://' + current_callback_url[7:]
+        settings_obj.fyers_redirect_uri = request.POST.get('fyers_redirect_uri', '').strip() or current_callback_url
         new_token = request.POST.get('fyers_access_token', '').strip()
 
         if new_token:
@@ -4339,6 +4726,191 @@ class FyersAuthCallbackView(View):
             messages.error(request, f"FYERS Token Exchange failed: {err}")
 
         return redirect('admins:live-data-feed')
+
+
+class EndpointsDirectoryView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, View):
+    """Render comprehensive platform endpoints directory with dynamic URLs and copy buttons."""
+    template_name = 'admins/endpoints_directory.html'
+    partial_template_name = 'admins/partials/endpoints_directory_content.html'
+
+    def get(self, request, *args, **kwargs):
+        origin = request.build_absolute_uri('/')[:-1]
+        if ('trycloudflare.com' in origin or 'ngrok' in origin) and origin.startswith('http://'):
+            origin = 'https://' + origin[7:]
+
+        ws_scheme = 'wss' if origin.startswith('https') else 'ws'
+        host_no_scheme = origin.split('://', 1)[-1]
+        ws_origin = f"{ws_scheme}://{host_no_scheme}"
+
+        user_id = getattr(request.user, 'id', 1)
+        endpoints = [
+            {
+                'category': 'oauth',
+                'category_label': 'OAuth & Callbacks',
+                'method': 'GET',
+                'method_badge': 'badge bg-info bg-opacity-25 text-info',
+                'title': 'FYERS OAuth Redirect Callback',
+                'path': '/admins/fyers/callback/',
+                'full_url': f"{origin}/admins/fyers/callback/",
+                'target': 'FYERS API Dashboard → Redirect URL',
+                'description': 'Handles authorization code exchange for daily FYERS live market feed JWT access token.',
+                'usage': 'Set as Redirect URL in FYERS Developer Dashboard. Marmot automatically handles the code-to-token handshake.',
+            },
+            {
+                'category': 'webhooks',
+                'category_label': 'Broker Webhooks',
+                'method': 'POST',
+                'method_badge': 'badge bg-warning bg-opacity-25 text-warning',
+                'title': 'DhanHQ Live Postback (Global)',
+                'path': '/postback/dhan/postback/',
+                'full_url': f"{origin}/postback/dhan/postback/",
+                'target': 'DhanHQ Developer Console → Webhook URL',
+                'description': 'Receives real-time order status, execution alerts, and position updates from Dhan API v2.',
+                'usage': 'Set as the Webhook URL in your DhanHQ developer console for push trade execution updates.',
+            },
+            {
+                'category': 'webhooks',
+                'category_label': 'Broker Webhooks',
+                'method': 'POST',
+                'method_badge': 'badge bg-warning bg-opacity-25 text-warning',
+                'title': 'DhanHQ User-Specific Postback',
+                'path': f'/postback/dhan/postback/{user_id}/',
+                'full_url': f"{origin}/postback/dhan/postback/{user_id}/",
+                'target': 'Multi-User Dhan Webhooks',
+                'description': 'Directs incoming Dhan alerts explicitly to a specific Marmot trader user account ID.',
+                'usage': f'Routes specifically to user #{user_id}. Replace ID for other traders as needed.',
+            },
+            {
+                'category': 'webhooks',
+                'category_label': 'Broker Webhooks',
+                'method': 'POST',
+                'method_badge': 'badge bg-warning bg-opacity-25 text-warning',
+                'title': 'Generic Multi-Broker Postback',
+                'path': '/postback/<broker>/postback/',
+                'full_url': f"{origin}/postback/fyers/postback/",
+                'target': 'FYERS / Zerodha / AngelOne Ingress',
+                'description': 'Unified postback ingress router for broker webhook payloads (e.g. fyers, zerodha).',
+                'usage': 'Replace <broker> with the broker identifier (e.g. /postback/fyers/postback/).',
+            },
+            {
+                'category': 'webhooks',
+                'category_label': 'Broker Webhooks',
+                'method': 'POST',
+                'method_badge': 'badge bg-warning bg-opacity-25 text-warning',
+                'title': 'Generic Multi-Broker User Postback',
+                'path': f'/postback/<broker>/postback/{user_id}/',
+                'full_url': f"{origin}/postback/fyers/postback/{user_id}/",
+                'target': 'Multi-Broker Multi-User Ingress',
+                'description': 'Routes broker webhook events directly to a designated broker adapter and user profile.',
+                'usage': f'Example for FYERS with current user: /postback/fyers/postback/{user_id}/',
+            },
+            {
+                'category': 'webhooks',
+                'category_label': 'Broker Webhooks',
+                'method': 'POST',
+                'method_badge': 'badge bg-secondary bg-opacity-25 text-white-50',
+                'title': 'REST API Postback Handler (Global)',
+                'path': '/api/postback/',
+                'full_url': f"{origin}/api/postback/",
+                'target': 'External Systems / Trading Bots',
+                'description': 'Standard REST API postback endpoint accepting JSON execution events.',
+                'usage': 'External webhook senders can POST order logs or alerts to this JSON endpoint.',
+            },
+            {
+                'category': 'webhooks',
+                'category_label': 'Broker Webhooks',
+                'method': 'POST',
+                'method_badge': 'badge bg-secondary bg-opacity-25 text-white-50',
+                'title': 'REST API Postback Handler (User)',
+                'path': f'/api/postback/{user_id}/',
+                'full_url': f"{origin}/api/postback/{user_id}/",
+                'target': 'External Systems / User Routing',
+                'description': 'Standard REST API postback routed explicitly to a specified user ID.',
+                'usage': f'POST execution JSON payloads directly to /api/postback/{user_id}/.',
+            },
+            {
+                'category': 'emulator',
+                'category_label': 'Emulator & Sandbox',
+                'method': 'POST',
+                'method_badge': 'badge bg-primary bg-opacity-25 text-primary',
+                'title': 'Dhan Emulator Live Mock Webhook',
+                'path': '/postback/mock/dhan/postback/',
+                'full_url': f"{origin}/postback/mock/dhan/postback/",
+                'target': 'Dhan Go Emulator (Port 8088)',
+                'description': 'Dedicated postback listener for simulated order execution alerts triggered by Dhan Emulator.',
+                'usage': 'Used automatically by the Sandbox / Live Mock engine to simulate instant fills and partials.',
+            },
+            {
+                'category': 'emulator',
+                'category_label': 'Emulator & Sandbox',
+                'method': 'GET/POST',
+                'method_badge': 'badge bg-primary bg-opacity-25 text-primary',
+                'title': 'Dhan Emulator REST API Ingress',
+                'path': '/mock-dhan/v2/',
+                'full_url': f"{origin}/mock-dhan/v2/",
+                'target': 'Dhan Emulator Gateway',
+                'description': 'Reverse-proxied HTTP API for orders, portfolio, holdings, and fund margin simulation.',
+                'usage': 'Points to the high-performance Dhan Go Emulator running on container port 8088.',
+            },
+            {
+                'category': 'emulator',
+                'category_label': 'Emulator & Sandbox',
+                'method': 'WS',
+                'method_badge': 'badge bg-success bg-opacity-25 text-success',
+                'title': 'Dhan Emulator Market Feed WebSocket',
+                'path': '/mock-ws',
+                'full_url': f"{ws_origin}/mock-ws",
+                'target': 'Dhan Emulator Streamer',
+                'description': 'Real-time WebSocket market feed streaming simulated ticks, LTPs, and quotes to terminals.',
+                'usage': 'Connect WebSocket client to stream binary or JSON market feed from emulator.',
+            },
+            {
+                'category': 'streaming',
+                'category_label': 'Streaming & Sockets',
+                'method': 'WS',
+                'method_badge': 'badge bg-success bg-opacity-25 text-success',
+                'title': 'Platform Real-Time WebSocket Hub',
+                'path': '/ws',
+                'full_url': f"{ws_origin}/ws",
+                'target': 'Go Microservice Hub (Port 8082)',
+                'description': 'Zero-copy high-throughput WebSocket broadcast hub for live option chains and strategy events.',
+                'usage': 'Used by Terminal UI to receive real-time options chain and ticker updates without HTTP polling.',
+            },
+            {
+                'category': 'operational',
+                'category_label': 'Operational Telemetry',
+                'method': 'GET',
+                'method_badge': 'badge bg-info bg-opacity-25 text-info',
+                'title': 'Live Terminal Operational Telemetry',
+                'path': '/admins/terminal/operational-data/?mode=LIVE',
+                'full_url': f"{origin}/admins/terminal/operational-data/?mode=LIVE",
+                'target': 'Live Terminal Engine',
+                'description': 'Returns active live strategy status, system clock, memory telemetry, and feed latency.',
+                'usage': 'JSON polling endpoint for terminal telemetry stats and active strategy indicators.',
+            },
+            {
+                'category': 'operational',
+                'category_label': 'Operational Telemetry',
+                'method': 'GET',
+                'method_badge': 'badge bg-info bg-opacity-25 text-info',
+                'title': 'Sandbox Terminal Operational Telemetry',
+                'path': '/admins/terminal/operational-data/?mode=MOCK',
+                'full_url': f"{origin}/admins/terminal/operational-data/?mode=MOCK",
+                'target': 'Sandbox Terminal Engine',
+                'description': 'Returns sandbox mock account balances, virtual clock, emulator connectivity, and execution telemetry.',
+                'usage': 'JSON polling endpoint for sandbox operational statistics.',
+            },
+        ]
+
+        context = {
+            'origin': origin,
+            'ws_origin': ws_origin,
+            'endpoints': endpoints,
+            'total_endpoints': len(endpoints),
+        }
+        if request.headers.get('HX-Request'):
+            return render(request, self.partial_template_name, context)
+        return render(request, self.template_name, context)
 
 
 def _get_live_strategy(user, pk):

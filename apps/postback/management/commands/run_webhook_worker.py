@@ -72,8 +72,16 @@ class Command(BaseCommand):
                             
                         except Exception as process_exc:
                             self.stdout.write(self.style.ERROR(f"Error processing message {message_id}: {process_exc}"))
-                            # Do NOT ack, so it stays in pending for potential retry or dead letter queue
-                            
+                            # Route failed payload to DLQ stream and ACK to prevent infinite pending PEL memory accumulation
+                            try:
+                                r.xadd('marmot:webhooks:dlq', {
+                                    'error': str(process_exc),
+                                    'original_id': str(message_id),
+                                    'payload': json.dumps(data)
+                                }, maxlen=5000, approximate=True)
+                                r.xack(stream_name, group_name, message_id)
+                            except Exception:
+                                pass
             except Exception as loop_exc:
                 self.stdout.write(self.style.ERROR(f"Worker loop error: {loop_exc}"))
                 time.sleep(2)

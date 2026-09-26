@@ -10,6 +10,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strconv"
 	"strings"
@@ -57,11 +58,14 @@ type ParquetStreamer struct {
 	totalRows       int64
 	currentRow      int64
 	currentDatetime string
-	currentDateStr  string
-	currentVIX      float64
-	latestTicks     map[string]models.MarketTick
-	rdb             *redis.Client
-	isCompleted     bool
+	currentDateStr    string
+	currentVIX        float64
+	latestTicks       map[string]models.MarketTick
+	activeExpiryDate  string
+	activeExpiryLabel string
+	activeExpiryTicks map[string]models.MarketTick
+	rdb               *redis.Client
+	isCompleted       bool
 }
 
 // NewParquetStreamer initializes the market feed streamer.
@@ -83,16 +87,17 @@ func NewParquetStreamer(eng *engine.MatchingEngine, backupDir string) *ParquetSt
 	})
 
 	ps := &ParquetStreamer{
-		engine:          eng,
-		clients:         make(map[*websocket.Conn]bool),
-		speed:           1,
-		isPlaying:       false,
-		availableDir:    backupDir,
-		currentDatetime: time.Now().Format("2006-01-02 15:04:05"),
-		currentDateStr:  time.Now().Format("2006-01-02"),
-		currentVIX:      13.28,
-		latestTicks:     make(map[string]models.MarketTick),
-		rdb:             rdb,
+		engine:            eng,
+		clients:           make(map[*websocket.Conn]bool),
+		speed:             1,
+		isPlaying:         false,
+		availableDir:      backupDir,
+		currentDatetime:   time.Now().Format("2006-01-02 15:04:05"),
+		currentDateStr:    time.Now().Format("2006-01-02"),
+		currentVIX:        13.28,
+		latestTicks:       make(map[string]models.MarketTick),
+		activeExpiryTicks: make(map[string]models.MarketTick),
+		rdb:               rdb,
 	}
 
 	// Auto-select primary parquet dataset prioritizing verified complete Spot + Options files
@@ -118,10 +123,14 @@ func NewParquetStreamer(eng *engine.MatchingEngine, backupDir string) *ParquetSt
 		log.Printf("[STREAMER] Initialized with primary Parquet dataset: %s", ps.currentFile)
 	}
 
-	// Auto-start playback on boot if parquet datasets exist
+	// Auto-start playback on boot only if EMULATOR_AUTO_PLAY is explicitly set to true
 	if ps.currentFile != "" {
-		ps.Start()
-		log.Printf("[STREAMER] Auto-started real-time playback for: %s", ps.currentFile)
+		if os.Getenv("EMULATOR_AUTO_PLAY") == "true" {
+			ps.Start()
+			log.Printf("[STREAMER] Auto-started real-time playback for: %s", ps.currentFile)
+		} else {
+			log.Printf("[STREAMER] Dataset %s loaded. Playback idle on boot (EMULATOR_AUTO_PLAY != true). Waiting for manual or API trigger.", ps.currentFile)
+		}
 	}
 	return ps
 }
@@ -268,15 +277,36 @@ func (ps *ParquetStreamer) Start() {
 	go ps.streamLoop()
 }
 
-// Stop pauses market feed playback.
+// Stop halts market feed playback and rewinds pointer to row 0.
 func (ps *ParquetStreamer) Stop() {
 	ps.mu.Lock()
-	defer ps.mu.Unlock()
-	if !ps.isPlaying {
-		return
+	if ps.isPlaying {
+		ps.isPlaying = false
+		close(ps.stopChan)
 	}
-	ps.isPlaying = false
-	close(ps.stopChan)
+	atomic.StoreInt64(&ps.currentRow, 0)
+	atomic.StoreInt64(&ps.ticksIngested, 0)
+	ps.isCompleted = false
+	activeFile := ps.currentFile
+	speed := ps.speed
+	tot := ps.totalRows
+	ps.mu.Unlock()
+
+	progressPayload := map[string]interface{}{
+		"type":        "progress",
+		"file":        activeFile,
+		"current_row": 0,
+		"total_rows":  tot,
+		"pct":         0.0,
+		"speed":       speed,
+		"is_playing":  false,
+		"date":        "",
+		"time":        "09:15:00",
+		"ticks":       0,
+	}
+	if pBytes, err := json.Marshal(progressPayload); err == nil {
+		ps.BroadcastRawMessage(pBytes)
+	}
 }
 
 // IsCompleted returns true if current dataset reached EOF.
@@ -463,6 +493,55 @@ func formatIndianFloat(val float64) string {
 	return fmt.Sprintf("%s.%02d", formatIndianNumber(intPart), fracPart)
 }
 
+// parseContractExpiryDate extracts the expiry date from contract trading symbol (e.g. NSE:NIFTY2681124450CE, NSE:NIFTY26AUG23600CE).
+func parseContractExpiryDate(sym string, tradeDate time.Time) (time.Time, string) {
+	clean := strings.ToUpper(strings.TrimSpace(sym))
+	clean = strings.TrimPrefix(clean, "NSE:")
+
+	// 1. Weekly FYERS format: [INDEX][YY][M][DD][STRIKE][CE|PE]
+	weeklyRe := regexp.MustCompile(`([A-Z]+)(\d{2})([1-9OND])(\d{2})(\d+)(CE|PE)`)
+	if matches := weeklyRe.FindStringSubmatch(clean); len(matches) == 7 {
+		yy, _ := strconv.Atoi(matches[2])
+		year := 2000 + yy
+		mChar := matches[3][0]
+		monthMap := map[byte]time.Month{
+			'1': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8, '9': 9,
+			'O': 10, 'N': 11, 'D': 12,
+		}
+		month := monthMap[mChar]
+		dd, _ := strconv.Atoi(matches[4])
+		if month >= 1 && month <= 12 && dd >= 1 && dd <= 31 {
+			expTime := time.Date(year, month, dd, 15, 30, 0, 0, tradeDate.Location())
+			expLabel := fmt.Sprintf("%02d %s %d (Weekly Expiry)", dd, strings.ToUpper(expTime.Format("Jan")), year)
+			return expTime, expLabel
+		}
+	}
+
+	// 2. Monthly FYERS format: [INDEX][YY][MMM][STRIKE][CE|PE]
+	monthlyRe := regexp.MustCompile(`([A-Z]+)(\d{2})(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)(\d+)(CE|PE)`)
+	if matches := monthlyRe.FindStringSubmatch(clean); len(matches) == 6 {
+		yy, _ := strconv.Atoi(matches[2])
+		year := 2000 + yy
+		mmm := matches[3]
+		monthMap := map[string]time.Month{
+			"JAN": 1, "FEB": 2, "MAR": 3, "APR": 4, "MAY": 5, "JUN": 6,
+			"JUL": 7, "AUG": 8, "SEP": 9, "OCT": 10, "NOV": 11, "DEC": 12,
+		}
+		month := monthMap[mmm]
+		if month >= 1 && month <= 12 {
+			firstOfNext := time.Date(year, month+1, 1, 0, 0, 0, 0, tradeDate.Location())
+			lastDay := firstOfNext.AddDate(0, 0, -1)
+			offset := (int(lastDay.Weekday()) - int(time.Thursday) + 7) % 7
+			lastThurs := lastDay.AddDate(0, 0, -offset)
+			expTime := time.Date(year, month, lastThurs.Day(), 15, 30, 0, 0, tradeDate.Location())
+			expLabel := fmt.Sprintf("%02d %s %d (Monthly Expiry)", lastThurs.Day(), mmm, year)
+			return expTime, expLabel
+		}
+	}
+
+	return time.Time{}, ""
+}
+
 // calculateIndexExpiry computes the next exchange expiry date and label (e.g. "09 JUL 2026", "Weekly Expiry").
 func calculateIndexExpiry(indexName, timeStr string) (string, string) {
 	tradeDt := time.Now()
@@ -617,68 +696,43 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 		ceOI := "—"
 		peOI := "—"
 
-		if t, ok := ps.latestTicks[ceKey]; ok && t.LTP > 0 {
-			ceLTP = t.LTP
-			if t.Open > 0 {
-				ceChg = float64(int((t.LTP-t.Open)*10)) / 10.0
-				ceChgPct = float64(int((ceChg/t.Open)*1000)) / 10.0
-			}
-			if t.OI > 0 {
-				ceOI = formatIndianNumber(t.OI)
-				totalCallOI += t.OI
-			} else if t.Volume > 0 {
-				ceOI = formatIndianNumber(t.Volume)
-			}
-			totalCallVol += t.Volume
+		// Prefer active expiry ticks to ensure 100% monotonic, single-expiry option chain consistency
+		tickCE, okCE := ps.activeExpiryTicks[ceKey]
+		if !okCE {
+			tickCE, okCE = ps.latestTicks[ceKey]
 		}
-		if t, ok := ps.latestTicks[peKey]; ok && t.LTP > 0 {
-			peLTP = t.LTP
-			if t.Open > 0 {
-				peChg = float64(int((t.LTP-t.Open)*10)) / 10.0
-				peChgPct = float64(int((peChg/t.Open)*1000)) / 10.0
+		if okCE && tickCE.LTP > 0 {
+			ceLTP = tickCE.LTP
+			if tickCE.Open > 0 {
+				ceChg = float64(int((tickCE.LTP-tickCE.Open)*10)) / 10.0
+				ceChgPct = float64(int((ceChg/tickCE.Open)*1000)) / 10.0
 			}
-			if t.OI > 0 {
-				peOI = formatIndianNumber(t.OI)
-				totalPutOI += t.OI
-			} else if t.Volume > 0 {
-				peOI = formatIndianNumber(t.Volume)
+			if tickCE.OI > 0 && tickCE.OI != 100000 {
+				ceOI = formatIndianNumber(tickCE.OI)
+				totalCallOI += tickCE.OI
+			} else if tickCE.Volume > 0 {
+				ceOI = formatIndianNumber(tickCE.Volume)
 			}
-			totalPutVol += t.Volume
+			totalCallVol += tickCE.Volume
 		}
 
-		if ceOI == "—" || peOI == "—" {
-			for _, t := range ps.latestTicks {
-				if strings.Contains(t.TradingSymbol, stkStr) || t.SecurityID == stkStr {
-					symUpper := strings.ToUpper(t.TradingSymbol)
-					if (strings.Contains(symUpper, "CE") || strings.Contains(symUpper, "CALL")) && ceOI == "—" && t.LTP > 0 {
-						ceLTP = t.LTP
-						if t.Open > 0 {
-							ceChg = float64(int((t.LTP-t.Open)*10)) / 10.0
-							ceChgPct = float64(int((ceChg/t.Open)*1000)) / 10.0
-						}
-						if t.OI > 0 {
-							ceOI = formatIndianNumber(t.OI)
-							totalCallOI += t.OI
-						} else if t.Volume > 0 {
-							ceOI = formatIndianNumber(t.Volume)
-						}
-						totalCallVol += t.Volume
-					} else if (strings.Contains(symUpper, "PE") || strings.Contains(symUpper, "PUT")) && peOI == "—" && t.LTP > 0 {
-						peLTP = t.LTP
-						if t.Open > 0 {
-							peChg = float64(int((t.LTP-t.Open)*10)) / 10.0
-							peChgPct = float64(int((peChg/t.Open)*1000)) / 10.0
-						}
-						if t.OI > 0 {
-							peOI = formatIndianNumber(t.OI)
-							totalPutOI += t.OI
-						} else if t.Volume > 0 {
-							peOI = formatIndianNumber(t.Volume)
-						}
-						totalPutVol += t.Volume
-					}
-				}
+		tickPE, okPE := ps.activeExpiryTicks[peKey]
+		if !okPE {
+			tickPE, okPE = ps.latestTicks[peKey]
+		}
+		if okPE && tickPE.LTP > 0 {
+			peLTP = tickPE.LTP
+			if tickPE.Open > 0 {
+				peChg = float64(int((tickPE.LTP-tickPE.Open)*10)) / 10.0
+				peChgPct = float64(int((peChg/tickPE.Open)*1000)) / 10.0
 			}
+			if tickPE.OI > 0 && tickPE.OI != 100000 {
+				peOI = formatIndianNumber(tickPE.OI)
+				totalPutOI += tickPE.OI
+			} else if tickPE.Volume > 0 {
+				peOI = formatIndianNumber(tickPE.Volume)
+			}
+			totalPutVol += tickPE.Volume
 		}
 
 		row := models.OptionStrikeRow{
@@ -717,6 +771,9 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 
 	vix := ps.currentVIX
 	expDate, expTag := calculateIndexExpiry(idxClean, timeStr)
+	if ps.activeExpiryLabel != "" {
+		expDate = ps.activeExpiryLabel
+	}
 
 	return models.OptionChainResponse{
 		IsLive:        ps.isPlaying,
@@ -821,6 +878,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 	dtCol := colOr("datetime", "Datetime", "''")
 	idxCol := colOr("index_name", "IndexName", "'NIFTY'")
 	instCol := colOr("instrument_type", "InstrumentType", "'OPTIDX'")
+	symCol := colOr("trading_symbol", "TradingSymbol", "''")
 	stkCol := colOr("strike", "Strike", "'0'")
 	optCol := colOr("option_type", "OptionType", "'CE'")
 	openCol := colOr("open", "Open", "0.0")
@@ -837,8 +895,8 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 		offsetClause = fmt.Sprintf(" OFFSET %d", startRow)
 	}
 
-	queryStr := fmt.Sprintf(`SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM read_parquet('%s') ORDER BY %s ASC, %s ASC%s`,
-		tsCol, dtCol, idxCol, instCol, stkCol, optCol, openCol, highCol, lowCol, closeCol, volCol, oiCol, ivCol, spotCol,
+	queryStr := fmt.Sprintf(`SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM read_parquet('%s') ORDER BY %s ASC, %s ASC%s`,
+		tsCol, dtCol, idxCol, instCol, symCol, stkCol, optCol, openCol, highCol, lowCol, closeCol, volCol, oiCol, ivCol, spotCol,
 		fullPath, tsCol, optCol, offsetClause)
 
 	rows, err := db.Query(queryStr)
@@ -880,7 +938,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 				break
 			}
 			var rec models.MarketCandleRecord
-			if err := rows.Scan(&rec.Timestamp, &rec.Datetime, &rec.IndexName, &rec.InstrumentType, &rec.Strike, &rec.OptionType, &rec.Open, &rec.High, &rec.Low, &rec.Close, &rec.Volume, &rec.OI, &rec.IV, &rec.SpotPrice); err != nil {
+			if err := rows.Scan(&rec.Timestamp, &rec.Datetime, &rec.IndexName, &rec.InstrumentType, &rec.TradingSymbol, &rec.Strike, &rec.OptionType, &rec.Open, &rec.High, &rec.Low, &rec.Close, &rec.Volume, &rec.OI, &rec.IV, &rec.SpotPrice); err != nil {
 				log.Printf("[STREAMER] DuckDB row scan error: %v", err)
 				return
 			}
@@ -1005,6 +1063,17 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 						_ = ps.rdb.Publish(context.Background(), "marmot:streamer:candles", cBytes).Err()
 					}
 
+					ps.mu.RLock()
+					activeFile := ps.currentFile
+					streamSpeed := ps.speed
+					totRows := ps.totalRows
+					cRow := atomic.LoadInt64(&ps.currentRow)
+					ps.mu.RUnlock()
+					var progPct float64
+					if totRows > 0 {
+						progPct = (float64(cRow) / float64(totRows)) * 100.0
+					}
+
 					// Broadcast virtual clock tick to Marmot UI for real-time historical clock sync
 					tickMsg := map[string]interface{}{
 						"type":           "mock_tick",
@@ -1021,11 +1090,50 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 						"formatted_time": currentBucketTime,
 						"timestamp":      currentBucketTime,
 						"is_virtual":     true,
+						"speed":          streamSpeed,
+						"progress_pct":   fmt.Sprintf("%.1f", progPct),
+						"current_row":    cRow,
+						"total_rows":     totRows,
+						"file":           activeFile,
 					}
 					if tBytes, err := json.Marshal(tickMsg); err == nil {
 						_ = ps.rdb.Publish(context.Background(), "marmot:mock_ticks", tBytes).Err()
 					}
 				}
+			}
+
+			// Determine nearest active exchange expiry from contracts in current bucket
+			var nearestExpiryDate string
+			var nearestExpiryLabel string
+			var nearestExpiryTime time.Time
+			bucketTradeDate := time.Date(parsedBucketTime.Year(), parsedBucketTime.Month(), parsedBucketTime.Day(), 0, 0, 0, 0, parsedBucketTime.Location())
+
+			for _, rec := range currentBucket {
+				if rec.TradingSymbol == "" || rec.OptionType == "INDEX" || rec.Strike == "SPOT" {
+					continue
+				}
+				expT, expLbl := parseContractExpiryDate(rec.TradingSymbol, parsedBucketTime)
+				if !expT.IsZero() {
+					expDateOnly := time.Date(expT.Year(), expT.Month(), expT.Day(), 0, 0, 0, 0, expT.Location())
+					if !expDateOnly.Before(bucketTradeDate) {
+						expKey := expDateOnly.Format("2006-01-02")
+						if nearestExpiryDate == "" || expDateOnly.Before(nearestExpiryTime) {
+							nearestExpiryDate = expKey
+							nearestExpiryTime = expDateOnly
+							nearestExpiryLabel = expLbl
+						}
+					}
+				}
+			}
+
+			if nearestExpiryDate != "" {
+				ps.mu.Lock()
+				if nearestExpiryDate != ps.activeExpiryDate {
+					ps.activeExpiryDate = nearestExpiryDate
+					ps.activeExpiryLabel = nearestExpiryLabel
+					ps.activeExpiryTicks = make(map[string]models.MarketTick)
+				}
+				ps.mu.Unlock()
 			}
 
 			for _, rec := range currentBucket {
@@ -1037,8 +1145,13 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					optType = "PE"
 				}
 
-				sym := fmt.Sprintf("%s %s %s", rec.IndexName, rec.Strike, optType)
+				sym := rec.TradingSymbol
+				if sym == "" {
+					sym = fmt.Sprintf("%s %s %s", rec.IndexName, rec.Strike, optType)
+				}
 				sym = strings.TrimSpace(sym)
+
+				strikeKey := ""
 				if rec.OptionType == "INDEX" || rec.Strike == "SPOT" {
 					sym = rec.IndexName
 					secID = "13"
@@ -1071,14 +1184,20 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 						}
 						atmStrike := math.Round(sp/step) * step
 						strikeNum := atmStrike + float64(offset)*step
-						secID = fmt.Sprintf("%.0f_%s", strikeNum, optType)
-						sym = fmt.Sprintf("%s %.0f %s", rec.IndexName, strikeNum, optType)
+						strikeKey = fmt.Sprintf("%.0f_%s", strikeNum, optType)
+						secID = strikeKey
+						if rec.TradingSymbol == "" {
+							sym = fmt.Sprintf("%s %.0f %s", rec.IndexName, strikeNum, optType)
+						}
 					}
 				} else {
 					num, err := strconv.ParseFloat(rec.Strike, 64)
 					if err == nil && num > 1000 {
-						secID = fmt.Sprintf("%.0f_%s", num, optType)
-						sym = fmt.Sprintf("%s %.0f %s", rec.IndexName, num, optType)
+						strikeKey = fmt.Sprintf("%.0f_%s", num, optType)
+						secID = strikeKey
+						if rec.TradingSymbol == "" {
+							sym = fmt.Sprintf("%s %.0f %s", rec.IndexName, num, optType)
+						}
 					}
 				}
 
@@ -1096,6 +1215,26 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					continue
 				}
 
+				isForActiveExpiry := false
+				if nearestExpiryDate == "" {
+					isForActiveExpiry = true
+				} else if rec.TradingSymbol != "" {
+					expT, _ := parseContractExpiryDate(rec.TradingSymbol, parsedBucketTime)
+					if !expT.IsZero() {
+						expKey := time.Date(expT.Year(), expT.Month(), expT.Day(), 0, 0, 0, 0, expT.Location()).Format("2006-01-02")
+						if expKey == nearestExpiryDate {
+							isForActiveExpiry = true
+						}
+					}
+				} else {
+					isForActiveExpiry = true
+				}
+
+				cleanOI := rec.OI
+				if cleanOI == 100000 {
+					cleanOI = 0
+				}
+
 				tick := models.MarketTick{
 					Timestamp:     parsedBucketTime,
 					SecurityID:    secID,
@@ -1106,9 +1245,15 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					Low:           rec.Low,
 					Close:         price,
 					Volume:        rec.Volume,
-					OI:            rec.OI,
+					OI:            cleanOI,
 				}
-				ps.BroadcastTick(tick)
+
+				if isForActiveExpiry && strikeKey != "" {
+					ps.mu.Lock()
+					ps.activeExpiryTicks[strikeKey] = tick
+					ps.mu.Unlock()
+					ps.BroadcastTick(tick)
+				}
 			}
 
 			// Concurrently compute and broadcast live INDIA VIX derived from option IV column
@@ -1165,6 +1310,9 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 			}
 			if pBytes, err := json.Marshal(pPayload); err == nil {
 				ps.BroadcastRawMessage(pBytes)
+				if ps.rdb != nil {
+					_ = ps.rdb.Publish(context.Background(), "marmot:mock_ticks", pBytes).Err()
+				}
 			}
 		}
 

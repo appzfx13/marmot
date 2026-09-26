@@ -56,7 +56,7 @@ func main() {
 	handler.RegisterRoutes(mux)
 
 	addr := fmt.Sprintf("0.0.0.0:%s", port)
-	log.Printf("[DHAN-EMULATOR] Server listening on %s (Dashboard: http://localhost:%s/mock/dashboard)", addr, port)
+	log.Printf("[DHAN-EMULATOR] Server listening on %s (Unified Gateway: http://localhost:8050/admins/dashboard/gateway-emulator/)", addr)
 
 	if err := http.ListenAndServe(addr, mux); err != nil {
 		log.Fatalf("[DHAN-EMULATOR] Server failed: %v", err)

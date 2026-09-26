@@ -72,3 +72,8 @@ class BaseBrokerAdapter(ABC):
     def emergency_kill_switch(self) -> Dict[str, Any]:
         """Emergency freeze all positions and cancel pending orders."""
         pass
+
+    def deactivate_kill_switch(self) -> Dict[str, Any]:
+        """Deactivate broker kill switch to re-enable trading."""
+        return {'success': True, 'broker': 'BASE', 'message': 'Kill switch deactivation not required for this broker.'}
+

@@ -154,11 +154,12 @@ func (j *StrategySignalJob) fetchMockBrokerPositions() []MockBrokerPosition {
 
 // StrategySignalJob manages the autonomous paper trading loop for an active strategy in Sandbox mode.
 type StrategySignalJob struct {
-	dbService    *services.DBService
-	config       *config.Config
-	payload      models.CommandPayload
-	hub          *ws.Hub
-	redisService *services.RedisService
+	dbService            *services.DBService
+	config               *config.Config
+	payload              models.CommandPayload
+	hub                  *ws.Hub
+	redisService         *services.RedisService
+	lastTelemetryLogTime time.Time
 }
 
 // SimulatedPosition represents an intraday simulated option position.
@@ -1379,7 +1380,8 @@ func (j *StrategySignalJob) saveTelemetry(
 			"spot_price": spotPrice,
 			"data":       telemetry,
 		})
-		if status == "STREAMING" && processingLatencyMs > 0 {
+		if status == "STREAMING" && processingLatencyMs > 0 && time.Since(j.lastTelemetryLogTime) >= 10*time.Second {
+			j.lastTelemetryLogTime = time.Now()
 			log.Printf("📡 [WS Telemetry] Task=%s | Spot=₹%.2f | NetPnL=₹%.2f | Margin=₹%s | OpenPos=%d | Latency=%dms\n",
 				j.payload.TaskID, spotPrice, realizedTotal+unrealizedTotal, telemetry["available_margin"], openCount, processingLatencyMs)
 		}

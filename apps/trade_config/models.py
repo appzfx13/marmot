@@ -7,6 +7,7 @@ from apps.common.choices import (
     LiveStrategyStatusChoices,
     MarketTypeChoices,
     RiskTypeChoices,
+    SessionRatingChoices,
     StrategyChoices,
     TaskStatusChoices,
 )
@@ -196,4 +197,41 @@ class DailyPortfolioSnapshot(BaseModel):
         ]
 
     def __str__(self):
-        return f"{self.user.username} - {self.trading_account.account_name} ({self.date}): PnL ₹{self.net_pnl}"
+        return f"{self.user.username} - {self.trading_account.account_name} ({self.date}): PnL ₹{self.net_pnl}"
+
+
+# --- Simulation Session Snapshot (Dedicated Archive for Mock/Gateway Execution) ---
+class SimulationSessionSnapshot(BaseModel):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='simulation_session_snapshots', verbose_name="Trader")
+    trading_account = models.ForeignKey(UserTradingAccount, on_delete=models.SET_NULL, null=True, blank=True, related_name='simulation_snapshots')
+    name = models.CharField(max_length=200, help_text="Custom name for this simulation session snapshot")
+    notes = models.TextField(blank=True, default="", help_text="Trader observations, market condition notes, or strategy rationale")
+    is_favorite = models.BooleanField(default=False, db_index=True, help_text="Favorite bookmark toggle")
+    rating = models.PositiveSmallIntegerField(choices=SessionRatingChoices.choices, default=SessionRatingChoices.ONE_STAR, db_index=True)
+    sim_mode = models.CharField(max_length=20, default='BACKUP', help_text="Simulation mode (LIVE or BACKUP)")
+    dataset_file = models.CharField(max_length=255, blank=True, default="", help_text="Historical Parquet dataset file name if in replay mode")
+    starting_balance = models.DecimalField(max_digits=14, decimal_places=2, default=100000.00, help_text="Starting account capital")
+    ending_balance = models.DecimalField(max_digits=14, decimal_places=2, default=100000.00, help_text="Ending available balance")
+    gross_pnl = models.DecimalField(max_digits=14, decimal_places=2, default=0.00, help_text="Gross realized trading PnL")
+    net_pnl = models.DecimalField(max_digits=14, decimal_places=2, default=0.00, help_text="Net PnL after brokerage & statutory charges")
+    total_charges = models.DecimalField(max_digits=14, decimal_places=2, default=0.00, help_text="Total brokerage and transaction charges")
+    total_trades = models.PositiveIntegerField(default=0, help_text="Total completed trades in session")
+    winning_trades = models.PositiveIntegerField(default=0, help_text="Count of profitable trades")
+    losing_trades = models.PositiveIntegerField(default=0, help_text="Count of losing trades")
+    win_rate = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, help_text="Win rate percentage (0-100%)")
+    max_drawdown = models.DecimalField(max_digits=14, decimal_places=2, default=0.00, help_text="Peak drawdown in session")
+    peak_margin_utilized = models.DecimalField(max_digits=14, decimal_places=2, default=0.00, help_text="Peak margin utilized during session")
+    closed_trades_snapshot = models.JSONField(default=list, blank=True, help_text="Snapshot of all closed trade pairs with prices, timestamps & PnL")
+    equity_curve_snapshot = models.JSONField(default=list, blank=True, help_text="Time-series data points for session equity curve chart")
+    orders_snapshot = models.JSONField(default=list, blank=True, help_text="Raw orders state captured from mock broker")
+    positions_snapshot = models.JSONField(default=list, blank=True, help_text="Raw positions state captured from mock broker")
+    calendar_heatmap_snapshot = models.JSONField(default=dict, blank=True, help_text="Daily PnL map for calendar heatmap visualization")
+
+    class Meta:
+        verbose_name = "Simulation Session Snapshot"
+        verbose_name_plural = "Simulation Session Snapshots"
+        ordering = ['-created_at', '-id']
+
+    def __str__(self):
+        return f"{self.name} ({self.get_rating_display()}) - Net PnL: ₹{self.net_pnl}"
+

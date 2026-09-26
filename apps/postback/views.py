@@ -7,10 +7,20 @@ from django.views import View
 from django.utils.decorators import method_decorator
 from django.views.decorators.csrf import csrf_exempt
 
+_REDIS_CLIENT = None
+
+def get_redis_client():
+    """Returns a singleton Redis client utilizing a reusable connection pool."""
+    global _REDIS_CLIENT
+    if _REDIS_CLIENT is None:
+        pool = redis.ConnectionPool.from_url(settings.REDIS_URL, max_connections=50, decode_responses=False)
+        _REDIS_CLIENT = redis.Redis(connection_pool=pool)
+    return _REDIS_CLIENT
+
 def push_webhook_to_stream(payload, user_id=None, broker_hint='dhan', ip_address=None, execution_mode='LIVE'):
-    """Push the raw webhook to a Redis Stream for async worker processing."""
+    """Push the raw webhook to a Redis Stream with capped maxlen for async worker processing."""
     try:
-        r = redis.Redis.from_url(settings.REDIS_URL)
+        r = get_redis_client()
         stream_name = 'marmot:webhooks:stream'
         data = {
             'payload': json.dumps(payload),
@@ -20,7 +30,8 @@ def push_webhook_to_stream(payload, user_id=None, broker_hint='dhan', ip_address
             'execution_mode': str(execution_mode),
             'timestamp': str(time.time())
         }
-        r.xadd(stream_name, data)
+        # Approximate trimming (maxlen=10000) guarantees O(1) performance and prevents Redis OOM
+        r.xadd(stream_name, data, maxlen=10000, approximate=True)
     except Exception as e:
         import logging
         logging.getLogger(__name__).error(f"Failed to push webhook to Redis Stream: {e}")

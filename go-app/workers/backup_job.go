@@ -71,7 +71,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 		return
 	}
 	if strikeCount <= 0 {
-		strikeCount = 5
+		strikeCount = 15
 	}
 
 	// Resolve credentials: read directly from dynamic Redis payload
@@ -106,9 +106,9 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 	// ── STEP 1: Download Index Spot Data into Staging Parquet ─────────────────
 	log.Printf("📥 [Task #%s] [Step 1/2] Downloading Index Spot candles (%s)...", taskID, indexName)
-	spotFiles, spotMap := j.downloadIndexSpot(ctx, taskID, stagingDir, indexName, startDate, endDate, hasOptions, fyersAppID, fyersAccessToken)
-	if spotFiles == nil && ctx.Err() == nil {
-		log.Printf("🛑 [Task #%s] Index Spot download aborted due to unrecoverable error. Halting task.", taskID)
+	spotFiles, spotMap := j.downloadIndexSpot(ctx, taskID, stagingDir, indexName, startDate, endDate, hasOptions, fyersAppID, fyersAccessToken, params.Use30Days5s)
+	if len(spotFiles) == 0 && ctx.Err() == nil {
+		log.Printf("🛑 [Task #%s] Index Spot download returned 0 files across date range [%s → %s]. Halting task.", taskID, startDate, endDate)
 		return
 	}
 
@@ -166,7 +166,29 @@ func (j *BackupJob) Run(ctx context.Context) {
 	})
 
 	finalDatasetFile := filepath.Join(backupTaskDir, "dataset.parquet")
-	totalRows, fileSizeMB, mergeErr := services.MergeParquetFiles(finalDatasetFile, allStagedFiles)
+	lastBroadcastPct := 85
+	lastBroadcastTime := time.Now()
+
+	totalRows, fileSizeMB, mergeErr := services.MergeParquetFilesWithProgress(
+		finalDatasetFile,
+		allStagedFiles,
+		func(currentFile int, totalFiles int, currentRows int64) {
+			if totalFiles <= 0 {
+				return
+			}
+			pct := 85 + int((float64(currentFile)/float64(totalFiles))*14.0)
+			now := time.Now()
+			if pct > lastBroadcastPct || now.Sub(lastBroadcastTime) >= 10*time.Second {
+				lastBroadcastPct = pct
+				lastBroadcastTime = now
+				if j.dbService != nil {
+					_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", pct)
+				}
+				j.broadcastProgress(ctx, taskID, pct, "running", 0, "")
+				log.Printf("⏳ [Task #%s] Merging Parquet chunks: %d/%d files (%d%%) - %d rows merged\n", taskID, currentFile, totalFiles, pct, currentRows)
+			}
+		},
+	)
 	if mergeErr != nil {
 		log.Printf("❌ [Task #%s] Failed to merge parquet dataset: %v\n", taskID, mergeErr)
 		j.broadcastProgress(ctx, taskID, 0, "error", 0, "")
@@ -271,48 +293,55 @@ func parseOptionSymbolExpiry(symbol string) int64 {
 	return time.Now().In(ist).AddDate(0, 0, 7).Unix()
 }
 
-// isShortRange returns true when the date range is ≤35 calendar days (30-day preset).
-// FYERS seconds-resolution data is only available for the last 30 trading days.
+// isShortRange returns true when the date range is ≤35 calendar days AND within the trailing 35 calendar days from today.
+// FYERS seconds-resolution data is only retained for the trailing 30-35 calendar days.
 func isShortRange(startDate, endDate string) bool {
 	start, err1 := time.Parse("2006-01-02", startDate)
 	end, err2 := time.Parse("2006-01-02", endDate)
 	if err1 != nil || err2 != nil {
 		return false
 	}
-	return end.Sub(start).Hours() <= 35*24
+	if end.Sub(start).Hours() > 35*24 {
+		return false
+	}
+	if time.Since(end).Hours() > 35*24 {
+		return false
+	}
+	return true
 }
 
 // downloadIndexSpot downloads OHLCV candles for Index spot into staging Parquet chunks.
-// Uses 5S (5-second) resolution for ≤35-day ranges; 1-minute for longer ranges.
+// Uses 5S (5-second) resolution for ≤35-day recent ranges when use30Days5s is active; 1-minute for all other ranges.
 func (j *BackupJob) downloadIndexSpot(
 	ctx context.Context,
 	taskID, stagingDir, indexName, startDate, endDate string,
 	hasOptions bool,
 	fyersAppID, fyersAccessToken string,
+	use30Days5s bool,
 ) ([]string, map[int64]float64) {
-	var createdFiles []string
+	createdFiles := make([]string, 0)
 	spotMap := make(map[int64]float64)
 	client := &http.Client{Timeout: 30 * time.Second}
 
 	start, err := time.Parse("2006-01-02", startDate)
 	if err != nil {
 		log.Printf("⚠️ [Task #%s] Invalid start date: %v", taskID, err)
-		return nil, spotMap
+		return createdFiles, spotMap
 	}
 	end, err := time.Parse("2006-01-02", endDate)
 	if err != nil {
 		log.Printf("⚠️ [Task #%s] Invalid end date: %v", taskID, err)
-		return nil, spotMap
+		return createdFiles, spotMap
 	}
 
-	// Short range → 5S resolution with 1-day chunks (FYERS seconds data limit: 30 trading days)
-	shortRange := isShortRange(startDate, endDate)
+	// 5S resolution is only valid for short recent ranges when the 5S toggle is active
+	shortRange := isShortRange(startDate, endDate) && use30Days5s
 	resolution := "1"
 	chunkDays := 30
 	if shortRange {
 		resolution = "5S"
 		chunkDays = 1
-		log.Printf("⚡ [Task #%s] Short range detected — using 5S resolution for spot data", taskID)
+		log.Printf("⚡ [Task #%s] Short recent range with 5S toggle detected — using 5S resolution for spot data", taskID)
 	}
 
 	totalDays := int(end.Sub(start).Hours()/24) + 1
@@ -444,6 +473,61 @@ func (j *BackupJob) downloadIndexSpot(
 						}
 						records = append(records, rec)
 					}
+					break
+				} else if resolution == "5S" {
+					log.Printf("ℹ️ [Task #%s] No 5S spot data for %s (%s). Falling back to 1-minute resolution.", taskID, fyersIndexSym, chunkStart.Format("2006-01-02"))
+					url1m := fmt.Sprintf("https://api-t1.fyers.in/data/history?symbol=%s&resolution=1&date_format=1&range_from=%s&range_to=%s&cont_flag=1",
+						url.QueryEscape(fyersIndexSym), chunkStart.Format("2006-01-02"), chunkEnd.Format("2006-01-02"))
+					req1m, err1m := http.NewRequestWithContext(ctx, "GET", url1m, nil)
+					if err1m == nil {
+						req1m.Header.Set("Authorization", fyersAppID+":"+fyersAccessToken)
+						req1m.Header.Set("Accept", "application/json")
+						if resp1m, doErr := client.Do(req1m); doErr == nil {
+							body1m, _ := io.ReadAll(resp1m.Body)
+							resp1m.Body.Close()
+							var fResp1m struct {
+								S       string      `json:"s"`
+								Candles [][]float64 `json:"candles"`
+							}
+							if jErr := json.Unmarshal(body1m, &fResp1m); jErr == nil && len(fResp1m.Candles) > 0 {
+								for _, c := range fResp1m.Candles {
+									if len(c) < 6 {
+										continue
+									}
+									tsEpoch := int64(c[0])
+									closeVal := c[4]
+									spotMap[tsEpoch] = closeVal
+									candleTime := time.Unix(tsEpoch, 0).In(ist)
+
+									rec := models.MarketCandleRecord{
+										Timestamp:      tsEpoch,
+										Datetime:       candleTime.Format("2006-01-02 15:04:05"),
+										IndexName:      indexName,
+										InstrumentType: "INDEX",
+										TradingSymbol:  fyersIndexSym,
+										Strike:         "SPOT",
+										OptionType:     "INDEX",
+										Open:           c[1],
+										High:           c[2],
+										Low:            c[3],
+										Close:          closeVal,
+										Volume:         int64(c[5]),
+										OI:             0,
+										IV:             0.0,
+										Delta:          0.0,
+										Gamma:          0.0,
+										Theta:          0.0,
+										Vega:           0.0,
+										Bid:            closeVal,
+										Ask:            closeVal,
+										SpotPrice:      closeVal,
+									}
+									records = append(records, rec)
+								}
+							}
+						}
+					}
+					break
 				}
 				break
 			} else if statusCode == 429 || statusCode >= 500 {
@@ -503,13 +587,14 @@ func (j *BackupJob) runOptionsDownload(
 	client := &http.Client{Transport: tr, Timeout: config.HTTPClientTimeout}
 	ist, _ := time.LoadLocation("Asia/Kolkata")
 
-	// ── Multi-expiry contract generation ─────────────────────────────────────
-	var contracts []OptionContractMetadata
+	// FYERS Expired FnO API maintains 5-second (5S) resolution across historical archives back to Oct 2018.
+	// When use30Days5s is active, retain 5S resolution for high-precision historical option backtesting.
 
 	expiries := generateIndexExpiries(indexName, startDate, endDate, ist)
 	log.Printf("📅 [Task #%s] Found %d %s expiries in [%s → %s] (5S Toggle: %v)", taskID, len(expiries), indexName, startDate, endDate, use30Days5s)
 
 	step := StrikeIntervalForIndex(indexName)
+	var contracts []OptionContractMetadata
 
 	for _, expiryDay := range expiries {
 		expiryAt1530 := time.Date(expiryDay.Year(), expiryDay.Month(), expiryDay.Day(), 15, 30, 0, 0, ist)
@@ -629,8 +714,13 @@ func (j *BackupJob) runOptionsDownload(
 				}
 
 				// ── STRICT RESOLUTION LOGIC & ZERO FALLBACKS ───────────────────
-				// If use30Days5s is TRUE -> strictly fetch 5S interval via standard history API
-				// If use30Days5s is FALSE -> strictly fetch 1-min interval via expired history API
+				// If use30Days5s is TRUE -> strictly fetch 5S interval (5-Second Resolution)
+				// If use30Days5s is FALSE -> fetch 1-min interval
+				optResolution := config.Resolution1Min
+				if use30Days5s {
+					optResolution = config.Resolution5S
+				}
+
 				contractStartT := time.Unix(contract.ExpiryEpoch, 0).In(ist).AddDate(0, 0, -30)
 				globalStartT, _ := time.ParseInLocation("2006-01-02", startDate, ist)
 				if contractStartT.Before(globalStartT) {
@@ -638,13 +728,14 @@ func (j *BackupJob) runOptionsDownload(
 				}
 				contractStart := contractStartT.Format("2006-01-02")
 
+				isExpiredContract := time.Now().After(time.Unix(contract.ExpiryEpoch, 0))
 				var reqURL string
-				if use30Days5s {
-					reqURL = fmt.Sprintf("%s?symbol=%s&resolution=%s&date_format=1&range_from=%s&range_to=%s&cont_flag=1",
-						config.FyersBaseHistoryURL, url.QueryEscape(contract.Symbol), config.Resolution5S, contractStart, endDate)
-				} else {
+				if isExpiredContract {
 					reqURL = fmt.Sprintf("%s?symbol=%s&resolution=%s&date_format=1&range_from=%s&range_to=%s&include_greeks=1&include_oi=1",
-						config.FyersExpiredHistoryURL, url.QueryEscape(contract.Symbol), config.Resolution1Min, contractStart, expiryDateStr)
+						config.FyersExpiredHistoryURL, url.QueryEscape(contract.Symbol), optResolution, contractStart, expiryDateStr)
+				} else {
+					reqURL = fmt.Sprintf("%s?symbol=%s&resolution=%s&date_format=1&range_from=%s&range_to=%s&cont_flag=1",
+						config.FyersBaseHistoryURL, url.QueryEscape(contract.Symbol), optResolution, contractStart, endDate)
 				}
 
 				select {
@@ -669,8 +760,60 @@ func (j *BackupJob) runOptionsDownload(
 				hResp.Body.Close()
 
 				if hResp.StatusCode != http.StatusOK {
-					log.Printf("⚠️ [Task #%s] HTTP %d for %s", taskID, hResp.StatusCode, contract.Symbol)
-					continue
+					// 1. If HTTP 422, attempt fallback with alternate symbol format (monthly vs weekly)
+					if hResp.StatusCode == http.StatusUnprocessableEntity {
+						altSymbol := getAlternateFyersOptionSymbol(indexName, contract.ExpiryEpoch, contract.StrikePrice, contract.OptionType, ist)
+						if altSymbol != "" && altSymbol != contract.Symbol {
+							var altReqURL string
+							if isExpiredContract {
+								altReqURL = fmt.Sprintf("%s?symbol=%s&resolution=%s&date_format=1&range_from=%s&range_to=%s&include_greeks=1&include_oi=1",
+									config.FyersExpiredHistoryURL, url.QueryEscape(altSymbol), optResolution, contractStart, expiryDateStr)
+							} else {
+								altReqURL = fmt.Sprintf("%s?symbol=%s&resolution=%s&date_format=1&range_from=%s&range_to=%s&cont_flag=1",
+									config.FyersBaseHistoryURL, url.QueryEscape(altSymbol), optResolution, contractStart, endDate)
+							}
+							altReq, altErr := http.NewRequestWithContext(ctx, "GET", altReqURL, nil)
+							if altErr == nil {
+								altReq.Header.Set("Authorization", fyersAppID+":"+fyersAccessToken)
+								altReq.Header.Set("Accept", "application/json")
+								altResp, altDoErr := client.Do(altReq)
+								if altDoErr == nil {
+									altBodyBytes, _ := io.ReadAll(altResp.Body)
+									altResp.Body.Close()
+									if altResp.StatusCode == http.StatusOK {
+										hResp.StatusCode = http.StatusOK
+										bodyBytes = altBodyBytes
+										contract.Symbol = altSymbol
+									}
+								}
+							}
+						}
+					}
+
+					// 2. If still not OK and was querying Expired FnO, try standard History API (for contracts expiring in current month)
+					if hResp.StatusCode != http.StatusOK && isExpiredContract {
+						baseReqURL := fmt.Sprintf("%s?symbol=%s&resolution=%s&date_format=1&range_from=%s&range_to=%s&cont_flag=1",
+							config.FyersBaseHistoryURL, url.QueryEscape(contract.Symbol), optResolution, contractStart, endDate)
+						bReq, bErr := http.NewRequestWithContext(ctx, "GET", baseReqURL, nil)
+						if bErr == nil {
+							bReq.Header.Set("Authorization", fyersAppID+":"+fyersAccessToken)
+							bReq.Header.Set("Accept", "application/json")
+							bResp, bDoErr := client.Do(bReq)
+							if bDoErr == nil {
+								bBodyBytes, _ := io.ReadAll(bResp.Body)
+								bResp.Body.Close()
+								if bResp.StatusCode == http.StatusOK {
+									hResp.StatusCode = http.StatusOK
+									bodyBytes = bBodyBytes
+								}
+							}
+						}
+					}
+
+					if hResp.StatusCode != http.StatusOK {
+						log.Printf("⚠️ [Task #%s] HTTP %d for %s", taskID, hResp.StatusCode, contract.Symbol)
+						continue
+					}
 				}
 
 				if len(bodyBytes) > 0 {
@@ -716,7 +859,12 @@ func (j *BackupJob) runOptionsDownload(
 								Low:            c[3],
 								Close:          closeVal,
 								Volume:         volumeVal,
-								OI:             contract.OI,
+								OI: func() int64 {
+									if len(c) >= 7 && c[6] > 0 {
+										return int64(c[6])
+									}
+									return 0
+								}(),
 								IV:             metrics.IV,
 								Delta:          metrics.Delta,
 								Gamma:          metrics.Gamma,
@@ -982,14 +1130,14 @@ func weeklyMonthCode(m time.Month) string {
 	return [...]string{"", "1", "2", "3", "4", "5", "6", "7", "8", "9", "O", "N", "D"}[m]
 }
 
-// isMonthlyExpiry returns true if t is the last Thursday of its month (monthly contract)
+// isMonthlyExpiry returns true if t is the last scheduled expiry of its month (monthly contract)
 func isMonthlyExpiry(t time.Time) bool {
 	return t.AddDate(0, 0, 7).Month() != t.Month()
 }
 
 // buildFyersOptionSymbol constructs the correct FYERS option symbol.
-// Monthly expiry (last Thu of month): NSE:NIFTY25JAN23500CE
-// Weekly expiry: NSE:NIFTY2420121450CE  (YY + M-code + DD with 2-digit day)
+// Monthly expiry (last expiry of month): NSE:NIFTY26JUL23500CE
+// Weekly expiry: NSE:NIFTY2670721450CE  (YY + M-code + DD with 2-digit day)
 func buildFyersOptionSymbol(indexName string, expiry time.Time, strike float64, cepe string) string {
 	yy := expiry.Format("06")
 	strikeStr := fmt.Sprintf("%.0f", strike)
@@ -1001,18 +1149,47 @@ func buildFyersOptionSymbol(indexName string, expiry time.Time, strike float64, 
 	return fmt.Sprintf("NSE:%s%s%s%02d%s%s", strings.ToUpper(indexName), yy, mCode, expiry.Day(), strikeStr, cepe)
 }
 
-// getExpiryWeekdayForIndex resolves the correct exchange weekly expiry day
-func getExpiryWeekdayForIndex(indexName string) time.Weekday {
+// getAlternateFyersOptionSymbol provides an alternate formatting fallback (e.g. monthly 3-letter month vs weekly day-code)
+func getAlternateFyersOptionSymbol(indexName string, expiryEpoch int64, strike float64, optType string, ist *time.Location) string {
+	expiry := time.Unix(expiryEpoch, 0).In(ist)
+	yy := expiry.Format("06")
+	strikeStr := fmt.Sprintf("%.0f", strike)
+	cepe := "CE"
+	if strings.ToUpper(optType) == "PUT" || strings.ToUpper(optType) == "PE" {
+		cepe = "PE"
+	}
+	if isMonthlyExpiry(expiry) {
+		mCode := weeklyMonthCode(expiry.Month())
+		return fmt.Sprintf("NSE:%s%s%s%02d%s%s", strings.ToUpper(indexName), yy, mCode, expiry.Day(), strikeStr, cepe)
+	}
+	mmm := strings.ToUpper(expiry.Format("Jan"))
+	return fmt.Sprintf("NSE:%s%s%s%s%s", strings.ToUpper(indexName), yy, mmm, strikeStr, cepe)
+}
+
+// getExpiryWeekdayForIndex resolves the correct exchange weekly expiry day based on index and regulatory date timeline
+func getExpiryWeekdayForIndex(indexName string, tradeDate time.Time) time.Weekday {
+	dStr := tradeDate.Format("2006-01-02")
 	switch strings.ToUpper(indexName) {
 	case "BANKNIFTY":
-		return time.Wednesday
+		if dStr >= "2023-09-04" && dStr < "2024-11-20" {
+			return time.Wednesday
+		}
+		return time.Thursday
 	case "FINNIFTY":
 		return time.Tuesday
 	case "MIDCPNIFTY":
-		return time.Monday
+		if dStr >= "2023-08-21" {
+			return time.Monday
+		}
+		return time.Wednesday
 	case "SENSEX":
 		return time.Friday
-	default:
+	case "BANKEX":
+		return time.Monday
+	default: // NIFTY
+		if dStr >= "2025-09-01" {
+			return time.Tuesday
+		}
 		return time.Thursday
 	}
 }
@@ -1021,15 +1198,14 @@ func getExpiryWeekdayForIndex(indexName string) time.Weekday {
 func generateIndexExpiries(indexName, startDate, endDate string, ist *time.Location) []time.Time {
 	start, _ := time.ParseInLocation("2006-01-02", startDate, ist)
 	end, _ := time.ParseInLocation("2006-01-02", endDate, ist)
-	targetWeekday := getExpiryWeekdayForIndex(indexName)
 	var result []time.Time
 	curr := start
-	for curr.Weekday() != targetWeekday {
-		curr = curr.AddDate(0, 0, 1)
-	}
 	for !curr.After(end) {
-		result = append(result, curr)
-		curr = curr.AddDate(0, 0, 7)
+		targetWeekday := getExpiryWeekdayForIndex(indexName, curr)
+		if curr.Weekday() == targetWeekday {
+			result = append(result, curr)
+		}
+		curr = curr.AddDate(0, 0, 1)
 	}
 	return result
 }

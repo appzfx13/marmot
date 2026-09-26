@@ -166,6 +166,7 @@ type MarketCandleRecord struct {
 	Datetime       string  `parquet:"datetime,string" json:"datetime"`
 	IndexName      string  `parquet:"index_name,string" json:"index_name"`
 	InstrumentType string  `parquet:"instrument_type,string" json:"instrument_type"`
+	TradingSymbol  string  `parquet:"trading_symbol,string" json:"trading_symbol"`
 	Strike         string  `parquet:"strike,string" json:"strike"`
 	OptionType     string  `parquet:"option_type,string" json:"option_type"`
 	Open           float64 `parquet:"open,double" json:"open"`

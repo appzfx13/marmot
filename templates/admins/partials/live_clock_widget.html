@@ -12,6 +12,9 @@
                     {{ market_clock.time_str|default:"09:15:00" }}
                 </span>
                 <span class="badge bg-dark bg-opacity-75 text-white-50 font-monospace smaller px-2 py-0.5 border border-white border-opacity-10">IST</span>
+                <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fw-bold" id="live-replay-speed-badge" style="display: none;">
+                    <i class="bi bi-speedometer2 me-1"></i><span id="live-replay-speed-val">1</span>x
+                </span>
             </div>
             <div class="theme-text-muted smaller d-flex align-items-center gap-2">
                 <span id="live-exchange-clock-date">{{ market_clock.date_str }}</span>
@@ -73,6 +76,12 @@
             }
             if (zoneElem) {
                 zoneElem.textContent = 'Historical Parquet Feed';
+            }
+            if (data.speed) {
+                const spdElem = document.getElementById('live-replay-speed-val');
+                const spdBadge = document.getElementById('live-replay-speed-badge');
+                if (spdElem) spdElem.textContent = data.speed;
+                if (spdBadge) spdBadge.style.display = 'inline-flex';
             }
             if (statusElem && !statusElem.classList.contains('virtual-clock-active')) {
                 statusElem.className = 'badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 virtual-clock-active';

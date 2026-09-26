@@ -1,7 +1,5 @@
 package ws
 
-import "log"
-
 // Hub maintains active clients and broadcasts messages.
 type Hub struct {
 	clients     map[*Client]bool
@@ -32,13 +30,13 @@ func NewHub() *Hub {
 	return &Hub{
 		clients:     make(map[*Client]bool),
 		taskSubs:    make(map[string]map[*Client]bool),
-		Broadcast:   make(chan []byte),
-		Register:    make(chan *Client),
-		Unregister:  make(chan *Client),
-		Subscribe:   make(chan *TaskSubscription),
-		Unsubscribe: make(chan *TaskSubscription),
-		TaskMessage: make(chan *TaskMessage),
-		SubSymbol:   make(chan string, 100),
+		Broadcast:   make(chan []byte, 1024),
+		Register:    make(chan *Client, 128),
+		Unregister:  make(chan *Client, 128),
+		Subscribe:   make(chan *TaskSubscription, 128),
+		Unsubscribe: make(chan *TaskSubscription, 128),
+		TaskMessage: make(chan *TaskMessage, 1024),
+		SubSymbol:   make(chan string, 256),
 	}
 }
 
@@ -85,7 +83,6 @@ func (h *Hub) Run() {
 			if !ok || len(subs) == 0 {
 				continue
 			}
-			log.Printf("📤 [WS Broadcast -> Task %s] Subs: %d | Data: %s\n", tm.TaskID, len(subs), string(tm.Data))
 			for client := range subs {
 				if _, stillConnected := h.clients[client]; stillConnected {
 					select {
@@ -100,7 +97,11 @@ func (h *Hub) Run() {
 	}
 }
 
-// BroadcastToTask queues a message for clients subscribed to the given taskID.
+// BroadcastToTask queues a message for clients subscribed to the given taskID in a non-blocking manner.
 func (h *Hub) BroadcastToTask(taskID string, message []byte) {
-	h.TaskMessage <- &TaskMessage{TaskID: taskID, Data: message}
+	select {
+	case h.TaskMessage <- &TaskMessage{TaskID: taskID, Data: message}:
+	default:
+		// Queue saturated; drop non-critical telemetry frame to guarantee zero-latency for execution thread
+	}
 }

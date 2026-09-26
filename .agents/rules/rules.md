@@ -15,6 +15,7 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
 - **Preserve Unrelated Code:** Preserve all existing comments, type annotations, and logic in untouched code sections.
 - **Straightforward & Readable Code:** Avoid over-engineering, unnecessary abstractions, or overly complex implementations. Write clear, easily understandable, maintainable code in Python and Go.
 - **Dependency Propagation:** When modifying or adding functionality, always update all dependent functions, method call signatures, views, templates, and service layers.
+- **Ingress & Tunnel Continuity (PRIORITY 1):** NEVER execute `docker compose down` during routine code modifications, testing, or feature updates. Routine container reloads must strictly use targeted container restarts (e.g. `docker compose restart web go_app`) to keep the public Cloudflare ingress tunnel and live broker webhook URLs continuously active without downtime or URL rotation.
 
 ---
 
@@ -121,3 +122,13 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
   2. **Prepare Implementation Plan:** Draft a structured `implementation_plan.md` artifact detailing proposed architectural changes and verification steps.
   3. **Stop & Request Start Approval:** Present the plan, discuss design choices, and wait for explicit user confirmation ("proceed to start") before modifying code.
 - **RCA - Fix - Approach Summary Table Required:** After completing approved work, AI agents MUST provide a structured summary table containing Root Cause Analysis (RCA), Fix Applied, and Architectural Approach in the final response.
+
+---
+
+## 12. Mandatory Browser Control & Playwright Verification
+- **End-to-End Visual & Network Testing (MANDATORY):** All automated AI agents and developers modifying frontend UI templates, HTMX swaps, live option chains, WebSocket consumers, forms, or admin dashboards MUST test and verify changes using Playwright and the Antigravity browser subagent / browser control.
+- **Verification Criteria:**
+  1. Navigate to the affected page(s) and authenticate if required.
+  2. Monitor network traffic in the browser context to verify zero redundant HTTP polling and confirm HTTP status 200/101.
+  3. Inspect DOM elements to verify real-time data updates, responsive layout alignment, and visual styling.
+  4. Capture and review screenshots to visually validate the UI before concluding any task.

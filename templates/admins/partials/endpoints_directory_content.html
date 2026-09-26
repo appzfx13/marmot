@@ -1,0 +1,256 @@
+{% load static %}
+
+<div class="col-12 px-0">
+    <!-- Header Banner -->
+    <div class="card p-4 rounded-4 shadow-sm mb-4" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+        <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3">
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1">
+                    <span class="material-icons text-warning fs-4">dns</span>
+                    <h4 class="fw-bold theme-text-main mb-0">Platform Endpoints &amp; Webhooks Directory</h4>
+                    <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2.5 py-1 smaller fw-bold">Live Ingress</span>
+                </div>
+                <p class="theme-text-muted small mb-0">
+                    Comprehensive catalog of all public webhooks, OAuth callbacks, Dhan emulator routes, and real-time streaming sockets.
+                </p>
+            </div>
+            <div class="d-flex flex-wrap align-items-center gap-2">
+                <div class="d-flex align-items-center gap-2 px-3 py-1.5 rounded-pill border" style="background: rgba(255, 255, 255, 0.03); border-color: var(--border-color) !important;">
+                    <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 8px; height: 8px;"></span>
+                    <span class="smaller font-monospace text-white-50">Active Host:</span>
+                    <span class="smaller font-monospace text-success fw-bold active-domain-label">{{ origin }}</span>
+                </div>
+                <a href="{% url 'admins:postback_list' %}" 
+                   class="btn btn-outline-secondary btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-1.5"
+                   hx-get="{% url 'admins:postback_list' %}" hx-target="#app-main-container" hx-push-url="true">
+                    <i class="bi bi-receipt"></i>
+                    <span>View Postback Logs</span>
+                </a>
+                <a href="{% url 'admins:live-data-feed' %}" 
+                   class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3 d-inline-flex align-items-center gap-1.5 shadow-sm"
+                   hx-get="{% url 'admins:live-data-feed' %}" hx-target="#app-main-container" hx-push-url="true">
+                    <i class="bi bi-broadcast"></i>
+                    <span>Live Data Feed</span>
+                </a>
+            </div>
+        </div>
+
+        <!-- Filter Pills & Search Bar -->
+        <div class="row g-3 align-items-center mt-3 pt-3 border-top" style="border-color: var(--border-color) !important;">
+            <div class="col-12 col-md-auto d-flex flex-wrap gap-1.5" id="categoryFilterContainer">
+                <button type="button" class="btn btn-sm rounded-pill px-3 category-pill active fw-semibold" data-category="all" style="background: var(--primary); color: #fff;">
+                    All <span class="badge bg-black bg-opacity-25 rounded-pill ms-1">{{ total_endpoints }}</span>
+                </button>
+                <button type="button" class="btn btn-sm rounded-pill px-3 category-pill border theme-text-muted" data-category="webhooks" style="background: transparent; border-color: var(--border-color);">
+                    <i class="bi bi-arrow-down-left-circle me-1 text-warning"></i>Broker Webhooks
+                </button>
+                <button type="button" class="btn btn-sm rounded-pill px-3 category-pill border theme-text-muted" data-category="oauth" style="background: transparent; border-color: var(--border-color);">
+                    <i class="bi bi-shield-lock me-1 text-info"></i>OAuth &amp; Callbacks
+                </button>
+                <button type="button" class="btn btn-sm rounded-pill px-3 category-pill border theme-text-muted" data-category="emulator" style="background: transparent; border-color: var(--border-color);">
+                    <i class="bi bi-cpu me-1 text-primary"></i>Emulator &amp; Sandbox
+                </button>
+                <button type="button" class="btn btn-sm rounded-pill px-3 category-pill border theme-text-muted" data-category="streaming" style="background: transparent; border-color: var(--border-color);">
+                    <i class="bi bi-activity me-1 text-success"></i>Streaming Sockets
+                </button>
+                <button type="button" class="btn btn-sm rounded-pill px-3 category-pill border theme-text-muted" data-category="operational" style="background: transparent; border-color: var(--border-color);">
+                    <i class="bi bi-speedometer2 me-1 text-info"></i>Telemetry APIs
+                </button>
+            </div>
+            <div class="col-12 col-md ms-md-auto">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text border-end-0" style="background: rgba(255, 255, 255, 0.05); border-color: var(--border-color); color: var(--text-muted);">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text" id="endpointSearchInput" class="form-control border-start-0" 
+                           placeholder="Search endpoint name, path, target, or usage..." 
+                           style="background: rgba(255, 255, 255, 0.05); border-color: var(--border-color); color: var(--text-main);">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Endpoints Directory Table Card -->
+    <div class="card rounded-4 shadow-sm overflow-hidden" style="background: var(--card-bg); border: 1px solid var(--border-color);">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0" id="endpointsTable" style="color: var(--text-main);">
+                <thead style="background: rgba(255, 255, 255, 0.02); border-bottom: 1px solid var(--border-color);">
+                    <tr class="smaller text-uppercase font-monospace theme-text-muted">
+                        <th class="ps-4 py-3" style="width: 22%;">Endpoint / Service</th>
+                        <th class="py-3" style="width: 38%;">Live Ingress URL &amp; Quick Copy</th>
+                        <th class="py-3" style="width: 20%;">Configuration Target</th>
+                        <th class="pe-4 py-3" style="width: 20%;">Usage &amp; Purpose</th>
+                    </tr>
+                </thead>
+                <tbody class="border-top-0">
+                    {% for ep in endpoints %}
+                    <tr class="endpoint-row border-bottom" data-category="{{ ep.category }}" style="border-color: var(--border-color) !important;">
+                        <!-- Endpoint Name & Method -->
+                        <td class="ps-4 py-3 align-top">
+                            <div class="d-flex align-items-center gap-2 mb-1.5">
+                                <span class="{{ ep.method_badge }} smaller fw-bold px-2 py-0.5 rounded font-monospace">{{ ep.method }}</span>
+                                <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller">{{ ep.category_label }}</span>
+                            </div>
+                            <div class="fw-bold theme-text-main small">{{ ep.title }}</div>
+                            <div class="smaller theme-text-muted font-monospace mt-0.5">{{ ep.path }}</div>
+                        </td>
+
+                        <!-- Live URL & Copy Button -->
+                        <td class="py-3 align-top">
+                            <div class="p-2.5 rounded-3 border d-flex flex-column gap-2" style="background: rgba(0, 0, 0, 0.25); border-color: var(--border-color) !important;">
+                                <div class="d-flex align-items-center justify-content-between gap-2">
+                                    <span class="smaller font-monospace text-warning text-break endpoint-full-url" data-path="{{ ep.path }}">{{ ep.full_url }}</span>
+                                    <button type="button" class="btn btn-outline-warning btn-sm px-2.5 py-1 d-inline-flex align-items-center gap-1 copy-endpoint-btn flex-shrink-0"
+                                            data-url="{{ ep.full_url }}" title="Copy Live Ingress URL">
+                                        <i class="bi bi-clipboard"></i>
+                                        <span class="smaller copy-btn-label">Copy</span>
+                                    </button>
+                                </div>
+                                <div class="d-flex align-items-center justify-content-between pt-1 border-top border-white border-opacity-5">
+                                    <span class="smaller theme-text-muted">Relative URI: <code class="text-white-50 font-monospace">{{ ep.path }}</code></span>
+                                    <button type="button" class="btn btn-link btn-sm p-0 smaller text-decoration-none theme-text-muted copy-path-btn" data-path="{{ ep.path }}">
+                                        <i class="bi bi-files me-0.5"></i>Copy Path
+                                    </button>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Target Destination -->
+                        <td class="py-3 align-top">
+                            <div class="d-flex align-items-center gap-1.5 mb-1 text-primary fw-semibold small">
+                                <i class="bi bi-geo-alt-fill smaller"></i>
+                                <span>{{ ep.target }}</span>
+                            </div>
+                            <div class="smaller theme-text-muted">{{ ep.description }}</div>
+                        </td>
+
+                        <!-- Usage Instructions -->
+                        <td class="pe-4 py-3 align-top">
+                            <div class="p-2 rounded-2 border smaller theme-text-muted font-monospace" style="background: rgba(255, 255, 255, 0.02); border-color: var(--border-color) !important; font-size: 0.775rem;">
+                                {{ ep.usage }}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-5 theme-text-muted">
+                            <i class="bi bi-inbox fs-2 d-block mb-2"></i>
+                            No endpoints found.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    // 1. Dynamic origin update matching browser address bar
+    const currentOrigin = window.location.origin;
+    const wsScheme = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const wsOrigin = wsScheme + '//' + window.location.host;
+
+    // Update active domain badge
+    document.querySelectorAll('.active-domain-label').forEach(function(el) {
+        el.textContent = currentOrigin;
+    });
+
+    // Update table live URLs to current browser origin
+    document.querySelectorAll('.endpoint-row').forEach(function(row) {
+        const urlEl = row.querySelector('.endpoint-full-url');
+        const copyBtn = row.querySelector('.copy-endpoint-btn');
+        if (urlEl && copyBtn) {
+            const path = urlEl.getAttribute('data-path') || '';
+            const isWs = row.getAttribute('data-category') === 'streaming' || path === '/mock-ws';
+            const base = isWs ? wsOrigin : currentOrigin;
+            const fullUrl = base + path;
+            urlEl.textContent = fullUrl;
+            copyBtn.setAttribute('data-url', fullUrl);
+        }
+    });
+
+    // 2. 1-Click Copy Handlers
+    document.querySelectorAll('.copy-endpoint-btn').forEach(function(btn) {
+        btn.onclick = function() {
+            const urlToCopy = this.getAttribute('data-url') || '';
+            if (!urlToCopy) return;
+            const labelEl = this.querySelector('.copy-btn-label');
+            const iconEl = this.querySelector('i');
+
+            navigator.clipboard.writeText(urlToCopy).then(() => {
+                if (labelEl) labelEl.textContent = 'Copied!';
+                if (iconEl) iconEl.className = 'bi bi-check2';
+                btn.classList.remove('btn-outline-warning');
+                btn.classList.add('btn-success', 'text-white');
+
+                setTimeout(() => {
+                    if (labelEl) labelEl.textContent = 'Copy';
+                    if (iconEl) iconEl.className = 'bi bi-clipboard';
+                    btn.classList.remove('btn-success', 'text-white');
+                    btn.classList.add('btn-outline-warning');
+                }, 2000);
+            }).catch(err => {
+                console.error('Clipboard copy error:', err);
+            });
+        };
+    });
+
+    document.querySelectorAll('.copy-path-btn').forEach(function(btn) {
+        btn.onclick = function() {
+            const path = this.getAttribute('data-path') || '';
+            if (!path) return;
+            navigator.clipboard.writeText(path).then(() => {
+                const originalText = this.innerHTML;
+                this.innerHTML = '<i class="bi bi-check2 text-success me-0.5"></i>Copied!';
+                setTimeout(() => {
+                    this.innerHTML = originalText;
+                }, 1800);
+            });
+        };
+    });
+
+    // 3. Category Filter Pills
+    const pills = document.querySelectorAll('.category-pill');
+    const rows = document.querySelectorAll('.endpoint-row');
+    const searchInput = document.getElementById('endpointSearchInput');
+
+    function applyFilterAndSearch() {
+        const activePill = document.querySelector('.category-pill.active');
+        const activeCategory = activePill ? activePill.getAttribute('data-category') : 'all';
+        const query = (searchInput ? searchInput.value : '').toLowerCase().trim();
+
+        rows.forEach(function(row) {
+            const rowCat = row.getAttribute('data-category') || '';
+            const matchesCat = activeCategory === 'all' || rowCat === activeCategory;
+            const textContent = row.textContent.toLowerCase();
+            const matchesQuery = !query || textContent.includes(query);
+
+            if (matchesCat && matchesQuery) {
+                row.style.display = '';
+            } else {
+                row.style.display = 'none';
+            }
+        });
+    }
+
+    pills.forEach(function(pill) {
+        pill.onclick = function() {
+            pills.forEach(p => {
+                p.classList.remove('active');
+                p.style.background = 'transparent';
+                p.style.color = 'var(--text-muted)';
+            });
+            this.classList.add('active');
+            this.style.background = 'var(--primary)';
+            this.style.color = '#fff';
+            applyFilterAndSearch();
+        };
+    });
+
+    if (searchInput) {
+        searchInput.addEventListener('input', applyFilterAndSearch);
+    }
+})();
+</script>

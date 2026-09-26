@@ -17,6 +17,12 @@ type QuantEngineStrategy struct {
 	orbHigh        float64
 	orbLow         float64
 	orbDiscovered  bool
+	currentBarKey  string
+	runningOpen    float64
+	runningHigh    float64
+	runningLow     float64
+	runningClose   float64
+	runningVolume  int64
 }
 
 // NewQuantEngineStrategy creates a new QuantEngineStrategy instance.
@@ -345,26 +351,14 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		lowPrice = math.Min(openPrice, closePrice) - 2.0
 	}
 
-	// 1. Maintain rolling candle buffer (last 30 candles)
-	s.candleBuffer = append(s.candleBuffer, currentCandle)
-	if len(s.candleBuffer) > 30 {
-		s.candleBuffer = s.candleBuffer[1:]
+	volFloat := 10000.0
+	if v, ok := currentCandle["volume"].(float64); ok && v > 0 {
+		volFloat = v
+	} else if vInt, ok := currentCandle["volume"].(int64); ok && vInt > 0 {
+		volFloat = float64(vInt)
 	}
 
-	// 2. Initial Opening Range Discovery (ORB) tracking
-	if !s.orbDiscovered {
-		if s.orbHigh == 0 || highPrice > s.orbHigh {
-			s.orbHigh = highPrice
-		}
-		if s.orbLow == 0 || lowPrice < s.orbLow {
-			s.orbLow = lowPrice
-		}
-		if len(s.candleBuffer) >= 15 {
-			s.orbDiscovered = true
-		}
-	}
-
-	// 3. Resolve Candle Time & Intraday Session Time Window Filter (09:20 - 15:00 IST)
+	// 1. Resolve Candle Time & Market Session Boundaries (09:15 - 15:30 IST)
 	candleTime := nowIST()
 	if dtStr, ok := currentCandle["datetime"].(string); ok && len(dtStr) >= 19 {
 		if pt, err := time.ParseInLocation("2006-01-02 15:04:05", dtStr[:19], istLocation); err == nil {
@@ -376,10 +370,64 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		candleTime = time.Unix(int64(tsFloat), 0).In(istLocation)
 	}
 
-	// Time window will be enforced after preset is loaded (placeholder check using broadest window)
+	// 2. Mathematical Consistency: 1-Minute OHLC Time-Bar Resampling
+	// Aggregates sub-second and 1-second live ticks into standard 1-minute OHLC bars,
+	// ensuring live trading and historical 1M replay evaluate mathematically identical candles.
+	barKey := candleTime.Format("2006-01-02 15:04")
+	if s.currentBarKey == barKey && len(s.candleBuffer) > 0 {
+		// Intra-minute tick: update active running bar in place
+		s.runningHigh = math.Max(s.runningHigh, highPrice)
+		s.runningLow = math.Min(s.runningLow, lowPrice)
+		s.runningClose = closePrice
+		s.runningVolume += int64(volFloat)
+
+		lastIdx := len(s.candleBuffer) - 1
+		s.candleBuffer[lastIdx]["high"] = s.runningHigh
+		s.candleBuffer[lastIdx]["low"] = s.runningLow
+		s.candleBuffer[lastIdx]["close"] = s.runningClose
+		s.candleBuffer[lastIdx]["volume"] = s.runningVolume
+	} else {
+		// New minute candle boundary: initialize new 1-minute OHLC bar
+		s.currentBarKey = barKey
+		s.runningOpen = openPrice
+		s.runningHigh = highPrice
+		s.runningLow = lowPrice
+		s.runningClose = closePrice
+		s.runningVolume = int64(volFloat)
+
+		newBar := map[string]interface{}{
+			"datetime":  candleTime.Format("2006-01-02 15:04:05"),
+			"timestamp": candleTime.Unix(),
+			"open":      openPrice,
+			"high":      highPrice,
+			"low":       lowPrice,
+			"close":     closePrice,
+			"volume":    s.runningVolume,
+		}
+		s.candleBuffer = append(s.candleBuffer, newBar)
+		if len(s.candleBuffer) > 30 {
+			s.candleBuffer = s.candleBuffer[1:]
+		}
+	}
+
+	// 3. Time-Based Opening Range Discovery (ORB) (09:15 - 09:30 AM IST = 15 Minutes)
 	minuteOfDay := candleTime.Hour()*60 + candleTime.Minute()
+	if !s.orbDiscovered {
+		if s.orbHigh == 0 || highPrice > s.orbHigh {
+			s.orbHigh = highPrice
+		}
+		if s.orbLow == 0 || lowPrice < s.orbLow {
+			s.orbLow = lowPrice
+		}
+		// ORB discovered after 15 minutes of market opening (at or after 09:30 AM IST)
+		if minuteOfDay >= (9*60+30) || (s.orbHigh > 0 && len(s.candleBuffer) >= 15) {
+			s.orbDiscovered = true
+		}
+	}
+
+	// Time window pre-filter: outside any valid market trading hours
 	if minuteOfDay < (9*60+15) || minuteOfDay > (15*60+5) {
-		return nil // Pre-filter: outside any valid market window
+		return nil // Outside valid market hours
 	}
 
 	// Enforce trade cooldown (default 5 minutes in backtest/quant mode to avoid churning)

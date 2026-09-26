@@ -54,24 +54,26 @@
 
     <!-- Live Header Action Buttons -->
     <div class="d-flex align-items-center gap-2 flex-wrap">
-        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="d-inline">
+        <button type="button" class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                data-bs-toggle="modal" data-bs-target="#confirmMockResetSessionModal" title="Reset all mock orders and restore ₹1,00,000 balance">
+            <span class="material-icons" style="font-size: 1rem;">restart_alt</span>
+            <span>Reset Session</span>
+        </button>
+
+        <button type="button" class="btn btn-danger btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 fw-bold"
+                data-bs-toggle="modal" data-bs-target="#confirmMockKillSwitchModal" title="Emergency kill switch across mock broker">
+            <span class="material-icons" style="font-size: 1rem;">bolt</span>
+            <span>Kill Switch</span>
+        </button>
+
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="d-none" id="mock-dashboard-reset-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="clear_session">
-            <button type="submit" class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-                    onclick="return confirm('Reset all mock orders, positions, and restore ₹1,00,000 initial balance?');">
-                <span class="material-icons" style="font-size: 1rem;">restart_alt</span>
-                <span>Reset Session</span>
-            </button>
         </form>
 
-        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="d-inline">
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#mock-broker-dashboard-container" hx-swap="innerHTML" class="d-none" id="mock-dashboard-kill-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="kill_switch">
-            <button type="submit" class="btn btn-danger btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 fw-bold"
-                    onclick="return confirm('TRIGGER KILL-SWITCH: Cancel ALL pending orders across mock broker?');">
-                <span class="material-icons" style="font-size: 1rem;">bolt</span>
-                <span>Kill Switch</span>
-            </button>
         </form>
 
         <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-2.5"
@@ -281,5 +283,107 @@
         script.onload = initEquityChart;
         document.head.appendChild(script);
     }
+
+    window.confirmMockAction = function(formId, modalId) {
+        const modalEl = document.getElementById(modalId);
+        if (modalEl && window.bootstrap) {
+            const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
+            modalInstance.hide();
+        }
+        setTimeout(() => {
+            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+            document.body.classList.remove('modal-open');
+            document.body.style.removeProperty('overflow');
+            document.body.style.removeProperty('padding-right');
+            const form = document.getElementById(formId);
+            if (form) {
+                if (window.htmx) {
+                    htmx.trigger(form, 'submit');
+                } else {
+                    form.submit();
+                }
+            }
+        }, 150);
+    };
 })();
 </script>
+
+<!-- Confirm Mock Reset Session Modal -->
+<div class="modal fade" id="confirmMockResetSessionModal" tabindex="-1" aria-labelledby="confirmMockResetSessionModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border border-warning border-opacity-30 shadow-lg" style="background: rgba(20, 20, 24, 0.95); backdrop-filter: blur(25px); color: #fafafa; border-radius: 14px;">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+                <h6 class="modal-title fw-bold text-white d-flex align-items-center gap-2" id="confirmMockResetSessionModalLabel">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">
+                        <i class="bi bi-arrow-counterclockwise fs-5"></i>
+                    </span>
+                    <span>Reset Simulation Session?</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="text-white-50 small mb-3">You are about to reset the active simulation session. This will clear runtime state across the emulator and Django:</p>
+                <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(255, 255, 255, 0.03);">
+                    <ul class="list-unstyled mb-0 smaller text-white-50 d-flex flex-column gap-1.5">
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-warning mt-0.5"></i>
+                            <span>Flushes all mock orders and positions from the Dhan mock broker engine (:8088).</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-warning mt-0.5"></i>
+                            <span>Restores available trading balance to default <strong>₹1,00,000.00</strong>.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-check2-circle text-warning mt-0.5"></i>
+                            <span>Clears session PnL and soft-deletes mock postback logs in Django.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmMockAction('mock-dashboard-reset-form', 'confirmMockResetSessionModal')">
+                    <i class="bi bi-arrow-counterclockwise me-1"></i>Yes, Reset Session
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Confirm Mock Kill Switch Modal -->
+<div class="modal fade" id="confirmMockKillSwitchModal" tabindex="-1" aria-labelledby="confirmMockKillSwitchModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content glass-card border border-danger border-opacity-30 shadow-lg" style="background: rgba(20, 20, 24, 0.95); backdrop-filter: blur(25px); color: #fafafa; border-radius: 14px;">
+            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+                <h6 class="modal-title fw-bold text-white d-flex align-items-center gap-2" id="confirmMockKillSwitchModalLabel">
+                    <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
+                        <i class="bi bi-lightning-charge-fill fs-5"></i>
+                    </span>
+                    <span>Trigger Emergency Kill-Switch?</span>
+                </h6>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body py-3">
+                <p class="text-white-50 small mb-3">Emergency override command across all simulated algorithmic accounts:</p>
+                <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(255, 255, 255, 0.03);">
+                    <ul class="list-unstyled mb-0 smaller text-white-50 d-flex flex-column gap-1.5">
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-x-circle text-danger mt-0.5"></i>
+                            <span>Immediately cancels <strong>ALL pending &amp; active orders</strong> in the engine.</span>
+                        </li>
+                        <li class="d-flex align-items-start gap-2">
+                            <i class="bi bi-x-circle text-danger mt-0.5"></i>
+                            <span>Prevents further unmanaged order fills or unintended executions.</span>
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+                <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
+                <button type="button" class="btn btn-danger fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmMockAction('mock-dashboard-kill-form', 'confirmMockKillSwitchModal')">
+                    <i class="bi bi-lightning-charge-fill me-1"></i>Yes, Trigger Kill-Switch
+                </button>
+            </div>
+        </div>
+    </div>
+</div>

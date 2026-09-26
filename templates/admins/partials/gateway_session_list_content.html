@@ -1,0 +1,432 @@
+{% load static %}
+
+<style>
+    /* ─── Antigravity Typography Enforcement ─── */
+    .session-view-wrapper,
+    .session-view-wrapper h1, .session-view-wrapper h2, .session-view-wrapper h3,
+    .session-view-wrapper h4, .session-view-wrapper h5, .session-view-wrapper h6,
+    .session-view-wrapper p, .session-view-wrapper span:not(.font-monospace):not(.material-icons),
+    .session-view-wrapper div:not(.font-monospace),
+    .session-view-wrapper table, .session-view-wrapper th, .session-view-wrapper td,
+    .session-view-wrapper .badge, .session-view-wrapper .btn {
+        font-family: 'Google Sans Flex', 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    }
+    .session-view-wrapper .font-monospace,
+    .session-view-wrapper .font-mono,
+    .session-view-wrapper code {
+        font-family: 'Google Sans Code', 'JetBrains Mono', 'Fira Code', monospace !important;
+    }
+</style>
+
+<div class="container-fluid px-0 session-view-wrapper">
+    <!-- Header Bar -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <div class="d-flex align-items-center gap-2 mb-1">
+                <span class="badge bg-primary-subtle text-primary border border-primary-subtle px-2 py-1 fs-8 text-uppercase fw-bold letter-spacing-1">
+                    <i class="bi bi-clock-history me-1"></i> Audit Archive
+                </span>
+                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-1 fs-8">
+                    {{ total_count }} Session{{ total_count|pluralize }} Recorded
+                </span>
+            </div>
+            <h3 class="fw-bold mb-1 tracking-tight" style="color: var(--text-primary, #ffffff);">Saved Simulation Sessions</h3>
+            <p class="small mb-0" style="color: var(--text-secondary, #94a3b8);">Auditable point-in-time snapshots of Dhan Gateway simulations with complete PnL, trades, and execution telemetry.</p>
+        </div>
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'admins:admin-gateway-emulator' %}" class="btn btn-sm btn-outline-info d-flex align-items-center gap-2 rounded-pill px-3">
+                <i class="bi bi-arrow-left"></i>
+                <span>Gateway Emulator</span>
+            </a>
+            <button class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-1 rounded-pill px-3"
+                    hx-get="{% url 'admins:admin-gateway-session-list' %}"
+                    hx-target="#gateway-session-list-container"
+                    hx-swap="innerHTML">
+                <i class="bi bi-arrow-clockwise"></i> Refresh
+            </button>
+        </div>
+    </div>
+
+    <!-- Aggregate KPI Stat Cards -->
+    <div class="row g-3 mb-4">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="glass-card p-3 rounded-3 shadow-sm h-100" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="small fw-medium text-uppercase letter-spacing-1" style="color: var(--text-secondary, #94a3b8);">Total Sessions</span>
+                    <div class="badge bg-primary-subtle text-primary p-2 rounded-circle">
+                        <i class="bi bi-collection fs-6"></i>
+                    </div>
+                </div>
+                <h4 class="fw-bold mb-0" style="color: var(--text-primary, #ffffff);">{{ total_count }}</h4>
+                <div class="small mt-1" style="color: var(--text-secondary, #94a3b8);">Archived audit snapshots</div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="glass-card p-3 rounded-3 shadow-sm h-100" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="small fw-medium text-uppercase letter-spacing-1" style="color: var(--text-secondary, #94a3b8);">Cumulative Net PnL</span>
+                    <div class="badge {% if total_net_pnl >= 0 %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %} p-2 rounded-circle">
+                        <i class="bi bi-currency-rupee fs-6"></i>
+                    </div>
+                </div>
+                <h4 class="fw-bold mb-0 font-monospace {% if total_net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                    {% if total_net_pnl > 0 %}+{% endif %}₹{{ total_net_pnl|floatformat:2 }}
+                </h4>
+                <div class="small mt-1" style="color: var(--text-secondary, #94a3b8);">Across all filtered sessions</div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="glass-card p-3 rounded-3 shadow-sm h-100" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="small fw-medium text-uppercase letter-spacing-1" style="color: var(--text-secondary, #94a3b8);">Best Single Session</span>
+                    <div class="badge bg-info-subtle text-info p-2 rounded-circle">
+                        <i class="bi bi-trophy fs-6"></i>
+                    </div>
+                </div>
+                <h4 class="fw-bold text-info mb-0 font-monospace">
+                    {% if max_pnl > 0 %}+{% endif %}₹{{ max_pnl|floatformat:2 }}
+                </h4>
+                <div class="small mt-1" style="color: var(--text-secondary, #94a3b8);">Peak net session gain</div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="glass-card p-3 rounded-3 shadow-sm h-100" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="small fw-medium text-uppercase letter-spacing-1" style="color: var(--text-secondary, #94a3b8);">Avg Win Rate / Trades</span>
+                    <div class="badge bg-warning-subtle text-warning p-2 rounded-circle">
+                        <i class="bi bi-pie-chart fs-6"></i>
+                    </div>
+                </div>
+                <h4 class="fw-bold mb-0 font-monospace" style="color: var(--text-primary, #ffffff);">
+                    {{ avg_win_rate|floatformat:1 }}%
+                </h4>
+                <div class="small mt-1" style="color: var(--text-secondary, #94a3b8);">{{ total_trades_count }} total trade{{ total_trades_count|pluralize }} recorded</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Filter & Search Toolbar -->
+    <div class="glass-card p-3 rounded-3 shadow-sm mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+        <form method="get"
+              action="{% url 'admins:admin-gateway-session-list' %}"
+              hx-get="{% url 'admins:admin-gateway-session-list' %}"
+              hx-target="#gateway-session-list-container"
+              hx-push-url="true"
+              class="row g-2 align-items-center">
+            
+            <!-- Search Query -->
+            <div class="col-12 col-md-4">
+                <div class="input-group input-group-sm">
+                    <span class="input-group-text bg-transparent border-secondary border-opacity-25" style="color: var(--text-secondary, #94a3b8);">
+                        <i class="bi bi-search"></i>
+                    </span>
+                    <input type="text"
+                           name="q"
+                           value="{{ query }}"
+                           placeholder="Search session by name..."
+                           class="form-control form-control-sm bg-transparent border-secondary border-opacity-25"
+                           style="color: var(--text-primary, #ffffff);"
+                           hx-trigger="keyup changed delay:300ms, search"
+                           hx-get="{% url 'admins:admin-gateway-session-list' %}"
+                           hx-target="#gateway-session-list-container"
+                           hx-include="closest form">
+                </div>
+            </div>
+
+            <!-- Rating Filter Pills -->
+            <div class="col-12 col-md-auto d-flex align-items-center gap-1">
+                <span class="small me-1" style="color: var(--text-secondary, #94a3b8);">Rating:</span>
+                <a href="?q={{ query }}&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}?q={{ query }}&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm {% if not rating_filter %}btn-primary text-white{% else %}btn-outline-secondary{% endif %} py-1 px-2.5 fs-8 rounded-pill">
+                    All
+                </a>
+                <a href="?q={{ query }}&rating=3&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}?q={{ query }}&rating=3&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm {% if rating_filter == '3' %}btn-warning text-dark fw-bold{% else %}btn-outline-secondary{% endif %} py-1 px-2.5 fs-8 rounded-pill">
+                    <i class="bi bi-star-fill text-warning"></i> 3 Stars
+                </a>
+                <a href="?q={{ query }}&rating=2&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}?q={{ query }}&rating=2&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm {% if rating_filter == '2' %}btn-warning text-dark fw-bold{% else %}btn-outline-secondary{% endif %} py-1 px-2.5 fs-8 rounded-pill">
+                    <i class="bi bi-star-fill text-warning"></i> 2 Stars
+                </a>
+                <a href="?q={{ query }}&rating=1&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}?q={{ query }}&rating=1&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm {% if rating_filter == '1' %}btn-warning text-dark fw-bold{% else %}btn-outline-secondary{% endif %} py-1 px-2.5 fs-8 rounded-pill">
+                    <i class="bi bi-star-fill text-warning"></i> 1 Star
+                </a>
+            </div>
+
+            <!-- Favorite Filter -->
+            <div class="col-12 col-md-auto d-flex align-items-center gap-1">
+                <a href="?q={{ query }}&rating={{ rating_filter }}&favorite={% if favorite_filter %}0{% else %}1{% endif %}&mode={{ mode_filter }}"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}?q={{ query }}&rating={{ rating_filter }}&favorite={% if favorite_filter %}0{% else %}1{% endif %}&mode={{ mode_filter }}"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm {% if favorite_filter %}btn-warning text-dark fw-bold{% else %}btn-outline-secondary{% endif %} py-1 px-2.5 fs-8 rounded-pill d-flex align-items-center gap-1">
+                    <i class="bi bi-star-fill"></i>
+                    <span>Favorites Only</span>
+                </a>
+            </div>
+
+            <!-- Mode Filter -->
+            <div class="col-12 col-md-auto d-flex align-items-center gap-1">
+                <span class="small me-1" style="color: var(--text-secondary, #94a3b8);">Mode:</span>
+                <a href="?q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}?q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm {% if not mode_filter %}btn-secondary text-light{% else %}btn-outline-secondary{% endif %} py-1 px-2.5 fs-8 rounded-pill">
+                    All
+                </a>
+                <a href="?q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}&mode=LIVE"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}?q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}&mode=LIVE"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm {% if mode_filter == 'LIVE' %}btn-success text-dark fw-bold{% else %}btn-outline-secondary{% endif %} py-1 px-2.5 fs-8 rounded-pill">
+                    Live Feed
+                </a>
+                <a href="?q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}&mode=BACKUP"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}?q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}&mode=BACKUP"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm {% if mode_filter == 'BACKUP' %}btn-info text-dark fw-bold{% else %}btn-outline-secondary{% endif %} py-1 px-2.5 fs-8 rounded-pill">
+                    Parquet Backup
+                </a>
+            </div>
+
+            <!-- Reset Filters -->
+            {% if query or rating_filter or favorite_filter or mode_filter %}
+            <div class="col-12 col-md-auto ms-md-auto">
+                <a href="{% url 'admins:admin-gateway-session-list' %}"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm btn-link text-decoration-none py-1 px-2 fs-8"
+                   style="color: var(--text-secondary, #94a3b8);">
+                    <i class="bi bi-x-circle me-1"></i> Clear Filters
+                </a>
+            </div>
+            {% endif %}
+        </form>
+    </div>
+
+    <!-- Sessions Table / List -->
+    <div class="glass-card rounded-3 shadow-sm overflow-hidden mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+        {% if snapshots %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 font-monospace fs-8" style="color: var(--text-primary, #ffffff);">
+                <thead class="text-uppercase fs-9 letter-spacing-1" style="background: rgba(255, 255, 255, 0.04); color: var(--text-secondary, #94a3b8); border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));">
+                    <tr>
+                        <th style="width: 44px;" class="text-center">Fav</th>
+                        <th>Session Name &amp; Notes</th>
+                        <th class="text-center" style="width: 100px;">Mode</th>
+                        <th class="text-center" style="width: 110px;">Rating</th>
+                        <th class="text-end" style="width: 130px;">Balance (₹)</th>
+                        <th class="text-end" style="width: 120px;">Net PnL</th>
+                        <th class="text-center" style="width: 140px;">Win Rate / Trades</th>
+                        <th class="text-end" style="width: 110px;">Max DD</th>
+                        <th class="text-center" style="width: 130px;">Saved On</th>
+                        <th class="text-end" style="width: 120px;">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-secondary divide-opacity-10">
+                    {% for s in snapshots %}
+                    <tr>
+                        <!-- Favorite Toggle -->
+                        <td class="text-center">
+                            <button class="btn btn-link p-0 border-0 text-decoration-none"
+                                    hx-post="{% url 'admins:admin-gateway-session-toggle-favorite' s.id %}"
+                                    hx-swap="innerHTML"
+                                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                    title="Toggle Favorite">
+                                {% if s.is_favorite %}
+                                <i class="bi bi-star-fill text-warning fs-5"></i>
+                                {% else %}
+                                <i class="bi bi-star text-muted fs-5"></i>
+                                {% endif %}
+                            </button>
+                        </td>
+
+                        <!-- Name & Metadata -->
+                        <td>
+                            <div class="d-flex flex-column">
+                                <a href="{% url 'admins:admin-gateway-session-detail' s.id %}" class="fw-bold text-decoration-none" style="color: var(--text-primary, #ffffff);">
+                                    {{ s.name }}
+                                </a>
+                                {% if s.notes %}
+                                <span class="fs-9 font-sans mt-0.5 text-truncate" style="color: var(--text-secondary, #94a3b8); max-width: 280px;" title="{{ s.notes }}">
+                                    {{ s.notes }}
+                                </span>
+                                {% endif %}
+                                {% if s.dataset_file %}
+                                <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle font-monospace fs-9 mt-1 align-self-start">
+                                    <i class="bi bi-file-earmark-binary me-1"></i>{{ s.dataset_file }}
+                                </span>
+                                {% endif %}
+                            </div>
+                        </td>
+
+                        <!-- Mode -->
+                        <td class="text-center">
+                            {% if s.sim_mode == 'LIVE' %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill">
+                                LIVE
+                            </span>
+                            {% else %}
+                            <span class="badge bg-info-subtle text-info border border-info-subtle px-2 py-0.5 rounded-pill">
+                                BACKUP
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Rating -->
+                        <td class="text-center">
+                            <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2 py-1 rounded-pill">
+                                {% if s.rating == 3 %}
+                                <i class="bi bi-star-fill text-warning"></i><i class="bi bi-star-fill text-warning"></i><i class="bi bi-star-fill text-warning"></i>
+                                {% elif s.rating == 2 %}
+                                <i class="bi bi-star-fill text-warning"></i><i class="bi bi-star-fill text-warning"></i><i class="bi bi-star text-secondary"></i>
+                                {% else %}
+                                <i class="bi bi-star-fill text-warning"></i><i class="bi bi-star text-secondary"></i><i class="bi bi-star text-secondary"></i>
+                                {% endif %}
+                            </span>
+                        </td>
+
+                        <!-- Balance Change -->
+                        <td class="text-end">
+                            <div class="fw-bold" style="color: var(--text-primary, #ffffff);">₹{{ s.ending_balance|floatformat:2 }}</div>
+                            <span class="fs-9" style="color: var(--text-secondary, #94a3b8);">from ₹{{ s.starting_balance|floatformat:0 }}</span>
+                        </td>
+
+                        <!-- Net PnL -->
+                        <td class="text-end">
+                            <span class="fw-bold {% if s.net_pnl > 0 %}text-success{% elif s.net_pnl < 0 %}text-danger{% else %}text-secondary{% endif %}">
+                                {% if s.net_pnl > 0 %}+{% endif %}₹{{ s.net_pnl|floatformat:2 }}
+                            </span>
+                            <div class="fs-9" style="color: var(--text-secondary, #94a3b8);">Charges: ₹{{ s.total_charges|floatformat:2 }}</div>
+                        </td>
+
+                        <!-- Win Rate & Trades -->
+                        <td class="text-center">
+                            <div class="d-flex align-items-center justify-content-center gap-1 mb-0.5">
+                                <span class="badge {% if s.win_rate >= 50 %}bg-success-subtle text-success{% else %}bg-secondary-subtle text-secondary{% endif %} px-2 py-0.5 rounded-pill">
+                                    {{ s.win_rate|floatformat:1 }}%
+                                </span>
+                            </div>
+                            <span class="fs-9" style="color: var(--text-secondary, #94a3b8);">
+                                <span class="text-success">{{ s.winning_trades }}W</span> / <span class="text-danger">{{ s.losing_trades }}L</span> ({{ s.total_trades }})
+                            </span>
+                        </td>
+
+                        <!-- Max Drawdown -->
+                        <td class="text-end font-monospace">
+                            {% if s.max_drawdown > 0 %}
+                            <span class="text-danger">-₹{{ s.max_drawdown|floatformat:2 }}</span>
+                            {% else %}
+                            <span style="color: var(--text-secondary, #94a3b8);">₹0.00</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Saved On -->
+                        <td class="text-center font-sans fs-9" style="color: var(--text-secondary, #94a3b8);">
+                            <div>{{ s.created_at|date:"d-M-Y" }}</div>
+                            <div>{{ s.created_at|time:"H:i:s" }}</div>
+                        </td>
+
+                        <!-- Actions -->
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-1">
+                                <a href="{% url 'admins:admin-gateway-session-detail' s.id %}"
+                                   class="btn btn-sm btn-outline-info p-1 px-2.5 fs-9 rounded-pill d-flex align-items-center gap-1"
+                                   title="Audit Session Details">
+                                    <i class="bi bi-eye"></i> Detail
+                                </a>
+                                <button class="btn btn-sm btn-outline-danger p-1 px-2 fs-9 rounded-pill"
+                                        hx-post="{% url 'admins:admin-gateway-session-delete' s.id %}"
+                                        hx-target="#gateway-session-list-container"
+                                        hx-confirm="Are you sure you want to permanently delete snapshot '{{ s.name }}'?"
+                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                        title="Delete Snapshot">
+                                    <i class="bi bi-trash"></i>
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <!-- Pagination -->
+        {% if page_obj.has_other_pages %}
+        <div class="d-flex justify-content-between align-items-center p-3 border-top border-secondary border-opacity-15">
+            <span class="small" style="color: var(--text-secondary, #94a3b8);">
+                Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ total_count }} snapshots
+            </span>
+            <ul class="pagination pagination-sm mb-0">
+                {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link bg-transparent border-secondary border-opacity-25"
+                       style="color: var(--text-primary, #ffffff);"
+                       href="?page={{ page_obj.previous_page_number }}&q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                       hx-get="{% url 'admins:admin-gateway-session-list' %}?page={{ page_obj.previous_page_number }}&q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                       hx-target="#gateway-session-list-container">
+                        &laquo; Prev
+                    </a>
+                </li>
+                {% endif %}
+                <li class="page-item active">
+                    <span class="page-link bg-primary text-light border-primary">
+                        Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}
+                    </span>
+                </li>
+                {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link bg-transparent border-secondary border-opacity-25"
+                       style="color: var(--text-primary, #ffffff);"
+                       href="?page={{ page_obj.next_page_number }}&q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                       hx-get="{% url 'admins:admin-gateway-session-list' %}?page={{ page_obj.next_page_number }}&q={{ query }}&rating={{ rating_filter }}&favorite={{ favorite_filter }}&mode={{ mode_filter }}"
+                       hx-target="#gateway-session-list-container">
+                        Next &raquo;
+                    </a>
+                </li>
+                {% endif %}
+            </ul>
+        </div>
+        {% endif %}
+
+        {% else %}
+        <!-- Empty State -->
+        <div class="text-center py-5 px-3">
+            <div class="badge bg-secondary-subtle text-secondary p-3 rounded-circle mb-3">
+                <i class="bi bi-clock-history fs-2"></i>
+            </div>
+            <h5 class="fw-bold mb-1" style="color: var(--text-primary, #ffffff);">No Simulation Snapshots Found</h5>
+            <p class="small mb-4" style="color: var(--text-secondary, #94a3b8); max-width: 480px; margin: 0 auto;">
+                {% if query or rating_filter or favorite_filter or mode_filter %}
+                No sessions matched your filter criteria. Try clearing filters or changing your search terms.
+                {% else %}
+                You haven't saved any simulation sessions yet. Run a live or backup simulation in the Gateway Emulator and click <strong>"Save Session"</strong> to snapshot your PnL, trades, and chart curves.
+                {% endif %}
+            </p>
+            <div class="d-flex justify-content-center gap-2">
+                {% if query or rating_filter or favorite_filter or mode_filter %}
+                <a href="{% url 'admins:admin-gateway-session-list' %}"
+                   hx-get="{% url 'admins:admin-gateway-session-list' %}"
+                   hx-target="#gateway-session-list-container"
+                   class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                    Clear Filters
+                </a>
+                {% endif %}
+                <a href="{% url 'admins:admin-gateway-emulator' %}" class="btn btn-sm btn-primary rounded-pill px-3">
+                    <i class="bi bi-play-circle me-1"></i> Go to Gateway Emulator
+                </a>
+            </div>
+        </div>
+        {% endif %}
+    </div>
+</div>

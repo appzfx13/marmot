@@ -25,12 +25,15 @@ type Handler struct {
 
 // NewHandler constructs a new Handler.
 func NewHandler(eng *engine.MatchingEngine, chaos *engine.ChaosManager, st *streamer.ParquetStreamer, tmplPath string) (*Handler, error) {
-	funcMap := template.FuncMap{
-		"plus": func(a, b float64) float64 { return a + b },
-	}
-	tmpl, err := template.New(filepath.Base(tmplPath)).Funcs(funcMap).ParseFiles(tmplPath)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse dashboard template: %w", err)
+	var tmpl *template.Template
+	if tmplPath != "" {
+		funcMap := template.FuncMap{
+			"plus": func(a, b float64) float64 { return a + b },
+		}
+		t, err := template.New(filepath.Base(tmplPath)).Funcs(funcMap).ParseFiles(tmplPath)
+		if err == nil {
+			tmpl = t
+		}
 	}
 	return &Handler{
 		engine:   eng,
@@ -42,10 +45,14 @@ func NewHandler(eng *engine.MatchingEngine, chaos *engine.ChaosManager, st *stre
 
 // RegisterRoutes registers all REST, WebSocket, and HTMX routes on the given mux.
 func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
-	// Root index redirect to dashboard
+	// Root index and legacy /mock/dashboard redirect to unified Django Gateway Emulator
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			http.Redirect(w, r, "/mock/dashboard", http.StatusFound)
+		if r.URL.Path == "/" || r.URL.Path == "/mock/dashboard" || r.URL.Path == "/mock/dashboard/" {
+			redirectURL := "http://localhost:8050/admins/dashboard/gateway-emulator/"
+			if strings.Contains(r.Host, "trycloudflare.com") || strings.Contains(r.Host, "ngrok") {
+				redirectURL = "/admins/dashboard/gateway-emulator/"
+			}
+			http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
 			return
 		}
 		http.NotFound(w, r)
@@ -315,88 +322,13 @@ func (h *Handler) resolveClientID(r *http.Request) string {
 	return h.engine.GetActiveAccountID()
 }
 
-// handleDashboard renders the complete HTML sandbox dashboard.
+// handleDashboard redirects legacy dashboard requests to the unified Django Gateway Emulator.
 func (h *Handler) handleDashboard(w http.ResponseWriter, r *http.Request) {
-	clientID := h.resolveClientID(r)
-	_ = h.engine.SetActiveAccountID(clientID)
-
-	// Heal browser cookie so all subsequent requests stay locked onto the valid active account
-	http.SetCookie(w, &http.Cookie{
-		Name:     "marmot_mock_client_id",
-		Value:    clientID,
-		Path:     "/",
-		MaxAge:   86400 * 30,
-		HttpOnly: false,
-	})
-
-	funds := h.engine.GetFundLimit(clientID)
-	orders := h.engine.GetOrders(clientID)
-	if len(orders) == 0 && clientID == "1000000001" {
-		orders = h.engine.GetAllOrders()
+	redirectURL := "http://localhost:8050/admins/dashboard/gateway-emulator/"
+	if strings.Contains(r.Host, "trycloudflare.com") || strings.Contains(r.Host, "ngrok") {
+		redirectURL = "/admins/dashboard/gateway-emulator/"
 	}
-	positions := h.engine.GetPositions(clientID)
-	activeAcc, _ := h.engine.GetAccount(clientID)
-	accounts := h.engine.GetAllAccounts()
-
-	isPlaying, speed, currentFile, ticks := h.streamer.GetStatus()
-	curRow, totRows, pct, curDt, curDate := h.streamer.GetProgress()
-	files := h.streamer.ListParquetDetails()
-
-	var currentInfo streamer.ParquetFileInfo
-	for _, f := range files {
-		if f.RelativePath == currentFile {
-			currentInfo = f
-			break
-		}
-	}
-	if currentInfo.IndexName == "" {
-		currentInfo.IndexName = "NIFTY"
-	}
-
-	data := struct {
-		ActiveAccount    *engine.ClientAccount
-		Accounts         []*engine.ClientAccount
-		Funds            models.FundLimitResponse
-		Orders           []*models.OrderRecord
-		Positions        []models.PositionItem
-		ParquetFiles     []streamer.ParquetFileInfo
-		CurrentFile      string
-		CurrentIndex     string
-		CurrentDateRange string
-		ChaosRPS         int
-		ChaosMode        string
-		StreamerPlaying  bool
-		StreamerSpeed    int
-		TicksIngested    int64
-		CurrentRow       int64
-		TotalRows        int64
-		ProgressPct      float64
-		CurrentDatetime  string
-		CurrentDate      string
-	}{
-		ActiveAccount:    activeAcc,
-		Accounts:         accounts,
-		Funds:            funds,
-		Orders:           orders,
-		Positions:        positions,
-		ParquetFiles:     files,
-		CurrentFile:      currentFile,
-		CurrentIndex:     currentInfo.IndexName,
-		CurrentDateRange: currentInfo.DateRange,
-		ChaosRPS:         h.chaos.GetRPS(),
-		ChaosMode:        string(h.chaos.GetMode()),
-		StreamerPlaying:  isPlaying,
-		StreamerSpeed:    speed,
-		TicksIngested:    ticks,
-		CurrentRow:       curRow,
-		TotalRows:        totRows,
-		ProgressPct:      pct,
-		CurrentDatetime:  curDt,
-		CurrentDate:      curDate,
-	}
-
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	h.tmpl.Execute(w, data)
+	http.Redirect(w, r, redirectURL, http.StatusMovedPermanently)
 }
 
 // handleDashboardFunds renders the fund partial for HTMX polling.

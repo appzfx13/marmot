@@ -1,6 +1,7 @@
 import logging
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.interval import IntervalTrigger
+from apscheduler.triggers.cron import CronTrigger
 from django.conf import settings
 from django.utils import timezone
 
@@ -81,6 +82,20 @@ def get_cached_macro_ai_intel(selected_index="NIFTY"):
     return cached
 
 
+def daily_morning_unfreeze_and_unblock_job():
+    """Runs daily at 6, 7, 8, and 9 AM IST to unfreeze and unblock all active traders."""
+    from apps.trade_core.services.risk_reset_service import unfreeze_and_unblock_active_traders
+
+    logger.info("⏰ [APScheduler] Triggered Daily Morning Unfreeze & Kill Switch Reset Job...")
+    try:
+        summary = unfreeze_and_unblock_active_traders(deactivate_broker_killswitch=True)
+        logger.info("✅ [APScheduler] Daily Morning Unfreeze Job Succeeded. Summary: %s", summary)
+        return summary
+    except Exception as e:
+        logger.error("❌ [APScheduler] Daily Morning Unfreeze Job Failed: %s", e)
+        return None
+
+
 def start_scheduler():
     """Initialize and start the background APScheduler instance safely."""
     global _scheduler
@@ -114,9 +129,21 @@ def start_scheduler():
         coalesce=True,
     )
 
+    # Register Daily Morning Unfreeze & Kill Switch Reset Job (6, 7, 8, 9 AM IST)
+    _scheduler.add_job(
+        daily_morning_unfreeze_and_unblock_job,
+        trigger=CronTrigger(hour='6,7,8,9', minute=0, timezone=tz_str),
+        id='morning_unfreeze_reset_cron',
+        name='Daily Morning Unfreeze & Kill Switch Reset (6, 7, 8, 9 AM IST)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         _scheduler.start()
-        logger.info("🚀 [APScheduler] BackgroundScheduler started with 8h Dhan Renewal & 1h Gemini AI Macro Jobs.")
+        logger.info("🚀 [APScheduler] BackgroundScheduler started with 8h Dhan Renewal, 1h Gemini AI Macro & Morning Unfreeze Jobs.")
     except Exception as e:
         logger.error("Failed to start BackgroundScheduler: %s", e)
+
 

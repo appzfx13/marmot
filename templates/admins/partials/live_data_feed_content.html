@@ -123,20 +123,26 @@
                             <label class="form-label small fw-semibold theme-text-main mb-0">OAuth Redirect URI</label>
                             <span class="badge bg-primary bg-opacity-25 text-primary smaller fw-bold"><i class="bi bi-magic me-1"></i>Auto-Callback Active</span>
                         </div>
-                        <input type="url" name="fyers_redirect_uri" id="fyersRedirectUriInput" class="form-control font-monospace smaller" 
-                               placeholder="https://pep-erratic-violate.ngrok-free.dev/admins/fyers/callback/" 
-                               value="{{ settings_obj.fyers_redirect_uri|default:'https://pep-erratic-violate.ngrok-free.dev/admins/fyers/callback/' }}" required
-                               style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-main);">
+                        <div class="input-group">
+                            <input type="url" name="fyers_redirect_uri" id="fyersRedirectUriInput" class="form-control font-monospace smaller" 
+                                   placeholder="{{ current_callback_url|default:'https://trade.marmot.com/admins/fyers/callback/' }}" 
+                                   value="{{ display_redirect_uri|default:settings_obj.fyers_redirect_uri }}" required
+                                   style="background: rgba(255, 255, 255, 0.05); border: 1px solid var(--border-color); color: var(--text-main);">
+                            <button type="button" class="btn btn-outline-secondary btn-sm px-2.5 d-flex align-items-center gap-1" id="copyRedirectUriBtn" title="Copy to clipboard">
+                                <i class="bi bi-clipboard"></i>
+                                <span class="smaller" id="copyBtnText">Copy</span>
+                            </button>
+                        </div>
                         <div class="d-flex align-items-center justify-content-between mt-1 flex-wrap gap-1">
                             <span class="form-text smaller text-warning"><i class="bi bi-info-circle me-1"></i>Must match the Redirect URL in your FYERS API Dashboard.</span>
-                            <div class="d-flex gap-2">
-                                <button type="button" class="btn btn-link btn-sm p-0 text-info text-decoration-none smaller" 
-                                        onclick="document.getElementById('fyersRedirectUriInput').value='https://pep-erratic-violate.ngrok-free.dev/admins/fyers/callback/';">
-                                    <i class="bi bi-link-45deg me-0.5"></i>Use ngrok Callback
+                            <div class="d-flex gap-2 align-items-center">
+                                <button type="button" class="btn btn-link btn-sm p-0 text-info text-decoration-none smaller fw-semibold" 
+                                        onclick="autoFillCurrentDomain();">
+                                    <i class="bi bi-link-45deg me-0.5"></i>Use Current Domain
                                 </button>
                                 <span class="theme-text-muted smaller">|</span>
                                 <button type="button" class="btn btn-link btn-sm p-0 text-muted text-decoration-none smaller" 
-                                        onclick="document.getElementById('fyersRedirectUriInput').value='https://trade.fyers.in/api-login/redirect-uri/index.html';">
+                                        onclick="document.getElementById('fyersRedirectUriInput').value='https://trade.fyers.in/api-login/redirect-uri/index.html'; if(window.updateAuthPortalLink) window.updateAuthPortalLink();">
                                     FYERS Helper URL
                                 </button>
                             </div>
@@ -200,15 +206,19 @@
                             <span class="badge bg-primary bg-opacity-25 text-primary smaller">1-Click Portal</span>
                         </div>
                         <p class="smaller theme-text-muted mb-2">Click to open FYERS secure login in a new tab. Log in with your mobile OTP / PIN.</p>
-                        {% if auth_url %}
-                            <a href="{{ auth_url }}" target="_blank" rel="noopener noreferrer" 
-                               class="btn btn-warning text-dark btn-sm rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
-                                <i class="bi bi-box-arrow-up-right"></i>
-                                <span>Open FYERS Auth Portal</span>
-                            </a>
-                        {% else %}
-                            <div class="alert alert-warning py-1.5 px-2.5 small mb-0">Enter App ID &amp; Redirect URI on the left first to generate link.</div>
-                        {% endif %}
+                        <div id="fyersPortalAuthContainer">
+                            {% if auth_url %}
+                                <a href="{{ auth_url }}" target="_blank" rel="noopener noreferrer" 
+                                   id="fyersPortalAuthLink"
+                                   data-app-id="{{ settings_obj.fyers_app_id }}"
+                                   class="btn btn-warning text-dark btn-sm rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1 shadow-sm">
+                                    <i class="bi bi-box-arrow-up-right"></i>
+                                    <span>Open FYERS Auth Portal</span>
+                                </a>
+                            {% else %}
+                                <div class="alert alert-warning py-1.5 px-2.5 small mb-0" id="fyersPortalAuthAlert">Enter App ID &amp; Redirect URI on the left first to generate link.</div>
+                            {% endif %}
+                        </div>
                     </div>
 
                     <div class="p-3 rounded-3 border" style="background: rgba(16, 185, 129, 0.05); border-color: rgba(16, 185, 129, 0.2) !important;">
@@ -255,3 +265,86 @@
         </div>
     </div>
 </div>
+
+<script>
+(function() {
+    function getOriginCallback() {
+        return window.location.origin + '/admins/fyers/callback/';
+    }
+
+    function updateAuthPortalLink() {
+        const input = document.getElementById('fyersRedirectUriInput');
+        const appIdInput = document.querySelector('input[name="fyers_app_id"]');
+        const container = document.getElementById('fyersPortalAuthContainer');
+        if (!container || !input) return;
+
+        const appId = appIdInput ? appIdInput.value.trim() : '';
+        const redirect = input.value.trim();
+
+        if (appId && redirect) {
+            const authUrl = 'https://api-t1.fyers.in/api/v3/generate-authcode?client_id=' + encodeURIComponent(appId) + '&redirect_uri=' + encodeURIComponent(redirect) + '&response_type=code&state=marmot_live_feed';
+            let link = document.getElementById('fyersPortalAuthLink');
+            if (!link) {
+                container.innerHTML = '<a href="' + authUrl + '" target="_blank" rel="noopener noreferrer" id="fyersPortalAuthLink" class="btn btn-warning text-dark btn-sm rounded-pill px-3 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"><i class="bi bi-box-arrow-up-right"></i><span>Open FYERS Auth Portal</span></a>';
+            } else {
+                link.href = authUrl;
+            }
+        }
+    }
+    window.updateAuthPortalLink = updateAuthPortalLink;
+
+    window.autoFillCurrentDomain = function() {
+        const input = document.getElementById('fyersRedirectUriInput');
+        if (input) {
+            input.value = getOriginCallback();
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+            updateAuthPortalLink();
+        }
+    };
+
+    // Auto-fill on initial render if input has stale tunnel or doesn't match current host
+    const input = document.getElementById('fyersRedirectUriInput');
+    if (input) {
+        const val = input.value.trim();
+        const currentHost = window.location.host;
+        if (!val || (val.includes('trycloudflare.com') && !val.includes(currentHost)) || (val.includes('ngrok') && !val.includes(currentHost))) {
+            input.value = getOriginCallback();
+        }
+
+        input.addEventListener('input', updateAuthPortalLink);
+        input.addEventListener('change', updateAuthPortalLink);
+
+        const appIdInput = document.querySelector('input[name="fyers_app_id"]');
+        if (appIdInput) {
+            appIdInput.addEventListener('input', updateAuthPortalLink);
+            appIdInput.addEventListener('change', updateAuthPortalLink);
+        }
+
+        updateAuthPortalLink();
+    }
+
+    // Copy to clipboard handler
+    const copyBtn = document.getElementById('copyRedirectUriBtn');
+    if (copyBtn) {
+        copyBtn.onclick = function() {
+            const input = document.getElementById('fyersRedirectUriInput');
+            if (input && input.value) {
+                navigator.clipboard.writeText(input.value).then(function() {
+                    const btnText = document.getElementById('copyBtnText');
+                    if (btnText) btnText.textContent = 'Copied!';
+                    copyBtn.classList.remove('btn-outline-secondary');
+                    copyBtn.classList.add('btn-success', 'text-white');
+                    setTimeout(function() {
+                        if (btnText) btnText.textContent = 'Copy';
+                        copyBtn.classList.remove('btn-success', 'text-white');
+                        copyBtn.classList.add('btn-outline-secondary');
+                    }, 2000);
+                }).catch(function(err) {
+                    console.error('Copy failed:', err);
+                });
+            }
+        };
+    }
+})();
+</script>

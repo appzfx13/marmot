@@ -5,6 +5,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/parquet-go/parquet-go"
 	"go-app/models"
@@ -43,9 +44,18 @@ func WriteChunkParquet(filePath string, records []models.MarketCandleRecord) err
 	return nil
 }
 
+// MergeProgressCallback is a function type for receiving progress updates during Parquet merging.
+type MergeProgressCallback func(currentFile int, totalFiles int, currentRows int64)
+
 // MergeParquetFiles merges multiple staged chunk Parquet files into a single consolidated Parquet file.
 // Returns total rows written, final file size in MB, and error if any.
 func MergeParquetFiles(outputFile string, sourceFiles []string) (int64, float64, error) {
+	return MergeParquetFilesWithProgress(outputFile, sourceFiles, nil)
+}
+
+// MergeParquetFilesWithProgress merges multiple staged chunk Parquet files into a single consolidated Parquet file with a progress callback.
+// Returns total rows written, final file size in MB, and error if any.
+func MergeParquetFilesWithProgress(outputFile string, sourceFiles []string, onProgress MergeProgressCallback) (int64, float64, error) {
 	if len(sourceFiles) == 0 {
 		return 0, 0, fmt.Errorf("no source parquet files to merge")
 	}
@@ -67,35 +77,46 @@ func MergeParquetFiles(outputFile string, sourceFiles []string) (int64, float64,
 	)
 
 	var totalRows int64
+	totalFiles := len(sourceFiles)
+	// Pre-allocate a 16K record buffer to minimize GC allocations and maximize throughput
+	buf := make([]models.MarketCandleRecord, 16384)
 
-	for _, srcPath := range sourceFiles {
+	for i, srcPath := range sourceFiles {
 		srcFile, err := os.Open(srcPath)
 		if err != nil {
 			continue // Skip unreadable chunk
 		}
 
 		reader := parquet.NewGenericReader[models.MarketCandleRecord](srcFile)
-		buf := make([]models.MarketCandleRecord, 1024)
 
 		for {
 			n, readErr := reader.Read(buf)
 			if n > 0 {
 				if _, writeErr := writer.Write(buf[:n]); writeErr != nil {
+					reader.Close()
 					srcFile.Close()
 					return totalRows, 0, fmt.Errorf("failed writing merged records: %w", writeErr)
 				}
 				totalRows += int64(n)
 			}
-			if readErr == io.EOF {
-				break
-			}
-			if readErr != nil {
+			if readErr == io.EOF || readErr != nil {
 				break
 			}
 		}
 
 		reader.Close()
 		srcFile.Close()
+
+		// Flush row group to disk immediately to keep memory usage at constant low footprint (~50MB)
+		if err := writer.Flush(); err != nil {
+			return totalRows, 0, fmt.Errorf("failed to flush row group after file %s: %w", srcPath, err)
+		}
+		// Yield 5ms between flushes to flatten CPU burst peaks and let other containers breathe
+		time.Sleep(5 * time.Millisecond)
+
+		if onProgress != nil && (i%10 == 0 || i == totalFiles-1) {
+			onProgress(i+1, totalFiles, totalRows)
+		}
 	}
 
 	if err := writer.Close(); err != nil {

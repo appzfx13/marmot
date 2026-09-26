@@ -1,0 +1,498 @@
+{% load static %}
+
+<style>
+    /* ─── Antigravity Typography Enforcement ─── */
+    .session-view-wrapper,
+    .session-view-wrapper h1, .session-view-wrapper h2, .session-view-wrapper h3,
+    .session-view-wrapper h4, .session-view-wrapper h5, .session-view-wrapper h6,
+    .session-view-wrapper p, .session-view-wrapper span:not(.font-monospace):not(.material-icons),
+    .session-view-wrapper div:not(.font-monospace),
+    .session-view-wrapper table, .session-view-wrapper th, .session-view-wrapper td,
+    .session-view-wrapper .badge, .session-view-wrapper .btn {
+        font-family: 'Google Sans Flex', 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif !important;
+    }
+    .session-view-wrapper .font-monospace,
+    .session-view-wrapper .font-mono,
+    .session-view-wrapper code {
+        font-family: 'Google Sans Code', 'JetBrains Mono', 'Fira Code', monospace !important;
+    }
+</style>
+
+<div class="container-fluid px-0 session-view-wrapper">
+    <!-- Breadcrumb & Top Bar -->
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-4 gap-3">
+        <div>
+            <nav aria-label="breadcrumb">
+                <ol class="breadcrumb mb-1 fs-8">
+                    <li class="breadcrumb-item">
+                        <a href="{% url 'admins:admin-gateway-session-list' %}" class="text-decoration-none" style="color: var(--text-secondary, #94a3b8);">
+                            <i class="bi bi-clock-history me-1"></i> Saved Sessions
+                        </a>
+                    </li>
+                    <li class="breadcrumb-item active" style="color: var(--text-primary, #ffffff);" aria-current="page">
+                        {{ snapshot.name }}
+                    </li>
+                </ol>
+            </nav>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                <h3 class="fw-bold mb-0 tracking-tight" style="color: var(--text-primary, #ffffff);">{{ snapshot.name }}</h3>
+                
+                <!-- Rating Badge -->
+                <span class="badge bg-warning-subtle text-warning border border-warning-subtle px-2.5 py-1 fs-8 rounded-pill">
+                    {% if snapshot.rating == 3 %}
+                    <i class="bi bi-star-fill text-warning"></i><i class="bi bi-star-fill text-warning"></i><i class="bi bi-star-fill text-warning"></i> (3 Stars)
+                    {% elif snapshot.rating == 2 %}
+                    <i class="bi bi-star-fill text-warning"></i><i class="bi bi-star-fill text-warning"></i><i class="bi bi-star text-secondary"></i> (2 Stars)
+                    {% else %}
+                    <i class="bi bi-star-fill text-warning"></i><i class="bi bi-star text-secondary"></i><i class="bi bi-star text-secondary"></i> (1 Star)
+                    {% endif %}
+                </span>
+
+                <!-- Mode Badge -->
+                {% if snapshot.sim_mode == 'LIVE' %}
+                <span class="badge bg-success-subtle text-success border border-success-subtle px-2.5 py-1 fs-8 rounded-pill">
+                    <i class="bi bi-broadcast-pin me-1"></i> LIVE SIMULATION
+                </span>
+                {% else %}
+                <span class="badge bg-info-subtle text-info border border-info-subtle px-2.5 py-1 fs-8 rounded-pill">
+                    <i class="bi bi-file-earmark-binary me-1"></i> PARQUET BACKUP
+                </span>
+                {% endif %}
+
+                <!-- Favorite Button -->
+                <button class="btn btn-sm btn-outline-warning d-flex align-items-center gap-1 py-0.5 px-2.5 fs-8 rounded-pill"
+                        hx-post="{% url 'admins:admin-gateway-session-toggle-favorite' snapshot.id %}"
+                        hx-swap="innerHTML"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        title="Toggle Favorite">
+                    {% if snapshot.is_favorite %}
+                    <i class="bi bi-star-fill text-warning"></i> <span>Favorited</span>
+                    {% else %}
+                    <i class="bi bi-star text-muted"></i> <span>Add to Favorites</span>
+                    {% endif %}
+                </button>
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <a href="{% url 'admins:admin-gateway-session-list' %}" class="btn btn-sm btn-outline-secondary d-flex align-items-center gap-2 rounded-pill px-3">
+                <i class="bi bi-arrow-left"></i>
+                <span>All Saved Sessions</span>
+            </a>
+            <a href="{% url 'admins:admin-gateway-emulator' %}" class="btn btn-sm btn-outline-info d-flex align-items-center gap-2 rounded-pill px-3">
+                <i class="bi bi-play-circle"></i>
+                <span>Gateway Emulator</span>
+            </a>
+            <button class="btn btn-sm btn-outline-danger d-flex align-items-center gap-1 rounded-pill px-3"
+                    hx-post="{% url 'admins:admin-gateway-session-delete' snapshot.id %}"
+                    hx-confirm="Are you sure you want to permanently delete this snapshot?"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'>
+                <i class="bi bi-trash"></i> Delete
+            </button>
+        </div>
+    </div>
+
+    <!-- Metadata & Snapshot Parameters Strip -->
+    <div class="glass-card p-3 rounded-3 shadow-sm mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+        <div class="row g-3 align-items-center">
+            <div class="col-12 col-md-3">
+                <div class="small fw-medium text-uppercase letter-spacing-1" style="color: var(--text-secondary, #94a3b8);">Snapshot Timestamp</div>
+                <div class="fw-bold font-monospace mt-0.5" style="color: var(--text-primary, #ffffff);">
+                    {{ snapshot.created_at|date:"d-M-Y H:i:s" }} IST
+                </div>
+            </div>
+            <div class="col-12 col-md-3">
+                <div class="small fw-medium text-uppercase letter-spacing-1" style="color: var(--text-secondary, #94a3b8);">Recorded By</div>
+                <div class="fw-semibold font-monospace mt-0.5" style="color: var(--text-primary, #ffffff);">
+                    <i class="bi bi-person-circle me-1 text-info"></i>{{ snapshot.user.username }}
+                </div>
+            </div>
+            <div class="col-12 col-md-3">
+                <div class="small fw-medium text-uppercase letter-spacing-1" style="color: var(--text-secondary, #94a3b8);">Trading Account Scope</div>
+                <div class="fw-semibold font-monospace mt-0.5" style="color: var(--text-primary, #ffffff);">
+                    {{ snapshot.trading_account.account_id|default:"1000000001 (Mock Account)" }}
+                </div>
+            </div>
+            <div class="col-12 col-md-3">
+                <div class="small fw-medium text-uppercase letter-spacing-1" style="color: var(--text-secondary, #94a3b8);">Dataset Replayed</div>
+                <div class="fw-semibold font-monospace mt-0.5 text-truncate" style="color: var(--text-primary, #ffffff);" title="{{ snapshot.dataset_file|default:'None' }}">
+                    {{ snapshot.dataset_file|default:"Realtime Market Ingestion" }}
+                </div>
+            </div>
+        </div>
+        {% if snapshot.notes %}
+        <div class="mt-3 pt-3 border-top border-secondary border-opacity-15">
+            <div class="small fw-medium text-uppercase letter-spacing-1 mb-1" style="color: var(--text-secondary, #94a3b8);">
+                <i class="bi bi-journal-text me-1 text-warning"></i> Observations &amp; Notes
+            </div>
+            <div class="p-2.5 rounded fs-8 font-sans" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255,255,255,0.08)); color: var(--text-primary, #ffffff);">
+                {{ snapshot.notes|linebreaksbr }}
+            </div>
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Capital Accounting Bridge & KPI Summary -->
+    <div class="glass-card p-4 rounded-3 shadow-sm mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+        <div class="d-flex align-items-center justify-content-between mb-3">
+            <span class="small fw-bold text-uppercase letter-spacing-1" style="color: var(--text-secondary, #94a3b8);">Account Balance &amp; Capital Accounting Snapshot</span>
+            <span class="badge {% if snapshot.net_pnl >= 0 %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-25 border border-opacity-25 rounded-pill px-3 py-1 fs-7 font-monospace">
+                {% if snapshot.net_pnl >= 0 %}+{% endif %}₹{{ snapshot.net_pnl|floatformat:2 }} Net Realized Session PnL
+            </span>
+        </div>
+
+        <div class="d-flex align-items-baseline justify-content-between flex-wrap gap-2 mb-3">
+            <div class="d-flex align-items-baseline gap-2 flex-wrap">
+                <span class="fs-3 fw-bold font-monospace" style="color: var(--text-primary, #ffffff);">
+                    ₹{{ snapshot.ending_balance|floatformat:2 }}
+                </span>
+                <span class="small fw-medium" style="color: var(--text-secondary, #94a3b8);">Closing Margin Balance</span>
+            </div>
+            <div class="d-flex align-items-center gap-2 small font-monospace">
+                <span class="badge rounded-pill px-2.5 py-1 bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25">
+                    Starting SOD: ₹{{ snapshot.starting_balance|floatformat:2 }}
+                </span>
+                <span class="badge rounded-pill px-2.5 py-1 bg-info bg-opacity-20 text-info border border-info border-opacity-25">
+                    Peak Margin: ₹{{ snapshot.peak_margin_utilized|floatformat:2 }}
+                </span>
+            </div>
+        </div>
+
+        <div class="row g-3 pt-3 border-top border-secondary border-opacity-15 small">
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-3 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+                    <div class="fs-9 fw-medium" style="color: var(--text-secondary, #94a3b8);">1. Starting SOD Capital</div>
+                    <div class="fw-bold font-monospace mt-1" style="color: var(--text-primary, #ffffff);">₹{{ snapshot.starting_balance|floatformat:2 }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-3 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+                    <div class="fs-9 fw-medium" style="color: var(--text-secondary, #94a3b8);">2. (+) Gross Profit</div>
+                    <div class="text-success fw-bold font-monospace mt-1">+₹{{ snapshot.gross_pnl|floatformat:2 }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-3 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+                    <div class="fs-9 fw-medium" style="color: var(--text-secondary, #94a3b8);">3. (-) Brokerage &amp; Taxes</div>
+                    <div class="text-danger fw-bold font-monospace mt-1">-₹{{ snapshot.total_charges|floatformat:2 }}</div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-3 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+                    <div class="fs-9 fw-medium" style="color: var(--text-secondary, #94a3b8);">4. (=) Net Realized PnL</div>
+                    <div class="{% if snapshot.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold font-monospace mt-1">
+                        {% if snapshot.net_pnl > 0 %}+{% endif %}₹{{ snapshot.net_pnl|floatformat:2 }}
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-3 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+                    <div class="fs-9 fw-medium" style="color: var(--text-secondary, #94a3b8);">5. Win Rate / Trades</div>
+                    <div class="fw-bold font-monospace mt-1" style="color: var(--text-primary, #ffffff);">
+                        {{ snapshot.win_rate|floatformat:1 }}% ({{ snapshot.winning_trades }}W / {{ snapshot.losing_trades }}L)
+                    </div>
+                </div>
+            </div>
+            <div class="col-6 col-md-4 col-xl-2">
+                <div class="p-3 rounded-3 h-100" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+                    <div class="fs-9 fw-medium" style="color: var(--text-secondary, #94a3b8);">6. Max Drawdown</div>
+                    <div class="text-danger fw-bold font-monospace mt-1">
+                        {% if snapshot.max_drawdown > 0 %}-₹{{ snapshot.max_drawdown|floatformat:2 }}{% else %}₹0.00{% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Equity Curve & Performance Analytics -->
+    <div class="glass-card p-4 rounded-3 shadow-sm mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3">
+            <div>
+                <h5 class="fw-bold mb-0 font-monospace" style="color: var(--text-primary, #ffffff);">Cumulative Session Equity Curve</h5>
+                <span class="small" style="color: var(--text-secondary, #94a3b8);">Realized mark-to-market progression captured during this simulation session.</span>
+            </div>
+            <div class="d-flex align-items-center gap-3 font-monospace small">
+                <div>
+                    <span class="fs-9" style="color: var(--text-secondary, #94a3b8);">Total Trades:</span>
+                    <span class="fw-bold" style="color: var(--text-primary, #ffffff);">{{ snapshot.total_trades }}</span>
+                </div>
+                <div>
+                    <span class="fs-9" style="color: var(--text-secondary, #94a3b8);">Net Return:</span>
+                    <span class="{% if snapshot.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">
+                        {% if snapshot.net_pnl > 0 %}+{% endif %}₹{{ snapshot.net_pnl|floatformat:2 }}
+                    </span>
+                </div>
+            </div>
+        </div>
+
+        <div class="position-relative" style="min-height: 280px; height: 320px;">
+            <canvas id="sessionSnapshotEquityChart"></canvas>
+        </div>
+    </div>
+
+    <!-- 12-Month Calendar Heatmap Container -->
+    <div id="mock-broker-calendar-container" class="mb-4">
+        {% include 'admins/partials/mock_broker_calendar_partial.html' with months=months year=year prev_year=prev_year next_year=next_year %}
+    </div>
+
+    <!-- Closed Trades Round-Trip Audit Table -->
+    <div class="glass-card rounded-3 shadow-sm overflow-hidden mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+        <div class="p-3 d-flex justify-content-between align-items-center" style="border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.08));">
+            <div>
+                <h5 class="fw-bold mb-0 font-monospace" style="color: var(--text-primary, #ffffff);">Snapshotted Round-Trip Closed Trades</h5>
+                <span class="small" style="color: var(--text-secondary, #94a3b8);">Complete trade pair executions matching entry and exit orders for this session.</span>
+            </div>
+            <span class="badge bg-secondary-subtle text-secondary font-monospace px-2.5 py-1 rounded-pill">
+                {{ trades|length }} Closed Pair{{ trades|length|pluralize }}
+            </span>
+        </div>
+
+        {% if trades %}
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0 font-monospace fs-8" style="color: var(--text-primary, #ffffff);">
+                <thead class="text-uppercase fs-9 letter-spacing-1" style="background: rgba(255, 255, 255, 0.04); color: var(--text-secondary, #94a3b8); border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));">
+                    <tr>
+                        <th>Symbol</th>
+                        <th class="text-center" style="width: 80px;">Side</th>
+                        <th>Entry Time &amp; Price</th>
+                        <th>Exit Time &amp; Price</th>
+                        <th class="text-end" style="width: 80px;">Qty</th>
+                        <th class="text-end" style="width: 120px;">Gross PnL</th>
+                        <th class="text-end" style="width: 110px;">Charges</th>
+                        <th class="text-end" style="width: 120px;">Net PnL</th>
+                        <th class="text-center" style="width: 100px;">Status</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-secondary divide-opacity-10">
+                    {% for t in trades %}
+                    <tr>
+                        <td class="fw-bold" style="color: var(--text-primary, #ffffff);">{{ t.symbol }}</td>
+                        <td class="text-center">
+                            <span class="badge {% if t.side == 'BUY' %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %} px-2 py-0.5 rounded-pill">
+                                {{ t.side }}
+                            </span>
+                        </td>
+                        <td>
+                            <div>₹{{ t.entry_price|floatformat:2 }}</div>
+                            <span class="fs-9" style="color: var(--text-secondary, #94a3b8);">{{ t.entry_time|default:"—" }}</span>
+                        </td>
+                        <td>
+                            <div>₹{{ t.exit_price|floatformat:2 }}</div>
+                            <span class="fs-9" style="color: var(--text-secondary, #94a3b8);">{{ t.exit_time|default:"—" }}</span>
+                        </td>
+                        <td class="text-end">{{ t.quantity }}</td>
+                        <td class="text-end {% if t.gross_pnl > 0 %}text-success{% elif t.gross_pnl < 0 %}text-danger{% else %}text-secondary{% endif %} fw-bold">
+                            {% if t.gross_pnl > 0 %}+{% endif %}₹{{ t.gross_pnl|floatformat:2 }}
+                        </td>
+                        <td class="text-end fs-9" style="color: var(--text-secondary, #94a3b8);">₹{{ t.charges|floatformat:2 }}</td>
+                        <td class="text-end {% if t.net_pnl > 0 %}text-success{% elif t.net_pnl < 0 %}text-danger{% else %}text-secondary{% endif %} fw-bold">
+                            {% if t.net_pnl > 0 %}+{% endif %}₹{{ t.net_pnl|floatformat:2 }}
+                        </td>
+                        <td class="text-center">
+                            {% if t.net_pnl > 0 %}
+                            <span class="badge bg-success-subtle text-success border border-success-subtle px-2 py-0.5 rounded-pill">WIN</span>
+                            {% elif t.net_pnl < 0 %}
+                            <span class="badge bg-danger-subtle text-danger border border-danger-subtle px-2 py-0.5 rounded-pill">LOSS</span>
+                            {% else %}
+                            <span class="badge bg-secondary-subtle text-secondary border border-secondary-subtle px-2 py-0.5 rounded-pill">EVEN</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="text-center py-4 small" style="color: var(--text-secondary, #94a3b8);">
+            No closed trade round-trips recorded in this session snapshot.
+        </div>
+        {% endif %}
+    </div>
+
+    <!-- Raw Orders & Positions Inspector (Collapsible) -->
+    <div class="accordion mb-4" id="snapshotRawAccordion">
+        <div class="accordion-item rounded-3 shadow-sm overflow-hidden" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+            <h2 class="accordion-header" id="headingOrders">
+                <button class="accordion-button collapsed font-monospace fs-8" type="button" data-bs-toggle="collapse" data-bs-target="#collapseOrders" aria-expanded="false" aria-controls="collapseOrders" style="background: rgba(255, 255, 255, 0.03); color: var(--text-primary, #ffffff);">
+                    <i class="bi bi-code-slash me-2 text-info"></i> Snapshotted Orders Payload ({{ orders|length }} records)
+                </button>
+            </h2>
+            <div id="collapseOrders" class="accordion-collapse collapse" aria-labelledby="headingOrders" data-bs-parent="#snapshotRawAccordion">
+                <div class="accordion-body p-3" style="background: rgba(0, 0, 0, 0.2);">
+                    {% if orders %}
+                    <div class="table-responsive">
+                        <table class="table table-sm font-monospace fs-9 mb-0" style="color: var(--text-primary, #ffffff);">
+                            <thead>
+                                <tr style="color: var(--text-secondary, #94a3b8);">
+                                    <th>Order ID</th>
+                                    <th>Symbol</th>
+                                    <th>Side</th>
+                                    <th>Type</th>
+                                    <th>Qty</th>
+                                    <th>Price</th>
+                                    <th>Status</th>
+                                    <th>Time</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for o in orders %}
+                                <tr>
+                                    <td>{{ o.order_id|default:o.id }}</td>
+                                    <td>{{ o.trading_symbol|default:o.symbol }}</td>
+                                    <td><span class="badge {% if o.transaction_type == 'BUY' %}bg-success-subtle text-success{% else %}bg-danger-subtle text-danger{% endif %} rounded-pill">{{ o.transaction_type|default:o.side }}</span></td>
+                                    <td>{{ o.order_type }}</td>
+                                    <td>{{ o.quantity }}</td>
+                                    <td>₹{{ o.price|default:o.average_price|floatformat:2 }}</td>
+                                    <td><span class="badge bg-secondary-subtle text-secondary rounded-pill">{{ o.order_status|default:o.status }}</span></td>
+                                    <td style="color: var(--text-secondary, #94a3b8);">{{ o.order_timestamp|default:o.create_time }}</td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <span class="fs-8" style="color: var(--text-secondary, #94a3b8);">No order telemetry recorded.</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+
+        <div class="accordion-item rounded-3 shadow-sm overflow-hidden mt-2" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
+            <h2 class="accordion-header" id="headingPositions">
+                <button class="accordion-button collapsed font-monospace fs-8" type="button" data-bs-toggle="collapse" data-bs-target="#collapsePositions" aria-expanded="false" aria-controls="collapsePositions" style="background: rgba(255, 255, 255, 0.03); color: var(--text-primary, #ffffff);">
+                    <i class="bi bi-layers me-2 text-warning"></i> Snapshotted Positions Payload ({{ positions|length }} records)
+                </button>
+            </h2>
+            <div id="collapsePositions" class="accordion-collapse collapse" aria-labelledby="headingPositions" data-bs-parent="#snapshotRawAccordion">
+                <div class="accordion-body p-3" style="background: rgba(0, 0, 0, 0.2);">
+                    {% if positions %}
+                    <div class="table-responsive">
+                        <table class="table table-sm font-monospace fs-9 mb-0" style="color: var(--text-primary, #ffffff);">
+                            <thead>
+                                <tr style="color: var(--text-secondary, #94a3b8);">
+                                    <th>Symbol</th>
+                                    <th>Position Type</th>
+                                    <th>Net Qty</th>
+                                    <th>Buy Avg</th>
+                                    <th>Sell Avg</th>
+                                    <th>Realized PnL</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for p in positions %}
+                                <tr>
+                                    <td>{{ p.trading_symbol|default:p.symbol }}</td>
+                                    <td>{{ p.position_type }}</td>
+                                    <td>{{ p.net_qty }}</td>
+                                    <td>₹{{ p.buy_avg|floatformat:2 }}</td>
+                                    <td>₹{{ p.sell_avg|floatformat:2 }}</td>
+                                    <td class="{% if p.realized_profit > 0 %}text-success{% elif p.realized_profit < 0 %}text-danger{% else %}text-secondary{% endif %}">
+                                        ₹{{ p.realized_profit|floatformat:2 }}
+                                    </td>
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                    {% else %}
+                    <span class="fs-8" style="color: var(--text-secondary, #94a3b8);">No open positions recorded at snapshot time.</span>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+(function() {
+    function initSessionDetailChart() {
+        const canvas = document.getElementById('sessionSnapshotEquityChart');
+        if (!canvas) return;
+
+        const rawData = {{ equity_curve_json|safe }};
+        if (!rawData || rawData.length === 0) {
+            const ctx = canvas.getContext('2d');
+            ctx.font = "14px 'Google Sans Flex', sans-serif";
+            ctx.fillStyle = "rgba(148, 163, 184, 0.7)";
+            ctx.textAlign = "center";
+            ctx.fillText("No closed trades recorded for session equity curve.", canvas.width / 2, canvas.height / 2);
+            return;
+        }
+
+        const labels = rawData.map(d => d.label || '');
+        const values = rawData.map(d => d.equity);
+
+        const ctx = canvas.getContext('2d');
+        const isProfit = values.length > 0 && values[values.length - 1] >= 0;
+        const strokeColor = isProfit ? '#10b981' : '#ef4444';
+        const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height || 320);
+        gradient.addColorStop(0, isProfit ? 'rgba(16, 185, 129, 0.3)' : 'rgba(239, 68, 68, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 0, 0, 0)');
+
+        new Chart(ctx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [{
+                    label: 'Cumulative Net PnL (₹)',
+                    data: values,
+                    borderColor: strokeColor,
+                    borderWidth: 2,
+                    backgroundColor: gradient,
+                    fill: true,
+                    tension: 0.25,
+                    pointRadius: values.length > 50 ? 1 : 3,
+                    pointHoverRadius: 6,
+                    pointBackgroundColor: strokeColor,
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    intersect: false,
+                    mode: 'index',
+                },
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        backgroundColor: '#0c0d12',
+                        borderColor: 'rgba(255, 255, 255, 0.15)',
+                        borderWidth: 1,
+                        titleColor: '#fff',
+                        bodyColor: '#e2e8f0',
+                        callbacks: {
+                            label: function(context) {
+                                const val = context.parsed.y;
+                                return (val >= 0 ? '+' : '') + '₹' + Number(val).toLocaleString('en-IN', { minimumFractionDigits: 2 });
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: { color: '#94a3b8', font: { size: 10, family: 'monospace' } }
+                    },
+                    y: {
+                        grid: { color: 'rgba(255, 255, 255, 0.05)' },
+                        ticks: {
+                            color: '#94a3b8',
+                            font: { size: 10, family: 'monospace' },
+                            callback: function(value) {
+                                return '₹' + Number(value).toLocaleString('en-IN');
+                            }
+                        }
+                    }
+                }
+            }
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSessionDetailChart);
+    } else {
+        setTimeout(initSessionDetailChart, 50);
+    }
+})();
+</script>

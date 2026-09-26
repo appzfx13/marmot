@@ -195,7 +195,7 @@ def send_control_command(task_id, command):
             "index_name": task.index_name or '',
             "forex_instrument": task.forex_instrument or '',
             "provider_name": task.provider_name,
-            "strike_count": task.strike_count or 5,
+            "strike_count": task.strike_count or 15,
             "use_30_days_5s": task.use_30_days_5s,
             "security_id": index_params.get("security_id", ""),
             "exchange_segment": index_params.get("exchange_segment", ""),
@@ -250,13 +250,18 @@ def inspect_parquet_dataset(task, query=None, limit=50):
         ]
 
     target_path = None
+    is_in_progress = False
     for p in candidate_paths:
         if p and os.path.exists(p) and not os.path.isdir(p):
-            target_path = p
-            break
+            if os.path.getsize(p) > 0:
+                target_path = p
+                break
+            else:
+                is_in_progress = True
 
     if not target_path:
-        return {'exists': False, 'error': 'Parquet dataset file not generated yet or missing on disk.'}
+        err_msg = 'Parquet dataset consolidation in progress...' if is_in_progress else 'Parquet dataset file not generated yet or missing on disk.'
+        return {'exists': False, 'error': err_msg}
 
     try:
         pf = pq.ParquetFile(target_path)

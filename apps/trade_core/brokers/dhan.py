@@ -1003,3 +1003,25 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             'message': f"All Dhan orders ({cancelled} cancelled) and positions ({squared} squared off) frozen for Client ID {self.client_id}. API Kill Switch Activated."
         }
 
+    def deactivate_kill_switch(self) -> Dict[str, Any]:
+        """Deactivates Dhan HQ Kill Switch API to restore order placement capabilities."""
+        token = str(self.get_access_token() or '').strip().strip('"').strip("'")
+        client_id = str(self.client_id or '').strip().strip('"').strip("'")
+        if not token or not client_id:
+            return {'success': False, 'broker': 'DHAN', 'message': f'Missing token or client ID for {self.account_name}'}
+
+        try:
+            url = f"{self.base_url}/killswitch?killSwitchStatus=DEACTIVATE"
+            headers = {"access-token": token, "client-id": client_id, "Accept": "application/json", "Content-Type": "application/json"}
+            resp = requests.post(url, headers=headers, timeout=6)
+            if resp.status_code == 200:
+                logger.info(f"Dhan HQ Kill Switch API deactivated successfully for {client_id}")
+                return {'success': True, 'broker': 'DHAN', 'client_id': client_id, 'message': 'Kill switch deactivated successfully.'}
+            else:
+                logger.error(f"Dhan HQ Kill Switch deactivation failed for {client_id}: {resp.text}")
+                return {'success': False, 'broker': 'DHAN', 'client_id': client_id, 'message': resp.text}
+        except Exception as e:
+            logger.error(f"Error deactivating Dhan kill switch for {client_id}: {e}")
+            return {'success': False, 'broker': 'DHAN', 'client_id': client_id, 'message': str(e)}
+
+

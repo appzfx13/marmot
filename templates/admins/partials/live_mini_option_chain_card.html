@@ -73,6 +73,11 @@
                     <span class="badge bg-dark bg-opacity-50 text-muted font-monospace border border-white border-opacity-10 px-2 py-0.5 smaller">
                         {{ option_chain.fyers_symbol }}
                     </span>
+                    {% if option_chain.is_partial_dataset %}
+                    <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace smaller" title="Historical dataset contains {{ option_chain.dataset_strike_count }} strikes around initial ATM">
+                        <i class="bi bi-info-circle me-1"></i>Partial Dataset: {{ option_chain.dataset_strike_count }} Strikes Available
+                    </span>
+                    {% endif %}
                 </div>
                 <small class="theme-text-muted" style="font-size: 0.74rem;">&plusmn;3 Strikes Active Window &bull; Real-time ATM Heatmap &bull; 100% Live Exchange Contracts</small>
             </div>
@@ -334,9 +339,9 @@
         <p class="theme-text-muted small mb-3" style="max-width: 520px; margin: 0 auto;">
             {{ option_chain.error_message|default:"The Dhan Emulator service on port 8088 is currently offline or unreachable. Please verify the mock_broker container." }}
         </p>
-        <a href="http://127.0.0.1:8088/mock/dashboard" target="_blank" class="btn btn-info text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
+        <a href="{% url 'admins:admin-gateway-emulator' %}" class="btn btn-info text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
             <i class="bi bi-sliders"></i>
-            <span>Open Dhan Emulator Controls (:8088)</span>
+            <span>Open Dhan Gateway Emulator</span>
         </a>
     </div>
     {% else %}
