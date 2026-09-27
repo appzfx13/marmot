@@ -386,11 +386,21 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
                         r.set(f"marmot:mock_quote:{idx_clean}", quote_json, ex=mock_ex)
 
                     exp_tag = ''
-                    if data.get('expiry_info') and data['expiry_info'].get('expiry_date'):
+                    raw_exp_date = data.get('expiry_date') or (data.get('expiry_info', {}).get('expiry_date') if isinstance(data.get('expiry_info'), dict) else '')
+                    if raw_exp_date:
                         try:
                             import datetime as dt_mod
-                            exp_d = dt_mod.datetime.strptime(str(data['expiry_info']['expiry_date']), '%d-%m-%Y')
-                            exp_tag = exp_d.strftime('%d%b').upper()
+                            raw_str = str(raw_exp_date).strip()
+                            exp_d = None
+                            for fmt in ('%d %b %Y', '%d-%m-%Y', '%Y-%m-%d', '%d %B %Y'):
+                                try:
+                                    exp_d = dt_mod.datetime.strptime(raw_str, fmt)
+                                    break
+                                except Exception:
+                                    pass
+                            if exp_d:
+                                exp_tag = exp_d.strftime('%d%b').upper()
+                                r.set(f"marmot:fyers:active_expiry:{idx_clean}", exp_d.strftime('%d %b').upper(), ex=86400)
                         except Exception:
                             pass
 

@@ -13,7 +13,7 @@ RUN go mod download || true
 # Copy source code
 COPY . .
 RUN go mod tidy
-RUN CGO_ENABLED=1 GOOS=linux go build -ldflags="-w -s" -o dhan-emulator main.go
+RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o dhan-emulator main.go
 
 # Production minimal runtime
 FROM debian:bookworm-slim

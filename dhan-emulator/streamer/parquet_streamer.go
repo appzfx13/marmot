@@ -2,9 +2,9 @@ package streamer
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"net/http"
@@ -21,7 +21,7 @@ import (
 	"dhan-emulator/engine"
 	"dhan-emulator/models"
 	"github.com/gorilla/websocket"
-	_ "github.com/marcboeker/go-duckdb"
+	"github.com/parquet-go/parquet-go"
 	"github.com/redis/go-redis/v9"
 )
 
@@ -67,6 +67,11 @@ type ParquetStreamer struct {
 	activeExpiryTicks map[string]models.MarketTick
 	rdb               *redis.Client
 	isCompleted       bool
+	lastSpotTick      models.MarketTick
+	lastSpotPrice     float64
+	lastMinuteStr     string
+	lastBucketTime    time.Time
+	regulator         *FrequencyRegulator
 }
 
 // NewParquetStreamer initializes the market feed streamer.
@@ -94,12 +99,13 @@ func NewParquetStreamer(eng *engine.MatchingEngine, backupDir string) *ParquetSt
 		profileKey:        "COMPRESSED",
 		isPlaying:         false,
 		availableDir:      backupDir,
-		currentDatetime:   time.Now().Format("2006-01-02 15:04:05"),
-		currentDateStr:    time.Now().Format("2006-01-02"),
+		currentDatetime:   "",
+		currentDateStr:    "",
 		currentVIX:        13.28,
 		latestTicks:       make(map[string]models.MarketTick),
 		activeExpiryTicks: make(map[string]models.MarketTick),
 		rdb:               rdb,
+		regulator:         NewFrequencyRegulator(1, "COMPRESSED"),
 	}
 
 	// Auto-select primary parquet dataset prioritizing verified complete Spot + Options files
@@ -122,6 +128,13 @@ func NewParquetStreamer(eng *engine.MatchingEngine, backupDir string) *ParquetSt
 			}
 		}
 		ps.currentFile = selected
+		_, startDt, _ := readParquetMeta(filepath.Join(ps.availableDir, selected))
+		if startDt != "" {
+			ps.currentDatetime = startDt
+			if len(startDt) >= 10 {
+				ps.currentDateStr = startDt[:10]
+			}
+		}
 		log.Printf("[STREAMER] Initialized with primary Parquet dataset: %s", ps.currentFile)
 	}
 
@@ -341,6 +354,9 @@ func (ps *ParquetStreamer) SetProfile(profile string) {
 	case "COMPRESSED":
 		ps.profileKey = "COMPRESSED"
 		ps.speed = 1
+	case "HIGH_COMPRESS", "BURST", "HIGH":
+		ps.profileKey = "HIGH_COMPRESS"
+		ps.speed = 12
 	case "MODERATE", "5X":
 		ps.profileKey = "MODERATE"
 		ps.speed = 5
@@ -369,6 +385,9 @@ func (ps *ParquetStreamer) SetProfile(profile string) {
 	ticks := atomic.LoadInt64(&ps.ticksIngested)
 	prof := ps.profileKey
 	spd := ps.speed
+	if ps.regulator != nil {
+		ps.regulator.SetSpeed(spd, prof)
+	}
 	ps.mu.Unlock()
 
 	pPayload := map[string]interface{}{
@@ -418,6 +437,9 @@ func (ps *ParquetStreamer) SetSpeed(speed int) {
 	dt := ps.currentDatetime
 	ticks := atomic.LoadInt64(&ps.ticksIngested)
 	prof := ps.profileKey
+	if ps.regulator != nil {
+		ps.regulator.SetSpeed(ps.speed, prof)
+	}
 	ps.mu.Unlock()
 
 	pPayload := map[string]interface{}{
@@ -443,10 +465,17 @@ func (ps *ParquetStreamer) SelectParquetFile(file string) {
 	ps.currentFile = file
 	// Atomically clear stale ticks, datetime, and counters from prior file
 	ps.latestTicks = make(map[string]models.MarketTick)
-	ps.currentDatetime = ""
+	_, startDt, _ := readParquetMeta(filepath.Join(ps.availableDir, file))
+	ps.currentDatetime = startDt
 	ps.currentDateStr = ""
+	if len(startDt) >= 10 {
+		ps.currentDateStr = startDt[:10]
+	}
 	atomic.StoreInt64(&ps.currentRow, 0)
 	atomic.StoreInt64(&ps.ticksIngested, 0)
+	if ps.regulator != nil {
+		ps.regulator.Reset()
+	}
 
 	wasPlaying := ps.isPlaying
 	if wasPlaying {
@@ -675,9 +704,6 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 	}
 
 	timeStr := ps.currentDatetime
-	if timeStr == "" {
-		timeStr = time.Now().Format("2006-01-02 15:04:05")
-	}
 
 	// 1. Locate current Spot price exclusively from real incoming ticks
 	spotLTP := 0.0
@@ -754,10 +780,48 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 
 	atmStrikeVal := math.Round(spotLTP/float64(strikeStep)) * float64(strikeStep)
 
-	// 2. Build 31 strikes window (ATM - 15*step to ATM + 15*step)
+	// 2. Scan available recorded strikes for boundary adaptation
+	minAvailStrike := 0.0
+	maxAvailStrike := 0.0
+	hasAvailTicks := false
+
+	checkTicks := func(m map[string]models.MarketTick) {
+		for k, t := range m {
+			if t.LTP > 0 {
+				parts := strings.Split(k, "_")
+				if len(parts) >= 2 {
+					if stk, err := strconv.ParseFloat(parts[0], 64); err == nil && stk > 1000 {
+						if !hasAvailTicks || stk < minAvailStrike {
+							minAvailStrike = stk
+						}
+						if !hasAvailTicks || stk > maxAvailStrike {
+							maxAvailStrike = stk
+						}
+						hasAvailTicks = true
+					}
+				}
+			}
+		}
+	}
+	if len(ps.activeExpiryTicks) > 0 {
+		checkTicks(ps.activeExpiryTicks)
+	} else {
+		checkTicks(ps.latestTicks)
+	}
+
+	// 3. Build 31 strikes window with adaptive centering to preserve visible strikes
 	var strikes []models.OptionStrikeRow
 	totalStrikes := 31
 	halfWindow := totalStrikes / 2
+
+	centerStrike := atmStrikeVal
+	if hasAvailTicks && minAvailStrike > 0 && maxAvailStrike > 0 {
+		if atmStrikeVal > maxAvailStrike {
+			centerStrike = maxAvailStrike - float64(3*strikeStep)
+		} else if atmStrikeVal < minAvailStrike {
+			centerStrike = minAvailStrike + float64(3*strikeStep)
+		}
+	}
 
 	totalCallVol := int64(0)
 	totalPutVol := int64(0)
@@ -765,9 +829,8 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 	totalPutOI := int64(0)
 
 	for i := -halfWindow; i <= halfWindow; i++ {
-		stkPrice := atmStrikeVal + float64(i*strikeStep)
+		stkPrice := centerStrike + float64(i*strikeStep)
 		isATM := (stkPrice == atmStrikeVal)
-		isActiveWindow := (i >= -3 && i <= 3)
 
 		stkStr := fmt.Sprintf("%.0f", stkPrice)
 		ceKey := stkStr + "_CE"
@@ -815,6 +878,8 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 			}
 			totalPutVol += tickPE.Volume
 		}
+
+		isActiveWindow := (i >= -3 && i <= 3) || (ceLTP > 0 || peLTP > 0) || (stkPrice >= atmStrikeVal-float64(3*strikeStep) && stkPrice <= atmStrikeVal+float64(3*strikeStep))
 
 		row := models.OptionStrikeRow{
 			Strike:         stkPrice,
@@ -905,24 +970,30 @@ func (ps *ParquetStreamer) streamLoop() {
 	}
 }
 
-// streamParquetFile reads Parquet records using DuckDB and streams all strikes concurrently for each timestamp.
+// streamParquetFile reads Parquet records using pure Go native streaming and streams all strikes concurrently for each timestamp.
 func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
-	log.Printf("[STREAMER] Starting Parquet replay via DuckDB from: %s", fullPath)
+	log.Printf("[STREAMER] Starting native Parquet streaming replay from: %s", fullPath)
 
-	db, err := sql.Open("duckdb", "")
+	file, err := os.Open(fullPath)
 	if err != nil {
-		log.Printf("[STREAMER] Error opening DuckDB: %v", err)
+		log.Printf("[STREAMER] Error opening Parquet file %s: %v", fullPath, err)
 		return
 	}
-	defer db.Close()
+	defer file.Close()
 
-	var totalRows int64
-	err = db.QueryRow(`SELECT COUNT(*) FROM read_parquet('` + fullPath + `')`).Scan(&totalRows)
+	stat, err := file.Stat()
 	if err != nil {
-		log.Printf("[STREAMER] Error getting row count from DuckDB: %v", err)
+		log.Printf("[STREAMER] Error stat Parquet file %s: %v", fullPath, err)
 		return
 	}
 
+	pf, err := parquet.OpenFile(file, stat.Size())
+	if err != nil {
+		log.Printf("[STREAMER] Error opening Parquet file reader: %v", err)
+		return
+	}
+
+	totalRows := pf.NumRows()
 	startRow := atomic.LoadInt64(&ps.currentRow)
 	ps.mu.Lock()
 	ps.totalRows = totalRows
@@ -933,62 +1004,36 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 	}
 	ps.mu.Unlock()
 
-	colsMap := make(map[string]bool)
-	if dRows, err := db.Query(`DESCRIBE SELECT * FROM read_parquet('` + fullPath + `') LIMIT 1`); err == nil {
-		for dRows.Next() {
-			var colName, colType string
-			var null, key, def, extra sql.NullString
-			if err := dRows.Scan(&colName, &colType, &null, &key, &def, &extra); err == nil {
-				colsMap[strings.ToLower(colName)] = true
+	reader := parquet.NewGenericReader[models.MarketCandleRecord](file)
+	defer reader.Close()
+
+	if startRow > 0 {
+		if err := reader.SeekToRow(startRow); err != nil {
+			log.Printf("[STREAMER] SeekToRow(%d) warning: %v", startRow, err)
+		}
+	}
+
+	buf := make([]models.MarketCandleRecord, 4096)
+	bufIdx := 0
+	bufLen := 0
+
+	getNextRow := func(dest *models.MarketCandleRecord) bool {
+		if bufIdx >= bufLen {
+			n, readErr := reader.Read(buf)
+			if n > 0 {
+				bufLen = n
+				bufIdx = 0
+			} else {
+				if readErr != nil && readErr != io.EOF {
+					log.Printf("[STREAMER] Parquet stream read error: %v", readErr)
+				}
+				return false
 			}
 		}
-		dRows.Close()
+		*dest = buf[bufIdx]
+		bufIdx++
+		return true
 	}
-
-	colOr := func(primary, fallback, defVal string) string {
-		if colsMap[strings.ToLower(primary)] {
-			return primary
-		}
-		if colsMap[strings.ToLower(fallback)] {
-			return fallback
-		}
-		return defVal
-	}
-
-	tsCol := colOr("timestamp", "Timestamp", "0")
-	dtCol := colOr("datetime", "Datetime", "''")
-	idxCol := colOr("index_name", "IndexName", "'NIFTY'")
-	instCol := colOr("instrument_type", "InstrumentType", "'OPTIDX'")
-	symCol := colOr("trading_symbol", "TradingSymbol", "''")
-	stkCol := colOr("strike", "Strike", "'0'")
-	optCol := colOr("option_type", "OptionType", "'CE'")
-	openCol := colOr("open", "Open", "0.0")
-	highCol := colOr("high", "High", "0.0")
-	lowCol := colOr("low", "Low", "0.0")
-	closeCol := colOr("close", "Close", "0.0")
-	volCol := colOr("volume", "Volume", "0")
-	oiCol := colOr("oi", "OI", "0")
-	ivCol := colOr("iv", "IV", "0.0")
-	spotCol := colOr("spot_price", "SpotPrice", "0.0")
-
-	db.Exec("PRAGMA memory_limit='2GB'")
-	db.Exec("PRAGMA threads=2")
-
-	offsetClause := ""
-	if startRow > 0 {
-		offsetClause = fmt.Sprintf(" OFFSET %d", startRow)
-	}
-
-	// Remove ORDER BY to allow linear streaming without full-table memory sort (Parquet is already chronologically ordered)
-	queryStr := fmt.Sprintf(`SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM read_parquet('%s')%s`,
-		tsCol, dtCol, idxCol, instCol, symCol, stkCol, optCol, openCol, highCol, lowCol, closeCol, volCol, oiCol, ivCol, spotCol,
-		fullPath, offsetClause)
-	rows, err := db.Query(queryStr)
-	if err != nil {
-		log.Printf("[STREAMER] DuckDB query error: %v", err)
-		return
-	}
-	defer rows.Close()
 
 	var pendingRecord *models.MarketCandleRecord
 	lastProgressBroadcast := time.Now()
@@ -1005,6 +1050,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 		// 1. Group all records sharing the exact same timestamp into one concurrent batch
 		var currentBucket []models.MarketCandleRecord
 		var currentBucketTime string
+		var parsedBucketTime time.Time
 
 		if pendingRecord != nil {
 			currentBucket = append(currentBucket, *pendingRecord)
@@ -1017,14 +1063,10 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 
 		eofReached := false
 		for {
-			if !rows.Next() {
+			var rec models.MarketCandleRecord
+			if !getNextRow(&rec) {
 				eofReached = true
 				break
-			}
-			var rec models.MarketCandleRecord
-			if err := rows.Scan(&rec.Timestamp, &rec.Datetime, &rec.IndexName, &rec.InstrumentType, &rec.TradingSymbol, &rec.Strike, &rec.OptionType, &rec.Open, &rec.High, &rec.Low, &rec.Close, &rec.Volume, &rec.OI, &rec.IV, &rec.SpotPrice); err != nil {
-				log.Printf("[STREAMER] DuckDB row scan error: %v (Query was: %s)", err, queryStr)
-				return
 			}
 
 			atomic.AddInt64(&ps.currentRow, 1)
@@ -1061,7 +1103,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 
 		// 2. Broadcast all strikes and spot index for timestamp T concurrently
 		if len(currentBucket) > 0 {
-			parsedBucketTime := time.Now()
+			parsedBucketTime = time.Now()
 			if len(currentBucketTime) >= 19 {
 				if t, err := time.Parse("2006-01-02 15:04:05", currentBucketTime[:19]); err == nil {
 					parsedBucketTime = t
@@ -1111,6 +1153,23 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					volume = 50000
 				}
 			}
+
+			// Sub-tick Spot Context Retention: If sub-tick only contains option rows, retain active 1-min spot baseline
+			ps.mu.RLock()
+			cachedSpotPrice := ps.lastSpotPrice
+			cachedSpotTick := ps.lastSpotTick
+			ps.mu.RUnlock()
+
+			if spotPrice <= 0 && cachedSpotPrice > 1000 {
+				spotPrice = cachedSpotPrice
+				spotIndexName = cachedSpotTick.TradingSymbol
+				openPrice = cachedSpotTick.Open
+				highPrice = cachedSpotTick.High
+				lowPrice = cachedSpotTick.Low
+				closePrice = cachedSpotTick.Close
+				volume = cachedSpotTick.Volume
+			}
+
 			if spotPrice > 1000 {
 				if spotIndexName == "" {
 					spotIndexName = "NIFTY"
@@ -1130,24 +1189,44 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					Close:         closePrice,
 					Volume:        volume,
 				}
-				ps.BroadcastTick(spotTick)
+
+				ps.mu.Lock()
+				ps.lastSpotPrice = spotPrice
+				ps.lastSpotTick = spotTick
+				var isNewMinuteBar bool
+				if ps.regulator != nil {
+					isNewMinuteBar, _, _ = ps.regulator.OnTick(parsedBucketTime)
+				} else {
+					currentMinuteStr := parsedBucketTime.Format("2006-01-02 15:04")
+					isNewMinuteBar = (ps.lastMinuteStr == "" || currentMinuteStr != ps.lastMinuteStr)
+					if isNewMinuteBar {
+						ps.lastMinuteStr = currentMinuteStr
+					}
+				}
+				ps.mu.Unlock()
+
+				if isNewMinuteBar {
+					ps.BroadcastTick(spotTick)
+
+					if ps.rdb != nil {
+						candleMsg := map[string]interface{}{
+							"index":      spotIndexName,
+							"datetime":   currentBucketTime,
+							"open":       openPrice,
+							"high":       highPrice,
+							"low":        lowPrice,
+							"close":      closePrice,
+							"spot_price": spotPrice,
+							"volume":     volume,
+							"vix":        ps.currentVIX,
+						}
+						if cBytes, err := json.Marshal(candleMsg); err == nil {
+							_ = ps.rdb.Publish(context.Background(), "marmot:streamer:candles", cBytes).Err()
+						}
+					}
+				}
 
 				if ps.rdb != nil {
-					candleMsg := map[string]interface{}{
-						"index":      spotIndexName,
-						"datetime":   currentBucketTime,
-						"open":       openPrice,
-						"high":       highPrice,
-						"low":        lowPrice,
-						"close":      closePrice,
-						"spot_price": spotPrice,
-						"volume":     volume,
-						"vix":        ps.currentVIX,
-					}
-					if cBytes, err := json.Marshal(candleMsg); err == nil {
-						_ = ps.rdb.Publish(context.Background(), "marmot:streamer:candles", cBytes).Err()
-					}
-
 					ps.mu.RLock()
 					activeFile := ps.currentFile
 					streamSpeed := ps.speed
@@ -1401,25 +1480,159 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 			}
 		}
 
-		// Dynamic speed pacing per market timestamp candle
+		// Dynamic frequency-matched speed pacing per market timestamp candle vs 5-second sub-tick slice
+		ps.mu.Lock()
+		timeStep := 60 * time.Second
+		if !ps.lastBucketTime.IsZero() && parsedBucketTime.After(ps.lastBucketTime) {
+			timeStep = parsedBucketTime.Sub(ps.lastBucketTime)
+		}
+		ps.lastBucketTime = parsedBucketTime
+		
+		// If dataset is 1-minute resolution, we will emit 12 sub-ticks (every 5 virtual seconds)
+		// to fulfill the 12 option candles in 1s requirement without fabricating synthetic prices.
+		isMacroResolution := timeStep == 60*time.Second
 		var sleepDuration time.Duration
-		if speed >= 250 {
-			sleepDuration = 5 * time.Millisecond
-		} else if speed >= 100 {
-			sleepDuration = 10 * time.Millisecond
-		} else if speed >= 50 {
-			sleepDuration = 20 * time.Millisecond
+		if ps.regulator != nil {
+			sleepDuration = ps.regulator.GetPacingSleep(5 * time.Second) // Always pace at 5s micro-tick speed
 		} else {
-			sleepDuration = time.Duration(1000/speed) * time.Millisecond
-			if sleepDuration < 5*time.Millisecond {
-				sleepDuration = 5 * time.Millisecond
-			}
+			sleepDuration = time.Duration(1000/(speed*12)) * time.Millisecond
+		}
+		ps.mu.Unlock()
+
+		subTicksToEmit := 1
+		if isMacroResolution {
+			subTicksToEmit = 12
 		}
 
-		select {
-		case <-ps.stopChan:
-			return
-		case <-time.After(sleepDuration):
+		for subTick := 0; subTick < subTicksToEmit; subTick++ {
+			// Calculate virtual time for this sub-tick
+			virtualSubTime := parsedBucketTime.Add(time.Duration(subTick*5) * time.Second)
+			virtualSubTimeStr := virtualSubTime.Format("2006-01-02 15:04:05")
+
+			ps.mu.Lock()
+			if ps.regulator != nil {
+				ps.regulator.OnTick(virtualSubTime)
+			}
+			ps.mu.Unlock()
+
+			// Broadcast virtual clock tick to Marmot UI for real-time historical clock sync
+			if ps.rdb != nil {
+				ps.mu.RLock()
+				activeFile := ps.currentFile
+				streamSpeed := ps.speed
+				totRows := ps.totalRows
+				cRow := atomic.LoadInt64(&ps.currentRow)
+				ps.mu.RUnlock()
+				var progPct float64
+				if totRows > 0 {
+					progPct = (float64(cRow) / float64(totRows)) * 100.0
+				}
+				
+				// Identify Spot
+				var spotPrice float64
+				var spotIndexName string
+				for _, rec := range currentBucket {
+					if rec.OptionType == "INDEX" || rec.Strike == "SPOT" {
+						spotIndexName = rec.IndexName
+						spotPrice = rec.Close
+						if spotPrice <= 0 {
+							spotPrice = rec.SpotPrice
+						}
+						break
+					}
+					if rec.SpotPrice > 1000 && spotPrice == 0 {
+						spotPrice = rec.SpotPrice
+						spotIndexName = rec.IndexName
+					}
+				}
+				if spotPrice <= 0 {
+					ps.mu.RLock()
+					spotPrice = ps.lastSpotPrice
+					spotIndexName = ps.lastSpotTick.TradingSymbol
+					ps.mu.RUnlock()
+				}
+				if spotIndexName == "" {
+					spotIndexName = "NIFTY"
+				}
+
+				tickMsg := map[string]interface{}{
+					"type":           "mock_tick",
+					"source":         "EMULATOR",
+					"is_mock":        true,
+					"index":          spotIndexName,
+					"symbol":         spotIndexName,
+					"spot_price":     spotPrice,
+					"ltp":            fmt.Sprintf("%.2f", spotPrice),
+					"formatted_time": virtualSubTimeStr,
+					"timestamp":      virtualSubTimeStr,
+					"is_virtual":     true,
+					"speed":          streamSpeed,
+					"progress_pct":   fmt.Sprintf("%.1f", progPct),
+					"current_row":    cRow,
+					"total_rows":     totRows,
+					"file":           activeFile,
+				}
+				if tBytes, err := json.Marshal(tickMsg); err == nil {
+					_ = ps.rdb.Publish(context.Background(), "marmot:mock_ticks", tBytes).Err()
+				}
+			}
+
+			// Actually broadcast the ticks to WebSocket clients if it's the sub-ticks
+			if subTick > 0 {
+				for _, rec := range currentBucket {
+					secID := rec.Strike
+					optType := strings.ToUpper(strings.TrimSpace(rec.OptionType))
+					if optType == "CALL" {
+						optType = "CE"
+					} else if optType == "PUT" {
+						optType = "PE"
+					}
+					sym := rec.TradingSymbol
+					if sym == "" {
+						sym = fmt.Sprintf("%s %s %s", rec.IndexName, rec.Strike, optType)
+					}
+					sym = strings.TrimSpace(sym)
+					if rec.OptionType == "INDEX" || rec.Strike == "SPOT" {
+						sym = rec.IndexName
+						secID = "13"
+						if strings.Contains(strings.ToUpper(rec.IndexName), "BANK") {
+							secID = "25"
+						}
+					}
+					price := rec.Close
+					if price <= 0 {
+						price = rec.Open
+					}
+					if price <= 0 {
+						continue
+					}
+					tick := models.MarketTick{
+						Timestamp:     virtualSubTime,
+						SecurityID:    secID,
+						TradingSymbol: sym,
+						LTP:           price,
+						Open:          rec.Open,
+						High:          rec.High,
+						Low:           rec.Low,
+						Close:         price,
+						Volume:        rec.Volume,
+						OI:            rec.OI,
+					}
+					if optType == "CE" || optType == "PE" {
+						strikeKey := fmt.Sprintf("%s_%s", rec.Strike, optType)
+						ps.mu.Lock()
+						ps.activeExpiryTicks[strikeKey] = tick
+						ps.mu.Unlock()
+					}
+					ps.BroadcastTick(tick)
+				}
+			}
+
+			select {
+			case <-ps.stopChan:
+				return
+			case <-time.After(sleepDuration):
+			}
 		}
 	}
 }
@@ -1451,82 +1664,58 @@ var (
 	datasetMetaCache   = make(map[string]ParquetFileInfo)
 )
 
-// readParquetMeta extracts index_name and date range from a parquet dataset using DuckDB.
+// readParquetMeta extracts index_name and date range from a parquet dataset using native Parquet footer metadata.
 func readParquetMeta(filePath string) (string, string, string) {
-	db, err := sql.Open("duckdb", "")
+	file, err := os.Open(filePath)
 	if err != nil {
-		return "", "", ""
+		return "NIFTY", "", ""
 	}
-	defer db.Close()
+	defer file.Close()
 
-	var idx, start, end string
-
-	// 1. Fast sample first row for columns and index_name (LIMIT 1 without ORDER BY reads only row 1)
-	qFirst := fmt.Sprintf(`SELECT * FROM read_parquet('%s') LIMIT 1`, filePath)
-	rows, err := db.Query(qFirst)
+	stat, err := file.Stat()
 	if err != nil {
-		return "", "", ""
+		return "NIFTY", "", ""
 	}
-	cols, err := rows.Columns()
+
+	pf, err := parquet.OpenFile(file, stat.Size())
 	if err != nil {
-		rows.Close()
-		return "", "", ""
+		return "NIFTY", "", ""
 	}
 
-	colMap := make(map[string]int)
-	for i, c := range cols {
-		colMap[strings.ToLower(c)] = i
+	numRows := pf.NumRows()
+	if numRows == 0 {
+		return "NIFTY", "", ""
 	}
 
-	if rows.Next() {
-		vals := make([]interface{}, len(cols))
-		valPtrs := make([]interface{}, len(cols))
-		for i := range vals {
-			valPtrs[i] = &vals[i]
-		}
-		if err := rows.Scan(valPtrs...); err == nil {
-			if i, ok := colMap["index_name"]; ok && vals[i] != nil {
-				idx = fmt.Sprintf("%v", vals[i])
-			} else if i, ok := colMap["indexname"]; ok && vals[i] != nil {
-				idx = fmt.Sprintf("%v", vals[i])
-			}
-			if i, ok := colMap["datetime"]; ok && vals[i] != nil {
-				start = fmt.Sprintf("%v", vals[i])
-			}
-		}
-	}
-	rows.Close()
+	reader := parquet.NewGenericReader[models.MarketCandleRecord](file)
+	defer reader.Close()
 
-	// 2. Fast min/max aggregation leveraging parquet statistics pushdown without expensive full-table sorting
-	if _, ok := colMap["timestamp"]; ok {
-		qMinMax := fmt.Sprintf(`SELECT min(timestamp), max(timestamp) FROM read_parquet('%s')`, filePath)
-		var qMin, qMax sql.NullInt64
-		if err := db.QueryRow(qMinMax).Scan(&qMin, &qMax); err == nil {
-			if qMin.Valid && qMin.Int64 > 0 {
-				start = time.Unix(qMin.Int64, 0).Format("2006-01-02 15:04:05")
-			}
-			if qMax.Valid && qMax.Int64 > 0 {
-				end = time.Unix(qMax.Int64, 0).Format("2006-01-02 15:04:05")
-			}
-		}
-	} else if _, ok := colMap["datetime"]; ok {
-		qMinMax := fmt.Sprintf(`SELECT min(datetime), max(datetime) FROM read_parquet('%s')`, filePath)
-		var qMin, qMax sql.NullString
-		if err := db.QueryRow(qMinMax).Scan(&qMin, &qMax); err == nil {
-			if qMin.Valid && qMin.String != "" {
-				start = qMin.String
-			}
-			if qMax.Valid && qMax.String != "" {
-				end = qMax.String
-			}
-		}
+	firstBatch := make([]models.MarketCandleRecord, 1)
+	n, _ := reader.Read(firstBatch)
+	if n == 0 {
+		return "NIFTY", "", ""
 	}
 
-	if end == "" {
-		end = start
-	}
+	idx := firstBatch[0].IndexName
 	if idx == "" {
 		idx = "NIFTY"
+	}
+	start := firstBatch[0].Datetime
+	if start == "" && firstBatch[0].Timestamp > 0 {
+		start = time.Unix(firstBatch[0].Timestamp, 0).Format("2006-01-02 15:04:05")
+	}
+
+	end := start
+	if numRows > 1 {
+		if err := reader.SeekToRow(numRows - 1); err == nil {
+			lastBatch := make([]models.MarketCandleRecord, 1)
+			if n, _ := reader.Read(lastBatch); n > 0 {
+				end = lastBatch[0].Datetime
+				if end == "" && lastBatch[0].Timestamp > 0 {
+					end = time.Unix(lastBatch[0].Timestamp, 0).Format("2006-01-02 15:04:05")
+				}
+			}
+		}
 	}
 	return idx, start, end
 }

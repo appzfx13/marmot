@@ -3301,12 +3301,25 @@
                                 }
                             }
                         }
-                        displayTs = timeStr + (timeStr.endsWith('IST') ? '' : ' IST');
+                        displayTs = dateStr + ' ' + timeStr + (timeStr.endsWith('IST') ? '' : ' IST');
                     }
                     var tEl = document.getElementById('live-option-chain-time');
                     if (tEl) tEl.textContent = displayTs;
                     var tEl2 = document.getElementById('live-macro-spot-time');
                     if (tEl2) tEl2.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + displayTs;
+
+                    // Toggle Expiry Day Badge
+                    var expEl = document.getElementById('live-option-chain-expiry');
+                    var expBadge = document.getElementById('live-option-chain-expiry-day-badge');
+                    if (expEl && expBadge && dateStr) {
+                        var expText = expEl.textContent.trim().toUpperCase();
+                        var dMatch = dateStr.toUpperCase();
+                        if (expText.includes(dMatch)) {
+                            expBadge.style.display = 'inline-block';
+                        } else {
+                            expBadge.style.display = 'none';
+                        }
+                    }
 
                     // Sync to Top HUD Exchange Clock Widget
                     window.dispatchEvent(new CustomEvent('marmot:virtual_clock', {

@@ -9,6 +9,8 @@ import urllib.parse
 
 
 
+from django.views.decorators.csrf import csrf_exempt
+from django.utils.decorators import method_decorator
 from django.contrib.auth import login as auth_login, logout as auth_logout
 from django.contrib.auth.views import LoginView
 from django.contrib.auth.mixins import LoginRequiredMixin
@@ -533,6 +535,16 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
         context['emulator_url'] = "/admins/dashboard/gateway-emulator/"
         context['emulator_external_url'] = "/admins/dashboard/gateway-emulator/"
 
+        # Resolve Dataset Safety Interlock Lock State
+        is_locked = self.request.session.get('gateway_dataset_locked', None)
+        if is_locked is None:
+            is_locked = bool(streamer_status.get('active_file'))
+            self.request.session['gateway_dataset_locked'] = is_locked
+        if streamer_status.get('is_playing'):
+            is_locked = True
+            self.request.session['gateway_dataset_locked'] = True
+        context['is_dataset_locked'] = is_locked
+
         # 3. Check FYERS Live Data Streaming State in Redis
         fyers_online = False
         fyers_last_tick = None
@@ -703,8 +715,17 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
             elif action == 'select_file':
                 file_path = request.POST.get('file', '')
                 requests.post(f'http://mock_broker:8088/mock/api/streamer/select?file={file_path}', timeout=3)
-                toast_title = 'Dataset Loaded'
+                request.session['gateway_dataset_locked'] = True
+                toast_title = 'Dataset Loaded & Locked'
                 toast_msg = f'Streamer switched to dataset: {file_path}.'
+            elif action == 'lock_dataset':
+                request.session['gateway_dataset_locked'] = True
+                toast_title = 'Dataset Confirmed & Locked'
+                toast_msg = 'Dataset locked. Simulation controls are now enabled.'
+            elif action == 'unlock_dataset':
+                request.session['gateway_dataset_locked'] = False
+                toast_title = 'Dataset Unlocked'
+                toast_msg = 'Dataset unlocked. You can now select a different file.'
             elif action == 'adjust_funds':
                 amount = request.POST.get('amount', '50000')
                 requests.post('http://mock_broker:8088/mock/api/funds/adjust', data={'amount': amount}, timeout=3)
@@ -1326,6 +1347,7 @@ class AdminLiveOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
         return render(request, 'admins/partials/live_orders_table.html', context)
 
 
+@method_decorator(csrf_exempt, name='dispatch')
 class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Resets all mock emulator orders, positions, and balances back to initial state."""
 
@@ -1342,14 +1364,35 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
             logger.warning("Failed to call mock_broker clear session: %s", e)
             is_success = False
 
+        # Invalidate Redis telemetry cache and mock session data
+        try:
+            from apps.market.services import redis_client
+            for pattern in ('marmot:dhan:live_summary:*', 'marmot:admins:mock_broker_meta', 'marmot:mock:telemetry:*'):
+                for key in redis_client.scan_iter(match=pattern):
+                    redis_client.delete(key)
+        except Exception as r_err:
+            logger.debug("Redis clear session cache error: %s", r_err)
+
+        # Clear mock postbacks to reset settled trade history
+        try:
+            from apps.common.models import PostbackLog
+            PostbackLog.objects.filter(payload__execution_mode='MOCK').delete()
+        except Exception as p_err:
+            logger.debug("PostbackLog mock clear error: %s", p_err)
+
         toast_msg = (
-            'Mock orders and positions have been reset. Initial balance restored.'
+            'Mock orders, positions, and trades have been reset. Initial balance restored.'
             if is_success else
             'Reset signal dispatched, but mock broker took longer to acknowledge. Refreshing telemetry...'
         )
         resp = HttpResponse(status=200)
         resp['HX-Trigger'] = json.dumps({
             'brokerOrderUpdate': True,
+            'reloadLiveDashboard': True,
+            'reloadMockBroker': True,
+            'reloadLivePositions': True,
+            'reloadLiveOrders': True,
+            'reloadLiveStrategies': True,
             'showToast': {
                 'title': 'Mock Session Reset' if is_success else 'Session Reset Dispatched',
                 'message': toast_msg,

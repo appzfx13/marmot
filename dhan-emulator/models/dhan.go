@@ -113,6 +113,10 @@ type PositionItem struct {
 	ExitTime              string  `json:"exitTime,omitempty"`
 	StopLoss              float64 `json:"stopLoss,omitempty"`
 	TakeProfit            float64 `json:"takeProfit,omitempty"`
+	TotalCharges          float64 `json:"totalCharges,omitempty"`
+	Brokerage             float64 `json:"brokerage,omitempty"`
+	STT                   float64 `json:"stt,omitempty"`
+	NetProfit             float64 `json:"netProfit,omitempty"`
 }
 
 // HoldingItem represents Dhan API v2 GET /v2/holdings item.
@@ -177,6 +181,12 @@ type MarketCandleRecord struct {
 	OI             int64   `parquet:"oi,int(64)" json:"oi"`
 	IV             float64 `parquet:"iv,double" json:"iv"`
 	SpotPrice      float64 `parquet:"spot_price,double" json:"spot_price"`
+	Delta          float64 `parquet:"delta,double,optional" json:"delta,omitempty"`
+	Gamma          float64 `parquet:"gamma,double,optional" json:"gamma,omitempty"`
+	Theta          float64 `parquet:"theta,double,optional" json:"theta,omitempty"`
+	Vega           float64 `parquet:"vega,double,optional" json:"vega,omitempty"`
+	Bid            float64 `parquet:"bid,double,optional" json:"bid,omitempty"`
+	Ask            float64 `parquet:"ask,double,optional" json:"ask,omitempty"`
 }
 
 // OptionStrikeRow represents a single bilateral (CE & PE) strike entry in the option chain matrix.
@@ -231,6 +241,9 @@ type BrokerStatsPayload struct {
 	UtilizedMargin       float64 `json:"utilizedMargin"`
 	RealizedProfit       float64 `json:"realizedProfit"`
 	RealizedPnL          float64 `json:"realized_pnl"`
+	TotalCharges         float64 `json:"totalCharges"`
+	TotalBrokerage       float64 `json:"totalBrokerage"`
+	NetRealizedPnL       float64 `json:"net_realized_pnl"`
 	UnrealizedProfit     float64 `json:"unrealizedProfit"`
 	LiveNetPnL           float64 `json:"liveNetPnL"`
 	NetPnL               float64 `json:"live_net_pnl"`
@@ -272,6 +285,8 @@ type PerformanceSummary struct {
 	WinRate         float64        `json:"winRate"`
 	GrossProfit     float64        `json:"grossProfit"`
 	GrossLoss       float64        `json:"grossLoss"`
+	TotalCharges    float64        `json:"totalCharges"`
+	TotalBrokerage  float64        `json:"totalBrokerage"`
 	NetRealizedPnL  float64        `json:"netRealizedPnL"`
 	ProfitFactor    float64        `json:"profitFactor"`
 	MaxDrawdown     float64        `json:"maxDrawdown"`

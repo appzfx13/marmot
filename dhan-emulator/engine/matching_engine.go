@@ -24,6 +24,8 @@ type ClientAccount struct {
 	InitialBalance   float64                         `json:"initialBalance"`
 	SodLimit         float64                         `json:"sodLimit"`
 	UtilizedMargin   float64                         `json:"utilizedMargin"`
+	TotalCharges     float64                         `json:"totalCharges"`
+	TotalBrokerage   float64                         `json:"totalBrokerage"`
 	CreatedAt        time.Time                       `json:"createdAt"`
 	Orders           map[string]*models.OrderRecord  `json:"orders"`
 	OrderList        []string                        `json:"orderList"` // ordered IDs
@@ -174,7 +176,8 @@ func (m *MatchingEngine) GetAccountStats(clientID string) models.BrokerStatsPayl
 	}
 
 	avail := acc.AvailableBalance
-	netPnl := realizedTotal + unrealizedTotal
+	netPnl := math.Round((realizedTotal + unrealizedTotal - acc.TotalCharges)*100) / 100
+	netRealized := math.Round((realizedTotal - acc.TotalCharges)*100) / 100
 	return models.BrokerStatsPayload{
 		Type:                 "broker_stats",
 		DhanClientID:         clientID,
@@ -182,7 +185,10 @@ func (m *MatchingEngine) GetAccountStats(clientID string) models.BrokerStatsPayl
 		AvailableMargin:      avail,
 		UtilizedMargin:       acc.UtilizedMargin,
 		RealizedProfit:       realizedTotal,
-		RealizedPnL:          realizedTotal,
+		RealizedPnL:          netRealized,
+		TotalCharges:         acc.TotalCharges,
+		TotalBrokerage:       acc.TotalBrokerage,
+		NetRealizedPnL:       netRealized,
 		UnrealizedProfit:     unrealizedTotal,
 		LiveNetPnL:           netPnl,
 		NetPnL:               netPnl,
@@ -360,6 +366,32 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 	}
 }
 
+// CalculateOptionBuyingCharges computes standard Indian statutory and broker charges for option trades.
+func CalculateOptionBuyingCharges(buyPrice, sellPrice float64, qty int) (totalCharges, brokerage, stt, exchangeCharges, sebiCharges, stampDuty, gst float64) {
+	buyTurnover := buyPrice * float64(qty)
+	sellTurnover := sellPrice * float64(qty)
+	totalTurnover := buyTurnover + sellTurnover
+
+	brokerageBuy := math.Min(20.0, buyTurnover*0.0005)
+	if buyTurnover <= 0 {
+		brokerageBuy = 0
+	}
+	brokerageSell := math.Min(20.0, sellTurnover*0.0005)
+	if sellTurnover <= 0 {
+		brokerageSell = 0
+	}
+	brokerage = math.Round((brokerageBuy+brokerageSell)*100) / 100
+
+	stt = math.Round(sellTurnover*0.001*100) / 100
+	exchangeCharges = math.Round(totalTurnover*0.0005*100) / 100
+	sebiCharges = math.Round(totalTurnover*0.000001*100) / 100
+	stampDuty = math.Round(buyTurnover*0.00003*100) / 100
+	gst = math.Round((brokerage+exchangeCharges+sebiCharges)*0.18*100) / 100
+
+	totalCharges = math.Round((brokerage+stt+exchangeCharges+sebiCharges+stampDuty+gst)*100) / 100
+	return
+}
+
 // PlaceOrder validates and creates a new order in PENDING status, then launches async execution.
 func (m *MatchingEngine) PlaceOrder(req models.OrderRequest) (*models.OrderResponse, error) {
 	m.mu.Lock()
@@ -528,9 +560,18 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 		pos.SellQty += ord.Order.Quantity
 		pos.SellAvg = totalSellValue / float64(pos.SellQty)
 		pos.NetQty = pos.BuyQty - pos.SellQty
-		// Realized profit calculation
+		// Realized profit calculation with Indian statutory charges
 		if pos.BuyQty > 0 {
-			pos.RealizedProfit += (fillPrice - pos.BuyAvg) * float64(ord.Order.Quantity)
+			pnl := (fillPrice - pos.BuyAvg) * float64(ord.Order.Quantity)
+			pos.RealizedProfit += pnl
+			totalChg, brk, stt, _, _, _, _ := CalculateOptionBuyingCharges(pos.BuyAvg, fillPrice, ord.Order.Quantity)
+			pos.TotalCharges += totalChg
+			pos.Brokerage += brk
+			pos.STT += stt
+			pos.NetProfit = pos.RealizedProfit - pos.TotalCharges
+			acc.TotalCharges += totalChg
+			acc.TotalBrokerage += brk
+			acc.AvailableBalance -= totalChg
 		}
 	}
 
@@ -596,9 +637,24 @@ func (m *MatchingEngine) executeOrderAsync(clientID, orderID string, fillPrice f
 		pos.NetQty = pos.BuyQty - pos.SellQty
 	} else {
 		acc.AvailableBalance += requiredMargin
+		if acc.UtilizedMargin >= requiredMargin {
+			acc.UtilizedMargin -= requiredMargin
+		}
 		pos.SellQty += ord.Order.Quantity
 		pos.SellAvg = fillPrice
 		pos.NetQty = pos.BuyQty - pos.SellQty
+		if pos.BuyQty > 0 {
+			pnl := (fillPrice - pos.BuyAvg) * float64(ord.Order.Quantity)
+			pos.RealizedProfit += pnl
+			totalChg, brk, stt, _, _, _, _ := CalculateOptionBuyingCharges(pos.BuyAvg, fillPrice, ord.Order.Quantity)
+			pos.TotalCharges += totalChg
+			pos.Brokerage += brk
+			pos.STT += stt
+			pos.NetProfit = pos.RealizedProfit - pos.TotalCharges
+			acc.TotalCharges += totalChg
+			acc.TotalBrokerage += brk
+			acc.AvailableBalance -= totalChg
+		}
 	}
 
 	webhook := m.buildPostbackWebhookLocked(ord)
@@ -630,8 +686,15 @@ func (m *MatchingEngine) squareOffPositionAutoLocked(acc *ClientAccount, pos *mo
 		pos.RealizedProfit += pnl
 		pos.SellQty += qty
 		pos.SellAvg = fillPrice
+		totalChg, brk, stt, _, _, _, _ := CalculateOptionBuyingCharges(pos.BuyAvg, fillPrice, qty)
+		pos.TotalCharges += totalChg
+		pos.Brokerage += brk
+		pos.STT += stt
+		pos.NetProfit = pos.RealizedProfit - pos.TotalCharges
+		acc.TotalCharges += totalChg
+		acc.TotalBrokerage += brk
 		releasedMargin := pos.BuyAvg * float64(qty)
-		acc.AvailableBalance += releasedMargin + pnl
+		acc.AvailableBalance += releasedMargin + pnl - totalChg
 		if acc.UtilizedMargin >= releasedMargin {
 			acc.UtilizedMargin -= releasedMargin
 		}
@@ -643,8 +706,15 @@ func (m *MatchingEngine) squareOffPositionAutoLocked(acc *ClientAccount, pos *mo
 		pos.RealizedProfit += pnl
 		pos.BuyQty += qty
 		pos.BuyAvg = fillPrice
+		totalChg, brk, stt, _, _, _, _ := CalculateOptionBuyingCharges(fillPrice, pos.SellAvg, qty)
+		pos.TotalCharges += totalChg
+		pos.Brokerage += brk
+		pos.STT += stt
+		pos.NetProfit = pos.RealizedProfit - pos.TotalCharges
+		acc.TotalCharges += totalChg
+		acc.TotalBrokerage += brk
 		releasedMargin := pos.SellAvg * float64(qty)
-		acc.AvailableBalance += releasedMargin + pnl
+		acc.AvailableBalance += releasedMargin + pnl - totalChg
 		if acc.UtilizedMargin >= releasedMargin {
 			acc.UtilizedMargin -= releasedMargin
 		}
@@ -1211,8 +1281,10 @@ func (m *MatchingEngine) GetPerformanceSummary(clientID string) models.Performan
 		}
 	}
 
-	summary.NetRealizedPnL = math.Round(cumPnL*100) / 100
-	summary.FinalEquity = math.Round((summary.InitialCapital+cumPnL)*100) / 100
+	summary.TotalCharges = math.Round(acc.TotalCharges*100) / 100
+	summary.TotalBrokerage = math.Round(acc.TotalBrokerage*100) / 100
+	summary.NetRealizedPnL = math.Round((cumPnL-acc.TotalCharges)*100) / 100
+	summary.FinalEquity = math.Round((summary.InitialCapital+cumPnL-acc.TotalCharges)*100) / 100
 
 	if summary.TotalTrades > 0 {
 		summary.WinRate = math.Round(float64(summary.WinningTrades)/float64(summary.TotalTrades)*1000) / 10
@@ -1229,7 +1301,7 @@ func (m *MatchingEngine) GetPerformanceSummary(clientID string) models.Performan
 		summary.MaxDrawdownPct = math.Round((maxDD/peakEquity)*1000) / 10
 	}
 	if summary.InitialCapital > 0 {
-		summary.ROI = math.Round((cumPnL/summary.InitialCapital)*1000) / 10
+		summary.ROI = math.Round(((cumPnL-acc.TotalCharges)/summary.InitialCapital)*1000) / 10
 	}
 
 	return summary

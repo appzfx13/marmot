@@ -166,7 +166,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 	})
 
 	finalDatasetFile := filepath.Join(backupTaskDir, "dataset.parquet")
-	lastBroadcastPct := 85
+	lastBroadcastPct := 95
 	lastBroadcastTime := time.Now()
 
 	totalRows, fileSizeMB, mergeErr := services.MergeParquetFilesWithProgress(
@@ -176,7 +176,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 			if totalFiles <= 0 {
 				return
 			}
-			pct := 85 + int((float64(currentFile)/float64(totalFiles))*14.0)
+			pct := 95 + int((float64(currentFile)/float64(totalFiles))*4.0)
 			now := time.Now()
 			if pct > lastBroadcastPct || now.Sub(lastBroadcastTime) >= 10*time.Second {
 				lastBroadcastPct = pct

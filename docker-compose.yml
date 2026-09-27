@@ -8,6 +8,7 @@ services:
       - .env
     ports:
       - "8052:5432"
+    mem_limit: 1024m
     volumes:
       - postgres_data:/var/lib/postgresql/data
     healthcheck:
@@ -23,8 +24,10 @@ services:
     image: redis:7-alpine
     container_name: redis_broker
     restart: always
+    command: redis-server --maxmemory 256mb --maxmemory-policy allkeys-lru
     ports:
       - "8051:6379"
+    mem_limit: 256m
     volumes:
       - redis_data:/data
     healthcheck:
@@ -44,6 +47,7 @@ services:
     command: python manage.py runserver 0.0.0.0:8000
     ports:
       - "8050:8000"
+    mem_limit: 1536m
     volumes:
       - .:/app
       - static_volume:/app/staticfiles
@@ -54,6 +58,9 @@ services:
       - DB_ENGINE=django.db.backends.postgresql
       - POSTGRES_HOST=db
       - RUN_MIGRATIONS=true
+      - MALLOC_ARENA_MAX=2
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
     stdin_open: true
     tty: true
     depends_on:
@@ -69,6 +76,7 @@ services:
     build: .
     container_name: django_webhook_worker
     command: python manage.py run_webhook_worker
+    mem_limit: 1024m
     volumes:
       - .:/app
     env_file:
@@ -76,6 +84,9 @@ services:
     environment:
       - DB_ENGINE=django.db.backends.postgresql
       - POSTGRES_HOST=db
+      - MALLOC_ARENA_MAX=2
+      - PYTHONDONTWRITEBYTECODE=1
+      - PYTHONUNBUFFERED=1
     depends_on:
       db:
         condition: service_healthy
@@ -107,6 +118,8 @@ services:
       - DB_TABLE_NAME=${DB_TABLE_NAME}
       # Cap Go runtime scheduler to 2 OS threads — prevents merge from using all 4 host cores
       - GOMAXPROCS=2
+      - GOMEMLIMIT=1536MiB
+      - GOGC=100
     depends_on:
       db:
         condition: service_healthy
@@ -120,6 +133,7 @@ services:
     image: nginx:alpine
     container_name: nginx_proxy
     restart: always
+    mem_limit: 256m
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - static_volume:/app/staticfiles:ro
@@ -135,6 +149,7 @@ services:
     image: cloudflare/cloudflared:latest
     container_name: cloudflare_tunnel
     restart: always
+    mem_limit: 256m
     user: root
     command: ${CLOUDFLARE_TUNNEL_CMD:-tunnel --logfile /var/log/cloudflared/cloudflared.log --url http://nginx_proxy:80}
     volumes:
@@ -153,6 +168,7 @@ services:
     restart: always
     ports:
       - "8088:8088"
+    mem_limit: 1024m
     volumes:
       - ./dhan-emulator/templates:/app/templates
       - ./backup:/app/backup:ro

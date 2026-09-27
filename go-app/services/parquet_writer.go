@@ -65,11 +65,16 @@ func MergeParquetFilesWithProgress(outputFile string, sourceFiles []string, onPr
 		return 0, 0, fmt.Errorf("failed to create output directory %s: %w", outDir, err)
 	}
 
-	outFile, err := os.OpenFile(outputFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
+	tempOutputFile := outputFile + ".tmp"
+	outFile, err := os.OpenFile(tempOutputFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
-		return 0, 0, fmt.Errorf("failed to create consolidated parquet file %s: %w", outputFile, err)
+		return 0, 0, fmt.Errorf("failed to create consolidated temporary parquet file %s: %w", tempOutputFile, err)
 	}
-	defer outFile.Close()
+	defer func() {
+		outFile.Close()
+		// Clean up temp file in case of error (rename will have already moved it if successful)
+		os.Remove(tempOutputFile)
+	}()
 
 	writer := parquet.NewGenericWriter[models.MarketCandleRecord](
 		outFile,
@@ -121,6 +126,14 @@ func MergeParquetFilesWithProgress(outputFile string, sourceFiles []string, onPr
 
 	if err := writer.Close(); err != nil {
 		return totalRows, 0, fmt.Errorf("failed to close final parquet writer: %w", err)
+	}
+
+	// Safely close the underlying file before renaming (crucial for OS level locks)
+	outFile.Close()
+
+	// Atomically rename the complete temporary file to the final destination
+	if err := os.Rename(tempOutputFile, outputFile); err != nil {
+		return totalRows, 0, fmt.Errorf("failed to atomically rename temp parquet to final %s: %w", outputFile, err)
 	}
 
 	// Calculate final file size in MB

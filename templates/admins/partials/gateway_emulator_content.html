@@ -309,28 +309,30 @@
             </div>
         </div>
 
-        <!-- Stop Button & Playback Actions -->
+        <!-- Stop Button & Playback Actions (1-Click Instant Execution) -->
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <!-- Play / Pause Toggle -->
             <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline" id="gateway-toggle-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle">
                 {% if streamer_status.is_playing %}
-                <button type="button" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#confirmPauseModal">
+                <button type="submit" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" title="Pause replay stream">
                     <i class="bi bi-pause-fill fs-6"></i>
                     <span>Pause Replay</span>
+                </button>
+                {% elif not is_dataset_locked %}
+                <!-- Interlock Safety: Locked until dataset confirmed -->
+                <button type="button" class="btn btn-secondary text-white-50 fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5 opacity-50" disabled title="Dataset Unlocked: Please select and lock dataset below first">
+                    <i class="bi bi-lock-fill fs-6 text-warning"></i>
+                    <span>Lock to Play</span>
                 </button>
                 {% elif streamer_status.current_row > 0 and not streamer_status.is_completed %}
                 <button type="submit" class="btn btn-info text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" title="Resume playback from current row">
                     <i class="bi bi-play-circle-fill fs-6"></i>
                     <span>Resume Replay</span>
                 </button>
-                <button type="button" class="btn btn-success text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" onclick="confirmGatewayAction('gateway-rewind-form', 'confirmRewindModal');" title="Start playback fresh from row 0">
-                    <i class="bi bi-play-fill fs-6"></i>
-                    <span>Start Replay</span>
-                </button>
                 {% else %}
-                <button type="submit" class="btn btn-success text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5">
+                <button type="submit" class="btn btn-success text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" title="Start playback">
                     <i class="bi bi-play-fill fs-6"></i>
                     <span>Start Replay</span>
                 </button>
@@ -341,19 +343,25 @@
             <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline" id="gateway-rewind-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="restart">
-                <button type="button" class="btn btn-outline-info btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" data-bs-toggle="modal" data-bs-target="#confirmRewindModal" title="Rewind to row 0 and restart stream">
+                {% if not is_dataset_locked and not streamer_status.is_playing %}
+                <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5 opacity-50" disabled title="Dataset Unlocked: Please lock dataset first">
                     <i class="bi bi-arrow-repeat fs-6"></i>
                     <span>Rewind</span>
                 </button>
+                {% else %}
+                <button type="submit" class="btn btn-outline-info btn-sm rounded-pill px-3 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5" title="Rewind to row 0 and restart stream">
+                    <i class="bi bi-arrow-repeat fs-6"></i>
+                    <span>Rewind</span>
+                </button>
+                {% endif %}
             </form>
 
             <!-- FUNCTIONAL STOP BUTTON -->
             <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline" id="gateway-stop-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="stop">
-                <button type="button"
+                <button type="submit"
                         class="btn btn-danger btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5 fw-bold"
-                        data-bs-toggle="modal" data-bs-target="#confirmStopModal"
                         title="Functional Stop: Halts stream, kills active strategy workers, and flushes orders">
                     <i class="bi bi-stop-circle-fill fs-6"></i>
                     <span>STOP SIMULATION</span>
@@ -396,155 +404,293 @@
         </div>
     </div>
 
-    <!-- Controls Row: Dataset Dropdown & Speed Multipliers -->
-    <div class="row g-3 align-items-end pb-3 pt-2">
-        <!-- 1. Dataset Selector Dropdown -->
-        <div class="col-12 col-lg-5">
-            <label class="text-secondary smaller fw-bold d-block mb-1.5 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">
-                <i class="bi bi-file-earmark-binary-fill me-1 text-warning"></i>Select Historical Backup Dataset
-            </label>
-            <div class="dropdown custom-parquet-dropdown w-100">
-                <button class="btn dropdown-toggle w-100 text-start d-flex align-items-center justify-content-between px-3 py-2 rounded-3 font-monospace"
-                        type="button" id="backupDatasetDropdownBtn" data-bs-toggle="dropdown" aria-expanded="false"
-                        style="background: #141416; color: #fafafa; font-size: 0.78rem; min-height: 42px; border: 1px solid rgba(255, 255, 255, 0.12); outline: none;">
-                    <div class="d-flex align-items-center gap-2 overflow-hidden me-2">
-                        <span class="badge rounded-pill px-2 py-0.5 smaller fw-bold flex-shrink-0" style="color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3); background: rgba(56, 189, 248, 0.12);">
-                            DATASET
-                        </span>
-                        <span class="text-truncate fw-semibold text-white">{{ streamer_status.active_file|default:"Select Backup Dataset..." }}</span>
+    <!-- Controls Row: Unified Bento Control Deck (Dataset & Equal-Width Profile Console) -->
+    <div class="row g-3 align-items-stretch pb-3 pt-2" style="position: relative; z-index: 50;">
+        <!-- 1. Left Bento Card: Active Parquet Dataset Source -->
+        <div class="col-12 col-xl-5" style="position: relative; z-index: 50;">
+            <div class="p-3 rounded-3 h-100 d-flex flex-column justify-content-between border border-secondary border-opacity-20 shadow-sm position-relative"
+                 style="background: rgba(15, 20, 30, 0.75); backdrop-filter: blur(16px); min-height: 110px;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-secondary smaller fw-bold text-uppercase d-flex align-items-center gap-1.5 font-monospace" style="font-size: 0.68rem; letter-spacing: 0.5px;">
+                        <i class="bi bi-database-fill-gear text-warning"></i>
+                        <span>Active Parquet Dataset</span>
+                    </span>
+                    <div class="d-flex align-items-center gap-1.5">
+                        {% if is_dataset_locked %}
+                            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 smaller font-monospace" style="font-size: 0.65rem;">
+                                <i class="bi bi-shield-lock me-1"></i>LOCKED &amp; READY
+                            </span>
+                            {% if not streamer_status.is_playing %}
+                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="unlock_dataset">
+                                <button type="submit" class="btn btn-outline-warning btn-xs py-0.5 px-2 rounded-pill font-monospace fw-bold shadow-sm d-inline-flex align-items-center gap-1" style="font-size: 0.65rem;" title="Unlock dataset to select another file">
+                                    <i class="bi bi-unlock-fill"></i>
+                                    <span>Unlock</span>
+                                </button>
+                            </form>
+                            {% else %}
+                            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2 py-0.5 smaller font-monospace" style="font-size: 0.65rem;">
+                                <i class="bi bi-broadcast me-1"></i>STREAMING
+                            </span>
+                            {% endif %}
+                        {% else %}
+                            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2 py-0.5 smaller font-monospace" style="font-size: 0.65rem;">
+                                <i class="bi bi-unlock-fill me-1"></i>UNLOCKED
+                            </span>
+                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="lock_dataset">
+                                <button type="submit" class="btn btn-success btn-xs py-0.5 px-2.5 rounded-pill font-monospace fw-bold text-dark shadow-sm d-inline-flex align-items-center gap-1" style="font-size: 0.68rem;" title="Confirm and Lock Dataset to enable replay controls">
+                                    <i class="bi bi-lock-fill"></i>
+                                    <span>Lock Dataset</span>
+                                </button>
+                            </form>
+                        {% endif %}
                     </div>
-                    <i class="bi bi-chevron-down text-white-50 flex-shrink-0 ms-2"></i>
-                </button>
-                <ul class="dropdown-menu dropdown-menu-dark w-100 shadow-lg p-1.5 custom-scroll"
-                    aria-labelledby="backupDatasetDropdownBtn"
-                    style="background: #121215; backdrop-filter: blur(20px); border-radius: 10px; border: 1px solid rgba(255, 255, 255, 0.12); max-height: 360px; overflow-y: auto; z-index: 1065 !important;">
-                    
-                    <!-- Strictly Complete Market Backup Datasets Only -->
-                    <li class="dropdown-header text-uppercase smaller text-muted px-2 py-1" style="font-size: 0.65rem;">
-                        <i class="bi bi-check-all text-success me-1"></i>Completed Backup Datasets (Ready for Simulation)
-                    </li>
-                    {% for b in completed_backups %}
-                    <li>
-                        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="m-0">
-                            {% csrf_token %}
-                            <input type="hidden" name="action" value="select_file">
-                            <input type="hidden" name="file" value="{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet">
-                            <button type="submit" class="dropdown-item rounded-2 py-2 px-2.5 mb-1 d-flex align-items-center justify-content-between font-monospace text-wrap {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}active{% endif %}"
-                                    style="font-size: 0.76rem; border: 1px solid {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.4){% else %}transparent{% endif %}; background: {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.12){% else %}transparent{% endif %}; cursor: pointer;">
-                                <div class="d-flex flex-column gap-1 me-2 overflow-hidden text-start">
-                                    <div class="d-flex align-items-center gap-1.5 flex-wrap">
-                                        <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
-                                            Task #{{ b.id }} &bull; {{ b.index_name|default:"NIFTY" }}
-                                        </span>
-                                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-1.5 py-0.5 smaller">
-                                            100% COMPLETE
-                                        </span>
-                                        <strong class="text-white text-truncate">{{ b.start_date }} &rarr; {{ b.end_date }}</strong>
-                                    </div>
-                                    <div class="d-flex align-items-center gap-2 smaller text-muted">
-                                        <span>Path: <code class="text-info">{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet</code></span>
-                                        <span>&bull;</span>
-                                        <span>{{ b.file_size_mb|default:0|floatformat:1 }} MB</span>
-                                    </div>
+                </div>
+
+                <div class="dropdown custom-parquet-dropdown w-100 position-relative">
+                    {% if is_dataset_locked %}
+                    <!-- LOCKED STATE: Card is frozen and cannot be opened during simulation -->
+                    <div class="w-100 text-start d-flex align-items-center justify-content-between p-2.5 rounded-3 font-monospace"
+                         style="background: rgba(22, 28, 42, 0.65); color: #cbd5e1; border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 10px; cursor: default;">
+                        <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="background: rgba(16, 185, 129, 0.15); width: 40px; height: 40px;">
+                                <i class="bi bi-shield-lock-fill fs-5 text-success"></i>
+                            </div>
+                            <div class="d-flex flex-column gap-0.5 overflow-hidden">
+                                <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                    <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold flex-shrink-0" style="color: #10b981; background: rgba(16, 185, 129, 0.15); font-size: 0.62rem;">
+                                        CONFIRMED &amp; LOCKED
+                                    </span>
+                                    <span class="text-white fw-bold font-monospace text-truncate" style="font-size: 0.82rem;">
+                                        {{ streamer_status.active_file|default:"Default Dataset" }}
+                                    </span>
                                 </div>
-                                {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}
-                                <i class="bi bi-check-circle-fill text-info fs-6 flex-shrink-0 ms-2"></i>
-                                {% endif %}
-                            </button>
-                        </form>
-                    </li>
-                    {% empty %}
-                    <li><span class="dropdown-item text-muted smaller">No 100% completed backup tasks found</span></li>
-                    {% endfor %}
-                </ul>
+                                <span class="text-muted smaller text-truncate" style="font-size: 0.68rem;">
+                                    {% if streamer_status.is_playing %}Replay running &bull; Stop simulation to unlock{% else %}Locked for replay &bull; Click "Unlock" above to switch dataset{% endif %}
+                                </span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-1.5 text-muted flex-shrink-0 ms-2">
+                            <i class="bi bi-lock-fill fs-6 text-success"></i>
+                        </div>
+                    </div>
+                    {% else %}
+                    <!-- UNLOCKED STATE: Interactive Dropdown with static popper & high z-index -->
+                    <button class="btn dropdown-toggle w-100 text-start d-flex align-items-center justify-content-between p-2.5 rounded-3 font-monospace position-relative"
+                            type="button" id="backupDatasetDropdownBtn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false"
+                            style="background: rgba(22, 28, 42, 0.95); color: #fafafa; border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 10px; outline: none; transition: all 0.2s ease;">
+                        <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                            <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                                 style="background: rgba(56, 189, 248, 0.15); width: 40px; height: 40px;">
+                                <i class="bi bi-file-earmark-bar-graph-fill fs-5 text-info"></i>
+                            </div>
+                            <div class="d-flex flex-column gap-0.5 overflow-hidden">
+                                <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                    <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold flex-shrink-0" style="color: #38bdf8; background: rgba(56, 189, 248, 0.15); font-size: 0.62rem;">
+                                        SELECT DATASET
+                                    </span>
+                                    <span class="text-white fw-bold font-monospace text-truncate" style="font-size: 0.82rem;">
+                                        {{ streamer_status.active_file|default:"Select Dataset..." }}
+                                    </span>
+                                </div>
+                                <span class="text-warning smaller text-truncate" style="font-size: 0.68rem;">
+                                    <i class="bi bi-exclamation-circle me-1"></i>Choose dataset &bull; click "Lock Dataset" to begin
+                                </span>
+                            </div>
+                        </div>
+                        <div class="d-flex align-items-center gap-1.5 text-info flex-shrink-0 ms-2">
+                            <span class="smaller fw-bold d-none d-sm-inline font-monospace" style="font-size: 0.7rem;">CHOOSE</span>
+                            <i class="bi bi-chevron-down fs-7"></i>
+                        </div>
+                    </button>
+                    <ul class="dropdown-menu dropdown-menu-dark w-100 shadow-lg p-2 custom-scroll"
+                        aria-labelledby="backupDatasetDropdownBtn"
+                        style="background: #10121a; backdrop-filter: blur(25px); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.18); max-height: 380px; overflow-y: auto; z-index: 1085 !important; margin-top: 6px; box-shadow: 0 16px 40px rgba(0,0,0,0.85) !important;">
+                        
+                        <!-- Strictly Complete Market Backup Datasets Only -->
+                        <li class="dropdown-header text-uppercase smaller text-muted px-2 py-1" style="font-size: 0.65rem;">
+                            <i class="bi bi-check-all text-success me-1"></i>Completed Backup Datasets (Auto-locks on selection)
+                        </li>
+                        {% for b in completed_backups %}
+                        <li>
+                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="m-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="action" value="select_file">
+                                <input type="hidden" name="file" value="{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet">
+                                <button type="submit" class="dropdown-item rounded-2 py-2 px-2.5 mb-1 d-flex align-items-center justify-content-between font-monospace text-wrap {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}active{% endif %}"
+                                        style="font-size: 0.76rem; border: 1px solid {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.4){% else %}transparent{% endif %}; background: {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.12){% else %}transparent{% endif %}; cursor: pointer;">
+                                    <div class="d-flex flex-column gap-1 me-2 overflow-hidden text-start">
+                                        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                            <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
+                                                Task #{{ b.id }} &bull; {{ b.index_name|default:"NIFTY" }}
+                                            </span>
+                                            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-1.5 py-0.5 smaller">
+                                                100% COMPLETE
+                                            </span>
+                                            <strong class="text-white text-truncate">{{ b.start_date }} &rarr; {{ b.end_date }}</strong>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2 smaller text-muted">
+                                            <span>Path: <code class="text-info">{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet</code></span>
+                                            <span>&bull;</span>
+                                            <span>{{ b.file_size_mb|default:0|floatformat:1 }} MB</span>
+                                        </div>
+                                    </div>
+                                    {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}
+                                    <i class="bi bi-check-circle-fill text-info fs-6 flex-shrink-0 ms-2"></i>
+                                    {% endif %}
+                                </button>
+                            </form>
+                        </li>
+                        {% empty %}
+                        <li><span class="dropdown-item text-muted smaller">No 100% completed backup tasks found</span></li>
+                        {% endfor %}
+                    </ul>
+                    {% endif %}
+                </div>
             </div>
         </div>
 
-        <!-- 2. Playback Profiles Selection Cards (Syncs Strategy Clock) -->
-        <div class="col-12 col-lg-7 text-start text-lg-end" id="gateway-speed-multipliers-wrapper">
-            <label class="text-secondary smaller fw-bold d-block mb-1.5 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">
-                <i class="bi bi-speedometer2 me-1 text-info"></i>Playback Execution Profile (Syncs Dual Engine)
-            </label>
-            <div class="d-flex flex-wrap gap-2 justify-content-start justify-content-lg-end" role="group">
-                <!-- 1: REAL -->
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="profile">
-                    <input type="hidden" name="profile" value="REALTIME">
-                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'REALTIME' %}active-profile-real{% endif %}"
-                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'REALTIME' %}#10b981{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'REALTIME' %}rgba(16, 185, 129, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+        <!-- 2. Right Bento Card: 5-Card Playback Profile Deck (Full Symmetrical Width) -->
+        <div class="col-12 col-xl-7" id="gateway-speed-multipliers-wrapper">
+            <div class="p-3 rounded-3 h-100 d-flex flex-column justify-content-between border border-secondary border-opacity-20 shadow-sm position-relative overflow-hidden"
+                 style="background: rgba(15, 20, 30, 0.75); backdrop-filter: blur(16px); min-height: 110px;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-secondary smaller fw-bold text-uppercase d-flex align-items-center gap-1.5 font-monospace" style="font-size: 0.68rem; letter-spacing: 0.5px;">
+                        <i class="bi bi-speedometer2 text-info"></i>
+                        <span>Playback Execution Profile (Syncs Dual Engine)</span>
+                    </span>
+                    <span class="text-muted smaller font-monospace" style="font-size: 0.65rem;">
+                        <i class="bi bi-cpu text-success me-1"></i>Virtual Clock Synchronized
+                    </span>
+                </div>
+
+                <!-- 6 Equal-Width Cards Flex Deck (Takes 100% of Width) -->
+                <div class="d-flex gap-2 w-100 align-items-stretch" role="group" id="gateway-speed-profile-selector">
+                    
+                    <!-- 1: REAL -->
+                    <button type="button" class="btn profile-pill-btn profile-bento-card rounded-3 flex-fill position-relative p-2 text-center font-monospace d-flex flex-column align-items-center justify-content-between {% if streamer_status.profile_key == 'REALTIME' %}active{% endif %}"
+                            data-profile="REALTIME"
+                            data-active-color="#10b981"
+                            data-glow-color="rgba(16, 185, 129, 0.45)"
+                            data-active-bg="rgba(16, 185, 129, 0.18)"
+                            onclick="window.setPlaybackProfile('REALTIME')"
+                            style="min-width: 0; min-height: 74px; border-radius: 0.5rem !important; border: 1px solid {% if streamer_status.profile_key == 'REALTIME' %}#10b981{% else %}rgba(255, 255, 255, 0.1){% endif %}; background: {% if streamer_status.profile_key == 'REALTIME' %}rgba(16, 185, 129, 0.18){% else %}rgba(22, 28, 42, 0.85){% endif %}; color: #ffffff; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); {% if streamer_status.profile_key == 'REALTIME' %}box-shadow: 0 0 14px rgba(16, 185, 129, 0.35); transform: translateY(-1px);{% endif %}"
                             title="REAL: Replays with true real-time gaps (1X speed)">
-                        <div class="fw-bold d-flex align-items-center gap-1.5 text-success">
-                            <span>🐢 1: REAL</span>
-                            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-1 py-0 smaller">1X</span>
+                        <span class="status-dot position-absolute rounded-circle shadow-sm" style="top: 5px; right: 5px; width: 6px; height: 6px; background: #10b981; display: {% if streamer_status.profile_key == 'REALTIME' %}inline-block{% else %}none{% endif %};"></span>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="fs-6">🐢</span>
+                            <span class="fw-bold text-success smaller" style="font-size: 0.74rem;">1: REAL</span>
                         </div>
-                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">Wall-Clock Gaps</div>
+                        <div class="my-0.5">
+                            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 fw-bold font-monospace" style="font-size: 0.72rem;">1X</span>
+                        </div>
+                        <div class="text-muted smaller text-truncate w-100" style="font-size: 0.60rem;">Wall-Clock</div>
                     </button>
-                </form>
 
-                <!-- 2: COMPRESSED -->
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="profile">
-                    <input type="hidden" name="profile" value="COMPRESSED">
-                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}active-profile-compressed{% endif %}"
-                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}#38bdf8{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}rgba(56, 189, 248, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+                    <!-- 2: COMPRESSED -->
+                    <button type="button" class="btn profile-pill-btn profile-bento-card rounded-3 flex-fill position-relative p-2 text-center font-monospace d-flex flex-column align-items-center justify-content-between {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}active{% endif %}"
+                            data-profile="COMPRESSED"
+                            data-active-color="#38bdf8"
+                            data-glow-color="rgba(56, 189, 248, 0.45)"
+                            data-active-bg="rgba(56, 189, 248, 0.18)"
+                            onclick="window.setPlaybackProfile('COMPRESSED')"
+                            style="min-width: 0; min-height: 74px; border-radius: 0.5rem !important; border: 1px solid {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}#38bdf8{% else %}rgba(255, 255, 255, 0.1){% endif %}; background: {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}rgba(56, 189, 248, 0.18){% else %}rgba(22, 28, 42, 0.85){% endif %}; color: #ffffff; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}box-shadow: 0 0 14px rgba(56, 189, 248, 0.35); transform: translateY(-1px);{% endif %}"
                             title="COMPRESSED: 1m Index + 5s Option sync with dead-time compression">
-                        <div class="fw-bold d-flex align-items-center gap-1.5 text-info">
-                            <span>⚡ 2: COMPRESSED</span>
-                            <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-1 py-0 smaller">1X</span>
+                        <span class="status-dot position-absolute rounded-circle shadow-sm" style="top: 5px; right: 5px; width: 6px; height: 6px; background: #38bdf8; display: {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}inline-block{% else %}none{% endif %};"></span>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="fs-6">⚡</span>
+                            <span class="fw-bold text-info smaller" style="font-size: 0.74rem;">2: COMP</span>
                         </div>
-                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">1m Spot + 5s Opt</div>
+                        <div class="my-0.5">
+                            <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 fw-bold font-monospace" style="font-size: 0.72rem;">1X</span>
+                        </div>
+                        <div class="text-muted smaller text-truncate w-100" style="font-size: 0.60rem;">1s Spot+Opt</div>
                     </button>
-                </form>
 
-                <!-- 3: MODERATE -->
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="profile">
-                    <input type="hidden" name="profile" value="MODERATE">
-                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'MODERATE' %}active-profile-moderate{% endif %}"
-                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'MODERATE' %}#f59e0b{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'MODERATE' %}rgba(245, 158, 11, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+                    <!-- 3: HIGH COMPRESS -->
+                    <button type="button" class="btn profile-pill-btn profile-bento-card rounded-3 flex-fill position-relative p-2 text-center font-monospace d-flex flex-column align-items-center justify-content-between {% if streamer_status.profile_key == 'HIGH_COMPRESS' %}active{% endif %}"
+                            data-profile="HIGH_COMPRESS"
+                            data-active-color="#06b6d4"
+                            data-glow-color="rgba(6, 182, 212, 0.45)"
+                            data-active-bg="rgba(6, 182, 212, 0.18)"
+                            onclick="window.setPlaybackProfile('HIGH_COMPRESS')"
+                            style="min-width: 0; min-height: 74px; border-radius: 0.5rem !important; border: 1px solid {% if streamer_status.profile_key == 'HIGH_COMPRESS' %}#06b6d4{% else %}rgba(255, 255, 255, 0.1){% endif %}; background: {% if streamer_status.profile_key == 'HIGH_COMPRESS' %}rgba(6, 182, 212, 0.18){% else %}rgba(22, 28, 42, 0.85){% endif %}; color: #ffffff; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); {% if streamer_status.profile_key == 'HIGH_COMPRESS' %}box-shadow: 0 0 14px rgba(6, 182, 212, 0.35); transform: translateY(-1px);{% endif %}"
+                            title="HIGH COMPRESS: 12 Option Candles/sec Burst (1 full minute / second)">
+                        <span class="status-dot position-absolute rounded-circle shadow-sm" style="top: 5px; right: 5px; width: 6px; height: 6px; background: #06b6d4; display: {% if streamer_status.profile_key == 'HIGH_COMPRESS' %}inline-block{% else %}none{% endif %};"></span>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="fs-6">🌪️</span>
+                            <span class="fw-bold smaller" style="color: #06b6d4; font-size: 0.74rem;">3: HIGH COMP</span>
+                        </div>
+                        <div class="my-0.5">
+                            <span class="badge rounded-pill px-2 py-0.5 fw-bold font-monospace" style="background: rgba(6, 182, 212, 0.25); color: #06b6d4; border: 1px solid rgba(6, 182, 212, 0.4); font-size: 0.72rem;">12X</span>
+                        </div>
+                        <div class="text-muted smaller text-truncate w-100" style="font-size: 0.60rem;">1m/s Burst</div>
+                    </button>
+
+                    <!-- 4: MODERATE -->
+                    <button type="button" class="btn profile-pill-btn profile-bento-card rounded-3 flex-fill position-relative p-2 text-center font-monospace d-flex flex-column align-items-center justify-content-between {% if streamer_status.profile_key == 'MODERATE' %}active{% endif %}"
+                            data-profile="MODERATE"
+                            data-active-color="#f59e0b"
+                            data-glow-color="rgba(245, 158, 11, 0.45)"
+                            data-active-bg="rgba(245, 158, 11, 0.18)"
+                            onclick="window.setPlaybackProfile('MODERATE')"
+                            style="min-width: 0; min-height: 74px; border-radius: 0.5rem !important; border: 1px solid {% if streamer_status.profile_key == 'MODERATE' %}#f59e0b{% else %}rgba(255, 255, 255, 0.1){% endif %}; background: {% if streamer_status.profile_key == 'MODERATE' %}rgba(245, 158, 11, 0.18){% else %}rgba(22, 28, 42, 0.85){% endif %}; color: #ffffff; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); {% if streamer_status.profile_key == 'MODERATE' %}box-shadow: 0 0 14px rgba(245, 158, 11, 0.35); transform: translateY(-1px);{% endif %}"
                             title="MODERATE: Replays at 5X accelerated speed">
-                        <div class="fw-bold d-flex align-items-center gap-1.5 text-warning">
-                            <span>🚀 3: MODERATE</span>
-                            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-1 py-0 smaller">5X</span>
+                        <span class="status-dot position-absolute rounded-circle shadow-sm" style="top: 5px; right: 5px; width: 6px; height: 6px; background: #f59e0b; display: {% if streamer_status.profile_key == 'MODERATE' %}inline-block{% else %}none{% endif %};"></span>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="fs-6">🚀</span>
+                            <span class="fw-bold text-warning smaller" style="font-size: 0.74rem;">4: MOD</span>
                         </div>
-                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">5x Replay Sync</div>
+                        <div class="my-0.5">
+                            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2 py-0.5 fw-bold font-monospace" style="font-size: 0.72rem;">5X</span>
+                        </div>
+                        <div class="text-muted smaller text-truncate w-100" style="font-size: 0.60rem;">5x Replay</div>
                     </button>
-                </form>
 
-                <!-- 4: SPEED -->
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="profile">
-                    <input type="hidden" name="profile" value="FAST">
-                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'FAST' %}active-profile-fast{% endif %}"
-                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'FAST' %}#ef4444{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'FAST' %}rgba(239, 68, 68, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+                    <!-- 5: SPEED -->
+                    <button type="button" class="btn profile-pill-btn profile-bento-card rounded-3 flex-fill position-relative p-2 text-center font-monospace d-flex flex-column align-items-center justify-content-between {% if streamer_status.profile_key == 'FAST' %}active{% endif %}"
+                            data-profile="FAST"
+                            data-active-color="#ef4444"
+                            data-glow-color="rgba(239, 68, 68, 0.45)"
+                            data-active-bg="rgba(239, 68, 68, 0.18)"
+                            onclick="window.setPlaybackProfile('FAST')"
+                            style="min-width: 0; min-height: 74px; border-radius: 0.5rem !important; border: 1px solid {% if streamer_status.profile_key == 'FAST' %}#ef4444{% else %}rgba(255, 255, 255, 0.1){% endif %}; background: {% if streamer_status.profile_key == 'FAST' %}rgba(239, 68, 68, 0.18){% else %}rgba(22, 28, 42, 0.85){% endif %}; color: #ffffff; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); {% if streamer_status.profile_key == 'FAST' %}box-shadow: 0 0 14px rgba(239, 68, 68, 0.35); transform: translateY(-1px);{% endif %}"
                             title="SPEED: Replays at 20X accelerated speed">
-                        <div class="fw-bold d-flex align-items-center gap-1.5 text-danger">
-                            <span>🔥 4: SPEED</span>
-                            <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-1 py-0 smaller">20X</span>
+                        <span class="status-dot position-absolute rounded-circle shadow-sm" style="top: 5px; right: 5px; width: 6px; height: 6px; background: #ef4444; display: {% if streamer_status.profile_key == 'FAST' %}inline-block{% else %}none{% endif %};"></span>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="fs-6">🔥</span>
+                            <span class="fw-bold text-danger smaller" style="font-size: 0.74rem;">5: SPEED</span>
                         </div>
-                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">20x Speed Sync</div>
+                        <div class="my-0.5">
+                            <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2 py-0.5 fw-bold font-monospace" style="font-size: 0.72rem;">20X</span>
+                        </div>
+                        <div class="text-muted smaller text-truncate w-100" style="font-size: 0.60rem;">20x Speed</div>
                     </button>
-                </form>
 
-                <!-- 5: HYPER -->
-                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
-                    {% csrf_token %}
-                    <input type="hidden" name="action" value="profile">
-                    <input type="hidden" name="profile" value="HYPER">
-                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'HYPER' %}active-profile-hyper{% endif %}"
-                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'HYPER' %}#a855f7{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'HYPER' %}rgba(168, 85, 247, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+                    <!-- 6: HYPER -->
+                    <button type="button" class="btn profile-pill-btn profile-bento-card rounded-3 flex-fill position-relative p-2 text-center font-monospace d-flex flex-column align-items-center justify-content-between {% if streamer_status.profile_key == 'HYPER' %}active{% endif %}"
+                            data-profile="HYPER"
+                            data-active-color="#c084fc"
+                            data-glow-color="rgba(192, 132, 252, 0.45)"
+                            data-active-bg="rgba(168, 85, 247, 0.18)"
+                            onclick="window.setPlaybackProfile('HYPER')"
+                            style="min-width: 0; min-height: 74px; border-radius: 0.5rem !important; border: 1px solid {% if streamer_status.profile_key == 'HYPER' %}#a855f7{% else %}rgba(255, 255, 255, 0.1){% endif %}; background: {% if streamer_status.profile_key == 'HYPER' %}rgba(168, 85, 247, 0.18){% else %}rgba(22, 28, 42, 0.85){% endif %}; color: #ffffff; cursor: pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); {% if streamer_status.profile_key == 'HYPER' %}box-shadow: 0 0 14px rgba(192, 132, 252, 0.35); transform: translateY(-1px);{% endif %}"
                             title="HYPER: Replays at 50X ultra speed">
-                        <div class="fw-bold d-flex align-items-center gap-1.5" style="color: #c084fc;">
-                            <span>🛸 5: HYPER</span>
-                            <span class="badge rounded-pill px-1 py-0 smaller" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">50X</span>
+                        <span class="status-dot position-absolute rounded-circle shadow-sm" style="top: 5px; right: 5px; width: 6px; height: 6px; background: #c084fc; display: {% if streamer_status.profile_key == 'HYPER' %}inline-block{% else %}none{% endif %};"></span>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="fs-6">🛸</span>
+                            <span class="fw-bold smaller" style="color: #c084fc; font-size: 0.74rem;">6: HYPER</span>
                         </div>
-                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">50x Ultra Burst</div>
+                        <div class="my-0.5">
+                            <span class="badge rounded-pill px-2 py-0.5 fw-bold font-monospace" style="background: rgba(168, 85, 247, 0.25); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.4); font-size: 0.72rem;">50X</span>
+                        </div>
+                        <div class="text-muted smaller text-truncate w-100" style="font-size: 0.60rem;">50x Burst</div>
                     </button>
-                </form>
+                </div>
             </div>
         </div>
     </div>
@@ -963,13 +1109,9 @@
                             const speedEl = document.getElementById('gateway-progress-speed');
                             if (speedEl && data.speed != null) {
                                 speedEl.innerText = data.speed + 'x';
-                                document.querySelectorAll('.speed-pill-btn').forEach(btn => {
-                                    if (btn.getAttribute('data-speed') == data.speed || btn.innerText.trim() === data.speed + 'x') {
-                                        btn.classList.add('active');
-                                    } else {
-                                        btn.classList.remove('active');
-                                    }
-                                });
+                            }
+                            if (window.applyActiveSpeedProfileUI && (data.profile_key || data.speed != null)) {
+                                window.applyActiveSpeedProfileUI(data.profile_key, data.speed);
                             }
                             const fileEl = document.getElementById('gateway-progress-file');
                             if (fileEl && data.active_file) {
@@ -1111,6 +1253,65 @@
         }).then(res => res.json()).then(data => {
             console.log('[GatewaySpeed] Set speed to ' + val + 'x successfully');
         }).catch(err => console.error('[GatewaySpeed] Error setting speed:', err));
+    };
+
+    window.setPlaybackProfile = function(profileKey) {
+        if (!profileKey) return;
+        window.applyActiveSpeedProfileUI(profileKey);
+
+        const formData = new FormData();
+        formData.append('action', 'profile');
+        formData.append('profile', profileKey);
+        const csrfEl = document.querySelector('input[name="csrfmiddlewaretoken"]');
+        if (csrfEl) formData.append('csrfmiddlewaretoken', csrfEl.value);
+
+        fetch('{% url "admins:admin-mock-broker-control" %}', {
+            method: 'POST',
+            headers: {
+                'X-Requested-With': 'XMLHttpRequest'
+            },
+            body: formData
+        }).then(res => {
+            console.log('[GatewayProfile] Set profile to ' + profileKey + ' successfully');
+        }).catch(err => console.error('[GatewayProfile] Error setting profile:', err));
+    };
+
+    window.applyActiveSpeedProfileUI = function(profileKey, speedVal) {
+        if (!profileKey && speedVal != null) {
+            if (speedVal == 1) profileKey = 'COMPRESSED';
+            else if (speedVal == 12) profileKey = 'HIGH_COMPRESS';
+            else if (speedVal == 5) profileKey = 'MODERATE';
+            else if (speedVal == 20) profileKey = 'FAST';
+            else if (speedVal == 50) profileKey = 'HYPER';
+        }
+        if (!profileKey) return;
+        profileKey = profileKey.toUpperCase().trim();
+        if (profileKey === 'REAL') profileKey = 'REALTIME';
+        if (profileKey === 'SPEED') profileKey = 'FAST';
+        if (profileKey === 'BURST' || profileKey === 'HIGH_COMP' || profileKey === 'HIGH COMP') profileKey = 'HIGH_COMPRESS';
+
+        document.querySelectorAll('.profile-pill-btn').forEach(btn => {
+            const btnProf = (btn.getAttribute('data-profile') || '').toUpperCase();
+            const dot = btn.querySelector('.status-dot');
+            if (btnProf === profileKey) {
+                btn.classList.add('active');
+                const activeColor = btn.getAttribute('data-active-color') || '#38bdf8';
+                const glowColor = btn.getAttribute('data-glow-color') || 'rgba(56, 189, 248, 0.45)';
+                const activeBg = btn.getAttribute('data-active-bg') || 'rgba(56, 189, 248, 0.18)';
+                btn.style.borderColor = activeColor;
+                btn.style.boxShadow = '0 0 14px ' + glowColor;
+                btn.style.background = activeBg;
+                btn.style.transform = 'translateY(-1px)';
+                if (dot) dot.style.display = 'inline-block';
+            } else {
+                btn.classList.remove('active');
+                btn.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                btn.style.boxShadow = 'none';
+                btn.style.background = 'rgba(22, 28, 42, 0.85)';
+                btn.style.transform = 'none';
+                if (dot) dot.style.display = 'none';
+            }
+        });
     };
 
     if (document.readyState === 'complete' || document.readyState === 'interactive') {
