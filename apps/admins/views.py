@@ -695,6 +695,11 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
                 requests.post(f'http://mock_broker:8088/mock/api/streamer/speed?val={val}', timeout=3)
                 toast_title = 'Speed Adjusted'
                 toast_msg = f'Replay speed set to {val}x.'
+            elif action == 'profile':
+                profile_val = request.POST.get('profile') or request.POST.get('val') or 'COMPRESSED'
+                requests.post(f'http://mock_broker:8088/mock/api/streamer/profile?profile={profile_val}', timeout=3)
+                toast_title = 'Playback Profile Activated'
+                toast_msg = f'Streamer switched to profile: {profile_val}.'
             elif action == 'select_file':
                 file_path = request.POST.get('file', '')
                 requests.post(f'http://mock_broker:8088/mock/api/streamer/select?file={file_path}', timeout=3)

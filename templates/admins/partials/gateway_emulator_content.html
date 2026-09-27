@@ -460,19 +460,91 @@
             </div>
         </div>
 
-        <!-- 2. Speed Multipliers (1x to 250x) -->
+        <!-- 2. Playback Profiles Selection Cards (Syncs Strategy Clock) -->
         <div class="col-12 col-lg-7 text-start text-lg-end" id="gateway-speed-multipliers-wrapper">
-            <label class="text-secondary smaller fw-bold d-block mb-1 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">
-                <i class="bi bi-speedometer2 me-1 text-info"></i>Replay Speed Multiplier (Syncs Strategy Clock)
+            <label class="text-secondary smaller fw-bold d-block mb-1.5 text-uppercase" style="font-size: 0.68rem; letter-spacing: 0.5px;">
+                <i class="bi bi-speedometer2 me-1 text-info"></i>Playback Execution Profile (Syncs Dual Engine)
             </label>
-            <div class="d-flex flex-wrap gap-1.5 justify-content-start justify-content-lg-end" role="group">
-                <button type="button" onclick="setGatewaySpeed(1)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 1 %}active{% endif %}" data-speed="1">1x</button>
-                <button type="button" onclick="setGatewaySpeed(5)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 5 %}active{% endif %}" data-speed="5">5x</button>
-                <button type="button" onclick="setGatewaySpeed(10)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 10 %}active{% endif %}" data-speed="10">10x</button>
-                <button type="button" onclick="setGatewaySpeed(25)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 25 %}active{% endif %}" data-speed="25">25x</button>
-                <button type="button" onclick="setGatewaySpeed(50)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 50 %}active{% endif %}" data-speed="50">50x</button>
-                <button type="button" onclick="setGatewaySpeed(100)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 100 %}active{% endif %}" data-speed="100">100x</button>
-                <button type="button" onclick="setGatewaySpeed(250)" class="btn speed-pill-btn rounded-pill {% if streamer_status.current_speed == 250 %}active{% endif %}" data-speed="250">250x</button>
+            <div class="d-flex flex-wrap gap-2 justify-content-start justify-content-lg-end" role="group">
+                <!-- 1: REAL -->
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="profile">
+                    <input type="hidden" name="profile" value="REALTIME">
+                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'REALTIME' %}active-profile-real{% endif %}"
+                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'REALTIME' %}#10b981{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'REALTIME' %}rgba(16, 185, 129, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+                            title="REAL: Replays with true real-time gaps (1X speed)">
+                        <div class="fw-bold d-flex align-items-center gap-1.5 text-success">
+                            <span>🐢 1: REAL</span>
+                            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-1 py-0 smaller">1X</span>
+                        </div>
+                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">Wall-Clock Gaps</div>
+                    </button>
+                </form>
+
+                <!-- 2: COMPRESSED -->
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="profile">
+                    <input type="hidden" name="profile" value="COMPRESSED">
+                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}active-profile-compressed{% endif %}"
+                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}#38bdf8{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'COMPRESSED' or not streamer_status.profile_key %}rgba(56, 189, 248, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+                            title="COMPRESSED: 1m Index + 5s Option sync with dead-time compression">
+                        <div class="fw-bold d-flex align-items-center gap-1.5 text-info">
+                            <span>⚡ 2: COMPRESSED</span>
+                            <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-1 py-0 smaller">1X</span>
+                        </div>
+                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">1m Spot + 5s Opt</div>
+                    </button>
+                </form>
+
+                <!-- 3: MODERATE -->
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="profile">
+                    <input type="hidden" name="profile" value="MODERATE">
+                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'MODERATE' %}active-profile-moderate{% endif %}"
+                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'MODERATE' %}#f59e0b{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'MODERATE' %}rgba(245, 158, 11, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+                            title="MODERATE: Replays at 5X accelerated speed">
+                        <div class="fw-bold d-flex align-items-center gap-1.5 text-warning">
+                            <span>🚀 3: MODERATE</span>
+                            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-1 py-0 smaller">5X</span>
+                        </div>
+                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">5x Replay Sync</div>
+                    </button>
+                </form>
+
+                <!-- 4: SPEED -->
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="profile">
+                    <input type="hidden" name="profile" value="FAST">
+                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'FAST' %}active-profile-fast{% endif %}"
+                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'FAST' %}#ef4444{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'FAST' %}rgba(239, 68, 68, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+                            title="SPEED: Replays at 20X accelerated speed">
+                        <div class="fw-bold d-flex align-items-center gap-1.5 text-danger">
+                            <span>🔥 4: SPEED</span>
+                            <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-1 py-0 smaller">20X</span>
+                        </div>
+                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">20x Speed Sync</div>
+                    </button>
+                </form>
+
+                <!-- 5: HYPER -->
+                <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
+                    {% csrf_token %}
+                    <input type="hidden" name="action" value="profile">
+                    <input type="hidden" name="profile" value="HYPER">
+                    <button type="submit" class="btn profile-pill-btn rounded-3 py-1.5 px-2.5 text-start font-monospace {% if streamer_status.profile_key == 'HYPER' %}active-profile-hyper{% endif %}"
+                            style="font-size: 0.72rem; border: 1px solid {% if streamer_status.profile_key == 'HYPER' %}#a855f7{% else %}rgba(255, 255, 255, 0.15){% endif %}; background: {% if streamer_status.profile_key == 'HYPER' %}rgba(168, 85, 247, 0.18){% else %}rgba(20, 20, 25, 0.6){% endif %}; color: #ffffff;"
+                            title="HYPER: Replays at 50X ultra speed">
+                        <div class="fw-bold d-flex align-items-center gap-1.5" style="color: #c084fc;">
+                            <span>🛸 5: HYPER</span>
+                            <span class="badge rounded-pill px-1 py-0 smaller" style="background: rgba(168, 85, 247, 0.2); color: #c084fc; border: 1px solid rgba(168, 85, 247, 0.3);">50X</span>
+                        </div>
+                        <div class="smaller text-muted mt-0.5" style="font-size: 0.64rem;">50x Ultra Burst</div>
+                    </button>
+                </form>
             </div>
         </div>
     </div>

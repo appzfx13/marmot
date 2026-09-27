@@ -49,7 +49,8 @@ type ParquetStreamer struct {
 	writeMu         sync.Mutex
 	engine          *engine.MatchingEngine
 	clients         map[*websocket.Conn]bool
-	speed           int // Multiplier: 1, 5, 10, 25, 50, 100, 250
+	speed           int // Multiplier: 1, 5, 20, 50
+	profileKey      string // Playback Profile: REALTIME, COMPRESSED, MODERATE, FAST, HYPER
 	isPlaying       bool
 	stopChan        chan struct{}
 	currentFile     string
@@ -90,6 +91,7 @@ func NewParquetStreamer(eng *engine.MatchingEngine, backupDir string) *ParquetSt
 		engine:            eng,
 		clients:           make(map[*websocket.Conn]bool),
 		speed:             1,
+		profileKey:        "COMPRESSED",
 		isPlaying:         false,
 		availableDir:      backupDir,
 		currentDatetime:   time.Now().Format("2006-01-02 15:04:05"),
@@ -328,13 +330,30 @@ func (ps *ParquetStreamer) Restart() {
 	ps.Start()
 }
 
-// SetSpeed sets tick replay multiplier and broadcasts immediate progress event.
-func (ps *ParquetStreamer) SetSpeed(speed int) {
+// SetProfile updates the playback profile (REAL, COMPRESSED, MODERATE, FAST, HYPER).
+func (ps *ParquetStreamer) SetProfile(profile string) {
 	ps.mu.Lock()
-	if speed <= 0 {
-		speed = 1
+	pUpper := strings.ToUpper(strings.TrimSpace(profile))
+	switch pUpper {
+	case "REAL", "REALTIME":
+		ps.profileKey = "REALTIME"
+		ps.speed = 1
+	case "COMPRESSED":
+		ps.profileKey = "COMPRESSED"
+		ps.speed = 1
+	case "MODERATE", "5X":
+		ps.profileKey = "MODERATE"
+		ps.speed = 5
+	case "SPEED", "FAST", "20X":
+		ps.profileKey = "FAST"
+		ps.speed = 20
+	case "HYPER", "50X":
+		ps.profileKey = "HYPER"
+		ps.speed = 50
+	default:
+		ps.profileKey = "COMPRESSED"
+		ps.speed = 1
 	}
-	ps.speed = speed
 	cur := atomic.LoadInt64(&ps.currentRow)
 	tot := ps.totalRows
 	pct := 0.0
@@ -348,6 +367,57 @@ func (ps *ParquetStreamer) SetSpeed(speed int) {
 	date := ps.currentDateStr
 	dt := ps.currentDatetime
 	ticks := atomic.LoadInt64(&ps.ticksIngested)
+	prof := ps.profileKey
+	spd := ps.speed
+	ps.mu.Unlock()
+
+	pPayload := map[string]interface{}{
+		"type":         "streamer_progress",
+		"active_file":  file,
+		"date":         date,
+		"datetime":     dt,
+		"current_row":  cur,
+		"total_rows":   tot,
+		"progress_pct": pct,
+		"speed":        spd,
+		"profile_key":  prof,
+		"ticks":        ticks,
+	}
+	if pBytes, err := json.Marshal(pPayload); err == nil {
+		ps.BroadcastRawMessage(pBytes)
+	}
+}
+
+// SetSpeed sets tick replay multiplier and broadcasts immediate progress event.
+func (ps *ParquetStreamer) SetSpeed(speed int) {
+	ps.mu.Lock()
+	if speed <= 0 {
+		speed = 1
+	}
+	ps.speed = speed
+	if speed == 1 {
+		ps.profileKey = "COMPRESSED"
+	} else if speed == 5 {
+		ps.profileKey = "MODERATE"
+	} else if speed == 20 {
+		ps.profileKey = "FAST"
+	} else if speed >= 50 {
+		ps.profileKey = "HYPER"
+	}
+	cur := atomic.LoadInt64(&ps.currentRow)
+	tot := ps.totalRows
+	pct := 0.0
+	if tot > 0 {
+		pct = math.Round((float64(cur)/float64(tot)*100.0)*100) / 100.0
+		if pct > 100.0 {
+			pct = 100.0
+		}
+	}
+	file := ps.currentFile
+	date := ps.currentDateStr
+	dt := ps.currentDatetime
+	ticks := atomic.LoadInt64(&ps.ticksIngested)
+	prof := ps.profileKey
 	ps.mu.Unlock()
 
 	pPayload := map[string]interface{}{
@@ -359,6 +429,7 @@ func (ps *ParquetStreamer) SetSpeed(speed int) {
 		"total_rows":   tot,
 		"progress_pct": pct,
 		"speed":        speed,
+		"profile_key":  prof,
 		"ticks":        ticks,
 	}
 	if pBytes, err := json.Marshal(pPayload); err == nil {
@@ -395,6 +466,16 @@ func (ps *ParquetStreamer) GetStatus() (bool, int, string, int64) {
 	ps.mu.RLock()
 	defer ps.mu.RUnlock()
 	return ps.isPlaying, ps.speed, ps.currentFile, atomic.LoadInt64(&ps.ticksIngested)
+}
+
+// GetProfileKey returns active playback profile key.
+func (ps *ParquetStreamer) GetProfileKey() string {
+	ps.mu.RLock()
+	defer ps.mu.RUnlock()
+	if ps.profileKey == "" {
+		return "COMPRESSED"
+	}
+	return ps.profileKey
 }
 
 // GetProgress returns dataset row progress metrics and active candle datetime.
@@ -853,7 +934,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 	ps.mu.Unlock()
 
 	colsMap := make(map[string]bool)
-	if dRows, err := db.Query(`DESCRIBE SELECT * FROM read_parquet('` + fullPath + `')`); err == nil {
+	if dRows, err := db.Query(`DESCRIBE SELECT * FROM read_parquet('` + fullPath + `') LIMIT 1`); err == nil {
 		for dRows.Next() {
 			var colName, colType string
 			var null, key, def, extra sql.NullString
@@ -890,15 +971,18 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 	ivCol := colOr("iv", "IV", "0.0")
 	spotCol := colOr("spot_price", "SpotPrice", "0.0")
 
+	db.Exec("PRAGMA memory_limit='2GB'")
+	db.Exec("PRAGMA threads=2")
+
 	offsetClause := ""
 	if startRow > 0 {
 		offsetClause = fmt.Sprintf(" OFFSET %d", startRow)
 	}
 
-	queryStr := fmt.Sprintf(`SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM read_parquet('%s') ORDER BY %s ASC, %s ASC%s`,
+	// Remove ORDER BY to allow linear streaming without full-table memory sort (Parquet is already chronologically ordered)
+	queryStr := fmt.Sprintf(`SELECT %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s FROM read_parquet('%s')%s`,
 		tsCol, dtCol, idxCol, instCol, symCol, stkCol, optCol, openCol, highCol, lowCol, closeCol, volCol, oiCol, ivCol, spotCol,
-		fullPath, tsCol, optCol, offsetClause)
-
+		fullPath, offsetClause)
 	rows, err := db.Query(queryStr)
 	if err != nil {
 		log.Printf("[STREAMER] DuckDB query error: %v", err)
@@ -939,11 +1023,12 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 			}
 			var rec models.MarketCandleRecord
 			if err := rows.Scan(&rec.Timestamp, &rec.Datetime, &rec.IndexName, &rec.InstrumentType, &rec.TradingSymbol, &rec.Strike, &rec.OptionType, &rec.Open, &rec.High, &rec.Low, &rec.Close, &rec.Volume, &rec.OI, &rec.IV, &rec.SpotPrice); err != nil {
-				log.Printf("[STREAMER] DuckDB row scan error: %v", err)
+				log.Printf("[STREAMER] DuckDB row scan error: %v (Query was: %s)", err, queryStr)
 				return
 			}
 
 			atomic.AddInt64(&ps.currentRow, 1)
+
 			recTime := rec.Datetime
 			if recTime == "" && rec.Timestamp > 0 {
 				recTime = time.Unix(rec.Timestamp, 0).Format("2006-01-02 15:04:05")
@@ -1366,7 +1451,7 @@ var (
 	datasetMetaCache   = make(map[string]ParquetFileInfo)
 )
 
-// readParquetMeta extracts index_name and date range from the first and last record of a parquet dataset using DuckDB.
+// readParquetMeta extracts index_name and date range from a parquet dataset using DuckDB.
 func readParquetMeta(filePath string) (string, string, string) {
 	db, err := sql.Open("duckdb", "")
 	if err != nil {
@@ -1374,56 +1459,74 @@ func readParquetMeta(filePath string) (string, string, string) {
 	}
 	defer db.Close()
 
-	colsMap := make(map[string]bool)
-	if dRows, err := db.Query(`DESCRIBE SELECT * FROM read_parquet('` + filePath + `')`); err == nil {
-		for dRows.Next() {
-			var colName, colType string
-			var null, key, def, extra sql.NullString
-			if err := dRows.Scan(&colName, &colType, &null, &key, &def, &extra); err == nil {
-				colsMap[strings.ToLower(colName)] = true
+	var idx, start, end string
+
+	// 1. Fast sample first row for columns and index_name (LIMIT 1 without ORDER BY reads only row 1)
+	qFirst := fmt.Sprintf(`SELECT * FROM read_parquet('%s') LIMIT 1`, filePath)
+	rows, err := db.Query(qFirst)
+	if err != nil {
+		return "", "", ""
+	}
+	cols, err := rows.Columns()
+	if err != nil {
+		rows.Close()
+		return "", "", ""
+	}
+
+	colMap := make(map[string]int)
+	for i, c := range cols {
+		colMap[strings.ToLower(c)] = i
+	}
+
+	if rows.Next() {
+		vals := make([]interface{}, len(cols))
+		valPtrs := make([]interface{}, len(cols))
+		for i := range vals {
+			valPtrs[i] = &vals[i]
+		}
+		if err := rows.Scan(valPtrs...); err == nil {
+			if i, ok := colMap["index_name"]; ok && vals[i] != nil {
+				idx = fmt.Sprintf("%v", vals[i])
+			} else if i, ok := colMap["indexname"]; ok && vals[i] != nil {
+				idx = fmt.Sprintf("%v", vals[i])
+			}
+			if i, ok := colMap["datetime"]; ok && vals[i] != nil {
+				start = fmt.Sprintf("%v", vals[i])
 			}
 		}
-		dRows.Close()
 	}
+	rows.Close()
 
-	idxCol := "'NIFTY'"
-	if colsMap["index_name"] {
-		idxCol = "index_name"
-	} else if colsMap["indexname"] {
-		idxCol = "IndexName"
-	}
-
-	dtCol := "''"
-	if colsMap["datetime"] {
-		dtCol = "datetime"
-	}
-
-	tsCol := "0"
-	if colsMap["timestamp"] {
-		tsCol = "timestamp"
-	}
-
-	var idx, start, end string
-	q1 := fmt.Sprintf(`SELECT %s, %s, %s FROM read_parquet('%s') ORDER BY %s ASC LIMIT 1`, idxCol, dtCol, tsCol, filePath, tsCol)
-	var tsVal int64
-	err = db.QueryRow(q1).Scan(&idx, &start, &tsVal)
-	if err == nil {
-		if start == "" && tsVal > 0 {
-			start = time.Unix(tsVal, 0).Format("2006-01-02 15:04:05")
+	// 2. Fast min/max aggregation leveraging parquet statistics pushdown without expensive full-table sorting
+	if _, ok := colMap["timestamp"]; ok {
+		qMinMax := fmt.Sprintf(`SELECT min(timestamp), max(timestamp) FROM read_parquet('%s')`, filePath)
+		var qMin, qMax sql.NullInt64
+		if err := db.QueryRow(qMinMax).Scan(&qMin, &qMax); err == nil {
+			if qMin.Valid && qMin.Int64 > 0 {
+				start = time.Unix(qMin.Int64, 0).Format("2006-01-02 15:04:05")
+			}
+			if qMax.Valid && qMax.Int64 > 0 {
+				end = time.Unix(qMax.Int64, 0).Format("2006-01-02 15:04:05")
+			}
 		}
-	}
-
-	q2 := fmt.Sprintf(`SELECT %s, %s FROM read_parquet('%s') ORDER BY %s DESC LIMIT 1`, dtCol, tsCol, filePath, tsCol)
-	var tsEndVal int64
-	err = db.QueryRow(q2).Scan(&end, &tsEndVal)
-	if err == nil {
-		if end == "" && tsEndVal > 0 {
-			end = time.Unix(tsEndVal, 0).Format("2006-01-02 15:04:05")
+	} else if _, ok := colMap["datetime"]; ok {
+		qMinMax := fmt.Sprintf(`SELECT min(datetime), max(datetime) FROM read_parquet('%s')`, filePath)
+		var qMin, qMax sql.NullString
+		if err := db.QueryRow(qMinMax).Scan(&qMin, &qMax); err == nil {
+			if qMin.Valid && qMin.String != "" {
+				start = qMin.String
+			}
+			if qMax.Valid && qMax.String != "" {
+				end = qMax.String
+			}
 		}
 	}
 
 	if end == "" {
 		end = start
+	}
+	if idx == "" {
+		idx = "NIFTY"
 	}
 	return idx, start, end
 }
@@ -1432,7 +1535,17 @@ func readParquetMeta(filePath string) (string, string, string) {
 func (ps *ParquetStreamer) ListParquetDetails() []ParquetFileInfo {
 	var results []ParquetFileInfo
 	_ = filepath.Walk(ps.availableDir, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() && filepath.Ext(path) == ".parquet" {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			name := info.Name()
+			if name == "ticks" || name == "staging" || strings.HasPrefix(name, ".") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if filepath.Ext(path) == ".parquet" {
 			rel, _ := filepath.Rel(ps.availableDir, path)
 			relSlash := filepath.ToSlash(rel)
 			szMB := float64(info.Size()) / (1024 * 1024)

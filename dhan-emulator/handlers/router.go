@@ -102,6 +102,7 @@ func (h *Handler) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/mock/api/streamer/stop", h.handleStreamerStop)
 	mux.HandleFunc("/mock/api/streamer/restart", h.handleStreamerRestart)
 	mux.HandleFunc("/mock/api/streamer/speed", h.handleStreamerSpeed)
+	mux.HandleFunc("/mock/api/streamer/profile", h.handleStreamerProfile)
 	mux.HandleFunc("/mock/api/streamer/select", h.handleStreamerSelect)
 	mux.HandleFunc("/mock/api/streamer/files", h.handleStreamerFiles)
 	mux.HandleFunc("/mock/api/streamer/status", h.handleStreamerStatus)
@@ -1045,6 +1046,27 @@ func (h *Handler) handleStreamerRestart(w http.ResponseWriter, r *http.Request) 
 	h.handleDashboardControls(w, r)
 }
 
+// handleStreamerProfile sets playback profile (REAL, COMPRESSED, MODERATE, FAST, HYPER).
+func (h *Handler) handleStreamerProfile(w http.ResponseWriter, r *http.Request) {
+	profStr := r.URL.Query().Get("profile")
+	if profStr == "" {
+		_ = r.ParseForm()
+		profStr = r.FormValue("profile")
+	}
+	if profStr == "" {
+		profStr = r.FormValue("val")
+	}
+	h.streamer.SetProfile(profStr)
+	if r.Header.Get("Accept") == "application/json" {
+		w.Header().Set("Content-Type", "application/json")
+		_, speed, _, _ := h.streamer.GetStatus()
+		profKey := h.streamer.GetProfileKey()
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "profile_key": profKey, "speed": speed})
+		return
+	}
+	h.handleDashboardControls(w, r)
+}
+
 // handleStreamerSpeed adjusts tick playback speed.
 func (h *Handler) handleStreamerSpeed(w http.ResponseWriter, r *http.Request) {
 	valStr := r.URL.Query().Get("val")
@@ -1058,7 +1080,8 @@ func (h *Handler) handleStreamerSpeed(w http.ResponseWriter, r *http.Request) {
 	if r.Header.Get("Accept") == "application/json" {
 		w.Header().Set("Content-Type", "application/json")
 		_, speed, _, _ := h.streamer.GetStatus()
-		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "speed": speed})
+		profKey := h.streamer.GetProfileKey()
+		_ = json.NewEncoder(w).Encode(map[string]interface{}{"success": true, "profile_key": profKey, "speed": speed})
 		return
 	}
 	h.handleDashboardControls(w, r)
@@ -1115,6 +1138,7 @@ func (h *Handler) handleStreamerStatus(w http.ResponseWriter, r *http.Request) {
 		curTime = curDt
 	}
 
+	profKey := h.streamer.GetProfileKey()
 	w.Header().Set("Content-Type", "application/json")
 	w.Header().Set("Access-Control-Allow-Origin", "*")
 	json.NewEncoder(w).Encode(map[string]interface{}{
@@ -1122,6 +1146,7 @@ func (h *Handler) handleStreamerStatus(w http.ResponseWriter, r *http.Request) {
 		"is_playing":     isPlaying,
 		"current_speed":  speed,
 		"speed":          speed,
+		"profile_key":    profKey,
 		"active_file":    currentFile,
 		"current_date":   curDate,
 		"current_time":   curTime,

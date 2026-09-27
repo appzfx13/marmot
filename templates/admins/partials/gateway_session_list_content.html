@@ -216,7 +216,6 @@
 
     <!-- Sessions Table / List -->
     <div class="glass-card rounded-3 shadow-sm overflow-hidden mb-4" style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color, rgba(255,255,255,0.08)) !important;">
-        {% if snapshots %}
         <div class="table-responsive">
             <table class="table table-hover align-middle mb-0 font-monospace fs-8" style="color: var(--text-primary, #ffffff);">
                 <thead class="text-uppercase fs-9 letter-spacing-1" style="background: rgba(255, 255, 255, 0.04); color: var(--text-secondary, #94a3b8); border-bottom: 1px solid var(--border-color, rgba(255,255,255,0.1));">
@@ -356,6 +355,36 @@
                             </div>
                         </td>
                     </tr>
+                    {% empty %}
+                    <!-- Empty State in Table -->
+                    <tr>
+                        <td colspan="10" class="text-center py-5 px-3">
+                            <div class="badge bg-secondary-subtle text-secondary p-3 rounded-circle mb-3">
+                                <i class="bi bi-clock-history fs-2"></i>
+                            </div>
+                            <h5 class="fw-bold mb-1" style="color: var(--text-primary, #ffffff);">No Simulation Snapshots Found</h5>
+                            <p class="small mb-4 font-sans" style="color: var(--text-secondary, #94a3b8); max-width: 480px; margin: 0 auto;">
+                                {% if query or rating_filter or favorite_filter or mode_filter %}
+                                No sessions matched your filter criteria. Try clearing filters or changing your search terms.
+                                {% else %}
+                                You haven't saved any simulation sessions yet. Run a live or backup simulation in the Gateway Emulator and click <strong>"Save Session"</strong> to snapshot your PnL, trades, and chart curves.
+                                {% endif %}
+                            </p>
+                            <div class="d-flex justify-content-center gap-2 font-sans">
+                                {% if query or rating_filter or favorite_filter or mode_filter %}
+                                <a href="{% url 'admins:admin-gateway-session-list' %}"
+                                   hx-get="{% url 'admins:admin-gateway-session-list' %}"
+                                   hx-target="#gateway-session-list-container"
+                                   class="btn btn-sm btn-outline-secondary rounded-pill px-3">
+                                    Clear Filters
+                                </a>
+                                {% endif %}
+                                <a href="{% url 'admins:admin-gateway-emulator' %}" class="btn btn-sm btn-primary rounded-pill px-3">
+                                    <i class="bi bi-play-circle me-1"></i> Go to Gateway Emulator
+                                </a>
+                            </div>
+                        </td>
+                    </tr>
                     {% endfor %}
                 </tbody>
             </table>
@@ -364,7 +393,7 @@
         <!-- Pagination -->
         {% if page_obj.has_other_pages %}
         <div class="d-flex justify-content-between align-items-center p-3 border-top border-secondary border-opacity-15">
-            <span class="small" style="color: var(--text-secondary, #94a3b8);">
+            <span class="small font-sans" style="color: var(--text-secondary, #94a3b8);">
                 Showing {{ page_obj.start_index }} to {{ page_obj.end_index }} of {{ total_count }} snapshots
             </span>
             <ul class="pagination pagination-sm mb-0">
@@ -396,36 +425,6 @@
                 </li>
                 {% endif %}
             </ul>
-        </div>
-        {% endif %}
-
-        {% else %}
-        <!-- Empty State -->
-        <div class="text-center py-5 px-3">
-            <div class="badge bg-secondary-subtle text-secondary p-3 rounded-circle mb-3">
-                <i class="bi bi-clock-history fs-2"></i>
-            </div>
-            <h5 class="fw-bold mb-1" style="color: var(--text-primary, #ffffff);">No Simulation Snapshots Found</h5>
-            <p class="small mb-4" style="color: var(--text-secondary, #94a3b8); max-width: 480px; margin: 0 auto;">
-                {% if query or rating_filter or favorite_filter or mode_filter %}
-                No sessions matched your filter criteria. Try clearing filters or changing your search terms.
-                {% else %}
-                You haven't saved any simulation sessions yet. Run a live or backup simulation in the Gateway Emulator and click <strong>"Save Session"</strong> to snapshot your PnL, trades, and chart curves.
-                {% endif %}
-            </p>
-            <div class="d-flex justify-content-center gap-2">
-                {% if query or rating_filter or favorite_filter or mode_filter %}
-                <a href="{% url 'admins:admin-gateway-session-list' %}"
-                   hx-get="{% url 'admins:admin-gateway-session-list' %}"
-                   hx-target="#gateway-session-list-container"
-                   class="btn btn-sm btn-outline-secondary rounded-pill px-3">
-                    Clear Filters
-                </a>
-                {% endif %}
-                <a href="{% url 'admins:admin-gateway-emulator' %}" class="btn btn-sm btn-primary rounded-pill px-3">
-                    <i class="bi bi-play-circle me-1"></i> Go to Gateway Emulator
-                </a>
-            </div>
         </div>
         {% endif %}
     </div>
