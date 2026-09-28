@@ -1250,6 +1250,50 @@ func (j *StrategySignalJob) fetchOptionChainSnaps(ctx context.Context, indexName
 		}
 	}
 
+	// Fallback to Fyers REST 31-strike chain cached by TargetedOptionChainPoller
+	if len(result) == 0 {
+		focKey := fmt.Sprintf("marmot:fyers:full_option_chain:%s", indexName)
+		if fData, fErr := j.redisService.Client.Get(ctx, focKey).Result(); fErr == nil && len(fData) > 0 {
+			var fullPayload struct {
+				Data struct {
+					OptionsChain []map[string]interface{} `json:"optionsChain"`
+				} `json:"data"`
+			}
+			if err := json.Unmarshal([]byte(fData), &fullPayload); err == nil {
+				for _, item := range fullPayload.Data.OptionsChain {
+					sp, _ := item["strike_price"].(float64)
+					if sp <= 0 {
+						continue
+					}
+					strike := int(sp)
+					optType, _ := item["option_type"].(string)
+					ltp, _ := item["ltp"].(float64)
+					if ltp <= 0 {
+						continue
+					}
+					snap := strategies.OptionSnap{Close: ltp}
+					if v, ok := item["bid"].(float64); ok {
+						snap.Bid = v
+					}
+					if v, ok := item["ask"].(float64); ok {
+						snap.Ask = v
+					}
+					if v, ok := item["oi"].(float64); ok {
+						snap.OI = int64(v)
+					}
+					if v, ok := item["volume"].(float64); ok {
+						snap.Volume = int64(v)
+					}
+					if optType == "CE" {
+						result[fmt.Sprintf("%d CALL", strike)] = snap
+					} else if optType == "PE" {
+						result[fmt.Sprintf("%d PUT", strike)] = snap
+					}
+				}
+			}
+		}
+	}
+
 	return result
 }
 

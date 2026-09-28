@@ -35,6 +35,10 @@ type LiveTickPayload struct {
 	IsPositive    bool    `json:"is_positive"`
 	FormattedTime string  `json:"formatted_time"`
 	Timestamp     string  `json:"timestamp"`
+	Bid           float64 `json:"bid,omitempty"`
+	Ask           float64 `json:"ask,omitempty"`
+	Volume        int64   `json:"volume,omitempty"`
+	OI            int64   `json:"oi,omitempty"`
 }
 
 // StartMarketDataBroadcaster streams real-time index ticks and Pub/Sub events to WS clients.
@@ -476,30 +480,73 @@ func processFyersJSONMap(ctx context.Context, data map[string]interface{}, redis
 	publishIndexQuoteToRedis(ctx, redisService, idxName, sym, ltp, ch, chp, high, low, open, prevClose, "WS_V3", prevLTP, tickWriter, hub)
 }
 
+// extractFloat extracts a float64 from a map searching multiple candidate keys.
+func extractFloat(m map[string]interface{}, keys ...string) float64 {
+	for _, k := range keys {
+		if val, ok := m[k]; ok {
+			switch v := val.(type) {
+			case float64:
+				return v
+			case float32:
+				return float64(v)
+			case int:
+				return float64(v)
+			case int64:
+				return float64(v)
+			}
+		}
+	}
+	return 0
+}
+
+// extractInt64 extracts an int64 from a map searching multiple candidate keys.
+func extractInt64(m map[string]interface{}, keys ...string) int64 {
+	for _, k := range keys {
+		if val, ok := m[k]; ok {
+			switch v := val.(type) {
+			case int64:
+				return v
+			case int:
+				return int64(v)
+			case float64:
+				return int64(v)
+			case float32:
+				return int64(v)
+			}
+		}
+	}
+	return 0
+}
+
 // processOptionTick normalizes dynamic option contract ticks and broadcasts to clients and Redis.
 func processOptionTick(ctx context.Context, sym string, data map[string]interface{}, redisService *services.RedisService, prevLTP map[string]float64, hub *Hub) {
-	var ltp, ch, chp, high, low, open, prevClose float64
+	targetMap := data
 	if vMap, isV := data["v"].(map[string]interface{}); isV {
-		ltp, _ = vMap["lp"].(float64)
-		ch, _ = vMap["ch"].(float64)
-		chp, _ = vMap["chp"].(float64)
-		high, _ = vMap["high_price"].(float64)
-		low, _ = vMap["low_price"].(float64)
-		open, _ = vMap["open_price"].(float64)
-		prevClose, _ = vMap["prev_close_price"].(float64)
-	} else {
-		ltp, _ = data["ltp"].(float64)
-		ch, _ = data["ch"].(float64)
-		chp, _ = data["chp"].(float64)
-		high, _ = data["high_price"].(float64)
-		low, _ = data["low_price"].(float64)
-		open, _ = data["open_price"].(float64)
-		prevClose, _ = data["prev_close_price"].(float64)
+		targetMap = vMap
 	}
 
+	ltp := extractFloat(targetMap, "lp", "ltp")
 	if ltp <= 0 {
 		return
 	}
+
+	ch := extractFloat(targetMap, "ch")
+	chp := extractFloat(targetMap, "chp")
+	high := extractFloat(targetMap, "high_price", "high")
+	low := extractFloat(targetMap, "low_price", "low")
+	open := extractFloat(targetMap, "open_price", "open")
+	prevClose := extractFloat(targetMap, "prev_close_price", "prev_close")
+
+	// Full Mode Fyers V3 data fields
+	bid := extractFloat(targetMap, "bid_price", "bp", "bid")
+	ask := extractFloat(targetMap, "ask_price", "sp", "ask")
+	bidSize := extractInt64(targetMap, "bid_size", "bq")
+	askSize := extractInt64(targetMap, "ask_size", "sq")
+	volume := extractInt64(targetMap, "vol_traded_today", "volume", "v")
+	oi := extractInt64(targetMap, "OI", "oi")
+	atp := extractFloat(targetMap, "avg_trade_price", "atp")
+	totBuyQty := extractInt64(targetMap, "tot_buy_qty")
+	totSellQty := extractInt64(targetMap, "tot_sell_qty")
 
 	nowStr := time.Now().Format("03:04:05 PM")
 	quotePayload := map[string]interface{}{
@@ -513,6 +560,15 @@ func processOptionTick(ctx context.Context, sym string, data map[string]interfac
 		"low_price":        low,
 		"open_price":       open,
 		"prev_close_price": prevClose,
+		"bid":              bid,
+		"ask":              ask,
+		"bid_size":         bidSize,
+		"ask_size":         askSize,
+		"volume":           volume,
+		"oi":               oi,
+		"atp":              atp,
+		"tot_buy_qty":      totBuyQty,
+		"tot_sell_qty":     totSellQty,
 		"last_updated":     nowStr,
 	}
 	if qBytes, err := json.Marshal(quotePayload); err == nil {
@@ -521,7 +577,8 @@ func processOptionTick(ctx context.Context, sym string, data map[string]interfac
 
 	if prevLTP[sym] != ltp {
 		prevLTP[sym] = ltp
-		log.Printf("⚡ [FYERS Option Tick] %s: ₹%.2f (Chg: %.2f | %.2f%%)\n", sym, ltp, ch, chp)
+		log.Printf("⚡ [FYERS Option Tick] %s: ₹%.2f (Chg: %.2f | %.2f%%) | Bid: ₹%.2f Ask: ₹%.2f | Vol: %d OI: %d\n",
+			sym, ltp, ch, chp, bid, ask, volume, oi)
 
 		if hub != nil && len(hub.clients) > 0 {
 			liveTick := &LiveTickPayload{
@@ -537,6 +594,10 @@ func processOptionTick(ctx context.Context, sym string, data map[string]interfac
 				IsPositive:    ch >= 0,
 				FormattedTime: nowStr,
 				Timestamp:     nowStr,
+				Bid:           bid,
+				Ask:           ask,
+				Volume:        volume,
+				OI:            oi,
 			}
 			if tickBytes, err := json.Marshal(liveTick); err == nil {
 				select {

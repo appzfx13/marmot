@@ -11,8 +11,13 @@ type StrikeCandidate struct {
 	Key           string  // Options map key e.g. "23650 CALL"
 	TradingSymbol string  // Full broker symbol e.g. "NIFTY 24OCT25 23650 CE"
 	LimitPrice    float64 // Optimal limit entry price
-	Premium       float64 // Option close price
-	Volume        int64   // Volume (primary rank criterion)
+	Premium       float64 // Option close / LTP
+	Volume        int64   // Volume
+	OI            int64   // Open Interest
+	Bid           float64 // Best Bid
+	Ask           float64 // Best Ask
+	SpreadPct     float64 // Bid-Ask spread as % of premium
+	Liquidity     int64   // Effective liquidity score (Volume + OI in live, Volume in backtest)
 	Offset        int     // Strike offset from ATM (0=ATM, 1=ATM+1, etc.)
 }
 
@@ -42,12 +47,13 @@ func limitPriceForSnap(snap OptionSnap) float64 {
 
 // SweepStrikesForBestEntry sweeps ATM±3 option strikes and returns the best entry candidate.
 //
-// Selection logic (3-step, data-driven):
-//  1. HARD GATE — discard strikes whose premium is outside the ideal index window
-//  2. RANK      — pick the strike with the highest Volume (most reliable liquidity signal)
-//  3. TIEBREAK  — if volumes equal, prefer the strike closest to ATM (lower offset)
+// Selection logic (Adaptive 4-step):
+//  1. HARD GATE 1 — discard strikes outside the ideal premium window
+//  2. HARD GATE 2 (Live) — discard strikes with wide bid-ask spread (> 5% of premium)
+//  3. RANK        — pick highest liquidity (Volume + OI in live mode; Volume in backtest)
+//  4. TIEBREAK    — prefer strike closest to ATM (lower absolute offset)
 //
-// Returns nil if no valid candidate found — caller must fall back to ATM market price.
+// Returns nil if no valid candidate found — caller falls back to ATM at market price.
 func SweepStrikesForBestEntry(
 	options map[string]OptionSnap,
 	atmStrike int,
@@ -86,9 +92,19 @@ func SweepStrikesForBestEntry(
 			numKey = relKey
 		}
 
-		// Step 1: Hard gate — skip if premium is outside the ideal window
+		// Step 1: Hard gate — premium window
 		if snap.Close < pMin || snap.Close > pMax {
 			continue
+		}
+
+		// Step 2: Hard gate (Live mode) — skip illiquid strikes with spread > 5%
+		var spreadPct float64
+		if snap.Bid > 0 && snap.Ask > 0 && snap.Ask >= snap.Bid {
+			spread := snap.Ask - snap.Bid
+			spreadPct = spread / snap.Close
+			if spreadPct > 0.05 {
+				continue
+			}
 		}
 
 		lp := limitPriceForSnap(snap)
@@ -101,12 +117,23 @@ func SweepStrikesForBestEntry(
 			tradingSymbol = fmt.Sprintf("%s %s %d %s", indexName, activeExpiry, strike, optType)
 		}
 
+		// Composite liquidity: in live mode Volume + OI; in backtest pure Volume
+		liquidity := snap.Volume
+		if snap.OI > 0 {
+			liquidity += snap.OI
+		}
+
 		candidate := &StrikeCandidate{
 			Key:           numKey,
 			TradingSymbol: tradingSymbol,
 			LimitPrice:    lp,
 			Premium:       snap.Close,
 			Volume:        snap.Volume,
+			OI:            snap.OI,
+			Bid:           snap.Bid,
+			Ask:           snap.Ask,
+			SpreadPct:     spreadPct,
+			Liquidity:     liquidity,
 			Offset:        offset,
 		}
 
@@ -115,14 +142,14 @@ func SweepStrikesForBestEntry(
 			continue
 		}
 
-		// Step 2: Rank by Volume (higher = better liquidity)
-		if candidate.Volume > best.Volume {
+		// Step 3: Rank by Liquidity (Volume + OI in live, Volume in backtest)
+		if candidate.Liquidity > best.Liquidity {
 			best = candidate
 			continue
 		}
 
-		// Step 3: Tiebreak by ATM proximity (lower absolute offset = better)
-		if candidate.Volume == best.Volume && abs(candidate.Offset) < abs(best.Offset) {
+		// Step 4: Tiebreak by ATM proximity (lower absolute offset = better)
+		if candidate.Liquidity == best.Liquidity && abs(candidate.Offset) < abs(best.Offset) {
 			best = candidate
 		}
 	}
