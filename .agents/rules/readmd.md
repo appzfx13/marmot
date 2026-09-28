@@ -132,3 +132,23 @@ All automated AI agents, subagents, and developers working on the Marmot codebas
   2. Monitor network traffic in the browser context to verify zero redundant HTTP polling and confirm HTTP status 200/101.
   3. Inspect DOM elements to verify real-time data updates, responsive layout alignment, and visual styling.
   4. Capture and review screenshots to visually validate the UI before concluding any task.
+
+---
+
+## 13. Strike Sweep Optimal Entry Architecture (Go Strategy Engine)
+- **Signal Source is Always the Index Spot Chart:** All entry signals (EMA crossover, RSI, MACD, ORB breakout) are evaluated **exclusively on the underlying index spot OHLCV candle**. Option premium prices are never used for signal generation — only for SL/TP management after entry.
+- **Strike Sweep After Signal (`go-app/strategies/strike_sweep.go`):** Once a bullish or bearish signal fires on the index, the engine MUST sweep ATM±3 option strikes (7 candidates: ATM-3 to ATM+3) to find the optimal entry strike and limit price. Never blindly pick ATM at market price.
+- **Scoring Criteria (in priority order):**
+  1. **OI Score (30%)** — Higher open interest = more liquid, tighter slippage
+  2. **Volume Score (20%)** — Higher volume = active market, better fills
+  3. **Premium Range Score (25%)** — Filter deep OTM junk and expensive deep ITM; ideal range: NIFTY 40–350 pts, BANKNIFTY 80–600 pts
+  4. **Bid-Ask Spread Tightness (15%)** — Tighter spread = better fill quality; live mode uses real bid/ask; backtest awards neutral 7.5/15
+  5. **Delta Proxy Score (10%)** — ATM gets 10 pts; each offset step away loses 2 pts
+- **Limit Price Computation:**
+  - **Live mode (Fyers WebSocket):** `LimitPrice = (Bid + Ask) / 2` — true mid-price, neither chasing ask nor waiting at bid
+  - **Backtest mode (Parquet, no bid/ask):** `LimitPrice = Close × 0.995` — conservative 0.5% below last close
+- **SL/TP Always Anchored on LimitPrice:** After sweep, `StopLossPrice` and `TargetPrice` must be recalculated from `LimitPrice`, not from spot close. Formula: `TP = LimitPrice + (slPts × RR)`, `SL = max(0.5, LimitPrice - slPts)`.
+- **Fallback Guarantee (Zero Regression):** If `SweepStrikesForBestEntry()` returns nil (no valid option data), the engine falls back to original ATM at market price. Never panic or skip the trade silently.
+- **Global Scope — All Paths:** The sweep applies to both `Execute()` (backtest) and `EvaluateLiveSignal()` (live/sandbox). Never revert any path to direct ATM lookup without sweeping first.
+- **Option Chain Injection (Live Path):** `strategy_worker.go` MUST call `fetchOptionChainSnaps(ctx, indexName)` and inject the result as `params["option_chain"]` before calling `strat.EvaluateLiveSignal(...)`. The option chain is read from Redis key `marmot:fyers:option_chain:{indexName}`.
+- **INDIAVIX Exclusion:** INDIAVIX has no option chain — never attempt strike sweep on VIX. It is used for macro/regime context only (e.g. high VIX = wide premium window).

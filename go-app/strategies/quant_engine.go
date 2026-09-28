@@ -209,20 +209,25 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 		concreteStrike := fmt.Sprintf("%d %s", atmNum, optionType)
 		entryOptPrice := 0.0
 
-		// Prioritize concrete absolute strike (e.g. "23650 CALL")
-		if snap, ok := tick.Options[concreteStrike]; ok && snap.Close > 0 {
-			entryOptPrice = snap.Close
-		} else if snap, ok := tick.Options["ATM "+optionType]; ok && snap.Close > 0 {
-			// Fallback to relative ATM alias
-			entryOptPrice = snap.Close
+		// Strike sweep: score ATM±3 strikes and pick the best entry candidate
+		bestStrike := SweepStrikesForBestEntry(tick.Options, atmNum, optionType, strikeStep, input.IndexName, "")
+		if bestStrike != nil && bestStrike.LimitPrice > 0 {
+			concreteStrike = bestStrike.Key
+			entryOptPrice = bestStrike.LimitPrice
 		} else {
-			// Fallback to nearby numeric offsets
-			for _, offset := range []int{1, -1, 2, -2} {
-				candidate := fmt.Sprintf("%d %s", atmNum+(offset*strikeStep), optionType)
-				if snap, ok := tick.Options[candidate]; ok && snap.Close > 0 {
-					concreteStrike = candidate
-					entryOptPrice = snap.Close
-					break
+			// Fallback: original ATM priority chain
+			if snap, ok := tick.Options[concreteStrike]; ok && snap.Close > 0 {
+				entryOptPrice = snap.Close
+			} else if snap, ok := tick.Options["ATM "+optionType]; ok && snap.Close > 0 {
+				entryOptPrice = snap.Close
+			} else {
+				for _, off := range []int{1, -1, 2, -2} {
+					candidate := fmt.Sprintf("%d %s", atmNum+(off*strikeStep), optionType)
+					if snap, ok := tick.Options[candidate]; ok && snap.Close > 0 {
+						concreteStrike = candidate
+						entryOptPrice = snap.Close
+						break
+					}
 				}
 			}
 		}
@@ -725,6 +730,33 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	targetPrice := math.Round((closePrice+slPts*rrRatio)*100) / 100
 	stopLossPrice := math.Round((closePrice-slPts)*100) / 100
 
+	orderType := preset.OrderType
+	if orderType == "" {
+		orderType = "MARKET"
+	}
+	limitPrice := 0.0
+	if orderType == "LIMIT" {
+		limitPrice = closePrice
+	}
+
+	// Strike sweep: if live option chain is available via params, find optimal entry strike + limit price.
+	// Injected by strategy_worker as params["option_chain"] before calling EvaluateLiveSignal.
+	strikeSweptSymbol := ""
+	if params != nil {
+		if oc, ok := params["option_chain"].(map[string]OptionSnap); ok && len(oc) > 0 {
+			bestStrike := SweepStrikesForBestEntry(oc, atmStrike, optionType, strikeStep, indexName, activeExpiry)
+			if bestStrike != nil && bestStrike.LimitPrice > 0 {
+				tradingSymbol = bestStrike.TradingSymbol
+				strikeSweptSymbol = bestStrike.Key
+				limitPrice = bestStrike.LimitPrice
+				orderType = "LIMIT"
+				// Anchor SL/TP on the scored limit price, not raw spot close
+				targetPrice = math.Round((limitPrice+slPts*rrRatio)*100) / 100
+				stopLossPrice = math.Max(0.5, math.Round((limitPrice-slPts)*100)/100)
+			}
+		}
+	}
+
 	indicators := map[string]interface{}{
 		"ema_fast":          preset.EMAFast,
 		"ema_slow":          preset.EMASlow,
@@ -738,15 +770,8 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		"orb_high":          math.Round(s.orbHigh*100) / 100,
 		"orb_low":           math.Round(s.orbLow*100) / 100,
 		"spot_price":        closePrice,
-	}
-
-	orderType := preset.OrderType
-	if orderType == "" {
-		orderType = "MARKET"
-	}
-	limitPrice := 0.0
-	if orderType == "LIMIT" {
-		limitPrice = closePrice
+		"swept_strike":      strikeSweptSymbol,
+		"limit_entry_price": limitPrice,
 	}
 
 	s.lastSignalTime = candleTime

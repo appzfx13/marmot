@@ -372,6 +372,11 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				params.Params["active_expiry"] = activeExp
 			}
 
+			// Inject live option chain so the strike sweep scorer can find the best entry strike.
+			if optChain := j.fetchOptionChainSnaps(ctx, indexName); len(optChain) > 0 {
+				params.Params["option_chain"] = optChain
+			}
+
 			sig := strat.EvaluateLiveSignal(cData, nil, indexName, params.Params)
 			if sig != nil {
 				alreadyOpen := false
@@ -396,7 +401,11 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				}
 
 				if !alreadyOpen && openPositionsCount < 6 {
-					fillPrice := j.fetchOptionLTP(ctx, indexName, sig.TradingSymbol, spotPrice)
+					// Use scored sweep limit price if provided; fall back to live LTP fetch.
+					fillPrice := sig.LimitPrice
+					if fillPrice <= 0 {
+						fillPrice = j.fetchOptionLTP(ctx, indexName, sig.TradingSymbol, spotPrice)
+					}
 					if fillPrice <= 0 {
 						fillPrice = 120.0
 					}
@@ -411,8 +420,15 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							rrRatio = rr
 						}
 					}
-					stopLoss := math.Max(1.0, math.Round((fillPrice-slPts)*100)/100)
-					target := math.Round((fillPrice+(slPts*rrRatio))*100) / 100
+					// If the sweep already anchored SL/TP on limitPrice, use those directly.
+					stopLoss := sig.StopLossPrice
+					target := sig.TargetPrice
+					if stopLoss <= 0 {
+						stopLoss = math.Max(1.0, math.Round((fillPrice-slPts)*100)/100)
+					}
+					if target <= 0 {
+						target = math.Round((fillPrice+(slPts*rrRatio))*100) / 100
+					}
 
 					orderTime := sig.Timestamp
 					if orderTime == "" {
@@ -1164,6 +1180,77 @@ func (j *StrategySignalJob) fetchOptionLTP(ctx context.Context, indexName, tradi
 	}
 
 	return 0.0
+}
+
+// fetchOptionChainSnaps reads live option quotes from Redis and builds a OptionSnap map
+// keyed by "{strike} CALL" or "{strike} PUT" for the strike sweep scorer.
+func (j *StrategySignalJob) fetchOptionChainSnaps(ctx context.Context, indexName string) map[string]strategies.OptionSnap {
+	result := make(map[string]strategies.OptionSnap)
+	if j.redisService == nil || j.redisService.Client == nil {
+		return result
+	}
+
+	// Scan redis for all option chain quotes for this index stored by broadcaster
+	ocKey := fmt.Sprintf("marmot:fyers:option_chain:%s", indexName)
+	data, err := j.redisService.Client.Get(ctx, ocKey).Result()
+	if err != nil || len(data) == 0 {
+		// Try with key prefix used in some environments
+		data, err = j.redisService.Client.Get(ctx, ":1:"+ocKey).Result()
+		if err != nil || len(data) == 0 {
+			return result
+		}
+	}
+
+	var ocPayload struct {
+		Strikes []map[string]interface{} `json:"strikes"`
+	}
+	if err := json.Unmarshal([]byte(data), &ocPayload); err != nil {
+		return result
+	}
+
+	for _, s := range ocPayload.Strikes {
+		strikeVal, _ := s["strike"].(float64)
+		if strikeVal <= 0 {
+			continue
+		}
+		strike := int(strikeVal)
+
+		if ceLTP, ok := s["ce_ltp"].(float64); ok && ceLTP > 0 {
+			ceSnap := strategies.OptionSnap{Close: ceLTP}
+			if v, ok := s["ce_bid"].(float64); ok {
+				ceSnap.Bid = v
+			}
+			if v, ok := s["ce_ask"].(float64); ok {
+				ceSnap.Ask = v
+			}
+			if v, ok := s["ce_oi"].(float64); ok {
+				ceSnap.OI = int64(v)
+			}
+			if v, ok := s["ce_volume"].(float64); ok {
+				ceSnap.Volume = int64(v)
+			}
+			result[fmt.Sprintf("%d CALL", strike)] = ceSnap
+		}
+
+		if peLTP, ok := s["pe_ltp"].(float64); ok && peLTP > 0 {
+			peSnap := strategies.OptionSnap{Close: peLTP}
+			if v, ok := s["pe_bid"].(float64); ok {
+				peSnap.Bid = v
+			}
+			if v, ok := s["pe_ask"].(float64); ok {
+				peSnap.Ask = v
+			}
+			if v, ok := s["pe_oi"].(float64); ok {
+				peSnap.OI = int64(v)
+			}
+			if v, ok := s["pe_volume"].(float64); ok {
+				peSnap.Volume = int64(v)
+			}
+			result[fmt.Sprintf("%d PUT", strike)] = peSnap
+		}
+	}
+
+	return result
 }
 
 // LiveQuoteMetrics holds real-time quote metrics fetched from Redis for index spot and candle construction.
