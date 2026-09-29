@@ -342,23 +342,48 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 		}
 	}
 
-	// Autonomous SL/TP Check on open positions
+	// Autonomous SL/TP Check on open positions with intra-candle Low/High precision
 	for _, acc := range m.accounts {
 		for _, pos := range acc.Positions {
 			if isContractMatch(pos.SecurityID, pos.TradingSymbol, tick.SecurityID, tick.TradingSymbol) && pos.NetQty != 0 && pos.PositionType != "CLOSED" {
+				lowPrice := tick.Low
+				if lowPrice <= 0 {
+					lowPrice = tick.LTP
+				}
+				highPrice := tick.High
+				if highPrice <= 0 {
+					highPrice = tick.LTP
+				}
+
 				if pos.NetQty > 0 {
 					// LONG position
-					if pos.StopLoss > 0 && tick.LTP <= pos.StopLoss {
-						m.squareOffPositionAutoLocked(acc, pos, "SL_HIT", tick.LTP)
-					} else if pos.TakeProfit > 0 && tick.LTP >= pos.TakeProfit {
-						m.squareOffPositionAutoLocked(acc, pos, "TP_HIT", tick.LTP)
+					if pos.StopLoss > 0 && lowPrice <= pos.StopLoss {
+						fillPx := pos.StopLoss
+						if tick.Open < pos.StopLoss && tick.Open > 0 {
+							fillPx = tick.Open // Gap down fill
+						}
+						m.squareOffPositionAutoLocked(acc, pos, "SL_HIT", fillPx)
+					} else if pos.TakeProfit > 0 && highPrice >= pos.TakeProfit {
+						fillPx := pos.TakeProfit
+						if tick.Open > pos.TakeProfit {
+							fillPx = tick.Open // Gap up fill
+						}
+						m.squareOffPositionAutoLocked(acc, pos, "TP_HIT", fillPx)
 					}
 				} else if pos.NetQty < 0 {
 					// SHORT position
-					if pos.StopLoss > 0 && tick.LTP >= pos.StopLoss {
-						m.squareOffPositionAutoLocked(acc, pos, "SL_HIT", tick.LTP)
-					} else if pos.TakeProfit > 0 && tick.LTP <= pos.TakeProfit {
-						m.squareOffPositionAutoLocked(acc, pos, "TP_HIT", tick.LTP)
+					if pos.StopLoss > 0 && highPrice >= pos.StopLoss {
+						fillPx := pos.StopLoss
+						if tick.Open > pos.StopLoss {
+							fillPx = tick.Open // Gap up fill
+						}
+						m.squareOffPositionAutoLocked(acc, pos, "SL_HIT", fillPx)
+					} else if pos.TakeProfit > 0 && lowPrice <= pos.TakeProfit {
+						fillPx := pos.TakeProfit
+						if tick.Open < pos.TakeProfit && tick.Open > 0 {
+							fillPx = tick.Open // Gap down fill
+						}
+						m.squareOffPositionAutoLocked(acc, pos, "TP_HIT", fillPx)
 					}
 				}
 			}
@@ -469,14 +494,34 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 		return
 	}
 
-	// 2. Resolve Fill Price
+	// 2. Resolve Fill Price from real-time or historical market tick
 	fillPrice := ord.Order.Price
 	if fillPrice <= 0 {
 		if ltp, hasLtp := m.ltpMap[ord.Order.SecurityID]; hasLtp && ltp > 0 {
 			fillPrice = ltp
+		} else if ltp, hasLtp := m.ltpMap[ord.Order.TradingSymbol]; hasLtp && ltp > 0 {
+			fillPrice = ltp
 		} else {
-			fillPrice = 100.0 // Default baseline fill price
+			// Search ltpMap for matching contract key
+			for k, v := range m.ltpMap {
+				if isContractMatch(ord.Order.SecurityID, ord.Order.TradingSymbol, k, k) && v > 0 {
+					fillPrice = v
+					break
+				}
+			}
 		}
+	}
+
+	if fillPrice <= 0 {
+		ord.Status = "REJECTED"
+		ord.RejectMsg = fmt.Sprintf("MARKET_DATA_UNAVAILABLE: No valid quote found for %s", ord.Order.TradingSymbol)
+		ord.UpdatedAt = time.Now()
+		webhook := m.buildPostbackWebhookLocked(ord)
+		m.mu.Unlock()
+		m.dispatchWebhook(webhook)
+		m.BroadcastAccountStats(clientID)
+		m.BroadcastOrderEvent(clientID, ord)
+		return
 	}
 
 	// 3. Margin & Funds Verification
