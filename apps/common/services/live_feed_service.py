@@ -487,7 +487,18 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
     today = timezone.localdate()
 
     if is_mock:
-        return get_mock_index_option_chain(idx_clean, strike_step, spot_symbol, today)
+        chain = get_mock_index_option_chain(idx_clean, strike_step, spot_symbol, today)
+        valid_strikes = sum(1 for s in chain.get('strikes', []) if (s.get('ce_ltp') and float(s.get('ce_ltp') or 0) > 0) or (s.get('pe_ltp') and float(s.get('pe_ltp') or 0) > 0))
+        if valid_strikes > 0 and float(chain.get('raw_spot_ltp') or 0) > 0:
+            return chain
+        live_chain = get_live_index_option_chain(index_name=index_name, is_mock=False)
+        if live_chain and (live_chain.get('is_live') or live_chain.get('is_fyers_live')):
+            live_chain = dict(live_chain)
+            live_chain['is_mock_mode'] = True
+            live_chain['feed_status'] = 'LIVE_SIMULATION'
+            live_chain['fyers_symbol'] = f"DHAN_MOCK:{idx_clean}"
+            return live_chain
+        return chain
 
     cache_key = f"marmot:fyers:option_chain:{idx_clean}"
     last_known_key = f"marmot:fyers:last_known_option_chain:{idx_clean}"
@@ -1076,27 +1087,11 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY', is_mock: bool = Fa
                 'is_live': True,
                 'is_cached': False,
             }
-        else:
-            selected_card = {
-                'name': cfg['name'],
-                'fyers_sym': f"DHAN_MOCK:{cfg['name']}",
-                'exchange': 'MOCK',
-                'ltp': '-',
-                'change': '-',
-                'change_pct': '-',
-                'high': '-',
-                'low': '-',
-                'summary': 'Mock Emulator standby',
-                'formatted_time': now_time_str,
-                'is_positive': True,
-                'is_live': False,
-                'is_cached': False,
+            return {
+                'selected_card': selected_card,
+                'macro_cards': [],
+                'selected_index': cfg['name'],
             }
-        return {
-            'selected_card': selected_card,
-            'macro_cards': [],
-            'selected_index': cfg['name'],
-        }
 
     cache_key = f"marmot:fyers_quote:{cfg['fyers_sym']}"
     last_known_key = f"marmot:fyers_last_known_quote:{cfg['fyers_sym']}"
@@ -1170,8 +1165,8 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY', is_mock: bool = Fa
         formatted_low = f"{low_p:,.2f}" if low_p >= 100 else f"{low_p:.2f}"
         selected_card = {
             'name': cfg['name'],
-            'fyers_sym': cfg['fyers_sym'],
-            'exchange': cfg['exchange'],
+            'fyers_sym': f"DHAN_MOCK:{cfg['name']}" if is_mock else cfg['fyers_sym'],
+            'exchange': 'MOCK' if is_mock else cfg['exchange'],
             'ltp': f"{lp:,.2f}" if lp >= 100 else f"{lp:.2f}",
             'change': f"{'+' if ch >= 0 else ''}{ch:.2f}",
             'change_pct': f"{'+' if chp >= 0 else ''}{chp:.2f}%",

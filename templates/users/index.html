@@ -2629,14 +2629,12 @@
                                         }
                                     }
                                 } else if (data.type === 'live_tick') {
-                                    const isMockView = window.isLiveMockActive ? window.isLiveMockActive() : false;
-                                    if (!isMockView) {
-                                        const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
-                                        if (spot && window.updateLiveSpotDOM) {
-                                            window.updateLiveSpotDOM(spot, data.data || data);
-                                        }
-                                        window.dispatchEvent(new CustomEvent('marmot:live_tick', { detail: data }));
+                                    // Live Realtime Market Feed: feeds both Live Dashboard and Live Mock Dashboard
+                                    const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
+                                    if (spot && window.updateLiveSpotDOM) {
+                                        window.updateLiveSpotDOM(spot, data.data || data);
                                     }
+                                    window.dispatchEvent(new CustomEvent('marmot:live_tick', { detail: data }));
                                 }
                                 if (data.type === 'mock_telemetry') {
                                     const t = data.data || data;
@@ -2783,9 +2781,6 @@
                 const isMockActive = window.isLiveMockActive ? window.isLiveMockActive() : false;
                 if (isMockPayload && !isMockActive) {
                     return; // Refuse to update Live Dashboard with mock/emulator ticks
-                }
-                if (!isMockPayload && isMockActive && payload && payload.source === 'FYERS') {
-                    return; // Refuse to update Live Mock Dashboard with FYERS live market ticks
                 }
                 const numPrice = Number(spotPrice);
                 const formattedPrice = '₹' + numPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

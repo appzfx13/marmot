@@ -731,9 +731,19 @@
             </div>
             <div class="text-end border-start border-secondary border-opacity-20 ps-3">
                 <div class="theme-text-muted" style="font-size: 0.7rem;">Realtime Spot (LTP)</div>
-                <div class="text-success fw-bold" style="font-size: 0.95rem;">
-                    ₹{{ fyers_last_tick.ltp|default:25420.50|floatformat:2 }}
-                </div>
+                    {% if fyers_last_tick.spot_ltp %}
+                    <div class="text-success fw-bold" style="font-size: 0.95rem;">
+                        ₹{{ fyers_last_tick.spot_ltp }}
+                    </div>
+                    {% elif fyers_last_tick.raw_spot_ltp %}
+                    <div class="text-success fw-bold" style="font-size: 0.95rem;">
+                        ₹{{ fyers_last_tick.raw_spot_ltp|floatformat:2 }}
+                    </div>
+                    {% else %}
+                    <div class="text-muted fw-bold" style="font-size: 0.95rem;">
+                        &mdash;
+                    </div>
+                    {% endif %}
             </div>
             <div class="text-end border-start border-secondary border-opacity-20 ps-3">
                 <div class="theme-text-muted" style="font-size: 0.7rem;">Latency</div>

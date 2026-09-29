@@ -5,6 +5,7 @@
      hx-include="#backupIndexSelect"
      hx-trigger="reloadOptionChain from:body"
      hx-target="#live-option-chain-container"
+     hx-sync="this:replace"
      hx-swap="innerHTML">
 
     <!-- Card Header with Index Dropdown & Stream Status -->
@@ -43,10 +44,10 @@
                                 <span>{{ option_chain.latency_ms }}ms LATENCY</span>
                             </span>
                             {% endif %}
-                            {% if option_chain.is_mock_feed_active or option_chain.feed_status == 'ACTIVE' %}
+                            {% if option_chain.is_mock_feed_active or option_chain.feed_status == 'ACTIVE' or option_chain.feed_status == 'LIVE_SIMULATION' %}
                             <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm">
                                 <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.42rem; height: 0.42rem;"></span>
-                                <span>MOCK FEED: ACTIVE</span>
+                                <span>{% if option_chain.feed_status == 'LIVE_SIMULATION' %}LIVE SIMULATION ACTIVE{% else %}MOCK FEED: ACTIVE{% endif %}</span>
                             </span>
                             {% else %}
                             <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-35 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm">
@@ -256,50 +257,50 @@
             </thead>
             <tbody>
                 {% for row in option_chain.strikes %}
-                <tr data-strike="{{ row.strike|floatformat:0 }}" class="{% if not row.is_active_window %}option-chain-outer-strike d-none{% endif %} {% if row.is_atm %}table-active option-chain-atm-row{% endif %}" {% if row.is_atm %}style="background: rgba(180, 241, 5, 0.09) !important; border-top: 2px solid #B4F105 !important; border-bottom: 2px solid #B4F105 !important;"{% endif %}>
+                <tr data-strike="{{ row.strike|floatformat:0 }}" data-ce-sym="{{ row.ce_symbol }}" data-pe-sym="{{ row.pe_symbol }}" class="{% if not row.is_active_window %}option-chain-outer-strike d-none{% endif %} {% if row.is_atm %}table-active option-chain-atm-row{% endif %}" {% if row.is_atm %}style="background: rgba(180, 241, 5, 0.09) !important; border-top: 2px solid #B4F105 !important; border-bottom: 2px solid #B4F105 !important;"{% endif %}>
                     <!-- Call OI -->
                     <td class="font-monospace text-muted smaller py-2.5"
                         id="oc-oi-ce-{{ row.strike|floatformat:0 }}"
-                        data-tick-key="ce_oi_{{ row.strike }}"
+                        data-tick-key="ce_oi_{{ row.strike|floatformat:0 }}"
                         data-tick-oi="{{ row.ce_oi }}">
                         {{ row.ce_oi }}
                     </td>
                     <!-- Call LTP & Chg -->
                     <td class="font-monospace text-end pe-3 border-end py-2.5" style="border-color: var(--border-color, rgba(255,255,255,0.08)) !important;">
                         {% if row.ce_ltp > 0 %}
-                        <span class="text-white fw-bold px-1 rounded transition-tick"
+                        <span class="fw-bold px-1 rounded transition-tick"
                               id="oc-ltp-ce-{{ row.strike|floatformat:0 }}"
-                              data-tick-key="ce_{{ row.strike }}"
+                              data-tick-key="ce_{{ row.strike|floatformat:0 }}"
                               data-tick-price="{{ row.ce_ltp }}">₹{{ row.ce_ltp|floatformat:2 }}</span>
                         <span class="smaller {% if row.ce_chg >= 0 %}text-success{% else %}text-danger{% endif %} ms-1" id="oc-chg-ce-{{ row.strike|floatformat:0 }}">
                             {% if row.ce_chg >= 0 %}+{% endif %}{{ row.ce_chg|floatformat:1 }}
                         </span>
                         {% else %}
-                        <span class="text-muted fw-normal px-1" id="oc-ltp-ce-{{ row.strike|floatformat:0 }}" data-tick-key="ce_{{ row.strike }}" data-tick-price="0">&mdash;</span>
+                        <span class="text-muted fw-normal px-1" id="oc-ltp-ce-{{ row.strike|floatformat:0 }}" data-tick-key="ce_{{ row.strike|floatformat:0 }}" data-tick-price="0">&mdash;</span>
                         {% endif %}
                     </td>
                     <!-- Strike -->
-                    <td class="font-monospace fw-bold py-2.5 {% if row.is_atm %}text-warning{% else %}text-white{% endif %}" style="font-size: 0.82rem; background: rgba(255, 255, 255, 0.02);">
+                    <td class="font-monospace fw-bold py-2.5 {% if row.is_atm %}text-warning{% else %}theme-text{% endif %}" style="font-size: 0.82rem; background: rgba(255, 255, 255, 0.02);">
                         ₹{{ row.strike|floatformat:0 }}{% if row.is_atm %}<span class="badge rounded-pill px-1.5 py-0.5 smaller ms-1 option-chain-atm-badge" style="background: #B4F105; color: #000; font-size: 0.65rem; font-weight: 800;">ATM</span>{% endif %}
                     </td>
                     <!-- Put LTP & Chg -->
                     <td class="font-monospace text-start ps-3 border-start py-2.5" style="border-color: var(--border-color, rgba(255,255,255,0.08)) !important;">
                         {% if row.pe_ltp > 0 %}
-                        <span class="text-white fw-bold px-1 rounded transition-tick"
+                        <span class="fw-bold px-1 rounded transition-tick"
                               id="oc-ltp-pe-{{ row.strike|floatformat:0 }}"
-                              data-tick-key="pe_{{ row.strike }}"
+                              data-tick-key="pe_{{ row.strike|floatformat:0 }}"
                               data-tick-price="{{ row.pe_ltp }}">₹{{ row.pe_ltp|floatformat:2 }}</span>
                         <span class="smaller {% if row.pe_chg >= 0 %}text-success{% else %}text-danger{% endif %} ms-1" id="oc-chg-pe-{{ row.strike|floatformat:0 }}">
                             {% if row.pe_chg >= 0 %}+{% endif %}{{ row.pe_chg|floatformat:1 }}
                         </span>
                         {% else %}
-                        <span class="text-muted fw-normal px-1" id="oc-ltp-pe-{{ row.strike|floatformat:0 }}" data-tick-key="pe_{{ row.strike }}" data-tick-price="0">&mdash;</span>
+                        <span class="text-muted fw-normal px-1" id="oc-ltp-pe-{{ row.strike|floatformat:0 }}" data-tick-key="pe_{{ row.strike|floatformat:0 }}" data-tick-price="0">&mdash;</span>
                         {% endif %}
                     </td>
                     <!-- Put OI -->
                     <td class="font-monospace text-muted smaller py-2.5"
                         id="oc-oi-pe-{{ row.strike|floatformat:0 }}"
-                        data-tick-key="pe_oi_{{ row.strike }}"
+                        data-tick-key="pe_oi_{{ row.strike|floatformat:0 }}"
                         data-tick-oi="{{ row.pe_oi }}">
                         {{ row.pe_oi }}
                     </td>
@@ -461,6 +462,39 @@
             }
         }
         window._optionChainLtpMap[key] = curPrice;
+    });
+
+    // 3. Dynamic WebSocket Subscription for Active ATM±3 Strike Contracts
+    function subscribeActiveOptionStrikes() {
+        if (!window.MarmotWS || !window.MarmotWS.ws || window.MarmotWS.ws.readyState !== WebSocket.OPEN) {
+            return;
+        }
+        var visibleRows = document.querySelectorAll('#live-option-chain-container tbody tr:not(.d-none)');
+        if (!window._subscribedOptionSymbols) {
+            window._subscribedOptionSymbols = new Set();
+        }
+        visibleRows.forEach(function(row) {
+            var ceSym = row.getAttribute('data-ce-sym');
+            var peSym = row.getAttribute('data-pe-sym');
+            [ceSym, peSym].forEach(function(sym) {
+                if (sym && !window._subscribedOptionSymbols.has(sym)) {
+                    try {
+                        window.MarmotWS.ws.send(JSON.stringify({ type: 'subscribe_symbol', symbol: sym }));
+                        window._subscribedOptionSymbols.add(sym);
+                        console.log('📡 [OptionChain] Subscribed strike to WS:', sym);
+                    } catch (err) {}
+                }
+            });
+        });
+    }
+
+    subscribeActiveOptionStrikes();
+    setTimeout(subscribeActiveOptionStrikes, 1000);
+    window.addEventListener('marmot:ws_connected', function() {
+        if (window._subscribedOptionSymbols) {
+            window._subscribedOptionSymbols.clear();
+        }
+        subscribeActiveOptionStrikes();
     });
 })();
 </script>
