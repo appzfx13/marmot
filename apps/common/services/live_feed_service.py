@@ -905,6 +905,36 @@ def get_live_contract_market_quote(symbol_str: str) -> float:
         except Exception:
             pass
 
+    # Direct Fyers quote check in Redis
+    if fyers_sym:
+        try:
+            fq_raw = redis_client.get(f"marmot:fyers_quote:{fyers_sym}")
+            if fq_raw:
+                import json
+                fq_data = json.loads(fq_raw) if isinstance(fq_raw, (str, bytes)) else fq_raw
+                lp = float(fq_data.get('lp') or fq_data.get('ltp') or 0.0)
+                if lp > 0:
+                    return lp
+        except Exception:
+            pass
+
+    # Option chain snapshot fallback in Redis
+    try:
+        import json
+        for chain_key in (f"marmot:fyers:option_chain:{idx_clean}", f"marmot:fyers:last_known_option_chain:{idx_clean}"):
+            oc_raw = redis_client.get(chain_key)
+            if oc_raw:
+                oc_data = json.loads(oc_raw) if isinstance(oc_raw, (str, bytes)) else oc_raw
+                for stk in oc_data.get('strikes', []):
+                    if float(stk.get('strike_price', 0)) == float(strike_val):
+                        opt_key = 'call' if opt_type == 'CE' else 'put'
+                        sub = stk.get(opt_key, {})
+                        lp = float(sub.get('ltp', 0.0) or 0.0)
+                        if lp > 0:
+                            return lp
+    except Exception:
+        pass
+
     return 0.0
 
 

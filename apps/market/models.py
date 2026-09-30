@@ -29,6 +29,7 @@ class MarketBackupTask(BaseModel):
     index_name = models.CharField(max_length=50, choices=IndexChoices.choices, default=IndexChoices.NIFTY, null=True, blank=True, help_text="Target trading index (INDEX/F&O only)")
     strike_count = models.PositiveIntegerField(default=15, null=True, blank=True, help_text="Number of strikes above/below ATM (INDEX/F&O only)")
     use_30_days_5s = models.BooleanField(default=True, help_text="Fetch 5S resolution data (INDEX/F&O only)")
+    use_30_days_1s = models.BooleanField(default=False, help_text="Fetch 1S resolution data (INDEX/F&O only)")
 
     # FOREX / CME Micro Futures fields (NEW — nullable)
     forex_instrument = models.CharField(max_length=10, choices=ForexInstrumentChoices.choices, null=True, blank=True, help_text="CME Micro Futures instrument to back up (FOREX/FUTURES only)")

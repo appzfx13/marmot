@@ -105,14 +105,15 @@
         letter-spacing: 0.02em;
     }
     .preset-30d-btn.active {
-        background: rgba(99,102,241,0.18);
-        border-color: rgba(99,102,241,0.5);
-        color: #a5b4fc;
+        background: rgba(245, 158, 11, 0.16) !important;
+        border-color: rgba(245, 158, 11, 0.5) !important;
+        color: #fbbf24 !important;
+        box-shadow: 0 0 12px rgba(245, 158, 11, 0.25);
     }
     [data-theme="light"] .preset-30d-btn.active {
-        background: rgba(99,102,241,0.12);
-        border-color: rgba(99,102,241,0.4);
-        color: #4f46e5;
+        background: rgba(217, 119, 6, 0.12) !important;
+        border-color: rgba(217, 119, 6, 0.4) !important;
+        color: #b45309 !important;
     }
     .date-locked {
         opacity: 0.65;
@@ -237,12 +238,14 @@
         </div>
 
         {# ═══ TIMEFRAME SELECTION (shared) ════════════════════════════════ #}
-        <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-2" style="border-color:var(--border-color)!important;">
-            <span class="material-icons text-primary fs-5">date_range</span>
-            <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Timeframe Selection</h6>
-            <button type="button" id="preset30dBtn" class="preset-30d-btn ms-2" onclick="toggle30DayPreset()">
-                <span class="material-icons" style="font-size:0.9rem;">bolt</span>
-                Previous 30 Days
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-3 pb-2 border-bottom mt-2" style="border-color:var(--border-color)!important;">
+            <div class="d-flex align-items-center gap-2">
+                <span class="material-icons text-primary fs-5">date_range</span>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Timeframe Selection</h6>
+            </div>
+            <button type="button" id="preset30dBtn" class="preset-30d-btn d-inline-flex align-items-center gap-1.5" onclick="toggle30Day1sPreset()">
+                <span class="material-icons text-warning" style="font-size:0.95rem;">bolt</span>
+                <span>⚡ 30-Day 1-Second (1S) Tick Data</span>
             </button>
         </div>
 
@@ -301,10 +304,19 @@
                     {% endfor %}
                 </div>
                 <div class="col-12 mt-3">
+                    <div class="form-check form-switch p-2.5 rounded-3 glass-card border border-secondary border-opacity-25 d-flex align-items-center gap-2" style="background: rgba(245, 158, 11, 0.05); border-color: rgba(245, 158, 11, 0.25) !important;">
+                        {{ form.use_30_days_1s }}
+                        <label class="form-check-label theme-text-main small fw-semibold cursor-pointer mb-0 ms-1 d-flex align-items-center gap-2 flex-wrap" for="{{ form.use_30_days_1s.id_for_label }}">
+                            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2 py-0.5 fs-xs fw-bold font-monospace">1S TICK DATA</span>
+                            <span>⚡ Download 30-Day Tick Data in 1-Second (1S) Resolution (Auto-fills trailing 30 days)</span>
+                        </label>
+                    </div>
+                </div>
+                <div class="col-12 mt-2">
                     <div class="form-check form-switch p-2 rounded glass-card border border-secondary border-opacity-25 d-flex align-items-center gap-2">
                         {{ form.use_30_days_5s }}
                         <label class="form-check-label theme-text-main small fw-semibold cursor-pointer mb-0 ms-1" for="{{ form.use_30_days_5s.id_for_label }}">
-                            ⚡ 5-Second (5S) High-Precision Resolution (Default &amp; Recommended for Algo Backtesting)
+                            5-Second (5S) Resolution (Alternative high-precision option)
                         </label>
                     </div>
                 </div>
@@ -466,8 +478,10 @@ document.addEventListener('DOMContentLoaded', function () {
         return `${yyyy}-${mm}-${dd}`;
     }
 
-    window.toggle30DayPreset = function () {
-        preset30dActive = !preset30dActive;
+    const use30Days1sInput = document.getElementById('id_use_30_days_1s');
+
+    function apply30DayState(isActive) {
+        preset30dActive = isActive;
         const btn         = document.getElementById('preset30dBtn');
         const startWrap   = document.getElementById('startDateWrap');
         const endWrap     = document.getElementById('endDateWrap');
@@ -475,7 +489,7 @@ document.addEventListener('DOMContentLoaded', function () {
         const endBadge    = document.getElementById('endLockBadge');
 
         if (preset30dActive) {
-            const today    = new Date();
+            const today     = new Date();
             const thirtyAgo = new Date(today);
             thirtyAgo.setDate(today.getDate() - 30);
 
@@ -485,9 +499,12 @@ document.addEventListener('DOMContentLoaded', function () {
             endInput.readOnly   = true;
             startWrap.classList.add('date-locked');
             endWrap.classList.add('date-locked');
+            startBadge.innerHTML = '<span class="material-icons" style="font-size:0.8rem;">lock</span>Auto-set · 30-day 1S preset';
+            endBadge.innerHTML   = '<span class="material-icons" style="font-size:0.8rem;">lock</span>Auto-set · 30-day 1S preset';
             startBadge.classList.add('visible');
             endBadge.classList.add('visible');
-            btn.classList.add('active');
+            if (btn) btn.classList.add('active');
+            if (use30Days1sInput) use30Days1sInput.checked = true;
         } else {
             startInput.readOnly = false;
             endInput.readOnly   = false;
@@ -495,9 +512,21 @@ document.addEventListener('DOMContentLoaded', function () {
             endWrap.classList.remove('date-locked');
             startBadge.classList.remove('visible');
             endBadge.classList.remove('visible');
-            btn.classList.remove('active');
+            if (btn) btn.classList.remove('active');
+            if (use30Days1sInput) use30Days1sInput.checked = false;
         }
+    }
+
+    window.toggle30Day1sPreset = function () {
+        apply30DayState(!preset30dActive);
     };
+    window.toggle30DayPreset = window.toggle30Day1sPreset;
+
+    if (use30Days1sInput) {
+        use30Days1sInput.addEventListener('change', function () {
+            apply30DayState(this.checked);
+        });
+    }
 
     // ── Init button: validate dates then open modal ───────────────────────
     document.getElementById('initBackupBtn').addEventListener('click', function () {

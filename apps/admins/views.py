@@ -281,7 +281,14 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
                     holdings_pnl = summary.get('holdings_pnl', 0.00)
                     holdings_pnl_pct = summary.get('holdings_pnl_pct', 0.00)
                     holdings_count = summary.get('holdings_count', 0)
+                    from apps.common.services.live_feed_service import get_live_contract_market_quote
                     raw_pos = summary.get('positions', [])
+                    for pos_dict in raw_pos:
+                        if not pos_dict.get('current_ltp') or float(pos_dict.get('current_ltp') or 0.0) <= 0:
+                            l_quote = get_live_contract_market_quote(pos_dict.get('trading_symbol') or pos_dict.get('security_id'))
+                            if l_quote > 0:
+                                pos_dict['current_ltp'] = l_quote
+
                     context['all_positions_count'] = len(raw_pos)
                     pos_paginator = Paginator(raw_pos, 10)
                     context['live_positions'] = pos_paginator.page(1).object_list
@@ -293,6 +300,12 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
                     context['live_holdings'] = hld_paginator.page(1).object_list
 
                     raw_ord = summary.get('orders', [])
+                    for ord_dict in raw_ord:
+                        if not ord_dict.get('current_ltp') or float(ord_dict.get('current_ltp') or 0.0) <= 0:
+                            l_quote = get_live_contract_market_quote(ord_dict.get('trading_symbol') or ord_dict.get('security_id'))
+                            if l_quote > 0:
+                                ord_dict['current_ltp'] = l_quote
+
                     context['orders_count'] = len(raw_ord)
                     ord_paginator = Paginator(raw_ord, 10)
                     context['live_orders'] = ord_paginator.page(1).object_list
@@ -1315,6 +1328,12 @@ class AdminLiveOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
 
         filter_status = request.GET.get('status', 'ALL').upper()
         raw_orders = orders_res.get('orders', [])
+        from apps.common.services.live_feed_service import get_live_contract_market_quote
+        for ord_dict in raw_orders:
+            if not ord_dict.get('current_ltp') or float(ord_dict.get('current_ltp') or 0.0) <= 0:
+                l_quote = get_live_contract_market_quote(ord_dict.get('trading_symbol') or ord_dict.get('security_id'))
+                if l_quote > 0:
+                    ord_dict['current_ltp'] = l_quote
         if filter_status == 'OPEN':
             filtered_orders = [o for o in raw_orders if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM']]
         elif filter_status == 'TRADED':

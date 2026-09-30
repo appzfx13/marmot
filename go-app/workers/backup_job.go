@@ -106,7 +106,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 	// ── STEP 1: Download Index Spot Data into Staging Parquet ─────────────────
 	log.Printf("📥 [Task #%s] [Step 1/2] Downloading Index Spot candles (%s)...", taskID, indexName)
-	spotFiles, spotMap := j.downloadIndexSpot(ctx, taskID, stagingDir, indexName, startDate, endDate, hasOptions, fyersAppID, fyersAccessToken, params.Use30Days5s)
+	spotFiles, spotMap := j.downloadIndexSpot(ctx, taskID, stagingDir, indexName, startDate, endDate, hasOptions, fyersAppID, fyersAccessToken, params.Use30Days1s, params.Use30Days5s)
 	if len(spotFiles) == 0 && ctx.Err() == nil {
 		log.Printf("🛑 [Task #%s] Index Spot download returned 0 files across date range [%s → %s]. Halting task.", taskID, startDate, endDate)
 		return
@@ -125,7 +125,7 @@ func (j *BackupJob) Run(ctx context.Context) {
 		log.Printf("ℹ️ [Task #%s] Skipping Option Strikes Download for %s (Index Spot only).", taskID, indexName)
 	} else {
 		log.Printf("📥 [Task #%s] [Step 2/2] Downloading Option Strikes (ATM±%d CE & PE)...", taskID, strikeCount)
-		optionFiles = j.runOptionsDownload(ctx, taskID, stagingDir, indexName, startDate, endDate, strikeCount, 45, fyersAppID, fyersAccessToken, spotMap, params.Use30Days5s)
+		optionFiles = j.runOptionsDownload(ctx, taskID, stagingDir, indexName, startDate, endDate, strikeCount, 45, fyersAppID, fyersAccessToken, spotMap, params.Use30Days1s, params.Use30Days5s)
 		if optionFiles == nil && ctx.Err() != nil {
 			log.Printf("⏸️ [Task #%s] Option strikes download interrupted by context cancellation.", taskID)
 			return
@@ -311,13 +311,13 @@ func isShortRange(startDate, endDate string) bool {
 }
 
 // downloadIndexSpot downloads OHLCV candles for Index spot into staging Parquet chunks.
-// Uses 5S (5-second) resolution for ≤35-day recent ranges when use30Days5s is active; 1-minute for all other ranges.
+// Uses 1S or 5S resolution for ≤35-day recent ranges when toggles are active; 1-minute for all other ranges.
 func (j *BackupJob) downloadIndexSpot(
 	ctx context.Context,
 	taskID, stagingDir, indexName, startDate, endDate string,
 	hasOptions bool,
 	fyersAppID, fyersAccessToken string,
-	use30Days5s bool,
+	use30Days1s, use30Days5s bool,
 ) ([]string, map[int64]float64) {
 	createdFiles := make([]string, 0)
 	spotMap := make(map[int64]float64)
@@ -334,12 +334,17 @@ func (j *BackupJob) downloadIndexSpot(
 		return createdFiles, spotMap
 	}
 
-	// 5S resolution is only valid for short recent ranges when the 5S toggle is active
-	shortRange := isShortRange(startDate, endDate) && use30Days5s
+	// 1S / 5S resolution is valid for short recent ranges when the respective toggle is active
+	shortRange1s := isShortRange(startDate, endDate) && use30Days1s
+	shortRange5s := isShortRange(startDate, endDate) && use30Days5s
 	resolution := "1"
 	chunkDays := 30
-	if shortRange {
-		resolution = "5S"
+	if shortRange1s {
+		resolution = config.Resolution1S
+		chunkDays = 1
+		log.Printf("⚡ [Task #%s] Short recent range with 1S toggle detected — using 1S resolution for spot data", taskID)
+	} else if shortRange5s {
+		resolution = config.Resolution5S
 		chunkDays = 1
 		log.Printf("⚡ [Task #%s] Short recent range with 5S toggle detected — using 5S resolution for spot data", taskID)
 	}
@@ -574,7 +579,7 @@ func (j *BackupJob) runOptionsDownload(
 	strikeCount, startProgress int,
 	fyersAppID, fyersAccessToken string,
 	spotMap map[int64]float64,
-	use30Days5s bool,
+	use30Days1s, use30Days5s bool,
 ) []string {
 	createdFiles := make([]string, 0)
 	var filesMutex sync.Mutex
@@ -587,11 +592,17 @@ func (j *BackupJob) runOptionsDownload(
 	client := &http.Client{Transport: tr, Timeout: config.HTTPClientTimeout}
 	ist, _ := time.LoadLocation("Asia/Kolkata")
 
-	// FYERS Expired FnO API maintains 5-second (5S) resolution across historical archives back to Oct 2018.
-	// When use30Days5s is active, retain 5S resolution for high-precision historical option backtesting.
+	// FYERS Expired FnO API maintains 1S / 5S resolution across historical archives.
+	// When use30Days1s or use30Days5s is active, retain requested high-precision resolution.
 
 	expiries := generateIndexExpiries(indexName, startDate, endDate, ist)
-	log.Printf("📅 [Task #%s] Found %d %s expiries in [%s → %s] (5S Toggle: %v)", taskID, len(expiries), indexName, startDate, endDate, use30Days5s)
+	resModeLabel := "1-Min"
+	if use30Days1s {
+		resModeLabel = "1S"
+	} else if use30Days5s {
+		resModeLabel = "5S"
+	}
+	log.Printf("📅 [Task #%s] Found %d %s expiries in [%s → %s] (Resolution: %s)", taskID, len(expiries), indexName, startDate, endDate, resModeLabel)
 
 	step := StrikeIntervalForIndex(indexName)
 	var contracts []OptionContractMetadata
@@ -650,7 +661,7 @@ func (j *BackupJob) runOptionsDownload(
 
 	totalContracts := len(contracts)
 	log.Printf("🔍 [Task #%s] Discovered %d option contracts to download from FYERS (Resolution Mode: %s)",
-		taskID, totalContracts, map[bool]string{true: "5S", false: "1-Min"}[use30Days5s])
+		taskID, totalContracts, resModeLabel)
 
 	tasksChan := make(chan OptionContractMetadata, totalContracts)
 	for _, c := range contracts {
@@ -714,10 +725,13 @@ func (j *BackupJob) runOptionsDownload(
 				}
 
 				// ── STRICT RESOLUTION LOGIC & ZERO FALLBACKS ───────────────────
+				// If use30Days1s is TRUE -> strictly fetch 1S interval (1-Second Resolution)
 				// If use30Days5s is TRUE -> strictly fetch 5S interval (5-Second Resolution)
-				// If use30Days5s is FALSE -> fetch 1-min interval
+				// Otherwise -> fetch 1-min interval
 				optResolution := config.Resolution1Min
-				if use30Days5s {
+				if use30Days1s {
+					optResolution = config.Resolution1S
+				} else if use30Days5s {
 					optResolution = config.Resolution5S
 				}
 

@@ -111,6 +111,7 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
             forex_instrument=form.cleaned_data.get('forex_instrument'),
             databento_schema=form.cleaned_data.get('databento_schema'),
             use_30_days_5s=form.cleaned_data.get('use_30_days_5s', True),
+            use_30_days_1s=form.cleaned_data.get('use_30_days_1s', False),
         )
         
         # Add success message and redirect back to the dashboard

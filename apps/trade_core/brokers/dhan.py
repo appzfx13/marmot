@@ -562,9 +562,13 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                     total_realized += realized
                     total_unrealized += unrealized
 
+                    pos_sym = pos.get("tradingSymbol") or pos.get("securityId", "")
+                    from apps.common.services.live_feed_service import get_live_contract_market_quote
+                    live_pos_ltp = get_live_contract_market_quote(pos_sym)
+
                     parsed_positions.append({
                         'position_type': pos.get("positionType", "LONG" if net_qty > 0 else ("SHORT" if net_qty < 0 else "CLOSED")),
-                        'trading_symbol': pos.get("tradingSymbol") or pos.get("securityId", ""),
+                        'trading_symbol': pos_sym,
                         'security_id': pos.get("securityId", ""),
                         'exchange_segment': pos.get("exchangeSegment", "NSE_FNO"),
                         'product_type': pos.get("productType", "INTRADAY"),
@@ -573,6 +577,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                         'net_qty': net_qty,
                         'buy_avg': buy_avg,
                         'sell_avg': sell_avg,
+                        'current_ltp': live_pos_ltp if live_pos_ltp > 0 else None,
                         'realized_profit': round(realized, 2),
                         'unrealized_profit': round(unrealized, 2),
                         'total_pnl': tot_pos_pnl,
@@ -650,6 +655,9 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                     leg_name = ord_item.get("legName") or sub_order.get("legName") or ord_item.get("leg_name", "")
                     trig_reason = ord_item.get("triggerReason") or ord_item.get("trigger_reason") or ord_item.get("rejectReason", "")
 
+                    from apps.common.services.live_feed_service import get_live_contract_market_quote
+                    live_ord_ltp = get_live_contract_market_quote(sym)
+
                     parsed_orders.append({
                         'order_id': ord_item.get("orderId", ""),
                         'exchange_order_id': ord_item.get("exchangeOrderId", ""),
@@ -666,6 +674,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                         'quantity': qty,
                         'filled_qty': filled_qty,
                         'price': price,
+                        'current_ltp': live_ord_ltp if live_ord_ltp > 0 else None,
                         'limit_entry_price': price,
                         'trigger_price': trig_price,
                         'stop_loss_price': sl,

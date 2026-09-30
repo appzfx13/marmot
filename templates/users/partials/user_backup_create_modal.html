@@ -41,21 +41,33 @@
                 <label class="form-label theme-text-muted smaller fw-bold uppercase mb-1" for="{{ form.start_date.id_for_label }}">
                     Start Date
                 </label>
-                {{ form.start_date }}
+                <div id="userStartDateWrap">{{ form.start_date }}</div>
+                <div class="date-lock-badge" id="userStartLockBadge"><span class="material-icons" style="font-size:0.8rem;">lock</span>Auto-set · 30-day 1S preset</div>
             </div>
 
             <div class="col-12 col-md-6">
                 <label class="form-label theme-text-muted smaller fw-bold uppercase mb-1" for="{{ form.end_date.id_for_label }}">
                     End Date
                 </label>
-                {{ form.end_date }}
+                <div id="userEndDateWrap">{{ form.end_date }}</div>
+                <div class="date-lock-badge" id="userEndLockBadge"><span class="material-icons" style="font-size:0.8rem;">lock</span>Auto-set · 30-day 1S preset</div>
+            </div>
+
+            <div class="col-12">
+                <div class="form-check form-switch p-2 rounded glass-card border border-warning border-opacity-25 d-flex align-items-center gap-2" style="background: rgba(245, 158, 11, 0.05);">
+                    {{ form.use_30_days_1s }}
+                    <label class="form-check-label theme-text-main small fw-semibold cursor-pointer mb-0 ms-1 d-flex align-items-center gap-2 flex-wrap" for="{{ form.use_30_days_1s.id_for_label }}">
+                        <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2 py-0.5 fs-xs fw-bold font-monospace">1S TICK DATA</span>
+                        <span>⚡ Download 30-Day Tick Data in 1-Second (1S) Resolution (Auto-fills trailing 30 days)</span>
+                    </label>
+                </div>
             </div>
 
             <div class="col-12">
                 <div class="form-check form-switch p-2 rounded glass-card border border-secondary border-opacity-25 d-flex align-items-center gap-2">
                     {{ form.use_30_days_5s }}
                     <label class="form-check-label theme-text-main small fw-semibold cursor-pointer mb-0 ms-1" for="{{ form.use_30_days_5s.id_for_label }}">
-                        ⚡ 5-Second (5S) High-Precision Resolution (Default &amp; Recommended for Algo Backtesting)
+                        5-Second (5S) High-Precision Resolution (Alternative)
                     </label>
                 </div>
             </div>
@@ -70,11 +82,65 @@
         </div>
     </form>
 
+    <style>
+        .date-locked { opacity: 0.65; pointer-events: none; }
+        .date-lock-badge { display: none; align-items: center; gap: 4px; font-size: 0.7rem; color: #fbbf24; margin-top: 4px; }
+        .date-lock-badge.visible { display: inline-flex; }
+    </style>
+
     <script>
         (function() {
-            const indexSelect = document.querySelector('form select[name="index_name"]');
+            const form = document.querySelector('form[hx-post*="user-backup-create"]');
+            const indexSelect = form ? form.querySelector('select[name="index_name"]') : null;
             const strikeCol = document.getElementById('userStrikeCountCol');
-            const strikeInput = document.querySelector('form input[name="strike_count"]');
+            const strikeInput = form ? form.querySelector('input[name="strike_count"]') : null;
+            const startInput = form ? form.querySelector('input[name="start_date"]') : null;
+            const endInput = form ? form.querySelector('input[name="end_date"]') : null;
+            const use30Days1sInput = form ? form.querySelector('input[name="use_30_days_1s"]') : null;
+            const startWrap = document.getElementById('userStartDateWrap');
+            const endWrap = document.getElementById('userEndDateWrap');
+            const startBadge = document.getElementById('userStartLockBadge');
+            const endBadge = document.getElementById('userEndLockBadge');
+
+            function toLocalDateStr(d) {
+                const year = d.getFullYear();
+                const month = String(d.getMonth() + 1).padStart(2, '0');
+                const day = String(d.getDate()).padStart(2, '0');
+                return `${year}-${month}-${day}`;
+            }
+
+            function applyUser30DayState(isActive) {
+                if (!startInput || !endInput) return;
+                if (isActive) {
+                    const today = new Date();
+                    const thirtyAgo = new Date(today);
+                    thirtyAgo.setDate(today.getDate() - 30);
+                    startInput.value = toLocalDateStr(thirtyAgo);
+                    endInput.value = toLocalDateStr(today);
+                    startInput.readOnly = true;
+                    endInput.readOnly = true;
+                    if (startWrap) startWrap.classList.add('date-locked');
+                    if (endWrap) endWrap.classList.add('date-locked');
+                    if (startBadge) startBadge.classList.add('visible');
+                    if (endBadge) endBadge.classList.add('visible');
+                } else {
+                    startInput.readOnly = false;
+                    endInput.readOnly = false;
+                    if (startWrap) startWrap.classList.remove('date-locked');
+                    if (endWrap) endWrap.classList.remove('date-locked');
+                    if (startBadge) startBadge.classList.remove('visible');
+                    if (endBadge) endBadge.classList.remove('visible');
+                }
+            }
+
+            if (use30Days1sInput) {
+                use30Days1sInput.addEventListener('change', function() {
+                    applyUser30DayState(this.checked);
+                });
+                if (use30Days1sInput.checked) {
+                    applyUser30DayState(true);
+                }
+            }
 
             function toggleUserStrikeField() {
                 if (indexSelect && strikeCol) {

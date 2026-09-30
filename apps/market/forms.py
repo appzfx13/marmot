@@ -22,6 +22,12 @@ class MarketBackupForm(forms.ModelForm):
         help_text="Fetch 5-Second (5S) high-precision resolution candles (Recommended for algo backtesting)",
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_5s'})
     )
+    use_30_days_1s = forms.BooleanField(
+        required=False,
+        initial=False,
+        help_text="Fetch 1-Second (1S) ultra-precision resolution tick data (30-day trailing range)",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_1s'})
+    )
 
     class Meta:
         model = MarketBackupTask
@@ -29,7 +35,7 @@ class MarketBackupForm(forms.ModelForm):
             'market_type',
             'start_date', 'end_date',
             # INDEX / F&O
-            'index_name', 'strike_count', 'use_30_days_5s',
+            'index_name', 'strike_count', 'use_30_days_5s', 'use_30_days_1s',
             # FOREX / CME
             'forex_instrument', 'databento_schema',
         ]
@@ -39,6 +45,7 @@ class MarketBackupForm(forms.ModelForm):
             'end_date':         forms.DateInput(attrs={'type': 'date', 'class': _FIELD_CSS}),
             'index_name':       forms.Select(attrs={'class': _SELECT_CSS}),
             'use_30_days_5s':   forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_5s'}),
+            'use_30_days_1s':   forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_1s'}),
             'forex_instrument': forms.Select(attrs={'class': _SELECT_CSS}),
             'databento_schema': forms.Select(attrs={'class': _SELECT_CSS}),
         }

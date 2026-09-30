@@ -139,7 +139,7 @@
                         <div class="theme-text-muted smaller">Qty: {{ pos.sell_qty }}</div>
                     </td>
                     <td class="text-end font-monospace small fw-bold text-white">
-                        <span id="pos-ltp-{{ forloop.counter }}" class="pos-live-ltp" data-symbol="{{ pos.trading_symbol }}">₹{{ pos.current_ltp|default:pos.buy_avg|floatformat:2 }}</span>
+                        <span id="pos-ltp-{{ forloop.counter }}" class="pos-live-ltp" data-symbol="{{ pos.trading_symbol }}">{% if pos.current_ltp and pos.current_ltp > 0 %}₹{{ pos.current_ltp|floatformat:2 }}{% else %}&mdash;{% endif %}</span>
                         {% if pos.status == 'OPEN' %}
                             <span class="spinner-grow spinner-grow-sm text-success ms-1" style="width: 0.35rem; height: 0.35rem;" role="status"></span>
                         {% endif %}
