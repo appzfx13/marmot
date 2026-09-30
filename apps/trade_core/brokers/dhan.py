@@ -17,6 +17,32 @@ from .dhan_scrip import DhanScripResolver
 logger = logging.getLogger(__name__)
 
 
+def _format_precise_time(raw_val: Any) -> str:
+    """Formats an ISO timestamp or date object into human-readable HH:MM:SS.mmm AM/PM (IST)."""
+    if not raw_val or str(raw_val).strip() in ('', '-', 'None', '0001-01-01T00:00:00Z'):
+        return '-'
+    val_str = str(raw_val).strip()
+    if 'T' not in val_str and not val_str.endswith('Z'):
+        return val_str
+    try:
+        clean_str = val_str.rstrip('Z')
+        if '.' in clean_str:
+            base, frac = clean_str.split('.', 1)
+            frac = (frac + '000000')[:6]
+            clean_str = f"{base}.{frac}+00:00"
+        else:
+            clean_str = f"{clean_str}+00:00"
+        from datetime import datetime
+        from django.utils import timezone as dj_timezone
+        dt = datetime.fromisoformat(clean_str)
+        ist = dj_timezone.get_fixed_timezone(330)
+        dt_ist = dt.astimezone(ist)
+        millis = dt_ist.microsecond // 1000
+        return dt_ist.strftime(f"%I:%M:%S.{millis:03d} %p")
+    except Exception:
+        return val_str
+
+
 class DhanBrokerAdapter(BaseBrokerAdapter):
     """
     Active Dhan Broker Plug-and-Play Execution Adapter.
@@ -611,8 +637,10 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                     trig_price = float(ord_item.get("triggerPrice") or sub_order.get("triggerPrice", 0.0) or 0.0)
                     sl = float(ord_item.get("stopLoss", 0.0) or 0.0)
                     tp = float(ord_item.get("takeProfit", 0.0) or 0.0)
-                    c_time = ord_item.get("createdAt") or ord_item.get("createTime") or ord_item.get("entryTime") or ""
-                    u_time = ord_item.get("updatedAt") or ord_item.get("updateTime") or ord_item.get("exitTime") or ""
+                    raw_c_time = ord_item.get("createdAt") or ord_item.get("createTime") or ord_item.get("entryTime") or ""
+                    raw_u_time = ord_item.get("updatedAt") or ord_item.get("updateTime") or ord_item.get("exitTime") or ""
+                    c_time = _format_precise_time(raw_c_time)
+                    u_time = _format_precise_time(raw_u_time)
                     sym = ord_item.get("tradingSymbol") or sub_order.get("securityId") or ord_item.get("securityId", "")
                     sec_id = ord_item.get("securityId") or sub_order.get("securityId", "")
                     tx_type = str(ord_item.get("transactionType") or sub_order.get("transactionType", "BUY")).upper()
@@ -648,12 +676,14 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                         'update_time': u_time,
                         'signal_time': c_time,
                         'execution_time': u_time,
+                        'limit_tapped_time': c_time,
+                        'raw_create_time': raw_c_time,
                         'oms_error_code': ord_item.get("omsErrorCode", ""),
                         'oms_error_desc': ord_item.get("omsErrorDescription", "") or ord_item.get("rejectReason", ""),
                     })
 
-                # Sort newest first by create_time
-                parsed_orders.sort(key=lambda x: str(x.get('create_time', '')), reverse=True)
+                # Sort newest first by raw_create_time
+                parsed_orders.sort(key=lambda x: str(x.get('raw_create_time', '')), reverse=True)
 
                 return {
                     'success': True,

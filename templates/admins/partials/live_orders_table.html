@@ -1,4 +1,4 @@
-{% load static %}
+{% load static text_filters %}
 <!-- templates/admins/partials/live_orders_table.html -->
 <div id="live-orders-container" 
      class="card mb-0 border-0 shadow-none bg-transparent"
@@ -96,8 +96,8 @@
                     <td>
                         <div class="font-monospace small theme-text-main fw-bold">#{{ ord.order_id }}</div>
                         <div class="theme-text-muted smaller d-flex flex-column gap-0.5 mt-0.5">
-                            <span><i class="bi bi-lightning text-warning me-1"></i>Sig: {{ ord.signal_time|default:ord.create_time }}</span>
-                            <span><i class="bi bi-check2-circle text-success me-1"></i>Fill: {{ ord.execution_time|default:ord.create_time }}</span>
+                            <span><i class="bi bi-lightning text-warning me-1"></i>Sig: {{ ord.signal_time|default:ord.create_time|format_precise_time }}</span>
+                            <span><i class="bi bi-check2-circle text-success me-1"></i>Fill: {{ ord.execution_time|default:ord.create_time|format_precise_time }}</span>
                         </div>
                     </td>
                     <td>
@@ -141,7 +141,7 @@
                     </td>
                     <td class="text-end font-monospace small">
                         <div class="fw-bold text-white">₹{{ ord.limit_entry_price|default:ord.price|floatformat:2 }}</div>
-                        <div class="theme-text-muted smaller">Tap: {{ ord.limit_tapped_time|default:ord.create_time }}</div>
+                        <div class="theme-text-muted smaller">Tap: {{ ord.limit_tapped_time|default:ord.create_time|format_precise_time }}</div>
                     </td>
                     <td class="text-center">
                         <div class="d-flex flex-column align-items-center gap-1">
