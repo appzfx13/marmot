@@ -9,6 +9,7 @@ import (
 	"math"
 	"net/http"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -315,11 +316,26 @@ func initFyersSocket(ctx context.Context, authHeader string, symbols []string, s
 
 func startFyersV3HSMStream(ctx context.Context, authHeader string, symbols []string, symbolToIndex map[string]string, prevLTP map[string]float64, redisService *services.RedisService, tickWriter *parquet.TickWriter, wsConnected *atomic.Bool, lastWSTickUnix *atomic.Int64, hub *Hub) interface{} {
 	var fyersSocket *fyersgosdk.FyersDataSocket
+	var symMu sync.Mutex
+	allSubscribedSymbols := make(map[string]bool)
+	for _, s := range symbols {
+		s = strings.TrimSpace(s)
+		if s != "" {
+			allSubscribedSymbols[s] = true
+		}
+	}
 
 	onConnect := func() {
-		log.Println("✅ [FYERS WS] HSM Socket Connected. Subscribing to symbols...")
-		if fyersSocket != nil {
-			fyersSocket.Subscribe(symbols, fyersgosdk.FULL_MODE_TYPE)
+		symMu.Lock()
+		activeSyms := make([]string, 0, len(allSubscribedSymbols))
+		for s := range allSubscribedSymbols {
+			activeSyms = append(activeSyms, s)
+		}
+		symMu.Unlock()
+
+		log.Printf("✅ [FYERS WS] HSM Socket Connected. Subscribing %d symbols (SymbolUpdate)...\n", len(activeSyms))
+		if fyersSocket != nil && len(activeSyms) > 0 {
+			fyersSocket.Subscribe(activeSyms, "SymbolUpdate")
 		}
 	}
 
@@ -348,7 +364,7 @@ func startFyersV3HSMStream(ctx context.Context, authHeader string, symbols []str
 	fyersSocket = fyersgosdk.NewFyersDataSocket(
 		authHeader, // which is appId:token
 		"",         // logPath
-		false,      // liteMode
+		false,      // liteMode (false = Full Mode)
 		false,      // writeToFile
 		true,       // reconnect
 		5,          // reconnectRetry
@@ -374,9 +390,35 @@ func startFyersV3HSMStream(ctx context.Context, authHeader string, symbols []str
 					if !ok {
 						return
 					}
-					if sym != "" && fyersSocket != nil {
-						log.Printf("⚡ [FYERS WS Dynamic Sub] Subscribing to symbol: %s\n", sym)
-						fyersSocket.Subscribe([]string{sym}, fyersgosdk.FULL_MODE_TYPE)
+					// Collect and batch all immediately queued symbols from channel
+					batch := []string{sym}
+					drain := true
+					for drain {
+						select {
+						case s, more := <-hub.SubSymbol:
+							if more && s != "" {
+								batch = append(batch, s)
+							}
+						default:
+							drain = false
+						}
+					}
+
+					// Deduplicate and filter against active registry
+					var toSub []string
+					symMu.Lock()
+					for _, s := range batch {
+						s = strings.TrimSpace(s)
+						if s != "" && !allSubscribedSymbols[s] {
+							allSubscribedSymbols[s] = true
+							toSub = append(toSub, s)
+						}
+					}
+					symMu.Unlock()
+
+					if len(toSub) > 0 && fyersSocket != nil {
+						log.Printf("⚡ [FYERS WS Dynamic Sub] Subscribing batch of %d symbols: %v\n", len(toSub), toSub)
+						fyersSocket.Subscribe(toSub, "SymbolUpdate")
 					}
 				}
 			}

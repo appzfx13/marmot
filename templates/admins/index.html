@@ -3541,17 +3541,27 @@
                 }
 
                 if (optType) {
-                    var strike = 0;
+                    var strike = parseInt(data.strike || 0, 10);
                     // 1. Try parsing numeric strike from secId (e.g. "24500_CE" or "24500")
-                    var secMatch = secId.match(/^(\d{4,6})/);
-                    if (secMatch) {
-                        strike = parseInt(secMatch[1], 10);
+                    if (!strike) {
+                        var secMatch = secId.match(/^(\d{4,6})/);
+                        if (secMatch) {
+                            strike = parseInt(secMatch[1], 10);
+                        }
                     }
-                    // 2. Fallback: extract numeric strike from symbol (e.g. "NIFTY 24500 CE", "NIFTY 24500.0 CE", "NIFTY2491524500CE")
+                    // 2. Fyers format: e.g. "NSE:NIFTY26O0622700CE", "NSE:BANKNIFTY26O0754800CE"
+                    if (!strike) {
+                        var fyersMatch = sym.match(/^[A-Z]+:[A-Z]+(?:\d{2})(?:[1-9OND]|[A-Z]{3})(?:\d{2})?(\d{4,5})(?:CE|PE)$/i);
+                        if (fyersMatch) {
+                            strike = parseInt(fyersMatch[1], 10);
+                        }
+                    }
+                    // 3. Fallback: extract numeric strike from symbol (e.g. "NIFTY 24500 CE", "NIFTY 24500.0 CE")
                     if (!strike) {
                         var strikeMatch = sym.match(/(\d{4,6})(?:\.0+)?\s*(?:CE|PE|C|P)$/i);
                         if (strikeMatch) {
-                            strike = parseInt(strikeMatch[1], 10);
+                            var rawStrike = parseInt(strikeMatch[1], 10);
+                            strike = rawStrike > 100000 ? (rawStrike % 100000) : rawStrike;
                         }
                     }
                     if (strike > 0 && ltp > 0) {
