@@ -8,6 +8,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"regexp"
 	"strings"
 	"sync"
 	"time"
@@ -223,12 +224,16 @@ func (m *MatchingEngine) BroadcastAccountStats(clientID string) {
 
 // BroadcastOrderEvent pushes an order update event over WebSocket.
 func (m *MatchingEngine) BroadcastOrderEvent(clientID string, ord *models.OrderRecord) {
+	sym := ord.Order.TradingSymbol
+	if sym == "" {
+		sym = ord.Order.CorrelationID
+	}
 	evt := models.BrokerOrderEvent{
 		Type:            "broker_order_event",
 		DhanClientID:    clientID,
 		OrderID:         ord.OrderID,
 		Status:          ord.Status,
-		TradingSymbol:   ord.Order.CorrelationID,
+		TradingSymbol:   sym,
 		TransactionType: ord.Order.TransactionType,
 		Price:           ord.FilledPrice,
 		Quantity:        ord.FilledQty,
@@ -249,21 +254,45 @@ func (m *MatchingEngine) BroadcastOrderEvent(clientID string, ord *models.OrderR
 	}
 }
 
+// parseOptionKey extracts underlying index, strike number and option type from arbitrary option symbols or IDs.
+func parseOptionKey(s string) (underlying string, strike string, optType string) {
+	upper := strings.ToUpper(strings.TrimSpace(s))
+	if upper == "" {
+		return "", "", ""
+	}
 
-// parseOptionKey extracts strike number and option type from arbitrary option symbols or IDs.
-func parseOptionKey(s string) (strike string, optType string) {
-	upper := strings.ToUpper(s)
-	if strings.Contains(upper, "PUT") || strings.Contains(upper, "_PE") || strings.Contains(upper, " PE") {
+	if strings.Contains(upper, "BANKNIFTY") {
+		underlying = "BANKNIFTY"
+	} else if strings.Contains(upper, "FINNIFTY") {
+		underlying = "FINNIFTY"
+	} else if strings.Contains(upper, "MIDCPNIFTY") {
+		underlying = "MIDCPNIFTY"
+	} else if strings.Contains(upper, "NIFTY") {
+		underlying = "NIFTY"
+	} else if strings.Contains(upper, "SENSEX") {
+		underlying = "SENSEX"
+	}
+
+	if strings.HasSuffix(upper, "PE") || strings.Contains(upper, "_PE") || strings.Contains(upper, " PE") || strings.Contains(upper, "-PE") || strings.Contains(upper, ":PE") || strings.Contains(upper, "PUT") {
 		optType = "PE"
-	} else if strings.Contains(upper, "CALL") || strings.Contains(upper, "_CE") || strings.Contains(upper, " CE") {
+	} else if strings.HasSuffix(upper, "CE") || strings.Contains(upper, "_CE") || strings.Contains(upper, " CE") || strings.Contains(upper, "-CE") || strings.Contains(upper, ":CE") || strings.Contains(upper, "CALL") {
 		optType = "CE"
 	}
+
+	if optType != "" {
+		re := regexp.MustCompile(`(\d{4,5})\s*(?:-|_)?(?:CE|PE|CALL|PUT)`)
+		if m := re.FindStringSubmatch(upper); len(m) > 1 {
+			strike = m[1]
+			return underlying, strike, optType
+		}
+	}
+
 	var digits []rune
 	for _, r := range upper {
 		if r >= '0' && r <= '9' {
 			digits = append(digits, r)
 		} else {
-			if len(digits) >= 4 {
+			if len(digits) >= 4 && len(digits) <= 5 {
 				break
 			}
 			digits = digits[:0]
@@ -272,7 +301,7 @@ func parseOptionKey(s string) (strike string, optType string) {
 	if len(digits) >= 4 {
 		strike = string(digits)
 	}
-	return strike, optType
+	return underlying, strike, optType
 }
 
 // isContractMatch checks if two symbols represent the same underlying option contract or spot instrument.
@@ -283,11 +312,70 @@ func isContractMatch(id1, sym1, id2, sym2 string) bool {
 	if sym1 != "" && (sym1 == id2 || sym1 == sym2) {
 		return true
 	}
-	st1, t1 := parseOptionKey(id1 + " " + sym1)
-	st2, t2 := parseOptionKey(id2 + " " + sym2)
-	if st1 != "" && st1 == st2 && t1 != "" && t1 == t2 {
+
+	clean := func(s string) string {
+		return strings.ToUpper(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(strings.ReplaceAll(s, " ", ""), ":", ""), "-", ""), "_", ""))
+	}
+	cId1, cSym1 := clean(id1), clean(sym1)
+	cId2, cSym2 := clean(id2), clean(sym2)
+	if cId1 != "" && (cId1 == cId2 || cId1 == cSym2) {
 		return true
 	}
+	if cSym1 != "" && (cSym1 == cId2 || cSym1 == cSym2) {
+		return true
+	}
+
+	s1 := sym1
+	if s1 == "" {
+		s1 = id1
+	}
+	s2 := sym2
+	if s2 == "" {
+		s2 = id2
+	}
+	u1, st1, t1 := parseOptionKey(s1)
+	u2, st2, t2 := parseOptionKey(s2)
+
+	if st1 == "" || t1 == "" {
+		if uId, stId, tId := parseOptionKey(id1); stId != "" || tId != "" {
+			if u1 == "" {
+				u1 = uId
+			}
+			if st1 == "" {
+				st1 = stId
+			}
+			if t1 == "" {
+				t1 = tId
+			}
+		}
+	}
+	if st2 == "" || t2 == "" {
+		if uId, stId, tId := parseOptionKey(id2); stId != "" || tId != "" {
+			if u2 == "" {
+				u2 = uId
+			}
+			if st2 == "" {
+				st2 = stId
+			}
+			if t2 == "" {
+				t2 = tId
+			}
+		}
+	}
+
+	if t1 != "" && t2 != "" {
+		if t1 == t2 && st1 != "" && st1 == st2 {
+			if u1 == "" || u2 == "" || u1 == u2 {
+				return true
+			}
+		}
+		return false
+	}
+
+	if t1 == "" && t2 == "" && u1 != "" && u1 == u2 {
+		return true
+	}
+
 	return false
 }
 
@@ -300,6 +388,9 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 		return
 	}
 	m.ltpMap[tick.SecurityID] = tick.LTP
+	if tick.TradingSymbol != "" {
+		m.ltpMap[tick.TradingSymbol] = tick.LTP
+	}
 
 	// Recalculate Unrealized PnL and MTM across open positions
 	hasOpenPos := false
@@ -677,29 +768,52 @@ func (m *MatchingEngine) executeOrderAsync(clientID, orderID string, fillPrice f
 	if ord.Order.TransactionType == "BUY" {
 		acc.AvailableBalance -= requiredMargin
 		acc.UtilizedMargin += requiredMargin
+		totalBuyValue := (pos.BuyAvg * float64(pos.BuyQty)) + (fillPrice * float64(ord.Order.Quantity))
 		pos.BuyQty += ord.Order.Quantity
-		pos.BuyAvg = fillPrice
+		pos.BuyAvg = totalBuyValue / float64(pos.BuyQty)
 		pos.NetQty = pos.BuyQty - pos.SellQty
-	} else {
-		acc.AvailableBalance += requiredMargin
-		if acc.UtilizedMargin >= requiredMargin {
-			acc.UtilizedMargin -= requiredMargin
+		if pos.EntryTime == "" {
+			pos.EntryTime = time.Now().Format("15:04:05")
 		}
+	} else {
+		// SELL
+		totalSellValue := (pos.SellAvg * float64(pos.SellQty)) + (fillPrice * float64(ord.Order.Quantity))
 		pos.SellQty += ord.Order.Quantity
-		pos.SellAvg = fillPrice
+		pos.SellAvg = totalSellValue / float64(pos.SellQty)
 		pos.NetQty = pos.BuyQty - pos.SellQty
 		if pos.BuyQty > 0 {
-			pnl := (fillPrice - pos.BuyAvg) * float64(ord.Order.Quantity)
+			qty := ord.Order.Quantity
+			pnl := (fillPrice - pos.BuyAvg) * float64(qty)
 			pos.RealizedProfit += pnl
-			totalChg, brk, stt, _, _, _, _ := CalculateOptionBuyingCharges(pos.BuyAvg, fillPrice, ord.Order.Quantity)
+			totalChg, brk, stt, _, _, _, _ := CalculateOptionBuyingCharges(pos.BuyAvg, fillPrice, qty)
 			pos.TotalCharges += totalChg
 			pos.Brokerage += brk
 			pos.STT += stt
 			pos.NetProfit = pos.RealizedProfit - pos.TotalCharges
 			acc.TotalCharges += totalChg
 			acc.TotalBrokerage += brk
-			acc.AvailableBalance -= totalChg
+			releasedMargin := pos.BuyAvg * float64(qty)
+			acc.AvailableBalance += releasedMargin + pnl - totalChg
+			if acc.UtilizedMargin >= releasedMargin {
+				acc.UtilizedMargin -= releasedMargin
+			}
+		} else {
+			acc.AvailableBalance += requiredMargin
+			if acc.UtilizedMargin >= requiredMargin {
+				acc.UtilizedMargin -= requiredMargin
+			}
 		}
+	}
+
+	if pos.NetQty > 0 {
+		pos.PositionType = "LONG"
+	} else if pos.NetQty < 0 {
+		pos.PositionType = "SHORT"
+	} else {
+		pos.PositionType = "CLOSED"
+		pos.ExitTime = time.Now().Format("15:04:05")
+		ord.ExitTime = time.Now()
+		pos.UnrealizedProfit = 0.0
 	}
 
 	webhook := m.buildPostbackWebhookLocked(ord)
@@ -779,6 +893,7 @@ func (m *MatchingEngine) squareOffPositionAutoLocked(acc *ClientAccount, pos *mo
 		OrderType:       "MARKET",
 		Validity:        "DAY",
 		SecurityID:      pos.SecurityID,
+		TradingSymbol:   pos.TradingSymbol,
 		Quantity:        qty,
 		Price:           fillPrice,
 		TriggerPrice:    fillPrice,
@@ -835,6 +950,10 @@ func (m *MatchingEngine) squareOffPositionAutoLocked(acc *ClientAccount, pos *mo
 // buildPostbackWebhookLocked creates the official DhanPostbackWebhook struct.
 func (m *MatchingEngine) buildPostbackWebhookLocked(ord *models.OrderRecord) models.DhanPostbackWebhook {
 	nowStr := time.Now().Format("2006-01-02 15:04:05")
+	sym := ord.Order.TradingSymbol
+	if sym == "" {
+		sym = ord.Order.CorrelationID
+	}
 	return models.DhanPostbackWebhook{
 		DhanClientID:      ord.Order.DhanClientID,
 		OrderID:           ord.OrderID,
@@ -846,7 +965,7 @@ func (m *MatchingEngine) buildPostbackWebhookLocked(ord *models.OrderRecord) mod
 		ProductType:       ord.Order.ProductType,
 		OrderType:         ord.Order.OrderType,
 		Validity:          ord.Order.Validity,
-		TradingSymbol:     ord.Order.CorrelationID,
+		TradingSymbol:     sym,
 		SecurityID:        ord.Order.SecurityID,
 		Quantity:          ord.Order.Quantity,
 		DisclosedQuantity: ord.Order.DisclosedQuantity,
@@ -1116,6 +1235,8 @@ func (m *MatchingEngine) ClearAccountSession(clientID string) {
 		acc.AvailableBalance = acc.InitialBalance
 		acc.SodLimit = acc.InitialBalance
 		acc.UtilizedMargin = 0.0
+		acc.TotalCharges = 0.0
+		acc.TotalBrokerage = 0.0
 	}
 	m.mu.Unlock()
 

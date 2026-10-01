@@ -2561,10 +2561,11 @@
 
             window.isLiveMockActive = function () {
                 const path = window.location.pathname || '';
-                if (path.includes('/dashboard/live-mock/')) return true;
-                if (document.getElementById('mockEnvInput')) return true;
+                const search = window.location.search || '';
+                if (path.includes('/dashboard/live-mock/') || search.toUpperCase().includes('ENV=MOCK')) return true;
+                if (document.getElementById('mockEnvInput') || document.querySelector('[data-env-mode="MOCK"]')) return true;
                 const headerTitle = document.querySelector('.page-title');
-                if (headerTitle && headerTitle.textContent.toLowerCase().includes('live mock')) return true;
+                if (headerTitle && (headerTitle.textContent.toLowerCase().includes('mock') || headerTitle.textContent.toLowerCase().includes('emulator'))) return true;
                 return false;
             };
 

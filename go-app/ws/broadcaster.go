@@ -42,6 +42,19 @@ type LiveTickPayload struct {
 	OI            int64   `json:"oi,omitempty"`
 }
 
+var (
+	spot1SRecorder *parquet.Spot1SRecorder
+	spotOnce       sync.Once
+)
+
+// GetSpot1SRecorder returns the singleton instance of Spot1SRecorder.
+func GetSpot1SRecorder() *parquet.Spot1SRecorder {
+	spotOnce.Do(func() {
+		spot1SRecorder = parquet.NewSpot1SRecorder("/app/backup")
+	})
+	return spot1SRecorder
+}
+
 // StartMarketDataBroadcaster streams real-time index ticks and Pub/Sub events to WS clients.
 func StartMarketDataBroadcaster(ctx context.Context, redisService *services.RedisService, dbService *services.DBService, hub *Hub) {
 	log.Println("🚀 [WS Broadcaster] Starting Hybrid Market Data Ingestion Pipeline (WS + REST)...")
@@ -728,6 +741,9 @@ func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisS
 		High:      high,
 		Low:       low,
 	})
+
+	// Pass spot tick to zero-load 1-second Parquet recorder
+	GetSpot1SRecorder().RecordSpotTickAsync(idxName, ltp, time.Now().Unix())
 
 	if prevLTP[idxName] != ltp {
 		log.Printf("⚡ [FYERS Sub-10ms Tick: %s] %s: ₹%.2f (Chg: %.2f | %.2f%%) | ATM: %d\n",

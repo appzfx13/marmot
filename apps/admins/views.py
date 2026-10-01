@@ -398,9 +398,8 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context['macro_ai_cards'] = macro_ribbon.get('macro_cards')
         context['macro_market_cards'] = get_live_macro_market_cards()
         context['is_sandbox'] = False
-        env_suffix = '?env=MOCK' if is_mock else ''
-        context['positions_partial_url'] = reverse('admins:admin-live-positions-partial') + env_suffix
-        context['orders_partial_url'] = reverse('admins:admin-live-orders-partial') + env_suffix
+        context['positions_partial_url'] = reverse('admins:admin-live-positions-partial')
+        context['orders_partial_url'] = reverse('admins:admin-live-orders-partial')
 
         pos_labels = [p.get('trading_symbol', p.get('tradingSymbol', 'Position')) for p in raw_pos]
         pos_pnls = [
@@ -1198,7 +1197,13 @@ class AdminLivePositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        is_mock = request.GET.get('env') == 'MOCK' or request.session.get('active_tab') == 'live-mock' or 'live-mock' in request.META.get('HTTP_REFERER', '')
+        is_mock = (
+            request.GET.get('env', '').upper() == 'MOCK' or
+            'ENV=MOCK' in request.GET.get('env', '').upper() or
+            request.session.get('active_tab') == 'live-mock' or
+            'live-mock' in request.META.get('HTTP_REFERER', '') or
+            'ENV=MOCK' in request.META.get('HTTP_REFERER', '').upper()
+        )
         if is_mock:
             live_account = user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type__in=['MOCK', 'SANDBOX']).first()
             if not live_account:
@@ -1249,6 +1254,7 @@ class AdminLivePositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View
             'live_account': live_account,
             'is_mock_mode': is_mock,
             'env_mode': 'MOCK' if is_mock else 'LIVE',
+            'positions_partial_url': reverse('admins:admin-live-positions-partial'),
         }
         return render(request, 'admins/partials/live_positions_table.html', context)
 
@@ -1258,7 +1264,13 @@ class AdminLiveHoldingsPartialView(LoginRequiredMixin, AdminRequiredMixin, View)
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        is_mock = request.GET.get('env') == 'MOCK' or request.session.get('active_tab') == 'live-mock' or 'live-mock' in request.META.get('HTTP_REFERER', '')
+        is_mock = (
+            request.GET.get('env', '').upper() == 'MOCK' or
+            'ENV=MOCK' in request.GET.get('env', '').upper() or
+            request.session.get('active_tab') == 'live-mock' or
+            'live-mock' in request.META.get('HTTP_REFERER', '') or
+            'ENV=MOCK' in request.META.get('HTTP_REFERER', '').upper()
+        )
         if is_mock:
             live_account = user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type__in=['MOCK', 'SANDBOX']).first()
             if not live_account:
@@ -1306,7 +1318,13 @@ class AdminLiveOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         user = request.user
-        is_mock = request.GET.get('env') == 'MOCK' or request.session.get('active_tab') == 'live-mock' or 'live-mock' in request.META.get('HTTP_REFERER', '')
+        is_mock = (
+            request.GET.get('env', '').upper() == 'MOCK' or
+            'ENV=MOCK' in request.GET.get('env', '').upper() or
+            request.session.get('active_tab') == 'live-mock' or
+            'live-mock' in request.META.get('HTTP_REFERER', '') or
+            'ENV=MOCK' in request.META.get('HTTP_REFERER', '').upper()
+        )
         if is_mock:
             live_account = user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type__in=['MOCK', 'SANDBOX']).first()
             if not live_account:
@@ -1362,6 +1380,7 @@ class AdminLiveOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
             'live_account': live_account,
             'is_mock_mode': is_mock,
             'env_mode': 'MOCK' if is_mock else 'LIVE',
+            'orders_partial_url': reverse('admins:admin-live-orders-partial'),
         }
         return render(request, 'admins/partials/live_orders_table.html', context)
 

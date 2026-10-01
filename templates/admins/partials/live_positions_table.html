@@ -2,7 +2,7 @@
 <!-- templates/admins/partials/live_positions_table.html -->
 <div id="live-positions-container" 
      class="card mb-0 border-0 shadow-none bg-transparent"
-     hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
+     hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status={{ filter_status|default:'ALL' }}{% if env_mode == 'MOCK' or is_mock_mode %}&env=MOCK{% endif %}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
      hx-trigger="reloadLivePositions from:body, brokerOrderUpdate from:body"
      hx-target="#live-positions-container"
      hx-swap="outerHTML">
@@ -16,7 +16,7 @@
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <button type="button" 
                         class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'ALL' or not filter_status %}active-all{% endif %}"
-                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=ALL{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=ALL{% if env_mode == 'MOCK' or is_mock_mode %}&env=MOCK{% endif %}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-layers"></i>
@@ -26,7 +26,7 @@
 
                 <button type="button" 
                         class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'OPEN' %}active-open{% endif %}"
-                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=OPEN{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=OPEN{% if env_mode == 'MOCK' or is_mock_mode %}&env=MOCK{% endif %}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-play-circle-fill"></i>
@@ -36,7 +36,7 @@
 
                 <button type="button" 
                         class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'CLOSED' %}active-closed{% endif %}"
-                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=CLOSED{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=CLOSED{% if env_mode == 'MOCK' or is_mock_mode %}&env=MOCK{% endif %}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                         hx-target="#live-positions-container"
                         hx-swap="outerHTML">
                     <i class="bi bi-check2-circle"></i>

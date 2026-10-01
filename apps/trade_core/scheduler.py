@@ -96,6 +96,57 @@ def daily_morning_unfreeze_and_unblock_job():
         return None
 
 
+def start_daily_spot_1s_recorder_job():
+    """Triggered by APScheduler at 09:14:55 AM IST Mon-Fri to activate Go 1S spot Parquet recorder."""
+    import json
+    import redis
+    logger.info("🔔 [APScheduler] Triggering Market Open 1S Index Spot Parquet Recording...")
+    try:
+        r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        r.set("marmot:live_record:active", "1")
+        payload = json.dumps({"action": "start_spot_1s_record"})
+        r.publish("marmot:tasks:control", payload)
+        logger.info("✅ [APScheduler] Published start_spot_1s_record to marmot:tasks:control")
+    except Exception as e:
+        logger.error("❌ [APScheduler] Failed to start live 1S spot recorder: %s", e)
+
+
+def stop_daily_spot_1s_recorder_job():
+    """Triggered by APScheduler at 15:30:05 PM IST Mon-Fri to finalize and flush Go 1S spot recorder."""
+    import json
+    import redis
+    logger.info("🔕 [APScheduler] Triggering Market Close 1S Index Spot Parquet Finalization...")
+    try:
+        r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        r.set("marmot:live_record:active", "0")
+        payload = json.dumps({"action": "stop_spot_1s_record"})
+        r.publish("marmot:tasks:control", payload)
+        logger.info("✅ [APScheduler] Published stop_spot_1s_record to marmot:tasks:control")
+    except Exception as e:
+        logger.error("❌ [APScheduler] Failed to stop live 1S spot recorder: %s", e)
+
+
+def run_postmarket_option_merge_job():
+    """Triggered by APScheduler at 16:00:00 PM IST Mon-Fri to fetch 1S options and merge into unified dataset."""
+    import json
+    import redis
+    from django.utils import timezone
+    logger.info("📦 [APScheduler] Triggering 4:00 PM Post-Market 1S Option Fetch & Consolidation Job...")
+    try:
+        r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
+        today_str = timezone.localdate().strftime('%Y-%m-%d')
+        payload = json.dumps({
+            "action": "run_daily_postmarket_merge",
+            "date": today_str,
+            "indices": ["NIFTY", "BANKNIFTY"],
+            "strike_count": 15,
+        })
+        r.publish("marmot:tasks:control", payload)
+        logger.info("✅ [APScheduler] Published run_daily_postmarket_merge for %s to marmot:tasks:control", today_str)
+    except Exception as e:
+        logger.error("❌ [APScheduler] Failed to trigger post-market option merge job: %s", e)
+
+
 def start_scheduler():
     """Initialize and start the background APScheduler instance safely."""
     global _scheduler
@@ -140,9 +191,42 @@ def start_scheduler():
         coalesce=True,
     )
 
+    # Register Market Open (09:14:55 AM Mon-Fri) 1S Live Spot Recorder Job
+    _scheduler.add_job(
+        start_daily_spot_1s_recorder_job,
+        trigger=CronTrigger(day_of_week='mon-fri', hour=9, minute=14, second=55, timezone=tz_str),
+        id='market_open_spot_1s_recorder_start',
+        name='Start Live 1S Index Spot Recorder at Market Open (09:14:55 AM IST)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Register Market Close (15:30:05 PM Mon-Fri) 1S Live Spot Recorder Job
+    _scheduler.add_job(
+        stop_daily_spot_1s_recorder_job,
+        trigger=CronTrigger(day_of_week='mon-fri', hour=15, minute=30, second=5, timezone=tz_str),
+        id='market_close_spot_1s_recorder_stop',
+        name='Stop Live 1S Index Spot Recorder at Market Close (15:30:05 PM IST)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
+    # Register 4:00 PM Post-Market (16:00:00 PM Mon-Fri) 1S Option Merge Job
+    _scheduler.add_job(
+        run_postmarket_option_merge_job,
+        trigger=CronTrigger(day_of_week='mon-fri', hour=16, minute=0, second=0, timezone=tz_str),
+        id='postmarket_option_merge_4pm',
+        name='Post-Market 1S Option Fetch & Parquet Consolidation (16:00:00 PM IST)',
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+    )
+
     try:
         _scheduler.start()
-        logger.info("🚀 [APScheduler] BackgroundScheduler started with 8h Dhan Renewal, 1h Gemini AI Macro & Morning Unfreeze Jobs.")
+        logger.info("🚀 [APScheduler] BackgroundScheduler started with Token Renewal, Gemini Macro, 1S Spot & 4PM Merge Jobs.")
     except Exception as e:
         logger.error("Failed to start BackgroundScheduler: %s", e)
 

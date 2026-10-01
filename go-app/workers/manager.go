@@ -60,6 +60,33 @@ func (m *TaskManager) StartListener(ctx context.Context, redisService *services.
 
 // handleMessage parses the JSON payload and routes the command or relays progress
 func (m *TaskManager) handleMessage(parentCtx context.Context, payloadStr string) {
+	var rawAction struct {
+		Action      string   `json:"action"`
+		Command     string   `json:"command"`
+		Date        string   `json:"date"`
+		Indices     []string `json:"indices"`
+		StrikeCount int      `json:"strike_count"`
+	}
+	if err := json.Unmarshal([]byte(payloadStr), &rawAction); err == nil {
+		action := strings.ToLower(rawAction.Action)
+		if action == "" {
+			action = strings.ToLower(rawAction.Command)
+		}
+		if action == "start_spot_1s_record" {
+			ws.GetSpot1SRecorder().SetActive(true)
+			return
+		}
+		if action == "stop_spot_1s_record" {
+			ws.GetSpot1SRecorder().SetActive(false)
+			return
+		}
+		if action == "run_daily_postmarket_merge" {
+			mergeJob := NewDailyMergeJob(m.dbService, m.config, m.redisService, m.hub)
+			go mergeJob.Run(parentCtx, rawAction.Date, rawAction.Indices, rawAction.StrikeCount)
+			return
+		}
+	}
+
 	var payload models.CommandPayload
 	if err := json.Unmarshal([]byte(payloadStr), &payload); err != nil {
 		log.Printf("⚠️ Invalid JSON payload received: %v\n", err)
