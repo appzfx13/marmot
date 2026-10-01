@@ -347,4 +347,132 @@ def inspect_parquet_dataset(task, query=None, limit=50):
             'error': f'Invalid Parquet binary format: {str(e)}'
         }
 
+
+def get_daily_ticks_metadata():
+    """Scans /app/backup/ticks/ directory and returns daily tick summaries and status."""
+    import glob
+    from datetime import datetime
+
+    base_dir = os.path.join(getattr(settings, 'BACKUP_DIR', '/app/backup'), 'ticks')
+    if not os.path.exists(base_dir):
+        base_dir = '/app/backup/ticks'
+
+    days = []
+    total_spot_days = 0
+    total_merged_days = 0
+    total_bytes = 0
+
+    if os.path.exists(base_dir):
+        dir_entries = [d for d in os.listdir(base_dir) if os.path.isdir(os.path.join(base_dir, d))]
+        dir_entries.sort(reverse=True)
+
+        for d_str in dir_entries:
+            try:
+                dt = datetime.strptime(d_str, '%Y-%m-%d')
+                day_name = dt.strftime('%A')
+                formatted_date = dt.strftime('%b %d, %Y')
+            except ValueError:
+                continue
+
+            day_path = os.path.join(base_dir, d_str)
+            spot_file = os.path.join(day_path, 'spot_1s.parquet')
+            dataset_file = os.path.join(day_path, 'dataset_1s.parquet')
+
+            has_spot = os.path.exists(spot_file)
+            spot_size_mb = 0.0
+            if has_spot:
+                try:
+                    s_size = os.path.getsize(spot_file)
+                    spot_size_mb = round(s_size / (1024 * 1024), 2)
+                    total_bytes += s_size
+                    total_spot_days += 1
+                except OSError:
+                    pass
+
+            has_merged = os.path.exists(dataset_file)
+            merged_size_mb = 0.0
+            if has_merged:
+                try:
+                    m_size = os.path.getsize(dataset_file)
+                    merged_size_mb = round(m_size / (1024 * 1024), 2)
+                    total_bytes += m_size
+                    total_merged_days += 1
+                except OSError:
+                    pass
+
+            raw_ticks = glob.glob(os.path.join(day_path, 'ticks_*.parquet'))
+            spot_parts = glob.glob(os.path.join(day_path, 'spot_parts', 'spot_*.parquet'))
+            if not spot_parts:
+                spot_parts = glob.glob(os.path.join(day_path, 'spot_*.parquet'))
+
+            redis_status = None
+            try:
+                redis_status = redis_client.get(f"marmot:merge:{d_str}:status")
+            except Exception:
+                pass
+
+            if redis_status == 'running':
+                status_label = 'Merging...'
+                status_badge = 'warning'
+            elif has_merged:
+                status_label = 'Merged'
+                status_badge = 'success'
+            elif has_spot:
+                status_label = 'Spot Ready'
+                status_badge = 'info'
+            elif raw_ticks:
+                status_label = 'Raw Ticks'
+                status_badge = 'secondary'
+            else:
+                status_label = 'Empty'
+                status_badge = 'dark'
+
+            days.append({
+                'date_str': d_str,
+                'formatted_date': formatted_date,
+                'day_name': day_name,
+                'has_spot': has_spot,
+                'spot_size_mb': spot_size_mb,
+                'has_merged': has_merged,
+                'merged_size_mb': merged_size_mb,
+                'raw_ticks_count': len(raw_ticks),
+                'spot_parts_count': len(spot_parts),
+                'status_label': status_label,
+                'status_badge': status_badge,
+                'redis_status': redis_status,
+                'target_indices': ['NIFTY', 'BANKNIFTY'],
+            })
+
+    total_storage_mb = round(total_bytes / (1024 * 1024), 2)
+    return {
+        'days': days,
+        'total_days': len(days),
+        'total_spot_days': total_spot_days,
+        'total_merged_days': total_merged_days,
+        'total_storage_mb': total_storage_mb,
+    }
+
+
+def dispatch_daily_strike_merge(date_str, indices=None, strike_count=15):
+    """Dispatches asynchronous 1S option download and merge request to Go microservice via Redis IPC."""
+    if not indices:
+        indices = ['NIFTY', 'BANKNIFTY']
+
+    payload = {
+        'action': 'run_daily_postmarket_merge',
+        'date': date_str,
+        'indices': indices,
+        'strike_count': strike_count,
+    }
+
+    try:
+        redis_client.set(f"marmot:merge:{date_str}:status", "running", ex=86400)
+    except Exception as e:
+        logger.warning(f"Could not set merge status in Redis: {e}")
+
+    redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
+    logger.info(f"Dispatched daily strike merge for {date_str} to Go microservice: {payload}")
+    return True
+
+
 

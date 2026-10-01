@@ -25,14 +25,16 @@ class Command(BaseCommand):
         group_name = 'webhook_workers'
         consumer_name = 'worker-1'
 
-        # Create consumer group if it doesn't exist
-        try:
-            r.xgroup_create(stream_name, group_name, id='0', mkstream=True)
-            self.stdout.write(self.style.SUCCESS(f"Created consumer group '{group_name}'"))
-        except redis.exceptions.ResponseError as e:
-            if "BUSYGROUP Consumer Group name already exists" not in str(e):
-                self.stdout.write(self.style.ERROR(f"Error creating group: {e}"))
+        # Helper to ensure consumer group exists
+        def ensure_group():
+            try:
+                r.xgroup_create(stream_name, group_name, id='0', mkstream=True)
+                self.stdout.write(self.style.SUCCESS(f"Created consumer group '{group_name}'"))
+            except redis.exceptions.ResponseError as e:
+                if "BUSYGROUP Consumer Group name already exists" not in str(e):
+                    self.stdout.write(self.style.ERROR(f"Error creating group: {e}"))
 
+        ensure_group()
         self.stdout.write(self.style.SUCCESS(f"Listening to stream '{stream_name}'..."))
 
         while True:
@@ -84,4 +86,6 @@ class Command(BaseCommand):
                                 pass
             except Exception as loop_exc:
                 self.stdout.write(self.style.ERROR(f"Worker loop error: {loop_exc}"))
+                if "NOGROUP" in str(loop_exc):
+                    ensure_group()
                 time.sleep(2)

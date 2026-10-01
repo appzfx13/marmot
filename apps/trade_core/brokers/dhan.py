@@ -544,13 +544,12 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                 for pos in positions_data:
                     realized = float(pos.get("realizedProfit", 0.0) or 0.0)
                     unrealized = float(pos.get("unrealizedProfit", 0.0) or 0.0)
-                    tot_pos_pnl = round(realized + unrealized, 2)
                     net_qty = int(pos.get("netQty", 0) or 0)
                     buy_qty = int(pos.get("buyQty", 0) or 0)
                     sell_qty = int(pos.get("sellQty", 0) or 0)
                     buy_avg = float(pos.get("buyAvg", 0.0) or 0.0)
                     sell_avg = float(pos.get("sellAvg", 0.0) or 0.0)
-                    
+
                     if net_qty != 0:
                         open_count += 1
                         pos_status = "OPEN"
@@ -558,13 +557,21 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                         closed_count += 1
                         pos_status = "CLOSED"
 
-                    net_pnl += tot_pos_pnl
-                    total_realized += realized
-                    total_unrealized += unrealized
-
                     pos_sym = pos.get("tradingSymbol") or pos.get("securityId", "")
                     from apps.common.services.live_feed_service import get_live_contract_market_quote
                     live_pos_ltp = get_live_contract_market_quote(pos_sym)
+
+                    # Dynamic Real-time MTM calculation using live tick price
+                    if net_qty != 0 and live_pos_ltp and live_pos_ltp > 0:
+                        if net_qty > 0 and buy_avg > 0:
+                            unrealized = round((live_pos_ltp - buy_avg) * net_qty, 2)
+                        elif net_qty < 0 and sell_avg > 0:
+                            unrealized = round((sell_avg - live_pos_ltp) * abs(net_qty), 2)
+
+                    tot_pos_pnl = round(realized + unrealized, 2)
+                    net_pnl += tot_pos_pnl
+                    total_realized += realized
+                    total_unrealized += unrealized
 
                     parsed_positions.append({
                         'position_type': pos.get("positionType", "LONG" if net_qty > 0 else ("SHORT" if net_qty < 0 else "CLOSED")),

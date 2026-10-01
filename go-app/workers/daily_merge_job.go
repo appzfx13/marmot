@@ -52,6 +52,10 @@ func (j *DailyMergeJob) Run(ctx context.Context, dateStr string, indices []strin
 	log.Printf("🚀 [DailyMergeJob] Starting 4:00 PM Post-Market 1S Consolidation for Date: %s | Indices: %v | Strikes: ±%d",
 		dateStr, indices, strikeCount)
 
+	if j.redisService != nil && j.redisService.Client != nil {
+		j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:merge:%s:status", dateStr), "running", 24*time.Hour)
+	}
+
 	// Step 1: Consolidate live 1S Spot part files into spot_1s.parquet
 	spotFile, err := parquet.ConsolidateDailySpot("/app/backup", dateStr)
 	if err != nil {
@@ -91,6 +95,9 @@ func (j *DailyMergeJob) Run(ctx context.Context, dateStr string, indices []strin
 	appID, token, isActive, _, credErr := j.dbService.GetBrokerCredentials(ctx)
 	if credErr != nil || !isActive || token == "" {
 		log.Printf("⚠️ [DailyMergeJob] Broker credentials unavailable (err: %v, active: %v). Skipping option download.", credErr, isActive)
+		if j.redisService != nil && j.redisService.Client != nil {
+			j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:merge:%s:status", dateStr), "error: broker credentials unavailable", 24*time.Hour)
+		}
 		return
 	}
 
@@ -168,4 +175,8 @@ func (j *DailyMergeJob) Run(ctx context.Context, dateStr string, indices []strin
 
 	log.Printf("🎉 [DailyMergeJob] Successfully created 1-second dataset (%d records, %.2f MB) at: %s",
 		len(allCombinedRecords), sizeMB, finalDatasetPath)
+
+	if j.redisService != nil && j.redisService.Client != nil {
+		j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:merge:%s:status", dateStr), "completed", 24*time.Hour)
+	}
 }

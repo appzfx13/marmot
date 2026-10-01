@@ -38,6 +38,7 @@ type DhanOrderPayload struct {
 	TriggerPrice    float64 `json:"triggerPrice,omitempty"`
 	BoStopLossValue float64 `json:"boStopLossValue,omitempty"`
 	BoProfitValue   float64 `json:"boProfitValue,omitempty"`
+	LegName         string  `json:"legName,omitempty"`
 }
 
 // deriveCanonicalOptionID extracts the canonical strike ID (e.g. 21700_PE) from arbitrary option symbols.
@@ -680,7 +681,10 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								}
 							}
 						}
-					} else if positions[i].CurrentLTP > 0 && sl > 0 && tp > 0 {
+					}
+
+					// Active Real-Time SL and TP Monitoring across Live & Mock Trading
+					if positions[i].Status == "OPEN" && positions[i].CurrentLTP > 0 && sl > 0 && tp > 0 {
 						triggerReason := ""
 						if positions[i].CurrentLTP <= sl {
 							triggerReason = "SL Hit"
@@ -715,7 +719,29 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								TriggerReason:   triggerReason,
 							}
 							orders = append([]SimulatedOrder{exitOrder}, orders...)
-							log.Printf("🛡️ [StrategyWorker #%s] POSITION SQUARED OFF (%s): SELL %s @ ₹%.2f\n", taskID, triggerReason, positions[i].TradingSymbol, positions[i].CurrentLTP)
+							log.Printf("🛡️ [StrategyWorker #%s] POSITION SQUARED OFF (%s): SELL %s @ ₹%.2f (P&L: ₹%.2f)\n",
+								taskID, triggerReason, positions[i].TradingSymbol, positions[i].CurrentLTP, posPnl)
+
+							if isMockMode(params.ExecutionMode) {
+								leg := "SL_HIT"
+								if triggerReason == "TP Hit" {
+									leg = "TP_HIT"
+								}
+								j.dispatchOrderToMockBroker(DhanOrderPayload{
+									DhanClientID:    "1000000001",
+									CorrelationID:   positions[i].TradingSymbol,
+									TradingSymbol:   positions[i].TradingSymbol,
+									TransactionType: "SELL",
+									ExchangeSegment: "NSE_FNO",
+									ProductType:     "INTRADAY",
+									OrderType:       "MARKET",
+									Validity:        "DAY",
+									SecurityID:      positions[i].TradingSymbol,
+									Quantity:        positions[i].BuyQty,
+									Price:           positions[i].CurrentLTP,
+									LegName:         leg,
+								})
+							}
 						}
 					}
 

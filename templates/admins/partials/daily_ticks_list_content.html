@@ -1,0 +1,284 @@
+{% load static %}
+<div class="d-flex flex-column gap-4" id="daily-ticks-container" hx-trigger="refreshDailyTicks from:body" hx-get="{% url 'market:daily_ticks_list' %}" hx-target="this">
+
+    <!-- START: Spark Page Header -->
+    <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+        <div>
+            <h1 class="page-title d-flex align-items-center gap-2">
+                <i class="bi bi-calendar2-range-fill text-info"></i>
+                <span>{{ page_title }}</span>
+            </h1>
+            <p class="page-subtitle text-muted mb-0">Daily 1-second index spot recordings and single consolidated strike-merged Parquet datasets (<code>/app/backup/ticks/</code>).</p>
+        </div>
+        
+        <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+            <button class="btn btn-outline-secondary rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
+                    hx-get="{% url 'market:daily_ticks_list' %}"
+                    hx-target="#daily-ticks-container"
+                    hx-swap="outerHTML"
+                    title="Refresh List">
+                <i class="bi bi-arrow-clockwise"></i>
+                <span>Refresh</span>
+            </button>
+            <a href="{% url 'market:market_backup_list' %}" class="btn btn-outline-primary rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm">
+                <i class="bi bi-cloud-arrow-down-fill"></i>
+                <span>Market Backups</span>
+            </a>
+        </div>
+    </div>
+    <!-- END: Spark Page Header -->
+
+    <!-- START: KPI Stat Cards -->
+    <div class="row g-3">
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card p-3 border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small fw-semibold text-uppercase">Recorded Days</span>
+                    <div class="p-2 rounded-3 bg-info bg-opacity-10 text-info">
+                        <i class="bi bi-calendar-check fs-5"></i>
+                    </div>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-bold mb-0 text-white">{{ total_days }}</h3>
+                    <span class="text-muted small">trading sessions</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card p-3 border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small fw-semibold text-uppercase">Spot 1S Ready</span>
+                    <div class="p-2 rounded-3 bg-primary bg-opacity-10 text-primary">
+                        <i class="bi bi-graph-up-arrow fs-5"></i>
+                    </div>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-bold mb-0 text-white">{{ total_spot_days }}</h3>
+                    <span class="text-muted small">consolidated</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card p-3 border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small fw-semibold text-uppercase">Merged With Strikes</span>
+                    <div class="p-2 rounded-3 bg-success bg-opacity-10 text-success">
+                        <i class="bi bi-layers-fill fs-5"></i>
+                    </div>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-bold mb-0 text-success">{{ total_merged_days }}</h3>
+                    <span class="text-muted small">full 1S datasets</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="col-12 col-sm-6 col-xl-3">
+            <div class="card p-3 border-0 shadow-sm rounded-4 h-100" style="background: rgba(255, 255, 255, 0.03); backdrop-filter: blur(10px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-2">
+                    <span class="text-muted small fw-semibold text-uppercase">Total Disk Footprint</span>
+                    <div class="p-2 rounded-3 bg-warning bg-opacity-10 text-warning">
+                        <i class="bi bi-hdd-network-fill fs-5"></i>
+                    </div>
+                </div>
+                <div class="d-flex align-items-baseline gap-2">
+                    <h3 class="fw-bold mb-0 text-white">{{ total_storage_mb }}</h3>
+                    <span class="text-muted small">MB storage</span>
+                </div>
+            </div>
+        </div>
+    </div>
+    <!-- END: KPI Stat Cards -->
+
+    <!-- START: Daily Recordings Table Card -->
+    <div class="card overflow-hidden d-flex flex-column mb-0 w-100 rounded-4 border-0 shadow-sm" style="min-height: 480px; background: rgba(255, 255, 255, 0.02); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.08) !important;">
+        <div class="card-header bg-transparent py-3 px-4 d-flex align-items-center justify-content-between border-bottom" style="border-color: rgba(255, 255, 255, 0.08) !important;">
+            <div class="d-flex align-items-center gap-2">
+                <i class="bi bi-table text-info"></i>
+                <span class="fw-bold text-white">Daily Partitioned Market Archive</span>
+                <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill ms-2">{{ days|length }} Days</span>
+            </div>
+            <div class="small text-muted">
+                <i class="bi bi-info-circle me-1"></i>
+                Auto-merges 1S options from Fyers across ATM&plusmn;15 strikes
+            </div>
+        </div>
+
+        <div class="table-responsive flex-grow-1 overflow-auto">
+            <table class="table align-middle mb-0 text-nowrap" style="color: var(--bs-body-color);">
+                <thead style="background: rgba(255, 255, 255, 0.03); border-bottom: 1px solid rgba(255, 255, 255, 0.08);">
+                    <tr>
+                        <th scope="col" class="ps-4 py-3 text-muted fw-semibold small">SESSION DATE</th>
+                        <th scope="col" class="py-3 text-muted fw-semibold small">INDEX SPOT (1-SEC)</th>
+                        <th scope="col" class="py-3 text-muted fw-semibold small">STRIKES MERGE STATUS</th>
+                        <th scope="col" class="py-3 text-muted fw-semibold small">TARGET INDICES</th>
+                        <th scope="col" class="py-3 text-end pe-4 text-muted fw-semibold small">ACTIONS</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for day in days %}
+                    <tr style="border-bottom: 1px solid rgba(255, 255, 255, 0.05);" class="align-middle">
+                        <!-- Date Column -->
+                        <td class="ps-4 py-3">
+                            <div class="d-flex align-items-center gap-2.5">
+                                <div class="p-2 rounded-3 bg-secondary bg-opacity-10 text-white-50">
+                                    <i class="bi bi-calendar3"></i>
+                                </div>
+                                <div>
+                                    <div class="fw-bold text-white fs-6 font-monospace">{{ day.date_str }}</div>
+                                    <div class="small text-muted d-flex align-items-center gap-1.5">
+                                        <span class="badge bg-dark border border-secondary border-opacity-25 text-white-50 px-1.5 py-0.5 rounded">{{ day.day_name }}</span>
+                                        <span>{{ day.formatted_date }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        </td>
+
+                        <!-- Spot 1S Status Column -->
+                        <td class="py-3">
+                            {% if day.has_spot %}
+                            <div class="d-flex flex-column gap-1">
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <span class="badge bg-info bg-opacity-15 text-info border border-info border-opacity-25 px-2 py-1 rounded-pill">
+                                        <i class="bi bi-check-circle-fill me-1"></i> Spot 1S Ready
+                                    </span>
+                                </div>
+                                <span class="small text-muted font-monospace">{{ day.spot_size_mb }} MB (spot_1s.parquet)</span>
+                            </div>
+                            {% elif day.spot_parts_count > 0 %}
+                            <div class="d-flex flex-column gap-1">
+                                <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-25 px-2 py-1 rounded-pill">
+                                    <i class="bi bi-pie-chart me-1"></i> {{ day.spot_parts_count }} Spot Parts
+                                </span>
+                                <span class="small text-muted">Ready for consolidation</span>
+                            </div>
+                            {% elif day.raw_ticks_count > 0 %}
+                            <div class="d-flex flex-column gap-1">
+                                <span class="badge bg-secondary bg-opacity-20 text-white-50 px-2 py-1 rounded-pill">
+                                    <i class="bi bi-activity me-1"></i> {{ day.raw_ticks_count }} Raw Ticks
+                                </span>
+                                <span class="small text-muted">Tick stream recorded</span>
+                            </div>
+                            {% else %}
+                            <span class="badge bg-dark text-muted">No Data</span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Strikes Merge Status Column -->
+                        <td class="py-3">
+                            {% if day.redis_status == 'running' %}
+                            <div class="d-flex align-items-center gap-2">
+                                <div class="spinner-border spinner-border-sm text-warning" role="status"></div>
+                                <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-25 px-2.5 py-1.5 rounded-pill">
+                                    Async Merge in Progress...
+                                </span>
+                            </div>
+                            {% elif day.has_merged %}
+                            <div class="d-flex flex-column gap-1">
+                                <div class="d-flex align-items-center gap-1.5">
+                                    <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 px-2.5 py-1.5 rounded-pill fw-semibold">
+                                        <i class="bi bi-check2-all me-1"></i> Merged With Strikes
+                                    </span>
+                                </div>
+                                <span class="small text-success-emphasis font-monospace ps-1">{{ day.merged_size_mb }} MB (dataset_1s.parquet)</span>
+                            </div>
+                            {% else %}
+                            <span class="badge bg-secondary bg-opacity-15 text-muted border border-secondary border-opacity-25 px-2.5 py-1.5 rounded-pill">
+                                <i class="bi bi-hourglass-split me-1"></i> Pending Merge
+                            </span>
+                            {% endif %}
+                        </td>
+
+                        <!-- Target Indices Column -->
+                        <td class="py-3">
+                            <div class="d-flex gap-1.5 flex-wrap">
+                                <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-25 px-2 py-1 rounded">NIFTY</span>
+                                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-25 px-2 py-1 rounded">BANKNIFTY</span>
+                            </div>
+                        </td>
+
+                        <!-- Actions Column -->
+                        <td class="py-3 text-end pe-4">
+                            <div class="d-inline-flex align-items-center gap-2">
+                                <!-- Spin indicator -->
+                                <span class="spinner-border spinner-border-sm text-primary htmx-indicator" id="spin-{{ day.date_str }}" role="status"></span>
+
+                                <!-- Merge with strikes Button -->
+                                <form method="POST"
+                                      hx-post="{% url 'market:daily_ticks_merge' day.date_str %}"
+                                      hx-target="#daily-ticks-container"
+                                      hx-swap="outerHTML"
+                                      hx-indicator="#spin-{{ day.date_str }}"
+                                      class="d-inline m-0">
+                                    {% csrf_token %}
+                                    <input type="hidden" name="strike_count" value="15">
+                                    <button type="submit" 
+                                            class="btn btn-sm {% if day.has_merged %}btn-outline-success{% else %}btn-primary text-white{% endif %} rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                                            id="btn-merge-{{ day.date_str }}"
+                                            title="Download 1S option resolution data from Fyers and merge with index spot into dataset_1s.parquet">
+                                        <i class="bi bi-layers-fill"></i>
+                                        <span>{% if day.has_merged %}Re-merge with strikes{% else %}Merge with strikes{% endif %}</span>
+                                    </button>
+                                </form>
+
+                                <!-- Parquet Download Dropdown -->
+                                {% if day.has_merged or day.has_spot %}
+                                <div class="dropdown d-inline">
+                                    <button class="btn btn-sm btn-outline-secondary rounded-pill px-2.5 py-1.5 dropdown-toggle" 
+                                            type="button" 
+                                            data-bs-toggle="dropdown" 
+                                            aria-expanded="false"
+                                            title="Download Parquet Files">
+                                        <i class="bi bi-download"></i>
+                                    </button>
+                                    <ul class="dropdown-menu dropdown-menu-end shadow-sm border border-secondary border-opacity-25" style="background: #1e222d;">
+                                        {% if day.has_merged %}
+                                        <li>
+                                            <a class="dropdown-item text-success d-flex align-items-center gap-2 py-2" 
+                                               href="{% url 'market:daily_ticks_download' day.date_str 'dataset' %}">
+                                                <i class="bi bi-file-earmark-zip"></i>
+                                                <div>
+                                                    <div class="fw-semibold">Merged Dataset (1S)</div>
+                                                    <div class="small text-muted">{{ day.merged_size_mb }} MB &bull; dataset_1s.parquet</div>
+                                                </div>
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                        {% if day.has_spot %}
+                                        <li>
+                                            <a class="dropdown-item text-info d-flex align-items-center gap-2 py-2" 
+                                               href="{% url 'market:daily_ticks_download' day.date_str 'spot' %}">
+                                                <i class="bi bi-file-earmark-bar-graph"></i>
+                                                <div>
+                                                    <div class="fw-semibold">Spot Index (1S)</div>
+                                                    <div class="small text-muted">{{ day.spot_size_mb }} MB &bull; spot_1s.parquet</div>
+                                                </div>
+                                            </a>
+                                        </li>
+                                        {% endif %}
+                                    </ul>
+                                </div>
+                                {% endif %}
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-5">
+                            <div class="d-flex flex-column align-items-center justify-content-center gap-2 text-muted">
+                                <i class="bi bi-inbox fs-1 text-white-50"></i>
+                                <h6 class="fw-semibold mb-0 text-white">No daily tick sessions recorded yet</h6>
+                                <p class="small mb-0">Daily 1-second index ticks will automatically appear here once recorded under <code>/app/backup/ticks/</code>.</p>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    <!-- END: Daily Recordings Table Card -->
+
+</div>

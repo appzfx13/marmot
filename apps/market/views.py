@@ -19,7 +19,11 @@ from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 from datetime import date, timedelta
 from .models import MarketBackupTask
 from .forms import MarketBackupForm, MacroBackupForm
-from .services import create_and_start_backup_task, create_and_start_macro_backup_task, send_control_command, inspect_parquet_dataset
+from .services import (
+    create_and_start_backup_task, create_and_start_macro_backup_task,
+    send_control_command, inspect_parquet_dataset,
+    get_daily_ticks_metadata, dispatch_daily_strike_merge
+)
 
 
 class MarketBackupListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
@@ -803,3 +807,71 @@ class MarketBackupScrollView(LoginRequiredMixin, AdminRequiredMixin, BaseHtmxScr
         context = super().get_context_data(**kwargs)
         context['current_sort'] = self.request.GET.get('sort', '-created_at').strip()
         return context
+
+
+class DailyTicksListView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """List view for daily tick recordings and 1S consolidated datasets."""
+    template_name = 'admins/daily_ticks_dashboard.html'
+    partial_template_name = 'admins/partials/daily_ticks_list_content.html'
+
+    def get(self, request, *args, **kwargs):
+        metadata = get_daily_ticks_metadata()
+        context = {
+            'page_title': 'Daily 1S Datasets & Ticks',
+            'days': metadata['days'],
+            'total_days': metadata['total_days'],
+            'total_spot_days': metadata['total_spot_days'],
+            'total_merged_days': metadata['total_merged_days'],
+            'total_storage_mb': metadata['total_storage_mb'],
+        }
+        if request.headers.get('HX-Request'):
+            return render(request, self.partial_template_name, context)
+        return render(request, self.template_name, context)
+
+
+class DailyTicksMergeActionView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Asynchronously triggers Go microservice 1S option download & strike merge."""
+    def post(self, request, date_str, *args, **kwargs):
+        indices = request.POST.getlist('indices') or ['NIFTY', 'BANKNIFTY']
+        try:
+            strike_count = int(request.POST.get('strike_count', 15))
+        except (ValueError, TypeError):
+            strike_count = 15
+
+        dispatch_daily_strike_merge(date_str, indices=indices, strike_count=strike_count)
+
+        if request.headers.get('HX-Request'):
+            messages.success(request, f"Merge initiated for {date_str} (ATM±{strike_count} strikes). Go microservice running asynchronously.")
+            response = HttpResponse(status=200)
+            response['HX-Trigger'] = json.dumps({
+                "refreshDailyTicks": True
+            })
+            # Re-render the refreshed list partial so the UI updates immediately
+            metadata = get_daily_ticks_metadata()
+            context = {
+                'page_title': 'Daily 1S Datasets & Ticks',
+                'days': metadata['days'],
+                'total_days': metadata['total_days'],
+                'total_spot_days': metadata['total_spot_days'],
+                'total_merged_days': metadata['total_merged_days'],
+                'total_storage_mb': metadata['total_storage_mb'],
+            }
+            return render(request, 'admins/partials/daily_ticks_list_content.html', context)
+
+        return JsonResponse({"status": "success", "message": f"Merge started for {date_str}"})
+
+
+class DailyTicksDownloadView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Direct file download for daily Parquet files (spot_1s.parquet or dataset_1s.parquet)."""
+    def get(self, request, date_str, file_type, *args, **kwargs):
+        base_dir = os.path.join(getattr(settings, 'BACKUP_DIR', '/app/backup'), 'ticks', date_str)
+        if not os.path.exists(base_dir):
+            base_dir = f"/app/backup/ticks/{date_str}"
+
+        filename = "dataset_1s.parquet" if file_type == 'dataset' else "spot_1s.parquet"
+        file_path = os.path.join(base_dir, filename)
+
+        if not os.path.exists(file_path):
+            raise Http404(f"File {filename} not found for date {date_str}")
+
+        return FileResponse(open(file_path, 'rb'), as_attachment=True, filename=f"{date_str}_{filename}")

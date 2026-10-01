@@ -16,11 +16,18 @@ from .views import (
     MacroBackupCreateView,
     MacroBackupCreatePageView,
     MacroBackupListView,
+    DailyTicksListView,
+    DailyTicksMergeActionView,
+    DailyTicksDownloadView,
 )
 
 app_name = 'market'
 
 urlpatterns = [
+    # Daily 1S Ticks & Consolidated Datasets
+    path('backup/daily-ticks/', DailyTicksListView.as_view(), name='daily_ticks_list'),
+    path('backup/daily-ticks/<str:date_str>/merge/', DailyTicksMergeActionView.as_view(), name='daily_ticks_merge'),
+    path('backup/daily-ticks/<str:date_str>/download/<str:file_type>/', DailyTicksDownloadView.as_view(), name='daily_ticks_download'),
     # Backup Dashboard / List
     path('backup/', MarketBackupListView.as_view(), name='market_backup_view'),
     path('backup/list/', MarketBackupListView.as_view(), name='market_backup_list'),

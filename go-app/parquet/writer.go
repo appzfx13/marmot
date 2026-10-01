@@ -330,10 +330,19 @@ func (r *Spot1SRecorder) Close() {
 
 // ConsolidateDailySpot combines all spot part files into a single spot_1s.parquet file.
 func ConsolidateDailySpot(baseDir, dateStr string) (string, error) {
+	targetDir := filepath.Join(baseDir, "ticks", dateStr)
+	targetFile := filepath.Join(targetDir, "spot_1s.parquet")
+
 	partsDir := filepath.Join(baseDir, "ticks", dateStr, "spot_parts")
 	matches, err := filepath.Glob(filepath.Join(partsDir, "spot_*.parquet"))
 	if err != nil || len(matches) == 0 {
-		return "", fmt.Errorf("no spot part files found in %s", partsDir)
+		matches, _ = filepath.Glob(filepath.Join(targetDir, "spot_*.parquet"))
+	}
+	if len(matches) == 0 {
+		if _, statErr := os.Stat(targetFile); statErr == nil {
+			return targetFile, nil
+		}
+		return "", fmt.Errorf("no spot part files found in %s or %s", partsDir, targetDir)
 	}
 
 	allRecords := make([]Spot1SRecord, 0)
@@ -356,8 +365,6 @@ func ConsolidateDailySpot(baseDir, dateStr string) (string, error) {
 		return allRecords[i].Timestamp < allRecords[j].Timestamp
 	})
 
-	targetDir := filepath.Join(baseDir, "ticks", dateStr)
-	targetFile := filepath.Join(targetDir, "spot_1s.parquet")
 	file, err := os.OpenFile(targetFile, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return "", fmt.Errorf("failed to create consolidated spot file: %w", err)

@@ -1895,11 +1895,20 @@
                     </li>
                     <li class="sidebar-menu-item">
                         <a href="{% url 'market:market_backup_list' %}"
-                            class="sidebar-menu-link {% if '/market/backup' in request.path and '/market/backup/macro' not in request.path %}active{% endif %}"
+                            class="sidebar-menu-link {% if '/market/backup' in request.path and '/market/backup/macro' not in request.path and '/market/backup/daily-ticks' not in request.path %}active{% endif %}"
                             id="admin-menu-market-backup" hx-get="{% url 'market:market_backup_list' %}"
                             hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-cloud-arrow-down-fill"></i>
                             <span>Market Backups</span>
+                        </a>
+                    </li>
+                    <li class="sidebar-menu-item">
+                        <a href="{% url 'market:daily_ticks_list' %}"
+                            class="sidebar-menu-link {% if '/market/backup/daily-ticks' in request.path or request.resolver_match.url_name == 'daily_ticks_list' %}active{% endif %}"
+                            id="admin-menu-daily-ticks" hx-get="{% url 'market:daily_ticks_list' %}"
+                            hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
+                            <i class="bi bi-calendar2-range-fill text-info"></i>
+                            <span>Daily 1S Datasets</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
