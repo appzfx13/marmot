@@ -60,8 +60,6 @@ class TradeExecConfigForm(forms.ModelForm):
             'layer_status',
             'layer_add_in_lot_count',
             'layer_percentage',
-            'forecast_status',
-            'backtest_status',
             # ── Forex / CME Futures (NEW, shown only for FOREX_FUTURES) ───────
             'forex_instrument',
             'forex_broker_api_key',
@@ -94,9 +92,6 @@ class TradeExecConfigForm(forms.ModelForm):
             'layer_status':         forms.CheckboxInput(attrs={'class': _CHECK_CSS, 'role': 'switch', 'id': 'id_layer_status'}),
             'layer_add_in_lot_count': forms.NumberInput(attrs={'class': _FIELD_CSS}),
             'layer_percentage':     forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '0.1'}),
-            # Features
-            'forecast_status':      forms.CheckboxInput(attrs={'class': _CHECK_CSS, 'role': 'switch', 'id': 'id_forecast_status'}),
-            'backtest_status':      forms.CheckboxInput(attrs={'class': _CHECK_CSS, 'role': 'switch', 'id': 'id_backtest_status'}),
             # Forex / CME (NEW)
             'forex_instrument':     forms.Select(attrs={'class': _SELECT_CSS}),
             'forex_broker_api_key': forms.TextInput(attrs={'class': _FIELD_CSS, 'placeholder': 'Rithmic / OANDA API Key'}),

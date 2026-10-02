@@ -48,7 +48,6 @@ class UserTradingAccount(BaseModel):
     is_default = models.BooleanField(default=False, help_text="Is this the default primary trading account for the user?")
     is_active = models.BooleanField(default=True, help_text="Account active toggle")
     is_configured = models.BooleanField(default=False, help_text="API key credentials validated")
-    is_trader_active = models.BooleanField(default=False, help_text="Real-time trading execution loop active for this account")
     keep_alive = models.BooleanField(default=False, help_text="Auto-refresh access token every 8 hours")
     last_token_refreshed_at = models.DateTimeField(null=True, blank=True, help_text="Timestamp of last successful token renewal")
     realtime_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Realtime account PnL")
@@ -104,14 +103,10 @@ class TradeExecConfig(BaseModel):
     layer_status = models.BooleanField(default=False, help_text="Enable order layering (pyramiding into winning positions)")
     layer_add_in_lot_count = models.PositiveSmallIntegerField(default=0, blank=True, help_text="Number of additional lots to add per layer entry")
     layer_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, blank=True, help_text="Percentage step/distance required per layer")
-    # Feature Toggles
-    forecast_status = models.BooleanField(default=False, help_text="Enable algorithmic predictive forecasting for position entries")
-    backtest_status = models.BooleanField(default=False, help_text="Enable backtest execution simulation mode")
 
     # Realtime Execution Telemetry & Feedback Logs
     execution_status = models.CharField(max_length=20, choices=TaskStatusChoices.choices, default=TaskStatusChoices.CREATED, help_text="Realtime execution status")
     realtime_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Realtime strategy execution PnL")
-    estimated_brokerage = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Estimated brokerage & taxes incurred")
     execution_remarks = models.TextField(blank=True, null=True, help_text="Execution notes and strategy remarks")
     api_response_log = models.JSONField(default=dict, blank=True, help_text="Live API response telemetry log for Sandbox & Live trades")
 

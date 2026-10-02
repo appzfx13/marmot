@@ -41,18 +41,6 @@ class User(AbstractUser, BaseModel):
         default=PLStatusChoices.NO_TRADE,
     )
 
-    # Primary Freeze Metrics
-    primary_freeze_time = models.DateTimeField(blank=True, null=True)
-    primary_freeze_pl = models.DecimalField(
-        max_digits=12, decimal_places=2, blank=True, null=True
-    )
-
-    # Final Freeze Metrics
-    final_freeze_time = models.DateTimeField(blank=True, null=True)
-    final_freeze_pl = models.DecimalField(
-        max_digits=12, decimal_places=2, blank=True, null=True
-    )
-
     REQUIRED_FIELDS = ['phone_number']
 
     # Custom Manager to support AbstractUser features (like createsuperuser) + SoftDelete

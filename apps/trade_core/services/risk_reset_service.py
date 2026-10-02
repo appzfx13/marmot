@@ -32,10 +32,6 @@ def unfreeze_and_unblock_active_traders(deactivate_broker_killswitch: bool = Tru
             final_freeze=False,
             is_blocked=False,
             trade_eligibility=True,
-            primary_freeze_time=None,
-            primary_freeze_pl=None,
-            final_freeze_time=None,
-            final_freeze_pl=None
         )
 
     logger.info("✅ [Risk Reset] Database flags cleared. Total active users reset: %d (candidates: %d)", updated_count, candidate_count)

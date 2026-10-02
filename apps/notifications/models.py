@@ -2,20 +2,6 @@ from django.db import models
 from django.conf import settings
 
 
-class RiverJob(models.Model):
-    id = models.BigAutoField(primary_key=True)
-    kind = models.TextField()
-    args = models.JSONField()
-    queue = models.TextField(default="default")
-    state = models.TextField(default="available")
-    max_attempts = models.IntegerField(default=3)
-
-    class Meta:
-        db_table = "river_job"
-        managed = False  # Tells Django ORM NOT to run migrations on this table
-
-
-
 
 class Notification(models.Model):
     user = models.ForeignKey(

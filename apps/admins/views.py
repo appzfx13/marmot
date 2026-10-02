@@ -4146,8 +4146,6 @@ class AdminTradeExecConfigToggleView(LoginRequiredMixin, AdminRequiredMixin, Vie
         'auto_lot_status': 'Auto Lot Sizing',
         'auto_sl_status': 'Auto Stop Loss',
         'layer_status': 'Order Layering',
-        'forecast_status': 'Predictive Forecasting',
-        'backtest_status': 'Backtest Mode',
         'is_active': 'Master Active status',
     }
 
