@@ -33,6 +33,7 @@ var StrategyPresets = map[string]StrategyConfig{
 	"momentum_guardrail": MomentumGuardrailPreset,
 	"macd_crossover":     MACDCrossoverPreset,
 	"macd_ict_hybrid":    MACDICTHybridPreset,
+	"volume_amd":          VolumeAMDPreset,
 }
 
 // GetStrategyPreset returns a StrategyConfig by rule_type key (case-insensitive).
@@ -52,6 +53,7 @@ var strategyRegistry = map[string]Strategy{
 	"ict_smc":         NewQuantEngineStrategy("ict_smc"),
 	"hft_scalp":       NewQuantEngineStrategy("hft_scalp"),
 	"macd_ict_hybrid": NewQuantEngineStrategy("macd_ict_hybrid"),
+	"volume_amd":      NewQuantEngineStrategy("volume_amd"),
 }
 
 // GetStrategy resolves a plug-and-play strategy instance by its strategy_name.

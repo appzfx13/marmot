@@ -17,10 +17,12 @@
         </a>
         <div class="d-flex align-items-center gap-1 mt-0">
             <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">{{ backtest.index_name }}</span>
-            {% if backtest.parameters.strategy_name == 'macd_ict_hybrid' %}
-            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">MACD+ICT Hybrid</span>
-            {% else %}
-            <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">RL Engine</span>
+            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">Go Engine</span>
+            {% if backtest.use_vix_assist %}
+            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">VIX Support</span>
+            {% endif %}
+            {% if backtest.use_macro_assist %}
+            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 rounded-pill px-2 py-0" style="font-size: 0.65rem;">AI Macro</span>
             {% endif %}
         </div>
     </td>
@@ -156,7 +158,7 @@
         <div class="trade-row-drawer p-3 mx-2 my-1 rounded-3">
             <div class="row g-3 small">
                 <div class="col-md-3">
-                    <div class="theme-text-muted small text-uppercase fw-bold" style="font-size: 0.68rem;">RL Model Configuration</div>
+                    <div class="theme-text-muted small text-uppercase fw-bold" style="font-size: 0.68rem;">Quantitative Engine Configuration</div>
                     <div class="theme-text-main fw-semibold mt-1">Algorithm: <span class="text-info">{{ backtest.parameters.algorithm|default:"PPO" }}</span></div>
                     <div class="theme-text-muted">Strike Selection: <span class="theme-text-main">{{ backtest.parameters.strike_selection|default:"ATM" }}</span></div>
                     <div class="theme-text-muted">Reward Policy: <span class="theme-text-main">{{ backtest.parameters.reward_scheme|default:"risk_adjusted" }}</span></div>

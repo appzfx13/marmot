@@ -117,7 +117,7 @@ func (j *BacktestJob) Run(ctx context.Context) {
 	// Preload all ticks from parquet once; group by date for O(1) per-day lookup
 	candlesByDate := make(map[string][]strategies.MarketTick)
 	if parquetFilePath != "" {
-		loaded, pqErr := pqreader.LoadTicksByDate(parquetFilePath)
+		loaded, pqErr := pqreader.LoadTicksByDateRange(parquetFilePath, startDate, endDate)
 		if pqErr != nil {
 			log.Printf("⚠️  [Backtest #%s] Parquet load failed (%v), will use synthetic ticks\n", taskID, pqErr)
 		} else {
@@ -184,6 +184,76 @@ func (j *BacktestJob) Run(ctx context.Context) {
 		}
 	}
 
+	// ── India VIX Volatility Support Loading ─────────────────────────────────
+	useVixAssist := false
+	if val, ok := params.Params["use_vix_assist"]; ok {
+		switch v := val.(type) {
+		case bool:
+			useVixAssist = v
+		case string:
+			useVixAssist = strings.EqualFold(v, "true") || v == "1" || strings.EqualFold(v, "on")
+		}
+	}
+
+	var vixMinuteMap map[string]float64
+	var vixDailyMap map[string]float64
+	if useVixAssist {
+		vixPath := ""
+		if p, ok := params.Params["vix_parquet_path"].(string); ok && p != "" {
+			if isFile(p) {
+				vixPath = p
+			} else if isFile(filepath.Join(p, "dataset.parquet")) {
+				vixPath = filepath.Join(p, "dataset.parquet")
+			} else {
+				matches, _ := filepath.Glob(filepath.Join(p, "*vix*.parquet"))
+				if len(matches) > 0 {
+					vixPath = matches[0]
+				}
+			}
+		}
+		if vixPath == "" {
+			if bid, ok := params.Params["vix_backup_task_id"].(string); ok && bid != "" {
+				cand := fmt.Sprintf("/app/backup/%s/%s/dataset.parquet", userID, bid)
+				if isFile(cand) {
+					vixPath = cand
+				} else {
+					matches, _ := filepath.Glob(fmt.Sprintf("/app/backup/%s/%s/*vix*.parquet", userID, bid))
+					if len(matches) > 0 {
+						vixPath = matches[0]
+					}
+				}
+			}
+		}
+		if vixPath == "" {
+			scanDirs := []string{fmt.Sprintf("/app/backup/%s", userID), "/app/backup/1", "/app/backup"}
+			for _, sDir := range scanDirs {
+				matches, _ := filepath.Glob(filepath.Join(sDir, "*", "*vix*.parquet"))
+				if len(matches) > 0 {
+					vixPath = matches[0]
+					break
+				}
+				matches2, _ := filepath.Glob(filepath.Join(sDir, "*vix*.parquet"))
+				if len(matches2) > 0 {
+					vixPath = matches2[0]
+					break
+				}
+			}
+		}
+
+		if vixPath != "" {
+			minMap, dMap, vErr := pqreader.LoadVixSnapshots(vixPath)
+			if vErr != nil {
+				log.Printf("⚠️  [Backtest #%s] India VIX load failed (%v)\n", taskID, vErr)
+			} else {
+				vixMinuteMap = minMap
+				vixDailyMap = dMap
+				log.Printf("📊 [Backtest #%s] India VIX Volatility Support ENABLED: %d keys across %d days from %s\n", taskID, len(vixMinuteMap), len(vixDailyMap), vixPath)
+			}
+		} else {
+			log.Printf("ℹ️  [Backtest #%s] India VIX support enabled but no VIX parquet file discovered\n", taskID)
+		}
+	}
+
 	compounding := NewCompoundingEngine(params.InitialCapital, params.Params)
 	allTrades := make([]strategies.TradeSignal, 0)
 	var totalPnL, peakPnL, maxDD, totalProfit, totalLoss float64
@@ -205,6 +275,7 @@ func (j *BacktestJob) Run(ctx context.Context) {
 
 		// Retrieve pre-loaded real ticks for this date. Skip if data is absent.
 		dayTicks, hasReal := candlesByDate[dateStr]
+		delete(candlesByDate, dateStr) // Free processed day ticks immediately to minimize RAM footprint
 		if !hasReal || len(dayTicks) == 0 {
 			log.Printf("⚠️ [Backtest #%s] Missing Parquet data for date %s. Skipping day.", taskID, dateStr)
 			currDate = currDate.AddDate(0, 0, 1)
@@ -228,6 +299,37 @@ func (j *BacktestJob) Run(ctx context.Context) {
 					}
 				}
 				t.Macro = snap
+			}
+		}
+
+		// Attach India VIX level to each tick if enabled
+		if useVixAssist && (len(vixMinuteMap) > 0 || len(vixDailyMap) > 0) {
+			lastVix := 0.0
+			if dVix, ok := vixDailyMap[dateStr]; ok {
+				lastVix = dVix
+			}
+			for idx := range dayTicks {
+				t := &dayTicks[idx]
+				curVix := 0.0
+				if len(t.Datetime) >= 16 {
+					minKey := strings.Replace(t.Datetime[:16], "T", " ", 1)
+					if v, ok := vixMinuteMap[minKey]; ok {
+						curVix = v
+					}
+				}
+				if curVix <= 0 && len(t.Datetime) >= 13 {
+					hourKey := strings.Replace(t.Datetime[:13], "T", " ", 1)
+					if v, ok := vixMinuteMap[hourKey]; ok {
+						curVix = v
+					}
+				}
+				if curVix <= 0 && lastVix > 0 {
+					curVix = lastVix
+				}
+				if curVix > 0 {
+					lastVix = curVix
+					t.Vix = curVix
+				}
 			}
 		}
 

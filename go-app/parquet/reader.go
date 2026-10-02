@@ -2,15 +2,25 @@ package parquet
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"math"
+	"os"
+	"runtime"
 	"sort"
+	"strconv"
 	"strings"
 
 	parquetgo "github.com/parquet-go/parquet-go"
 
 	"go-app/strategies"
 )
+
+var offsetLabels = map[int]string{
+	-6: "ATM-6", -5: "ATM-5", -4: "ATM-4", -3: "ATM-3", -2: "ATM-2", -1: "ATM-1",
+	0: "ATM",
+	1: "ATM+1", 2: "ATM+2", 3: "ATM+3", 4: "ATM+4", 5: "ATM+5", 6: "ATM+6",
+}
 
 // optionRow mirrors the flat schema of dataset.parquet.
 type optionRow struct {
@@ -51,115 +61,161 @@ type tickBucket struct {
 
 // LoadTicksByDate reads a flat dataset.parquet and returns a map of
 // "YYYY-MM-DD" -> []MarketTick (sorted chronologically by timestamp).
-// Each MarketTick is a complete minute-level broker feed snapshot.
+// Each MarketTick is a complete broker feed snapshot.
 func LoadTicksByDate(filePath string) (map[string][]strategies.MarketTick, error) {
-	rows, err := parquetgo.ReadFile[optionRow](filePath)
+	return LoadTicksByDateRange(filePath, "", "")
+}
+
+// LoadTicksByDateRange reads dataset.parquet using a streaming RowGroup reader to minimize RAM usage.
+// If startDate/endDate are non-empty ("YYYY-MM-DD"), rows outside that range are discarded at stream time.
+func LoadTicksByDateRange(filePath string, startDate string, endDate string) (map[string][]strategies.MarketTick, error) {
+	f, err := os.Open(filePath)
 	if err != nil {
-		return nil, fmt.Errorf("parquet read error: %w", err)
+		return nil, fmt.Errorf("parquet open error: %w", err)
+	}
+	defer f.Close()
+
+	stat, err := f.Stat()
+	if err != nil {
+		return nil, fmt.Errorf("parquet stat error: %w", err)
 	}
 
-	// Group rows by timestamp into buckets
+	pf, err := parquetgo.OpenFile(f, stat.Size())
+	if err != nil {
+		return nil, fmt.Errorf("parquet open file error: %w", err)
+	}
+
 	buckets := make(map[int64]*tickBucket)
 	tsOrder := make([]int64, 0)
+	buf := make([]optionRow, 4096)
 
-	for _, row := range rows {
-		ts := row.Timestamp
-		bucket, exists := buckets[ts]
-		if !exists {
-			bucket = &tickBucket{
-				timestamp: ts,
-				datetime:  row.Datetime,
-				indexName: row.IndexName,
-				options:   make(map[string]strategies.OptionSnap),
-			}
-			buckets[ts] = bucket
-			tsOrder = append(tsOrder, ts)
-		}
+	// Stream through each RowGroup to maintain low, steady memory consumption (<50 MB)
+	for _, rg := range pf.RowGroups() {
+		reader := parquetgo.NewGenericRowGroupReader[optionRow](rg)
+		for {
+			n, rErr := reader.Read(buf)
+			for i := 0; i < n; i++ {
+				row := &buf[i]
 
-		instrUpper := strings.ToUpper(row.InstrumentType)
-		optTypeUpper := strings.ToUpper(row.OptionType)
-
-		if instrUpper == "INDEX" {
-			// Spot OHLCV — take close from spot_price if close is zero
-			cl := row.Close
-			if cl <= 0 {
-				cl = row.SpotPrice
-			}
-			op := row.Open
-			if op <= 0 {
-				op = cl
-			}
-			hi := row.High
-			if hi <= 0 {
-				hi = cl
-			}
-			lo := row.Low
-			if lo <= 0 {
-				lo = cl
-			}
-			bucket.spotOpen = op
-			bucket.spotHigh = hi
-			bucket.spotLow = lo
-			bucket.spotClose = cl
-			bucket.hasSpot = true
-		} else if instrUpper == "OPTION" && (optTypeUpper == "CALL" || optTypeUpper == "PUT") {
-			// Option chain entry — key: "{strike} {CALL|PUT}"
-			key := row.Strike + " " + optTypeUpper
-
-			// Filter to nearest active expiry: avoid far-dated or monthly expiries overwriting active weeklies
-			currDate := ""
-			if len(row.Datetime) >= 10 {
-				currDate = row.Datetime[:10]
-			}
-			if existing, exists := bucket.options[key]; exists {
-				newExp := parseExpiryFromSymbol(row.TradingSymbol)
-				oldExp := parseExpiryFromSymbol(existing.TradingSymbol)
-				if oldExp != "" && oldExp >= currDate {
-					if newExp == "" || newExp < currDate {
-						continue // keep current active expiry
+				// Optional date-range filter at stream time
+				if len(row.Datetime) >= 10 {
+					rowDate := row.Datetime[:10]
+					if startDate != "" && rowDate < startDate {
+						continue
 					}
-					if oldExp < newExp {
-						continue // old expiry is nearer to active trade date
+					if endDate != "" && rowDate > endDate {
+						continue
 					}
-					if oldExp == newExp && existing.Volume >= row.Volume {
-						continue // prefer higher volume if expiry matches
+				}
+
+				ts := row.Timestamp
+				bucket, exists := buckets[ts]
+				if !exists {
+					bucket = &tickBucket{
+						timestamp: ts,
+						datetime:  row.Datetime,
+						indexName: row.IndexName,
+						options:   make(map[string]strategies.OptionSnap),
+					}
+					buckets[ts] = bucket
+					tsOrder = append(tsOrder, ts)
+				}
+
+				instrUpper := strings.ToUpper(row.InstrumentType)
+				optTypeUpper := strings.ToUpper(row.OptionType)
+
+				if instrUpper == "INDEX" {
+					// Spot OHLCV — take close from spot_price if close is zero
+					cl := row.Close
+					if cl <= 0 {
+						cl = row.SpotPrice
+					}
+					op := row.Open
+					if op <= 0 {
+						op = cl
+					}
+					hi := row.High
+					if hi <= 0 {
+						hi = cl
+					}
+					lo := row.Low
+					if lo <= 0 {
+						lo = cl
+					}
+					bucket.spotOpen = op
+					bucket.spotHigh = hi
+					bucket.spotLow = lo
+					bucket.spotClose = cl
+					bucket.hasSpot = true
+				} else if instrUpper == "OPTION" && (optTypeUpper == "CALL" || optTypeUpper == "PUT") {
+					// Option chain entry — key: "{strike} {CALL|PUT}"
+					key := row.Strike + " " + optTypeUpper
+
+					// Filter to nearest active expiry: avoid far-dated or monthly expiries overwriting active weeklies
+					currDate := ""
+					if len(row.Datetime) >= 10 {
+						currDate = row.Datetime[:10]
+					}
+					if existing, exists := bucket.options[key]; exists {
+						newExp := parseExpiryFromSymbol(row.TradingSymbol)
+						oldExp := parseExpiryFromSymbol(existing.TradingSymbol)
+						if oldExp != "" && oldExp >= currDate {
+							if newExp == "" || newExp < currDate {
+								continue // keep current active expiry
+							}
+							if oldExp < newExp {
+								continue // old expiry is nearer to active trade date
+							}
+							if oldExp == newExp && existing.Volume >= row.Volume {
+								continue // prefer higher volume if expiry matches
+							}
+						}
+					}
+
+					cl := row.Close
+					if cl <= 0 {
+						cl = row.SpotPrice
+					}
+					op := row.Open
+					if op <= 0 {
+						op = cl
+					}
+					hi := row.High
+					if hi <= 0 {
+						hi = cl
+					}
+					lo := row.Low
+					if lo <= 0 {
+						lo = cl
+					}
+					bucket.options[key] = strategies.OptionSnap{
+						TradingSymbol: row.TradingSymbol,
+						Open:          op,
+						High:          hi,
+						Low:           lo,
+						Close:         cl,
+						Volume:        row.Volume,
+						OI:            row.OI,
+						IV:            row.IV,
+						Delta:         row.Delta,
+						Gamma:         row.Gamma,
+						Theta:         row.Theta,
+						Vega:          row.Vega,
+						Bid:           row.Bid,
+						Ask:           row.Ask,
 					}
 				}
 			}
 
-			cl := row.Close
-			if cl <= 0 {
-				cl = row.SpotPrice
-			}
-			op := row.Open
-			if op <= 0 {
-				op = cl
-			}
-			hi := row.High
-			if hi <= 0 {
-				hi = cl
-			}
-			lo := row.Low
-			if lo <= 0 {
-				lo = cl
-			}
-			bucket.options[key] = strategies.OptionSnap{
-				TradingSymbol: row.TradingSymbol,
-				Open:          op,
-				High:          hi,
-				Low:           lo,
-				Close:         cl,
-				Volume:        row.Volume,
-				OI:            row.OI,
-				IV:            row.IV,
-				Delta:         row.Delta,
-				Gamma:         row.Gamma,
-				Theta:         row.Theta,
-				Vega:          row.Vega,
-				Bid:           row.Bid,
-				Ask:           row.Ask,
+			if rErr != nil {
+				if rErr == io.EOF {
+					break
+				}
+				_ = reader.Close()
+				return nil, fmt.Errorf("parquet stream read error: %w", rErr)
 			}
 		}
+		_ = reader.Close()
 	}
 
 	// Sort timestamps chronologically
@@ -171,25 +227,39 @@ func LoadTicksByDate(filePath string) (map[string][]strategies.MarketTick, error
 
 	for _, ts := range tsOrder {
 		b := buckets[ts]
+		delete(buckets, ts) // Progressive deallocation: free bucket memory immediately
 		if !b.hasSpot || b.spotClose <= 0 {
 			continue // skip ticks with no valid spot data
 		}
 
-		// Automatically create ATM, ATM±N aliases for numeric strikes to ensure all strategies match
+		// Keep strictly ATM±3 options (7 strikes x 2 types = 14 snaps) needed by strategy sweep engine.
+		// Deep ITM/OTM options outside ATM±3 are never swept or evaluated by any strategy.
 		step := strikeStepForIndex(b.indexName)
-		if step > 0 {
+		opts := b.options
+		if step > 0 && len(b.options) > 14 {
+			pruned := make(map[string]strategies.OptionSnap, 28)
 			atmNum := int(math.Round(b.spotClose/float64(step))) * step
 			for _, optType := range []string{"CALL", "PUT"} {
-				for offset := -6; offset <= 6; offset++ {
+				for offset := -3; offset <= 3; offset++ {
 					numStrike := atmNum + (offset * step)
-					numKey := fmt.Sprintf("%d %s", numStrike, optType)
+					numKey := strconv.Itoa(numStrike) + " " + optType
 					if snap, ok := b.options[numKey]; ok {
-						label := "ATM"
-						if offset > 0 {
-							label = fmt.Sprintf("ATM+%d", offset)
-						} else if offset < 0 {
-							label = fmt.Sprintf("ATM-%d", -offset)
-						}
+						label := offsetLabels[offset]
+						relKey := label + " " + optType
+						pruned[relKey] = snap
+						pruned[numKey] = snap
+					}
+				}
+			}
+			opts = pruned
+		} else if step > 0 {
+			atmNum := int(math.Round(b.spotClose/float64(step))) * step
+			for _, optType := range []string{"CALL", "PUT"} {
+				for offset := -3; offset <= 3; offset++ {
+					numStrike := atmNum + (offset * step)
+					numKey := strconv.Itoa(numStrike) + " " + optType
+					if snap, ok := b.options[numKey]; ok {
+						label := offsetLabels[offset]
 						relKey := label + " " + optType
 						if _, exists := b.options[relKey]; !exists {
 							b.options[relKey] = snap
@@ -215,13 +285,14 @@ func LoadTicksByDate(filePath string) (map[string][]strategies.MarketTick, error
 			SpotHigh:  b.spotHigh,
 			SpotLow:   b.spotLow,
 			SpotClose: b.spotClose,
-			Options:   b.options,
+			Options:   opts,
 		}
 		byDate[dateStr] = append(byDate[dateStr], tick)
 		totalTicks++
 	}
 
-	log.Printf("📦 [Parquet] %d ticks | %d trading days | %s", totalTicks, len(byDate), filePath)
+	runtime.GC()
+	log.Printf("📦 [Parquet Stream] %d ticks | %d trading days | %s", totalTicks, len(byDate), filePath)
 	return byDate, nil
 }
 

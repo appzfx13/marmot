@@ -63,51 +63,13 @@
                            value="{{ suggested_name }}" required>
                 </div>
 
-                <!-- Target Trading Account -->
-                <div class="col-md-7">
-                    <div class="d-flex align-items-center justify-content-between mb-1">
-                        <label class="form-label small fw-semibold text-white mb-0">Target Trading Account (Broker API)</label>
-                        <div class="d-flex align-items-center gap-2">
-                            <button type="button" 
-                                    class="btn btn-link p-0 text-decoration-none text-info smaller fw-bold d-inline-flex align-items-center gap-1"
-                                    hx-get="{% url 'admins:admin-sandbox-account-create-modal' %}"
-                                    hx-target="#globalHtmxModalDialog"
-                                    hx-swap="innerHTML"
-                                    title="Create a new isolated Sandbox Account">
-                                <i class="bi bi-plus-circle-fill"></i> + Sandbox
-                            </button>
-                            <button type="button" 
-                                    class="btn btn-link p-0 text-decoration-none text-warning smaller fw-bold d-inline-flex align-items-center gap-1"
-                                    hx-post="{% url 'admins:admin-connect-mock-broker' %}"
-                                    hx-target="#deployTradingAccountSelect"
-                                    hx-swap="outerHTML"
-                                    title="Connect / Refresh Dhan Mock Gateway (:8088)">
-                                <i class="bi bi-hdd-network-fill"></i> + Connect Mock
-                            </button>
-                        </div>
-                    </div>
-                    <select name="trading_account_id" id="deployTradingAccountSelect" class="form-select"
-                            style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
-                        {% if user_accounts %}
-                            {% for acc in user_accounts %}
-                            <option value="{{ acc.id }}" data-account-type="{{ acc.account_type }}" {% if acc.is_default or acc.account_type == default_mode %}selected{% endif %}>
-                                {{ acc.account_name }} ({{ acc.broker.name }} - {{ acc.account_type }}) {% if acc.account_type == 'MOCK' %}[ONLINE :8088]{% endif %}
-                            </option>
-                            {% endfor %}
-                        {% else %}
-                            <option value="" data-account-type="STANDBY">No Active Account Configured (Standby Mode)</option>
-                        {% endif %}
-                    </select>
-                </div>
-
                 <!-- Execution Mode -->
-                <div class="col-md-5">
+                <div class="col-md-6">
                     <label class="form-label small fw-semibold text-white mb-1">Execution Mode</label>
                     <select name="execution_mode" id="deployExecutionModeSelect" class="form-select"
                             style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
-                        <option value="LIVE" {% if default_mode == 'LIVE' %}selected{% endif %}>LIVE Real Market Execution</option>
-                        <option value="SANDBOX" {% if default_mode == 'SANDBOX' %}selected{% endif %}>SANDBOX Paper Trading</option>
-                        <option value="MOCK" {% if default_mode == 'MOCK' %}selected{% endif %}>MOCK Live Paper Trading (Dhan Emulator)</option>
+                        <option value="SANDBOX" {% if default_mode == 'SANDBOX' or default_mode == 'MOCK' %}selected{% endif %}>SANDBOX Execution (Virtual Capital &amp; Mock Broker)</option>
+                        <option value="LIVE" {% if default_mode == 'LIVE' %}selected{% endif %}>LIVE Real Market Execution (Real Broker API)</option>
                     </select>
                 </div>
 
@@ -122,13 +84,34 @@
                     </div>
                 </div>
 
-                <!-- Initial State Info -->
-                <div class="col-md-6">
-                    <label class="form-label small fw-semibold text-white mb-1">Initial Deployment Status</label>
-                    <div class="form-control d-flex align-items-center justify-content-between"
-                         style="background: rgba(255,255,255,0.04); border: 1px solid var(--border-color); color: rgba(241, 245, 249, 0.7);">
-                        <span class="small"><i class="bi bi-pause-circle me-1 text-warning"></i> Inactive (is_active = False)</span>
-                        <span class="badge bg-secondary bg-opacity-35 text-white px-2 py-0.5 smaller font-monospace">STANDBY</span>
+                <!-- Target Trading Account (Shown ONLY in LIVE Mode) -->
+                <div class="col-12" id="tradingAccountContainer">
+                    <label class="form-label small fw-semibold text-white mb-1">Target Trading Account (Broker API)</label>
+                    <select name="trading_account_id" id="deployTradingAccountSelect" class="form-select"
+                            style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;">
+                        {% if user_accounts %}
+                            {% for acc in user_accounts %}
+                            <option value="{{ acc.id }}" data-account-type="{{ acc.account_type }}" {% if acc.is_default or acc.account_type == default_mode %}selected{% endif %}>
+                                {{ acc.account_name }} ({{ acc.broker.name }} - {{ acc.account_type }})
+                            </option>
+                            {% endfor %}
+                        {% else %}
+                            <option value="" data-account-type="STANDBY">No Active Account Configured (Standby Mode)</option>
+                        {% endif %}
+                    </select>
+                </div>
+
+                <!-- Sandbox Auto-Router Banner (Shown ONLY in SANDBOX Mode) -->
+                <div class="col-12" id="sandboxAutoRouterBanner">
+                    <div class="p-2.5 rounded-3 d-flex align-items-center justify-content-between" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25);">
+                        <div class="d-flex align-items-center gap-2">
+                            <i class="bi bi-hdd-network-fill text-success fs-5"></i>
+                            <div>
+                                <span class="small fw-bold text-white d-block">Auto-Bound Sandbox Route</span>
+                                <span class="smaller text-muted">Orders &amp; virtual PnL will route to Dhan Mock Broker Gateway (<code class="text-success">:8088</code>)</span>
+                            </div>
+                        </div>
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 smaller font-monospace">MOCK ENGINE READY</span>
                     </div>
                 </div>
             </div>
@@ -167,64 +150,37 @@
 
     <script>
     (function() {
-        var accSelect = document.getElementById('deployTradingAccountSelect');
         var modeSelect = document.getElementById('deployExecutionModeSelect');
         var nameInput = document.getElementById('deployStrategyNameInput');
-        if (!accSelect || !modeSelect) return;
+        var accContainer = document.getElementById('tradingAccountContainer');
+        var sandboxBanner = document.getElementById('sandboxAutoRouterBanner');
+        if (!modeSelect) return;
 
-        function updateNamePrefix(mode) {
-            if (!nameInput) return;
-            var val = nameInput.value;
-            if (mode === 'MOCK') {
-                if (val.startsWith('Live ')) nameInput.value = 'Mock ' + val.substring(5);
-                else if (val.startsWith('Sandbox ')) nameInput.value = 'Mock ' + val.substring(8);
-                else if (!val.startsWith('Mock ')) nameInput.value = 'Mock ' + val;
-            } else if (mode === 'SANDBOX') {
-                if (val.startsWith('Live ')) nameInput.value = 'Sandbox ' + val.substring(5);
-                else if (val.startsWith('Mock ')) nameInput.value = 'Sandbox ' + val.substring(5);
-                else if (!val.startsWith('Sandbox ')) nameInput.value = 'Sandbox ' + val;
-            } else if (mode === 'LIVE') {
-                if (val.startsWith('Sandbox ')) nameInput.value = 'Live ' + val.substring(8);
-                else if (val.startsWith('Mock ')) nameInput.value = 'Live ' + val.substring(5);
-                else if (!val.startsWith('Live ')) nameInput.value = 'Live ' + val;
-            }
-        }
-
-        function syncFromAccount() {
-            var opt = accSelect.options[accSelect.selectedIndex];
-            if (opt && opt.getAttribute('data-account-type')) {
-                var accType = opt.getAttribute('data-account-type').toUpperCase();
-                if (accType === 'MOCK') {
-                    modeSelect.value = 'MOCK';
-                    updateNamePrefix('MOCK');
-                } else if (accType === 'SANDBOX') {
-                    modeSelect.value = 'SANDBOX';
-                    updateNamePrefix('SANDBOX');
-                } else if (accType === 'LIVE') {
-                    modeSelect.value = 'LIVE';
-                    updateNamePrefix('LIVE');
-                }
-            }
-        }
-
-        function syncFromMode() {
+        function syncModeUI() {
             var mode = modeSelect.value;
-            updateNamePrefix(mode);
-            var currentOpt = accSelect.options[accSelect.selectedIndex];
-            if (currentOpt && currentOpt.getAttribute('data-account-type') !== mode) {
-                for (var i = 0; i < accSelect.options.length; i++) {
-                    if (accSelect.options[i].getAttribute('data-account-type') === mode) {
-                        accSelect.selectedIndex = i;
-                        break;
-                    }
+            if (mode === 'SANDBOX' || mode === 'MOCK') {
+                if (accContainer) accContainer.style.display = 'none';
+                if (sandboxBanner) sandboxBanner.style.display = 'block';
+                if (nameInput) {
+                    var val = nameInput.value;
+                    if (val.startsWith('Live ')) nameInput.value = 'Sandbox ' + val.substring(5);
+                    else if (val.startsWith('Mock ')) nameInput.value = 'Sandbox ' + val.substring(5);
+                    else if (!val.startsWith('Sandbox ')) nameInput.value = 'Sandbox ' + val;
+                }
+            } else {
+                if (accContainer) accContainer.style.display = 'block';
+                if (sandboxBanner) sandboxBanner.style.display = 'none';
+                if (nameInput) {
+                    var val = nameInput.value;
+                    if (val.startsWith('Sandbox ')) nameInput.value = 'Live ' + val.substring(8);
+                    else if (val.startsWith('Mock ')) nameInput.value = 'Live ' + val.substring(5);
+                    else if (!val.startsWith('Live ')) nameInput.value = 'Live ' + val;
                 }
             }
         }
 
-        accSelect.addEventListener('change', syncFromAccount);
-        modeSelect.addEventListener('change', syncFromMode);
-
-        syncFromAccount();
+        modeSelect.addEventListener('change', syncModeUI);
+        syncModeUI();
     })();
     </script>
 </div>

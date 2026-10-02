@@ -75,6 +75,57 @@ class MarketBackupTask(BaseModel):
             return "Databento"
         return "FYERS"
 
+    @property
+    def resolution_label(self):
+        """Short readable resolution badge label (e.g. 5s Ticks, 1s High-Freq, 1h Macro)."""
+        if self.is_macro_assist:
+            return f"{self.macro_timeframe or '1h'} Macro"
+        if self.market_type == MarketTypeChoices.FOREX_FUTURES:
+            if self.databento_schema == DatabentoSchemaChoices.OHLCV_1M:
+                return "1m OHLCV"
+            elif self.databento_schema == DatabentoSchemaChoices.TRADES:
+                return "Tick Trades"
+            elif self.databento_schema == DatabentoSchemaChoices.MBP_10:
+                return "MBP-10 DOM"
+            return self.get_databento_schema_display() or "1m OHLCV"
+        if self.use_30_days_1s:
+            return "1s High-Freq"
+        if self.use_30_days_5s:
+            return "5s Ticks"
+        return "1m Candles"
+
+    @property
+    def resolution_badge_style(self):
+        """Color styling for resolution badge."""
+        if self.is_macro_assist:
+            return "background:rgba(234,179,8,0.18);color:#facc15;border:1px solid rgba(234,179,8,0.4);"
+        if self.market_type == MarketTypeChoices.FOREX_FUTURES:
+            return "background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);"
+        if self.use_30_days_1s:
+            return "background:rgba(168,85,247,0.18);color:#c084fc;border:1px solid rgba(168,85,247,0.4);"
+        if self.use_30_days_5s:
+            return "background:rgba(6,182,212,0.18);color:#22d3ee;border:1px solid rgba(6,182,212,0.4);"
+        return "background:rgba(100,116,139,0.18);color:#94a3b8;border:1px solid rgba(100,116,139,0.4);"
+
+    @property
+    def total_strikes_count(self):
+        """Calculates total option contracts (CE + PE + ATM)."""
+        sc = self.strike_count or 0
+        return (sc * 2) + 1 if sc > 0 else 0
+
+    @property
+    def resolution_detail(self):
+        """Detailed granularity description for tooltips and inspect cards."""
+        if self.is_macro_assist:
+            return f"Resampled {self.macro_timeframe or '1h'} OHLCV with Gemini Fundamental Sentiment & Regime Flow"
+        if self.market_type == MarketTypeChoices.FOREX_FUTURES:
+            return f"CME Globex Micro Futures · {self.get_databento_schema_display()}"
+        freq = "1s High-Frequency" if self.use_30_days_1s else ("5s Granular Ticks (12/min)" if self.use_30_days_5s else "1m Aggregated OHLCV")
+        if self.index_name == 'INDIAVIX' or not self.strike_count:
+            return f"Spot Volatility Index Only ({freq} Stream)"
+        contracts_text = f"±{self.strike_count} ATM ({self.total_strikes_count} Contracts)" if self.strike_count else "Spot Only"
+        return f"Spot: 1s Ticks | Options: {freq} across {contracts_text}"
+
     def delete_dataset_files(self):
         """Removes task backup dataset folder from disk."""
         user_id = str(self.created_by.id if self.created_by else 1)

@@ -30,6 +30,7 @@ class StrategyChoices(models.TextChoices):
     ICT_SMC = 'ict_smc', 'ICT Smart Money Concepts (SMC v3)'
     HFT_SCALP = 'hft_scalp', 'High-Frequency Micro-Scalp (HFT 1:2.0)'
     MACD_ICT_HYBRID = 'macd_ict_hybrid', 'Advanced HTF MACD + ICT Hybrid (1:2.0 High Winrate)'
+    VOLUME_AMD = 'volume_amd', 'Volume + AMD (Accumulation, Manipulation, Distribution)'
 
 
 # Strike Selection Choices
@@ -97,6 +98,7 @@ class TestLogEventChoices(models.TextChoices):
 # Account Type Choices
 class AccountTypeChoices(models.TextChoices):
     LIVE = "LIVE", "Live Account"
+    SANDBOX = "SANDBOX", "Sandbox Account"
     MOCK = "MOCK", "Mock Emulator Account"
 
 

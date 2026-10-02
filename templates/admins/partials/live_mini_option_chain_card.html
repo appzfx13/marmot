@@ -1,7 +1,7 @@
 {% load static %}
 <!-- Real-Time Dynamic Option Chain & Live Pricing Telemetry Widget -->
 <div class="card shadow-sm overflow-hidden mb-0 p-0 glass-card"
-     hx-get="{% url 'admins:admin-live-option-chain' %}{% if is_mock_mode or env_mode == 'MOCK' %}?env=MOCK{% endif %}"
+     hx-get="{% url 'admins:admin-live-option-chain' %}{% if is_mock_mode or env_mode == 'MOCK' or option_chain.is_mock_mode %}?env=MOCK{% endif %}"
      hx-include="#backupIndexSelect"
      hx-trigger="reloadOptionChain from:body"
      hx-target="#live-option-chain-container"
@@ -108,7 +108,7 @@
                         name="index"
                         class="form-select form-select-sm rounded-pill px-3 py-1.5 fw-bold font-monospace shadow-sm"
                         style="background: #18181b; color: #fafafa; border: 1px solid rgba(255, 255, 255, 0.15); min-width: 170px; cursor: pointer;"
-                        hx-get="{% url 'admins:admin-live-option-chain' %}{% if is_mock_mode or env_mode == 'MOCK' %}?env=MOCK{% endif %}"
+                        hx-get="{% url 'admins:admin-live-option-chain' %}{% if is_mock_mode or env_mode == 'MOCK' or option_chain.is_mock_mode %}?env=MOCK{% endif %}"
                         hx-target="#live-option-chain-container"
                         hx-trigger="change"
                         hx-swap="innerHTML">
@@ -124,7 +124,7 @@
             <button type="button" 
                     class="btn btn-sm btn-outline-secondary rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
                     style="width: 34px; height: 34px; border-color: rgba(255, 255, 255, 0.15);"
-                    hx-get="{% url 'admins:admin-live-option-chain' %}?index={{ selected_index|default:option_chain.index_name }}{% if is_mock_mode or env_mode == 'MOCK' %}&env=MOCK{% endif %}"
+                    hx-get="{% url 'admins:admin-live-option-chain' %}?index={{ selected_index|default:option_chain.index_name }}{% if is_mock_mode or env_mode == 'MOCK' or option_chain.is_mock_mode %}&env=MOCK{% endif %}"
                     hx-target="#live-option-chain-container"
                     hx-swap="innerHTML"
                     title="Refresh Live Option Chain &amp; Quotes">
@@ -133,7 +133,7 @@
         </div>
     </div>
 
-    {% if option_chain.is_live %}
+    {% if option_chain.is_live or option_chain.emulator_connected or option_chain.is_mock_live or is_mock_mode %}
     <!-- START: Real-Time Index Pricing HUD Card -->
     <div class="py-2.5 px-4 border-bottom border-secondary border-opacity-15" style="background: rgba(255, 255, 255, 0.015);">
         <div class="row g-3 align-items-center">

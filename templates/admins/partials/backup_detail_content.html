@@ -192,6 +192,20 @@
                         <span class="stat-value">{{ backup.start_date|date:"M d, Y" }} → {{ backup.end_date|date:"M d, Y" }}</span>
                     </div>
 
+                    <div class="stat-item">
+                        <span class="stat-label">Sampling Resolution</span>
+                        <span class="stat-value">
+                            <span class="badge rounded-pill px-2.5 py-1 font-monospace fw-bold" style="{{ backup.resolution_badge_style }}">
+                                {{ backup.resolution_label }}
+                            </span>
+                        </span>
+                    </div>
+
+                    <div class="stat-item">
+                        <span class="stat-label">Resolution Specification</span>
+                        <span class="stat-value font-monospace small" style="font-size: 0.78rem;">{{ backup.resolution_detail }}</span>
+                    </div>
+
                     {% if backup.is_macro_assist %}
                     <div class="stat-item">
                         <span class="stat-label">Observation Interval</span>
@@ -200,7 +214,7 @@
                     {% elif backup.market_type != 'FOREX_FUTURES' %}
                     <div class="stat-item">
                         <span class="stat-label">Strike Spread</span>
-                        <span class="stat-value">±{{ backup.strike_count }} ATM (CE &amp; PE)</span>
+                        <span class="stat-value">±{{ backup.strike_count }} ATM ({{ backup.total_strikes_count }} Contracts CE &amp; PE)</span>
                     </div>
                     {% endif %}
 

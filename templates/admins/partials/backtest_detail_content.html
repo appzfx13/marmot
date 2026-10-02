@@ -166,6 +166,24 @@
                         <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Ready</span>
                     {% endif %}
                 </span>
+                {% if backtest.use_macro_assist %}
+                    <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1 smaller fw-bold d-inline-flex align-items-center gap-1">
+                        <span class="material-icons" style="font-size: 0.85rem;">psychology_alt</span> AI Macro: Enabled
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary bg-opacity-15 text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 smaller fw-medium d-inline-flex align-items-center gap-1">
+                        <span class="material-icons" style="font-size: 0.85rem;">remove_circle_outline</span> AI Macro: Disabled
+                    </span>
+                {% endif %}
+                {% if backtest.use_vix_assist %}
+                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-1 smaller fw-bold d-inline-flex align-items-center gap-1">
+                        <span class="material-icons" style="font-size: 0.85rem;">show_chart</span> India VIX: Enabled
+                    </span>
+                {% else %}
+                    <span class="badge bg-secondary bg-opacity-15 text-secondary border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 smaller fw-medium d-inline-flex align-items-center gap-1">
+                        <span class="material-icons" style="font-size: 0.85rem;">remove_circle_outline</span> India VIX: Disabled
+                    </span>
+                {% endif %}
             </div>
             <p class="page-subtitle mb-0">
                 Index: <strong class="theme-text-main">{{ backtest.index_name }}</strong> &nbsp;|&nbsp; 
@@ -288,7 +306,7 @@
     <div class="d-flex align-items-center justify-content-between mb-3">
         <div class="d-flex align-items-center gap-2">
             <span class="loading-dots text-primary"><span></span><span></span><span></span></span>
-            <strong class="theme-text-main small text-uppercase tracking-wider">Reinforcement Learning & Options Execution Simulation In Progress</strong>
+            <strong class="theme-text-main small text-uppercase tracking-wider">Quantitative & Options Execution Simulation In Progress</strong>
         </div>
         <span id="backtest-live-progress-pct" class="badge bg-primary rounded-pill px-3 py-1 font-monospace fw-bold">{{ backtest.progress|default:0 }}%</span>
     </div>
@@ -378,6 +396,69 @@
         <div class="col-6 col-md-4 col-xl-2">
             <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Stop Loss & Target</span>
             <span class="text-danger fw-semibold font-monospace">{{ backtest.parameters.stop_loss_points|default:30 }} pts</span> / <span class="text-success fw-semibold font-monospace">{{ backtest.parameters.rr_ratio|default:2.0 }}x RR</span>
+        </div>
+    </div>
+
+    <!-- Dual Regime Status Cards: AI Macro Assist & India VIX Volatility Support -->
+    <div class="row g-2.5 mt-3 pt-2.5 border-top border-secondary border-opacity-10">
+        <!-- Status Card 1: AI Macro Assist -->
+        <div class="col-12 col-md-6">
+            <div class="p-2.5 rounded-3 border h-100 d-flex align-items-center justify-content-between gap-3 shadow-sm"
+                 style="background: {% if backtest.use_macro_assist %}rgba(245, 158, 11, 0.06){% else %}rgba(255, 255, 255, 0.02){% endif %}; border-color: {% if backtest.use_macro_assist %}rgba(245, 158, 11, 0.25){% else %}var(--border-color){% endif %} !important;">
+                <div class="d-flex align-items-center gap-2.5">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                         style="width: 36px; height: 36px; background: {% if backtest.use_macro_assist %}rgba(245, 158, 11, 0.15){% else %}rgba(148, 163, 184, 0.1){% endif %}; border: 1px solid {% if backtest.use_macro_assist %}rgba(245, 158, 11, 0.3){% else %}rgba(148, 163, 184, 0.2){% endif %};">
+                        <span class="material-icons {% if backtest.use_macro_assist %}text-warning{% else %}theme-text-muted{% endif %}" style="font-size: 1.15rem;">psychology_alt</span>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="fw-bold theme-text-main" style="font-size: 0.84rem;">AI Macro Assist</span>
+                            {% if backtest.use_macro_assist %}
+                            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2 py-0 fw-bold font-monospace" style="font-size: 0.65rem;">ENABLED ({{ backtest.macro_timeframe|default:'1h' }})</span>
+                            {% else %}
+                            <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-0 fw-medium font-monospace" style="font-size: 0.65rem;">DISABLED</span>
+                            {% endif %}
+                        </div>
+                        <small class="theme-text-muted d-block" style="font-size: 0.72rem; line-height: 1.35;">
+                            {% if backtest.use_macro_assist %}
+                                Hourly Gemini FII/DII sentiment &amp; macro risk regimes dynamically guide execution bias.
+                            {% else %}
+                                Standard quantitative rules without external macro sentiment overlays.
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Status Card 2: India VIX Volatility Support -->
+        <div class="col-12 col-md-6">
+            <div class="p-2.5 rounded-3 border h-100 d-flex align-items-center justify-content-between gap-3 shadow-sm"
+                 style="background: {% if backtest.use_vix_assist %}rgba(14, 165, 233, 0.06){% else %}rgba(255, 255, 255, 0.02){% endif %}; border-color: {% if backtest.use_vix_assist %}rgba(14, 165, 233, 0.25){% else %}var(--border-color){% endif %} !important;">
+                <div class="d-flex align-items-center gap-2.5">
+                    <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                         style="width: 36px; height: 36px; background: {% if backtest.use_vix_assist %}rgba(14, 165, 233, 0.15){% else %}rgba(148, 163, 184, 0.1){% endif %}; border: 1px solid {% if backtest.use_vix_assist %}rgba(14, 165, 233, 0.3){% else %}rgba(148, 163, 184, 0.2){% endif %};">
+                        <span class="material-icons {% if backtest.use_vix_assist %}text-info{% else %}theme-text-muted{% endif %}" style="font-size: 1.15rem;">show_chart</span>
+                    </div>
+                    <div>
+                        <div class="d-flex align-items-center gap-1.5">
+                            <span class="fw-bold theme-text-main" style="font-size: 0.84rem;">India VIX Support</span>
+                            {% if backtest.use_vix_assist %}
+                            <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0 fw-bold font-monospace" style="font-size: 0.65rem;">ENABLED (Regime Fed)</span>
+                            {% else %}
+                            <span class="badge bg-secondary bg-opacity-20 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-0 fw-medium font-monospace" style="font-size: 0.65rem;">DISABLED</span>
+                            {% endif %}
+                        </div>
+                        <small class="theme-text-muted d-block" style="font-size: 0.72rem; line-height: 1.35;">
+                            {% if backtest.use_vix_assist %}
+                                Real-time India VIX feed attached to every market tick for dynamic volatility regime awareness.
+                            {% else %}
+                                Standard execution without volatility index feed or compression filters.
+                            {% endif %}
+                        </small>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -701,16 +782,28 @@
                 </div>
             </div>
             
-            <div class="d-flex align-items-center gap-2">
+            <div class="d-flex align-items-center gap-2 flex-wrap">
                 {% if backtest.use_macro_assist %}
                 <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-1 fw-bold smaller d-inline-flex align-items-center gap-1">
                     <span class="material-icons fs-6" style="font-size: 0.85rem !important;">psychology_alt</span>
-                    <span>Gemini AI Macro Ingested ({{ backtest.macro_timeframe|default:'1h' }})</span>
+                    <span>AI Macro Active ({{ backtest.macro_timeframe|default:'1h' }})</span>
                 </span>
                 {% else %}
-                <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-bold smaller d-inline-flex align-items-center gap-1">
-                    <span class="material-icons fs-6" style="font-size: 0.85rem !important;">verified</span>
-                    <span>Go Quant Engine Validated</span>
+                <span class="badge bg-secondary bg-opacity-15 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1 fw-medium smaller d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6" style="font-size: 0.85rem !important;">remove_circle_outline</span>
+                    <span>AI Macro Disabled</span>
+                </span>
+                {% endif %}
+
+                {% if backtest.use_vix_assist %}
+                <span class="badge bg-info bg-opacity-15 text-info border border-info border-opacity-25 rounded-pill px-3 py-1 fw-bold smaller d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6" style="font-size: 0.85rem !important;">show_chart</span>
+                    <span>India VIX Regime Fed</span>
+                </span>
+                {% else %}
+                <span class="badge bg-secondary bg-opacity-15 text-secondary border border-secondary border-opacity-25 rounded-pill px-3 py-1 fw-medium smaller d-inline-flex align-items-center gap-1">
+                    <span class="material-icons fs-6" style="font-size: 0.85rem !important;">remove_circle_outline</span>
+                    <span>Standard Volatility</span>
                 </span>
                 {% endif %}
             </div>

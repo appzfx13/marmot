@@ -488,8 +488,7 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
 
     if is_mock:
         chain = get_mock_index_option_chain(idx_clean, strike_step, spot_symbol, today)
-        valid_strikes = sum(1 for s in chain.get('strikes', []) if (s.get('ce_ltp') and float(s.get('ce_ltp') or 0) > 0) or (s.get('pe_ltp') and float(s.get('pe_ltp') or 0) > 0))
-        if valid_strikes > 0 and float(chain.get('raw_spot_ltp') or 0) > 0:
+        if chain and (chain.get('emulator_connected') or float(chain.get('raw_spot_ltp') or 0) > 0 or chain.get('feed_status') in ('ACTIVE', 'STANDBY')):
             return chain
         live_chain = get_live_index_option_chain(index_name=index_name, is_mock=False)
         if live_chain and (live_chain.get('is_live') or live_chain.get('is_fyers_live')):

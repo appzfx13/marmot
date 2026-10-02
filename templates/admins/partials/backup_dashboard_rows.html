@@ -27,15 +27,31 @@
     </td>
 
     <td class="py-3 bg-transparent">
+        <div class="d-flex align-items-center gap-1.5 flex-wrap">
+            <span class="badge rounded-pill px-2 py-0.5 fw-bold font-monospace" style="{{ backup.resolution_badge_style }}; font-size: 0.68rem;" title="{{ backup.resolution_detail }}">
+                {{ backup.resolution_label }}
+            </span>
+            <span class="small theme-text-muted font-monospace" style="font-size: 0.70rem;">
+                <strong class="text-white">{{ backup.file_size_mb }} MB</strong>
+            </span>
+        </div>
         {% if backup.is_macro_assist %}
-            <div class="small text-warning fw-semibold">{{ backup.macro_timeframe|default:"1h" }} Interval</div>
+            <div class="small text-warning fw-semibold mt-0.5">{{ backup.macro_timeframe|default:"1h" }} Sentiment Resampling</div>
             {% if backup.linked_backup_task %}
-                <div class="small text-info" style="font-size: 0.72rem;">Co-located #{{ backup.linked_backup_task.id }}</div>
+                <div class="small text-info" style="font-size: 0.70rem;">Co-located with Dataset #{{ backup.linked_backup_task.id }}</div>
             {% endif %}
+        {% elif backup.market_type == 'FOREX_FUTURES' %}
+            <div class="small text-success fw-semibold mt-0.5">{{ backup.get_databento_schema_display }}</div>
+        {% elif backup.index_name == 'INDIAVIX' or not backup.strike_count %}
+            <div class="small text-info fw-semibold mt-0.5">Spot Volatility Index Only</div>
         {% else %}
-            <div class="small theme-text-muted">±{{ backup.strike_count }} ATM</div>
+            <div class="small theme-text-main fw-semibold mt-0.5">
+                ±{{ backup.strike_count }} ATM <span class="theme-text-muted font-monospace" style="font-size: 0.68rem;">({{ backup.total_strikes_count }} Contracts)</span>
+            </div>
         {% endif %}
-        <div class="small theme-text-main font-monospace">{{ backup.file_size_mb }} MB</div>
+        <div class="small theme-text-muted text-truncate mt-0.5" style="font-size: 0.67rem; max-width: 230px;" title="{{ backup.resolution_detail }}">
+            <span class="material-icons align-middle" style="font-size: 0.78rem;">tune</span> {{ backup.resolution_detail }}
+        </div>
     </td>
 
     <!-- Real-Time Progress Bar -->

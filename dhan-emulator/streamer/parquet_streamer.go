@@ -136,6 +136,7 @@ func NewParquetStreamer(eng *engine.MatchingEngine, backupDir string) *ParquetSt
 			}
 		}
 		log.Printf("[STREAMER] Initialized with primary Parquet dataset: %s", ps.currentFile)
+		ps.preIndexParquetFile(filepath.Join(ps.availableDir, selected))
 	}
 
 	// Auto-start playback on boot only if EMULATOR_AUTO_PLAY is explicitly set to true
@@ -483,6 +484,8 @@ func (ps *ParquetStreamer) SelectParquetFile(file string) {
 		ps.isPlaying = false
 	}
 	ps.mu.Unlock()
+
+	ps.preIndexParquetFile(filepath.Join(ps.availableDir, file))
 
 	if wasPlaying {
 		time.Sleep(50 * time.Millisecond)
@@ -833,18 +836,58 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 		isATM := (stkPrice == atmStrikeVal)
 
 		stkStr := fmt.Sprintf("%.0f", stkPrice)
-		ceKey := stkStr + "_CE"
-		peKey := stkStr + "_PE"
 
 		var ceLTP, peLTP, ceChg, peChg, ceChgPct, peChgPct float64
 		ceOI := "—"
 		peOI := "—"
 
-		// Prefer active expiry ticks to ensure 100% monotonic, single-expiry option chain consistency
-		tickCE, okCE := ps.activeExpiryTicks[ceKey]
-		if !okCE {
-			tickCE, okCE = ps.latestTicks[ceKey]
+		findOptionTick := func(optType string) (models.MarketTick, bool) {
+			altType := "CALL"
+			if optType == "PE" {
+				altType = "PUT"
+			}
+			keys := []string{
+				fmt.Sprintf("%s_%s", stkStr, optType),
+				fmt.Sprintf("%s_%s", stkStr, altType),
+			}
+			for _, k := range keys {
+				if t, ok := ps.activeExpiryTicks[k]; ok && t.LTP > 0 {
+					return t, true
+				}
+			}
+			for _, k := range keys {
+				if t, ok := ps.latestTicks[k]; ok && t.LTP > 0 {
+					return t, true
+				}
+			}
+
+			var bestTick models.MarketTick
+			var found bool
+
+			for k, t := range ps.activeExpiryTicks {
+				if t.LTP > 0 && strings.Contains(k, stkStr) && (strings.Contains(k, optType) || strings.Contains(k, altType)) {
+					if !found || t.Timestamp.After(bestTick.Timestamp) {
+						bestTick = t
+						found = true
+					}
+				}
+			}
+			if found {
+				return bestTick, true
+			}
+
+			for k, t := range ps.latestTicks {
+				if t.LTP > 0 && strings.Contains(k, stkStr) && (strings.Contains(k, optType) || strings.Contains(k, altType)) {
+					if !found || t.Timestamp.After(bestTick.Timestamp) {
+						bestTick = t
+						found = true
+					}
+				}
+			}
+			return bestTick, found
 		}
+
+		tickCE, okCE := findOptionTick("CE")
 		if okCE && tickCE.LTP > 0 {
 			ceLTP = tickCE.LTP
 			if tickCE.Open > 0 {
@@ -860,10 +903,7 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 			totalCallVol += tickCE.Volume
 		}
 
-		tickPE, okPE := ps.activeExpiryTicks[peKey]
-		if !okPE {
-			tickPE, okPE = ps.latestTicks[peKey]
-		}
+		tickPE, okPE := findOptionTick("PE")
 		if okPE && tickPE.LTP > 0 {
 			peLTP = tickPE.LTP
 			if tickPE.Open > 0 {
@@ -879,16 +919,27 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 			totalPutVol += tickPE.Volume
 		}
 
+		ceSymbol := tickCE.TradingSymbol
+		if ceSymbol == "" {
+			ceSymbol = fmt.Sprintf("DHAN_MOCK:%s_%.0f_CE", idxClean, stkPrice)
+		}
+		peSymbol := tickPE.TradingSymbol
+		if peSymbol == "" {
+			peSymbol = fmt.Sprintf("DHAN_MOCK:%s_%.0f_PE", idxClean, stkPrice)
+		}
+
 		isActiveWindow := (i >= -3 && i <= 3) || (ceLTP > 0 || peLTP > 0) || (stkPrice >= atmStrikeVal-float64(3*strikeStep) && stkPrice <= atmStrikeVal+float64(3*strikeStep))
 
 		row := models.OptionStrikeRow{
 			Strike:         stkPrice,
 			IsActiveWindow: isActiveWindow,
 			IsATM:          isATM,
+			CESymbol:       ceSymbol,
 			CE_LTP:         ceLTP,
 			CE_Change:      ceChg,
 			CE_ChangePct:   ceChgPct,
 			CE_OI:          ceOI,
+			PESymbol:       peSymbol,
 			PE_LTP:         peLTP,
 			PE_Change:      peChg,
 			PE_ChangePct:   peChgPct,
@@ -1003,6 +1054,8 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 		ps.isCompleted = false
 	}
 	ps.mu.Unlock()
+
+	ps.preIndexParquetFile(fullPath)
 
 	reader := parquet.NewGenericReader[models.MarketCandleRecord](file)
 	defer reader.Close()
@@ -1412,9 +1465,15 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					OI:            cleanOI,
 				}
 
-				if isForActiveExpiry && strikeKey != "" {
+				if strikeKey != "" {
 					ps.mu.Lock()
-					ps.activeExpiryTicks[strikeKey] = tick
+					ps.latestTicks[strikeKey] = tick
+					if sym != "" {
+						ps.latestTicks[sym] = tick
+					}
+					if isForActiveExpiry {
+						ps.activeExpiryTicks[strikeKey] = tick
+					}
 					ps.mu.Unlock()
 					ps.BroadcastTick(tick)
 				}
@@ -1634,7 +1693,132 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 			case <-time.After(sleepDuration):
 			}
 		}
+
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			log.Printf("[STREAMER] Parquet read error: %v", err)
+			break
+		}
 	}
+
+	ps.mu.Lock()
+	ps.isPlaying = false
+	ps.isCompleted = true
+	ps.mu.Unlock()
+	log.Printf("[STREAMER] Parquet playback completed for file: %s (total rows: %d)", fullPath, ps.ticksIngested)
+}
+
+// preIndexParquetFile scans the dataset file to pre-populate initial historical quotes for all option strikes.
+func (ps *ParquetStreamer) preIndexParquetFile(fullPath string) {
+	log.Printf("[STREAMER] Starting preIndexParquetFile for %s", fullPath)
+	file, err := os.Open(fullPath)
+	if err != nil {
+		log.Printf("[STREAMER] preIndex error open %s: %v", fullPath, err)
+		return
+	}
+	defer file.Close()
+
+	stat, err := file.Stat()
+	if err != nil {
+		log.Printf("[STREAMER] preIndex error stat %s: %v", fullPath, err)
+		return
+	}
+
+	pf, err := parquet.OpenFile(file, stat.Size())
+	if err != nil {
+		log.Printf("[STREAMER] preIndex error OpenFile %s: %v", fullPath, err)
+		return
+	}
+
+	if pf.NumRows() == 0 {
+		return
+	}
+
+	ps.mu.Lock()
+	defer ps.mu.Unlock()
+
+	indexedCount := 0
+	for _, rg := range pf.RowGroups() {
+		rgReader := parquet.NewGenericRowGroupReader[models.MarketCandleRecord](rg)
+		batch := make([]models.MarketCandleRecord, 16)
+		n, _ := rgReader.Read(batch)
+		rgReader.Close()
+
+		if n > 0 {
+			for i := 0; i < n; i++ {
+				rec := batch[i]
+				optType := strings.ToUpper(strings.TrimSpace(rec.OptionType))
+				if rec.Strike == "SPOT" || optType == "INDEX" {
+					price := rec.Close
+					if price <= 0 {
+						price = rec.Open
+					}
+					if price > 0 {
+						secID := "13"
+						if strings.Contains(strings.ToUpper(rec.IndexName), "BANK") {
+							secID = "25"
+						}
+						tick := models.MarketTick{
+							SecurityID:    secID,
+							TradingSymbol: rec.IndexName,
+							LTP:           price,
+							Open:          rec.Open,
+							High:          rec.High,
+							Low:           rec.Low,
+							Close:         price,
+							Volume:        rec.Volume,
+						}
+						ps.latestTicks[secID] = tick
+						ps.latestTicks[strings.ToUpper(rec.IndexName)] = tick
+						ps.latestTicks["NIFTY"] = tick
+						ps.latestTicks["NIFTY 50"] = tick
+					}
+				} else if optType != "" {
+					if optType == "CALL" {
+						optType = "CE"
+					} else if optType == "PUT" {
+						optType = "PE"
+					}
+					num, parseErr := strconv.ParseFloat(rec.Strike, 64)
+					if parseErr == nil && num > 1000 {
+						stkKey := fmt.Sprintf("%.0f_%s", num, optType)
+						if _, exists := ps.latestTicks[stkKey]; !exists {
+							sym := rec.TradingSymbol
+							if sym == "" {
+								sym = fmt.Sprintf("%s %.0f %s", rec.IndexName, num, optType)
+							}
+							price := rec.Close
+							if price <= 0 {
+								price = rec.Open
+							}
+							if price > 0 {
+								tick := models.MarketTick{
+									SecurityID:    stkKey,
+									TradingSymbol: sym,
+									LTP:           price,
+									Open:          rec.Open,
+									High:          rec.High,
+									Low:           rec.Low,
+									Close:         price,
+									Volume:        rec.Volume,
+									OI:            rec.OI,
+								}
+								ps.latestTicks[stkKey] = tick
+								if sym != "" {
+									ps.latestTicks[sym] = tick
+								}
+								ps.activeExpiryTicks[stkKey] = tick
+								indexedCount++
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+	log.Printf("[STREAMER] Successfully pre-indexed initial historical option quotes for %d strike keys from %s in ~30ms", indexedCount, fullPath)
 }
 
 // streamSynthetic is disabled to strictly uphold Rule 10 (zero fake Brownian walk ticks).

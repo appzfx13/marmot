@@ -229,6 +229,16 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 						break
 					}
 				}
+				// Nearest strike fallback if exact ATM offsets are absent in dataset
+				if entryOptPrice <= 0 {
+					for optKey, snap := range tick.Options {
+						if snap.Close > 0 && strings.Contains(strings.ToUpper(optKey), optionType) {
+							concreteStrike = optKey
+							entryOptPrice = snap.Close
+							break
+						}
+					}
+				}
 			}
 		}
 
@@ -614,6 +624,87 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 				)
 			}
 		}
+	} else if presetKey == "volume_amd" && len(s.candleBuffer) >= 5 {
+		// Volume + AMD (Accumulation, Manipulation, Distribution) Pattern
+		// Phase 1: Accumulation Boundaries (Rolling 15 bars or ORB if established)
+		accHigh := 0.0
+		accLow := 99999999.0
+		lookback := len(s.candleBuffer) - 1
+		if lookback > 15 {
+			lookback = 15
+		}
+		startIdx := len(s.candleBuffer) - 1 - lookback
+		for b := startIdx; b < len(s.candleBuffer)-1; b++ {
+			cHigh, _ := s.candleBuffer[b]["high"].(float64)
+			cLow, _ := s.candleBuffer[b]["low"].(float64)
+			if cHigh > accHigh {
+				accHigh = cHigh
+			}
+			if cLow > 0 && cLow < accLow {
+				accLow = cLow
+			}
+		}
+
+		// Phase 2: Volume Confirmation (previous bar surge or strong intra-minute pace)
+		avgVol := s.calculateAvgVolume(s.candleBuffer[:len(s.candleBuffer)-1], 15)
+		prevVol := 0.0
+		if len(s.candleBuffer) >= 2 {
+			if v, ok := s.candleBuffer[len(s.candleBuffer)-2]["volume"].(int64); ok {
+				prevVol = float64(v)
+			} else if vf, ok := s.candleBuffer[len(s.candleBuffer)-2]["volume"].(float64); ok {
+				prevVol = vf
+			}
+		}
+		isVolSurge := avgVol <= 0 || prevVol >= (avgVol * 1.1) || float64(s.runningVolume) >= (avgVol * 0.4)
+
+		// Rejection Wick Calculations
+		lowerWick := math.Min(openPrice, closePrice) - lowPrice
+		upperWick := highPrice - math.Max(openPrice, closePrice)
+		lowerWickRatio := lowerWick / candRange
+		upperWickRatio := upperWick / candRange
+
+		// Previous candle metrics (for 2-bar manipulation -> distribution)
+		prevLow, prevHigh := 0.0, 0.0
+		prevOpen, prevClose := 0.0, 0.0
+		prevRange := 1.0
+		prevLowerWickRatio := 0.0
+		prevUpperWickRatio := 0.0
+		if len(s.candleBuffer) >= 2 {
+			p := s.candleBuffer[len(s.candleBuffer)-2]
+			prevLow, _ = p["low"].(float64)
+			prevHigh, _ = p["high"].(float64)
+			prevOpen, _ = p["open"].(float64)
+			prevClose, _ = p["close"].(float64)
+			prevRange = math.Max(1.0, prevHigh-prevLow)
+			prevLowerWickRatio = (math.Min(prevOpen, prevClose) - prevLow) / prevRange
+			prevUpperWickRatio = (prevHigh - math.Max(prevOpen, prevClose)) / prevRange
+		}
+
+		// Bullish AMD (Spring / Sell-side Sweep below AccLow)
+		// 1-bar: dipped below accLow, closed above accLow with lower wick >= 25%
+		// 2-bar: previous bar dipped below accLow with rejection wick, current bar is green breaking structure
+		if isVolSurge && (
+			(lowPrice < accLow && closePrice >= accLow && lowerWickRatio >= 0.25 && closePrice > openPrice) ||
+			(prevLow > 0 && prevLow < accLow && prevLowerWickRatio >= 0.25 && closePrice > openPrice && closePrice >= prevHigh) ) {
+			isBullishSignal = true
+			triggerReason = fmt.Sprintf(
+				"⚡ [%s] Bullish Sweep (Low=%.1f < AccLow=%.1f) | Wick=%.1f%% | Close=%.1f",
+				preset.Name, math.Min(lowPrice, prevLow), accLow, math.Max(lowerWickRatio, prevLowerWickRatio)*100, closePrice,
+			)
+		}
+
+		// Bearish AMD (Upthrust / Buy-side Sweep above AccHigh)
+		// 1-bar: popped above accHigh, closed below accHigh with upper wick >= 25%
+		// 2-bar: previous bar popped above accHigh with rejection wick, current bar is red breaking structure
+		if !isBullishSignal && isVolSurge && (
+			(highPrice > accHigh && closePrice <= accHigh && upperWickRatio >= 0.25 && closePrice < openPrice) ||
+			(prevHigh > 0 && prevHigh > accHigh && prevUpperWickRatio >= 0.25 && closePrice < openPrice && closePrice <= prevLow) ) {
+			isBearishSignal = true
+			triggerReason = fmt.Sprintf(
+				"⚡ [%s] Bearish Sweep (High=%.1f > AccHigh=%.1f) | Wick=%.1f%% | Close=%.1f",
+				preset.Name, math.Max(highPrice, prevHigh), accHigh, math.Max(upperWickRatio, prevUpperWickRatio)*100, closePrice,
+			)
+		}
 	} else if isBullishTrend && isBullishCandle && isBullishORB && isBullishRSI && isBullishMACD && displacementRatio >= minDisplacement {
 		isBullishSignal = true
 		triggerReason = fmt.Sprintf(
@@ -727,9 +818,6 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		}
 	}
 
-	targetPrice := math.Round((closePrice+slPts*rrRatio)*100) / 100
-	stopLossPrice := math.Round((closePrice-slPts)*100) / 100
-
 	orderType := preset.OrderType
 	if orderType == "" {
 		orderType = "MARKET"
@@ -750,11 +838,29 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 				strikeSweptSymbol = bestStrike.Key
 				limitPrice = bestStrike.LimitPrice
 				orderType = "LIMIT"
-				// Anchor SL/TP on the scored limit price, not raw spot close
-				targetPrice = math.Round((limitPrice+slPts*rrRatio)*100) / 100
-				stopLossPrice = math.Max(0.5, math.Round((limitPrice-slPts)*100)/100)
 			}
 		}
+	}
+
+	// Always anchor SL/TP on the actual traded instrument price (Option Premium if limitPrice > 0, else Spot)
+	basePrice := limitPrice
+	if basePrice <= 0 {
+		basePrice = closePrice
+	}
+
+	var targetPrice, stopLossPrice float64
+	if basePrice < 2000 {
+		// Option premium contract
+		optSLPts := slPts
+		if optSLPts <= 0 || optSLPts >= basePrice*0.70 {
+			optSLPts = math.Max(1.0, math.Round(basePrice*0.20*100)/100)
+		}
+		stopLossPrice = math.Max(0.5, math.Round((basePrice-optSLPts)*100)/100)
+		targetPrice = math.Round((basePrice+(optSLPts*rrRatio))*100) / 100
+	} else {
+		// Index spot contract
+		stopLossPrice = math.Round((basePrice-slPts)*100) / 100
+		targetPrice = math.Round((basePrice+slPts*rrRatio)*100) / 100
 	}
 
 	indicators := map[string]interface{}{
@@ -847,6 +953,32 @@ func (s *QuantEngineStrategy) calculateRSI(candles []map[string]interface{}, per
 	}
 	rs := avgGain / avgLoss
 	return 100.0 - (100.0 / (1.0 + rs))
+}
+
+// calculateAvgVolume computes simple moving average of volume over last N candles.
+func (s *QuantEngineStrategy) calculateAvgVolume(candles []map[string]interface{}, period int) float64 {
+	if len(candles) == 0 {
+		return 0
+	}
+	start := 0
+	if len(candles) > period {
+		start = len(candles) - period
+	}
+	var total float64
+	count := 0
+	for i := start; i < len(candles); i++ {
+		if v, ok := candles[i]["volume"].(int64); ok && v > 0 {
+			total += float64(v)
+			count++
+		} else if vFloat, ok := candles[i]["volume"].(float64); ok && vFloat > 0 {
+			total += vFloat
+			count++
+		}
+	}
+	if count == 0 {
+		return 0
+	}
+	return total / float64(count)
 }
 
 // calculateMACD returns (macdLine, signalLine, histogram) using standard 12/26/9 periods.

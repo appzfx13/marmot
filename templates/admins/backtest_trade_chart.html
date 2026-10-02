@@ -104,12 +104,26 @@
             box-shadow: 0 2px 6px rgba(41, 98, 255, 0.35);
         }
 
+        /* Strategy Scenario & Execution Intelligence Header */
+        .strategy-scenario-banner {
+            background: #111520;
+            border-bottom: 1px solid var(--border-color);
+            padding: 5px 16px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            z-index: 19;
+            flex-shrink: 0;
+            min-height: 34px;
+        }
+
         /* Dual Split-Screen Chart Viewport Layout */
         .dual-chart-main-layout {
             flex: 1;
             display: flex;
             width: 100%;
-            height: calc(100vh - 52px);
+            height: calc(100vh - 86px);
             overflow: hidden;
             position: relative;
         }
@@ -422,9 +436,9 @@
             </button>
             {% endif %}
 
-            <button type="button" id="btnMasterToggleBoxes" class="btn-nav-action active" title="Single-click Toggle All Box Overlays (Spot & Option)">
-                <span class="material-icons" style="font-size: 0.95rem; color: #38bdf8;">layers</span>
-                <span class="d-none d-lg-inline">Boxes (ON)</span>
+            <button type="button" id="btnMasterToggleBoxes" class="btn-nav-action active" title="Toggle Box Modes: All Ghosted ➔ Trade Focus ➔ OFF">
+                <span class="material-icons" style="font-size: 0.95rem; color: #c084fc;">layers</span>
+                <span class="d-none d-lg-inline">Boxes: All (Ghosted)</span>
             </button>
 
             <button type="button" id="btnOpenBoxConfigModal" class="btn-nav-action" title="Box Opacity, Borders & Custom Templates">
@@ -454,6 +468,57 @@
             </button>
         </div>
     </header>
+
+    <!-- 1B. Strategy Scenario & Execution Intelligence Header Bar -->
+    <div class="strategy-scenario-banner" id="scenarioBanner">
+        <!-- Left: Strategy Scenario & Exact Trigger -->
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="badge rounded-pill px-2 py-0.5 font-monospace fw-bold" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45); font-size: 0.68rem;">
+                ⚡ SCENARIO
+            </span>
+            <span class="fw-semibold text-white font-monospace" id="bannerStrategyScenario" style="font-size: 0.74rem;">
+                {{ trade.entry_reason|default:trade.reason }}
+            </span>
+        </div>
+
+        <!-- Right: Spot vs Strike Key Metrics & Execution Lifecycle -->
+        <div class="d-flex align-items-center gap-2.5 flex-wrap font-monospace" style="font-size: 0.72rem;">
+            <!-- Spot Levels -->
+            <div class="d-flex align-items-center gap-1.5" title="Index Spot Entry, Exit and Point Movement">
+                <span class="theme-text-muted">INDEX:</span>
+                <span class="text-info fw-bold">₹{{ trade.index_entry_price|default:trade.entry_price|floatformat:2 }}</span>
+                <span class="theme-text-muted">➔</span>
+                <span class="text-white fw-bold">₹{{ trade.index_exit_price|default:trade.exit_price|floatformat:2 }}</span>
+                <span class="badge rounded-pill px-1.5 py-0.5 {% if trade.index_points >= 0 %}bg-success-subtle text-success border border-success-subtle{% else %}bg-danger-subtle text-danger border border-danger-subtle{% endif %}">
+                    {% if trade.index_points >= 0 %}+{% endif %}{{ trade.index_points|floatformat:1 }} pts
+                </span>
+            </div>
+
+            <span class="text-secondary opacity-40">|</span>
+
+            <!-- Strike Levels -->
+            <div class="d-flex align-items-center gap-1.5" title="Option Contract Limit Entry, Target, SL & Exit">
+                <span class="theme-text-muted">STRIKE:</span>
+                <span class="text-info fw-bold">₹{{ trade.entry_price|floatformat:2 }}</span>
+                <span class="text-success fw-bold">🎯 TP ₹{{ trade.target_price|floatformat:2 }}</span>
+                <span class="text-danger fw-bold">🛑 SL ₹{{ trade.initial_stop_loss_price|default:trade.stop_loss_price|floatformat:2 }}</span>
+                {% if trade.trailing_stop_loss_price and trade.trailing_stop_loss_price != trade.initial_stop_loss_price %}
+                <span class="text-warning fw-bold">🛡️ Trail ₹{{ trade.trailing_stop_loss_price|floatformat:2 }}</span>
+                {% endif %}
+                <span class="theme-text-muted">➔</span>
+                <span class="{% if trade.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold">Exit ₹{{ trade.exit_price|floatformat:2 }}</span>
+            </div>
+
+            <span class="text-secondary opacity-40">|</span>
+
+            <!-- Realized PnL -->
+            <div class="d-flex align-items-center gap-1">
+                <span class="badge px-2 py-0.5 fw-bold {% if trade.net_pnl >= 0 %}bg-success text-white{% else %}bg-danger text-white{% endif %}">
+                    {% if trade.net_pnl >= 0 %}+{% endif %}₹{{ trade.net_pnl|floatformat:2 }} ({{ trade.status }})
+                </span>
+            </div>
+        </div>
+    </div>
 
     <!-- 2. Dual Split-Pane Chart Area (Index on Left, Option on Right) -->
     <main class="dual-chart-main-layout">
@@ -867,6 +932,7 @@
 
         // Box Opacity, Colors & Template State Management
         const DEFAULT_BOX_STYLES = {
+            displayMode: 'position_only', // 'position_only' (TradingView Position Box Only), 'trade_only' (Trade SMC setup), 'all' (ghosted background), 'off'
             spot: {
                 visible: true,
                 bodyOpacity: 0.12,
@@ -947,6 +1013,7 @@
                 if (saved) {
                     const parsed = JSON.parse(saved);
                     return {
+                        displayMode: parsed.displayMode || 'position_only',
                         spot: { ...DEFAULT_BOX_STYLES.spot, ...(parsed.spot || {}) },
                         option: { ...DEFAULT_BOX_STYLES.option, ...(parsed.option || {}) },
                         activePreset: parsed.activePreset || 'balanced',
@@ -1306,8 +1373,9 @@
 
             const riskDist = Math.abs(entryP - stopP);
             const reserveEdgeP = Number((isBuy ? (stopP - (riskDist * 0.15)) : (stopP + (riskDist * 0.15))).toFixed(2));
+            const trailingStopP = Number(rawTradeData.trailing_stop_loss_price || rawTradeData.initial_stop_loss_price || stopP);
 
-            return { entryP, exitP, targetP, stopP, reserveEdgeP };
+            return { entryP, exitP, targetP, stopP, trailingStopP, reserveEdgeP };
         }
 
         // Apply Data, Native PriceLines, and Markers to Both Panes
@@ -1334,50 +1402,65 @@
                 updateOptionHeaderBar(activeOptCandles[activeOptCandles.length - 1]);
             }
 
-            // A. Update Native PriceLines on Spot
+            // A. Update Native PriceLines on Spot (Index)
             clearPriceLines(spotCandleSeries, spotPriceLines);
             const spotEntryP = Number(rawTradeData.entry.index_price || rawTradeData.entry.price);
-            const tradeType = (rawTradeData.trade_type || '').toUpperCase();
-            const strikeStr = (rawTradeData.strike || '').toUpperCase();
-            const isBearishSpot = (typeof rawTradeData.is_bearish_spot !== 'undefined') ?
-                Boolean(rawTradeData.is_bearish_spot) :
-                (tradeType.includes('PE') || tradeType.includes('PUT') || strikeStr.includes('PE') || strikeStr.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL'));
+            const isBearishSpot = Boolean(rawTradeData.is_bearish_spot);
             const idxPts = Math.abs(Number(rawTradeData.index_points || 30));
-            const spotTargetP = Number((isBearishSpot ? (spotEntryP - idxPts * 1.5) : (spotEntryP + idxPts * 1.5)).toFixed(2));
-            const spotStopP = Number((isBearishSpot ? (spotEntryP + idxPts * 0.8) : (spotEntryP - idxPts * 0.8)).toFixed(2));
+            const spotTargetP = Number(rawTradeData.spot_target_price || (isBearishSpot ? (spotEntryP - idxPts * 1.5) : (spotEntryP + idxPts * 1.5)).toFixed(2));
+            const spotStopP = Number(rawTradeData.spot_stop_price || (isBearishSpot ? (spotEntryP + idxPts * 0.75) : (spotEntryP - idxPts * 0.75)).toFixed(2));
+            const spotExitP = Number(rawTradeData.exit.index_price || rawTradeData.exit.price);
 
             spotPriceLines.push(spotCandleSeries.createPriceLine({
-                price: spotTargetP, color: '#10b981', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
-                axisLabelVisible: true, title: 'TARGET ' + spotTargetP.toFixed(2),
+                price: spotTargetP, color: 'rgba(16, 185, 129, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true, title: 'TP ' + spotTargetP.toFixed(2),
             }));
             spotPriceLines.push(spotCandleSeries.createPriceLine({
-                price: spotEntryP, color: '#0284c7', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+                price: spotEntryP, color: 'rgba(56, 189, 248, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
                 axisLabelVisible: true, title: 'ENTRY ' + spotEntryP.toFixed(2),
             }));
             spotPriceLines.push(spotCandleSeries.createPriceLine({
-                price: spotStopP, color: '#ef4444', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
-                axisLabelVisible: true, title: 'STOP ' + spotStopP.toFixed(2),
+                price: spotStopP, color: 'rgba(239, 68, 68, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true, title: 'SL ' + spotStopP.toFixed(2),
             }));
+            if (spotExitP && Math.abs(spotExitP - spotEntryP) > 0.05) {
+                spotPriceLines.push(spotCandleSeries.createPriceLine({
+                    price: spotExitP, color: (rawTradeData.pnl >= 0) ? 'rgba(16, 185, 129, 0.85)' : 'rgba(239, 68, 68, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: true, title: 'EXIT ' + spotExitP.toFixed(2),
+                }));
+            }
 
-            // B. Update Native PriceLines on Option
+            // B. Update Native PriceLines on Option (Strike)
             clearPriceLines(optionCandleSeries, optionPriceLines);
             const optLevels = getResolvedOptionLevels();
             if (optLevels) {
                 optionPriceLines.push(optionCandleSeries.createPriceLine({
-                    price: optLevels.targetP, color: '#10b981', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
-                    axisLabelVisible: true, title: 'TARGET ' + optLevels.targetP.toFixed(2),
+                    price: optLevels.targetP, color: 'rgba(16, 185, 129, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true, title: 'TP ' + optLevels.targetP.toFixed(2),
                 }));
                 optionPriceLines.push(optionCandleSeries.createPriceLine({
-                    price: optLevels.entryP, color: '#0284c7', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Dashed,
+                    price: optLevels.entryP, color: 'rgba(56, 189, 248, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
                     axisLabelVisible: true, title: 'ENTRY ' + optLevels.entryP.toFixed(2),
                 }));
                 optionPriceLines.push(optionCandleSeries.createPriceLine({
-                    price: optLevels.stopP, color: '#ef4444', lineWidth: 2, lineStyle: LightweightCharts.LineStyle.Solid,
-                    axisLabelVisible: true, title: 'STOP ' + optLevels.stopP.toFixed(2),
+                    price: optLevels.stopP, color: 'rgba(239, 68, 68, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true, title: 'SL ' + optLevels.stopP.toFixed(2),
                 }));
+                if (optLevels.trailingStopP && Math.abs(optLevels.trailingStopP - optLevels.stopP) > 0.05) {
+                    optionPriceLines.push(optionCandleSeries.createPriceLine({
+                        price: optLevels.trailingStopP, color: 'rgba(245, 158, 11, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+                        axisLabelVisible: true, title: 'TRAIL SL ' + optLevels.trailingStopP.toFixed(2),
+                    }));
+                }
+                if (optLevels.exitP && Math.abs(optLevels.exitP - optLevels.entryP) > 0.05) {
+                    optionPriceLines.push(optionCandleSeries.createPriceLine({
+                        price: optLevels.exitP, color: (rawTradeData.pnl >= 0) ? 'rgba(16, 185, 129, 0.85)' : 'rgba(239, 68, 68, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+                        axisLabelVisible: true, title: 'EXIT ' + optLevels.exitP.toFixed(2),
+                    }));
+                }
                 if (optLevels.reserveEdgeP > 0) {
                     optionPriceLines.push(optionCandleSeries.createPriceLine({
-                        price: optLevels.reserveEdgeP, color: '#f59e0b', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+                        price: optLevels.reserveEdgeP, color: 'rgba(245, 158, 11, 0.7)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
                         axisLabelVisible: true, title: 'RESERVE ' + optLevels.reserveEdgeP.toFixed(2),
                     }));
                 }
@@ -1423,31 +1506,31 @@
                 (tradeType.includes('PE') || tradeType.includes('PUT') || strikeStr.includes('PE') || strikeStr.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL'));
             const markers = [];
 
-            // 1. Signal Generated Marker
+            // 1. Signal Generated Marker (Yellow Arrow)
             if (signalEpoch && signalEpoch !== entryEpoch) {
                 markers.push({
                     time: findNearestCandleTime(activeSpotCandles, signalEpoch),
                     position: isBearishSpot ? 'aboveBar' : 'belowBar',
-                    color: '#f59e0b',
-                    shape: 'circle',
+                    color: '#eab308',
+                    shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
                     text: `⚡ SIGNAL (${tl.signal_time || ''}) Spot: ${tl.signal_spot ? tl.signal_spot.toFixed(1) : ''}`,
-                    size: 1,
+                    size: 2,
                 });
             }
 
-            // 2. Limit Tapped / Executed Marker
+            // 2. Limit Tapped / Executed Marker (Blue Arrow)
             if (entryEpoch) {
                 markers.push({
                     time: findNearestCandleTime(activeSpotCandles, entryEpoch),
                     position: isBearishSpot ? 'aboveBar' : 'belowBar',
                     color: '#0284c7',
                     shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
-                    text: `${isBearishSpot ? '▼' : '▲'} TAPPED ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    text: `${isBearishSpot ? '▼' : '▲'} ENTRY ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
                     size: 2,
                 });
             }
 
-            // 3. Exit Marker (TP or SL Hit)
+            // 3. Exit Marker (TP Green Arrow or SL Red Arrow)
             if (exitEpoch) {
                 const isWin = (rawTradeData.pnl >= 0);
                 const exitType = (rawTradeData.exit && rawTradeData.exit.exit_type) || '';
@@ -1483,16 +1566,16 @@
             const placedEpoch = tl.limit_placed_epoch;
             const markers = [];
 
-            // 1. Signal Time Marker
+            // 1. Signal Time Marker (Yellow Arrow)
             if (signalEpoch && signalEpoch !== entryEpoch) {
                 const cmpStr = tl.signal_strike_ltp ? ` CMP: ₹${Number(tl.signal_strike_ltp).toFixed(1)}` : '';
                 markers.push({
                     time: findNearestCandleTime(activeOptCandles, signalEpoch),
                     position: 'belowBar',
-                    color: '#f59e0b',
-                    shape: 'circle',
+                    color: '#eab308',
+                    shape: 'arrowUp',
                     text: `⚡ SIGNAL (${tl.signal_time || ''})${cmpStr}`,
-                    size: 1,
+                    size: 2,
                 });
             }
 
@@ -1508,19 +1591,19 @@
                 });
             }
 
-            // 3. Limit Tapped / Filled Marker
+            // 3. Limit Tapped / Filled Marker (Blue Arrow)
             if (entryEpoch) {
                 markers.push({
                     time: findNearestCandleTime(activeOptCandles, entryEpoch),
                     position: 'belowBar',
-                    color: '#10b981',
+                    color: '#0284c7',
                     shape: 'arrowUp',
-                    text: `🎯 TAPPED / FILLED ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    text: `▲ ENTRY FILLED ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
                     size: 2,
                 });
             }
 
-            // 4. Exit Marker (TP, Trailing SL, or SL Hit)
+            // 4. Exit Marker (TP Green Arrow or SL Red Arrow)
             if (exitEpoch) {
                 const isWin = (rawTradeData.pnl >= 0);
                 const exitType = (rawTradeData.exit && rawTradeData.exit.exit_type) || '';
@@ -1557,30 +1640,26 @@
         function renderAllPositionOverlays() {
             if (!rawTradeData || !rawTradeData.entry) return;
             const spotEntryP = Number(rawTradeData.entry.index_price || rawTradeData.entry.price);
-            const tradeType = (rawTradeData.trade_type || '').toUpperCase();
-            const strikeStr = (rawTradeData.strike || '').toUpperCase();
-            const isBearishSpot = (typeof rawTradeData.is_bearish_spot !== 'undefined') ?
-                Boolean(rawTradeData.is_bearish_spot) :
-                (tradeType.includes('PE') || tradeType.includes('PUT') || strikeStr.includes('PE') || strikeStr.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL'));
+            const isBearishSpot = Boolean(rawTradeData.is_bearish_spot);
             const idxPts = Math.abs(Number(rawTradeData.index_points || 30));
-            const spotTargetP = Number((isBearishSpot ? (spotEntryP - idxPts * 1.5) : (spotEntryP + idxPts * 1.5)).toFixed(2));
-            const spotStopP = Number((isBearishSpot ? (spotEntryP + idxPts * 0.8) : (spotEntryP - idxPts * 0.8)).toFixed(2));
+            const spotTargetP = Number(rawTradeData.spot_target_price || (isBearishSpot ? (spotEntryP - idxPts * 1.5) : (spotEntryP + idxPts * 1.5)).toFixed(2));
+            const spotStopP = Number(rawTradeData.spot_stop_price || (isBearishSpot ? (spotEntryP + idxPts * 0.75) : (spotEntryP - idxPts * 0.75)).toFixed(2));
 
             renderPaneOverlay(
                 spotChart, spotCandleSeries, spotOverlayCanvas, spotCtx, activeSpotCandles,
-                spotEntryP, spotTargetP, spotStopP, 'SPOT'
+                spotEntryP, spotTargetP, spotStopP, null, 'SPOT'
             );
 
             const optLevels = getResolvedOptionLevels();
             if (optLevels) {
                 renderPaneOverlay(
                     optionChart, optionCandleSeries, optionOverlayCanvas, optCtx, activeOptCandles,
-                    optLevels.entryP, optLevels.targetP, optLevels.stopP, 'OPTION'
+                    optLevels.entryP, optLevels.targetP, optLevels.stopP, optLevels.trailingStopP, 'OPTION'
                 );
             }
         }
 
-        function renderPaneOverlay(chartInst, seriesInst, canvasEl, ctx, candlesList, entryP, targetP, stopP, paneType) {
+        function renderPaneOverlay(chartInst, seriesInst, canvasEl, ctx, candlesList, entryP, targetP, stopP, trailingP, paneType) {
             if (!chartInst || !seriesInst || !rawTradeData || candlesList.length === 0) return;
 
             const w = canvasEl.clientWidth;
@@ -1589,14 +1668,11 @@
 
             const entryEpoch = rawTradeData.entry.epoch;
             const exitEpoch = rawTradeData.exit.epoch;
-            const dayBoundaryEpoch = rawTradeData.day_boundary_epoch;
 
             let enIdx = -1;
             let exIdx = -1;
-            let dayIdx = -1;
             let minEnDiff = Infinity;
             let minExDiff = Infinity;
-            let minDayDiff = Infinity;
 
             for (let i = 0; i < candlesList.length; i++) {
                 const t = candlesList[i].time;
@@ -1604,44 +1680,49 @@
                 if (enDiff < minEnDiff) { minEnDiff = enDiff; enIdx = i; }
                 const exDiff = Math.abs(t - exitEpoch);
                 if (exDiff < minExDiff) { minExDiff = exDiff; exIdx = i; }
-                if (dayBoundaryEpoch) {
-                    const dDiff = Math.abs(t - dayBoundaryEpoch);
-                    if (dDiff < minDayDiff) { minDayDiff = dDiff; dayIdx = i; }
-                }
             }
 
-            // 1. Day Boundary Divider
-            let dayX = (dayIdx >= 0) ? chartInst.timeScale().logicalToCoordinate(dayIdx) : null;
-            if (dayX === null && dayBoundaryEpoch) dayX = chartInst.timeScale().timeToCoordinate(dayBoundaryEpoch);
+            // 1. Day Boundary Dividers for all days in candlesList (+4 days context)
+            const seenDates = new Set();
+            for (let i = 1; i < candlesList.length; i++) {
+                const prevD = candlesList[i - 1].date;
+                const currD = candlesList[i].date;
+                if (currD && prevD && currD !== prevD && !seenDates.has(currD)) {
+                    seenDates.add(currD);
+                    let dX = chartInst.timeScale().logicalToCoordinate(i);
+                    if (dX === null) dX = chartInst.timeScale().timeToCoordinate(candlesList[i].time);
+                    if (dX !== null && dX >= -50 && dX <= w + 50) {
+                        ctx.save();
+                        const isTradeDay = (currD === rawTradeData.date);
+                        ctx.strokeStyle = isTradeDay ? 'rgba(56, 189, 248, 0.7)' : 'rgba(255, 255, 255, 0.16)';
+                        ctx.lineWidth = isTradeDay ? 1.5 : 1.0;
+                        ctx.setLineDash(isTradeDay ? [5, 4] : [3, 4]);
+                        ctx.beginPath();
+                        ctx.moveTo(dX, 0);
+                        ctx.lineTo(dX, h);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
 
-            if (dayX !== null && dayX >= -100 && dayX <= w + 100) {
-                ctx.save();
-                ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
-                ctx.lineWidth = 1.2;
-                ctx.setLineDash([5, 5]);
-                ctx.beginPath();
-                ctx.moveTo(dayX, 0);
-                ctx.lineTo(dayX, h);
-                ctx.stroke();
-                ctx.setLineDash([]);
+                        const dLabel = isTradeDay ? `🎯 TRADE DAY (${currD})` : currD;
+                        ctx.font = 'bold 9.5px JetBrains Mono, monospace';
+                        const textW = ctx.measureText(dLabel).width + 16;
+                        ctx.fillStyle = isTradeDay ? 'rgba(2, 132, 199, 0.95)' : 'rgba(15, 23, 42, 0.88)';
+                        ctx.fillRect(dX - (textW / 2), 8, textW, 18);
+                        ctx.strokeStyle = isTradeDay ? '#38bdf8' : 'rgba(255, 255, 255, 0.2)';
+                        ctx.strokeRect(dX - (textW / 2), 8, textW, 18);
 
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.92)';
-                ctx.fillRect(dayX - 75, 10, 150, 18);
-                ctx.strokeStyle = 'rgba(56, 189, 248, 0.5)';
-                ctx.strokeRect(dayX - 75, 10, 150, 18);
-
-                ctx.fillStyle = '#38bdf8';
-                ctx.font = 'bold 9.5px JetBrains Mono, monospace';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`◂ PREV | TODAY`, dayX, 19);
-                ctx.restore();
+                        ctx.fillStyle = isTradeDay ? '#ffffff' : '#94a3b8';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText(dLabel, dX, 17);
+                        ctx.restore();
+                    }
+                }
             }
 
             // 2. Position Box Anchoring
             const cfg = (paneType === 'SPOT') ? boxStyles.spot : boxStyles.option;
-            if (!cfg || !cfg.visible) {
-                // If boxes hidden on this chart, return immediately after drawing day divider
+            if (!cfg || !cfg.visible || boxStyles.displayMode === 'off') {
                 return;
             }
 
@@ -1676,35 +1757,183 @@
             const stopStroke = hexToRgba(cfg.bearishColor, cfg.borderOpacity);
 
             if (enY !== null) {
-                // Target Green Box
+                // 1. Target Green Profit Zone Box (TradingView Style)
                 if (tgY !== null) {
                     const topY = Math.min(enY, tgY);
-                    const boxH = Math.max(1, Math.abs(tgY - enY));
-                    ctx.fillStyle = targetFill;
+                    const boxH = Math.max(2, Math.abs(tgY - enY));
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(16, 185, 129, 0.22)';
                     ctx.fillRect(enX, topY, boxWidth, boxH);
-                    ctx.strokeStyle = targetStroke;
-                    ctx.lineWidth = cfg.borderWidth;
+                    ctx.strokeStyle = 'rgba(16, 185, 129, 0.85)';
+                    ctx.lineWidth = 1.5;
                     ctx.strokeRect(enX, topY, boxWidth, boxH);
+
+                    // Target Pill Badge (Top of Target Box, matching TradingView Tool)
+                    const ptsDiff = Math.abs(targetP - entryP);
+                    const pctDiff = ((ptsDiff / entryP) * 100).toFixed(2);
+                    const qty = Number(rawTradeData.quantity || 65);
+                    const amountVal = (ptsDiff * qty).toFixed(0);
+                    const tgText = (paneType === 'SPOT') ?
+                        `Target: ${targetP.toFixed(1)} (+${ptsDiff.toFixed(1)} pts | +${pctDiff}%)` :
+                        `Target: ₹${targetP.toFixed(2)} (+${pctDiff}%) Amount: ₹${amountVal}`;
+
+                    ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                    const tgTextW = ctx.measureText(tgText).width + 16;
+                    const tgBadgeX = Math.max(8, Math.min(w - tgTextW - 8, enX + 6));
+                    const tgBadgeY = tgY < enY ? Math.max(4, tgY - 18) : (tgY + 3);
+
+                    ctx.fillStyle = '#10b981';
+                    ctx.beginPath();
+                    if (ctx.roundRect) {
+                        ctx.roundRect(tgBadgeX, tgBadgeY, tgTextW, 16, 4);
+                    } else {
+                        ctx.rect(tgBadgeX, tgBadgeY, tgTextW, 16);
+                    }
+                    ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(tgText, tgBadgeX + 8, tgBadgeY + 8);
+                    ctx.restore();
                 }
 
-                // Stop Loss Red Box
+                // 2. Stop Loss Red Risk Zone Box (TradingView Style)
                 if (slY !== null) {
                     const topY = Math.min(enY, slY);
-                    const boxH = Math.max(1, Math.abs(slY - enY));
-                    ctx.fillStyle = stopFill;
+                    const boxH = Math.max(2, Math.abs(slY - enY));
+                    ctx.save();
+                    ctx.fillStyle = 'rgba(239, 68, 68, 0.22)';
                     ctx.fillRect(enX, topY, boxWidth, boxH);
-                    ctx.strokeStyle = stopStroke;
-                    ctx.lineWidth = cfg.borderWidth;
+                    ctx.strokeStyle = 'rgba(239, 68, 68, 0.85)';
+                    ctx.lineWidth = 1.5;
                     ctx.strokeRect(enX, topY, boxWidth, boxH);
+
+                    // Stop Pill Badge (Bottom of Stop Box, matching TradingView Tool)
+                    const ptsDiff = Math.abs(stopP - entryP);
+                    const pctDiff = ((ptsDiff / entryP) * 100).toFixed(2);
+                    const qty = Number(rawTradeData.quantity || 65);
+                    const amountVal = (ptsDiff * qty).toFixed(0);
+                    const slText = (paneType === 'SPOT') ?
+                        `Stop: ${stopP.toFixed(1)} (-${ptsDiff.toFixed(1)} pts | -${pctDiff}%)` :
+                        `Stop: ₹${stopP.toFixed(2)} (-${pctDiff}%) Amount: ₹${amountVal}`;
+
+                    ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                    const slTextW = ctx.measureText(slText).width + 16;
+                    const slBadgeX = Math.max(8, Math.min(w - slTextW - 8, enX + 6));
+                    const slBadgeY = slY > enY ? Math.min(h - 20, slY + 3) : Math.max(4, slY - 18);
+
+                    ctx.fillStyle = '#ef4444';
+                    ctx.beginPath();
+                    if (ctx.roundRect) {
+                        ctx.roundRect(slBadgeX, slBadgeY, slTextW, 16, 4);
+                    } else {
+                        ctx.rect(slBadgeX, slBadgeY, slTextW, 16);
+                    }
+                    ctx.fill();
+                    ctx.fillStyle = '#ffffff';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(slText, slBadgeX + 8, slBadgeY + 8);
+                    ctx.restore();
                 }
 
-                // Entry Horizontal Divider
-                ctx.strokeStyle = 'rgba(2, 132, 199, 0.9)';
+                // 3. Trailing SL Level Line (if distinct from initial stop)
+                if (trailingP && Math.abs(trailingP - stopP) > 0.05) {
+                    const trY = seriesInst.priceToCoordinate(trailingP);
+                    if (trY !== null) {
+                        ctx.save();
+                        ctx.strokeStyle = '#f59e0b';
+                        ctx.lineWidth = 1.5;
+                        ctx.setLineDash([4, 3]);
+                        ctx.beginPath();
+                        ctx.moveTo(enX, trY);
+                        ctx.lineTo(exX, trY);
+                        ctx.stroke();
+                        ctx.setLineDash([]);
+
+                        ctx.fillStyle = 'rgba(245, 158, 11, 0.9)';
+                        ctx.fillRect(enX + 4, trY - 7, 52, 14);
+                        ctx.fillStyle = '#000000';
+                        ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                        ctx.textAlign = 'center';
+                        ctx.textBaseline = 'middle';
+                        ctx.fillText('TRAIL SL', enX + 30, trY);
+                        ctx.restore();
+                    }
+                }
+
+                // 4. Entry Horizontal Divider
+                ctx.save();
+                ctx.strokeStyle = 'rgba(56, 189, 248, 0.9)';
                 ctx.lineWidth = 1.5;
                 ctx.beginPath();
                 ctx.moveTo(enX, enY);
                 ctx.lineTo(exX, enY);
                 ctx.stroke();
+                ctx.restore();
+
+                // 5. Centered Realized Outcome Badge (TradingView Center Pill, matching Image 2)
+                if (boxWidth >= 30) {
+                    ctx.save();
+                    const midX = enX + (boxWidth / 2);
+                    const pillY = Math.max(35, Math.min(h - 35, enY));
+                    const isWin = (rawTradeData.pnl >= 0);
+                    const pnlStr = (paneType === 'SPOT') ?
+                        `Closed P&L: ${isWin ? '+' : ''}${Number(rawTradeData.index_points || 0).toFixed(1)} pts (${rawTradeData.status})` :
+                        `Closed P&L: ${isWin ? '+' : ''}₹${Number(rawTradeData.pnl || 0).toFixed(2)}, Qty: ${rawTradeData.quantity || 65}`;
+                    const rrStr = `Risk/Reward Ratio: ${rawTradeData.risk_reward || '1:2.0'}`;
+
+                    ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                    const pW = Math.max(ctx.measureText(pnlStr).width, ctx.measureText(rrStr).width) + 20;
+                    const bX = Math.max(6, Math.min(w - pW - 6, midX - (pW / 2)));
+
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+                    ctx.beginPath();
+                    if (ctx.roundRect) {
+                        ctx.roundRect(bX, pillY - 14, pW, 28, 5);
+                    } else {
+                        ctx.rect(bX, pillY - 14, pW, 28);
+                    }
+                    ctx.fill();
+                    ctx.strokeStyle = isWin ? '#10b981' : '#00f2fe';
+                    ctx.lineWidth = 1.4;
+                    ctx.stroke();
+
+                    ctx.fillStyle = isWin ? '#34d399' : '#f87171';
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'top';
+                    ctx.fillText(pnlStr, bX + (pW / 2), pillY - 10);
+
+                    ctx.fillStyle = '#94a3b8';
+                    ctx.font = '7.5px JetBrains Mono, monospace';
+                    ctx.fillText(rrStr, bX + (pW / 2), pillY + 3);
+                    ctx.restore();
+                }
+
+                // 6. TradingView Blue Anchor Corner Handles (Matching Image 2)
+                const handleCoords = [];
+                if (tgY !== null) {
+                    handleCoords.push([enX, tgY], [exX, tgY]);
+                }
+                handleCoords.push([enX, enY], [exX, enY]);
+                if (slY !== null) {
+                    handleCoords.push([enX, slY], [exX, slY]);
+                }
+                ctx.save();
+                handleCoords.forEach(([hx, hy]) => {
+                    ctx.fillStyle = '#0f172a';
+                    ctx.strokeStyle = '#2563eb';
+                    ctx.lineWidth = 2.2;
+                    ctx.beginPath();
+                    if (ctx.roundRect) {
+                        ctx.roundRect(hx - 5, hy - 5, 10, 10, 3);
+                    } else {
+                        ctx.rect(hx - 5, hy - 5, 10, 10);
+                    }
+                    ctx.fill();
+                    ctx.stroke();
+                });
+                ctx.restore();
             }
 
             // 3. SMC Overlays (Fair Value Gaps, Liquidity Sweeps, CHoCH)
@@ -1713,7 +1942,7 @@
 
         let showSMCOverlays = true;
 
-        // SMC Detection: Fair Value Gaps (FVGs) - Scans full trading day
+        // SMC Detection: Fair Value Gaps (FVGs) - Filter micro noise (min 0.9 pt)
         function detectFairValueGaps(candles) {
             if (!candles || candles.length < 3) return [];
             const fvgs = [];
@@ -1723,7 +1952,7 @@
                 const c3 = candles[i];
                 
                 // Bullish FVG: Candle 1 High < Candle 3 Low (Gap up imbalance)
-                if (c3.low > c1.high && (c3.low - c1.high) >= 0.4) {
+                if (c3.low > c1.high && (c3.low - c1.high) >= 0.9) {
                     fvgs.push({
                         type: 'BULLISH',
                         top: c3.low,
@@ -1734,7 +1963,7 @@
                     });
                 }
                 // Bearish FVG: Candle 1 Low > Candle 3 High (Gap down imbalance)
-                else if (c1.low > c3.high && (c1.low - c3.high) >= 0.4) {
+                else if (c1.low > c3.high && (c1.low - c3.high) >= 0.9) {
                     fvgs.push({
                         type: 'BEARISH',
                         top: c1.low,
@@ -1748,7 +1977,7 @@
             return fvgs;
         }
 
-        // SMC Detection: Liquidity Sweeps - Scans full trading day
+        // SMC Detection: Liquidity Sweeps - Filter micro noise (min 0.9 pt)
         function detectLiquiditySweeps(candles) {
             if (!candles || candles.length < 10) return [];
             const sweeps = [];
@@ -1767,7 +1996,7 @@
                 }
 
                 // Buy-Side Liquidity (BSL) Sweep: Wick penetrates swing high, but close closes inside
-                if (curr.high > maxH && curr.close < maxH && (curr.high - maxH) >= 0.5) {
+                if (curr.high > maxH && curr.close < maxH && (curr.high - maxH) >= 0.9) {
                     sweeps.push({
                         type: 'BSL_SWEEP',
                         level: maxH,
@@ -1778,7 +2007,7 @@
                 }
 
                 // Sell-Side Liquidity (SSL) Sweep: Wick penetrates swing low, but close closes inside
-                if (curr.low < minL && curr.close > minL && (minL - curr.low) >= 0.5) {
+                if (curr.low < minL && curr.close > minL && (minL - curr.low) >= 0.9) {
                     sweeps.push({
                         type: 'SSL_SWEEP',
                         level: minL,
@@ -1831,19 +2060,34 @@
             return chochs;
         }
 
-        // Render SMC Zones & Markers on Canvas
+        // Render SMC Zones & Markers on Canvas (Trade-Related Vivid Contrast & Background Ghosting)
         function renderSMCOverlayZones(chartInst, seriesInst, ctx, candlesList, paneType) {
             const cfg = (paneType === 'SPOT') ? boxStyles.spot : boxStyles.option;
-            if (!cfg || !cfg.visible) return;
+            if (!cfg || !cfg.visible || boxStyles.displayMode === 'off' || boxStyles.displayMode === 'position_only') return;
+
+            const mode = boxStyles.displayMode || 'all';
 
             const fvgs = detectFairValueGaps(candlesList);
             const sweeps = detectLiquiditySweeps(candlesList);
             const chochs = detectCHoCHBreakouts(candlesList);
 
-            const dashPattern = (cfg.borderStyle === 'solid') ? [] : ((cfg.borderStyle === 'dotted') ? [2, 2] : [4, 2]);
+            // Determine Trade Setup Horizon (-45m before signal/entry to +15m after exit)
+            const entryEpoch = (rawTradeData && rawTradeData.entry) ? Number(rawTradeData.entry.epoch) : 0;
+            const exitEpoch = (rawTradeData && rawTradeData.exit) ? Number(rawTradeData.exit.epoch) : entryEpoch;
+            const signalEpoch = (rawTradeData && rawTradeData.timeline && rawTradeData.timeline.signal_epoch) ?
+                Number(rawTradeData.timeline.signal_epoch) : (entryEpoch > 0 ? entryEpoch - 60 : 0);
+
+            const setupStartEpoch = (Math.min(signalEpoch || entryEpoch, entryEpoch) || 0) - (45 * 60);
+            const setupEndEpoch = (exitEpoch || entryEpoch || 0) + (15 * 60);
 
             // A. Draw Fair Value Gap (FVG) Boxes
             fvgs.forEach(fvg => {
+                const fvgCandle = candlesList[fvg.startIdx];
+                const fvgTime = fvgCandle ? fvgCandle.time : 0;
+                const isTradeRelated = (fvgTime >= setupStartEpoch && fvgTime <= setupEndEpoch);
+
+                if (mode === 'trade_only' && !isTradeRelated) return;
+
                 let startX = chartInst.timeScale().logicalToCoordinate(fvg.startIdx);
                 let endX = chartInst.timeScale().logicalToCoordinate(fvg.endIdx);
                 if (startX === null || isNaN(startX)) return;
@@ -1857,39 +2101,47 @@
                 const boxH = Math.max(2, Math.abs(yBottom - yTop));
                 const boxW = Math.max(10, endX - startX);
 
+                const bodyOp = isTradeRelated ? Math.min(0.42, Math.max(0.28, cfg.bodyOpacity * 2.4)) : 0.04;
+                const borderOp = isTradeRelated ? Math.min(1.0, Math.max(0.85, cfg.borderOpacity)) : 0.14;
+                const borderW = isTradeRelated ? Math.max(1.8, cfg.borderWidth + 0.4) : 0.8;
+                const dash = isTradeRelated ? 
+                    ((cfg.borderStyle === 'solid') ? [] : ((cfg.borderStyle === 'dotted') ? [2, 2] : [4, 2])) : 
+                    [2, 3];
+
                 ctx.save();
-                if (fvg.type === 'BULLISH') {
-                    ctx.fillStyle = hexToRgba(cfg.bullishColor, cfg.bodyOpacity);
-                    ctx.fillRect(startX, topY, boxW, boxH);
-                    ctx.strokeStyle = hexToRgba(cfg.bullishColor, cfg.borderOpacity);
-                    ctx.lineWidth = cfg.borderWidth;
-                    ctx.setLineDash(dashPattern);
-                    ctx.strokeRect(startX, topY, boxW, boxH);
+                const col = fvg.type === 'BULLISH' ? cfg.bullishColor : cfg.bearishColor;
+                ctx.fillStyle = hexToRgba(col, bodyOp);
+                ctx.fillRect(startX, topY, boxW, boxH);
+                ctx.strokeStyle = hexToRgba(col, borderOp);
+                ctx.lineWidth = borderW;
+                ctx.setLineDash(dash);
+                ctx.strokeRect(startX, topY, boxW, boxH);
 
-                    ctx.fillStyle = cfg.bullishColor;
-                    ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                if (isTradeRelated) {
+                    ctx.fillStyle = col;
+                    ctx.font = 'bold 9px JetBrains Mono, monospace';
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText('+FVG [1m Imbalance]', startX + 4, topY + (boxH / 2));
-                } else {
-                    ctx.fillStyle = hexToRgba(cfg.bearishColor, cfg.bodyOpacity);
-                    ctx.fillRect(startX, topY, boxW, boxH);
-                    ctx.strokeStyle = hexToRgba(cfg.bearishColor, cfg.borderOpacity);
-                    ctx.lineWidth = cfg.borderWidth;
-                    ctx.setLineDash(dashPattern);
-                    ctx.strokeRect(startX, topY, boxW, boxH);
-
-                    ctx.fillStyle = cfg.bearishColor;
-                    ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                    const fvgTag = fvg.type === 'BULLISH' ? '🎯 ENTRY +FVG [1m Imbalance]' : '🎯 ENTRY -FVG [1m Imbalance]';
+                    ctx.fillText(fvgTag, startX + 5, topY + (boxH / 2));
+                } else if (boxW >= 30) {
+                    ctx.fillStyle = hexToRgba(col, 0.45);
+                    ctx.font = '7.5px JetBrains Mono, monospace';
                     ctx.textAlign = 'left';
                     ctx.textBaseline = 'middle';
-                    ctx.fillText('-FVG [1m Imbalance]', startX + 4, topY + (boxH / 2));
+                    ctx.fillText(fvg.type === 'BULLISH' ? '+FVG' : '-FVG', startX + 3, topY + (boxH / 2));
                 }
                 ctx.restore();
             });
 
             // B. Draw Liquidity Sweeps
             sweeps.forEach(sw => {
+                const swCandle = candlesList[sw.idx];
+                const swTime = swCandle ? swCandle.time : 0;
+                const isTradeRelated = (swTime >= setupStartEpoch && swTime <= setupEndEpoch);
+
+                if (mode === 'trade_only' && !isTradeRelated) return;
+
                 let startX = chartInst.timeScale().logicalToCoordinate(sw.prevIdx);
                 let sweepX = chartInst.timeScale().logicalToCoordinate(sw.idx);
                 if (startX === null || sweepX === null || isNaN(startX) || isNaN(sweepX)) return;
@@ -1897,32 +2149,60 @@
                 const yLevel = seriesInst.priceToCoordinate(sw.level);
                 if (yLevel === null) return;
 
+                const baseCol = sw.type === 'BSL_SWEEP' ? '#f59e0b' : '#38bdf8';
+                const strokeCol = isTradeRelated ? baseCol : hexToRgba(baseCol, 0.22);
+                const lineW = isTradeRelated ? 1.8 : 0.8;
+
                 ctx.save();
-                ctx.strokeStyle = sw.type === 'BSL_SWEEP' ? '#f59e0b' : '#38bdf8';
-                ctx.lineWidth = 1.3;
-                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = strokeCol;
+                ctx.lineWidth = lineW;
+                ctx.setLineDash(isTradeRelated ? [4, 4] : [2, 4]);
                 ctx.beginPath();
                 ctx.moveTo(startX, yLevel);
-                ctx.lineTo(sweepX + 25, yLevel);
+                ctx.lineTo(sweepX + (isTradeRelated ? 30 : 15), yLevel);
                 ctx.stroke();
 
-                // Lightning Sweep Tag
-                ctx.fillStyle = 'rgba(15, 23, 42, 0.88)';
-                ctx.fillRect(sweepX - 2, yLevel - 9, 72, 16);
-                ctx.strokeStyle = sw.type === 'BSL_SWEEP' ? '#f59e0b' : '#38bdf8';
-                ctx.setLineDash([]);
-                ctx.strokeRect(sweepX - 2, yLevel - 9, 72, 16);
+                if (isTradeRelated) {
+                    // Bold Highlighted Lightning Sweep Tag
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.94)';
+                    const tagW = 95;
+                    ctx.fillRect(sweepX - 2, yLevel - 10, tagW, 20);
+                    ctx.strokeStyle = baseCol;
+                    ctx.lineWidth = 1.4;
+                    ctx.setLineDash([]);
+                    ctx.strokeRect(sweepX - 2, yLevel - 10, tagW, 20);
 
-                ctx.fillStyle = sw.type === 'BSL_SWEEP' ? '#fbbf24' : '#38bdf8';
-                ctx.font = 'bold 8px JetBrains Mono, monospace';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(`⚡ SWEEP ${sw.level.toFixed(1)}`, sweepX + 2, yLevel);
+                    ctx.fillStyle = sw.type === 'BSL_SWEEP' ? '#fbbf24' : '#38bdf8';
+                    ctx.font = 'bold 8.5px JetBrains Mono, monospace';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`⚡ SWEEP ${sw.level.toFixed(1)}`, sweepX + 4, yLevel);
+                } else {
+                    // Dimmed subtle ghost tag
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.5)';
+                    ctx.fillRect(sweepX - 2, yLevel - 7, 50, 14);
+                    ctx.strokeStyle = hexToRgba(baseCol, 0.2);
+                    ctx.lineWidth = 0.7;
+                    ctx.setLineDash([]);
+                    ctx.strokeRect(sweepX - 2, yLevel - 7, 50, 14);
+
+                    ctx.fillStyle = hexToRgba(baseCol, 0.5);
+                    ctx.font = '7px JetBrains Mono, monospace';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(`${sw.level.toFixed(0)}`, sweepX + 2, yLevel);
+                }
                 ctx.restore();
             });
 
             // C. Draw CHoCH Breakouts
             chochs.forEach(ch => {
+                const chCandle = candlesList[ch.idx];
+                const chTime = chCandle ? chCandle.time : 0;
+                const isTradeRelated = (chTime >= setupStartEpoch && chTime <= setupEndEpoch);
+
+                if (mode === 'trade_only' && !isTradeRelated) return;
+
                 let startX = chartInst.timeScale().logicalToCoordinate(ch.prevIdx);
                 let breakX = chartInst.timeScale().logicalToCoordinate(ch.idx);
                 if (startX === null || breakX === null || isNaN(startX) || isNaN(breakX)) return;
@@ -1930,20 +2210,26 @@
                 const yLevel = seriesInst.priceToCoordinate(ch.level);
                 if (yLevel === null) return;
 
+                const baseCol = ch.type === 'BULLISH_CHOCH' ? '#10b981' : '#ef4444';
+                const strokeCol = isTradeRelated ? baseCol : hexToRgba(baseCol, 0.22);
+                const lineW = isTradeRelated ? 1.8 : 0.8;
+
                 ctx.save();
-                ctx.strokeStyle = ch.type === 'BULLISH_CHOCH' ? '#10b981' : '#ef4444';
-                ctx.lineWidth = 1.4;
-                ctx.setLineDash([5, 3]);
+                ctx.strokeStyle = strokeCol;
+                ctx.lineWidth = lineW;
+                ctx.setLineDash(isTradeRelated ? [5, 3] : [2, 4]);
                 ctx.beginPath();
                 ctx.moveTo(startX, yLevel);
-                ctx.lineTo(breakX + 30, yLevel);
+                ctx.lineTo(breakX + (isTradeRelated ? 32 : 18), yLevel);
                 ctx.stroke();
 
-                ctx.fillStyle = ch.type === 'BULLISH_CHOCH' ? '#10b981' : '#ef4444';
-                ctx.font = 'bold 8.5px JetBrains Mono, monospace';
-                ctx.textAlign = 'left';
-                ctx.textBaseline = 'bottom';
-                ctx.fillText(`CHoCH Breakout ⚡`, breakX + 4, yLevel - 2);
+                if (isTradeRelated) {
+                    ctx.fillStyle = baseCol;
+                    ctx.font = 'bold 9px JetBrains Mono, monospace';
+                    ctx.textAlign = 'left';
+                    ctx.textBaseline = 'bottom';
+                    ctx.fillText(`CHoCH Breakout ⚡`, breakX + 4, yLevel - 2);
+                }
                 ctx.restore();
             });
         }
@@ -1990,6 +2276,9 @@
                     }
 
                     rawTradeData = data;
+                    window.rawTradeData = data;
+                    window.spotChart = spotChart;
+                    window.optionChart = optionChart;
 
                     if (data.reserve_edge_price) {
                         document.getElementById('hudReserveEdge').innerText = `₹${Number(data.reserve_edge_price).toFixed(2)}`;
@@ -1997,10 +2286,16 @@
                     if (data.risk_reward) {
                         document.getElementById('hudRiskReward').innerText = data.risk_reward;
                     }
-                    if (data.prev_date) {
+                    if (data.context_days && data.selected_dates && data.selected_dates.length > 0) {
+                        const firstD = data.selected_dates[0];
+                        const lastD = data.selected_dates[data.selected_dates.length - 1];
+                        document.getElementById('dateRangeBadge').innerText = `${data.context_days} Days (${firstD} → ${lastD})`;
+                    } else if (data.prev_date) {
                         document.getElementById('dateRangeBadge').innerText = `2 Days (${data.prev_date} → ${data.date})`;
                     }
                     if (data.entry && data.entry.reason) {
+                        const elBanner = document.getElementById('bannerStrategyScenario');
+                        if (elBanner) elBanner.innerText = data.entry.reason;
                         const elEntryReason = document.getElementById('hudEntryReason');
                         if (elEntryReason) {
                             elEntryReason.innerText = data.entry.reason.length > 38 ? data.entry.reason.slice(0, 36) + '...' : data.entry.reason;
@@ -2196,12 +2491,39 @@
                 }
 
                 if (masterBtn) {
-                    const anyOn = spotOn || optOn;
-                    masterBtn.classList.toggle('active', anyOn);
-                    const label = masterBtn.querySelector('span:not(.material-icons)');
-                    if (label) label.innerText = anyOn ? 'Boxes (ON)' : 'Boxes (OFF)';
+                    const mode = boxStyles.displayMode || 'position_only';
                     const icon = masterBtn.querySelector('.material-icons');
-                    if (icon) icon.style.color = anyOn ? '#38bdf8' : '#94a3b8';
+                    const label = masterBtn.querySelector('span:not(.material-icons)');
+
+                    if (mode === 'position_only') {
+                        masterBtn.classList.add('active');
+                        if (label) label.innerText = 'Position Box Only';
+                        if (icon) {
+                            icon.innerText = 'aspect_ratio';
+                            icon.style.color = '#38bdf8';
+                        }
+                    } else if (mode === 'trade_only') {
+                        masterBtn.classList.add('active');
+                        if (label) label.innerText = 'Boxes: Trade Focus';
+                        if (icon) {
+                            icon.innerText = 'filter_center_focus';
+                            icon.style.color = '#fbbf24';
+                        }
+                    } else if (mode === 'all') {
+                        masterBtn.classList.add('active');
+                        if (label) label.innerText = 'Boxes: All (Ghosted)';
+                        if (icon) {
+                            icon.innerText = 'layers';
+                            icon.style.color = '#c084fc';
+                        }
+                    } else { // 'off'
+                        masterBtn.classList.remove('active');
+                        if (label) label.innerText = 'Boxes: OFF';
+                        if (icon) {
+                            icon.innerText = 'layers_clear';
+                            icon.style.color = '#94a3b8';
+                        }
+                    }
                 }
             }
 
@@ -2357,13 +2679,25 @@
                 });
             }
 
-            // Master & Pane Toggle Buttons
+            // Master & Pane Toggle Buttons (4-State Mode: Position Only -> Trade Focus -> All Ghosted -> OFF)
             if (masterBtn) {
                 masterBtn.addEventListener('click', function() {
-                    const anyOn = boxStyles.spot.visible || boxStyles.option.visible;
-                    const nextState = !anyOn;
-                    boxStyles.spot.visible = nextState;
-                    boxStyles.option.visible = nextState;
+                    const currentMode = boxStyles.displayMode || 'position_only';
+                    let nextMode = 'trade_only';
+                    if (currentMode === 'position_only') nextMode = 'trade_only';
+                    else if (currentMode === 'trade_only') nextMode = 'all';
+                    else if (currentMode === 'all') nextMode = 'off';
+                    else nextMode = 'position_only';
+
+                    boxStyles.displayMode = nextMode;
+                    if (nextMode === 'off') {
+                        boxStyles.spot.visible = false;
+                        boxStyles.option.visible = false;
+                    } else {
+                        boxStyles.spot.visible = true;
+                        boxStyles.option.visible = true;
+                    }
+
                     saveBoxStyles(boxStyles);
                     syncInputsFromState();
                     updateToggleButtonsUI();
@@ -2375,6 +2709,11 @@
                 spotToggleBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     boxStyles.spot.visible = !boxStyles.spot.visible;
+                    if (!boxStyles.spot.visible && !boxStyles.option.visible) {
+                        boxStyles.displayMode = 'off';
+                    } else if (boxStyles.displayMode === 'off') {
+                        boxStyles.displayMode = 'position_only';
+                    }
                     saveBoxStyles(boxStyles);
                     syncInputsFromState();
                     updateToggleButtonsUI();
@@ -2386,6 +2725,11 @@
                 optToggleBtn.addEventListener('click', function(e) {
                     e.stopPropagation();
                     boxStyles.option.visible = !boxStyles.option.visible;
+                    if (!boxStyles.spot.visible && !boxStyles.option.visible) {
+                        boxStyles.displayMode = 'off';
+                    } else if (boxStyles.displayMode === 'off') {
+                        boxStyles.displayMode = 'position_only';
+                    }
                     saveBoxStyles(boxStyles);
                     syncInputsFromState();
                     updateToggleButtonsUI();

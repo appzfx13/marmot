@@ -61,6 +61,22 @@
                 <input class="form-check-input ms-3 cursor-pointer" type="checkbox" role="switch" id="modal_use_macro_assist_cb" style="width: 2.5rem; height: 1.25rem;" {% if backtest.use_macro_assist %}checked{% endif %} onchange="document.getElementById('modal_use_macro_assist').value = this.checked ? 'true' : 'false';">
             </div>
         </div>
+
+        <div class="card glass-card border border-light border-opacity-10 p-3 mt-2.5 rounded-3">
+            <div class="form-check form-switch d-flex align-items-center justify-content-between p-0 m-0">
+                <div>
+                    <label class="form-check-label theme-text-main fw-semibold d-flex align-items-center gap-1.5 cursor-pointer" for="modal_use_vix_assist_cb">
+                        <span class="material-icons text-info" style="font-size: 1.15rem;">show_chart</span>
+                        <span>India VIX Support</span>
+                    </label>
+                    <div class="theme-text-muted small" style="font-size: 0.76rem;">
+                        Attach real intraday India VIX volatility regime to simulation ticks
+                    </div>
+                </div>
+                <input type="hidden" name="use_vix_assist" id="modal_use_vix_assist" value="{% if backtest.use_vix_assist %}true{% else %}false{% endif %}">
+                <input class="form-check-input ms-3 cursor-pointer" type="checkbox" role="switch" id="modal_use_vix_assist_cb" style="width: 2.5rem; height: 1.25rem;" {% if backtest.use_vix_assist %}checked{% endif %} onchange="document.getElementById('modal_use_vix_assist').value = this.checked ? 'true' : 'false';">
+            </div>
+        </div>
         {% else %}
         Are you sure you want to <strong class="text-danger">cancel</strong> Strategy Backtest Task
         <strong class="theme-text-main">#BT-{{ backtest.id|stringformat:"04d" }}</strong>?
@@ -71,7 +87,7 @@
         <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill d-inline-flex align-items-center gap-1.5 px-4 py-2" data-bs-dismiss="modal" style="font-size: 0.82rem;">Cancel</button>
         <button type="button" hx-post="{% url 'backtest:backtest_control' backtest.pk %}"
             hx-vals='{"action": "{{ action }}"}'
-            {% if action == 'resume' or action == 'start' %}hx-include="#modal_use_macro_assist"{% endif %}
+            {% if action == 'resume' or action == 'start' %}hx-include="#modal_use_macro_assist, #modal_use_vix_assist"{% endif %}
             hx-swap="none"
             class="btn btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 px-4 py-2 fw-semibold {% if action == 'pause' %}btn-warning{% elif action == 'resume' or action == 'start' %}btn-success{% else %}btn-danger{% endif %}" style="font-size: 0.82rem;">
             {% if action == 'pause' %}

@@ -51,6 +51,10 @@ class BacktestTask(BaseModel):
     use_macro_assist = models.BooleanField(default=False, help_text="Enable Gemini AI Macro Assist in RL observation space")
     macro_timeframe = models.CharField(max_length=10, choices=MacroTimeframeChoices.choices, default=MacroTimeframeChoices.H1, null=True, blank=True, help_text="Macro timeframe (default 1h)")
 
+    # India VIX Volatility Support
+    use_vix_assist = models.BooleanField(default=False, help_text="Enable India VIX volatility regime assist in backtest evaluation")
+    vix_backup_task = models.ForeignKey('market.MarketBackupTask', on_delete=models.SET_NULL, null=True, blank=True, related_name='vix_backtests', help_text="Linked India VIX dataset")
+
     # Dynamic Position Sizing & Auto Risk Management
     enable_ai_lot_sizing = models.BooleanField(default=False, help_text="Enable AI Macro Dynamic Position Sizing")
     auto_risk_management = models.BooleanField(default=True, help_text="Enforce automatic risk management and capital utilization limits")

@@ -39,3 +39,4 @@ class BacktestRuleTypeChoices(models.TextChoices):
     ALGO_MICRO_SCALP = 'algo_micro_scalp', 'Institutional Micro-Scalp & Dynamic Risk Guard'
     MOMENTUM_SCALP = 'momentum_scalp', 'Momentum Scalp 1:2.5 (EMA 9/21 + ORB)'
     HFT_SCALP = 'hft_scalp', 'High-Frequency Micro-Scalp (HFT 1:2.0)'
+    VOLUME_AMD = 'volume_amd', 'Volume + AMD (Accumulation, Manipulation, Distribution) Pattern'

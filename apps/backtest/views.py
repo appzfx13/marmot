@@ -49,7 +49,12 @@ class BacktestDashboardView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         queryset = super().get_queryset().filter(is_deleted=False)
         q = self.request.GET.get('q', '').strip()
         if q:
-            queryset = queryset.filter(strategy_name__icontains=q) | queryset.filter(id__icontains=q)
+            clean_q = q.replace('+', ' ').strip()
+            words = [w for w in clean_q.split() if len(w) >= 2]
+            q_filter = Q(strategy_name__icontains=q) | Q(id__icontains=q) | Q(rules__name__icontains=q) | Q(rules__rule_type__icontains=q)
+            for w in words:
+                q_filter |= Q(strategy_name__icontains=w) | Q(rules__name__icontains=w) | Q(rules__rule_type__icontains=w)
+            queryset = queryset.filter(q_filter).distinct()
         status = self.request.GET.get('status', '').strip()
         if status:
             queryset = queryset.filter(status=status)
@@ -180,6 +185,10 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
         use_macro = bool(form.cleaned_data.get('use_macro_assist', False))
         macro_tf = form.cleaned_data.get('macro_timeframe') or '1h'
         macro_backup_task = form.cleaned_data.get('macro_backup_task')
+        use_vix = bool(form.cleaned_data.get('use_vix_assist', False))
+        vix_backup_task = form.cleaned_data.get('vix_backup_task')
+        if use_vix and not vix_backup_task:
+            vix_backup_task = MarketBackupTask.objects.filter(is_deleted=False, index_name='INDIAVIX', status='completed').order_by('-id').first()
         enable_ai_lot_sizing = bool(form.cleaned_data.get('enable_ai_lot_sizing', False))
         auto_risk_management = bool(form.cleaned_data.get('auto_risk_management', True))
         max_risk_pct = float(form.cleaned_data.get('max_risk_per_trade_pct') or 2.0)
@@ -190,6 +199,11 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
 
         params["use_macro_assist"] = use_macro
         params["macro_timeframe"] = macro_tf
+        params["use_vix_assist"] = use_vix
+        if vix_backup_task:
+            params["vix_backup_task_id"] = str(vix_backup_task.id)
+            if vix_backup_task.parquet_file_path:
+                params["vix_parquet_path"] = vix_backup_task.parquet_file_path
         params["enable_ai_lot_sizing"] = enable_ai_lot_sizing
         params["enable_ai_compounding"] = enable_ai_lot_sizing
         params["compounding_profile"] = compounding_profile
@@ -211,6 +225,8 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
             use_macro_assist=use_macro,
             macro_timeframe=macro_tf,
             macro_backup_task=macro_backup_task,
+            use_vix_assist=use_vix,
+            vix_backup_task=vix_backup_task,
             enable_ai_lot_sizing=enable_ai_lot_sizing,
             auto_risk_management=auto_risk_management,
             max_risk_per_trade_pct=max_risk_pct,
@@ -919,6 +935,31 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
             target_trade = all_trades[trade_num - 1]
 
         if not target_trade:
+            possible_paths = []
+            if backtest.result_file_path:
+                possible_paths.append(backtest.result_file_path)
+            user_id = getattr(backtest, 'user_id', 1) or getattr(backtest, 'created_by_id', 1) or 1
+            possible_paths.append(f"/app/go-app/data/users/{user_id}/backtests/backtest_{backtest.id}.json")
+            possible_paths.append(os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', str(user_id), 'backtests', f'backtest_{backtest.id}.json'))
+            possible_paths.append(f"/app/data/users/{user_id}/backtests/backtest_{backtest.id}.json")
+            possible_paths.append(os.path.join(settings.BASE_DIR, 'data', 'users', str(user_id), 'backtests', f'backtest_{backtest.id}.json'))
+            disk_trades = []
+            for path in possible_paths:
+                if path and os.path.exists(path):
+                    try:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            for line in f:
+                                if line.strip():
+                                    disk_trades.append(json.loads(line.strip()))
+                        if disk_trades:
+                            break
+                    except Exception:
+                        pass
+            if disk_trades and (1 <= trade_num <= len(disk_trades)):
+                target_trade = disk_trades[trade_num - 1]
+                target_trade['serial_no'] = trade_num
+
+        if not target_trade:
             return JsonResponse({'error': 'Trade not found'}, status=404)
 
         raw_ts = str(target_trade.get('timestamp') or target_trade.get('entry_time') or '')
@@ -961,9 +1002,19 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
             stop_loss_price = round(entry_price - risk_dist, 2) if 'BUY' in trade_type else round(entry_price + risk_dist, 2)
         reserve_edge_price = round(stop_loss_price - (risk_dist * 0.15), 2) if 'BUY' in trade_type else round(stop_loss_price + (risk_dist * 0.15), 2)
 
+        is_bearish_spot = ('PE' in trade_type or 'PUT' in trade_type or 'PE' in strike or 'PUT' in strike or 'SHORT' in trade_type or 'SELL' in trade_type)
+        idx_pts = abs(index_points) if abs(index_points) > 5.0 else 25.0
+        if is_bearish_spot:
+            spot_target_price = round(index_entry - (idx_pts * 1.5), 2)
+            spot_stop_price = round(index_entry + (idx_pts * 0.75), 2)
+        else:
+            spot_target_price = round(index_entry + (idx_pts * 1.5), 2)
+            spot_stop_price = round(index_entry - (idx_pts * 0.75), 2)
+
         candles = []
         spot_candles = []
-        prev_date = ""
+        selected_dates = [trade_date]
+        prev_date = trade_date
 
         candidate_paths = []
         if backtest.backup_task and backtest.backup_task.parquet_file_path:
@@ -976,33 +1027,46 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
         for p_path in candidate_paths:
             if p_path and os.path.exists(p_path):
                 try:
+                    import pyarrow.parquet as pq
                     import pandas as pd
                     import datetime as dt
-                    df = pd.read_parquet(p_path)
-                    all_dates = sorted(list(set(df['datetime'].astype(str).str[:10])))
+                    import re
+
+                    # 1. Resolve trading dates for +4 days context window
+                    date_tbl = pq.read_table(p_path, columns=['datetime'], filters=[('strike', '==', 'SPOT')])
+                    all_dates = sorted(list({str(x)[:10] for x in date_tbl['datetime'].to_pylist()}))
+
                     if trade_date in all_dates:
                         t_idx = all_dates.index(trade_date)
-                        selected_dates = [all_dates[t_idx - 1], trade_date] if t_idx > 0 else [trade_date]
+                        start_idx = max(0, t_idx - 4)
+                        end_idx = min(len(all_dates), max(t_idx + 1, start_idx + 5))
+                        selected_dates = all_dates[start_idx:end_idx]
                         prev_date = all_dates[t_idx - 1] if t_idx > 0 else trade_date
                     else:
                         selected_dates = [trade_date]
                         prev_date = trade_date
 
-                    sub_df = df[df['datetime'].astype(str).str[:10].isin(selected_dates)]
-                    if not sub_df.empty:
-                        dt_time = sub_df['datetime'].astype(str).str[11:19]
-                        sub_df = sub_df[(dt_time >= '09:15:00') & (dt_time <= '15:30:00')]
-                    if not sub_df.empty:
-                        s_df = sub_df[sub_df['strike'] == 'SPOT']
-                        if s_df.empty:
-                            s_df = sub_df[sub_df['option_type'] == 'INDEX']
-                        spot_map = {}
-                        for _, row in s_df.iterrows():
+                    start_time_str = f"{selected_dates[0]} 09:15:00"
+                    end_time_str = f"{selected_dates[-1]} 15:30:00"
+
+                    # 2. Read SPOT candles using predicate pushdown
+                    spot_tbl = pq.read_table(
+                        p_path,
+                        columns=['datetime', 'open', 'high', 'low', 'close', 'volume', 'strike'],
+                        filters=[
+                            ('strike', '==', 'SPOT'),
+                            ('datetime', '>=', start_time_str),
+                            ('datetime', '<=', end_time_str),
+                        ]
+                    )
+                    spot_df = spot_tbl.to_pandas()
+                    if not spot_df.empty:
+                        t_str_col = spot_df['datetime'].astype(str).str[11:19]
+                        spot_df = spot_df[(t_str_col >= '09:15:00') & (t_str_col <= '15:30:00')].sort_values('datetime')
+                        for _, row in spot_df.iterrows():
                             dt_str = str(row['datetime'])[:19]
                             dt_val = dt.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
                             epoch_sec = int(dt_val.timestamp())
-                            spot_close = float(row['close'])
-                            spot_map[dt_str] = spot_close
                             spot_candles.append({
                                 'time': epoch_sec,
                                 'datetime': dt_str,
@@ -1011,159 +1075,90 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                                 'open': round(float(row['open']), 2),
                                 'high': round(float(row['high']), 2),
                                 'low': round(float(row['low']), 2),
-                                'close': round(spot_close, 2),
+                                'close': round(float(row['close']), 2),
                                 'volume': int(row.get('volume', 0)),
                             })
 
-                        opt_type = 'PUT' if ('PE' in trade_type or 'PUT' in trade_type) else 'CALL'
-                        opt_df = sub_df[sub_df['option_type'] == opt_type]
+                    # 3. Read Traded Option Strike Candles
+                    trade_strike_raw = str(target_trade.get('strike', '')).upper()
+                    opt_type = 'PUT' if ('PE' in trade_strike_raw or 'PUT' in trade_strike_raw or 'PE' in str(trade_type).upper() or 'PUT' in str(trade_type).upper()) else 'CALL'
+                    m_num = re.search(r'(\d{4,6})', trade_strike_raw)
+                    target_strike_str = m_num.group(1) if m_num else None
+                    if not target_strike_str and target_trade.get('strike_price'):
+                        try:
+                            target_strike_str = str(int(float(target_trade.get('strike_price'))))
+                        except Exception:
+                            pass
+                    if not target_strike_str and index_entry > 0:
+                        strike_step = INDEX_STRIKE_INTERVAL.get(str(backtest.index_name or 'NIFTY').upper(), 50)
+                        target_strike_str = str(int(round(index_entry / strike_step) * strike_step))
+
+                    strike_symbol = None
+                    if target_strike_str:
+                        opt_filters = [
+                            ('strike', '==', target_strike_str),
+                            ('option_type', '==', opt_type),
+                            ('datetime', '>=', start_time_str),
+                            ('datetime', '<=', end_time_str),
+                        ]
+                        opt_tbl = pq.read_table(
+                            p_path,
+                            columns=['datetime', 'open', 'high', 'low', 'close', 'volume', 'trading_symbol', 'strike', 'option_type'],
+                            filters=opt_filters
+                        )
+                        opt_df = opt_tbl.to_pandas()
                         if not opt_df.empty:
-                            import re
+                            t_str_col = opt_df['datetime'].astype(str).str[11:19]
+                            opt_df = opt_df[(t_str_col >= '09:15:00') & (t_str_col <= '15:30:00')]
 
-                            trade_strike_raw = str(target_trade.get('strike', ''))
-                            is_ce = ('CE' in trade_type or 'CALL' in trade_type)
-                            index_name = str(backtest.index_name or target_trade.get('symbol') or '').upper()
-                            strike_step = INDEX_STRIKE_INTERVAL.get(index_name, 50)
+                            # Identify closest contract symbol at trade entry timestamp
+                            entry_ts_prefix = raw_ts[:16]
+                            at_entry = opt_df[opt_df['datetime'].astype(str).str.startswith(entry_ts_prefix)]
+                            chosen_symbol = None
+                            if not at_entry.empty:
+                                at_entry = at_entry.copy()
+                                at_entry['diff'] = (at_entry['close'] - entry_price).abs()
+                                chosen_symbol = at_entry.sort_values('diff').iloc[0]['trading_symbol']
 
-                            target_num = None
-                            m_num = re.search(r'(\d{4,6})', trade_strike_raw)
-                            if m_num:
-                                target_num = int(m_num.group(1))
-                            elif target_trade.get('strike_price'):
-                                try:
-                                    target_num = int(float(target_trade.get('strike_price')))
-                                except Exception:
-                                    pass
+                            if not chosen_symbol:
+                                td_rows = opt_df[opt_df['datetime'].astype(str).str[:10] == trade_date]
+                                chosen_symbol = td_rows.iloc[0]['trading_symbol'] if not td_rows.empty else opt_df.iloc[0]['trading_symbol']
+                            strike_symbol = chosen_symbol
 
-                            if not target_num and index_entry > 0:
-                                entry_atm = round(index_entry / strike_step) * strike_step
-                                if '(ATM)' in trade_strike_raw or trade_strike_raw == 'ATM':
-                                    target_num = entry_atm
-                                elif '(ITM1)' in trade_strike_raw: target_num = entry_atm - strike_step if is_ce else entry_atm + strike_step
-                                elif '(ITM2)' in trade_strike_raw: target_num = entry_atm - (2 * strike_step) if is_ce else entry_atm + (2 * strike_step)
-                                elif '(ITM3)' in trade_strike_raw: target_num = entry_atm - (3 * strike_step) if is_ce else entry_atm + (3 * strike_step)
-                                elif '(OTM1)' in trade_strike_raw: target_num = entry_atm + strike_step if is_ce else entry_atm - strike_step
-                                elif '(OTM2)' in trade_strike_raw: target_num = entry_atm + (2 * strike_step) if is_ce else entry_atm - (2 * strike_step)
-                                elif '(OTM3)' in trade_strike_raw: target_num = entry_atm + (3 * strike_step) if is_ce else entry_atm - (3 * strike_step)
-                                else:
-                                    target_num = entry_atm
+                            opt_df['date'] = opt_df['datetime'].astype(str).str[:10]
+                            opt_df['minute'] = opt_df['datetime'].astype(str).str[:16]
 
-                            opt_df = opt_df.copy()
-                            opt_df['dt_str'] = opt_df['datetime'].astype(str).str[:19]
-                            grouped_opt = {k: v for k, v in opt_df.groupby('dt_str')}
+                            selected_rows = []
+                            for d, d_group in opt_df.groupby('date'):
+                                sym_group = d_group[d_group['trading_symbol'] == chosen_symbol]
+                                if sym_group.empty:
+                                    first_sym = d_group['trading_symbol'].iloc[0]
+                                    sym_group = d_group[d_group['trading_symbol'] == first_sym]
+                                selected_rows.append(sym_group)
 
-                            sorted_dts = sorted(list(set(opt_df['dt_str'].unique()) | set(spot_map.keys())))
-                            last_spot = index_entry if index_entry > 0 else (spot_candles[0]['close'] if spot_candles else 24500.0)
+                            if selected_rows:
+                                final_opt_df = pd.concat(selected_rows)
+                                agg_candles = []
+                                for min_str, min_group in final_opt_df.groupby('minute', sort=True):
+                                    min_dt_str = min_str + ":00"
+                                    min_dt_val = dt.datetime.strptime(min_dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
+                                    agg_candles.append({
+                                        'time': int(min_dt_val.timestamp()),
+                                        'datetime': min_dt_str,
+                                        'date': min_str[:10],
+                                        'time_str': min_str[11:16],
+                                        'open': round(float(min_group.iloc[0]['open']), 2),
+                                        'high': round(float(min_group['high'].max()), 2),
+                                        'low': round(float(min_group['low'].min()), 2),
+                                        'close': round(float(min_group.iloc[-1]['close']), 2),
+                                        'volume': int(min_group['volume'].sum()),
+                                    })
+                                candles = sorted(agg_candles, key=lambda c: c['time'])
 
-                            for dt_str in sorted_dts:
-                                if dt_str not in grouped_opt:
-                                    continue
-                                min_df = grouped_opt[dt_str]
-                                if min_df.empty:
-                                    continue
-
-                                curr_spot = spot_map.get(dt_str, last_spot)
-                                last_spot = curr_spot
-                                curr_atm = round(curr_spot / strike_step) * strike_step
-
-                                chosen_row = None
-                                if target_num:
-                                    abs_matches = min_df[min_df['strike'] == str(target_num)]
-                                    if not abs_matches.empty:
-                                        chosen_row = abs_matches.iloc[0]
-
-                                if chosen_row is None and target_num:
-                                    diff = int(round((target_num - curr_atm) / strike_step))
-                                    req_label = "ATM" if diff == 0 else f"ATM{'+' if diff > 0 else ''}{diff}"
-                                    rel_matches = min_df[min_df['strike'] == req_label]
-                                    if not rel_matches.empty:
-                                        chosen_row = rel_matches.iloc[0]
-                                    else:
-                                        avail = min_df['strike'].tolist()
-                                        def parse_offset(lbl):
-                                            if lbl == 'ATM': return 0
-                                            m = re.search(r'ATM([+-]?\d+)', str(lbl))
-                                            return int(m.group(1)) if m else 999
-                                        avail_sorted = sorted(avail, key=lambda l: abs(parse_offset(l) - diff))
-                                        if avail_sorted:
-                                            chosen_row = min_df[min_df['strike'] == avail_sorted[0]].iloc[0]
-
-                                if chosen_row is None:
-                                    chosen_row = min_df.iloc[0]
-
-                                dt_val = dt.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
-                                epoch_sec = int(dt_val.timestamp())
-                                candles.append({
-                                    'time': epoch_sec,
-                                    'datetime': dt_str,
-                                    'date': dt_str[:10],
-                                    'time_str': dt_str[11:16],
-                                    'open': round(float(chosen_row['open']), 2),
-                                    'high': round(float(chosen_row['high']), 2),
-                                    'low': round(float(chosen_row['low']), 2),
-                                    'close': round(float(chosen_row['close']), 2),
-                                    'volume': int(chosen_row.get('volume', 0)),
-                                })
-                        if candles or spot_candles:
-                            break
+                    if candles or spot_candles:
+                        break
                 except Exception as e:
-                    logger.error(f"Error loading Parquet candles for trade {trade_num}: {e}")
-
-        if not candles:
-            import datetime as dt
-            import random
-            try:
-                base_dt = dt.datetime.strptime(trade_date, "%Y-%m-%d")
-            except Exception:
-                base_dt = dt.datetime.now()
-            p_dt = base_dt - dt.timedelta(days=3 if base_dt.weekday() == 0 else 1)
-            prev_date = p_dt.strftime("%Y-%m-%d")
-
-            for sim_date in [prev_date, trade_date]:
-                s_dt = dt.datetime.strptime(f"{sim_date} 09:15:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
-                curr_p = entry_price if entry_price > 0 else 100.0
-                curr_s = index_entry if index_entry > 0 else 24500.0
-                t_min = 0
-                while t_min <= 375:
-                    bar_dt = s_dt + dt.timedelta(minutes=t_min)
-                    bar_epoch = int(bar_dt.timestamp())
-                    t_str = bar_dt.strftime("%H:%M")
-                    step = random.uniform(-1.5, 1.5)
-                    b_open = curr_p
-                    b_close = max(1.0, curr_p + step)
-                    b_high = max(b_open, b_close) + random.uniform(0.1, 1.2)
-                    b_low = min(b_open, b_close) - random.uniform(0.1, 1.2)
-                    candles.append({
-                        'time': bar_epoch,
-                        'datetime': bar_dt.strftime("%Y-%m-%d %H:%M:%S"),
-                        'date': sim_date,
-                        'time_str': t_str,
-                        'open': round(b_open, 2),
-                        'high': round(b_high, 2),
-                        'low': round(max(0.1, b_low), 2),
-                        'close': round(b_close, 2),
-                        'volume': random.randint(500, 8000),
-                    })
-                    curr_p = b_close
-
-                    s_step = random.uniform(-6.0, 6.0)
-                    s_open = curr_s
-                    s_close = curr_s + s_step
-                    s_high = max(s_open, s_close) + random.uniform(1.0, 8.0)
-                    s_low = min(s_open, s_close) - random.uniform(1.0, 8.0)
-                    spot_candles.append({
-                        'time': bar_epoch,
-                        'datetime': bar_dt.strftime("%Y-%m-%d %H:%M:%S"),
-                        'date': sim_date,
-                        'time_str': t_str,
-                        'open': round(s_open, 2),
-                        'high': round(s_high, 2),
-                        'low': round(s_low, 2),
-                        'close': round(s_close, 2),
-                        'volume': random.randint(1500, 25000),
-                    })
-                    curr_s = s_close
-                    t_min += 1
+                    logger.error(f"Error loading PyArrow Parquet candles for trade {trade_num}: {e}")
 
         entry_time_str = raw_ts[11:16] if len(raw_ts) >= 16 else "09:15"
         exit_time_str = exit_ts[11:16] if len(exit_ts) >= 16 else "15:15"
@@ -1236,6 +1231,7 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
             'timeframe': '1m',
             'symbol': symbol,
             'strike': strike,
+            'strike_symbol': strike_symbol or strike,
             'trade_num': trade_num,
             'trade_type': trade_type,
             'is_bearish_spot': is_bearish_spot,
@@ -1296,6 +1292,10 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
             'initial_stop_loss_price': stop_loss_price,
             'trailing_stop_loss_price': trailing_sl_price,
             'reserve_edge_price': reserve_edge_price,
+            'spot_target_price': spot_target_price,
+            'spot_stop_price': spot_stop_price,
+            'selected_dates': selected_dates,
+            'context_days': len(selected_dates),
             'day_boundary_epoch': day_boundary_epoch,
             'candles': candles,
             'spot_candles': spot_candles,
@@ -1309,7 +1309,7 @@ class BacktestTradeChartView(LoginRequiredMixin, AdminRequiredMixin, View):
     def get(self, request, pk, trade_num, *args, **kwargs):
         backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
         trade_data = get_backtest_trades_context(backtest, request)
-        all_trades = trade_data['all_trades']
+        all_trades = trade_data.get('all_trades', [])
 
         target_trade = None
         current_index = -1
@@ -1332,9 +1332,46 @@ class BacktestTradeChartView(LoginRequiredMixin, AdminRequiredMixin, View):
                     break
 
         if not target_trade:
+            possible_paths = []
+            if backtest.result_file_path:
+                possible_paths.append(backtest.result_file_path)
+            user_id = getattr(backtest, 'user_id', 1) or getattr(backtest, 'created_by_id', 1) or 1
+            possible_paths.append(f"/app/go-app/data/users/{user_id}/backtests/backtest_{backtest.id}.json")
+            possible_paths.append(os.path.join(settings.BASE_DIR, 'go-app', 'data', 'users', str(user_id), 'backtests', f'backtest_{backtest.id}.json'))
+            possible_paths.append(f"/app/data/users/{user_id}/backtests/backtest_{backtest.id}.json")
+            possible_paths.append(os.path.join(settings.BASE_DIR, 'data', 'users', str(user_id), 'backtests', f'backtest_{backtest.id}.json'))
+            disk_trades = []
+            for path in possible_paths:
+                if path and os.path.exists(path):
+                    try:
+                        with open(path, 'r', encoding='utf-8') as f:
+                            for line in f:
+                                if line.strip():
+                                    disk_trades.append(json.loads(line.strip()))
+                        if disk_trades:
+                            break
+                    except Exception:
+                        pass
+            if disk_trades:
+                for idx, t in enumerate(disk_trades, start=1):
+                    t['serial_no'] = idx
+                if 1 <= trade_num <= len(disk_trades):
+                    current_index = trade_num - 1
+                    target_trade = disk_trades[current_index]
+                    all_trades = disk_trades
+
+        if not target_trade:
             raise Http404("Trade order not found")
 
         target_trade = dict(target_trade)
+        pnl_val = float(target_trade.get('pnl', target_trade.get('net_pnl', 0.0)))
+        target_trade['net_pnl'] = pnl_val
+        target_trade['pnl'] = pnl_val
+        if 'index_points' not in target_trade or target_trade['index_points'] is None:
+            en = float(target_trade.get('index_entry_price', target_trade.get('entry_price', 0)))
+            ex = float(target_trade.get('index_exit_price', target_trade.get('exit_price', 0)))
+            target_trade['index_points'] = round(ex - en, 2)
+
         target_trade['entry_time'] = str(target_trade.get('timestamp') or target_trade.get('entry_time') or '')[11:16]
         target_trade['exit_time'] = str(target_trade.get('exit_timestamp') or target_trade.get('exit_time') or target_trade.get('timestamp') or '')[11:16]
         target_trade['decision_time'] = str(target_trade.get('decision_timestamp') or target_trade.get('timestamp') or '')[11:16]
@@ -1867,7 +1904,12 @@ class BacktestDashboardScrollView(LoginRequiredMixin, AdminRequiredMixin, BaseHt
         queryset = BacktestTask.objects.filter(is_deleted=False)
         q = self.request.GET.get('q', '').strip()
         if q:
-            queryset = queryset.filter(strategy_name__icontains=q) | queryset.filter(id__icontains=q)
+            clean_q = q.replace('+', ' ').strip()
+            words = [w for w in clean_q.split() if len(w) >= 2]
+            q_filter = Q(strategy_name__icontains=q) | Q(id__icontains=q) | Q(rules__name__icontains=q) | Q(rules__rule_type__icontains=q)
+            for w in words:
+                q_filter |= Q(strategy_name__icontains=w) | Q(rules__name__icontains=w) | Q(rules__rule_type__icontains=w)
+            queryset = queryset.filter(q_filter).distinct()
         status = self.request.GET.get('status', '').strip()
         if status:
             queryset = queryset.filter(status=status)
@@ -1887,10 +1929,13 @@ class BacktestControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         if action in ['start', 'resume'] and task:
             use_macro = request.POST.get('use_macro_assist') in ['true', 'True', '1', 'on']
             task.use_macro_assist = use_macro
+            use_vix = request.POST.get('use_vix_assist') in ['true', 'True', '1', 'on']
+            task.use_vix_assist = use_vix
             if not isinstance(task.parameters, dict):
                 task.parameters = {}
             task.parameters['use_macro_assist'] = use_macro
-            task.save(update_fields=['use_macro_assist', 'parameters'])
+            task.parameters['use_vix_assist'] = use_vix
+            task.save(update_fields=['use_macro_assist', 'use_vix_assist', 'parameters'])
 
         send_backtest_control_command(pk, action)
         msg = f"Backtest command '{action.upper()}' sent successfully."
@@ -1914,7 +1959,7 @@ class BacktestStatusView(LoginRequiredMixin, AdminRequiredMixin, View):
             'progress': task.progress or 0,
             'total_trades': task.results.get('total_trades', 0) if task.results else 0,
             'net_pnl': task.results.get('net_pnl', 0.0) if task.results else 0.0,
-            'step_info': f"Executing reinforcement learning strategy ({task.progress or 0}%)..." if task.status == BacktestTask.StatusChoices.RUNNING else "",
+            'step_info': f"Executing quantitative strategy ({task.progress or 0}%)..." if task.status == BacktestTask.StatusChoices.RUNNING else "",
             'error_logs': task.error_logs or '',
         })
 
@@ -2096,6 +2141,89 @@ The **Go Quantitative Strategy Engine** executes deterministic, auditable rule-b
             },
             "user_manual": "# High-Frequency Micro-Scalp (HFT)\n\nUltra-fast EMA 3/8 micro-scalp with tight 8pt SL, 1:2.0 RR, and 0.8R trailing breakeven shield to achieve high win rates.",
         },
+        {
+            "name": "Volume + AMD Pattern (1:2.5 Limit Midpoint)",
+            "code_name": "volume_amd",
+            "category": "Smart Money / Volume Flow",
+            "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
+            "description": "Institutional Accumulation, Manipulation (Sweep), and Distribution engine with volume absorption spike and 1:2.5 Limit entry.",
+            "go_file_path": "go-app/strategies/preset_volume_amd.go",
+            "default_parameters": {
+                "lots_count": 1,
+                "strike_selection": "ATM",
+                "risk_reward_ratio": 2.5,
+                "rr_ratio": 2.5,
+                "stop_loss_points": 12.0,
+                "sl_pts": 12.0,
+                "ema_fast": 9,
+                "ema_slow": 21,
+                "use_orb_filter": False,
+                "use_orb": False,
+                "min_displacement": 0.50,
+                "trail_breakeven": True,
+                "breakeven_at_r": 1.5,
+                "entry_window_from": "09:25",
+                "entry_window_to": "15:00",
+                "cooldown_seconds": 300,
+            },
+            "user_manual": "# Volume + AMD Pattern Strategy Manual\n\n## 1. Overview\nThe Volume + AMD (Accumulation, Manipulation, Distribution) strategy captures institutional liquidity sweeps and false-breakout rejections.\n\n## 2. Signal Generation Logic\n- Phase 1 (Accumulation): Rolling 15-period consolidation boundaries (accHigh, accLow).\n- Phase 2 (Manipulation): Liquidity sweep outside boundaries with volume surge (>= 1.4x) and rejection wick (>= 25%).\n- Phase 3 (Distribution): Reversal entry via Strike Sweep (ATM±3) mid-price limit order with 1:2.5 RR and trailing stop to breakeven at 1.5R.\n",
+        },
+        {
+            "name": "Advanced HTF MACD + ICT Hybrid (1:2.0 High Winrate)",
+            "code_name": "macd_ict_hybrid",
+            "category": "HTF MACD / Smart Money",
+            "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
+            "description": "15m HTF MACD & 200 EMA momentum gatekeeper with 1m Liquidity Sweep, MSS, and FVG Consequent Encroachment (50% CE) entry.",
+            "go_file_path": "go-app/strategies/preset_macd_ict.go",
+            "default_parameters": {
+                "lots_count": 1,
+                "strike_selection": "ATM",
+                "risk_reward_ratio": 2.0,
+                "rr_ratio": 2.0,
+                "stop_loss_points": 15.0,
+                "sl_pts": 15.0,
+                "ema_fast": 12,
+                "ema_slow": 26,
+                "use_orb_filter": True,
+                "use_orb": True,
+                "min_displacement": 0.65,
+                "trail_breakeven": True,
+                "breakeven_at_r": 1.2,
+                "entry_window_from": "09:20",
+                "entry_window_to": "14:45",
+                "cooldown_seconds": 300,
+                "order_type": "LIMIT",
+            },
+            "user_manual": "# Advanced HTF MACD + ICT Hybrid Strategy Manual\n\n## 1. Overview\nFuses 15m Higher-Timeframe (HTF) MACD trend & momentum expansion with 1m ICT Smart Money entry precision.\n\n## 2. Signal Generation Logic\n- 15m MACD (12/26) histogram direction acts as trend gate (must be expanding in signal direction).\n- 200 EMA on 15m chart confirms macro bias (price must be above/below EMA).\n- On confirmation, engine sweeps 1m for Liquidity Sweep → MSS → FVG Consequent Encroachment (50% CE) limit entry.\n- Strike Sweep (ATM±3) selects optimal option entry via OI/Volume/Premium scoring.\n- 1:2.0 RR with trailing breakeven at 1.2R and 5-minute cooldown between trades.\n",
+        },
+        {
+            "name": "Morning 3-Min HTF & Option MACD Retest",
+            "code_name": "morning_macd_retest",
+            "category": "HTF MACD / Smart Money",
+            "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
+            "description": "3-minute HTF MACD retest strategy targeting morning session momentum with option premium confirmation.",
+            "go_file_path": "go-app/strategies/quant_engine.go",
+            "default_parameters": {
+                "lots_count": 1,
+                "strike_selection": "ATM",
+                "risk_reward_ratio": 2.0,
+                "rr_ratio": 2.0,
+                "stop_loss_points": 12.0,
+                "sl_pts": 12.0,
+                "ema_fast": 12,
+                "ema_slow": 26,
+                "use_orb_filter": True,
+                "use_orb": True,
+                "min_displacement": 0.55,
+                "trail_breakeven": True,
+                "breakeven_at_r": 1.0,
+                "entry_window_from": "09:20",
+                "entry_window_to": "11:30",
+                "cooldown_seconds": 240,
+                "order_type": "LIMIT",
+            },
+            "user_manual": "# Morning 3-Min HTF & Option MACD Retest\n\n## 1. Overview\nTargets the high-probability morning momentum window (9:20–11:30 IST) using 3-minute MACD retest setups.\n\n## 2. Signal Generation Logic\n- 3m MACD (12/26) crossover with retest of signal line confirms entry.\n- ORB 15m filter ensures trades align with opening range direction.\n- Option MACD: premium EMA crossover on selected strike used for secondary confirmation.\n- Tight 12pt SL, 1:2.0 RR, trailing stop to breakeven at 1.0R.\n",
+        },
     ]
 
     for item in defaults:
@@ -2117,7 +2245,7 @@ class StrategyListView(HTMXPartialMixin, LoginRequiredMixin, ListView):
     template_name = 'admins/strategy_list.html'
     partial_template_name = 'admins/partials/strategy_list_content.html'
     context_object_name = 'strategies'
-    paginate_by = 5
+    paginate_by = 20
 
     def get_queryset(self):
         ensure_default_strategies()
@@ -2482,9 +2610,12 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             'active_rule_ids': active_rule_ids,
             'available_macro_backups': available_macro_backups,
             'available_primary_backups': available_primary_backups,
+            'available_vix_backups': MarketBackupTask.objects.filter(is_deleted=False, index_name='INDIAVIX').order_by('-id'),
             'macro_timeframe_choices': MacroTimeframeChoices.choices,
             'use_macro_assist_val': bool(task.use_macro_assist or params.get('use_macro_assist', False)),
             'macro_timeframe_val': str(task.macro_timeframe or params.get('macro_timeframe', '1h')),
+            'use_vix_assist_val': bool(task.use_vix_assist or params.get('use_vix_assist', False)),
+            'current_vix_backup_id': task.vix_backup_task_id,
             'current_macro_backup_id': task.macro_backup_task_id,
             'current_backup_id': task.backup_task_id,
             'start_date_val': task.start_date.strftime('%Y-%m-%d') if task.start_date else '',
@@ -2601,10 +2732,13 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         use_macro_assist = ('use_macro_assist' in request.POST)
         macro_timeframe = request.POST.get('macro_timeframe', '1h').strip() or '1h'
         macro_backup_task_id = request.POST.get('macro_backup_task', '').strip()
+        use_vix_assist = ('use_vix_assist' in request.POST)
+        vix_backup_task_id = request.POST.get('vix_backup_task', '').strip()
         backup_task_id = request.POST.get('backup_task', '').strip()
 
         task.use_macro_assist = use_macro_assist
         task.macro_timeframe = macro_timeframe
+        task.use_vix_assist = use_vix_assist
         if macro_backup_task_id:
             try:
                 task.macro_backup_task = MarketBackupTask.objects.filter(pk=int(macro_backup_task_id), is_deleted=False).first()
@@ -2612,6 +2746,16 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
                 task.macro_backup_task = None
         else:
             task.macro_backup_task = None
+
+        if vix_backup_task_id:
+            try:
+                task.vix_backup_task = MarketBackupTask.objects.filter(pk=int(vix_backup_task_id), is_deleted=False).first()
+            except ValueError:
+                task.vix_backup_task = None
+        elif use_vix_assist:
+            task.vix_backup_task = MarketBackupTask.objects.filter(is_deleted=False, index_name='INDIAVIX', status='completed').order_by('-id').first()
+        else:
+            task.vix_backup_task = None
 
         if backup_task_id:
             try:
@@ -2661,6 +2805,9 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             "prompt_directives": prompt_directives,
             "use_macro_assist": use_macro_assist,
             "macro_timeframe": macro_timeframe,
+            "use_vix_assist": use_vix_assist,
+            "vix_backup_task_id": str(task.vix_backup_task.id) if task.vix_backup_task else "",
+            "vix_parquet_path": (task.vix_backup_task.parquet_file_path if task.vix_backup_task else "") or "",
         }
         is_clone = (request.POST.get('action') == 'clone')
 
@@ -2678,6 +2825,8 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
                 use_macro_assist=use_macro_assist,
                 macro_timeframe=macro_timeframe,
                 macro_backup_task=task.macro_backup_task,
+                use_vix_assist=use_vix_assist,
+                vix_backup_task=task.vix_backup_task,
                 backup_task=task.backup_task,
                 enable_ai_lot_sizing=enable_ai_lot_sizing,
                 auto_risk_management=auto_risk_management,
@@ -2697,7 +2846,7 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             })
             return response
 
-        task.save(update_fields=['start_date', 'end_date', 'initial_capital', 'parameters', 'use_macro_assist', 'macro_timeframe', 'macro_backup_task', 'backup_task', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap'])
+        task.save(update_fields=['start_date', 'end_date', 'initial_capital', 'parameters', 'use_macro_assist', 'macro_timeframe', 'macro_backup_task', 'use_vix_assist', 'vix_backup_task', 'backup_task', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap'])
         task.rules.set(rules_qs)
 
         send_backtest_control_command(task.id, 'START')
@@ -2986,31 +3135,40 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
     def post(self, request, pk, *args, **kwargs):
         backtest = get_object_or_404(BacktestTask, pk=pk)
 
-        trading_account_id = request.POST.get('trading_account_id')
-        raw_mode = request.POST.get('execution_mode', 'LIVE').strip().upper()
-        if raw_mode == 'MOCK':
-            execution_mode = AccountTypeChoices.MOCK
+        raw_mode = request.POST.get('execution_mode', 'SANDBOX').strip().upper()
+        if raw_mode in ['SANDBOX', 'MOCK']:
+            execution_mode = AccountTypeChoices.SANDBOX
+            mode_prefix = "Sandbox"
+            target_account = request.user.trading_accounts.filter(account_type__in=[AccountTypeChoices.SANDBOX, AccountTypeChoices.MOCK], is_active=True).order_by('-is_default', 'id').first()
         else:
             execution_mode = AccountTypeChoices.LIVE
-
-        target_account = None
-        if trading_account_id:
-            target_account = request.user.trading_accounts.filter(id=trading_account_id, is_active=True).first()
-            if target_account and target_account.account_type in [AccountTypeChoices.LIVE, AccountTypeChoices.MOCK]:
-                execution_mode = target_account.account_type
-
-        if execution_mode == AccountTypeChoices.MOCK:
-            mode_prefix = "Mock"
-        else:
             mode_prefix = "Live"
+            trading_account_id = request.POST.get('trading_account_id')
+            target_account = None
+            if trading_account_id:
+                target_account = request.user.trading_accounts.filter(id=trading_account_id, is_active=True).first()
+            if not target_account:
+                target_account = request.user.trading_accounts.filter(account_type=AccountTypeChoices.LIVE, is_active=True).order_by('-is_default', 'id').first()
+
         raw_name = request.POST.get('name', '').strip()
         if not raw_name:
             name = f"{mode_prefix} {backtest.index_name} {backtest.get_strategy_name_display()} #BT-{backtest.id:04d}"
         else:
             name = raw_name
-        try:
-            allocated_capital = float(request.POST.get('allocated_capital', backtest.initial_capital))
-        except (ValueError, TypeError):
+
+        is_active_val = str(request.POST.get('is_active', 'false')).strip().lower()
+        is_active = is_active_val in ['true', '1', 'active']
+        status = LiveStrategyStatusChoices.RUNNING if is_active else LiveStrategyStatusChoices.STANDBY
+
+        allocated_capital_raw = request.POST.get('allocated_capital')
+        if allocated_capital_raw:
+            try:
+                allocated_capital = float(allocated_capital_raw)
+            except (ValueError, TypeError):
+                allocated_capital = float(backtest.initial_capital)
+        elif target_account and hasattr(target_account, 'account_summary') and target_account.account_summary:
+            allocated_capital = float(target_account.account_summary.get('balance') or target_account.account_summary.get('initial_capital') or backtest.initial_capital)
+        else:
             allocated_capital = float(backtest.initial_capital)
 
         # STRICT ISOLATION: clone rules into immutable dicts
@@ -3046,7 +3204,7 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
 
         live_strat = LiveStrategy.objects.create(
             user=request.user,
-            trading_account_id=trading_account_id if trading_account_id else None,
+            trading_account=target_account,
             backtest_task=backtest,
             name=name,
             strategy_name=backtest.strategy_name,
@@ -3055,9 +3213,9 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
             allocated_capital=allocated_capital,
             frozen_rules_snapshot=rules_snapshot,
             frozen_parameters=parameters_snapshot,
-            is_active=False,
+            is_active=is_active,
             execution_mode=execution_mode,
-            status=LiveStrategyStatusChoices.STANDBY,
+            status=status,
             created_by=request.user,
         )
 
@@ -3155,6 +3313,8 @@ class BacktestApplyAiSuggestionsView(LoginRequiredMixin, AdminRequiredMixin, Vie
             use_macro_assist=backtest.use_macro_assist,
             macro_timeframe=backtest.macro_timeframe,
             macro_backup_task=backtest.macro_backup_task,
+            use_vix_assist=backtest.use_vix_assist,
+            vix_backup_task=backtest.vix_backup_task,
             enable_ai_lot_sizing=backtest.enable_ai_lot_sizing,
             auto_risk_management=backtest.auto_risk_management,
             max_risk_per_trade_pct=float(suggested_params.get('max_risk_per_trade_pct', backtest.max_risk_per_trade_pct)),
@@ -3223,6 +3383,8 @@ class BacktestSimulateCompoundingView(LoginRequiredMixin, AdminRequiredMixin, Vi
             use_macro_assist=backtest.use_macro_assist,
             macro_timeframe=backtest.macro_timeframe,
             macro_backup_task=backtest.macro_backup_task,
+            use_vix_assist=backtest.use_vix_assist,
+            vix_backup_task=backtest.vix_backup_task,
             enable_ai_lot_sizing=False,
             auto_risk_management=True,
             max_risk_per_trade_pct=float(suggested_params.get('max_risk_per_trade_pct', backtest.max_risk_per_trade_pct)),

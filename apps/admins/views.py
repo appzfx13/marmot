@@ -453,14 +453,15 @@ def _build_mock_broker_calendar(daily_map: dict, selected_year: int = 2026):
     return months_data
 
 
-class AdminLiveMockDashboardView(AdminLiveDashboardView):
-    """Admin Mock Broker Live Trading Dashboard running on Dhan Mock Emulator (:8088) with 100% Live UI parity."""
-    template_name = 'admins/mock_broker_dashboard.html'
-    partial_template_name = 'admins/partials/live_dashboard_content.html'
+class AdminSandboxDashboardView(AdminLiveDashboardView):
+    """Admin Sandbox Trading & Strategy Simulation Dashboard running on Dhan Mock Emulator (:8088)."""
+    template_name = 'admins/sandbox_dashboard.html'
+    partial_template_name = 'admins/partials/sandbox_dashboard_content.html'
     is_mock_view = True
 
 
-AdminMockBrokerDashboardView = AdminLiveMockDashboardView
+AdminLiveMockDashboardView = AdminSandboxDashboardView
+AdminMockBrokerDashboardView = AdminSandboxDashboardView
 
 
 class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
@@ -1139,7 +1140,14 @@ class AdminLiveOptionChainPartialView(LoginRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         index_name = request.GET.get('index', 'NIFTY').upper().strip()
         available_indexes = get_available_backup_indexes()
-        is_mock = request.GET.get('env') == 'MOCK' or request.session.get('active_tab') == 'live-mock' or 'live-mock' in request.META.get('HTTP_REFERER', '')
+        referer = request.META.get('HTTP_REFERER', '')
+        current_url = request.headers.get('Hx-Current-Url', '')
+        is_mock = (
+            request.GET.get('env') == 'MOCK'
+            or request.session.get('active_tab') == 'live-mock'
+            or 'live-mock' in referer
+            or 'live-mock' in current_url
+        )
         option_chain = get_live_index_option_chain(index_name, is_mock=is_mock)
         context = {
             'selected_index': index_name,

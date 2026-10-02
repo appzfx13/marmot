@@ -1216,25 +1216,32 @@
     }
 
     window.confirmGatewayAction = function(formId, modalId) {
-        const modalEl = document.getElementById(modalId);
-        if (modalEl && window.bootstrap) {
-            const modalInstance = bootstrap.Modal.getInstance(modalEl) || new bootstrap.Modal(modalEl);
-            modalInstance.hide();
-        }
-        setTimeout(() => {
-            document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
-            document.body.classList.remove('modal-open');
-            document.body.style.removeProperty('overflow');
-            document.body.style.removeProperty('padding-right');
-            const form = document.getElementById(formId);
-            if (form) {
-                if (window.htmx) {
-                    htmx.trigger(form, 'submit');
-                } else {
-                    form.submit();
+        const modals = Array.from(document.querySelectorAll('#' + modalId));
+        modals.forEach(m => {
+            if (window.bootstrap) {
+                const inst = bootstrap.Modal.getInstance(m);
+                if (inst) {
+                    try { inst.hide(); } catch (e) {}
+                    try { inst.dispose(); } catch (e) {}
                 }
             }
-        }, 120);
+            if (m.parentElement === document.body) {
+                m.remove();
+            }
+        });
+        document.querySelectorAll('.modal-backdrop').forEach(b => b.remove());
+        document.body.classList.remove('modal-open');
+        document.body.style.removeProperty('overflow');
+        document.body.style.removeProperty('padding-right');
+
+        const form = document.getElementById(formId);
+        if (form) {
+            if (window.htmx) {
+                htmx.trigger(form, 'submit');
+            } else {
+                form.submit();
+            }
+        }
     };
 
     window.setGatewaySpeed = function(val) {
@@ -1336,6 +1343,24 @@
     document.body.addEventListener('htmx:afterSwap', function(e) {
         if (e.detail.target && (e.detail.target.id === 'gateway-emulator-container' || e.detail.target.closest('#gateway-emulator-container'))) {
             setTimeout(initGatewayEquityChart, 80);
+        }
+    });
+    document.body.addEventListener('htmx:beforeSwap', function(e) {
+        if (e.detail.target && (e.detail.target.id === 'gateway-emulator-container' || e.detail.target.closest('#gateway-emulator-container'))) {
+            const modalIds = [
+                'confirmPauseModal', 'confirmRewindModal', 'confirmStopModal',
+                'confirmClearOrdersModal', 'confirmResetSessionModal', 'confirmKillSwitchModal',
+                'mockOrderTicketModal', 'saveSessionModal'
+            ];
+            modalIds.forEach(id => {
+                document.querySelectorAll('body > #' + id).forEach(el => {
+                    if (window.bootstrap) {
+                        const inst = bootstrap.Modal.getInstance(el);
+                        if (inst) try { inst.dispose(); } catch (err) {}
+                    }
+                    el.remove();
+                });
+            });
         }
     });
 })();

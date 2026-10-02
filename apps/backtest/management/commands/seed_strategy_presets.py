@@ -1,13 +1,18 @@
 from django.core.management.base import BaseCommand
 from apps.backtest.models import BacktestRule
 from apps.backtest.services import GO_STRATEGY_PRESETS
+from apps.backtest.views import ensure_default_strategies
 
 
 class Command(BaseCommand):
-    """Seed clean, system-level BacktestRule presets that activate Go quantitative strategies."""
-    help = "Seeds database with BacktestRule records mapped to hardcoded Go strategy presets."
+    """Seed clean, system-level BacktestRule presets and TradingStrategy catalog."""
+    help = "Seeds database with BacktestRule records and Strategy Hub catalog."
 
     def handle(self, *args, **options):
+        # 1. Seed TradingStrategy catalog for Strategy Library & Execution Hub
+        ensure_default_strategies()
+        self.stdout.write(self.style.SUCCESS("✓ Seeded TradingStrategy catalog for Strategy Library & Execution Hub."))
+
         count = 0
         for item in GO_STRATEGY_PRESETS:
             rule_type = item['rule_type']

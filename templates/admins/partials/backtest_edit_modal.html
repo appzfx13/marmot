@@ -1154,6 +1154,50 @@
                 </div>
             </div>
 
+            <!-- India VIX Volatility Support -->
+            <div class="mb-4 p-3.5 p-md-4 rounded-3 border edit-modal-subpanel">
+                <div class="d-flex align-items-center justify-content-between mb-2 flex-wrap gap-2">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-warning" style="font-size: 1.2rem;">show_chart</span>
+                        <span class="edit-modal-section-title">
+                            India VIX Volatility Regime Support
+                        </span>
+                        <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-0.5 ms-1" style="font-size: 0.70rem;">
+                            Volatility Guard
+                        </span>
+                    </div>
+                    <div class="form-check form-switch p-0 m-0 d-flex align-items-center gap-2">
+                        <label class="form-check-label edit-modal-label small fw-semibold cursor-pointer mb-0" for="edit_use_vix_assist" style="font-size: 0.78rem;">
+                            Enable India VIX Support
+                        </label>
+                        <input type="checkbox" name="use_vix_assist" id="edit_use_vix_assist" 
+                               class="form-check-input edit-rule-toggle m-0" 
+                               role="switch" 
+                               {% if use_vix_assist_val %}checked{% endif %}>
+                    </div>
+                </div>
+
+                <div class="row g-3.5 pt-1.5">
+                    <div class="col-12">
+                        <label class="form-label edit-modal-label small fw-bold text-uppercase mb-2" for="edit_vix_backup_task" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                            <span class="material-icons align-middle me-1" style="font-size: 0.85rem;">dataset</span>
+                            1-Year Common India VIX Parquet Dataset
+                        </label>
+                        <select name="vix_backup_task" id="edit_vix_backup_task" class="form-select edit-modal-input font-monospace" style="font-size: 0.82rem;">
+                            <option value="">-- Auto-Detect / Common INDIAVIX Parquet Dataset (Optional) --</option>
+                            {% for v_task in available_vix_backups %}
+                            <option value="{{ v_task.id }}" {% if v_task.id == current_vix_backup_id %}selected{% endif %}>
+                                #{{ v_task.id }} · {{ v_task.display_symbol }} ({{ v_task.start_date }} → {{ v_task.end_date }}) [{{ v_task.file_size_mb|floatformat:1 }} MB]
+                            </option>
+                            {% endfor %}
+                        </select>
+                        <small class="edit-modal-muted mt-2 d-block" style="font-size: 0.73rem; line-height: 1.4;">
+                            Synchronizes real intraday India VIX regime readings to the simulation engine.
+                        </small>
+                    </div>
+                </div>
+            </div>
+
             <!-- 3. Strategy Rules Selection (Generous Padding & Smooth Native Scrolling) -->
             <div class="mb-4 p-3.5 p-md-4 rounded-3 border edit-modal-subpanel">
                 <div class="d-flex align-items-center justify-content-between mb-3 pb-2.5 border-bottom flex-wrap gap-2" style="border-color: var(--border-color) !important;">

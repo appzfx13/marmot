@@ -89,3 +89,4 @@ docker compose build go_app && docker compose up -d go_app
 1. **`ict_smc.go`**: ICT / Smart Money Concepts Order Block & Fair Value Gap (FVG) Strategy.
 2. **`gamma_blast.go`**: Expiry Day 0DTE Option Gamma Blast Strategy (using dynamic option contract expiry date metadata).
 3. **`candle_3pm.go`**: 3:00 PM Breakout Candle Strategy.
+4. **`preset_volume_amd.go`**: Volume + AMD (Accumulation, Manipulation, Distribution) Pattern Strategy. See detailed guide in [VOLUME_AMD_STRATEGY.md](file:///e:/Workspace/Projects/MARMOT/marmot/go-app/strategies/VOLUME_AMD_STRATEGY.md).

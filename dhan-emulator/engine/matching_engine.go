@@ -647,6 +647,16 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 	}
 	ord.TakeProfit = ord.Order.BoProfitValue
 
+	// OMS Guardrail: If an Option contract received an index-level SL (e.g. SL >= fillPrice or SL > 2000), normalize to option premium risk
+	if (ord.Order.ExchangeSegment == "NSE_FNO" || strings.HasSuffix(strings.ToUpper(ord.Order.TradingSymbol), "CE") || strings.HasSuffix(strings.ToUpper(ord.Order.TradingSymbol), "PE") || fillPrice < 2000) && fillPrice > 0 {
+		if ord.StopLoss >= fillPrice || ord.StopLoss > 2000 {
+			ord.StopLoss = math.Max(0.5, math.Round(fillPrice*0.80*100)/100)
+		}
+		if ord.TakeProfit <= fillPrice || ord.TakeProfit > 2000 {
+			ord.TakeProfit = math.Round(fillPrice*1.40*100)/100
+		}
+	}
+
 	posKey := ord.Order.SecurityID + "_" + ord.Order.ProductType
 	sym := ord.Order.TradingSymbol
 	if sym == "" {

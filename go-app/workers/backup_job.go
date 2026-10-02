@@ -70,7 +70,9 @@ func (j *BackupJob) Run(ctx context.Context) {
 		j.runForexBackupPipeline(ctx, taskID, userID, backupTaskDir, stagingDir)
 		return
 	}
-	if strikeCount <= 0 {
+	if strings.EqualFold(indexName, "INDIAVIX") {
+		strikeCount = 0
+	} else if strikeCount < 0 {
 		strikeCount = 15
 	}
 
@@ -85,8 +87,13 @@ func (j *BackupJob) Run(ctx context.Context) {
 		log.Printf("⚠️ [Task #%s] FYERS Access Token is empty! Ensure credentials are set.", taskID)
 	}
 
-	log.Printf("🚀 [Task #%s] Starting Unified Parquet Backup (Spot + ATM±%d Option Strikes) for User #%s | %s → %s",
-		taskID, strikeCount, userID, startDate, endDate)
+	if strikeCount > 0 {
+		log.Printf("🚀 [Task #%s] Starting Unified Parquet Backup (Spot + ATM±%d Option Strikes) for User #%s | %s → %s",
+			taskID, strikeCount, userID, startDate, endDate)
+	} else {
+		log.Printf("🚀 [Task #%s] Starting Unified Parquet Backup (Index Spot Only) for User #%s | %s → %s",
+			taskID, userID, startDate, endDate)
+	}
 
 	existingProgress, err := j.dbService.GetTaskProgress(ctx, taskID)
 	if err != nil {
@@ -106,9 +113,16 @@ func (j *BackupJob) Run(ctx context.Context) {
 
 	// ── STEP 1: Download Index Spot Data into Staging Parquet ─────────────────
 	log.Printf("📥 [Task #%s] [Step 1/2] Downloading Index Spot candles (%s)...", taskID, indexName)
-	spotFiles, spotMap := j.downloadIndexSpot(ctx, taskID, stagingDir, indexName, startDate, endDate, hasOptions, fyersAppID, fyersAccessToken, params.Use30Days1s, params.Use30Days5s)
+	spotFiles, spotMap, spotErr := j.downloadIndexSpot(ctx, taskID, stagingDir, indexName, startDate, endDate, hasOptions, fyersAppID, fyersAccessToken, params.Use30Days1s, params.Use30Days5s)
+	if spotErr != nil && ctx.Err() == nil {
+		log.Printf("🛑 [Task #%s] Index Spot download failed: %v. Halting task.", taskID, spotErr)
+		_ = j.dbService.RecordError(ctx, taskID, spotErr.Error())
+		return
+	}
 	if len(spotFiles) == 0 && ctx.Err() == nil {
-		log.Printf("🛑 [Task #%s] Index Spot download returned 0 files across date range [%s → %s]. Halting task.", taskID, startDate, endDate)
+		errMsg := fmt.Sprintf("Index Spot download returned 0 files across date range [%s → %s]. Halting task.", startDate, endDate)
+		log.Printf("🛑 [Task #%s] %s", taskID, errMsg)
+		_ = j.dbService.RecordError(ctx, taskID, errMsg)
 		return
 	}
 
@@ -318,7 +332,7 @@ func (j *BackupJob) downloadIndexSpot(
 	hasOptions bool,
 	fyersAppID, fyersAccessToken string,
 	use30Days1s, use30Days5s bool,
-) ([]string, map[int64]float64) {
+) ([]string, map[int64]float64, error) {
 	createdFiles := make([]string, 0)
 	spotMap := make(map[int64]float64)
 	client := &http.Client{Timeout: 30 * time.Second}
@@ -326,12 +340,12 @@ func (j *BackupJob) downloadIndexSpot(
 	start, err := time.Parse("2006-01-02", startDate)
 	if err != nil {
 		log.Printf("⚠️ [Task #%s] Invalid start date: %v", taskID, err)
-		return createdFiles, spotMap
+		return createdFiles, spotMap, err
 	}
 	end, err := time.Parse("2006-01-02", endDate)
 	if err != nil {
 		log.Printf("⚠️ [Task #%s] Invalid end date: %v", taskID, err)
-		return createdFiles, spotMap
+		return createdFiles, spotMap, err
 	}
 
 	// 1S / 5S resolution is valid for short recent ranges when the respective toggle is active
@@ -369,14 +383,14 @@ func (j *BackupJob) downloadIndexSpot(
 	if fyersAccessToken == "" {
 		log.Printf("❌ [Task #%s] FYERS Access Token missing! Cannot download spot candles for %s.", taskID, indexName)
 		_ = j.dbService.RecordError(ctx, taskID, "FYERS Access Token missing")
-		return nil, spotMap
+		return nil, spotMap, fmt.Errorf("FYERS Access Token missing")
 	}
 
 	for chunkStart.Before(end) || chunkStart.Equal(end) {
 		select {
 		case <-ctx.Done():
 			log.Printf("⏸️ [Task #%s] Index download interrupted for pause/cancel.", taskID)
-			return createdFiles, spotMap
+			return createdFiles, spotMap, ctx.Err()
 		default:
 		}
 
@@ -539,8 +553,10 @@ func (j *BackupJob) downloadIndexSpot(
 				time.Sleep(time.Duration(attempt+1) * 2 * time.Second)
 				continue
 			} else {
-				log.Printf("❌ [Task #%s] FYERS Spot History HTTP %d: %s", taskID, statusCode, string(bodyBytes))
-				break
+				brokerErr := fmt.Sprintf("FYERS Spot History HTTP %d: %s", statusCode, string(bodyBytes))
+				log.Printf("❌ [Task #%s] %s", taskID, brokerErr)
+				_ = j.dbService.RecordError(ctx, taskID, brokerErr)
+				return createdFiles, spotMap, fmt.Errorf("%s", brokerErr)
 			}
 		}
 
@@ -569,7 +585,7 @@ func (j *BackupJob) downloadIndexSpot(
 		time.Sleep(100 * time.Millisecond)
 	}
 
-	return createdFiles, spotMap
+	return createdFiles, spotMap, nil
 }
 
 // runOptionsDownload fetches options via FYERS API v3 and calculates exact Black-Scholes Greeks

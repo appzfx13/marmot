@@ -196,7 +196,7 @@ def send_control_command(task_id, command):
             "index_name": task.index_name or '',
             "forex_instrument": task.forex_instrument or '',
             "provider_name": task.provider_name,
-            "strike_count": task.strike_count or 15,
+            "strike_count": 0 if (task.strike_count == 0 or task.index_name == 'INDIAVIX') else (task.strike_count if task.strike_count is not None else 15),
             "use_30_days_5s": task.use_30_days_5s,
             "use_30_days_1s": task.use_30_days_1s,
             "security_id": index_params.get("security_id", ""),

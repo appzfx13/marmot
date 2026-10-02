@@ -421,14 +421,25 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							rrRatio = rr
 						}
 					}
-					// If the sweep already anchored SL/TP on limitPrice, use those directly.
 					stopLoss := sig.StopLossPrice
 					target := sig.TargetPrice
-					if stopLoss <= 0 {
-						stopLoss = math.Max(1.0, math.Round((fillPrice-slPts)*100)/100)
-					}
-					if target <= 0 {
-						target = math.Round((fillPrice+(slPts*rrRatio))*100) / 100
+					if fillPrice < 2000 {
+						// Option premium contract: ensure SL is below fillPrice and not index-scale
+						if stopLoss <= 0 || stopLoss >= fillPrice || stopLoss > 2000 {
+							optSLPts := slPts
+							if optSLPts <= 0 || optSLPts >= fillPrice*0.70 {
+								optSLPts = math.Max(1.0, math.Round(fillPrice*0.20*100)/100)
+							}
+							stopLoss = math.Max(0.5, math.Round((fillPrice-optSLPts)*100)/100)
+							target = math.Round((fillPrice+(optSLPts*rrRatio))*100) / 100
+						}
+					} else {
+						if stopLoss <= 0 {
+							stopLoss = math.Max(1.0, math.Round((fillPrice-slPts)*100)/100)
+						}
+						if target <= 0 {
+							target = math.Round((fillPrice+(slPts*rrRatio))*100) / 100
+						}
 					}
 
 					orderTime := sig.Timestamp

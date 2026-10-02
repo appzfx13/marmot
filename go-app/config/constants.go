@@ -8,7 +8,7 @@ const (
 	FyersExpiredHistoryURL = "https://api-t1.fyers.in/data/history/fno/expired/historical-data"
 
 	// Resolution Identifiers
-	Resolution1S   = "1S"
+	Resolution1S   = "5S" // FYERS API lowest sub-minute resolution is 5S (1S returns HTTP 422)
 	Resolution5S   = "5S"
 	Resolution1Min = "1"
 

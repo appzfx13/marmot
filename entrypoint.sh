@@ -40,6 +40,7 @@ if [ "$RUN_MIGRATIONS" = "true" ]; then
   python manage.py initadmin
 
   echo "Seeding/Verifying Backtest Strategy Rules..."
+  python manage.py seed_strategy_presets
 fi
 
 # Execute main container process

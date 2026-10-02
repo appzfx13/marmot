@@ -194,10 +194,12 @@ type OptionStrikeRow struct {
 	Strike         float64 `json:"strike"`
 	IsActiveWindow bool    `json:"is_active_window"`
 	IsATM          bool    `json:"is_atm"`
+	CESymbol       string  `json:"ce_symbol"`
 	CE_LTP         float64 `json:"ce_ltp"`
 	CE_Change      float64 `json:"ce_chg"`
 	CE_ChangePct   float64 `json:"ce_chg_pct"`
 	CE_OI          string  `json:"ce_oi"`
+	PESymbol       string  `json:"pe_symbol"`
 	PE_LTP         float64 `json:"pe_ltp"`
 	PE_Change      float64 `json:"pe_chg"`
 	PE_ChangePct   float64 `json:"pe_chg_pct"`

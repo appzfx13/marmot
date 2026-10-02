@@ -40,6 +40,7 @@ type MarketTick struct {
 	SpotHigh  float64               `json:"spot_high"`
 	SpotLow   float64               `json:"spot_low"`
 	SpotClose float64               `json:"spot_close"`
+	Vix       float64               `json:"vix,omitempty"`
 	Options   map[string]OptionSnap `json:"options"`
 	Macro     *MacroSnapshot        `json:"macro,omitempty"`
 }

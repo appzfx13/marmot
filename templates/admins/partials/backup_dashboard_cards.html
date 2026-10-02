@@ -4,7 +4,7 @@
         <div class="d-flex align-items-center gap-2">
             <input class="form-check-input bulk-item-checkbox" type="checkbox" value="{{ backup.id }}">
             <div>
-                <div class="fw-bold theme-text-main font-monospace d-flex align-items-center gap-1">
+                <div class="fw-bold theme-text-main font-monospace d-flex align-items-center gap-1 flex-wrap">
                     <span>#{{ backup.id|stringformat:"04d" }}</span>
                     {% if backup.is_macro_assist %}
                         <span class="badge" style="background:rgba(234,179,8,0.18);color:#facc15;border:1px solid rgba(234,179,8,0.35);font-size:0.65rem;">🤖 MACRO</span>
@@ -13,6 +13,9 @@
                     {% else %}
                         <span class="badge" style="background:rgba(59,130,246,0.15);color:#60a5fa;border:1px solid rgba(59,130,246,0.3);font-size:0.65rem;">INDEX</span>
                     {% endif %}
+                    <span class="badge rounded-pill px-1.5 py-0.5 fw-bold font-monospace" style="{{ backup.resolution_badge_style }}; font-size: 0.65rem;" title="{{ backup.resolution_detail }}">
+                        {{ backup.resolution_label }}
+                    </span>
                 </div>
                 <div class="small fw-semibold {% if backup.is_macro_assist %}text-warning{% elif backup.market_type == 'FOREX_FUTURES' %}text-success{% else %}text-primary{% endif %}">{{ backup.display_symbol }}</div>
                 <div class="small theme-text-muted" style="font-size:0.68rem;">{% if backup.is_macro_assist %}Gemini AI{% else %}{{ backup.provider_name }}{% endif %}</div>
@@ -44,9 +47,13 @@
         </div>
     </div>
 
-    <div class="d-flex justify-content-between align-items-center small mb-2 theme-text-muted">
+    <div class="d-flex justify-content-between align-items-center small mb-1 theme-text-muted">
         <span>{{ backup.start_date|date:"d M" }} → {{ backup.end_date|date:"d M Y" }}</span>
-        <span>{% if backup.is_macro_assist %}{{ backup.macro_timeframe|default:"1h" }} Interval{% else %}±{{ backup.strike_count }} ATM{% endif %} | {{ backup.file_size_mb }} MB</span>
+        <span>{% if backup.is_macro_assist %}{{ backup.macro_timeframe|default:"1h" }} Interval{% elif backup.index_name == 'INDIAVIX' or not backup.strike_count %}Spot Volatility Only{% else %}±{{ backup.strike_count }} ATM ({{ backup.total_strikes_count }}c){% endif %} | <strong class="text-white">{{ backup.file_size_mb }} MB</strong></span>
+    </div>
+
+    <div class="small theme-text-muted text-truncate mb-2" style="font-size: 0.68rem;" title="{{ backup.resolution_detail }}">
+        <span class="material-icons align-middle" style="font-size: 0.78rem;">tune</span> {{ backup.resolution_detail }}
     </div>
 
     <div class="d-flex justify-content-end gap-2 pt-2 border-top border-secondary border-opacity-10">

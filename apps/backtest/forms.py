@@ -123,10 +123,16 @@ class IndexBacktestTaskForm(forms.ModelForm):
     use_macro_assist = forms.BooleanField(required=False, initial=False, label="USE AI MACRO ASSIST", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_index_use_macro_assist'}))
     macro_timeframe = forms.ChoiceField(choices=MacroTimeframeChoices.choices, initial=MacroTimeframeChoices.H1, required=False, widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_macro_timeframe'}))
     macro_backup_task = MarketBackupTaskChoiceField(queryset=MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=True).order_by('-id'), required=False, empty_label="-- Auto-Detect / Select Macro Parquet Dataset (Optional) --", widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_macro_backup_task'}))
+    use_vix_assist = forms.BooleanField(required=False, initial=False, label="USE INDIA VIX SUPPORT",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_index_use_vix_assist'}))
+    vix_backup_task = MarketBackupTaskChoiceField(
+        queryset=MarketBackupTask.objects.filter(is_deleted=False, index_name='INDIAVIX').order_by('-id'),
+        required=False, empty_label="-- Auto-Detect / Select India VIX Parquet Dataset (Optional) --",
+        widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_vix_backup_task'}))
 
     class Meta:
         model = BacktestTask
-        fields = ['market_type', 'backup_task', 'macro_backup_task', 'use_macro_assist', 'macro_timeframe', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
+        fields = ['market_type', 'backup_task', 'macro_backup_task', 'use_macro_assist', 'macro_timeframe', 'use_vix_assist', 'vix_backup_task', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
         widgets = {
             'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_strategy_name'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_index_name'}),
@@ -182,10 +188,16 @@ class ForexBacktestTaskForm(forms.ModelForm):
     use_macro_assist = forms.BooleanField(required=False, initial=False, label="USE AI MACRO ASSIST", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_forex_use_macro_assist'}))
     macro_timeframe = forms.ChoiceField(choices=MacroTimeframeChoices.choices, initial=MacroTimeframeChoices.H1, required=False, widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_macro_timeframe'}))
     macro_backup_task = MarketBackupTaskChoiceField(queryset=MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=True).order_by('-id'), required=False, empty_label="-- Auto-Detect / Select Macro Parquet Dataset (Optional) --", widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_macro_backup_task'}))
+    use_vix_assist = forms.BooleanField(required=False, initial=False, label="USE INDIA VIX SUPPORT",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_forex_use_vix_assist'}))
+    vix_backup_task = MarketBackupTaskChoiceField(
+        queryset=MarketBackupTask.objects.filter(is_deleted=False, index_name='INDIAVIX').order_by('-id'),
+        required=False, empty_label="-- Auto-Detect / Select India VIX Parquet Dataset (Optional) --",
+        widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_vix_backup_task'}))
 
     class Meta:
         model = BacktestTask
-        fields = ['market_type', 'backup_task', 'macro_backup_task', 'use_macro_assist', 'macro_timeframe', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
+        fields = ['market_type', 'backup_task', 'macro_backup_task', 'use_macro_assist', 'macro_timeframe', 'use_vix_assist', 'vix_backup_task', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'rules']
         widgets = {
             'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_strategy_name'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_index_name'}),

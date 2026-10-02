@@ -94,7 +94,7 @@ def broadcast_backtest_progress(task_id, progress: int, status: str, net_pnl: fl
         logger.error("Failed to broadcast backtest progress", exc=e, extra={"task_id": task_id})
 
 
-def create_and_start_backtest_task(strategy_name, index_name, start_date, end_date, initial_capital, parameters, user, backup_task=None, use_macro_assist=False, macro_timeframe='1h', macro_backup_task=None, enable_ai_lot_sizing=False, auto_risk_management=True, max_risk_per_trade_pct=2.00, max_capital_utilization_pct=60.00, max_lots_cap=10):
+def create_and_start_backtest_task(strategy_name, index_name, start_date, end_date, initial_capital, parameters, user, backup_task=None, use_macro_assist=False, macro_timeframe='1h', macro_backup_task=None, use_vix_assist=False, vix_backup_task=None, enable_ai_lot_sizing=False, auto_risk_management=True, max_risk_per_trade_pct=2.00, max_capital_utilization_pct=60.00, max_lots_cap=10):
     """Creates a BacktestTask DB entry in CREATED status without auto-starting."""
     task = BacktestTask.objects.create(
         strategy_name=strategy_name,
@@ -107,6 +107,8 @@ def create_and_start_backtest_task(strategy_name, index_name, start_date, end_da
         use_macro_assist=use_macro_assist,
         macro_timeframe=macro_timeframe or '1h',
         macro_backup_task=macro_backup_task,
+        use_vix_assist=use_vix_assist,
+        vix_backup_task=vix_backup_task,
         enable_ai_lot_sizing=enable_ai_lot_sizing,
         auto_risk_management=auto_risk_management,
         max_risk_per_trade_pct=max_risk_per_trade_pct,
@@ -140,6 +142,17 @@ def send_backtest_control_command(task_id, command):
         # the latest attached rules, not the stale snapshot from task creation.
         current_params = dict(task.parameters or {})
         current_params['use_macro_assist'] = bool(task.use_macro_assist)
+        current_params['use_vix_assist'] = bool(task.use_vix_assist)
+        if task.use_vix_assist and not task.vix_backup_task:
+            from apps.market.models import MarketBackupTask
+            auto_vix = MarketBackupTask.objects.filter(is_deleted=False, index_name='INDIAVIX', status='completed').order_by('-id').first()
+            if auto_vix:
+                task.vix_backup_task = auto_vix
+                task.save(update_fields=['vix_backup_task'])
+        if task.vix_backup_task:
+            current_params['vix_backup_task_id'] = str(task.vix_backup_task.id)
+            if task.vix_backup_task.parquet_file_path:
+                current_params['vix_parquet_path'] = task.vix_backup_task.parquet_file_path
         current_params['rules'] = [
             {
                 'id': r.id,
@@ -204,6 +217,9 @@ def send_backtest_control_command(task_id, command):
             "initial_capital": task.initial_capital,
             "user_id": str(task.created_by.id if getattr(task, 'created_by', None) else 1),
             "backup_task_id": str(task.backup_task.id) if task.backup_task else "",
+            "use_vix_assist": bool(task.use_vix_assist),
+            "vix_backup_task_id": str(task.vix_backup_task.id) if task.vix_backup_task else "",
+            "vix_parquet_path": (task.vix_backup_task.parquet_file_path if task.vix_backup_task else "") or "",
             "params": task.parameters or {}
         }
     }
@@ -435,6 +451,28 @@ GO_STRATEGY_PRESETS = [
             'min_displacement': 0.65,
             'trail_breakeven': True,
             'breakeven_at_r': 1.2,
+            'cooldown_seconds': 300,
+            'order_type': 'LIMIT',
+        },
+        'is_system_preset': True,
+        'is_active': True,
+    },
+    {
+        'rule_type': 'volume_amd',
+        'name': 'Volume + AMD Pattern (1:2.5 Limit Midpoint)',
+        'market_type': 'ALL',
+        'description': 'Institutional Accumulation, Manipulation (Sweep), and Distribution engine with volume absorption spike and 1:2.5 Limit entry.',
+        'parameters': {
+            'ema_fast': 9,
+            'ema_slow': 21,
+            'entry_window_from': 9 * 60 + 25,
+            'entry_window_to': 15 * 60,
+            'sl_pts': 12.0,
+            'rr_ratio': 2.5,
+            'use_orb_filter': False,
+            'min_displacement': 0.50,
+            'trail_breakeven': True,
+            'breakeven_at_r': 1.5,
             'cooldown_seconds': 300,
             'order_type': 'LIMIT',
         },
