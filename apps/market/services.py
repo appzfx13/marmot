@@ -13,6 +13,17 @@ logger = logging.getLogger(__name__)
 REDIS_URL = settings.REDIS_URL
 redis_client = redis.Redis.from_url(REDIS_URL, decode_responses=True)
 
+
+def dispatch_task_command(payload: dict) -> None:
+    """Dispatches command to Go engine via both Redis Streams (persistent) and Pub/Sub (instant trigger)."""
+    payload_str = json.dumps(payload)
+    try:
+        redis_client.xadd(REDIS_CHANNEL, {'data': payload_str}, maxlen=1000)
+    except Exception as stream_err:
+        logger.debug("Redis stream XADD warning: %s", stream_err)
+    redis_client.publish(REDIS_CHANNEL, payload_str)
+
+
 def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None, use_30_days_5s=False, use_30_days_1s=False):
     """Creates the backup record in Postgres with pre-stored path and dispatches to Go engine."""
     task = MarketBackupTask.objects.create(
@@ -211,7 +222,7 @@ def send_control_command(task_id, command):
             "databento_api_key": getattr(settings, 'DATABENTO_API_KEY', ''),
         }
 
-    redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
+    dispatch_task_command(payload)
 
     return task
 
@@ -470,7 +481,7 @@ def dispatch_daily_strike_merge(date_str, indices=None, strike_count=15):
     except Exception as e:
         logger.warning(f"Could not set merge status in Redis: {e}")
 
-    redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
+    dispatch_task_command(payload)
     logger.info(f"Dispatched daily strike merge for {date_str} to Go microservice: {payload}")
     return True
 

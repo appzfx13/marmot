@@ -105,6 +105,10 @@ def start_daily_spot_1s_recorder_job():
         r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
         r.set("marmot:live_record:active", "1")
         payload = json.dumps({"action": "start_spot_1s_record"})
+        try:
+            r.xadd("marmot:tasks:control", {"data": payload}, maxlen=1000)
+        except Exception:
+            pass
         r.publish("marmot:tasks:control", payload)
         logger.info("✅ [APScheduler] Published start_spot_1s_record to marmot:tasks:control")
     except Exception as e:
@@ -120,6 +124,10 @@ def stop_daily_spot_1s_recorder_job():
         r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
         r.set("marmot:live_record:active", "0")
         payload = json.dumps({"action": "stop_spot_1s_record"})
+        try:
+            r.xadd("marmot:tasks:control", {"data": payload}, maxlen=1000)
+        except Exception:
+            pass
         r.publish("marmot:tasks:control", payload)
         logger.info("✅ [APScheduler] Published stop_spot_1s_record to marmot:tasks:control")
     except Exception as e:
@@ -141,6 +149,10 @@ def run_postmarket_option_merge_job():
             "indices": ["NIFTY", "BANKNIFTY"],
             "strike_count": 15,
         })
+        try:
+            r.xadd("marmot:tasks:control", {"data": payload}, maxlen=1000)
+        except Exception:
+            pass
         r.publish("marmot:tasks:control", payload)
         logger.info("✅ [APScheduler] Published run_daily_postmarket_merge for %s to marmot:tasks:control", today_str)
     except Exception as e:

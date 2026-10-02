@@ -348,12 +348,12 @@ node_parquet -->|"processes datasets"| node_datasets
 node_workers -->|"broadcasts progress"| node_redis
 node_market -->|"fetches macro data"| node_macroai
 node_market -->|"publishes task status"| node_redis
-node_marketfeed -->|"requests broker data"| node_brokerfactory
-node_marketfeed -->|"uses market services"| node_market
-node_marketfeed -->|"reads account config"| node_tradeconfig
+node_brokers -->|"Sub-10ms WebSockets"| node_ws
+node_ws -->|"Caches quotes & chains"| node_redis
+node_marketfeed -->|"Reads cached quotes (<1ms)"| node_redis
+node_tradeconfig -->|"stores configuration"| node_postgres
 node_brokerfactory -->|"selects adapter"| node_dhan
 node_brokerfactory -->|"selects adapter"| node_fyers
-node_tradeconfig -->|"stores configuration"| node_postgres
 node_brokers -->|"sends order events"| node_postback
 node_postback -->|"records events"| node_postbacklog
 node_postback -.->|"publishes order events"| node_redis
@@ -361,7 +361,7 @@ node_postbacklog -->|"persists records"| node_postgres
 node_backtest -.->|"summarizes trades"| node_vector
 node_backtest -->|"supports RL research"| node_rl
 node_rl -->|"integrates PPO"| node_tensortrade
-node_redis -->|"dispatches tasks"| node_workers
+node_redis -->|"dispatches tasks (Streams)"| node_workers
 node_redis -->|"relays progress"| node_ws
 node_ws -->|"streams updates"| node_telemetry
 node_django -.->|"sends alerts"| node_notifications

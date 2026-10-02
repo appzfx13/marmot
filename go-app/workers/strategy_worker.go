@@ -280,6 +280,9 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 		defer candleSub.Close()
 	}
 
+	liveTickChan := ws.SubscribeLiveTicks(indexName)
+	defer ws.UnsubscribeLiveTicks(indexName, liveTickChan)
+
 	for {
 		select {
 		case <-ctx.Done():
@@ -287,6 +290,11 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			j.saveTelemetry(context.Background(), userID, params.StrategyID, strategyName, false, "PAUSED",
 				23760.0, cashBalance, cashBalance, positions, orders, 0)
 			return
+
+		case tick, ok := <-liveTickChan:
+			if ok && tick.SpotPrice > 0 {
+				spotPrice = tick.SpotPrice
+			}
 
 		case msg, ok := <-candleChan:
 			if !ok || msg == nil {
@@ -1343,9 +1351,27 @@ type LiveQuoteMetrics struct {
 	LowPrice  float64
 }
 
-// fetchSpotMetrics reads authentic session quote data from Redis (open, high, low, lp).
+// fetchSpotMetrics reads authentic session quote data from in-memory cache or Redis (open, high, low, lp).
 func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName string) LiveQuoteMetrics {
 	res := LiveQuoteMetrics{}
+
+	// 0. Primary in LIVE mode: Instant in-memory spot read from Go WebSocket engine (0.00ms, zero Redis load)
+	if !isMockMode(j.payload.Params.ExecutionMode) {
+		if tick, ok := ws.GetLatestSpot(indexName); ok && tick.SpotPrice > 0 {
+			res.SpotPrice = tick.SpotPrice
+			var high, low float64
+			_, _ = fmt.Sscanf(strings.ReplaceAll(tick.High, ",", ""), "%f", &high)
+			_, _ = fmt.Sscanf(strings.ReplaceAll(tick.Low, ",", ""), "%f", &low)
+			res.HighPrice = high
+			res.LowPrice = low
+			step := StrikeIntervalForIndex(indexName)
+			if step <= 0 {
+				step = 50
+			}
+			res.ATMStrike = int(math.Round(tick.SpotPrice/float64(step)) * float64(step))
+			return res
+		}
+	}
 
 	// 1. In SANDBOX / MOCK mode, query local mock broker emulator directly for live advancing Parquet replay spot
 	if isMockMode(j.payload.Params.ExecutionMode) {

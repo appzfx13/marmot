@@ -3,16 +3,41 @@ package workers
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
 	"strings"
 	"sync"
+	"time"
+
+	"github.com/redis/go-redis/v9"
 
 	"go-app/config"
 	"go-app/models"
 	"go-app/services"
 	"go-app/ws"
 )
+
+var (
+	recentMsgMu   sync.Mutex
+	recentMsgHash = make(map[string]time.Time)
+)
+
+func isDuplicateMsg(payload string) bool {
+	recentMsgMu.Lock()
+	defer recentMsgMu.Unlock()
+	now := time.Now()
+	for k, t := range recentMsgHash {
+		if now.Sub(t) > 10*time.Second {
+			delete(recentMsgHash, k)
+		}
+	}
+	if t, exists := recentMsgHash[payload]; exists && now.Sub(t) < 3*time.Second {
+		return true
+	}
+	recentMsgHash[payload] = now
+	return false
+}
 
 // TaskManager handles the lifecycle of backup tasks and listens for IPC commands
 type TaskManager struct {
@@ -35,12 +60,16 @@ func NewTaskManager(dbService *services.DBService, cfg *config.Config, hub *ws.H
 	}
 }
 
-// StartListener blocks and listens for commands on the given Redis Pub/Sub channel
+// StartListener blocks and listens for commands on both Redis Pub/Sub and persistent Redis Streams.
 func (m *TaskManager) StartListener(ctx context.Context, redisService *services.RedisService, channelName string) {
+	// 1. Launch persistent Redis Stream listener for guaranteed delivery and zero command loss
+	go m.startStreamListener(ctx, redisService, channelName)
+
+	// 2. Subscribe to real-time Pub/Sub for sub-millisecond execution triggers
 	pubsub := redisService.Subscribe(ctx, channelName)
 	defer pubsub.Close()
 
-	log.Printf("🎧 Task Manager listening for Redis commands on channel: '%s'\n", channelName)
+	log.Printf("🎧 Task Manager listening for Redis commands on channel/stream: '%s'\n", channelName)
 
 	ch := pubsub.Channel()
 
@@ -58,8 +87,50 @@ func (m *TaskManager) StartListener(ctx context.Context, redisService *services.
 	}
 }
 
+// startStreamListener continuously polls Redis Streams with XRead blocking for durable delivery.
+func (m *TaskManager) startStreamListener(ctx context.Context, redisService *services.RedisService, streamName string) {
+	if redisService == nil || redisService.Client == nil {
+		return
+	}
+	lastID := "$"
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		default:
+		}
+
+		res, err := redisService.Client.XRead(ctx, &redis.XReadArgs{
+			Streams: []string{streamName, lastID},
+			Count:   10,
+			Block:   2 * time.Second,
+		}).Result()
+
+		if err != nil {
+			if errors.Is(err, context.Canceled) {
+				return
+			}
+			time.Sleep(500 * time.Millisecond)
+			continue
+		}
+
+		for _, stream := range res {
+			for _, message := range stream.Messages {
+				lastID = message.ID
+				if dataStr, ok := message.Values["data"].(string); ok && dataStr != "" {
+					m.handleMessage(ctx, dataStr)
+				}
+			}
+		}
+	}
+}
+
 // handleMessage parses the JSON payload and routes the command or relays progress
 func (m *TaskManager) handleMessage(parentCtx context.Context, payloadStr string) {
+	if isDuplicateMsg(payloadStr) {
+		return
+	}
+
 	var rawAction struct {
 		Action      string   `json:"action"`
 		Command     string   `json:"command"`

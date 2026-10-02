@@ -224,9 +224,10 @@ def send_backtest_control_command(task_id, command):
         }
     }
     try:
-        redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
+        from apps.market.services import dispatch_task_command
+        dispatch_task_command(payload)
     except Exception as e:
-        logger.warning(f"Redis publish warning: {e}")
+        logger.warning(f"Redis dispatch warning: {e}")
 
     return task
 

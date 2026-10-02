@@ -410,25 +410,13 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
                             if row.get('ce_ltp') and float(row['ce_ltp']) > 0:
                                 val = str(row['ce_ltp'])
                                 r.set(f"marmot:opt_ltp:{idx_clean}:{stk}:CE", val, ex=120)
-                                r.set(f"marmot:opt_ltp:{idx_clean}:{stk}:CALL", val, ex=120)
-                                r.set(f"marmot:opt_ltp:{idx_clean}:SPOT:{stk}:CE", val, ex=120)
-                                r.set(f"marmot:opt_ltp:{idx_clean}:SPOT:{stk}:CALL", val, ex=120)
-                                cache.set(f"marmot:opt_ltp:{idx_clean}:{stk}:CE", float(val), timeout=120)
-                                cache.set(f"marmot:opt_ltp:{idx_clean}:{stk}:CALL", float(val), timeout=120)
                                 if exp_tag:
                                     r.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{stk}:CE", val, ex=120)
-                                    r.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{stk}:CALL", val, ex=120)
                             if row.get('pe_ltp') and float(row['pe_ltp']) > 0:
                                 val = str(row['pe_ltp'])
                                 r.set(f"marmot:opt_ltp:{idx_clean}:{stk}:PE", val, ex=120)
-                                r.set(f"marmot:opt_ltp:{idx_clean}:{stk}:PUT", val, ex=120)
-                                r.set(f"marmot:opt_ltp:{idx_clean}:SPOT:{stk}:PE", val, ex=120)
-                                r.set(f"marmot:opt_ltp:{idx_clean}:SPOT:{stk}:PUT", val, ex=120)
-                                cache.set(f"marmot:opt_ltp:{idx_clean}:{stk}:PE", float(val), timeout=120)
-                                cache.set(f"marmot:opt_ltp:{idx_clean}:{stk}:PUT", float(val), timeout=120)
                                 if exp_tag:
                                     r.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{stk}:PE", val, ex=120)
-                                    r.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{stk}:PUT", val, ex=120)
                 except Exception as re_err:
                     logger.debug("Redis mock sync exception: %s", re_err)
 
@@ -503,6 +491,24 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
     last_known_key = f"marmot:fyers:last_known_option_chain:{idx_clean}"
     rate_limit_key = "marmot:fyers_rate_limited"
     from django.core.cache import cache
+    from apps.market.services import redis_client
+    import json
+
+    # 1. Primary: Direct Redis check for real-time Go WebSocket streamed / targeted snapshot (<1ms, zero HTTP calls)
+    for r_candidate in (
+        f"marmot:fyers:option_chain:{idx_clean}",
+        f"marmot:fyers:last_known_option_chain:{idx_clean}",
+        f"marmot:fyers:full_option_chain:{idx_clean}",
+    ):
+        try:
+            r_raw = redis_client.get(r_candidate)
+            if r_raw:
+                parsed = json.loads(r_raw) if isinstance(r_raw, (str, bytes)) else r_raw
+                if isinstance(parsed, dict) and parsed.get('strikes') and len(parsed.get('strikes', [])) > 0:
+                    return parsed
+        except Exception:
+            pass
+
     cached_payload = cache.get(cache_key)
     if cached_payload and cached_payload.get('is_live'):
         return cached_payload
@@ -855,37 +861,7 @@ def get_live_contract_market_quote(symbol_str: str) -> float:
     strike_val = m.group(2) if m else ''
     opt_type = 'CE' if (m and m.group(3) in ['CALL', 'CE']) else 'PE'
 
-    settings_obj = SiteSettings.load()
-    if settings_obj.fyers_access_token and settings_obj.fyers_app_id:
-        try:
-            url = f"https://api-t1.fyers.in/data/quotes?symbols={fyers_sym}"
-            headers = {'Authorization': f"{settings_obj.fyers_app_id}:{settings_obj.fyers_access_token}"}
-            resp = requests.get(url, headers=headers, timeout=2.0)
-            if resp.status_code == 200:
-                data = resp.json()
-                if data.get('s') == 'ok' and data.get('d'):
-                    v = data['d'][0].get('v', {})
-                    lp = float(v.get('lp', 0.0))
-                    if lp > 0:
-                        cache.set(cache_key, lp, timeout=5)
-                        try:
-                            redis_client.set(f"marmot:contract_ltp:{fyers_sym}", str(lp), ex=120)
-                        except Exception:
-                            pass
-                        m_exp = re.search(r'([A-Z]+)\s+(\d{1,2})\s+([A-Z]{3})\s+(\d+)\s+(CALL|PUT|CE|PE)', str(symbol_str).upper())
-                        if m_exp:
-                            idx_clean, day, mon, strike_val, otype = m_exp.groups()
-                            exp_tag = f"{int(day):02d}{mon}"
-                            opt_type = 'CE' if otype in ['CALL', 'CE'] else 'PE'
-                            try:
-                                redis_client.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{strike_val}:{opt_type}", str(lp), ex=120)
-                                redis_client.set(f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{strike_val}:CALL" if opt_type == 'CE' else f"marmot:opt_ltp:{idx_clean}:{exp_tag}:{strike_val}:PUT", str(lp), ex=120)
-                            except Exception:
-                                pass
-                        return lp
-        except Exception:
-            pass
-
+    # 1. Primary: Check Redis for strike LTPs and direct quotes cached by Go WebSocket
     if strike_val:
         m_exp = re.search(r'([A-Z]+)\s+(\d{1,2})\s+([A-Z]{3})\s+(\d+)\s+(CALL|PUT|CE|PE)', str(symbol_str).upper())
         if m_exp:
@@ -904,7 +880,7 @@ def get_live_contract_market_quote(symbol_str: str) -> float:
         except Exception:
             pass
 
-    # Direct Fyers quote check in Redis
+    # 2. Check direct Fyers quote key in Redis
     if fyers_sym:
         try:
             fq_raw = redis_client.get(f"marmot:fyers_quote:{fyers_sym}")
@@ -917,22 +893,47 @@ def get_live_contract_market_quote(symbol_str: str) -> float:
         except Exception:
             pass
 
-    # Option chain snapshot fallback in Redis
+    # 3. Check option chain snapshot in Redis
     try:
         import json
-        for chain_key in (f"marmot:fyers:option_chain:{idx_clean}", f"marmot:fyers:last_known_option_chain:{idx_clean}"):
+        for chain_key in (f"marmot:fyers:option_chain:{idx_clean}", f"marmot:fyers:last_known_option_chain:{idx_clean}", f"marmot:mock:option_chain:{idx_clean}"):
             oc_raw = redis_client.get(chain_key)
             if oc_raw:
                 oc_data = json.loads(oc_raw) if isinstance(oc_raw, (str, bytes)) else oc_raw
                 for stk in oc_data.get('strikes', []):
-                    if float(stk.get('strike_price', 0)) == float(strike_val):
-                        opt_key = 'call' if opt_type == 'CE' else 'put'
-                        sub = stk.get(opt_key, {})
-                        lp = float(sub.get('ltp', 0.0) or 0.0)
-                        if lp > 0:
-                            return lp
+                    stk_p = stk.get('strike_price') or stk.get('strike')
+                    if stk_p and str(stk_p) == str(strike_val):
+                        opt_key = 'ce_ltp' if opt_type == 'CE' else 'pe_ltp'
+                        val_num = float(stk.get(opt_key, 0.0) or 0.0)
+                        if val_num > 0:
+                            return val_num
     except Exception:
         pass
+
+    # 4. Fallback: Outbound HTTP call to Fyers only if totally absent in Redis and session active
+    settings_obj = SiteSettings.load()
+    if settings_obj.fyers_access_token and settings_obj.fyers_app_id and not cache.get("marmot:fyers_rate_limited"):
+        try:
+            url = f"https://api-t1.fyers.in/data/quotes?symbols={fyers_sym}"
+            headers = {'Authorization': f"{settings_obj.fyers_app_id}:{settings_obj.fyers_access_token}"}
+            resp = requests.get(url, headers=headers, timeout=1.5)
+            if resp.status_code == 200:
+                data = resp.json()
+                if data.get('s') == 'ok' and data.get('d'):
+                    v = data['d'][0].get('v', {})
+                    lp = float(v.get('lp', 0.0))
+                    if lp > 0:
+                        cache.set(cache_key, lp, timeout=5)
+                        try:
+                            redis_client.set(f"marmot:contract_ltp:{fyers_sym}", str(lp), ex=120)
+                            redis_client.set(f"marmot:opt_ltp:{idx_clean}:{strike_val}:{opt_type}", str(lp), ex=120)
+                        except Exception:
+                            pass
+                        return lp
+            elif resp.status_code == 429:
+                cache.set("marmot:fyers_rate_limited", True, timeout=60)
+        except Exception:
+            pass
 
     return 0.0
 

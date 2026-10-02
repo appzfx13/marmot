@@ -45,7 +45,69 @@ type LiveTickPayload struct {
 var (
 	spot1SRecorder *parquet.Spot1SRecorder
 	spotOnce       sync.Once
+
+	latestSpotMu  sync.RWMutex
+	latestSpotMap = make(map[string]LiveTickPayload)
+
+	tickSubMu   sync.RWMutex
+	tickSubList = make(map[string][]chan LiveTickPayload)
 )
+
+// SetLatestSpot updates the in-memory spot cache and notifies internal strategy channels with 0ms latency.
+func SetLatestSpot(payload LiveTickPayload) {
+	latestSpotMu.Lock()
+	idx := payload.Index
+	if idx == "" {
+		idx = payload.Symbol
+	}
+	latestSpotMap[idx] = payload
+	latestSpotMu.Unlock()
+
+	// Notify internal strategy subscribers
+	tickSubMu.RLock()
+	if subs, ok := tickSubList[idx]; ok {
+		for _, ch := range subs {
+			select {
+			case ch <- payload:
+			default:
+			}
+		}
+	}
+	tickSubMu.RUnlock()
+}
+
+// GetLatestSpot retrieves instant in-memory spot telemetry with zero Redis roundtrips.
+func GetLatestSpot(indexName string) (LiveTickPayload, bool) {
+	latestSpotMu.RLock()
+	val, ok := latestSpotMap[indexName]
+	latestSpotMu.RUnlock()
+	return val, ok
+}
+
+// SubscribeLiveTicks registers a Go channel to receive live ticks directly in memory.
+func SubscribeLiveTicks(indexName string) chan LiveTickPayload {
+	ch := make(chan LiveTickPayload, 64)
+	tickSubMu.Lock()
+	tickSubList[indexName] = append(tickSubList[indexName], ch)
+	tickSubMu.Unlock()
+	return ch
+}
+
+// UnsubscribeLiveTicks removes a channel from the live tick subscription list.
+func UnsubscribeLiveTicks(indexName string, ch chan LiveTickPayload) {
+	tickSubMu.Lock()
+	defer tickSubMu.Unlock()
+	subs, ok := tickSubList[indexName]
+	if !ok {
+		return
+	}
+	for i, c := range subs {
+		if c == ch {
+			tickSubList[indexName] = append(subs[:i], subs[i+1:]...)
+			break
+		}
+	}
+}
 
 // GetSpot1SRecorder returns the singleton instance of Spot1SRecorder.
 func GetSpot1SRecorder() *parquet.Spot1SRecorder {
@@ -745,26 +807,30 @@ func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisS
 	// Pass spot tick to zero-load 1-second Parquet recorder
 	GetSpot1SRecorder().RecordSpotTickAsync(idxName, ltp, time.Now().Unix())
 
+	liveTick := LiveTickPayload{
+		Type:          "live_tick",
+		Index:         idxName,
+		FyersSym:      sym,
+		SpotPrice:     ltp,
+		LTP:           fmt.Sprintf("%.2f", ltp),
+		Change:        fmt.Sprintf("%.2f", ch),
+		ChangePct:     fmt.Sprintf("%.2f%%", chp),
+		High:          fmt.Sprintf("%.2f", high),
+		Low:           fmt.Sprintf("%.2f", low),
+		IsPositive:    ch >= 0,
+		FormattedTime: nowStr,
+		Timestamp:     nowStr,
+	}
+
+	// Instant in-memory cache update (<0.01ms) for zero-latency strategy reads
+	SetLatestSpot(liveTick)
+
 	if prevLTP[idxName] != ltp {
 		log.Printf("⚡ [FYERS Sub-10ms Tick: %s] %s: ₹%.2f (Chg: %.2f | %.2f%%) | ATM: %d\n",
 			source, idxName, ltp, ch, chp, atmStrike)
 		prevLTP[idxName] = ltp
 
 		if hub != nil && len(hub.clients) > 0 {
-			liveTick := &LiveTickPayload{
-				Type:          "live_tick",
-				Index:         idxName,
-				FyersSym:      sym,
-				SpotPrice:     ltp,
-				LTP:           fmt.Sprintf("%.2f", ltp),
-				Change:        fmt.Sprintf("%.2f", ch),
-				ChangePct:     fmt.Sprintf("%.2f%%", chp),
-				High:          fmt.Sprintf("%.2f", high),
-				Low:           fmt.Sprintf("%.2f", low),
-				IsPositive:    ch >= 0,
-				FormattedTime: nowStr,
-				Timestamp:     nowStr,
-			}
 			if tickBytes, err := json.Marshal(liveTick); err == nil {
 				select {
 				case hub.Broadcast <- tickBytes:

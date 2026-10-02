@@ -3124,7 +3124,8 @@ class AdminSandboxAccountDeleteView(LoginRequiredMixin, AdminRequiredMixin, View
                         'command': 'PAUSE_STRATEGY',
                         'params': {'strategy_name': strat.strategy_name, 'strategy_id': strat.pk},
                     }
-                    redis_client.publish(REDIS_CHANNEL, _json.dumps(ipc_payload))
+                    from apps.market.services import dispatch_task_command
+                    dispatch_task_command(ipc_payload)
                 except Exception:
                     pass
             redis_client.delete(f"marmot:sandbox:telemetry:strategy:{strat.id}")
@@ -5093,7 +5094,8 @@ class LiveStrategyToggleView(LoginRequiredMixin, View):
                     'rules': strategy.frozen_rules_snapshot or [],
                 },
             }
-            redis_client.publish(REDIS_CHANNEL, _json.dumps(ipc_payload))
+            from apps.market.services import dispatch_task_command
+            dispatch_task_command(ipc_payload)
         except Exception as exc:
             import logging
             logging.getLogger(__name__).warning("Failed to publish strategy IPC command: %s", exc)
@@ -5131,13 +5133,13 @@ class LiveStrategyDeleteView(LoginRequiredMixin, View):
             try:
                 import json as _json
                 from apps.market.services import redis_client
-                from apps.common.constants import REDIS_CHANNEL
+                from apps.market.services import dispatch_task_command
                 ipc_payload = {
                     'task_id': f"strategy_{strategy.pk}",
                     'command': 'PAUSE_STRATEGY',
                     'params': {'strategy_name': strategy.strategy_name, 'strategy_id': strategy.pk},
                 }
-                redis_client.publish(REDIS_CHANNEL, _json.dumps(ipc_payload))
+                dispatch_task_command(ipc_payload)
             except Exception as exc:
                 import logging
                 logging.getLogger(__name__).warning("Failed to halt strategy before delete: %s", exc)
@@ -6205,7 +6207,8 @@ class AdminStrategyCheckView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         }
         
         try:
-            redis_client.publish(REDIS_CHANNEL, json.dumps(payload))
+            from apps.market.services import dispatch_task_command
+            dispatch_task_command(payload)
         except Exception as e:
             pass
             
