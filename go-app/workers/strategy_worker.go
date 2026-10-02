@@ -67,7 +67,12 @@ func deriveCanonicalOptionID(symbol string) string {
 
 // isMockMode returns true if the execution mode corresponds to paper trading, sandbox, or simulation.
 func isMockMode(mode string) bool {
-	return strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE")
+	return strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE") || strings.EqualFold(mode, "SANDBOX")
+}
+
+// isRealLiveMode returns true if the execution mode corresponds to real-money production broker execution.
+func isRealLiveMode(mode string) bool {
+	return strings.EqualFold(mode, "REAL_LIVE") || strings.EqualFold(mode, "PRODUCTION")
 }
 
 // getActiveMockAccountID queries the active mock broker account ID dynamically.
@@ -87,6 +92,83 @@ func (j *StrategySignalJob) getActiveMockAccountID() string {
 		}
 	}
 	return "1000000001"
+}
+
+// getDhanLiveCredentials dynamically resolves active Dhan Client ID and access token from Redis cache.
+func (j *StrategySignalJob) getDhanLiveCredentials(ctx context.Context) (string, string) {
+	keys, err := j.redisService.Client.Keys(ctx, "dhan_token:*").Result()
+	if err == nil && len(keys) > 0 {
+		for _, k := range keys {
+			parts := strings.Split(k, ":")
+			if len(parts) == 2 && parts[1] != "" {
+				token, err := j.redisService.Client.Get(ctx, k).Result()
+				if err == nil && token != "" {
+					return parts[1], token
+				}
+			}
+		}
+	}
+	if token, err := j.redisService.Client.Get(ctx, "marmot:dhan:active_token").Result(); err == nil && token != "" {
+		cid, _ := j.redisService.Client.Get(ctx, "marmot:dhan:active_client_id").Result()
+		if cid != "" {
+			return cid, token
+		}
+	}
+	return "", ""
+}
+
+// dispatchOrderToDhanLive dispatches a direct, ultra-low latency REST order to Dhan HQ Production API.
+func (j *StrategySignalJob) dispatchOrderToDhanLive(ctx context.Context, req DhanOrderPayload, clientID string) {
+	go func() {
+		cid, token := j.getDhanLiveCredentials(ctx)
+		if clientID != "" {
+			cid = clientID
+		}
+		if cid == "" || token == "" {
+			log.Printf("⚠️ [StrategyWorker Direct Live] Execution Skipped: Active Dhan live token not found in Redis")
+			return
+		}
+
+		req.DhanClientID = cid
+		bodyBytes, err := json.Marshal(req)
+		if err != nil {
+			log.Printf("⚠️ [StrategyWorker Direct Live] Failed to marshal Dhan live order payload: %v", err)
+			return
+		}
+
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", "https://api.dhan.co/v2/orders", bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			log.Printf("⚠️ [StrategyWorker Direct Live] Failed to create Dhan live order request: %v", err)
+			return
+		}
+
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("access-token", token)
+		httpReq.Header.Set("client-id", cid)
+
+		client := &http.Client{Timeout: 5 * time.Second}
+		startTime := time.Now()
+		resp, err := client.Do(httpReq)
+		latency := time.Since(startTime).Milliseconds()
+
+		if err != nil {
+			log.Printf("⚠️ [StrategyWorker Direct Live] Dhan Live Order API network error (%dms): %v", latency, err)
+			return
+		}
+		defer resp.Body.Close()
+
+		log.Printf("⚡ [StrategyWorker Direct Live Dispatch] Order executed via Dhan API (Acc: %s | %s %s x %d | Latency: %dms) -> HTTP %d",
+			cid, req.TransactionType, req.TradingSymbol, req.Quantity, latency, resp.StatusCode)
+
+		eventPayload, _ := json.Marshal(map[string]interface{}{
+			"type":         "order_update",
+			"broker":       "DHAN",
+			"order_id":     req.CorrelationID,
+			"status":       "TRADED",
+			"execution_ms": latency,
+		})
+		_ = j.redisService.Client.Publish(ctx, "marmot:orders", eventPayload).Err()
+	}()
 }
 
 // dispatchOrderToMockBroker sends an asynchronous order request to the Dhan mock broker REST endpoint.
@@ -513,24 +595,27 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						log.Printf("🚀 [StrategyWorker #%s] EVENT-DRIVEN ENTRY BUY: %s @ ₹%.2f (Rule #%d: %s | SL=%.1f TP=%.1f)\n",
 							taskID, sig.TradingSymbol, fillPrice, sig.RuleID, sig.RuleName, stopLoss, target)
 
-						if isMockMode(params.ExecutionMode) {
-							canonSecID := deriveCanonicalOptionID(sig.TradingSymbol)
-							j.dispatchOrderToMockBroker(DhanOrderPayload{
-								DhanClientID:    "1000000001",
-								CorrelationID:   sig.TradingSymbol,
-								TradingSymbol:   sig.TradingSymbol,
-								TransactionType: sig.Transaction,
-								ExchangeSegment: "NSE_FNO",
-								ProductType:     "INTRADAY",
-								OrderType:       "MARKET",
-								Validity:        "DAY",
-								SecurityID:      canonSecID,
-								Quantity:        sig.Quantity,
-								Price:           fillPrice,
-								TriggerPrice:    stopLoss,
-								BoStopLossValue: stopLoss,
-								BoProfitValue:   target,
-							})
+						canonSecID := deriveCanonicalOptionID(sig.TradingSymbol)
+						dhanPayload := DhanOrderPayload{
+							DhanClientID:    "1000000001",
+							CorrelationID:   sig.TradingSymbol,
+							TradingSymbol:   sig.TradingSymbol,
+							TransactionType: sig.Transaction,
+							ExchangeSegment: "NSE_FNO",
+							ProductType:     "INTRADAY",
+							OrderType:       "MARKET",
+							Validity:        "DAY",
+							SecurityID:      canonSecID,
+							Quantity:        sig.Quantity,
+							Price:           fillPrice,
+							TriggerPrice:    stopLoss,
+							BoStopLossValue: stopLoss,
+							BoProfitValue:   target,
+						}
+						if isRealLiveMode(params.ExecutionMode) {
+							j.dispatchOrderToDhanLive(ctx, dhanPayload, "")
+						} else if isMockMode(params.ExecutionMode) {
+							j.dispatchOrderToMockBroker(dhanPayload)
 						}
 					}
 					orders = append([]SimulatedOrder{newOrder}, orders...)
@@ -611,21 +696,24 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						positions = append([]SimulatedPosition{newPos}, positions...)
 						log.Printf("⚡ [StrategyWorker #%s] PENDING LIMIT EXECUTED: BUY %s @ ₹%.2f\n", taskID, orders[k].TradingSymbol, orders[k].CurrentLTP)
 
-						if isMockMode(params.ExecutionMode) {
-							j.dispatchOrderToMockBroker(DhanOrderPayload{
-								DhanClientID:    "1000000001",
-								CorrelationID:   orders[k].TradingSymbol,
-								TransactionType: "BUY",
-								ExchangeSegment: "NSE_FNO",
-								ProductType:     "INTRADAY",
-								OrderType:       "LIMIT",
-								Validity:        "DAY",
-								SecurityID:      orders[k].TradingSymbol,
-								Quantity:        orders[k].Quantity,
-								Price:           orders[k].CurrentLTP,
-								BoStopLossValue: orders[k].StopLossPrice,
-								BoProfitValue:   orders[k].TargetPrice,
-							})
+						dhanPayload := DhanOrderPayload{
+							DhanClientID:    "1000000001",
+							CorrelationID:   orders[k].TradingSymbol,
+							TransactionType: "BUY",
+							ExchangeSegment: "NSE_FNO",
+							ProductType:     "INTRADAY",
+							OrderType:       "LIMIT",
+							Validity:        "DAY",
+							SecurityID:      orders[k].TradingSymbol,
+							Quantity:        orders[k].Quantity,
+							Price:           orders[k].CurrentLTP,
+							BoStopLossValue: orders[k].StopLossPrice,
+							BoProfitValue:   orders[k].TargetPrice,
+						}
+						if isRealLiveMode(params.ExecutionMode) {
+							j.dispatchOrderToDhanLive(ctx, dhanPayload, "")
+						} else if isMockMode(params.ExecutionMode) {
+							j.dispatchOrderToMockBroker(dhanPayload)
 						}
 					}
 				}
@@ -741,25 +829,28 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							log.Printf("🛡️ [StrategyWorker #%s] POSITION SQUARED OFF (%s): SELL %s @ ₹%.2f (P&L: ₹%.2f)\n",
 								taskID, triggerReason, positions[i].TradingSymbol, positions[i].CurrentLTP, posPnl)
 
-							if isMockMode(params.ExecutionMode) {
-								leg := "SL_HIT"
-								if triggerReason == "TP Hit" {
-									leg = "TP_HIT"
-								}
-								j.dispatchOrderToMockBroker(DhanOrderPayload{
-									DhanClientID:    "1000000001",
-									CorrelationID:   positions[i].TradingSymbol,
-									TradingSymbol:   positions[i].TradingSymbol,
-									TransactionType: "SELL",
-									ExchangeSegment: "NSE_FNO",
-									ProductType:     "INTRADAY",
-									OrderType:       "MARKET",
-									Validity:        "DAY",
-									SecurityID:      positions[i].TradingSymbol,
-									Quantity:        positions[i].BuyQty,
-									Price:           positions[i].CurrentLTP,
-									LegName:         leg,
-								})
+							leg := "SL_HIT"
+							if triggerReason == "TP Hit" {
+								leg = "TP_HIT"
+							}
+							dhanPayload := DhanOrderPayload{
+								DhanClientID:    "1000000001",
+								CorrelationID:   positions[i].TradingSymbol,
+								TradingSymbol:   positions[i].TradingSymbol,
+								TransactionType: "SELL",
+								ExchangeSegment: "NSE_FNO",
+								ProductType:     "INTRADAY",
+								OrderType:       "MARKET",
+								Validity:        "DAY",
+								SecurityID:      positions[i].TradingSymbol,
+								Quantity:        positions[i].BuyQty,
+								Price:           positions[i].CurrentLTP,
+								LegName:         leg,
+							}
+							if isRealLiveMode(params.ExecutionMode) {
+								j.dispatchOrderToDhanLive(ctx, dhanPayload, "")
+							} else if isMockMode(params.ExecutionMode) {
+								j.dispatchOrderToMockBroker(dhanPayload)
 							}
 						}
 					}
@@ -900,21 +991,24 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								positions = append([]SimulatedPosition{newPos}, positions...)
 								log.Printf("⚡ [StrategyWorker #%s] MARKET EXECUTED: %s %s @ ₹%.2f\n", taskID, sig.Transaction, sig.TradingSymbol, fillPrice)
 
-								if isMockMode(params.ExecutionMode) {
-									j.dispatchOrderToMockBroker(DhanOrderPayload{
-										DhanClientID:    "1000000001",
-										CorrelationID:   sig.TradingSymbol,
-										TransactionType: sig.Transaction,
-										ExchangeSegment: "NSE_FNO",
-										ProductType:     "INTRADAY",
-										OrderType:       sig.OrderType,
-										Validity:        "DAY",
-										SecurityID:      sig.TradingSymbol,
-										Quantity:        sig.Quantity,
-										Price:           fillPrice,
-										BoStopLossValue: stopLoss,
-										BoProfitValue:   target,
-									})
+								dhanPayload := DhanOrderPayload{
+									DhanClientID:    "1000000001",
+									CorrelationID:   sig.TradingSymbol,
+									TransactionType: sig.Transaction,
+									ExchangeSegment: "NSE_FNO",
+									ProductType:     "INTRADAY",
+									OrderType:       sig.OrderType,
+									Validity:        "DAY",
+									SecurityID:      sig.TradingSymbol,
+									Quantity:        sig.Quantity,
+									Price:           fillPrice,
+									BoStopLossValue: stopLoss,
+									BoProfitValue:   target,
+								}
+								if isRealLiveMode(params.ExecutionMode) {
+									j.dispatchOrderToDhanLive(ctx, dhanPayload, "")
+								} else if isMockMode(params.ExecutionMode) {
+									j.dispatchOrderToMockBroker(dhanPayload)
 								}
 							} else {
 								log.Printf("⏳ [StrategyWorker #%s] LIMIT ORDER PLACED (PENDING): %s %s @ ₹%.2f\n", taskID, sig.Transaction, sig.TradingSymbol, fillPrice)

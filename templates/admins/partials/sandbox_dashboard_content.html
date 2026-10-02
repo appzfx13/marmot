@@ -5,17 +5,19 @@
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-1">
         <div>
             <h1 class="page-title">Sandbox Dashboard</h1>
-            <p class="page-subtitle mb-0">Risk-free strategy testing environment using simulated virtual capital and zero broker friction.</p>
+            <p class="page-subtitle mb-0">Risk-free strategy testing environment using simulated virtual capital and
+                zero broker friction.</p>
         </div>
         <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap ms-md-auto">
             <span class="badge rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
-                  style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.30); color: #34d399; backdrop-filter: blur(12px); font-size: 0.82rem; font-family: var(--font-sans, inherit);">
-                <span class="spinner-grow spinner-grow-sm" style="width: 0.45rem; height: 0.45rem; color: #34d399;" role="status"></span>
+                style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.30); color: #34d399; backdrop-filter: blur(12px); font-size: 0.82rem; font-family: var(--font-sans, inherit);">
+                <span class="spinner-grow spinner-grow-sm" style="width: 0.45rem; height: 0.45rem; color: #34d399;"
+                    role="status"></span>
                 <span style="letter-spacing: 0.02em;">Mock Broker Engine &bull; Online (:8088)</span>
             </span>
         </div>
     </div>
-    <!-- END: Sandbox Dashboard Header Banner -->nner -->
+    <!-- END: Sandbox Dashboard Header Banner -- -->
 
     <!-- Real-Time Exchange Clock HUD -->
     {% include 'admins/partials/live_clock_widget.html' %}
@@ -29,25 +31,31 @@
 
     <!-- START: Open / Running Positions (Top Side Priority, Spark Design Standard) -->
     <div class="card shadow-sm overflow-hidden mb-0 p-0">
-        <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div
+            class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
             <div class="d-flex align-items-center gap-3">
-                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
-                     style="width: 38px; height: 38px; background: rgba(34, 197, 94, 0.12) !important; color: #22c55e !important; border: 1px solid rgba(34, 197, 94, 0.25) !important;">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0"
+                    style="width: 38px; height: 38px; background: rgba(34, 197, 94, 0.12) !important; color: #22c55e !important; border: 1px solid rgba(34, 197, 94, 0.25) !important;">
                     <i class="bi bi-layers-half fs-5"></i>
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Open &amp; Running Positions</h5>
-                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5">
-                            <span class="spinner-grow spinner-grow-sm" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
+                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Open &amp; Running
+                            Positions</h5>
+                        <span
+                            class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5">
+                            <span class="spinner-grow spinner-grow-sm" role="status"
+                                style="width: 0.45rem; height: 0.45rem;"></span>
                             <span>{{ open_positions_count }} ACTIVE POSITIONS</span>
                         </span>
                     </div>
-                    <small class="theme-text-muted" style="font-size: 0.74rem;">Real-time MTM telemetry, live contract prices, and instant risk exit controls</small>
+                    <small class="theme-text-muted" style="font-size: 0.74rem;">Real-time MTM telemetry, live contract
+                        prices, and instant risk exit controls</small>
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2 ms-md-auto">
-                <span class="badge bg-secondary bg-opacity-25 text-white-50 px-3 py-1.5 rounded-pill font-monospace small">
+                <span
+                    class="badge bg-secondary bg-opacity-25 text-white-50 px-3 py-1.5 rounded-pill font-monospace small">
                     {{ all_positions_count|default:open_positions_count }} Total Contracts
                 </span>
             </div>
@@ -59,37 +67,38 @@
     <!-- END: Open / Running Positions -->
 
     <!-- START: Deployed Algorithmic Strategy Orchestrator (Top Strategy Cockpit) -->
-    <div class="card shadow-sm overflow-hidden mb-0 p-0"
-         id="sandbox-deployed-strategies-card"
-         hx-get="{% url 'admins:admin-sandbox-dashboard' %}?account_id={{ sandbox_account.id|default:'' }}{% if selected_strategy %}&strategy_id={{ selected_strategy.id }}{% endif %}"
-         hx-trigger="reloadLiveStrategies from:body, reloadLiveDashboard from:body, reloadSandboxDashboard from:body"
-         hx-target="#sandbox-deployed-strategies-card"
-         hx-select="#sandbox-deployed-strategies-card"
-         hx-swap="outerHTML">
-        <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+    <div class="card shadow-sm overflow-hidden mb-0 p-0" id="sandbox-deployed-strategies-card"
+        hx-get="{% url 'admins:admin-sandbox-dashboard' %}?account_id={{ sandbox_account.id|default:'' }}{% if selected_strategy %}&strategy_id={{ selected_strategy.id }}{% endif %}"
+        hx-trigger="reloadLiveStrategies from:body, reloadLiveDashboard from:body, reloadSandboxDashboard from:body"
+        hx-target="#sandbox-deployed-strategies-card" hx-select="#sandbox-deployed-strategies-card" hx-swap="outerHTML">
+        <div
+            class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
             <div class="d-flex align-items-center gap-3">
-                <div class="rounded-circle bg-primary bg-opacity-15 text-primary d-flex align-items-center justify-content-center flex-shrink-0" style="width: 40px; height: 40px;">
+                <div class="rounded-circle bg-primary bg-opacity-15 text-primary d-flex align-items-center justify-content-center flex-shrink-0"
+                    style="width: 40px; height: 40px;">
                     <i class="bi bi-cpu-fill fs-5"></i>
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Deployed Algorithmic Strategies</h5>
-                        <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold">
+                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Deployed Algorithmic
+                            Strategies</h5>
+                        <span
+                            class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold">
                             {{ live_strategies|length }} ACTIVE DEPLOYMENTS
                         </span>
-                        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 fs-xs fw-bold">
+                        <span
+                            class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 fs-xs fw-bold">
                             PAPER SIMULATION
                         </span>
                     </div>
-                    <small class="theme-text-muted" style="font-size: 0.74rem;">Go Quant Engine &amp; quantitative strategy execution registry with isolated rulebook snapshots</small>
+                    <small class="theme-text-muted" style="font-size: 0.74rem;">Go Quant Engine &amp; quantitative
+                        strategy execution registry with isolated rulebook snapshots</small>
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2 ms-md-auto">
-                <a href="{% url 'admins:backtest_dashboard' %}" 
-                   class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none"
-                   hx-get="{% url 'admins:backtest_dashboard' %}" 
-                   hx-target="#app-main-container" 
-                   hx-push-url="true">
+                <a href="{% url 'admins:backtest_dashboard' %}"
+                    class="btn btn-sm btn-outline-primary rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none"
+                    hx-get="{% url 'admins:backtest_dashboard' %}" hx-target="#app-main-container" hx-push-url="true">
                     <i class="bi bi-plus-lg"></i>
                     <span>Deploy From Backtest</span>
                 </a>
@@ -112,26 +121,26 @@
                     </thead>
                     <tbody>
                         {% for strat in live_strategies %}
-                            {% include 'admins/partials/live_strategy_row.html' with strategy=strat %}
+                        {% include 'admins/partials/live_strategy_row.html' with strategy=strat %}
                         {% endfor %}
                     </tbody>
                 </table>
             </div>
             {% else %}
             <div class="text-center py-5 theme-text-muted">
-                <div class="rounded-circle bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-2 mx-auto" style="width: 52px; height: 52px;">
+                <div class="rounded-circle bg-primary bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-2 mx-auto"
+                    style="width: 52px; height: 52px;">
                     <i class="bi bi-rocket-takeoff fs-3 text-primary"></i>
                 </div>
                 <h6 class="fw-bold theme-text-main mb-1">No Deployed Strategies Yet</h6>
                 <p class="small mb-3 mx-auto" style="max-width: 480px;">
-                    Select any completed RL model in the <strong>Backtest Engine</strong> and click 
-                    <span class="badge bg-warning text-dark fw-bold px-2 py-0.5">Move to Execute</span> to deploy it with frozen hyperparameter snapshots.
+                    Select any completed RL model in the <strong>Backtest Engine</strong> and click
+                    <span class="badge bg-warning text-dark fw-bold px-2 py-0.5">Move to Execute</span> to deploy it
+                    with frozen hyperparameter snapshots.
                 </p>
-                <a href="{% url 'admins:backtest_dashboard' %}" 
-                   class="btn btn-primary btn-sm rounded-pill px-3.5 py-1.5 fw-bold shadow-sm"
-                   hx-get="{% url 'admins:backtest_dashboard' %}" 
-                   hx-target="#app-main-container" 
-                   hx-push-url="true">
+                <a href="{% url 'admins:backtest_dashboard' %}"
+                    class="btn btn-primary btn-sm rounded-pill px-3.5 py-1.5 fw-bold shadow-sm"
+                    hx-get="{% url 'admins:backtest_dashboard' %}" hx-target="#app-main-container" hx-push-url="true">
                     Browse Backtest Engine
                 </a>
             </div>
@@ -166,27 +175,34 @@
 
     <!-- START: Broker Orders & Execution Book (At the Bottom, Spark Design Standard) -->
     <div class="card shadow-sm overflow-hidden mb-0 p-0">
-        <div class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+        <div
+            class="card-header bg-transparent py-3 px-4 border-bottom border-secondary border-opacity-20 d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
             <div class="d-flex align-items-center gap-3">
-                <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0" 
-                     style="width: 42px; height: 42px; background: rgba(245, 158, 11, 0.12) !important; border: 1px solid rgba(245, 158, 11, 0.45) !important; box-shadow: 0 0 15px rgba(245, 158, 11, 0.35), inset 0 0 10px rgba(245, 158, 11, 0.12); color: #fbbf24 !important;">
-                    <i class="bi bi-journal-text fs-5" style="filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8));"></i>
+                <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
+                    style="width: 42px; height: 42px; background: rgba(245, 158, 11, 0.12) !important; border: 1px solid rgba(245, 158, 11, 0.45) !important; box-shadow: 0 0 15px rgba(245, 158, 11, 0.35), inset 0 0 10px rgba(245, 158, 11, 0.12); color: #fbbf24 !important;">
+                    <i class="bi bi-journal-text fs-5"
+                        style="filter: drop-shadow(0 0 6px rgba(245, 158, 11, 0.8));"></i>
                 </div>
                 <div>
                     <div class="d-flex align-items-center gap-2 flex-wrap">
-                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Sandbox Orders &amp; Execution Book</h5>
-                        <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold">
+                        <h5 class="fw-bold theme-text-main mb-0" style="font-size: 1.05rem;">Sandbox Orders &amp;
+                            Execution Book</h5>
+                        <span
+                            class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold">
                             {{ todays_orders_count }} TOTAL ORDERS TODAY
                         </span>
                     </div>
-                    <small class="theme-text-muted" style="font-size: 0.74rem;">Real-time broker order audit trail, pending triggers, and filled execution logs</small>
+                    <small class="theme-text-muted" style="font-size: 0.74rem;">Real-time broker order audit trail,
+                        pending triggers, and filled execution logs</small>
                 </div>
             </div>
             <div class="d-flex align-items-center gap-2 ms-md-auto">
-                <span class="badge bg-success bg-opacity-20 text-success rounded-pill px-3 py-1.5 smaller fw-bold font-monospace">
+                <span
+                    class="badge bg-success bg-opacity-20 text-success rounded-pill px-3 py-1.5 smaller fw-bold font-monospace">
                     {{ traded_orders_count }} Executed
                 </span>
-                <span class="badge bg-warning bg-opacity-20 text-warning rounded-pill px-3 py-1.5 smaller fw-bold font-monospace">
+                <span
+                    class="badge bg-warning bg-opacity-20 text-warning rounded-pill px-3 py-1.5 smaller fw-bold font-monospace">
                     {{ open_orders_count }} Pending
                 </span>
             </div>
@@ -201,162 +217,162 @@
 
 <!-- Real-time WebSocket Telemetry Sync for Sandbox Portfolio -->
 <script>
-(function() {
-    function updateMetric(elId, val, prefix) {
-        const el = document.getElementById(elId);
-        if (!el) return;
-        const num = parseFloat(val) || 0;
-        const formatted = '₹' + Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-        const displayText = (num > 0 && prefix === '+') ? '+' + formatted : (num < 0 ? '-' + formatted : formatted);
-        if (el.textContent.trim() !== displayText) {
-            console.log('📈 [SandboxUI:MetricCard] #' + elId + ' updated -> ' + displayText);
-            el.textContent = displayText;
-            if (num > 0) {
-                el.classList.add('text-success');
-                el.classList.remove('text-danger');
-            } else if (num < 0) {
-                el.classList.add('text-danger');
-                el.classList.remove('text-success');
-            }
-            el.style.transition = 'opacity 0.2s ease';
-            el.style.opacity = '0.5';
-            setTimeout(function() { el.style.opacity = '1'; }, 200);
-        }
-    }
-
-    function handleSandboxTelemetry(data) {
-        const payload = data.data || data;
-        if (!payload) return;
-        console.log('🎯 [SandboxUI:TelemetrySync] Live sync applied from Go WS:', {
-            net_pnl: payload.live_net_pnl,
-            unrealized: payload.unrealized_pnl,
-            realized: payload.realized_pnl,
-            available_margin: payload.available_margin,
-            open_positions_count: payload.open_positions_count,
-            positions_len: (payload.positions || []).length,
-            latency_ms: payload.processing_latency_ms
-        });
-        if (payload.live_net_pnl !== undefined) updateMetric('sandbox-live-net-pnl', payload.live_net_pnl, '+');
-        if (payload.unrealized_pnl !== undefined) updateMetric('sandbox-unrealized-pnl', payload.unrealized_pnl, '+');
-        if (payload.realized_pnl !== undefined) updateMetric('sandbox-realized-pnl', payload.realized_pnl, '+');
-        if (payload.available_margin !== undefined) updateMetric('sandbox-available-margin', payload.available_margin, '');
-        if (payload.margin_utilized !== undefined) updateMetric('sandbox-margin-utilized', payload.margin_utilized, '');
-        if (payload.open_positions_count !== undefined) {
-            const posBadge = document.getElementById('sandbox-open-positions-badge');
-            if (posBadge) posBadge.textContent = payload.open_positions_count + ' Active Pos';
-        }
-
-        // 0-Latency Micro-Updates for Position P&L Bar Chart
-        if (window._positionPnlBarChartInstance && payload.positions && payload.positions.length > 0) {
-            const labels = [];
-            const pnlData = [];
-            const colors = [];
-            payload.positions.forEach(function(p) {
-                labels.push(p.trading_symbol || 'Position');
-                const pnl = parseFloat(p.total_pnl !== undefined ? p.total_pnl : (p.unrealized_profit || 0)) || 0;
-                pnlData.push(pnl);
-                colors.push(pnl >= 0 ? '#10B981' : '#EF4444');
-            });
-            window._positionPnlBarChartInstance.data.labels = labels;
-            window._positionPnlBarChartInstance.data.datasets[0].data = pnlData;
-            window._positionPnlBarChartInstance.data.datasets[0].backgroundColor = colors;
-            window._positionPnlBarChartInstance.data.datasets[0].borderColor = colors;
-            window._positionPnlBarChartInstance.update('none');
-            console.log('📊 [SandboxUI:Chart] Position P&L Bar Chart updated (' + payload.positions.length + ' positions)');
-        }
-
-        // 0-Latency Micro-Updates for Open Positions in Table
-        if (payload.positions && payload.positions.length > 0) {
-            payload.positions.forEach(function(pos, idx) {
-                const ltpEl = document.getElementById('pos-ltp-' + (idx + 1));
-                if (ltpEl && pos.current_ltp) {
-                    ltpEl.textContent = '₹' + parseFloat(pos.current_ltp).toFixed(2);
+    (function () {
+        function updateMetric(elId, val, prefix) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const num = parseFloat(val) || 0;
+            const formatted = '₹' + Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const displayText = (num > 0 && prefix === '+') ? '+' + formatted : (num < 0 ? '-' + formatted : formatted);
+            if (el.textContent.trim() !== displayText) {
+                console.log('📈 [SandboxUI:MetricCard] #' + elId + ' updated -> ' + displayText);
+                el.textContent = displayText;
+                if (num > 0) {
+                    el.classList.add('text-success');
+                    el.classList.remove('text-danger');
+                } else if (num < 0) {
+                    el.classList.add('text-danger');
+                    el.classList.remove('text-success');
                 }
-                const unrlEl = document.getElementById('pos-unrealized-' + (idx + 1));
-                if (unrlEl && pos.unrealized_profit !== undefined) {
-                    const u = parseFloat(pos.unrealized_profit) || 0;
-                    unrlEl.textContent = (u >= 0 ? '+₹' : '-₹') + Math.abs(u).toFixed(2);
-                    unrlEl.className = 'text-end font-monospace small pos-live-unrealized ' + (u >= 0 ? 'text-success' : 'text-danger');
-                }
-                const totEl = document.getElementById('pos-total-' + (idx + 1));
-                if (totEl && pos.total_pnl !== undefined) {
-                    const t = parseFloat(pos.total_pnl) || 0;
-                    totEl.textContent = (t >= 0 ? '+₹' : '-₹') + Math.abs(t).toFixed(2);
-                    totEl.className = 'text-end font-monospace fw-bold fs-6 pos-live-total ' + (t >= 0 ? 'text-success' : 'text-danger');
-                }
-            });
-            console.log('📋 [SandboxUI:Positions] Micro-updated table rows for ' + payload.positions.length + ' active position(s)');
-        }
-
-        // 0-Latency Micro-Updates for Orders in Table
-        if (payload.orders && payload.orders.length > 0) {
-            payload.orders.forEach(function(ord) {
-                const ordLtpEl = document.getElementById('order-ltp-' + ord.order_id);
-                if (ordLtpEl && ord.current_ltp) {
-                    ordLtpEl.textContent = 'LTP: ₹' + parseFloat(ord.current_ltp).toFixed(2);
-                }
-            });
-            console.log('📑 [SandboxUI:Orders] Micro-updated table rows for ' + payload.orders.length + ' simulated order(s)');
-        }
-        
-        // 0-Latency Tick Latency Metric Update
-        if (payload.processing_latency_ms !== undefined) {
-            const latEl = document.getElementById('engine-latency-indicator');
-            const latVal = document.getElementById('latency-ms-val');
-            if (latEl && latVal) {
-                latEl.style.display = 'block';
-                latVal.textContent = payload.processing_latency_ms;
-                if (payload.processing_latency_ms > 100) {
-                    latVal.className = 'text-warning fw-bold';
-                } else {
-                    latVal.className = 'text-success fw-bold';
-                }
+                el.style.transition = 'opacity 0.2s ease';
+                el.style.opacity = '0.5';
+                setTimeout(function () { el.style.opacity = '1'; }, 200);
             }
         }
-    }
 
-    window.addEventListener('marmot:sandbox-telemetry', function(e) {
-        handleSandboxTelemetry(e.detail);
-    });
+        function handleSandboxTelemetry(data) {
+            const payload = data.data || data;
+            if (!payload) return;
+            console.log('🎯 [SandboxUI:TelemetrySync] Live sync applied from Go WS:', {
+                net_pnl: payload.live_net_pnl,
+                unrealized: payload.unrealized_pnl,
+                realized: payload.realized_pnl,
+                available_margin: payload.available_margin,
+                open_positions_count: payload.open_positions_count,
+                positions_len: (payload.positions || []).length,
+                latency_ms: payload.processing_latency_ms
+            });
+            if (payload.live_net_pnl !== undefined) updateMetric('sandbox-live-net-pnl', payload.live_net_pnl, '+');
+            if (payload.unrealized_pnl !== undefined) updateMetric('sandbox-unrealized-pnl', payload.unrealized_pnl, '+');
+            if (payload.realized_pnl !== undefined) updateMetric('sandbox-realized-pnl', payload.realized_pnl, '+');
+            if (payload.available_margin !== undefined) updateMetric('sandbox-available-margin', payload.available_margin, '');
+            if (payload.margin_utilized !== undefined) updateMetric('sandbox-margin-utilized', payload.margin_utilized, '');
+            if (payload.open_positions_count !== undefined) {
+                const posBadge = document.getElementById('sandbox-open-positions-badge');
+                if (posBadge) posBadge.textContent = payload.open_positions_count + ' Active Pos';
+            }
 
-    // Real-Time 0-Latency Sync for Position P&L Bar Chart on HTMX Auto-Polls
-    document.body.addEventListener('htmx:afterSwap', function(evt) {
-        if (evt.detail && evt.detail.target && evt.detail.target.id === 'live-positions-container') {
-            const rows = document.querySelectorAll('#live-positions-container tbody tr[data-symbol]');
-            if (rows.length > 0 && window._positionPnlBarChartInstance) {
+            // 0-Latency Micro-Updates for Position P&L Bar Chart
+            if (window._positionPnlBarChartInstance && payload.positions && payload.positions.length > 0) {
                 const labels = [];
                 const pnlData = [];
                 const colors = [];
-                let totalPnl = 0;
-                rows.forEach(function(r) {
-                    const s = r.getAttribute('data-symbol') || 'Position';
-                    const p = parseFloat(r.getAttribute('data-pnl')) || 0;
-                    totalPnl += p;
-                    labels.push(s);
-                    pnlData.push(p);
-                    colors.push(p >= 0 ? '#10B981' : '#EF4444');
+                payload.positions.forEach(function (p) {
+                    labels.push(p.trading_symbol || 'Position');
+                    const pnl = parseFloat(p.total_pnl !== undefined ? p.total_pnl : (p.unrealized_profit || 0)) || 0;
+                    pnlData.push(pnl);
+                    colors.push(pnl >= 0 ? '#10B981' : '#EF4444');
                 });
                 window._positionPnlBarChartInstance.data.labels = labels;
                 window._positionPnlBarChartInstance.data.datasets[0].data = pnlData;
                 window._positionPnlBarChartInstance.data.datasets[0].backgroundColor = colors;
                 window._positionPnlBarChartInstance.data.datasets[0].borderColor = colors;
                 window._positionPnlBarChartInstance.update('none');
+                console.log('📊 [SandboxUI:Chart] Position P&L Bar Chart updated (' + payload.positions.length + ' positions)');
+            }
 
-                const pnlValEl = document.getElementById('calendarCardPnlValue');
-                if (pnlValEl) {
-                    const fmt = '₹' + Math.abs(totalPnl).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    pnlValEl.textContent = (totalPnl > 0 ? '+' : (totalPnl < 0 ? '-' : '')) + fmt;
-                    pnlValEl.className = 'fw-bold font-monospace fs-5 ' + (totalPnl >= 0 ? 'text-success' : 'text-danger');
+            // 0-Latency Micro-Updates for Open Positions in Table
+            if (payload.positions && payload.positions.length > 0) {
+                payload.positions.forEach(function (pos, idx) {
+                    const ltpEl = document.getElementById('pos-ltp-' + (idx + 1));
+                    if (ltpEl && pos.current_ltp) {
+                        ltpEl.textContent = '₹' + parseFloat(pos.current_ltp).toFixed(2);
+                    }
+                    const unrlEl = document.getElementById('pos-unrealized-' + (idx + 1));
+                    if (unrlEl && pos.unrealized_profit !== undefined) {
+                        const u = parseFloat(pos.unrealized_profit) || 0;
+                        unrlEl.textContent = (u >= 0 ? '+₹' : '-₹') + Math.abs(u).toFixed(2);
+                        unrlEl.className = 'text-end font-monospace small pos-live-unrealized ' + (u >= 0 ? 'text-success' : 'text-danger');
+                    }
+                    const totEl = document.getElementById('pos-total-' + (idx + 1));
+                    if (totEl && pos.total_pnl !== undefined) {
+                        const t = parseFloat(pos.total_pnl) || 0;
+                        totEl.textContent = (t >= 0 ? '+₹' : '-₹') + Math.abs(t).toFixed(2);
+                        totEl.className = 'text-end font-monospace fw-bold fs-6 pos-live-total ' + (t >= 0 ? 'text-success' : 'text-danger');
+                    }
+                });
+                console.log('📋 [SandboxUI:Positions] Micro-updated table rows for ' + payload.positions.length + ' active position(s)');
+            }
+
+            // 0-Latency Micro-Updates for Orders in Table
+            if (payload.orders && payload.orders.length > 0) {
+                payload.orders.forEach(function (ord) {
+                    const ordLtpEl = document.getElementById('order-ltp-' + ord.order_id);
+                    if (ordLtpEl && ord.current_ltp) {
+                        ordLtpEl.textContent = 'LTP: ₹' + parseFloat(ord.current_ltp).toFixed(2);
+                    }
+                });
+                console.log('📑 [SandboxUI:Orders] Micro-updated table rows for ' + payload.orders.length + ' simulated order(s)');
+            }
+
+            // 0-Latency Tick Latency Metric Update
+            if (payload.processing_latency_ms !== undefined) {
+                const latEl = document.getElementById('engine-latency-indicator');
+                const latVal = document.getElementById('latency-ms-val');
+                if (latEl && latVal) {
+                    latEl.style.display = 'block';
+                    latVal.textContent = payload.processing_latency_ms;
+                    if (payload.processing_latency_ms > 100) {
+                        latVal.className = 'text-warning fw-bold';
+                    } else {
+                        latVal.className = 'text-success fw-bold';
+                    }
                 }
             }
         }
-    });
 
-    if (window.MarmotWS) {
-        {% for strat in live_strategies %}
+        window.addEventListener('marmot:sandbox-telemetry', function (e) {
+            handleSandboxTelemetry(e.detail);
+        });
+
+        // Real-Time 0-Latency Sync for Position P&L Bar Chart on HTMX Auto-Polls
+        document.body.addEventListener('htmx:afterSwap', function (evt) {
+            if (evt.detail && evt.detail.target && evt.detail.target.id === 'live-positions-container') {
+                const rows = document.querySelectorAll('#live-positions-container tbody tr[data-symbol]');
+                if (rows.length > 0 && window._positionPnlBarChartInstance) {
+                    const labels = [];
+                    const pnlData = [];
+                    const colors = [];
+                    let totalPnl = 0;
+                    rows.forEach(function (r) {
+                        const s = r.getAttribute('data-symbol') || 'Position';
+                        const p = parseFloat(r.getAttribute('data-pnl')) || 0;
+                        totalPnl += p;
+                        labels.push(s);
+                        pnlData.push(p);
+                        colors.push(p >= 0 ? '#10B981' : '#EF4444');
+                    });
+                    window._positionPnlBarChartInstance.data.labels = labels;
+                    window._positionPnlBarChartInstance.data.datasets[0].data = pnlData;
+                    window._positionPnlBarChartInstance.data.datasets[0].backgroundColor = colors;
+                    window._positionPnlBarChartInstance.data.datasets[0].borderColor = colors;
+                    window._positionPnlBarChartInstance.update('none');
+
+                    const pnlValEl = document.getElementById('calendarCardPnlValue');
+                    if (pnlValEl) {
+                        const fmt = '₹' + Math.abs(totalPnl).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                        pnlValEl.textContent = (totalPnl > 0 ? '+' : (totalPnl < 0 ? '-' : '')) + fmt;
+                        pnlValEl.className = 'fw-bold font-monospace fs-5 ' + (totalPnl >= 0 ? 'text-success' : 'text-danger');
+                    }
+                }
+            }
+        });
+
+        if (window.MarmotWS) {
+            {% for strat in live_strategies %}
             window.MarmotWS.subscribe("strategy_{{ strat.id }}", handleSandboxTelemetry);
-        {% endfor %}
-        window.MarmotWS.connect();
-    }
-})();
+            {% endfor %}
+            window.MarmotWS.connect();
+        }
+    })();
 </script>
