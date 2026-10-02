@@ -964,7 +964,7 @@ class AdminGatewaySessionSaveView(LoginRequiredMixin, View):
         return resp
 
 
-class AdminGatewaySessionListView(LoginRequiredMixin, TemplateView):
+class AdminGatewaySessionListView(HTMXPartialMixin, LoginRequiredMixin, TemplateView):
     """Lists saved simulation session snapshots with filters and KPI totals."""
     template_name = 'admins/gateway_session_list.html'
     partial_template_name = 'admins/partials/gateway_session_list_content.html'
@@ -1020,14 +1020,8 @@ class AdminGatewaySessionListView(LoginRequiredMixin, TemplateView):
         context['snapshots'] = page_obj.object_list
         return context
 
-    def get(self, request, *args, **kwargs):
-        if request.headers.get('HX-Request') and request.headers.get('HX-Target') == 'gateway-session-list-container':
-            context = self.get_context_data(**kwargs)
-            return render(request, self.partial_template_name, context)
-        return super().get(request, *args, **kwargs)
 
-
-class AdminGatewaySessionDetailView(LoginRequiredMixin, TemplateView):
+class AdminGatewaySessionDetailView(HTMXPartialMixin, LoginRequiredMixin, TemplateView):
     """Detailed historical audit view of a specific saved session snapshot."""
     template_name = 'admins/gateway_session_detail.html'
     partial_template_name = 'admins/partials/gateway_session_detail_content.html'
@@ -1072,12 +1066,6 @@ class AdminGatewaySessionDetailView(LoginRequiredMixin, TemplateView):
         context['prev_year'] = selected_year - 1
         context['next_year'] = selected_year + 1
         return context
-
-    def get(self, request, *args, **kwargs):
-        if request.headers.get('HX-Request') and request.headers.get('HX-Target') == 'gateway-session-detail-container':
-            context = self.get_context_data(**kwargs)
-            return render(request, self.partial_template_name, context)
-        return super().get(request, *args, **kwargs)
 
 
 class AdminGatewaySessionToggleFavoriteView(LoginRequiredMixin, View):
