@@ -39,6 +39,7 @@ type DhanOrderPayload struct {
 	BoStopLossValue float64 `json:"boStopLossValue,omitempty"`
 	BoProfitValue   float64 `json:"boProfitValue,omitempty"`
 	LegName         string  `json:"legName,omitempty"`
+	LogicalTimestamp string `json:"logical_timestamp,omitempty"`
 }
 
 // deriveCanonicalOptionID extracts the canonical strike ID (e.g. 21700_PE) from arbitrary option symbols.
@@ -171,35 +172,31 @@ func (j *StrategySignalJob) dispatchOrderToDhanLive(ctx context.Context, req Dha
 	}()
 }
 
-// dispatchOrderToMockBroker sends an asynchronous order request to the Dhan mock broker REST endpoint.
-func (j *StrategySignalJob) dispatchOrderToMockBroker(req DhanOrderPayload) {
-	go func() {
-		if req.DhanClientID == "" || req.DhanClientID == "1000000001" {
-			req.DhanClientID = j.getActiveMockAccountID()
-		}
-		bodyBytes, err := json.Marshal(req)
-		if err != nil {
-			log.Printf("⚠️ [StrategyWorker] Failed to marshal mock broker order payload: %v", err)
-			return
-		}
-		httpReq, err := http.NewRequest("POST", "http://mock_broker:8088/mock/v2/orders", bytes.NewBuffer(bodyBytes))
-		if err != nil {
-			log.Printf("⚠️ [StrategyWorker] Failed to create mock broker order request: %v", err)
-			return
-		}
-		httpReq.Header.Set("Content-Type", "application/json")
-		httpReq.Header.Set("client-id", req.DhanClientID)
+// dispatchOrderToMockBroker sends a synchronous order request to the Dhan mock broker via Redis.
+func (j *StrategySignalJob) dispatchOrderToMockBroker(ctx context.Context, req DhanOrderPayload) {
+	if req.DhanClientID == "" || req.DhanClientID == "1000000001" {
+		req.DhanClientID = j.getActiveMockAccountID()
+	}
+	bodyBytes, err := json.Marshal(req)
+	if err != nil {
+		log.Printf("⚠️ [StrategyWorker] Failed to marshal mock broker order payload: %v", err)
+		return
+	}
 
-		client := &http.Client{Timeout: 3 * time.Second}
-		resp, err := client.Do(httpReq)
-		if err != nil {
-			log.Printf("⚠️ [StrategyWorker] Mock Broker HTTP Order API dispatch failed: %v", err)
-			return
-		}
-		defer resp.Body.Close()
-		log.Printf("📤 [StrategyWorker] Order dispatched to Mock Broker API (Acc: %s | %s %s x %d) -> HTTP %d",
-			req.DhanClientID, req.TransactionType, req.SecurityID, req.Quantity, resp.StatusCode)
-	}()
+	err = j.redisService.Client.XAdd(ctx, &redis.XAddArgs{
+		Stream: "marmot:mock:orders",
+		Values: map[string]interface{}{
+			"payload":           string(bodyBytes),
+			"logical_timestamp": req.LogicalTimestamp,
+		},
+	}).Err()
+
+	if err != nil {
+		log.Printf("⚠️ [StrategyWorker] Mock Broker Redis Order API dispatch failed: %v", err)
+		return
+	}
+	log.Printf("📤 [StrategyWorker] Order dispatched to Mock Broker via Redis (Acc: %s | %s %s x %d)",
+		req.DhanClientID, req.TransactionType, req.SecurityID, req.Quantity)
 }
 
 // MockBrokerPosition represents a position item returned by the Dhan mock broker.
@@ -611,11 +608,12 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							TriggerPrice:    stopLoss,
 							BoStopLossValue: stopLoss,
 							BoProfitValue:   target,
+							LogicalTimestamp: orderTime,
 						}
 						if isRealLiveMode(params.ExecutionMode) {
 							j.dispatchOrderToDhanLive(ctx, dhanPayload, "")
 						} else if isMockMode(params.ExecutionMode) {
-							j.dispatchOrderToMockBroker(dhanPayload)
+							j.dispatchOrderToMockBroker(ctx, dhanPayload)
 						}
 					}
 					orders = append([]SimulatedOrder{newOrder}, orders...)
@@ -709,11 +707,12 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							Price:           orders[k].CurrentLTP,
 							BoStopLossValue: orders[k].StopLossPrice,
 							BoProfitValue:   orders[k].TargetPrice,
+							LogicalTimestamp: nowIST().Format("03:04:05 PM"),
 						}
 						if isRealLiveMode(params.ExecutionMode) {
 							j.dispatchOrderToDhanLive(ctx, dhanPayload, "")
 						} else if isMockMode(params.ExecutionMode) {
-							j.dispatchOrderToMockBroker(dhanPayload)
+							j.dispatchOrderToMockBroker(ctx, dhanPayload)
 						}
 					}
 				}
@@ -846,11 +845,12 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								Quantity:        positions[i].BuyQty,
 								Price:           positions[i].CurrentLTP,
 								LegName:         leg,
+								LogicalTimestamp: nowStr,
 							}
 							if isRealLiveMode(params.ExecutionMode) {
 								j.dispatchOrderToDhanLive(ctx, dhanPayload, "")
 							} else if isMockMode(params.ExecutionMode) {
-								j.dispatchOrderToMockBroker(dhanPayload)
+								j.dispatchOrderToMockBroker(ctx, dhanPayload)
 							}
 						}
 					}
@@ -1004,11 +1004,12 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 									Price:           fillPrice,
 									BoStopLossValue: stopLoss,
 									BoProfitValue:   target,
+									LogicalTimestamp: nowStr,
 								}
 								if isRealLiveMode(params.ExecutionMode) {
 									j.dispatchOrderToDhanLive(ctx, dhanPayload, "")
 								} else if isMockMode(params.ExecutionMode) {
-									j.dispatchOrderToMockBroker(dhanPayload)
+									j.dispatchOrderToMockBroker(ctx, dhanPayload)
 								}
 							} else {
 								log.Printf("⏳ [StrategyWorker #%s] LIMIT ORDER PLACED (PENDING): %s %s @ ₹%.2f\n", taskID, sig.Transaction, sig.TradingSymbol, fillPrice)

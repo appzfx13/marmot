@@ -1,10 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+
+	"github.com/redis/go-redis/v9"
 
 	"dhan-emulator/engine"
 	"dhan-emulator/handlers"
@@ -32,28 +35,47 @@ func main() {
 		tmplPath = "templates/dashboard.html"
 	}
 
+	redisUrl := os.Getenv("REDIS_URL")
+	if redisUrl == "" {
+		redisUrl = "redis://redis:6379/0"
+	}
+
 	log.Println("[DHAN-EMULATOR] Initializing Broker Gateway Sandbox...")
 	log.Printf("[DHAN-EMULATOR] Postback Target: %s", postbackURL)
 	log.Printf("[DHAN-EMULATOR] Parquet Dir: %s", backupDir)
+	log.Printf("[DHAN-EMULATOR] Redis URL: %s", redisUrl)
+
+	// 0. Initialize Redis Client
+	opts, err := redis.ParseURL(redisUrl)
+	if err != nil {
+		log.Fatalf("[DHAN-EMULATOR] Invalid Redis URL: %v", err)
+	}
+	rdb := redis.NewClient(opts)
+	if err := rdb.Ping(context.Background()).Err(); err != nil {
+		log.Fatalf("[DHAN-EMULATOR] Failed to connect to Redis: %v", err)
+	}
 
 	// 1. Initialize Chaos Engine (Default 20 req/sec)
 	chaos := engine.NewChaosManager(20)
 
 	// 2. Initialize In-Memory Matching & Valuation Engine
-	matchingEngine := engine.NewMatchingEngine(chaos, postbackURL)
+	matchingEngine := engine.NewMatchingEngine(chaos, postbackURL, rdb)
 
 	// 3. Initialize Parquet & Market Feed Streamer
 	marketStreamer := streamer.NewParquetStreamer(matchingEngine, backupDir)
 	matchingEngine.SetBroadcaster(marketStreamer.BroadcastRawMessage)
 
 	// 4. Initialize HTTP Handler & Routes
-	handler, err := handlers.NewHandler(matchingEngine, chaos, marketStreamer, tmplPath)
+	handler, err = handlers.NewHandler(matchingEngine, chaos, marketStreamer, tmplPath)
 	if err != nil {
 		log.Fatalf("[DHAN-EMULATOR] Failed to initialize handler: %v", err)
 	}
 
 	mux := http.NewServeMux()
 	handler.RegisterRoutes(mux)
+
+	// 5. Start Redis Order Consumer
+	go matchingEngine.StartRedisOrderConsumer(context.Background())
 
 	addr := fmt.Sprintf("0.0.0.0:%s", port)
 	log.Printf("[DHAN-EMULATOR] Server listening on %s (Unified Gateway: http://localhost:8050/admins/dashboard/gateway-emulator/)", addr)

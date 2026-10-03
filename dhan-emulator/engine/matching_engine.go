@@ -2,6 +2,7 @@ package engine
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -13,6 +14,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"dhan-emulator/models"
 )
 
@@ -49,10 +51,11 @@ type MatchingEngine struct {
 	orderCounter       int64
 	broadcaster        BroadcastHandler
 	lastStatsBroadcast time.Time
+	rdb                *redis.Client
 }
 
 // NewMatchingEngine initializes the MatchingEngine with seeded default accounts.
-func NewMatchingEngine(chaos *ChaosManager, postbackURL string) *MatchingEngine {
+func NewMatchingEngine(chaos *ChaosManager, postbackURL string, rdb *redis.Client) *MatchingEngine {
 	if postbackURL == "" {
 		postbackURL = "http://web:8000/postback/dhan/postback/"
 	}
@@ -65,6 +68,7 @@ func NewMatchingEngine(chaos *ChaosManager, postbackURL string) *MatchingEngine 
 		chaos:           chaos,
 		postbackURL:     postbackURL,
 		httpClient:      &http.Client{Timeout: 5 * time.Second},
+		rdb:             rdb,
 	}
 
 	// Seed Primary Account (Dhan) - Default ₹1,00,000
@@ -1010,6 +1014,24 @@ func (m *MatchingEngine) dispatchWebhook(webhook models.DhanPostbackWebhook) {
 		return
 	}
 
+	if m.rdb != nil {
+		ctx := context.Background()
+		err := m.rdb.XAdd(ctx, &redis.XAddArgs{
+			Stream: "marmot:webhooks:stream",
+			Values: map[string]interface{}{
+				"payload":        string(payload),
+				"broker_hint":    "dhan",
+				"execution_mode": "MOCK",
+			},
+		}).Err()
+		if err != nil {
+			log.Printf("[MOCK BROKER] Failed to push webhook to Redis stream: %v", err)
+		} else {
+			log.Printf("[MOCK BROKER] Dispatched Webhook via Redis: OrderID=%s, Status=%s", webhook.OrderID, webhook.OrderStatus)
+		}
+		return
+	}
+
 	req, err := http.NewRequest("POST", m.postbackURL, bytes.NewBuffer(payload))
 	if err != nil {
 		log.Printf("[MOCK BROKER] Failed to construct postback request: %v", err)
@@ -1024,7 +1046,7 @@ func (m *MatchingEngine) dispatchWebhook(webhook models.DhanPostbackWebhook) {
 	}
 	defer resp.Body.Close()
 
-	log.Printf("[MOCK BROKER] Dispatched Webhook: OrderID=%s, Status=%s -> Response Code %d", webhook.OrderID, webhook.OrderStatus, resp.StatusCode)
+	log.Printf("[MOCK BROKER] Dispatched Webhook via HTTP: OrderID=%s, Status=%s -> Response Code %d", webhook.OrderID, webhook.OrderStatus, resp.StatusCode)
 }
 
 // CancelOrder marks an active pending order as CANCELLED.
@@ -1481,4 +1503,74 @@ func (m *MatchingEngine) GetPerformanceSummary(clientID string) models.Performan
 	}
 
 	return summary
+}
+
+// StartRedisOrderConsumer starts consuming from marmot:mock:orders
+func (m *MatchingEngine) StartRedisOrderConsumer(ctx context.Context) {
+	if m.rdb == nil {
+		log.Println("[MOCK BROKER] Redis client is nil, skipping Redis consumer")
+		return
+	}
+
+	streamName := "marmot:mock:orders"
+	groupName := "mock_broker_group"
+	consumerName := "consumer-1"
+
+	err := m.rdb.XGroupCreateMkStream(ctx, streamName, groupName, "0").Err()
+	if err != nil && !strings.Contains(err.Error(), "BUSYGROUP") {
+		log.Printf("[MOCK BROKER] Failed to create Redis consumer group: %v", err)
+	}
+
+	log.Printf("[MOCK BROKER] Started consuming from Redis stream: %s", streamName)
+
+	for {
+		streams, err := m.rdb.XReadGroup(ctx, &redis.XReadGroupArgs{
+			Group:    groupName,
+			Consumer: consumerName,
+			Streams:  []string{streamName, ">"},
+			Count:    10,
+			Block:    2 * time.Second,
+		}).Result()
+
+		if err != nil && err != redis.Nil {
+			log.Printf("[MOCK BROKER] Redis XReadGroup error: %v", err)
+			time.Sleep(1 * time.Second)
+			continue
+		}
+
+		for _, stream := range streams {
+			for _, msg := range stream.Messages {
+				payloadStr, ok := msg.Values["payload"].(string)
+				if !ok {
+					log.Printf("[MOCK BROKER] Invalid message format in stream %s", msg.ID)
+					m.rdb.XAck(ctx, streamName, groupName, msg.ID)
+					continue
+				}
+
+				var req models.OrderRequest
+				if err := json.Unmarshal([]byte(payloadStr), &req); err != nil {
+					log.Printf("[MOCK BROKER] Failed to unmarshal order payload: %v", err)
+					m.rdb.XAck(ctx, streamName, groupName, msg.ID)
+					continue
+				}
+
+				// Optionally parse logical_timestamp if passed in the values
+				if tsStr, ok := msg.Values["logical_timestamp"].(string); ok && tsStr != "" {
+					// Store it somewhere if tick-level accuracy needs it
+					// Right now we just execute it via PlaceOrder
+				}
+
+				log.Printf("[MOCK BROKER] Received order via Redis: %s", req.CorrelationID)
+
+				// Execute PlaceOrder
+				resp := m.PlaceOrder(req.DhanClientID, req)
+				if resp.OrderID != "" {
+					log.Printf("[MOCK BROKER] Order placed successfully via Redis: %s", resp.OrderID)
+				}
+
+				// Ack message
+				m.rdb.XAck(ctx, streamName, groupName, msg.ID)
+			}
+		}
+	}
 }
