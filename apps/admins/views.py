@@ -790,6 +790,9 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
             toast_msg = f'Mock broker signal sent, but service took longer to reply: {e}'
             toast_type = 'warning'
 
+        from django.core.cache import cache
+        cache.delete('marmot:admins:mock_broker_meta')
+
         if request.headers.get('X-Requested-With') == 'XMLHttpRequest' and action == 'speed':
             from django.http import JsonResponse
             return JsonResponse({'success': True, 'speed': request.POST.get('val', '25')})
