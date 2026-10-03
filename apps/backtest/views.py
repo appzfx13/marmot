@@ -3184,6 +3184,20 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
             }
             for r in backtest.rules.all()
         ]
+        if not rules_snapshot:
+            matched_rule = BacktestRule.objects.filter(rule_type=backtest.strategy_name).first()
+            if not matched_rule:
+                matched_rule = BacktestRule.objects.filter(rule_type='volume_amd').first()
+            if matched_rule:
+                rules_snapshot = [{
+                    'rule_id': matched_rule.id,
+                    'name': matched_rule.name,
+                    'rule_type': matched_rule.rule_type,
+                    'market_type': matched_rule.market_type,
+                    'description': matched_rule.description,
+                    'prompt_directive': matched_rule.prompt_directive,
+                    'parameters': matched_rule.parameters,
+                }]
         parameters_snapshot = {
             'strategy_parameters': backtest.parameters,
             'initial_capital': float(backtest.initial_capital),

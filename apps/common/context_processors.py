@@ -14,5 +14,6 @@ def site_settings_context(request):
     """Inject cached SiteSettings globally into template context."""
     return {
         'site_settings': get_site_settings(),
+        'WS_PORT': getattr(settings, 'WS_PORT', '8082'),
     }
 

@@ -705,18 +705,22 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 				preset.Name, math.Max(highPrice, prevHigh), accHigh, math.Max(upperWickRatio, prevUpperWickRatio)*100, closePrice,
 			)
 		}
-	} else if isBullishTrend && isBullishCandle && isBullishORB && isBullishRSI && isBullishMACD && displacementRatio >= minDisplacement {
-		isBullishSignal = true
-		triggerReason = fmt.Sprintf(
-			"⚡ [%s] EMA %d/%d Bull (%.1f>%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
-			preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, rsiValue, macdLine, displacementPct,
-		)
-	} else if isBearishTrend && isBearishCandle && isBearishORB && isBearishRSI && isBearishMACD && displacementRatio >= minDisplacement {
-		isBearishSignal = true
-		triggerReason = fmt.Sprintf(
-			"⚡ [%s] EMA %d/%d Bear (%.1f<%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
-			preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, rsiValue, macdLine, displacementPct,
-		)
+	}
+
+	if !isBullishSignal && !isBearishSignal {
+		if isBullishTrend && isBullishCandle && isBullishORB && isBullishRSI && isBullishMACD && displacementRatio >= minDisplacement {
+			isBullishSignal = true
+			triggerReason = fmt.Sprintf(
+				"⚡ [%s] EMA %d/%d Bull (%.1f>%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
+				preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, rsiValue, macdLine, displacementPct,
+			)
+		} else if isBearishTrend && isBearishCandle && isBearishORB && isBearishRSI && isBearishMACD && displacementRatio >= minDisplacement {
+			isBearishSignal = true
+			triggerReason = fmt.Sprintf(
+				"⚡ [%s] EMA %d/%d Bear (%.1f<%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
+				preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, rsiValue, macdLine, displacementPct,
+			)
+		}
 	}
 
 	// If neither rule criteria is met, hold state (NO TRADE)
@@ -823,9 +827,6 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		orderType = "MARKET"
 	}
 	limitPrice := 0.0
-	if orderType == "LIMIT" {
-		limitPrice = closePrice
-	}
 
 	// Strike sweep: if live option chain is available via params, find optimal entry strike + limit price.
 	// Injected by strategy_worker as params["option_chain"] before calling EvaluateLiveSignal.
@@ -842,14 +843,38 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		}
 	}
 
-	// Always anchor SL/TP on the actual traded instrument price (Option Premium if limitPrice > 0, else Spot)
+	// Always anchor SL/TP on the actual traded instrument price (Option Premium if trading options, else Spot)
+	isOptionContract := strings.Contains(tradingSymbol, "CALL") || strings.Contains(tradingSymbol, "PUT") ||
+		strings.HasSuffix(tradingSymbol, "CE") || strings.HasSuffix(tradingSymbol, "PE") ||
+		strings.Contains(tradingSymbol, " CE") || strings.Contains(tradingSymbol, " PE")
+
 	basePrice := limitPrice
-	if basePrice <= 0 {
-		basePrice = closePrice
+	if isOptionContract {
+		if basePrice <= 0 || basePrice > 2000 {
+			if optLtp, ok := params["option_ltp"].(float64); ok && optLtp > 0 && optLtp < 2000 {
+				basePrice = optLtp
+			} else {
+				if strings.Contains(indexName, "BANK") {
+					basePrice = 250.0
+				} else {
+					basePrice = 120.0
+				}
+			}
+			if orderType == "LIMIT" {
+				limitPrice = basePrice
+			}
+		}
+	} else {
+		if basePrice <= 0 {
+			basePrice = closePrice
+		}
+		if orderType == "LIMIT" && limitPrice <= 0 {
+			limitPrice = closePrice
+		}
 	}
 
 	var targetPrice, stopLossPrice float64
-	if basePrice < 2000 {
+	if isOptionContract || basePrice < 2000 {
 		// Option premium contract
 		optSLPts := slPts
 		if optSLPts <= 0 || optSLPts >= basePrice*0.70 {

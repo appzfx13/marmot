@@ -1563,8 +1563,10 @@ func (m *MatchingEngine) StartRedisOrderConsumer(ctx context.Context) {
 				log.Printf("[MOCK BROKER] Received order via Redis: %s", req.CorrelationID)
 
 				// Execute PlaceOrder
-				resp := m.PlaceOrder(req.DhanClientID, req)
-				if resp.OrderID != "" {
+				resp, err := m.PlaceOrder(req)
+				if err != nil {
+					log.Printf("[MOCK BROKER] PlaceOrder error via Redis: %v", err)
+				} else if resp != nil && resp.OrderID != "" {
 					log.Printf("[MOCK BROKER] Order placed successfully via Redis: %s", resp.OrderID)
 				}
 

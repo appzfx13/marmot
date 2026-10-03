@@ -66,7 +66,7 @@ func main() {
 	matchingEngine.SetBroadcaster(marketStreamer.BroadcastRawMessage)
 
 	// 4. Initialize HTTP Handler & Routes
-	handler, err = handlers.NewHandler(matchingEngine, chaos, marketStreamer, tmplPath)
+	handler, err := handlers.NewHandler(matchingEngine, chaos, marketStreamer, tmplPath)
 	if err != nil {
 		log.Fatalf("[DHAN-EMULATOR] Failed to initialize handler: %v", err)
 	}

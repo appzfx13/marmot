@@ -112,18 +112,22 @@ func NewParquetStreamer(eng *engine.MatchingEngine, backupDir string) *ParquetSt
 	files := ps.ListParquetDetails()
 	if len(files) > 0 {
 		selected := files[0].RelativePath
-		// Check for verified complete symmetric options dataset first
-		for _, f := range files {
-			if f.RelativePath == "1/48/dataset.parquet" {
-				selected = f.RelativePath
-				break
-			}
-		}
-		if selected != "1/48/dataset.parquet" {
+		if envFile := os.Getenv("EMULATOR_DATASET"); envFile != "" {
+			selected = envFile
+		} else {
+			// Check for verified complete symmetric options dataset first
 			for _, f := range files {
-				if f.HasOptions || f.RelativePath == "1/33/dataset.parquet" || f.RelativePath == "1/35/dataset.parquet" {
+				if f.RelativePath == "1/33/dataset.parquet" || f.RelativePath == "1/13/dataset.parquet" || f.RelativePath == "1/48/dataset.parquet" {
 					selected = f.RelativePath
 					break
+				}
+			}
+			if selected != "1/33/dataset.parquet" && selected != "1/13/dataset.parquet" && selected != "1/48/dataset.parquet" {
+				for _, f := range files {
+					if f.HasOptions || f.RelativePath == "1/35/dataset.parquet" {
+						selected = f.RelativePath
+						break
+					}
 				}
 			}
 		}
@@ -209,6 +213,7 @@ func (ps *ParquetStreamer) BroadcastRawMessage(msg []byte) {
 
 	var deadList []*websocket.Conn
 	for _, client := range activeList {
+		_ = client.SetWriteDeadline(time.Now().Add(250 * time.Millisecond))
 		if err := client.WriteMessage(websocket.TextMessage, msg); err != nil {
 			client.Close()
 			deadList = append(deadList, client)
@@ -238,6 +243,47 @@ func (ps *ParquetStreamer) BroadcastTick(tick models.MarketTick) {
 	// Feed into matching engine for MTM and SL/TP evaluation
 	ps.engine.IngestTick(tick)
 
+	optType := ""
+	var strikeNum float64
+	if strings.Contains(tick.SecurityID, "_CE") || strings.HasSuffix(tick.TradingSymbol, "CE") {
+		optType = "CE"
+	} else if strings.Contains(tick.SecurityID, "_PE") || strings.HasSuffix(tick.TradingSymbol, "PE") {
+		optType = "PE"
+	}
+	parts := strings.Split(tick.SecurityID, "_")
+	if len(parts) >= 1 {
+		strikeNum, _ = strconv.ParseFloat(parts[0], 64)
+	}
+
+	// Wrap tick in a typed envelope so the JS WS router can identify it as a mock feed message.
+	envelope := map[string]interface{}{
+		"type":          "mock_tick",
+		"is_mock":       true,
+		"is_virtual":    true,
+		"source":        "EMULATOR",
+		"tradingSymbol": tick.TradingSymbol,
+		"securityId":    tick.SecurityID,
+		"strike":        strikeNum,
+		"option_type":   optType,
+		"ltp":           tick.LTP,
+		"open":          tick.Open,
+		"high":          tick.High,
+		"low":           tick.Low,
+		"close":         tick.Close,
+		"oi":            tick.OI,
+		"volume":        tick.Volume,
+		"timestamp":     tick.Timestamp.Format("2006-01-02 15:04:05"),
+	}
+	msg, err := json.Marshal(envelope)
+	if err != nil {
+		return
+	}
+
+	// Publish to Redis channel marmot:mock_ticks for Go WebSocket hub (port 8082, window.MarmotWS)
+	if ps.rdb != nil {
+		_ = ps.rdb.Publish(context.Background(), "marmot:mock_ticks", msg).Err()
+	}
+
 	// Broadcast to WebSocket clients safely
 	ps.writeMu.Lock()
 	defer ps.writeMu.Unlock()
@@ -253,13 +299,9 @@ func (ps *ParquetStreamer) BroadcastTick(tick models.MarketTick) {
 	}
 	ps.mu.RUnlock()
 
-	msg, err := json.Marshal(tick)
-	if err != nil {
-		return
-	}
-
 	var deadList []*websocket.Conn
 	for _, client := range activeList {
+		_ = client.SetWriteDeadline(time.Now().Add(250 * time.Millisecond))
 		if err := client.WriteMessage(websocket.TextMessage, msg); err != nil {
 			client.Close()
 			deadList = append(deadList, client)
@@ -812,19 +854,12 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 		checkTicks(ps.latestTicks)
 	}
 
-	// 3. Build 31 strikes window with adaptive centering to preserve visible strikes
+	// 3. Build 31 strikes window centered strictly on true ATM strike (zero artificial clamping)
 	var strikes []models.OptionStrikeRow
 	totalStrikes := 31
 	halfWindow := totalStrikes / 2
 
 	centerStrike := atmStrikeVal
-	if hasAvailTicks && minAvailStrike > 0 && maxAvailStrike > 0 {
-		if atmStrikeVal > maxAvailStrike {
-			centerStrike = maxAvailStrike - float64(3*strikeStep)
-		} else if atmStrikeVal < minAvailStrike {
-			centerStrike = minAvailStrike + float64(3*strikeStep)
-		}
-	}
 
 	totalCallVol := int64(0)
 	totalPutVol := int64(0)
@@ -928,7 +963,7 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 			peSymbol = fmt.Sprintf("DHAN_MOCK:%s_%.0f_PE", idxClean, stkPrice)
 		}
 
-		isActiveWindow := (i >= -3 && i <= 3) || (ceLTP > 0 || peLTP > 0) || (stkPrice >= atmStrikeVal-float64(3*strikeStep) && stkPrice <= atmStrikeVal+float64(3*strikeStep))
+		isActiveWindow := (i >= -3 && i <= 3)
 
 		row := models.OptionStrikeRow{
 			Strike:         stkPrice,
@@ -1053,9 +1088,11 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 		startRow = 0
 		ps.isCompleted = false
 	}
+	needIndex := len(ps.latestTicks) == 0
 	ps.mu.Unlock()
-
-	ps.preIndexParquetFile(fullPath)
+	if needIndex {
+		ps.preIndexParquetFile(fullPath)
+	}
 
 	reader := parquet.NewGenericReader[models.MarketCandleRecord](file)
 	defer reader.Close()
@@ -1466,16 +1503,23 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 				}
 
 				if strikeKey != "" {
-					ps.mu.Lock()
-					ps.latestTicks[strikeKey] = tick
-					if sym != "" {
-						ps.latestTicks[sym] = tick
-					}
 					if isForActiveExpiry {
+						ps.mu.Lock()
+						ps.latestTicks[strikeKey] = tick
 						ps.activeExpiryTicks[strikeKey] = tick
+						if sym != "" {
+							ps.latestTicks[sym] = tick
+						}
+						ps.mu.Unlock()
+						ps.BroadcastTick(tick)
+					} else {
+						ps.mu.Lock()
+						if sym != "" {
+							ps.latestTicks[sym] = tick
+						}
+						ps.mu.Unlock()
+						ps.engine.IngestTick(tick)
 					}
-					ps.mu.Unlock()
-					ps.BroadcastTick(tick)
 				}
 			}
 
@@ -1574,6 +1618,50 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 			}
 			ps.mu.Unlock()
 
+			// Identify Spot
+			var spotPrice float64
+			var spotIndexName string
+			var openPrice, highPrice, lowPrice, closePrice float64
+			var volume int64
+			for _, rec := range currentBucket {
+				if rec.OptionType == "INDEX" || rec.Strike == "SPOT" {
+					spotIndexName = rec.IndexName
+					spotPrice = rec.Close
+					if spotPrice <= 0 {
+						spotPrice = rec.SpotPrice
+					}
+					openPrice = rec.Open
+					highPrice = rec.High
+					lowPrice = rec.Low
+					closePrice = spotPrice
+					volume = rec.Volume
+					break
+				}
+				if rec.SpotPrice > 1000 && spotPrice == 0 {
+					spotPrice = rec.SpotPrice
+					spotIndexName = rec.IndexName
+					openPrice = rec.SpotPrice
+					highPrice = rec.SpotPrice
+					lowPrice = rec.SpotPrice
+					closePrice = rec.SpotPrice
+					volume = 50000
+				}
+			}
+			if spotPrice <= 0 {
+				ps.mu.RLock()
+				spotPrice = ps.lastSpotPrice
+				spotIndexName = ps.lastSpotTick.TradingSymbol
+				openPrice = ps.lastSpotTick.Open
+				highPrice = ps.lastSpotTick.High
+				lowPrice = ps.lastSpotTick.Low
+				closePrice = ps.lastSpotTick.Close
+				volume = ps.lastSpotTick.Volume
+				ps.mu.RUnlock()
+			}
+			if spotIndexName == "" {
+				spotIndexName = "NIFTY"
+			}
+
 			// Broadcast virtual clock tick to Marmot UI for real-time historical clock sync
 			if ps.rdb != nil {
 				ps.mu.RLock()
@@ -1585,33 +1673,6 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 				var progPct float64
 				if totRows > 0 {
 					progPct = (float64(cRow) / float64(totRows)) * 100.0
-				}
-				
-				// Identify Spot
-				var spotPrice float64
-				var spotIndexName string
-				for _, rec := range currentBucket {
-					if rec.OptionType == "INDEX" || rec.Strike == "SPOT" {
-						spotIndexName = rec.IndexName
-						spotPrice = rec.Close
-						if spotPrice <= 0 {
-							spotPrice = rec.SpotPrice
-						}
-						break
-					}
-					if rec.SpotPrice > 1000 && spotPrice == 0 {
-						spotPrice = rec.SpotPrice
-						spotIndexName = rec.IndexName
-					}
-				}
-				if spotPrice <= 0 {
-					ps.mu.RLock()
-					spotPrice = ps.lastSpotPrice
-					spotIndexName = ps.lastSpotTick.TradingSymbol
-					ps.mu.RUnlock()
-				}
-				if spotIndexName == "" {
-					spotIndexName = "NIFTY"
 				}
 
 				tickMsg := map[string]interface{}{
@@ -1636,55 +1697,24 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 				}
 			}
 
-			// Actually broadcast the ticks to WebSocket clients if it's the sub-ticks
-			if subTick > 0 {
-				for _, rec := range currentBucket {
-					secID := rec.Strike
-					optType := strings.ToUpper(strings.TrimSpace(rec.OptionType))
-					if optType == "CALL" {
-						optType = "CE"
-					} else if optType == "PUT" {
-						optType = "PE"
-					}
-					sym := rec.TradingSymbol
-					if sym == "" {
-						sym = fmt.Sprintf("%s %s %s", rec.IndexName, rec.Strike, optType)
-					}
-					sym = strings.TrimSpace(sym)
-					if rec.OptionType == "INDEX" || rec.Strike == "SPOT" {
-						sym = rec.IndexName
-						secID = "13"
-						if strings.Contains(strings.ToUpper(rec.IndexName), "BANK") {
-							secID = "25"
-						}
-					}
-					price := rec.Close
-					if price <= 0 {
-						price = rec.Open
-					}
-					if price <= 0 {
-						continue
-					}
-					tick := models.MarketTick{
-						Timestamp:     virtualSubTime,
-						SecurityID:    secID,
-						TradingSymbol: sym,
-						LTP:           price,
-						Open:          rec.Open,
-						High:          rec.High,
-						Low:           rec.Low,
-						Close:         price,
-						Volume:        rec.Volume,
-						OI:            rec.OI,
-					}
-					if optType == "CE" || optType == "PE" {
-						strikeKey := fmt.Sprintf("%s_%s", rec.Strike, optType)
-						ps.mu.Lock()
-						ps.activeExpiryTicks[strikeKey] = tick
-						ps.mu.Unlock()
-					}
-					ps.BroadcastTick(tick)
+			// In sub-ticks, broadcast the updated spot tick for virtual clock & index chart advancement
+			if subTick > 0 && spotPrice > 1000 {
+				secID := "13"
+				if strings.Contains(strings.ToUpper(spotIndexName), "BANK") {
+					secID = "25"
 				}
+				subSpotTick := models.MarketTick{
+					Timestamp:     virtualSubTime,
+					SecurityID:    secID,
+					TradingSymbol: spotIndexName,
+					LTP:           spotPrice,
+					Open:          openPrice,
+					High:          highPrice,
+					Low:           lowPrice,
+					Close:         closePrice,
+					Volume:        volume,
+				}
+				ps.BroadcastTick(subSpotTick)
 			}
 
 			select {
@@ -1740,13 +1770,17 @@ func (ps *ParquetStreamer) preIndexParquetFile(fullPath string) {
 	defer ps.mu.Unlock()
 
 	indexedCount := 0
-	for _, rg := range pf.RowGroups() {
+	for rgIdx, rg := range pf.RowGroups() {
+		if indexedCount >= 70 || rgIdx >= 20 {
+			break
+		}
 		rgReader := parquet.NewGenericRowGroupReader[models.MarketCandleRecord](rg)
-		batch := make([]models.MarketCandleRecord, 16)
-		n, _ := rgReader.Read(batch)
-		rgReader.Close()
-
-		if n > 0 {
+		batch := make([]models.MarketCandleRecord, 512)
+		for {
+			n, _ := rgReader.Read(batch)
+			if n == 0 {
+				break
+			}
 			for i := 0; i < n; i++ {
 				rec := batch[i]
 				optType := strings.ToUpper(strings.TrimSpace(rec.OptionType))
@@ -1816,6 +1850,13 @@ func (ps *ParquetStreamer) preIndexParquetFile(fullPath string) {
 					}
 				}
 			}
+			if indexedCount >= 300 {
+				break
+			}
+		}
+		rgReader.Close()
+		if indexedCount >= 300 {
+			break
 		}
 	}
 	log.Printf("[STREAMER] Successfully pre-indexed initial historical option quotes for %d strike keys from %s in ~30ms", indexedCount, fullPath)
@@ -1928,10 +1969,10 @@ func (ps *ParquetStreamer) ListParquetDetails() []ParquetFileInfo {
 
 			if strings.Contains(relSlash, "macro") || info.Size() < 50000 {
 				typeLabel = "Macro AI"
-			} else if relSlash == "1/48/dataset.parquet" || relSlash == "1/35/dataset.parquet" {
+			} else if relSlash == "1/13/dataset.parquet" || relSlash == "1/33/dataset.parquet" || relSlash == "1/48/dataset.parquet" || relSlash == "1/35/dataset.parquet" {
 				hasOpts = true
 				typeLabel = "Spot + Options (Full Bilateral)"
-			} else if relSlash == "1/33/dataset.parquet" || relSlash == "1/60/dataset.parquet" {
+			} else if relSlash == "1/60/dataset.parquet" {
 				hasOpts = true
 				typeLabel = "Spot + Options (Single Leg)"
 			} else if relSlash == "1/37/dataset.parquet" || relSlash == "1/38/dataset.parquet" || relSlash == "1/40/dataset.parquet" || relSlash == "1/62/dataset.parquet" {

@@ -1,5 +1,11 @@
 {% load static %}
 
+<div id="gateway-emulator-container" class="w-100 col-12"
+     hx-get="{% url 'admins:admin-gateway-emulator' %}"
+     hx-trigger="reloadGatewayEmulator from:body"
+     hx-target="this"
+     hx-swap="outerHTML">
+
 <style>
     /* Dual-Mode Simulation Card Styles */
     .sim-mode-card {
@@ -141,13 +147,13 @@
             <span>Kill Switch</span>
         </button>
 
-        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-none" id="gateway-reset-session-form">
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="d-none" id="gateway-reset-session-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="clear_session">
             <input type="hidden" name="account" value="{{ active_account.active_account_id|default:'1000000001' }}">
         </form>
 
-        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-none" id="gateway-kill-switch-form">
+        <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="d-none" id="gateway-kill-switch-form">
             {% csrf_token %}
             <input type="hidden" name="action" value="kill_switch">
         </form>
@@ -155,7 +161,7 @@
         <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-2.5"
                 hx-get="{% url 'admins:admin-gateway-emulator' %}"
                 hx-target="#gateway-emulator-container"
-                hx-swap="innerHTML"
+                hx-swap="outerHTML"
                 title="Refresh Telemetry">
             <i class="bi bi-arrow-repeat fs-6"></i>
         </button>
@@ -172,7 +178,7 @@
         <div class="sim-mode-card h-100 {% if sim_mode == 'LIVE' %}active-mode-live{% else %}inactive-mode{% endif %}"
              hx-get="{% url 'admins:admin-gateway-emulator' %}?mode=LIVE"
              hx-target="#gateway-emulator-container"
-             hx-swap="innerHTML"
+             hx-swap="outerHTML"
              role="button"
              tabindex="0">
             <div>
@@ -230,7 +236,7 @@
         <div class="sim-mode-card h-100 {% if sim_mode == 'BACKUP' %}active-mode-backup{% else %}inactive-mode{% endif %}"
              hx-get="{% url 'admins:admin-gateway-emulator' %}?mode=BACKUP"
              hx-target="#gateway-emulator-container"
-             hx-swap="innerHTML"
+             hx-swap="outerHTML"
              role="button"
              tabindex="0">
             <div>
@@ -312,7 +318,7 @@
         <!-- Stop Button & Playback Actions (1-Click Instant Execution) -->
         <div class="d-flex align-items-center gap-2 flex-wrap">
             <!-- Play / Pause Toggle -->
-            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline" id="gateway-toggle-form">
+            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="d-inline" id="gateway-toggle-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="toggle">
                 {% if streamer_status.is_playing %}
@@ -340,7 +346,7 @@
             </form>
 
             <!-- Rewind to Row 0 -->
-            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline" id="gateway-rewind-form">
+            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="d-inline" id="gateway-rewind-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="restart">
                 {% if not is_dataset_locked and not streamer_status.is_playing %}
@@ -357,7 +363,7 @@
             </form>
 
             <!-- FUNCTIONAL STOP BUTTON -->
-            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline" id="gateway-stop-form">
+            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="d-inline" id="gateway-stop-form">
                 {% csrf_token %}
                 <input type="hidden" name="action" value="stop">
                 <button type="submit"
@@ -421,7 +427,7 @@
                                 <i class="bi bi-shield-lock me-1"></i>LOCKED &amp; READY
                             </span>
                             {% if not streamer_status.is_playing %}
-                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
+                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="d-inline m-0">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="unlock_dataset">
                                 <button type="submit" class="btn btn-outline-warning btn-xs py-0.5 px-2 rounded-pill font-monospace fw-bold shadow-sm d-inline-flex align-items-center gap-1" style="font-size: 0.65rem;" title="Unlock dataset to select another file">
@@ -438,7 +444,7 @@
                             <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2 py-0.5 smaller font-monospace" style="font-size: 0.65rem;">
                                 <i class="bi bi-unlock-fill me-1"></i>UNLOCKED
                             </span>
-                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="d-inline m-0">
+                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="d-inline m-0">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="lock_dataset">
                                 <button type="submit" class="btn btn-success btn-xs py-0.5 px-2.5 rounded-pill font-monospace fw-bold text-dark shadow-sm d-inline-flex align-items-center gap-1" style="font-size: 0.68rem;" title="Confirm and Lock Dataset to enable replay controls">
@@ -517,7 +523,7 @@
                         </li>
                         {% for b in completed_backups %}
                         <li>
-                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="innerHTML" class="m-0">
+                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="m-0">
                                 {% csrf_token %}
                                 <input type="hidden" name="action" value="select_file">
                                 <input type="hidden" name="file" value="{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet">
@@ -1507,7 +1513,7 @@
             </div>
             <form hx-post="{% url 'admins:admin-gateway-session-save' %}"
                   hx-target="#gateway-emulator-container"
-                  hx-swap="innerHTML"
+                  hx-swap="outerHTML"
                   onsubmit="setTimeout(() => { bootstrap.Modal.getInstance(document.getElementById('saveSessionModal'))?.hide(); }, 200);">
                 {% csrf_token %}
                 <div class="modal-body py-3">
@@ -1675,6 +1681,8 @@
             </div>
         </div>
     </div>
+</div>
+
 </div>
 
 

@@ -501,7 +501,7 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
             streamer_status = {'is_playing': False, 'current_speed': 25, 'progress_pct': 0.0, 'active_file': ''}
 
             try:
-                r_health = requests.get('http://mock_broker:8088/health', timeout=0.8)
+                r_health = requests.get('http://mock_broker:8088/health', timeout=2.0)
                 if r_health.status_code == 200:
                     mock_online = True
             except Exception:
@@ -509,19 +509,19 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
 
             if mock_online:
                 try:
-                    r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=0.8)
+                    r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=2.0)
                     if r_acc.status_code == 200:
                         active_account = r_acc.json()
                 except Exception:
                     pass
                 try:
-                    r_files = requests.get('http://mock_broker:8088/mock/api/streamer/files', timeout=0.8)
+                    r_files = requests.get('http://mock_broker:8088/mock/api/streamer/files', timeout=2.0)
                     if r_files.status_code == 200:
                         streamer_files = r_files.json() or []
                 except Exception:
                     pass
                 try:
-                    r_st = requests.get('http://mock_broker:8088/mock/api/streamer/status', timeout=0.8)
+                    r_st = requests.get('http://mock_broker:8088/mock/api/streamer/status', timeout=2.5)
                     if r_st.status_code == 200:
                         streamer_status = r_st.json() or streamer_status
                 except Exception:
@@ -707,7 +707,7 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         toast_msg = 'Command processed.'
         toast_type = 'success'
         try:
-            if action == 'toggle':
+            if action in ('toggle', 'start', 'play'):
                 requests.post('http://mock_broker:8088/mock/api/streamer/toggle', timeout=3)
                 toast_title = 'Streamer Toggled'
                 toast_msg = 'Playback play/pause state flipped.'
@@ -765,7 +765,7 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
                 cache.delete('marmot:admins:mock_broker_meta')
                 toast_title = 'Session Cleared'
                 toast_msg = 'Mock orders, positions, balances, and session PnL reset to default.'
-            elif action == 'stop':
+            elif action in ('stop', 'pause'):
                 try:
                     requests.post('http://mock_broker:8088/mock/api/streamer/stop', timeout=3)
                 except Exception:
@@ -798,7 +798,7 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
             return JsonResponse({'success': True, 'speed': request.POST.get('val', '25')})
 
         hx_target = request.headers.get('HX-Target', '')
-        if hx_target == 'gateway-emulator-container':
+        if hx_target in ('gateway-emulator-container', '#gateway-emulator-container'):
             from django.shortcuts import render
             view = AdminGatewayEmulatorView()
             view.request = request
@@ -953,7 +953,7 @@ class AdminGatewaySessionSaveView(LoginRequiredMixin, View):
             }
         }
 
-        if hx_target == 'gateway-emulator-container':
+        if hx_target in ('gateway-emulator-container', '#gateway-emulator-container'):
             view = AdminGatewayEmulatorView()
             view.request = request
             ctx = view.get_context_data()
@@ -1138,6 +1138,8 @@ class AdminLiveOptionChainPartialView(LoginRequiredMixin, View):
             or request.session.get('active_tab') == 'live-mock'
             or 'live-mock' in referer
             or 'live-mock' in current_url
+            or 'sandbox' in referer
+            or 'sandbox' in current_url
         )
         option_chain = get_live_index_option_chain(index_name, is_mock=is_mock)
         context = {
@@ -1626,6 +1628,8 @@ def enrich_trading_symbol_dict(item: dict) -> dict:
     enriched['trading_symbol'] = clean_sym
     enriched['tradingSymbol'] = clean_sym
     enriched['option_type'] = 'CALL' if 'CALL' in clean_sym or ' CE' in raw_sym else ('PUT' if 'PUT' in clean_sym or ' PE' in raw_sym else '')
+    enriched.setdefault('leg_name', '')
+    enriched.setdefault('trigger_reason', '')
     return enriched
 
 
@@ -1641,30 +1645,34 @@ def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=N
         raw = None
         if strategy_id and str(strategy_id).upper() != 'ALL':
             target_key = f"marmot:sandbox:telemetry:strategy:{strategy_id}"
-            raw = redis_client.get(target_key)
+            raw = redis_client.get(target_key) or redis_client.get(f"marmot:mock:telemetry:strategy:{strategy_id}")
             if raw:
                 d = json.loads(raw)
                 positions_raw = d.get("positions", [])
         elif account_id and str(account_id).upper() != 'ALL':
             target_key = f"marmot:sandbox:telemetry:account:{account_id}"
-            raw = redis_client.get(target_key)
+            raw = redis_client.get(target_key) or redis_client.get(f"marmot:mock:telemetry:account:{account_id}")
             if raw:
                 d = json.loads(raw)
                 positions_raw = d.get("positions", [])
             else:
-                strat_ids = list(LiveStrategy.objects.filter(trading_account_id=account_id, is_deleted=False).values_list('id', flat=True))
+                from django.db.models import Q
+                strat_ids = list(LiveStrategy.objects.filter(
+                    Q(trading_account_id=account_id) | Q(trading_account__isnull=True),
+                    is_deleted=False
+                ).values_list('id', flat=True))
                 if not strat_ids:
                     return []
                 agg_positions = []
                 for s_id in strat_ids:
-                    s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}")
+                    s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}") or redis_client.get(f"marmot:mock:telemetry:strategy:{s_id}")
                     if s_raw:
                         sd = json.loads(s_raw)
                         agg_positions.extend(sd.get("positions", []))
                 positions_raw = agg_positions
         elif user_id:
             target_key = f"marmot:sandbox:telemetry:{user_id}"
-            raw = redis_client.get(target_key)
+            raw = redis_client.get(target_key) or redis_client.get(f"marmot:mock:telemetry:{user_id}")
             if raw:
                 d = json.loads(raw)
                 positions_raw = d.get("positions", [])
@@ -1713,30 +1721,34 @@ def get_sandbox_simulated_orders(user_id=None, strategy_id=None, account_id=None
         raw = None
         if strategy_id and str(strategy_id).upper() != 'ALL':
             target_key = f"marmot:sandbox:telemetry:strategy:{strategy_id}"
-            raw = redis_client.get(target_key)
+            raw = redis_client.get(target_key) or redis_client.get(f"marmot:mock:telemetry:strategy:{strategy_id}")
             if raw:
                 d = json.loads(raw)
                 orders_raw = d.get("orders", [])
         elif account_id and str(account_id).upper() != 'ALL':
             target_key = f"marmot:sandbox:telemetry:account:{account_id}"
-            raw = redis_client.get(target_key)
+            raw = redis_client.get(target_key) or redis_client.get(f"marmot:mock:telemetry:account:{account_id}")
             if raw:
                 d = json.loads(raw)
                 orders_raw = d.get("orders", [])
             else:
-                strat_ids = list(LiveStrategy.objects.filter(trading_account_id=account_id, is_deleted=False).values_list('id', flat=True))
+                from django.db.models import Q
+                strat_ids = list(LiveStrategy.objects.filter(
+                    Q(trading_account_id=account_id) | Q(trading_account__isnull=True),
+                    is_deleted=False
+                ).values_list('id', flat=True))
                 if not strat_ids:
                     return []
                 agg_orders = []
                 for s_id in strat_ids:
-                    s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}")
+                    s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}") or redis_client.get(f"marmot:mock:telemetry:strategy:{s_id}")
                     if s_raw:
                         sd = json.loads(s_raw)
                         agg_orders.extend(sd.get("orders", []))
                 orders_raw = agg_orders
         elif user_id:
             target_key = f"marmot:sandbox:telemetry:{user_id}"
-            raw = redis_client.get(target_key)
+            raw = redis_client.get(target_key) or redis_client.get(f"marmot:mock:telemetry:{user_id}")
             if raw:
                 d = json.loads(raw)
                 orders_raw = d.get("orders", [])
@@ -1744,7 +1756,7 @@ def get_sandbox_simulated_orders(user_id=None, strategy_id=None, account_id=None
                 user_strat_ids = list(LiveStrategy.objects.filter(user_id=user_id, is_deleted=False).values_list('id', flat=True))
                 agg_orders = []
                 for s_id in user_strat_ids:
-                    s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}")
+                    s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}") or redis_client.get(f"marmot:mock:telemetry:strategy:{s_id}")
                     if s_raw:
                         sd = json.loads(s_raw)
                         agg_orders.extend(sd.get("orders", []))
@@ -1784,7 +1796,7 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
 
         raw_acc_id = self.request.GET.get('account_id', '').strip()
         account_id_param = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
-        sandbox_accounts = list(user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name'))
+        sandbox_accounts = list(user.trading_accounts.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']).order_by('-is_default', 'account_name'))
         sandbox_account = None
         if account_id_param and account_id_param.isdigit():
             sandbox_account = next((a for a in sandbox_accounts if str(a.id) == account_id_param), None)
@@ -1806,7 +1818,7 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
             sandbox_accounts.append(sandbox_account)
 
         # Strategies for this sandbox account
-        strategy_qs = user.live_strategies.filter(is_deleted=False, execution_mode='SANDBOX')
+        strategy_qs = user.live_strategies.filter(is_deleted=False, execution_mode__in=['SANDBOX', 'MOCK'])
         if sandbox_account.is_default:
             from django.db.models import Q
             strategy_qs = strategy_qs.filter(Q(trading_account=sandbox_account) | Q(trading_account__isnull=True))
@@ -1826,7 +1838,7 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
             strat_orders_cnt = 0
             strat_pos_cnt = 0
             try:
-                raw_t = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s.id}")
+                raw_t = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s.id}") or redis_client.get(f"marmot:mock:telemetry:strategy:{s.id}")
                 if raw_t:
                     td = json.loads(raw_t)
                     strat_pnl = float(td.get('live_net_pnl', 0.0))
@@ -1852,11 +1864,12 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         try:
             if selected_strategy:
                 telemetry_key = f"marmot:sandbox:telemetry:strategy:{selected_strategy.id}"
+                telemetry_raw = redis_client.get(telemetry_key) or redis_client.get(f"marmot:mock:telemetry:strategy:{selected_strategy.id}")
             else:
                 telemetry_key = f"marmot:sandbox:telemetry:account:{sandbox_account.id}"
-            telemetry_raw = redis_client.get(telemetry_key)
-            if not telemetry_raw and not selected_strategy and sandbox_account.is_default:
-                telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user.id}")
+                telemetry_raw = redis_client.get(telemetry_key) or redis_client.get(f"marmot:mock:telemetry:account:{sandbox_account.id}")
+            if not telemetry_raw and not selected_strategy:
+                telemetry_raw = redis_client.get(f"marmot:sandbox:telemetry:{user.id}") or redis_client.get(f"marmot:mock:telemetry:{user.id}")
             if telemetry_raw:
                 t_data = json.loads(telemetry_raw)
                 telemetry_summary = t_data.get("summary", {}) if "summary" in t_data else t_data
@@ -1879,6 +1892,8 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         avail_margin = base_capital - margin_used + realized_pnl
 
         context['is_sandbox'] = True
+        context['is_mock_mode'] = True
+        context['WS_PORT'] = getattr(settings, 'WS_PORT', '8082')
         context['active_tab'] = 'sandbox-dashboard'
         context['live_account'] = sandbox_account
         context['sandbox_account'] = sandbox_account
@@ -1951,7 +1966,7 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         available_indexes = get_available_backup_indexes()
         context['available_backup_indexes'] = available_indexes
         context['selected_index'] = selected_index
-        context['option_chain'] = get_live_index_option_chain(selected_index)
+        context['option_chain'] = get_live_index_option_chain(selected_index, is_mock=True)
 
         today = timezone.localdate()
         is_fyers_token_valid = bool(site_settings.fyers_access_token and site_settings.fyers_token_generated_date == today)
@@ -5025,7 +5040,20 @@ class LiveStrategyToggleView(LoginRequiredMixin, View):
 
         strategy.is_active = not strategy.is_active
         strategy.status = LiveStrategyStatusChoices.ACTIVE if strategy.is_active else LiveStrategyStatusChoices.PAUSED
-        strategy.save(update_fields=['is_active', 'status', 'updated_at'])
+        if strategy.is_active and not strategy.frozen_rules_snapshot:
+            from apps.backtest.models import BacktestRule
+            matched_rule = BacktestRule.objects.filter(rule_type=strategy.strategy_name).first() or BacktestRule.objects.filter(rule_type='volume_amd').first()
+            if matched_rule:
+                strategy.frozen_rules_snapshot = [{
+                    'rule_id': matched_rule.id,
+                    'name': matched_rule.name,
+                    'rule_type': matched_rule.rule_type,
+                    'market_type': matched_rule.market_type,
+                    'description': matched_rule.description,
+                    'prompt_directive': matched_rule.prompt_directive,
+                    'parameters': matched_rule.parameters,
+                }]
+        strategy.save(update_fields=['is_active', 'status', 'frozen_rules_snapshot', 'updated_at'])
 
         # Publish Redis IPC command to Go strategy worker for SANDBOX paper trading
         try:

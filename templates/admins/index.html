@@ -2664,7 +2664,7 @@
                 if (isTunnel) {
                     wsUrl = proto + '//' + window.location.host + '/ws';
                 } else {
-                    const wsPort = window.MARMOT_WS_PORT || '{{ WS_PORT|default:"8053" }}';
+                    const wsPort = window.MARMOT_WS_PORT || '{{ WS_PORT|default:"8082" }}';
                     wsUrl = proto + '//' + host + ':' + wsPort + '/ws';
                 }
             }
@@ -2672,10 +2672,10 @@
             window.isLiveMockActive = function () {
                 const path = window.location.pathname || '';
                 const search = window.location.search || '';
-                if (path.includes('/dashboard/live-mock/') || search.toUpperCase().includes('ENV=MOCK')) return true;
+                if (path.includes('/dashboard/live-mock/') || path.includes('/dashboard/sandbox/') || path.includes('/sandbox/') || path.includes('/gateway-emulator/') || path.includes('/emulator/') || search.toUpperCase().includes('ENV=MOCK')) return true;
                 if (document.getElementById('mockEnvInput') || document.querySelector('[data-env-mode="MOCK"]')) return true;
                 const headerTitle = document.querySelector('.page-title');
-                if (headerTitle && (headerTitle.textContent.toLowerCase().includes('mock') || headerTitle.textContent.toLowerCase().includes('emulator'))) return true;
+                if (headerTitle && (headerTitle.textContent.toLowerCase().includes('mock') || headerTitle.textContent.toLowerCase().includes('emulator') || headerTitle.textContent.toLowerCase().includes('sandbox'))) return true;
                 return false;
             };
 
@@ -2781,16 +2781,15 @@
                                 if (isMockFeed) {
                                     // STRICT ISOLATION: Mock broker feed ONLY feeds into Live Mock Dashboard
                                     if (window.isLiveMockActive && window.isLiveMockActive()) {
-                                        const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
-                                        if (spot && window.updateLiveSpotDOM) {
-                                            window.updateLiveSpotDOM(spot, data.data || data);
-                                        }
                                         if (window.handleEmulatorTick) {
                                             window.handleEmulatorTick(data.data || data);
                                         }
                                     }
                                 } else if (data.type === 'live_tick') {
-                                    // Live Realtime Market Feed: feeds both Live Dashboard and Live Mock Dashboard
+                                    // STRICT ISOLATION: Real-world live ticks only update Live Dashboard, never Sandbox/Mock Replay
+                                    if (window.isLiveMockActive && window.isLiveMockActive()) {
+                                        return;
+                                    }
                                     const sym = (data.symbol || data.fyers_sym || (data.data ? (data.data.symbol || data.data.fyers_sym) : '') || '').toUpperCase().trim();
                                     const isOption = sym.endsWith('CE') || sym.endsWith('PE') || sym.includes(' CE') || sym.includes(' PE');
                                     if (!isOption) {
@@ -2820,6 +2819,7 @@
                                         latency_ms: t.processing_latency_ms
                                     });
                                     window.dispatchEvent(new CustomEvent('marmot:mock-telemetry', { detail: data }));
+                                    window.dispatchEvent(new CustomEvent('marmot:sandbox-telemetry', { detail: data }));
                                     const stratKey = data.task_id || (data.data && data.data.strategy_id ? 'strategy_' + data.data.strategy_id : null);
                                     if (stratKey && window.MarmotWS.callbacks[String(stratKey)]) {
                                         window.MarmotWS.callbacks[String(stratKey)].forEach(function (cb) {
@@ -2828,12 +2828,14 @@
                                     }
                                 }
                                 if (data.type === 'order_update' || data.type === 'orders') {
-                                    console.log('📑 [MarmotWS:Orders] Dispatching reloadLiveOrders event');
+                                    console.log('📑 [MarmotWS:Orders] Dispatching reloadLiveOrders & reloadSandboxOrders events');
                                     document.body.dispatchEvent(new CustomEvent('reloadLiveOrders'));
+                                    document.body.dispatchEvent(new CustomEvent('reloadSandboxOrders'));
                                 }
                                 if (data.type === 'position_update' || data.type === 'positions') {
-                                    console.log('📑 [MarmotWS:Positions] Dispatching reloadLivePositions event');
+                                    console.log('📑 [MarmotWS:Positions] Dispatching reloadLivePositions & reloadSandboxPositions events');
                                     document.body.dispatchEvent(new CustomEvent('reloadLivePositions'));
+                                    document.body.dispatchEvent(new CustomEvent('reloadSandboxPositions'));
                                 }
                                 if (data.type === 'telemetry' || data.type === 'portfolio_tick') {
                                     window.dispatchEvent(new CustomEvent('marmot:telemetry', { detail: data }));
@@ -3007,6 +3009,9 @@
                 if (isMockPayload && !isMockActive) {
                     return; // Refuse to update Live Dashboard with mock/emulator ticks
                 }
+                if (!isMockPayload && isMockActive) {
+                    return; // Refuse to update Live Mock / Sandbox Dashboard with real live market ticks
+                }
                 const numPrice = Number(spotPrice);
                 const formattedPrice = '₹' + numPrice.toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                 const tickIndex = (payload && payload.index) ? String(payload.index).toUpperCase().trim() : '';
@@ -3132,32 +3137,19 @@
                     if (atmEl) {
                         const prevAtm = parseInt(atmEl.textContent.trim(), 10);
                         atmEl.textContent = atmStrike;
-                        // If ATM strike shifted, trigger option chain table reload to realign strikes heatmap
+                        // Client-side DOM sliding handles ATM badge and strike window purely in memory.
+                        // Only trigger HTTP table reload if the shifted ATM strike row is not present in the DOM table.
                         if (!isNaN(prevAtm) && prevAtm > 0 && prevAtm !== atmStrike) {
-                            console.log('🎯 [OptionChain] ATM strike shifted from ' + prevAtm + ' to ' + atmStrike + ' -> Triggering table reload');
-                            window.triggerOptionChainReload(true);
+                            const targetAtmRow = document.querySelector('#live-option-chain-container tbody tr[data-strike="' + atmStrike + '"]');
+                            if (!targetAtmRow && typeof window.triggerOptionChainReload === 'function') {
+                                console.log('🎯 [OptionChain] Strike ' + atmStrike + ' outside loaded table -> Triggering backend table fetch');
+                                window.triggerOptionChainReload(true);
+                            }
                         }
                     }
 
-                    // Continuous Event-Driven Option Chain refresh on incoming WebSocket Ticks
-                    const nowTs = Date.now();
-                    if (window._lastSpotReloadPrice === undefined) {
-                        window._lastSpotReloadPrice = numPrice;
-                    }
-                    if (window._lastOcReloadTimestamp === undefined) {
-                        window._lastOcReloadTimestamp = nowTs;
-                    }
-                    const spotDiff = Math.abs(numPrice - window._lastSpotReloadPrice);
-                    const timeDiff = nowTs - window._lastOcReloadTimestamp;
-
-                    // Trigger if spot drifted by >= 1.0 pt OR if 3.0 seconds elapsed on incoming tick
-                    if (spotDiff >= 1.0 || timeDiff >= 3000) {
-                        const didReload = window.triggerOptionChainReload(false);
-                        if (didReload) {
-                            window._lastSpotReloadPrice = numPrice;
-                            window._lastOcReloadTimestamp = nowTs;
-                        }
-                    }
+                    // Real-time telemetry is pushed directly to DOM via WebSocket (updateStrikeLTP & updateLiveSpotDOM).
+                    // Continuous HTTP reload on 1pt drift removed to adhere strictly to Marmot Rule 7 (0 HTTP polling).
 
                     // Option Chain Spot Change Badge
                     if (payload && payload.change && payload.change_pct) {
@@ -3203,40 +3195,6 @@
                 }
             };
 
-            // Smart tick updater (automatically bypassed when WebSocket is connected; throttled fallback otherwise)
-            (function initSmartTickSync() {
-                let isFetching = false;
-                function fetchLiveTick() {
-                    // 1. If WebSocket is connected (live broker or emulator), skip HTTP polling completely (0 HTTP requests)
-                    if ((window.MarmotWS && window.MarmotWS.ws && window.MarmotWS.ws.readyState === WebSocket.OPEN) ||
-                        (window._DhanEmulatorWS && window._DhanEmulatorWS.readyState === WebSocket.OPEN)) {
-                        return;
-                    }
-                    if (isFetching || document.hidden) return;
-                    if (!document.getElementById('live-macro-spot-ltp') && !document.getElementById('live-option-chain-spot-ltp')) return;
-                    isFetching = true;
-                    fetch('/admins/dashboard/live/tick/?index=NIFTY')
-                        .then(function (res) { return res.json(); })
-                        .then(function (data) {
-                            isFetching = false;
-                            if (data && data.success && data.ltp) {
-                                const cleanLtp = parseFloat(String(data.ltp).replace(/,/g, ''));
-                                if (cleanLtp > 0 && window.updateLiveSpotDOM) {
-                                    window.updateLiveSpotDOM(cleanLtp, {
-                                        formatted_time: data.timestamp,
-                                        timestamp: data.timestamp,
-                                        change: data.change,
-                                        change_pct: data.change_pct
-                                    });
-                                }
-                            }
-                        })
-                        .catch(function () {
-                            isFetching = false;
-                        });
-                }
-                setInterval(fetchLiveTick, 2500);
-            })();
         })();
     </script>
 
@@ -3397,6 +3355,11 @@
                             speed: payload.speed || null
                         }
                     }));
+
+                    var ocLastUpEl = document.getElementById('option-chain-last-updated');
+                    if (ocLastUpEl && displayTs) {
+                        ocLastUpEl.textContent = displayTs;
+                    }
                 }
 
                 // ATM strike: recalculate and update badge

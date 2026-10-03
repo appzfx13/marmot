@@ -335,7 +335,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 	log.Printf("🚀 [StrategyWorker #%s] Autonomous Signal Loop started for %s (%s) [User #%s]\n",
 		taskID, strategyName, indexName, userID)
 
-	ticker := time.NewTicker(250 * time.Millisecond)
+	ticker := time.NewTicker(1000 * time.Millisecond)
 	defer ticker.Stop()
 
 	initialCapital := params.InitialCapital
@@ -491,10 +491,10 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				if !alreadyOpen && openPositionsCount < 6 {
 					// Use scored sweep limit price if provided; fall back to live LTP fetch.
 					fillPrice := sig.LimitPrice
-					if fillPrice <= 0 {
+					if fillPrice <= 0 || fillPrice > 2000 {
 						fillPrice = j.fetchOptionLTP(ctx, indexName, sig.TradingSymbol, spotPrice)
 					}
-					if fillPrice <= 0 {
+					if fillPrice <= 0 || fillPrice > 2000 {
 						fillPrice = 120.0
 					}
 
@@ -640,17 +640,19 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			}
 			isMarketOpen := isSegmentMarketOpen(segment)
 			if isMockMode(params.ExecutionMode) {
-				isMarketOpen = true
-			} else if !isMarketOpen && j.redisService != nil && j.redisService.Client != nil {
-				if val, err := j.redisService.Client.Get(ctx, "marmot:mock_feed:active").Result(); err == nil && val == "true" {
-					isMarketOpen = true
+				mockActive := false
+				if j.redisService != nil && j.redisService.Client != nil {
+					if val, err := j.redisService.Client.Get(ctx, "marmot:mock_feed:active").Result(); err == nil && val == "true" {
+						mockActive = true
+					}
 				}
+				isMarketOpen = mockActive || isMarketOpen
 			}
 			if !isMarketOpen {
-				// When market is closed, sleep evaluation to avoid CPU and log churn
-				if tickCounter%30 == 0 {
+				// When market/streamer is paused or closed, throttle evaluation to avoid CPU and Redis write churn
+				if tickCounter%10 == 0 {
 					spotPrice, _ = j.fetchSpotPrice(ctx, indexName)
-					j.saveTelemetry(ctx, userID, params.StrategyID, strategyName, false, "MARKET_CLOSED",
+					j.saveTelemetry(ctx, userID, params.StrategyID, strategyName, false, "PAUSED",
 						spotPrice, cashBalance, cashBalance, positions, orders, 0)
 				}
 				tickCounter++
@@ -1653,13 +1655,17 @@ func (j *StrategySignalJob) saveTelemetry(
 		return
 	}
 
-	// 1. User-level sandbox telemetry
+	// 1. User-level sandbox & mock telemetry
 	userKey := fmt.Sprintf("marmot:mock:telemetry:%s", userID)
 	_ = j.redisService.Client.Set(ctx, userKey, bytes, 30*time.Minute).Err()
+	sandboxUserKey := fmt.Sprintf("marmot:sandbox:telemetry:%s", userID)
+	_ = j.redisService.Client.Set(ctx, sandboxUserKey, bytes, 30*time.Minute).Err()
 
 	// 2. Strategy-level telemetry
 	stratKey := fmt.Sprintf("marmot:mock:telemetry:strategy:%d", strategyID)
 	_ = j.redisService.Client.Set(ctx, stratKey, bytes, 30*time.Minute).Err()
+	sandboxStratKey := fmt.Sprintf("marmot:sandbox:telemetry:strategy:%d", strategyID)
+	_ = j.redisService.Client.Set(ctx, sandboxStratKey, bytes, 30*time.Minute).Err()
 
 	// 3. WS Broadcast to active subscribers & general hub
 	if j.hub != nil {

@@ -103,9 +103,9 @@
                     <td>
                         <div class="fw-bold theme-text-main font-monospace d-flex align-items-center gap-1.5 flex-wrap">
                             <span>{{ ord.trading_symbol }}</span>
-                            {% if 'CALL' in ord.trading_symbol or ord.option_type == 'CALL' %}
+                            {% if 'CALL' in ord.trading_symbol or 'CE' in ord.trading_symbol or ord.option_type == 'CALL' or ord.option_type == 'CE' %}
                                 <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-1.5 py-0.5 fs-xs fw-bold font-monospace">CALL</span>
-                            {% elif 'PUT' in ord.trading_symbol or ord.option_type == 'PUT' %}
+                            {% elif 'PUT' in ord.trading_symbol or 'PE' in ord.trading_symbol or ord.option_type == 'PUT' or ord.option_type == 'PE' %}
                                 <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-1.5 py-0.5 fs-xs fw-bold font-monospace">PUT</span>
                             {% endif %}
                         </div>
@@ -117,11 +117,11 @@
                                 <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0.5 fw-bold fs-xs d-inline-flex align-items-center gap-1">
                                     <i class="bi bi-arrow-up-right"></i> BUY
                                 </span>
-                            {% elif ord.leg_name == 'SL_HIT' or 'SL' in ord.leg_name or 'SL' in ord.trigger_reason %}
+                            {% elif ord.leg_name == 'SL_HIT' or ord.leg_name and 'SL' in ord.leg_name or ord.trigger_reason and 'SL' in ord.trigger_reason %}
                                 <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-35 rounded-pill px-2 py-0.5 fw-bold fs-xs d-inline-flex align-items-center gap-1 shadow-sm" title="Stop-Loss Hit Triggered by Broker OMS">
                                     <i class="bi bi-shield-x"></i> SL HIT (SELL)
                                 </span>
-                            {% elif ord.leg_name == 'TP_HIT' or 'TP' in ord.leg_name or 'TP' in ord.trigger_reason %}
+                            {% elif ord.leg_name == 'TP_HIT' or ord.leg_name and 'TP' in ord.leg_name or ord.trigger_reason and 'TP' in ord.trigger_reason %}
                                 <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-35 rounded-pill px-2 py-0.5 fw-bold fs-xs d-inline-flex align-items-center gap-1 shadow-sm" title="Take-Profit Target Hit Triggered by Broker OMS">
                                     <i class="bi bi-trophy"></i> TP HIT (SELL)
                                 </span>
@@ -141,6 +141,11 @@
                     </td>
                     <td class="text-end font-monospace small">
                         <div class="fw-bold text-white">₹{{ ord.limit_entry_price|default:ord.price|floatformat:2 }}</div>
+                        {% if ord.indicators and ord.indicators.spot_price %}
+                            <div class="smaller font-monospace text-info opacity-75">Spot: ₹{{ ord.indicators.spot_price|floatformat:1 }}</div>
+                        {% elif ord.entry_spot and ord.entry_spot > 0 %}
+                            <div class="smaller font-monospace text-info opacity-75">Spot: ₹{{ ord.entry_spot|floatformat:1 }}</div>
+                        {% endif %}
                         <div class="theme-text-muted smaller">Tap: {{ ord.limit_tapped_time|default:ord.create_time|format_precise_time }}</div>
                     </td>
                     <td class="text-center">
@@ -185,8 +190,8 @@
                             </span>
                         {% endif %}
                         {% if ord.trigger_reason or ord.leg_name %}
-                            <div class="smaller mt-0.5 font-monospace {% if 'SL' in ord.leg_name or 'SL' in ord.trigger_reason %}text-danger{% else %}text-info{% endif %}" title="{{ ord.trigger_reason|default:ord.leg_name }}">
-                                <i class="bi {% if 'SL' in ord.leg_name or 'SL' in ord.trigger_reason %}bi-shield-exclamation{% else %}bi-flag{% endif %} me-0.5"></i>{{ ord.trigger_reason|default:ord.leg_name }}
+                            <div class="smaller mt-0.5 font-monospace {% if ord.leg_name and 'SL' in ord.leg_name or ord.trigger_reason and 'SL' in ord.trigger_reason %}text-danger{% else %}text-info{% endif %}" title="{{ ord.trigger_reason|default:ord.leg_name }}">
+                                <i class="bi {% if ord.leg_name and 'SL' in ord.leg_name or ord.trigger_reason and 'SL' in ord.trigger_reason %}bi-shield-exclamation{% else %}bi-flag{% endif %} me-0.5"></i>{{ ord.trigger_reason|default:ord.leg_name }}
                             </div>
                         {% elif ord.oms_error_desc %}
                             <div class="text-danger smaller text-truncate" style="max-width: 150px;" title="{{ ord.oms_error_desc }}">
