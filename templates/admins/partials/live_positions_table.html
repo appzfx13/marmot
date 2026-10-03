@@ -15,16 +15,6 @@
             </span>
             <div class="d-flex align-items-center gap-2 flex-wrap">
                 <button type="button" 
-                        class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'ALL' or not filter_status %}active-all{% endif %}"
-                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=ALL{% if env_mode == 'MOCK' or is_mock_mode %}&env=MOCK{% endif %}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
-                        hx-target="#live-positions-container"
-                        hx-swap="outerHTML">
-                    <i class="bi bi-layers"></i>
-                    <span>All</span>
-                    <span class="filter-count-badge font-monospace">{{ all_positions_count|default:live_positions|length }}</span>
-                </button>
-
-                <button type="button" 
                         class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'OPEN' %}active-open{% endif %}"
                         hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=OPEN{% if env_mode == 'MOCK' or is_mock_mode %}&env=MOCK{% endif %}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
                         hx-target="#live-positions-container"
@@ -43,21 +33,31 @@
                     <span>Closed</span>
                     <span class="filter-count-badge font-monospace">{{ closed_positions_count|default:"0" }}</span>
                 </button>
+
+                <button type="button" 
+                        class="filter-pill-btn rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm text-decoration-none border transition-all {% if filter_status == 'ALL' or not filter_status %}active-all{% endif %}"
+                        hx-get="{{ positions_partial_url|default:'/admins/dashboard/live/positions/' }}?status=ALL{% if env_mode == 'MOCK' or is_mock_mode %}&env=MOCK{% endif %}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}{% if selected_strategy_id and selected_strategy_id != 'ALL' %}&strategy_id={{ selected_strategy_id }}{% endif %}"
+                        hx-target="#live-positions-container"
+                        hx-swap="outerHTML">
+                    <i class="bi bi-layers"></i>
+                    <span>All</span>
+                    <span class="filter-count-badge font-monospace">{% if all_positions_count %}{{ all_positions_count }}{% else %}{{ open_positions_count|default:"0"|add:closed_positions_count|default:"0" }}{% endif %}</span>
+                </button>
             </div>
         </div>
 
         <div class="d-flex align-items-center gap-3 flex-wrap">
             <div class="d-flex align-items-center gap-2 small">
                 <span class="theme-text-muted">Realized:</span>
-                <span class="fw-bold font-monospace {% if realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">₹{{ realized_pnl|floatformat:2 }}</span>
+                <span id="live-positions-realized-pnl" class="fw-bold font-monospace {% if realized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">₹{{ realized_pnl|floatformat:2 }}</span>
             </div>
             <div class="d-flex align-items-center gap-2 small">
                 <span class="theme-text-muted">Unrealized:</span>
-                <span class="fw-bold font-monospace {% if unrealized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">₹{{ unrealized_pnl|floatformat:2 }}</span>
+                <span id="live-positions-unrealized-pnl" class="fw-bold font-monospace {% if unrealized_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">₹{{ unrealized_pnl|floatformat:2 }}</span>
             </div>
             <div class="d-flex align-items-center gap-2 small ps-2 border-start border-secondary border-opacity-25">
                 <span class="theme-text-muted">Net P&amp;L:</span>
-                <span class="fw-bold fs-6 font-monospace {% if live_net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">₹{{ live_net_pnl|floatformat:2 }}</span>
+                <span id="live-positions-net-pnl" class="fw-bold fs-6 font-monospace {% if live_net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">₹{{ live_net_pnl|floatformat:2 }}</span>
             </div>
             <button type="button" 
                     class="btn-date-picker text-decoration-none shadow-sm px-2.5 py-1.5"
@@ -91,7 +91,7 @@
             </thead>
             <tbody>
                 {% for pos in live_positions %}
-                <tr data-symbol="{{ pos.trading_symbol }}" data-pnl="{{ pos.total_pnl|default:pos.unrealized_profit|default:0 }}" data-ltp="{{ pos.current_ltp|default:0 }}">
+                <tr data-symbol="{{ pos.trading_symbol }}" data-status="{{ pos.status }}" data-buy-avg="{{ pos.buy_avg|default:0 }}" data-qty="{{ pos.net_qty|default:0 }}" data-pnl="{{ pos.total_pnl|default:pos.unrealized_profit|default:0 }}" data-ltp="{{ pos.current_ltp|default:0 }}" class="{% if pos.status == 'OPEN' %}table-active border-start border-3 border-success{% endif %}">
                     <td>
                         <div class="fw-bold theme-text-main font-monospace d-flex align-items-center gap-1.5 flex-wrap">
                             <span>{{ pos.trading_symbol }}</span>
@@ -147,11 +147,11 @@
                     <td class="text-end font-monospace small {% if pos.realized_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
                         ₹{{ pos.realized_profit|floatformat:2 }}
                     </td>
-                    <td id="pos-unrealized-{{ forloop.counter }}" class="text-end font-monospace small pos-live-unrealized {% if pos.unrealized_profit >= 0 %}text-success{% else %}text-danger{% endif %}">
-                        ₹{{ pos.unrealized_profit|floatformat:2 }}
+                    <td id="pos-unrealized-{{ forloop.counter }}" class="text-end font-monospace small pos-live-unrealized {% if pos.unrealized_profit >= 0 %}text-success{% else %}text-danger{% endif %}" data-symbol="{{ pos.trading_symbol }}">
+                        {% if pos.unrealized_profit >= 0 %}+{% endif %}₹{{ pos.unrealized_profit|floatformat:2 }}
                     </td>
-                    <td id="pos-total-{{ forloop.counter }}" class="text-end font-monospace fw-bold fs-6 pos-live-total {% if pos.total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
-                        ₹{{ pos.total_pnl|floatformat:2 }}
+                    <td id="pos-total-{{ forloop.counter }}" class="text-end font-monospace fw-bold fs-6 pos-live-total {% if pos.total_pnl >= 0 %}text-success{% else %}text-danger{% endif %}" data-symbol="{{ pos.trading_symbol }}">
+                        {% if pos.total_pnl >= 0 %}+{% endif %}₹{{ pos.total_pnl|floatformat:2 }}
                     </td>
                     <td class="text-end pe-3">
                         {% if pos.status == 'OPEN' and pos.net_qty != 0 %}

@@ -9,6 +9,16 @@
                 zero broker friction.</p>
         </div>
         <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap ms-md-auto">
+            <button type="button" 
+                    class="btn btn-outline-danger rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    style="font-size: 0.8rem;"
+                    hx-post="{% url 'admins:admin-sandbox-clear-session' %}"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-swap="none"
+                    hx-confirm="Are you sure you want to clear all sandbox simulated positions, orders, and restore starting capital (₹1,00,000)?">
+                <i class="bi bi-trash3"></i>
+                <span>Clear Session</span>
+            </button>
             <span class="badge rounded-pill px-3 py-2 fw-semibold d-inline-flex align-items-center gap-2 shadow-sm"
                 style="background: rgba(16, 185, 129, 0.10); border: 1px solid rgba(16, 185, 129, 0.30); color: #34d399; backdrop-filter: blur(12px); font-size: 0.82rem; font-family: var(--font-sans, inherit);">
                 <span class="spinner-grow spinner-grow-sm" style="width: 0.45rem; height: 0.45rem; color: #34d399;"
@@ -284,21 +294,31 @@
             // 0-Latency Micro-Updates for Open Positions in Table
             if (payload.positions && payload.positions.length > 0) {
                 payload.positions.forEach(function (pos, idx) {
-                    const ltpEl = document.getElementById('pos-ltp-' + (idx + 1));
-                    if (ltpEl && pos.current_ltp) {
-                        ltpEl.textContent = '₹' + parseFloat(pos.current_ltp).toFixed(2);
+                    const sym = (pos.trading_symbol || '').trim();
+                    let row = null;
+                    if (sym) {
+                        row = document.querySelector('#live-positions-container tbody tr[data-symbol="' + sym + '"]');
                     }
-                    const unrlEl = document.getElementById('pos-unrealized-' + (idx + 1));
-                    if (unrlEl && pos.unrealized_profit !== undefined) {
-                        const u = parseFloat(pos.unrealized_profit) || 0;
-                        unrlEl.textContent = (u >= 0 ? '+₹' : '-₹') + Math.abs(u).toFixed(2);
-                        unrlEl.className = 'text-end font-monospace small pos-live-unrealized ' + (u >= 0 ? 'text-success' : 'text-danger');
+                    if (!row) {
+                        row = document.querySelector('#live-positions-container tbody tr:nth-child(' + (idx + 1) + ')');
                     }
-                    const totEl = document.getElementById('pos-total-' + (idx + 1));
-                    if (totEl && pos.total_pnl !== undefined) {
-                        const t = parseFloat(pos.total_pnl) || 0;
-                        totEl.textContent = (t >= 0 ? '+₹' : '-₹') + Math.abs(t).toFixed(2);
-                        totEl.className = 'text-end font-monospace fw-bold fs-6 pos-live-total ' + (t >= 0 ? 'text-success' : 'text-danger');
+                    if (row) {
+                        const ltpEl = row.querySelector('.pos-live-ltp');
+                        if (ltpEl && pos.current_ltp) {
+                            ltpEl.textContent = '₹' + parseFloat(pos.current_ltp).toFixed(2);
+                        }
+                        const unrlEl = row.querySelector('.pos-live-unrealized');
+                        if (unrlEl && pos.unrealized_profit !== undefined) {
+                            const u = parseFloat(pos.unrealized_profit) || 0;
+                            unrlEl.textContent = (u >= 0 ? '+₹' : '-₹') + Math.abs(u).toFixed(2);
+                            unrlEl.className = 'text-end font-monospace small pos-live-unrealized ' + (u >= 0 ? 'text-success' : 'text-danger');
+                        }
+                        const totEl = row.querySelector('.pos-live-total');
+                        if (totEl && pos.total_pnl !== undefined) {
+                            const t = parseFloat(pos.total_pnl) || 0;
+                            totEl.textContent = (t >= 0 ? '+₹' : '-₹') + Math.abs(t).toFixed(2);
+                            totEl.className = 'text-end font-monospace fw-bold fs-6 pos-live-total ' + (t >= 0 ? 'text-success' : 'text-danger');
+                        }
                     }
                 });
                 console.log('📋 [SandboxUI:Positions] Micro-updated table rows for ' + payload.positions.length + ' active position(s)');

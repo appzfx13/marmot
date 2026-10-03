@@ -16,6 +16,8 @@ type StrategyConfig struct {
 	RequireExpiryDay bool
 	TrailBreakeven   bool
 	BreakevenAtR     float64 // trail SL to entry when profit >= X * initial risk
+	TSL2_At_R        float64 // trail SL to TSL2_Lock_R when profit >= X * initial risk
+	TSL2_Lock_R      float64 // lock in Y * initial risk
 	CooldownSeconds  int
 	OrderType        string // "MARKET" or "LIMIT"
 	Description      string

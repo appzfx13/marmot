@@ -2720,8 +2720,56 @@
 
                     if (incStrike && rawStrike && incStrike === rawStrike && ((isIncCE && isRawCE) || (isIncPE && isRawPE))) {
                         el.textContent = '₹' + ltpFloat.toFixed(2);
+                        const row = el.closest('tr');
+                        if (row && row.getAttribute('data-status') === 'OPEN') {
+                            const buyAvg = parseFloat(row.getAttribute('data-buy-avg')) || 0;
+                            const qty = parseInt(row.getAttribute('data-qty')) || 0;
+                            if (qty > 0 && buyAvg > 0) {
+                                const unrl = Math.round((ltpFloat - buyAvg) * qty * 100) / 100;
+                                const unrlEl = row.querySelector('.pos-live-unrealized');
+                                if (unrlEl) {
+                                    unrlEl.textContent = (unrl >= 0 ? '+₹' : '-₹') + Math.abs(unrl).toFixed(2);
+                                    unrlEl.className = 'text-end font-monospace small pos-live-unrealized ' + (unrl >= 0 ? 'text-success' : 'text-danger');
+                                }
+                                const totEl = row.querySelector('.pos-live-total');
+                                if (totEl) {
+                                    totEl.textContent = (unrl >= 0 ? '+₹' : '-₹') + Math.abs(unrl).toFixed(2);
+                                    totEl.className = 'text-end font-monospace fw-bold fs-6 pos-live-total ' + (unrl >= 0 ? 'text-success' : 'text-danger');
+                                }
+                                row.setAttribute('data-ltp', ltpFloat.toFixed(2));
+                                row.setAttribute('data-pnl', unrl.toFixed(2));
+                            }
+                        }
                     }
                 });
+
+                let totalUnrealized = 0;
+                let hasOpen = false;
+                document.querySelectorAll('#live-positions-container tbody tr[data-status="OPEN"]').forEach(function(r) {
+                    hasOpen = true;
+                    const p = parseFloat(r.getAttribute('data-pnl')) || 0;
+                    totalUnrealized += p;
+                });
+                if (hasOpen) {
+                    const unrlHeaderEl = document.getElementById('live-positions-unrealized-pnl');
+                    if (unrlHeaderEl) {
+                        unrlHeaderEl.textContent = (totalUnrealized >= 0 ? '+₹' : '-₹') + Math.abs(totalUnrealized).toFixed(2);
+                        unrlHeaderEl.className = 'fw-bold font-monospace ' + (totalUnrealized >= 0 ? 'text-success' : 'text-danger');
+                    }
+                    const unrlCardEl = document.getElementById('sandbox-unrealized-pnl');
+                    if (unrlCardEl) {
+                        unrlCardEl.textContent = (totalUnrealized >= 0 ? '+₹' : '-₹') + Math.abs(totalUnrealized).toFixed(2);
+                        unrlCardEl.className = 'fw-bold fs-5 font-monospace ' + (totalUnrealized >= 0 ? 'text-success' : 'text-danger');
+                    }
+                    const realHeaderEl = document.getElementById('live-positions-realized-pnl');
+                    const realVal = realHeaderEl ? (parseFloat(realHeaderEl.textContent.replace(/[^\d.-]/g, '')) || 0) : 0;
+                    const netHeaderEl = document.getElementById('live-positions-net-pnl');
+                    if (netHeaderEl) {
+                        const net = realVal + totalUnrealized;
+                        netHeaderEl.textContent = (net >= 0 ? '+₹' : '-₹') + Math.abs(net).toFixed(2);
+                        netHeaderEl.className = 'fw-bold fs-6 font-monospace ' + (net >= 0 ? 'text-success' : 'text-danger');
+                    }
+                }
             };
 
             window.MarmotWS = {
@@ -3572,6 +3620,9 @@
                     }
                     if (strike > 0 && ltp > 0) {
                         updateStrikeLTP(strike, optType, ltp);
+                        if (window.updateLiveOptionContractsDOM) {
+                            window.updateLiveOptionContractsDOM(sym || (strike + ' ' + optType), ltp);
+                        }
                     }
                     var oi = parseInt(data.oi || data.OI || data.openInterest || 0, 10);
                     if (strike > 0 && oi > 0) {

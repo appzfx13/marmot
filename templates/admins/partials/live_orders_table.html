@@ -149,6 +149,7 @@
                         <div class="theme-text-muted smaller">Tap: {{ ord.limit_tapped_time|default:ord.create_time|format_precise_time }}</div>
                     </td>
                     <td class="text-center">
+                        {% if ord.transaction_type == 'BUY' %}
                         <div class="d-flex flex-column align-items-center gap-1">
                             <span class="badge bg-danger bg-opacity-15 text-danger border border-danger border-opacity-25 rounded-pill px-2 py-0.5 smaller font-monospace">
                                 SL: ₹{{ ord.stop_loss_price|default:ord.price|floatformat:1 }}
@@ -157,6 +158,9 @@
                                 TP: ₹{{ ord.target_price|default:ord.price|floatformat:1 }}
                             </span>
                         </div>
+                        {% else %}
+                        <span class="text-muted small">&mdash;</span>
+                        {% endif %}
                     </td>
                     <td class="text-end font-monospace small">
                         <div class="fw-bold text-success">₹{{ ord.price|floatformat:2 }}</div>

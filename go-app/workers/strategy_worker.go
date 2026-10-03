@@ -284,6 +284,7 @@ type SimulatedOrder struct {
 	StopLossPrice        float64                `json:"stop_loss_price,omitempty"`
 	InitialTargetPrice   float64                `json:"initial_target_price,omitempty"`
 	InitialStopLossPrice float64                `json:"initial_stop_loss_price,omitempty"`
+	TrailingStage        int                    `json:"trailing_stage,omitempty"`
 	CurrentLTP           float64                `json:"current_ltp,omitempty"`
 	RuleID          int                    `json:"rule_id,omitempty"`
 	RuleName        string                 `json:"rule_name,omitempty"`
@@ -331,6 +332,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 		log.Printf("❌ [StrategyWorker #%s] Strategy '%s' not registered\n", taskID, strategyName)
 		return
 	}
+	stratParams := strategies.GetStrategyPreset(strategyName)
 
 	log.Printf("🚀 [StrategyWorker #%s] Autonomous Signal Loop started for %s (%s) [User #%s]\n",
 		taskID, strategyName, indexName, userID)
@@ -678,6 +680,25 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						orders[k].OrderStatus = "TRADED"
 						orders[k].ExecutionTime = nowIST().Format("03:04:05 PM")
 						orders[k].FilledQty = orders[k].Quantity
+						
+						diff := orders[k].LimitEntryPrice - orders[k].CurrentLTP
+						orders[k].Price = orders[k].CurrentLTP
+						
+						// Recalculate SL and TP distances based on actual fill price improvement
+						if diff > 0 {
+							orders[k].StopLossPrice -= diff
+							orders[k].TargetPrice -= diff
+							orders[k].InitialStopLossPrice -= diff
+							orders[k].InitialTargetPrice -= diff
+							
+							// Ensure SL doesn't go below minimum tick 0.05
+							if orders[k].StopLossPrice < 0.05 {
+								orders[k].StopLossPrice = 0.05
+							}
+							if orders[k].InitialStopLossPrice < 0.05 {
+								orders[k].InitialStopLossPrice = 0.05
+							}
+						}
 
 						newPos := SimulatedPosition{
 							TradingSymbol:    orders[k].TradingSymbol,
@@ -734,11 +755,52 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 					positions[i].TotalPnL = posPnl
 
 					var sl, tp float64
-					for _, o := range orders {
+					var activeOrderIdx = -1
+					for idx, o := range orders {
 						if o.TradingSymbol == positions[i].TradingSymbol && o.TransactionType == "BUY" && o.OrderStatus == "TRADED" {
 							sl = o.StopLossPrice
 							tp = o.TargetPrice
+							activeOrderIdx = idx
 							break
+						}
+					}
+
+					// Dynamic TSL Evaluation
+					if activeOrderIdx != -1 {
+						o := &orders[activeOrderIdx]
+						initialRisk := o.Price - o.InitialStopLossPrice
+						if initialRisk > 0 {
+							profitPts := positions[i].CurrentLTP - o.Price
+							profitR := profitPts / initialRisk
+
+							// Evaluate TSL 2
+							if stratParams.TSL2_At_R > 0 && o.TrailingStage < 2 {
+								if profitR >= stratParams.TSL2_At_R {
+									newSL := o.Price + (initialRisk * stratParams.TSL2_Lock_R)
+									if newSL > o.StopLossPrice {
+										o.StopLossPrice = newSL
+										o.TrailingStage = 2
+										sl = newSL
+										log.Printf("📈 [StrategyWorker #%s] TSL2 Activated! SL trailed to ₹%.2f (%.1fR locked)", taskID, newSL, stratParams.TSL2_Lock_R)
+									}
+								}
+							}
+							
+							// Evaluate TSL 1 (Breakeven)
+							threshold := stratParams.BreakevenAtR
+							if threshold == 0 && stratParams.TrailBreakeven {
+								threshold = 1.5 // fallback
+							}
+							if threshold > 0 && o.TrailingStage < 1 {
+								if profitR >= threshold {
+									if o.Price > o.StopLossPrice {
+										o.StopLossPrice = o.Price
+										o.TrailingStage = 1
+										sl = o.Price
+										log.Printf("📈 [StrategyWorker #%s] TSL1 Activated! SL trailed to breakeven @ ₹%.2f", taskID, o.Price)
+									}
+								}
+							}
 						}
 					}
 
@@ -796,8 +858,19 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						triggerReason := ""
 						if positions[i].CurrentLTP <= sl {
 							triggerReason = "SL Hit"
+							if activeOrderIdx != -1 {
+								if orders[activeOrderIdx].TrailingStage == 1 {
+									triggerReason = "TSL 1 Hit"
+								} else if orders[activeOrderIdx].TrailingStage >= 2 {
+									triggerReason = "TSL 2 Hit"
+								}
+							}
 						} else if positions[i].CurrentLTP >= tp {
 							triggerReason = "TP Hit"
+						}
+						
+						if triggerReason == "SL Hit" && posPnl >= 0 {
+							triggerReason = "Breakeven Exit"
 						}
 
 						if triggerReason != "" {

@@ -226,10 +226,19 @@ class MockBrokerPnLService:
                 gross_pnl = (exit_price - entry_price) * qty
                 charges = cls.BROKERAGE_PER_LEG * 2
                 net_pnl = gross_pnl - charges
-                leg_name = sell_payload.get('legName') or sell_payload.get('leg_name') or ''
-                exit_reason = leg_name if leg_name in ('SL_HIT', 'TP_HIT') else 'SQUAREOFF'
+                leg_name = str(sell_payload.get('legName') or sell_payload.get('leg_name') or '')
+                if gross_pnl > 0:
+                    exit_reason = 'TRAILING_SL' if 'SL' in leg_name.upper() else 'TP_HIT'
+                elif gross_pnl < 0:
+                    exit_reason = 'SL_HIT'
+                else:
+                    exit_reason = 'SQUAREOFF'
                 entry_dt = buy_leg.created_at
                 exit_dt = sell_leg.created_at
+                feed_entry_raw = str(buy_payload.get('logicalTimestamp') or buy_payload.get('exchangeTime') or buy_payload.get('createTime') or '')
+                feed_exit_raw = str(sell_payload.get('logicalTimestamp') or sell_payload.get('exchangeTime') or sell_payload.get('createTime') or '')
+                feed_entry = feed_entry_raw if feed_entry_raw else (entry_dt.strftime('%d %b %H:%M:%S') if entry_dt else '—')
+                feed_exit = feed_exit_raw if feed_exit_raw else (exit_dt.strftime('%d %b %H:%M:%S') if exit_dt else '—')
                 duration_secs = int((exit_dt - entry_dt).total_seconds()) if exit_dt and entry_dt else 0
                 trades.append({
                     'symbol': buy_leg.symbol or sell_leg.symbol or '',
@@ -242,11 +251,16 @@ class MockBrokerPnLService:
                     'exit_reason': exit_reason,
                     'entry_time': entry_dt,
                     'exit_time': exit_dt,
+                    'feed_entry_time': feed_entry,
+                    'feed_exit_time': feed_exit,
                     'trade_date': entry_dt.date() if entry_dt else None,
                     'duration_secs': duration_secs,
                     'is_winner': net_pnl > 0,
+                    'trade_id': f"{buy_leg.id}_{sell_leg.id}",
                 })
         trades.sort(key=lambda t: t['entry_time'] or '', reverse=True)
+        for idx, t in enumerate(trades):
+            t['serial_no'] = len(trades) - idx
         return trades
 
     @classmethod

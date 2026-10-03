@@ -54,8 +54,8 @@
                 <tr>
                     <th scope="col" class="ps-2">#</th>
                     <th scope="col">Trading Symbol</th>
-                    <th scope="col">Entry Time</th>
-                    <th scope="col">Exit Time</th>
+                    <th scope="col">Entry Time (Feed)</th>
+                    <th scope="col">Exit Time (Feed)</th>
                     <th scope="col" class="text-end">Entry (₹)</th>
                     <th scope="col" class="text-end">Exit (₹)</th>
                     <th scope="col" class="text-center">Qty</th>
@@ -63,7 +63,8 @@
                     <th scope="col" class="text-end">Charges</th>
                     <th scope="col" class="text-end">Net PnL</th>
                     <th scope="col" class="text-center">Exit Reason</th>
-                    <th scope="col" class="text-center pe-2">Duration</th>
+                    <th scope="col" class="text-center">Duration</th>
+                    <th scope="col" class="text-center pe-2">Chart</th>
                 </tr>
             </thead>
             <tbody>
@@ -74,10 +75,10 @@
                         <span class="font-monospace">{{ trade.symbol }}</span>
                     </td>
                     <td class="font-monospace text-muted" style="font-size: 0.8rem;">
-                        {{ trade.entry_time|date:"d M H:i:s"|default:"—" }}
+                        {{ trade.feed_entry_time|default:trade.entry_time|date:"d M H:i:s" }}
                     </td>
                     <td class="font-monospace text-muted" style="font-size: 0.8rem;">
-                        {{ trade.exit_time|date:"d M H:i:s"|default:"—" }}
+                        {{ trade.feed_exit_time|default:trade.exit_time|date:"d M H:i:s" }}
                     </td>
                     <td class="text-end font-monospace theme-text-main">
                         ₹{{ trade.entry_price|floatformat:2 }}
@@ -104,6 +105,10 @@
                         <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
                             TP HIT
                         </span>
+                        {% elif trade.exit_reason == 'TRAILING_SL' or trade.exit_reason == 'TRAILING_SL_HIT' %}
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
+                            TRAILING SL
+                        </span>
                         {% elif trade.exit_reason == 'SL_HIT' %}
                         <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
                             SL HIT
@@ -114,7 +119,7 @@
                         </span>
                         {% endif %}
                     </td>
-                    <td class="text-center pe-2 font-monospace text-muted" style="font-size: 0.78rem;">
+                    <td class="text-center font-monospace text-muted" style="font-size: 0.78rem;">
                         {% if trade.duration_secs < 60 %}
                             {{ trade.duration_secs }}s
                         {% elif trade.duration_secs < 3600 %}
@@ -122,6 +127,19 @@
                         {% else %}
                             {% widthratio trade.duration_secs 3600 1 %}h
                         {% endif %}
+                    </td>
+                    <td class="text-center pe-2">
+                        <button type="button"
+                                class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-0.5 smaller fw-semibold d-inline-flex align-items-center gap-1 shadow-sm"
+                                hx-get="{% url 'admins:admin-mock-trade-chart' forloop.counter %}"
+                                hx-target="#globalHtmxModalDialog"
+                                hx-swap="innerHTML"
+                                data-bs-toggle="modal"
+                                data-bs-target="#globalHtmxModal"
+                                title="View Candlestick Trade Chart">
+                            <i class="bi bi-graph-up"></i>
+                            <span>Chart</span>
+                        </button>
                     </td>
                 </tr>
                 {% empty %}

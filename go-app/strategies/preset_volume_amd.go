@@ -14,6 +14,8 @@ var VolumeAMDPreset = StrategyConfig{
 	UseORBFilter:    false,
 	TrailBreakeven:  true,
 	BreakevenAtR:    1.5,
+	TSL2_At_R:       2.0,
+	TSL2_Lock_R:     1.0,
 	CooldownSeconds: 300,
 	OrderType:       "LIMIT",
 	Description:     "Volume + AMD liquidity sweep strategy. High volume absorption wick at accumulation extremes triggers 1:2.5 distribution entry.",

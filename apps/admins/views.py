@@ -697,6 +697,31 @@ class AdminMockBrokerTradesView(LoginRequiredMixin, AdminRequiredMixin, View):
         return render(request, 'admins/partials/mock_broker_trades_table.html', context)
 
 
+class AdminMockTradeChartView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Interactive Dual Candlestick Chart View for a closed Mock Broker trade pair."""
+
+    def get(self, request, serial_no, *args, **kwargs):
+        from apps.postback.services import MockBrokerPnLService
+        from django.http import Http404
+        all_trades = MockBrokerPnLService.get_session_trades(user=None)
+        target_trade = None
+        s_no = int(serial_no)
+        for t in all_trades:
+            if t.get('serial_no') == s_no:
+                target_trade = t
+                break
+        if not target_trade and 0 < s_no <= len(all_trades):
+            target_trade = all_trades[s_no - 1]
+        if not target_trade:
+            raise Http404("Trade not found")
+
+        context = {
+            'trade': target_trade,
+            'serial_no': serial_no,
+        }
+        return render(request, 'admins/partials/mock_trade_chart_modal.html', context)
+
+
 class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Dispatches streamer and account actions directly to Dhan Emulator."""
 
@@ -1406,7 +1431,7 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
         # Invalidate Redis telemetry cache and mock session data
         try:
             from apps.market.services import redis_client
-            for pattern in ('marmot:dhan:live_summary:*', 'marmot:admins:mock_broker_meta', 'marmot:mock:telemetry:*'):
+            for pattern in ('marmot:dhan:live_summary:*', 'marmot:admins:mock_broker_meta', 'marmot:mock:telemetry:*', 'marmot:sandbox:telemetry:*'):
                 for key in redis_client.scan_iter(match=pattern):
                     redis_client.delete(key)
         except Exception as r_err:
@@ -1420,7 +1445,7 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
             logger.debug("PostbackLog mock clear error: %s", p_err)
 
         toast_msg = (
-            'Mock orders, positions, and trades have been reset. Initial balance restored.'
+            'Sandbox & Mock orders, positions, and trades have been reset. Starting balance restored.'
             if is_success else
             'Reset signal dispatched, but mock broker took longer to acknowledge. Refreshing telemetry...'
         )
@@ -1428,12 +1453,14 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
         resp['HX-Trigger'] = json.dumps({
             'brokerOrderUpdate': True,
             'reloadLiveDashboard': True,
+            'reloadSandboxDashboard': True,
             'reloadMockBroker': True,
             'reloadLivePositions': True,
             'reloadLiveOrders': True,
+            'reloadSandboxOrders': True,
             'reloadLiveStrategies': True,
             'showToast': {
-                'title': 'Mock Session Reset' if is_success else 'Session Reset Dispatched',
+                'title': 'Session Reset' if is_success else 'Session Reset Dispatched',
                 'message': toast_msg,
                 'type': 'success' if is_success else 'warning',
             }
@@ -1703,6 +1730,7 @@ def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=N
                     redis_client.set(target_key, json.dumps(data_obj), ex=86400)
                 except Exception:
                     pass
+            enriched_list.sort(key=lambda p: (0 if str(p.get('status', '')).upper() == 'OPEN' else 1, -float(p.get('total_pnl', 0.0) or 0.0)))
             return enriched_list
     except Exception:
         pass
@@ -1886,10 +1914,21 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         traded_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() == 'TRADED')
 
         acc_summary = sandbox_account.account_summary or {}
-        acc_init_capital = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 1000000.00)
+        acc_init_capital = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 100000.00)
         base_capital = float(selected_strategy.allocated_capital or 100000.00) if selected_strategy else acc_init_capital
         margin_used = sum(float(p.get('buy_avg', 0.0)) * int(p.get('net_qty', 0)) for p in raw_pos if p.get('status') == 'OPEN')
         avail_margin = base_capital - margin_used + realized_pnl
+        try:
+            import requests
+            r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=0.8)
+            if r_acc.status_code == 200:
+                acc_data = r_acc.json()
+                if acc_data.get('available_balance') is not None:
+                    avail_margin = float(acc_data['available_balance'])
+                if acc_data.get('sod_limit'):
+                    base_capital = float(acc_data['sod_limit'])
+        except Exception:
+            pass
 
         context['is_sandbox'] = True
         context['is_mock_mode'] = True
@@ -1917,10 +1956,10 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
 
         base_cards_url = reverse('admins:admin-sandbox-cards-partial')
         context['cards_partial_url'] = base_cards_url
-        context['available_margin'] = telemetry_summary.get('available_margin', f"{avail_margin:,.2f}")
-        context['cash_balance'] = telemetry_summary.get('cash', f"{base_capital:,.2f}")
+        context['available_margin'] = f"{avail_margin:,.2f}"
+        context['cash_balance'] = f"{base_capital:,.2f}"
         context['collateral'] = "0.00"
-        context['margin_utilized'] = telemetry_summary.get('margin_utilized', f"{margin_used:,.2f}")
+        context['margin_utilized'] = f"{margin_used:,.2f}"
         context['live_net_pnl'] = net_pnl
         context['realized_pnl'] = realized_pnl
         context['unrealized_pnl'] = unrealized_pnl
@@ -1935,6 +1974,7 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         context['holdings_pnl_pct'] = (unrealized_pnl / margin_used * 100.0) if margin_used > 0 else 0.00
         context['holdings_count'] = open_cnt
 
+        raw_pos.sort(key=lambda p: (0 if str(p.get('status', '')).upper() == 'OPEN' else 1, -float(p.get('total_pnl', 0.0) or 0.0)))
         context['all_positions_count'] = len(raw_pos)
         pos_paginator = Paginator(raw_pos, 10)
         context['live_positions'] = pos_paginator.page(1).object_list
@@ -2106,10 +2146,21 @@ class AdminSandboxCardsPartialView(LoginRequiredMixin, AdminRequiredMixin, View)
         traded_ord_cnt = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() == 'TRADED')
 
         acc_summary = sandbox_account.account_summary if sandbox_account else {}
-        acc_init_capital = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 1000000.00)
+        acc_init_capital = float(acc_summary.get('balance') or acc_summary.get('initial_capital') or 100000.00)
         base_capital = float(selected_strategy.allocated_capital or 100000.00) if selected_strategy else acc_init_capital
         margin_used = sum(float(p.get('buy_avg', 0.0)) * int(p.get('net_qty', 0)) for p in raw_pos if p.get('status') == 'OPEN')
         avail_margin = base_capital - margin_used + realized_pnl
+        try:
+            import requests
+            r_acc = requests.get('http://mock_broker:8088/mock/v2/active-account', timeout=0.8)
+            if r_acc.status_code == 200:
+                acc_data = r_acc.json()
+                if acc_data.get('available_balance') is not None:
+                    avail_margin = float(acc_data['available_balance'])
+                if acc_data.get('sod_limit'):
+                    base_capital = float(acc_data['sod_limit'])
+        except Exception:
+            pass
 
         query_params = []
         if strategy_id_param and strategy_id_param != 'ALL':
@@ -2127,10 +2178,10 @@ class AdminSandboxCardsPartialView(LoginRequiredMixin, AdminRequiredMixin, View)
             'selected_account_id': str(sandbox_account.id) if sandbox_account else '',
             'sandbox_account': sandbox_account,
             'broker_name': 'SANDBOX PAPER BROKER',
-            'available_margin': telemetry_summary.get('available_margin', f"{avail_margin:,.2f}"),
-            'cash_balance': telemetry_summary.get('cash', f"{base_capital:,.2f}"),
+            'available_margin': f"{avail_margin:,.2f}",
+            'cash_balance': f"{base_capital:,.2f}",
             'collateral': "0.00",
-            'margin_utilized': telemetry_summary.get('margin_utilized', f"{margin_used:,.2f}"),
+            'margin_utilized': f"{margin_used:,.2f}",
             'live_net_pnl': net_pnl,
             'realized_pnl': realized_pnl,
             'unrealized_pnl': unrealized_pnl,
@@ -2167,6 +2218,7 @@ class AdminSandboxPositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, V
         elif filter_status == 'CLOSED':
             filtered_positions = [p for p in raw_positions if p.get('status') == 'CLOSED']
         else:
+            raw_positions.sort(key=lambda p: (0 if str(p.get('status', '')).upper() == 'OPEN' else 1, -float(p.get('total_pnl', 0.0) or 0.0)))
             filtered_positions = raw_positions
 
         page_num = request.GET.get('page', 1)
