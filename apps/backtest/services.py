@@ -480,6 +480,31 @@ GO_STRATEGY_PRESETS = [
         'is_system_preset': True,
         'is_active': True,
     },
+    {
+        'rule_type': 'ema_macd_retest',
+        'name': 'EMA 9/21 Retest + MACD Momentum (1:2.0 RR)',
+        'market_type': 'ALL',
+        'description': 'EMA 9/21 trend alignment with price pullback retest to EMA 9 and MACD zero-line momentum gatekeeper. Features Strike Sweep ATM±3 mid-price entry and 1:2.0 RR with trailing breakeven.',
+        'parameters': {
+            'ema_fast': 9,
+            'ema_slow': 21,
+            'macd_fast': 12,
+            'macd_slow': 26,
+            'macd_signal': 9,
+            'entry_window_from': 9 * 60 + 20,
+            'entry_window_to': 14 * 60 + 45,
+            'sl_pts': 15.0,
+            'rr_ratio': 2.0,
+            'use_orb_filter': False,
+            'min_displacement': 0.40,
+            'trail_breakeven': True,
+            'breakeven_at_r': 1.2,
+            'cooldown_seconds': 300,
+            'order_type': 'LIMIT',
+        },
+        'is_system_preset': True,
+        'is_active': True,
+    },
 ]
 
 

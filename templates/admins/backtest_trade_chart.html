@@ -104,6 +104,22 @@
             box-shadow: 0 2px 6px rgba(41, 98, 255, 0.35);
         }
 
+        .pointer-auto {
+            pointer-events: auto !important;
+        }
+        .tf-group-pane {
+            display: inline-flex;
+            background: rgba(0, 0, 0, 0.45);
+            padding: 1px;
+            border-radius: 5px;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        .tf-group-pane .btn-tf {
+            font-size: 0.68rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+
         /* Strategy Scenario & Execution Intelligence Header */
         .strategy-scenario-banner {
             background: #111520;
@@ -190,7 +206,7 @@
             position: absolute;
             top: 8px;
             left: 12px;
-            z-index: 10;
+            z-index: 20;
             pointer-events: none;
             background: rgba(19, 23, 34, 0.88);
             backdrop-filter: blur(8px);
@@ -200,7 +216,7 @@
             font-size: 0.74rem;
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 8px;
         }
 
         .pane-title-badge {
@@ -212,10 +228,42 @@
         .badge-index { background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.4); }
         .badge-strike { background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.4); }
 
+        .text-cyan { color: #00e5ff !important; }
+        .text-amber { color: #f59e0b !important; }
+
+        /* MACD Momentum Subpane */
+        .macd-subpane-container {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 28%;
+            border-top: 1px solid rgba(255, 255, 255, 0.1);
+            background: #090c12;
+            z-index: 5;
+            display: block;
+        }
+
+        .macd-header-bar {
+            position: absolute;
+            top: 4px;
+            left: 10px;
+            z-index: 10;
+            pointer-events: none;
+            font-size: 0.68rem;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(11, 14, 20, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 4px;
+            padding: 2px 7px;
+        }
+
         /* Floating Risk Reserve HUD */
         .risk-reserve-hud {
             position: absolute;
-            top: 8px;
+            top: 46px;
             right: 16px;
             width: 310px;
             background: rgba(14, 18, 28, 0.94);
@@ -399,15 +447,16 @@
             </div>
         </div>
 
-        <!-- Center: Timeframe Selector (Synchronized across both charts) -->
+        <!-- Center: Dual Chart Alignment & Synchronization Controls -->
         <div class="d-flex align-items-center gap-2">
-            <div class="tf-group">
-                <button type="button" class="btn-tf active" data-tf="1">1m</button>
-                <button type="button" class="btn-tf" data-tf="3">3m</button>
-                <button type="button" class="btn-tf" data-tf="5">5m</button>
-                <button type="button" class="btn-tf" data-tf="15">15m</button>
-                <button type="button" class="btn-tf" data-tf="30">30m</button>
-            </div>
+            <button type="button" id="btnToggleScrollSync" class="btn-nav-action" title="Toggle between Independent Horizontal Scrolling and Synchronized Scrolling">
+                <span class="material-icons" id="scrollSyncIcon" style="font-size: 0.95rem; color: #38bdf8;">lock_open</span>
+                <span id="scrollSyncLabel">Separate Scroll</span>
+            </button>
+            <button type="button" id="btnFocusTrade" class="btn-nav-action" title="Center both charts on Trade Execution Window">
+                <span class="material-icons" style="font-size: 0.95rem; color: #fbbf24;">filter_center_focus</span>
+                <span>Focus Trade</span>
+            </button>
         </div>
 
         <!-- Right: Prev / Next Navigation & Tools -->
@@ -532,13 +581,39 @@
                 <span>L: <span id="spotLow" class="text-danger">-</span></span>
                 <span>C: <span id="spotClose" class="text-white">-</span></span>
                 <span id="spotTime" class="theme-text-muted">-</span>
-                <button type="button" id="btnToggleSpotBoxes" class="btn-pane-toggle active ms-2" title="Toggle Spot Overlays (FVG/Position Boxes)">
+                <span id="spotEmaFastVal" class="text-cyan fw-bold ms-1" title="Fast EMA (9)">E9: -</span>
+                <span id="spotEmaSlowVal" class="text-amber fw-bold" title="Slow EMA (21)">E21: -</span>
+                <div class="tf-group tf-group-pane pointer-auto ms-1" id="spotTfGroup">
+                    <button type="button" class="btn-tf" data-chart="spot" data-tf="10s">10s</button>
+                    <button type="button" class="btn-tf active" data-chart="spot" data-tf="1">1m</button>
+                    <button type="button" class="btn-tf" data-chart="spot" data-tf="3">3m</button>
+                    <button type="button" class="btn-tf" data-chart="spot" data-tf="5">5m</button>
+                    <button type="button" class="btn-tf" data-chart="spot" data-tf="15">15m</button>
+                </div>
+                <button type="button" id="btnToggleEma" class="btn-pane-toggle active ms-1 pointer-auto" title="Toggle EMA 9 / EMA 21 Overlays">
+                    <span class="material-icons" style="font-size: 0.85rem;">show_chart</span>
+                    <span>EMA</span>
+                </button>
+                <button type="button" id="btnToggleMacd" class="btn-pane-toggle active ms-1 pointer-auto" title="Toggle MACD Subpane">
+                    <span class="material-icons" style="font-size: 0.85rem;">bar_chart</span>
+                    <span>MACD</span>
+                </button>
+                <button type="button" id="btnToggleSpotBoxes" class="btn-pane-toggle active ms-1 pointer-auto" title="Toggle Spot Overlays (FVG/Position Boxes)">
                     <span class="material-icons" style="font-size: 0.85rem;">visibility</span>
                     <span>Boxes</span>
                 </button>
             </div>
-            <div id="spotChartContainer" class="chart-canvas-container"></div>
-            <canvas id="spotOverlayCanvas" class="overlay-canvas"></canvas>
+            <div id="spotChartContainer" class="chart-canvas-container" style="height: 72%;"></div>
+            <canvas id="spotOverlayCanvas" class="overlay-canvas" style="height: 72%;"></canvas>
+            <div id="spotMacdContainer" class="macd-subpane-container">
+                <div id="spotMacdHeaderBar" class="macd-header-bar mono">
+                    <span class="text-secondary fw-bold">MACD (12, 26, 9)</span>
+                    <span class="text-cyan">MACD: <span id="macdVal">-</span></span>
+                    <span class="text-amber">Signal: <span id="macdSigVal">-</span></span>
+                    <span class="text-white">Hist: <span id="macdHistVal">-</span></span>
+                </div>
+                <div id="spotMacdChartEl" style="width: 100%; height: 100%;"></div>
+            </div>
         </section>
 
         <!-- CENTER SPLITTER: Draggable Resizer -->
@@ -556,7 +631,14 @@
                 <span>C: <span id="optClose" class="text-white">-</span></span>
                 <span>Vol: <span id="optVol" class="text-secondary">-</span></span>
                 <span id="optTime" class="theme-text-muted">-</span>
-                <button type="button" id="btnToggleOptionBoxes" class="btn-pane-toggle active ms-2" title="Toggle Option Overlays (FVG/Position Boxes)">
+                <div class="tf-group tf-group-pane pointer-auto ms-1" id="optionTfGroup">
+                    <button type="button" class="btn-tf" data-chart="option" data-tf="10s">10s</button>
+                    <button type="button" class="btn-tf active" data-chart="option" data-tf="1">1m</button>
+                    <button type="button" class="btn-tf" data-chart="option" data-tf="3">3m</button>
+                    <button type="button" class="btn-tf" data-chart="option" data-tf="5">5m</button>
+                    <button type="button" class="btn-tf" data-chart="option" data-tf="15">15m</button>
+                </div>
+                <button type="button" id="btnToggleOptionBoxes" class="btn-pane-toggle active ms-1 pointer-auto" title="Toggle Option Overlays (FVG/Position Boxes)">
                     <span class="material-icons" style="font-size: 0.85rem;">visibility</span>
                     <span>Boxes</span>
                 </button>
@@ -925,8 +1007,26 @@
         let optionCandleSeries = null;
         let optionVolumeSeries = null;
 
+        // Visual Technical Indicators (EMA & MACD)
+        const spotMacdContainer = document.getElementById('spotMacdContainer');
+        const spotMacdChartEl = document.getElementById('spotMacdChartEl');
+        let spotMacdChart = null;
+        let spotEmaFastSeries = null;
+        let spotEmaSlowSeries = null;
+        let macdLineSeries = null;
+        let macdSignalSeries = null;
+        let macdHistogramSeries = null;
+        let isEmaVisible = true;
+        let isMacdVisible = true;
+        let currentEmaFastData = [];
+        let currentEmaSlowData = [];
+        let currentMacdData = { macd: [], signal: [], hist: [] };
+
         let rawTradeData = null;
         let currentTimeframe = '1';
+        let currentSpotTF = '1';
+        let currentOptionTF = '1';
+        let isScrollSyncEnabled = false; // Default: independent horizontal scrolling
         let activeSpotCandles = [];
         let activeOptCandles = [];
 
@@ -1062,13 +1162,14 @@
                         const d = new Date(timestamp * 1000);
                         const hours = String(d.getUTCHours()).padStart(2, '0');
                         const mins = String(d.getUTCMinutes()).padStart(2, '0');
-                        return `${hours}:${mins}`;
+                        const secs = String(d.getUTCSeconds()).padStart(2, '0');
+                        return `${hours}:${mins}:${secs}`;
                     }
                 },
                 timeScale: {
                     borderColor: '#242936',
                     timeVisible: true,
-                    secondsVisible: false,
+                    secondsVisible: true,
                     rightOffset: 8,
                     barSpacing: 6,
                     tickMarkFormatter: (time, tickMarkType, locale) => {
@@ -1079,6 +1180,10 @@
                         }
                         const hours = String(d.getUTCHours()).padStart(2, '0');
                         const mins = String(d.getUTCMinutes()).padStart(2, '0');
+                        const secs = d.getUTCSeconds();
+                        if (secs !== 0) {
+                            return `${hours}:${mins}:${String(secs).padStart(2, '0')}`;
+                        }
                         return `${hours}:${mins}`;
                     }
                 },
@@ -1098,6 +1203,7 @@
         function initDualCharts() {
             spotContainer.innerHTML = '';
             optionContainer.innerHTML = '';
+            if (spotMacdChartEl) spotMacdChartEl.innerHTML = '';
 
             spotChart = createTradingViewChart(spotContainer, '{{ trade.symbol }} SPOT');
             spotCandleSeries = spotChart.addCandlestickSeries({
@@ -1110,6 +1216,89 @@
                 wickDownColor: '#f87171',
                 wickVisible: true,
             });
+
+            // EMA 9 & EMA 21 Overlays on Spot Chart
+            spotEmaFastSeries = spotChart.addLineSeries({
+                color: '#00e5ff',
+                lineWidth: 1.5,
+                title: 'EMA 9',
+                priceLineVisible: false,
+                lastValueVisible: false,
+                crosshairMarkerVisible: true,
+            });
+            spotEmaSlowSeries = spotChart.addLineSeries({
+                color: '#f59e0b',
+                lineWidth: 1.5,
+                title: 'EMA 21',
+                priceLineVisible: false,
+                lastValueVisible: false,
+                crosshairMarkerVisible: true,
+            });
+
+            // MACD Subpane Chart
+            if (spotMacdChartEl) {
+                spotMacdChart = LightweightCharts.createChart(spotMacdChartEl, {
+                    width: spotMacdChartEl.clientWidth || spotContainer.clientWidth,
+                    height: spotMacdChartEl.clientHeight || 150,
+                    layout: {
+                        background: { type: 'solid', color: '#090c12' },
+                        textColor: '#94a3b8',
+                        fontSize: 10,
+                        fontFamily: 'JetBrains Mono, monospace'
+                    },
+                    grid: {
+                        vertLines: { color: 'rgba(255, 255, 255, 0.03)' },
+                        horzLines: { color: 'rgba(255, 255, 255, 0.03)' }
+                    },
+                    crosshair: {
+                        mode: LightweightCharts.CrosshairMode.Normal,
+                        vertLine: { color: 'rgba(56, 189, 248, 0.5)', width: 1, style: 3, labelBackgroundColor: '#0284c7' },
+                        horzLine: { color: 'rgba(56, 189, 248, 0.5)', width: 1, style: 3, labelBackgroundColor: '#0284c7' }
+                    },
+                    rightPriceScale: {
+                        borderColor: '#242936',
+                        scaleMargins: { top: 0.15, bottom: 0.15 }
+                    },
+                    timeScale: {
+                        visible: false,
+                        rightOffset: 8,
+                        barSpacing: 6,
+                    }
+                });
+
+                macdHistogramSeries = spotMacdChart.addHistogramSeries({
+                    priceFormat: { type: 'volume' },
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                });
+
+                macdLineSeries = spotMacdChart.addLineSeries({
+                    color: '#00e5ff',
+                    lineWidth: 1.5,
+                    title: 'MACD',
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                    crosshairMarkerVisible: true,
+                });
+
+                macdSignalSeries = spotMacdChart.addLineSeries({
+                    color: '#f59e0b',
+                    lineWidth: 1.5,
+                    title: 'Signal',
+                    priceLineVisible: false,
+                    lastValueVisible: false,
+                    crosshairMarkerVisible: true,
+                });
+
+                macdHistogramSeries.createPriceLine({
+                    price: 0,
+                    color: 'rgba(255, 255, 255, 0.2)',
+                    lineWidth: 1,
+                    lineStyle: LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: false,
+                    title: ''
+                });
+            }
 
             optionChart = createTradingViewChart(optionContainer, '{{ trade.strike|default:trade.symbol }}');
             optionCandleSeries = optionChart.addCandlestickSeries({
@@ -1132,7 +1321,7 @@
                 visible: false,
             });
 
-            // Synchronize Crosshair Inspection & Header Stats between both panes
+            // Synchronize Crosshair Inspection & Header Stats between panes
             let isSyncingCrosshair = false;
 
             spotChart.subscribeCrosshairMove(param => {
@@ -1143,7 +1332,34 @@
                     const spotData = param.seriesData.get(spotCandleSeries);
                     if (spotData) updateSpotHeaderBar(spotData, param.time);
 
-                    const matchOpt = activeOptCandles.find(c => c.time === param.time);
+                    if (spotEmaFastSeries) {
+                        const fastVal = param.seriesData.get(spotEmaFastSeries);
+                        const slowVal = param.seriesData.get(spotEmaSlowSeries);
+                        const elF = document.getElementById('spotEmaFastVal');
+                        const elS = document.getElementById('spotEmaSlowVal');
+                        if (elF) elF.innerText = (fastVal && fastVal.value !== undefined) ? `E9: ${fastVal.value.toFixed(2)}` : 'E9: -';
+                        if (elS) elS.innerText = (slowVal && slowVal.value !== undefined) ? `E21: ${slowVal.value.toFixed(2)}` : 'E21: -';
+                    }
+
+                    if (spotMacdChart && isMacdVisible) {
+                        try {
+                            const macdVal = param.seriesData.get(macdLineSeries);
+                            const sigVal = param.seriesData.get(macdSignalSeries);
+                            const histVal = param.seriesData.get(macdHistogramSeries);
+                            const elM = document.getElementById('macdVal');
+                            const elS = document.getElementById('macdSigVal');
+                            const elH = document.getElementById('macdHistVal');
+                            if (elM) elM.innerText = (macdVal && macdVal.value !== undefined) ? macdVal.value.toFixed(2) : '-';
+                            if (elS) elS.innerText = (sigVal && sigVal.value !== undefined) ? sigVal.value.toFixed(2) : '-';
+                            if (elH) elH.innerText = (histVal && histVal.value !== undefined) ? histVal.value.toFixed(2) : '-';
+                            if (macdLineSeries) spotMacdChart.setCrosshairPosition(macdVal ? macdVal.value : 0, param.time, macdLineSeries);
+                        } catch (e) {}
+                    }
+
+                    let matchOpt = activeOptCandles.find(c => c.time === param.time);
+                    if (!matchOpt) {
+                        matchOpt = activeOptCandles.find(c => Math.abs(c.time - param.time) < 30);
+                    }
                     if (matchOpt) updateOptionHeaderBar(matchOpt);
 
                     if (optionCandleSeries) {
@@ -1155,6 +1371,32 @@
                 }
                 isSyncingCrosshair = false;
             });
+
+            if (spotMacdChart) {
+                spotMacdChart.subscribeCrosshairMove(param => {
+                    if (isSyncingCrosshair) return;
+                    isSyncingCrosshair = true;
+                    if (param && param.time) {
+                        const mVal = param.seriesData.get(macdLineSeries);
+                        const sVal = param.seriesData.get(macdSignalSeries);
+                        const hVal = param.seriesData.get(macdHistogramSeries);
+                        const elM = document.getElementById('macdVal');
+                        const elS = document.getElementById('macdSigVal');
+                        const elH = document.getElementById('macdHistVal');
+                        if (elM) elM.innerText = (mVal && mVal.value !== undefined) ? mVal.value.toFixed(2) : '-';
+                        if (elS) elS.innerText = (sVal && sVal.value !== undefined) ? sVal.value.toFixed(2) : '-';
+                        if (elH) elH.innerText = (hVal && hVal.value !== undefined) ? hVal.value.toFixed(2) : '-';
+
+                        let matchSpot = activeSpotCandles.find(c => c.time === param.time);
+                        if (!matchSpot) matchSpot = activeSpotCandles.find(c => Math.abs(c.time - param.time) < 30);
+                        if (matchSpot && spotCandleSeries) {
+                            updateSpotHeaderBar(matchSpot, param.time);
+                            try { spotChart.setCrosshairPosition(matchSpot.close, param.time, spotCandleSeries); } catch (e) {}
+                        }
+                    }
+                    isSyncingCrosshair = false;
+                });
+            }
 
             optionChart.subscribeCrosshairMove(param => {
                 if (isSyncingCrosshair) return;
@@ -1171,7 +1413,10 @@
                         });
                     }
 
-                    const matchSpot = activeSpotCandles.find(c => c.time === param.time);
+                    let matchSpot = activeSpotCandles.find(c => c.time === param.time);
+                    if (!matchSpot) {
+                        matchSpot = activeSpotCandles.find(c => Math.abs(c.time - param.time) < 60);
+                    }
                     if (matchSpot) updateSpotHeaderBar(matchSpot, param.time);
 
                     if (spotCandleSeries) {
@@ -1184,21 +1429,22 @@
                 isSyncingCrosshair = false;
             });
 
-            // Synchronize Visible Range Zoom & Pan between both charts
+            // Synchronize Visible Range Zoom & Pan between both charts (ONLY when user enables Sync)
             let isSyncingRange = false;
 
             function syncTimeScale(sourceChart, targetChart) {
-                const range = sourceChart.timeScale().getVisibleLogicalRange();
-                if (range && !isSyncingRange) {
+                if (!isScrollSyncEnabled || isSyncingRange) return;
+                const timeRange = sourceChart.timeScale().getVisibleRange();
+                if (timeRange && timeRange.from && timeRange.to) {
                     isSyncingRange = true;
-                    try { targetChart.timeScale().setVisibleLogicalRange(range); } catch (e) {}
+                    try { targetChart.timeScale().setVisibleRange(timeRange); } catch (e) {}
                     scheduleOverlaysSync();
                     isSyncingRange = false;
                 }
             }
 
-            spotChart.timeScale().subscribeVisibleLogicalRangeChange(() => syncTimeScale(spotChart, optionChart));
-            optionChart.timeScale().subscribeVisibleLogicalRangeChange(() => syncTimeScale(optionChart, spotChart));
+            spotChart.timeScale().subscribeVisibleTimeRangeChange(() => syncTimeScale(spotChart, optionChart));
+            optionChart.timeScale().subscribeVisibleTimeRangeChange(() => syncTimeScale(optionChart, spotChart));
 
             // Continuous Drag & Scroll Sync Loop
             [spotContainer, optionContainer].forEach(cnt => {
@@ -1251,6 +1497,11 @@
 
             spotChart.applyOptions({ width: spotW, height: spotH });
             optionChart.applyOptions({ width: optW, height: optH });
+            if (spotMacdChart && isMacdVisible && spotMacdChartEl) {
+                const macdW = spotMacdChartEl.clientWidth || spotW;
+                const macdH = spotMacdChartEl.clientHeight || 150;
+                spotMacdChart.applyOptions({ width: macdW, height: macdH });
+            }
 
             const dpr = window.devicePixelRatio || 1;
 
@@ -1273,12 +1524,19 @@
             }
         }
 
-        // Resample 1m candles into higher timeframe bars
-        function resampleCandles(candles, tfMinutes) {
+        // Resample candles into requested timeframe (supports 10s, 30s, 1m, 3m, 5m, 15m, 30m)
+        function resampleCandles(candles, tf) {
             if (!candles || candles.length === 0) return [];
-            if (tfMinutes === '1') return candles;
 
-            const intervalSec = parseInt(tfMinutes, 10) * 60;
+            let intervalSec = 60;
+            if (tf === '10s' || tf === '10') {
+                intervalSec = 10;
+            } else if (tf === '30s') {
+                intervalSec = 30;
+            } else {
+                intervalSec = (parseInt(tf, 10) || 1) * 60;
+            }
+
             const resampled = [];
             let currentBucket = null;
 
@@ -1292,7 +1550,7 @@
                         high: c.high,
                         low: c.low,
                         close: c.close,
-                        volume: c.volume,
+                        volume: c.volume || 0,
                         date: c.date,
                         time_str: c.time_str,
                         datetime: c.datetime,
@@ -1378,33 +1636,10 @@
             return { entryP, exitP, targetP, stopP, trailingStopP, reserveEdgeP };
         }
 
-        // Apply Data, Native PriceLines, and Markers to Both Panes
-        function applyDataToBothCharts() {
-            if (!rawTradeData) return;
-
-            activeSpotCandles = resampleCandles(rawTradeData.spot_candles || [], currentTimeframe);
-            activeOptCandles = resampleCandles(rawTradeData.candles || [], currentTimeframe);
-
-            spotCandleSeries.setData(activeSpotCandles);
-            optionCandleSeries.setData(activeOptCandles);
-
-            const volData = activeOptCandles.map(c => ({
-                time: c.time,
-                value: c.volume || 0,
-                color: (c.close >= c.open) ? 'rgba(8, 153, 129, 0.28)' : 'rgba(242, 54, 69, 0.28)'
-            }));
-            optionVolumeSeries.setData(volData);
-
-            if (activeSpotCandles.length > 0) {
-                updateSpotHeaderBar(activeSpotCandles[activeSpotCandles.length - 1]);
-            }
-            if (activeOptCandles.length > 0) {
-                updateOptionHeaderBar(activeOptCandles[activeOptCandles.length - 1]);
-            }
-
-            // A. Update Native PriceLines on Spot (Index)
+        // A. Update Native PriceLines on Spot (Index)
+        function applySpotPriceLines(spotEntryP) {
             clearPriceLines(spotCandleSeries, spotPriceLines);
-            const spotEntryP = Number(rawTradeData.entry.index_price || rawTradeData.entry.price);
+            if (!rawTradeData) return;
             const isBearishSpot = Boolean(rawTradeData.is_bearish_spot);
             const idxPts = Math.abs(Number(rawTradeData.index_points || 30));
             const spotTargetP = Number(rawTradeData.spot_target_price || (isBearishSpot ? (spotEntryP - idxPts * 1.5) : (spotEntryP + idxPts * 1.5)).toFixed(2));
@@ -1429,54 +1664,214 @@
                     axisLabelVisible: true, title: 'EXIT ' + spotExitP.toFixed(2),
                 }));
             }
+        }
 
-            // B. Update Native PriceLines on Option (Strike)
+        // B. Update Native PriceLines on Option (Strike)
+        function applyOptionPriceLines(optLevels) {
             clearPriceLines(optionCandleSeries, optionPriceLines);
-            const optLevels = getResolvedOptionLevels();
-            if (optLevels) {
+            if (!optLevels) return;
+            optionPriceLines.push(optionCandleSeries.createPriceLine({
+                price: optLevels.targetP, color: 'rgba(16, 185, 129, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true, title: 'TP ' + optLevels.targetP.toFixed(2),
+            }));
+            optionPriceLines.push(optionCandleSeries.createPriceLine({
+                price: optLevels.entryP, color: 'rgba(56, 189, 248, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true, title: 'ENTRY ' + optLevels.entryP.toFixed(2),
+            }));
+            optionPriceLines.push(optionCandleSeries.createPriceLine({
+                price: optLevels.stopP, color: 'rgba(239, 68, 68, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+                axisLabelVisible: true, title: 'SL ' + optLevels.stopP.toFixed(2),
+            }));
+            if (optLevels.trailingStopP && Math.abs(optLevels.trailingStopP - optLevels.stopP) > 0.05) {
                 optionPriceLines.push(optionCandleSeries.createPriceLine({
-                    price: optLevels.targetP, color: 'rgba(16, 185, 129, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true, title: 'TP ' + optLevels.targetP.toFixed(2),
+                    price: optLevels.trailingStopP, color: 'rgba(245, 158, 11, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
+                    axisLabelVisible: true, title: 'TRAIL SL ' + optLevels.trailingStopP.toFixed(2),
                 }));
+            }
+            if (optLevels.exitP && Math.abs(optLevels.exitP - optLevels.entryP) > 0.05) {
                 optionPriceLines.push(optionCandleSeries.createPriceLine({
-                    price: optLevels.entryP, color: 'rgba(56, 189, 248, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true, title: 'ENTRY ' + optLevels.entryP.toFixed(2),
+                    price: optLevels.exitP, color: (rawTradeData.pnl >= 0) ? 'rgba(16, 185, 129, 0.85)' : 'rgba(239, 68, 68, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: true, title: 'EXIT ' + optLevels.exitP.toFixed(2),
                 }));
+            }
+            if (optLevels.reserveEdgeP > 0) {
                 optionPriceLines.push(optionCandleSeries.createPriceLine({
-                    price: optLevels.stopP, color: 'rgba(239, 68, 68, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-                    axisLabelVisible: true, title: 'SL ' + optLevels.stopP.toFixed(2),
+                    price: optLevels.reserveEdgeP, color: 'rgba(245, 158, 11, 0.7)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
+                    axisLabelVisible: true, title: 'RESERVE ' + optLevels.reserveEdgeP.toFixed(2),
                 }));
-                if (optLevels.trailingStopP && Math.abs(optLevels.trailingStopP - optLevels.stopP) > 0.05) {
-                    optionPriceLines.push(optionCandleSeries.createPriceLine({
-                        price: optLevels.trailingStopP, color: 'rgba(245, 158, 11, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dashed,
-                        axisLabelVisible: true, title: 'TRAIL SL ' + optLevels.trailingStopP.toFixed(2),
-                    }));
+            }
+        }
+
+        // Technical Indicator Calculators (EMA & MACD)
+        function calculateEMA(candles, period) {
+            if (!candles || candles.length < period) return [];
+            const k = 2 / (period + 1);
+            const emaData = [];
+            let sum = 0;
+            for (let i = 0; i < period; i++) {
+                sum += Number(candles[i].close);
+            }
+            let prevEma = sum / period;
+            emaData.push({ time: candles[period - 1].time, value: Number(prevEma.toFixed(2)) });
+            for (let i = period; i < candles.length; i++) {
+                const close = Number(candles[i].close);
+                prevEma = (close - prevEma) * k + prevEma;
+                emaData.push({ time: candles[i].time, value: Number(prevEma.toFixed(2)) });
+            }
+            return emaData;
+        }
+
+        function calculateMACD(candles, fastPeriod = 12, slowPeriod = 26, signalPeriod = 9) {
+            if (!candles || candles.length < (slowPeriod + signalPeriod)) {
+                return { macd: [], signal: [], hist: [] };
+            }
+            const emaFast = calculateEMA(candles, fastPeriod);
+            const emaSlow = calculateEMA(candles, slowPeriod);
+            const fastMap = new Map();
+            emaFast.forEach(d => fastMap.set(d.time, d.value));
+
+            const macdLinePoints = [];
+            emaSlow.forEach(slowPt => {
+                if (fastMap.has(slowPt.time)) {
+                    const macdVal = Number((fastMap.get(slowPt.time) - slowPt.value).toFixed(2));
+                    macdLinePoints.push({ time: slowPt.time, close: macdVal });
                 }
-                if (optLevels.exitP && Math.abs(optLevels.exitP - optLevels.entryP) > 0.05) {
-                    optionPriceLines.push(optionCandleSeries.createPriceLine({
-                        price: optLevels.exitP, color: (rawTradeData.pnl >= 0) ? 'rgba(16, 185, 129, 0.85)' : 'rgba(239, 68, 68, 0.85)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
-                        axisLabelVisible: true, title: 'EXIT ' + optLevels.exitP.toFixed(2),
-                    }));
-                }
-                if (optLevels.reserveEdgeP > 0) {
-                    optionPriceLines.push(optionCandleSeries.createPriceLine({
-                        price: optLevels.reserveEdgeP, color: 'rgba(245, 158, 11, 0.7)', lineWidth: 1, lineStyle: LightweightCharts.LineStyle.Dotted,
-                        axisLabelVisible: true, title: 'RESERVE ' + optLevels.reserveEdgeP.toFixed(2),
-                    }));
-                }
+            });
+
+            if (macdLinePoints.length < signalPeriod) {
+                return { macd: [], signal: [], hist: [] };
             }
 
-            // C. Native Markers on Spot
+            const signalLinePoints = calculateEMA(macdLinePoints, signalPeriod);
+            const signalMap = new Map();
+            signalLinePoints.forEach(s => signalMap.set(s.time, s.value));
+
+            const macdSeries = [];
+            const signalSeries = [];
+            const histSeries = [];
+
+            macdLinePoints.forEach(m => {
+                macdSeries.push({ time: m.time, value: m.close });
+                if (signalMap.has(m.time)) {
+                    const sigVal = signalMap.get(m.time);
+                    signalSeries.push({ time: m.time, value: sigVal });
+                    const histVal = Number((m.close - sigVal).toFixed(2));
+                    histSeries.push({
+                        time: m.time,
+                        value: histVal,
+                        color: histVal >= 0 ? 'rgba(38, 166, 154, 0.75)' : 'rgba(239, 83, 80, 0.75)'
+                    });
+                }
+            });
+
+            return { macd: macdSeries, signal: signalSeries, hist: histSeries };
+        }
+
+        // Update Spot Chart Independently
+        function updateSpotChartData() {
+            if (!rawTradeData) return;
+            activeSpotCandles = resampleCandles(rawTradeData.spot_candles || [], currentSpotTF);
+            spotCandleSeries.setData(activeSpotCandles);
+
+            // Calculate and populate Technical Indicators
+            currentEmaFastData = calculateEMA(activeSpotCandles, 9);
+            currentEmaSlowData = calculateEMA(activeSpotCandles, 21);
+            currentMacdData = calculateMACD(activeSpotCandles, 12, 26, 9);
+
+            if (spotEmaFastSeries) spotEmaFastSeries.setData(currentEmaFastData);
+            if (spotEmaSlowSeries) spotEmaSlowSeries.setData(currentEmaSlowData);
+
+            if (macdLineSeries) macdLineSeries.setData(currentMacdData.macd);
+            if (macdSignalSeries) macdSignalSeries.setData(currentMacdData.signal);
+            if (macdHistogramSeries) macdHistogramSeries.setData(currentMacdData.hist);
+
+            if (activeSpotCandles.length > 0) {
+                const lastCandle = activeSpotCandles[activeSpotCandles.length - 1];
+                updateSpotHeaderBar(lastCandle);
+                const lastFast = currentEmaFastData.length > 0 ? currentEmaFastData[currentEmaFastData.length - 1].value : null;
+                const lastSlow = currentEmaSlowData.length > 0 ? currentEmaSlowData[currentEmaSlowData.length - 1].value : null;
+                const elF = document.getElementById('spotEmaFastVal');
+                const elS = document.getElementById('spotEmaSlowVal');
+                if (elF) elF.innerText = lastFast !== null ? `E9: ${lastFast.toFixed(2)}` : 'E9: -';
+                if (elS) elS.innerText = lastSlow !== null ? `E21: ${lastSlow.toFixed(2)}` : 'E21: -';
+
+                if (currentMacdData.macd.length > 0) {
+                    const lastM = currentMacdData.macd[currentMacdData.macd.length - 1].value;
+                    const lastSig = currentMacdData.signal.length > 0 ? currentMacdData.signal[currentMacdData.signal.length - 1].value : 0;
+                    const lastH = currentMacdData.hist.length > 0 ? currentMacdData.hist[currentMacdData.hist.length - 1].value : 0;
+                    const elM = document.getElementById('macdVal');
+                    const elSig = document.getElementById('macdSigVal');
+                    const elH = document.getElementById('macdHistVal');
+                    if (elM) elM.innerText = lastM.toFixed(2);
+                    if (elSig) elSig.innerText = lastSig.toFixed(2);
+                    if (elH) elH.innerText = lastH.toFixed(2);
+                }
+            }
+            const spotEntryP = Number(rawTradeData.entry.index_price || rawTradeData.entry.price);
+            applySpotPriceLines(spotEntryP);
             applySpotMarkers(spotEntryP);
-
-            // D. Native Markers on Option
-            applyOptionMarkers(optLevels);
-
-            // Fit content
-            spotChart.timeScale().fitContent();
-            optionChart.timeScale().fitContent();
-
             scheduleOverlaysSync();
+        }
+
+        // Update Option Chart Independently (Supports 10s timeframe)
+        function updateOptionChartData() {
+            if (!rawTradeData) return;
+            activeOptCandles = resampleCandles(rawTradeData.candles || [], currentOptionTF);
+            optionCandleSeries.setData(activeOptCandles);
+            const volData = activeOptCandles.map(c => ({
+                time: c.time,
+                value: c.volume || 0,
+                color: (c.close >= c.open) ? 'rgba(8, 153, 129, 0.28)' : 'rgba(242, 54, 69, 0.28)'
+            }));
+            optionVolumeSeries.setData(volData);
+            if (activeOptCandles.length > 0) {
+                updateOptionHeaderBar(activeOptCandles[activeOptCandles.length - 1]);
+            }
+            const optLevels = getResolvedOptionLevels();
+            applyOptionPriceLines(optLevels);
+            applyOptionMarkers(optLevels);
+            scheduleOverlaysSync();
+        }
+
+        // Focus Trade Window on both charts
+        function focusTradeWindow() {
+            if (!rawTradeData || !rawTradeData.entry) {
+                if (spotChart) spotChart.timeScale().fitContent();
+                if (optionChart) optionChart.timeScale().fitContent();
+                return;
+            }
+            const tl = rawTradeData.timeline || {};
+            const entryEpoch = tl.limit_tapped_epoch || rawTradeData.entry.epoch;
+            const exitEpoch = tl.exit_epoch || (rawTradeData.exit ? rawTradeData.exit.epoch : (entryEpoch + 300));
+            const startEpoch = entryEpoch - 600; // 10 min context before entry
+            const endEpoch = exitEpoch + 600;    // 10 min context after exit
+
+            try {
+                spotChart.timeScale().setVisibleRange({ from: startEpoch, to: endEpoch });
+            } catch (e) {
+                try { spotChart.timeScale().fitContent(); } catch (err) {}
+            }
+            if (spotMacdChart && isMacdVisible) {
+                try {
+                    spotMacdChart.timeScale().setVisibleRange({ from: startEpoch, to: endEpoch });
+                } catch (e) {
+                    try { spotMacdChart.timeScale().fitContent(); } catch (err) {}
+                }
+            }
+            try {
+                optionChart.timeScale().setVisibleRange({ from: startEpoch, to: endEpoch });
+            } catch (e) {
+                try { optionChart.timeScale().fitContent(); } catch (err) {}
+            }
+            scheduleOverlaysSync();
+        }
+
+        // Apply Data to Both Charts (Initial Load)
+        function applyDataToBothCharts() {
+            if (!rawTradeData) return;
+            updateSpotChartData();
+            updateOptionChartData();
+            focusTradeWindow();
         }
 
         function findNearestCandleTime(candles, targetTime) {
@@ -2245,13 +2640,25 @@
             }
         }
 
+        function formatCandleTime(candle) {
+            if (!candle) return '-';
+            if (candle.time) {
+                const d = new Date(candle.time * 1000);
+                const hh = String(d.getUTCHours()).padStart(2, '0');
+                const mm = String(d.getUTCMinutes()).padStart(2, '0');
+                const ss = String(d.getUTCSeconds()).padStart(2, '0');
+                return `${hh}:${mm}:${ss}`;
+            }
+            return candle.datetime ? candle.datetime.slice(11, 19) : (candle.time_str || '-');
+        }
+
         function updateSpotHeaderBar(candle, customTime) {
             if (!candle) return;
             document.getElementById('spotOpen').innerText = Number(candle.open).toFixed(2);
             document.getElementById('spotHigh').innerText = Number(candle.high).toFixed(2);
             document.getElementById('spotLow').innerText = Number(candle.low).toFixed(2);
             document.getElementById('spotClose').innerText = Number(candle.close).toFixed(2);
-            document.getElementById('spotTime').innerText = candle.datetime ? candle.datetime.slice(11, 16) : (candle.time_str || '');
+            document.getElementById('spotTime').innerText = formatCandleTime(candle);
         }
 
         function updateOptionHeaderBar(candle) {
@@ -2261,7 +2668,7 @@
             document.getElementById('optLow').innerText = Number(candle.low).toFixed(2);
             document.getElementById('optClose').innerText = Number(candle.close).toFixed(2);
             document.getElementById('optVol').innerText = (candle.volume || 0).toLocaleString();
-            document.getElementById('optTime').innerText = candle.datetime ? candle.datetime.slice(11, 16) : (candle.time_str || '');
+            document.getElementById('optTime').innerText = formatCandleTime(candle);
         }
 
         // Fetch Data from Backend
@@ -2352,14 +2759,64 @@
 
         // Event Listeners
         function setupEventListeners() {
-            document.querySelectorAll('.btn-tf').forEach(btn => {
-                btn.addEventListener('click', function() {
-                    document.querySelectorAll('.btn-tf').forEach(b => b.classList.remove('active'));
+            // Independent Spot Timeframe Buttons
+            document.querySelectorAll('#spotTfGroup .btn-tf').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    document.querySelectorAll('#spotTfGroup .btn-tf').forEach(b => b.classList.remove('active'));
                     this.classList.add('active');
-                    currentTimeframe = this.getAttribute('data-tf');
-                    applyDataToBothCharts();
+                    currentSpotTF = this.getAttribute('data-tf');
+                    updateSpotChartData();
                 });
             });
+
+            // Independent Option Timeframe Buttons (Supports 10s sub-minute)
+            document.querySelectorAll('#optionTfGroup .btn-tf').forEach(btn => {
+                btn.addEventListener('click', function(e) {
+                    e.stopPropagation();
+                    document.querySelectorAll('#optionTfGroup .btn-tf').forEach(b => b.classList.remove('active'));
+                    this.classList.add('active');
+                    currentOptionTF = this.getAttribute('data-tf');
+                    updateOptionChartData();
+                });
+            });
+
+            // Separate Scroll vs Sync Scroll Toggle
+            const btnToggleScrollSync = document.getElementById('btnToggleScrollSync');
+            const scrollSyncIcon = document.getElementById('scrollSyncIcon');
+            const scrollSyncLabel = document.getElementById('scrollSyncLabel');
+            if (btnToggleScrollSync) {
+                btnToggleScrollSync.addEventListener('click', function() {
+                    isScrollSyncEnabled = !isScrollSyncEnabled;
+                    if (isScrollSyncEnabled) {
+                        this.classList.add('active');
+                        if (scrollSyncIcon) {
+                            scrollSyncIcon.innerText = 'lock';
+                            scrollSyncIcon.style.color = '#10b981';
+                        }
+                        if (scrollSyncLabel) scrollSyncLabel.innerText = 'Sync Scroll';
+                        const spotRange = spotChart.timeScale().getVisibleRange();
+                        if (spotRange && spotRange.from && spotRange.to) {
+                            try { optionChart.timeScale().setVisibleRange(spotRange); } catch (e) {}
+                        }
+                    } else {
+                        this.classList.remove('active');
+                        if (scrollSyncIcon) {
+                            scrollSyncIcon.innerText = 'lock_open';
+                            scrollSyncIcon.style.color = '#38bdf8';
+                        }
+                        if (scrollSyncLabel) scrollSyncLabel.innerText = 'Separate Scroll';
+                    }
+                });
+            }
+
+            // Focus Trade Window Button
+            const btnFocusTrade = document.getElementById('btnFocusTrade');
+            if (btnFocusTrade) {
+                btnFocusTrade.addEventListener('click', () => {
+                    focusTradeWindow();
+                });
+            }
 
             const btnSMC = document.getElementById('btnToggleSMC');
             if (btnSMC) {
@@ -2370,8 +2827,48 @@
                 });
             }
 
+            // Indicator Toggles (EMA & MACD)
+            const btnToggleEma = document.getElementById('btnToggleEma');
+            if (btnToggleEma) {
+                btnToggleEma.addEventListener('click', function() {
+                    isEmaVisible = !isEmaVisible;
+                    this.classList.toggle('active', isEmaVisible);
+                    if (spotEmaFastSeries) spotEmaFastSeries.applyOptions({ visible: isEmaVisible });
+                    if (spotEmaSlowSeries) spotEmaSlowSeries.applyOptions({ visible: isEmaVisible });
+                    const elF = document.getElementById('spotEmaFastVal');
+                    const elS = document.getElementById('spotEmaSlowVal');
+                    if (elF) elF.style.display = isEmaVisible ? 'inline' : 'none';
+                    if (elS) elS.style.display = isEmaVisible ? 'inline' : 'none';
+                });
+            }
+
+            const btnToggleMacd = document.getElementById('btnToggleMacd');
+            if (btnToggleMacd) {
+                btnToggleMacd.addEventListener('click', function() {
+                    isMacdVisible = !isMacdVisible;
+                    this.classList.toggle('active', isMacdVisible);
+                    if (isMacdVisible) {
+                        if (spotMacdContainer) spotMacdContainer.style.display = 'block';
+                        if (spotContainer) spotContainer.style.height = '72%';
+                        if (spotOverlayCanvas) spotOverlayCanvas.style.height = '72%';
+                    } else {
+                        if (spotMacdContainer) spotMacdContainer.style.display = 'none';
+                        if (spotContainer) spotContainer.style.height = '100%';
+                        if (spotOverlayCanvas) spotOverlayCanvas.style.height = '100%';
+                    }
+                    handleDualResize();
+                    if (isMacdVisible && spotMacdChart && spotChart) {
+                        try {
+                            const range = spotChart.timeScale().getVisibleRange();
+                            if (range) spotMacdChart.timeScale().setVisibleRange(range);
+                        } catch (e) {}
+                    }
+                });
+            }
+
             document.getElementById('btnFitChart').addEventListener('click', () => {
                 if (spotChart) spotChart.timeScale().fitContent();
+                if (spotMacdChart && isMacdVisible) spotMacdChart.timeScale().fitContent();
                 if (optionChart) optionChart.timeScale().fitContent();
             });
 

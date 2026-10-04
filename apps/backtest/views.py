@@ -1139,20 +1139,42 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                             if selected_rows:
                                 final_opt_df = pd.concat(selected_rows)
                                 agg_candles = []
-                                for min_str, min_group in final_opt_df.groupby('minute', sort=True):
-                                    min_dt_str = min_str + ":00"
-                                    min_dt_val = dt.datetime.strptime(min_dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
-                                    agg_candles.append({
-                                        'time': int(min_dt_val.timestamp()),
-                                        'datetime': min_dt_str,
-                                        'date': min_str[:10],
-                                        'time_str': min_str[11:16],
-                                        'open': round(float(min_group.iloc[0]['open']), 2),
-                                        'high': round(float(min_group['high'].max()), 2),
-                                        'low': round(float(min_group['low'].min()), 2),
-                                        'close': round(float(min_group.iloc[-1]['close']), 2),
-                                        'volume': int(min_group['volume'].sum()),
-                                    })
+                                has_seconds = False
+                                if len(final_opt_df) >= 2:
+                                    s_vals = final_opt_df['datetime'].astype(str).str[17:19].unique()
+                                    if len(s_vals) > 1:
+                                        has_seconds = True
+
+                                if has_seconds:
+                                    for _, row in final_opt_df.iterrows():
+                                        dt_str = str(row['datetime'])[:19]
+                                        dt_val = dt.datetime.strptime(dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
+                                        agg_candles.append({
+                                            'time': int(dt_val.timestamp()),
+                                            'datetime': dt_str,
+                                            'date': dt_str[:10],
+                                            'time_str': dt_str[11:19],
+                                            'open': round(float(row['open']), 2),
+                                            'high': round(float(row['high']), 2),
+                                            'low': round(float(row['low']), 2),
+                                            'close': round(float(row['close']), 2),
+                                            'volume': int(row.get('volume', 0)),
+                                        })
+                                else:
+                                    for min_str, min_group in final_opt_df.groupby('minute', sort=True):
+                                        min_dt_str = min_str + ":00"
+                                        min_dt_val = dt.datetime.strptime(min_dt_str, "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc)
+                                        agg_candles.append({
+                                            'time': int(min_dt_val.timestamp()),
+                                            'datetime': min_dt_str,
+                                            'date': min_str[:10],
+                                            'time_str': min_str[11:16],
+                                            'open': round(float(min_group.iloc[0]['open']), 2),
+                                            'high': round(float(min_group['high'].max()), 2),
+                                            'low': round(float(min_group['low'].min()), 2),
+                                            'close': round(float(min_group.iloc[-1]['close']), 2),
+                                            'volume': int(min_group['volume'].sum()),
+                                        })
                                 candles = sorted(agg_candles, key=lambda c: c['time'])
 
                     if candles or spot_candles:
@@ -1186,22 +1208,17 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
         decision_raw = str(target_trade.get('decision_timestamp') or '')
         decision_time_str = decision_raw[11:16] if len(decision_raw) >= 16 else ""
         if not decision_time_str:
-            try:
-                e_dt = dt.datetime.strptime(f"{trade_date} {entry_time_str}:00", "%Y-%m-%d %H:%M:%S")
-                d_dt = e_dt - dt.timedelta(minutes=max(1, retest_duration_min))
-                decision_time_str = d_dt.strftime("%H:%M")
-            except Exception:
-                decision_time_str = entry_time_str
+            decision_time_str = entry_time_str
 
         decision_spot = float(target_trade.get('decision_spot_price') or index_entry)
-        decision_strike_ltp = float(target_trade.get('decision_strike_ltp') or (entry_price + 2.5))
+        decision_strike_ltp = float(target_trade.get('decision_strike_ltp') or entry_price)
         order_placed_raw = str(target_trade.get('order_placed_timestamp') or '')
         order_placed_time_str = order_placed_raw[11:16] if len(order_placed_raw) >= 16 else decision_time_str
 
         try:
             decision_epoch = int(dt.datetime.strptime(f"{trade_date} {decision_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
         except Exception:
-            decision_epoch = max(0, entry_epoch - 60)
+            decision_epoch = entry_epoch
 
         try:
             order_placed_epoch = int(dt.datetime.strptime(f"{trade_date} {order_placed_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
@@ -2224,6 +2241,37 @@ The **Go Quantitative Strategy Engine** executes deterministic, auditable rule-b
             },
             "user_manual": "# Morning 3-Min HTF & Option MACD Retest\n\n## 1. Overview\nTargets the high-probability morning momentum window (9:20–11:30 IST) using 3-minute MACD retest setups.\n\n## 2. Signal Generation Logic\n- 3m MACD (12/26) crossover with retest of signal line confirms entry.\n- ORB 15m filter ensures trades align with opening range direction.\n- Option MACD: premium EMA crossover on selected strike used for secondary confirmation.\n- Tight 12pt SL, 1:2.0 RR, trailing stop to breakeven at 1.0R.\n",
         },
+        {
+            "name": "EMA 9/21 Retest + MACD Momentum (1:2.0 RR)",
+            "code_name": "ema_macd_retest",
+            "category": "Momentum & Retest",
+            "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
+            "description": "EMA 9/21 trend alignment with price pullback retest to EMA 9 and MACD zero-line momentum gatekeeper. Features Strike Sweep ATM±3 mid-price entry and 1:2.0 RR with trailing breakeven.",
+            "go_file_path": "go-app/strategies/preset_ema_macd_retest.go",
+            "default_parameters": {
+                "lots_count": 1,
+                "strike_selection": "ATM",
+                "risk_reward_ratio": 2.0,
+                "rr_ratio": 2.0,
+                "stop_loss_points": 15.0,
+                "sl_pts": 15.0,
+                "ema_fast": 9,
+                "ema_slow": 21,
+                "macd_fast": 12,
+                "macd_slow": 26,
+                "macd_signal": 9,
+                "use_orb_filter": False,
+                "use_orb": False,
+                "min_displacement": 0.40,
+                "trail_breakeven": True,
+                "breakeven_at_r": 1.2,
+                "entry_window_from": "09:20",
+                "entry_window_to": "14:45",
+                "cooldown_seconds": 300,
+                "order_type": "LIMIT",
+            },
+            "user_manual": "# EMA 9/21 Retest + MACD Momentum Strategy Manual\n\n## 1. Overview\nThe EMA 9/21 Retest + MACD Momentum strategy captures high-probability trend continuation moves by requiring price to pull back and retest the fast EMA 9 after an established trend crossover, confirmed by MACD momentum.\n\n## 2. Signal Generation Logic\n- Trend Alignment: EMA 9 > EMA 21 (Bullish) or EMA 9 < EMA 21 (Bearish).\n- Retest Trigger: Price pulls back to test EMA 9 level (Low <= EMA 9 <= High) and closes in trend direction.\n- MACD Momentum Gatekeeper: MACD line > Signal line & MACD >= 0 (CALL) or MACD line < Signal line & MACD <= 0 (PUT).\n- Optimal Entry Strike Sweep: Sweeps ATM±3 strikes for highest liquidity (OI/Volume) and limit entry mid-price.\n- Risk Management: 15 pt Stop Loss, 30 pt Target (1:2.0 RR), trailing stop to breakeven at 1.2R.\n",
+        },
     ]
 
     for item in defaults:
@@ -2644,6 +2692,8 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             'strike_selection_val': params.get('strike_selection', 'ATM'),
             'stop_loss_points_val': params.get('stop_loss_points', params.get('sl_pts', 30.0)),
             'rr_ratio_val': params.get('rr_ratio', 2.0),
+            'enable_trailing_sl_val': bool(params.get('enable_trailing_sl', True)) if not isinstance(params.get('enable_trailing_sl', True), str) else params.get('enable_trailing_sl', 'true').lower() in ('true', '1', 'on'),
+            'trailing_sl_trigger_r_val': float(params.get('trailing_sl_trigger_r', 1.2) or 1.2),
             'prompt_directives_val': params.get('prompt_directives', ''),
         }
         return render(request, 'admins/partials/backtest_edit_modal.html', context)
@@ -2683,6 +2733,12 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             lots_count = int(request.POST.get('lots_count', 1))
         except ValueError:
             lots_count = 1
+
+        enable_trailing_sl = ('enable_trailing_sl' in request.POST)
+        try:
+            trailing_sl_trigger_r = float(request.POST.get('trailing_sl_trigger_r', '1.2').strip() or 1.2)
+        except ValueError:
+            trailing_sl_trigger_r = 1.2
 
         enable_ai_lot_sizing = ('enable_ai_lot_sizing' in request.POST)
         enable_ai_compounding = enable_ai_lot_sizing or ('enable_ai_compounding' in request.POST)
@@ -2791,6 +2847,8 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             "stop_loss_points": sl_pts,
             "sl_pts": sl_pts,
             "lots_count": lots_count,
+            "enable_trailing_sl": enable_trailing_sl,
+            "trailing_sl_trigger_r": trailing_sl_trigger_r,
             "enable_ai_lot_sizing": enable_ai_lot_sizing,
             "enable_ai_compounding": enable_ai_compounding,
             "compounding_batch_trades": compounding_batch_trades,

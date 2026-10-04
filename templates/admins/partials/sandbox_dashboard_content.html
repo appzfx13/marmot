@@ -386,17 +386,20 @@
                     }
                     if (row) {
                         const ltpEl = row.querySelector('.pos-live-ltp');
-                        if (ltpEl && pos.current_ltp) {
+                        const lastTick = parseInt(ltpEl ? ltpEl.getAttribute('data-last-tick') : 0, 10) || 0;
+                        const hasFreshTick = (Date.now() - lastTick) < 3000;
+
+                        if (ltpEl && pos.current_ltp && !hasFreshTick) {
                             ltpEl.textContent = '₹' + parseFloat(pos.current_ltp).toFixed(2);
                         }
                         const unrlEl = row.querySelector('.pos-live-unrealized');
-                        if (unrlEl && pos.unrealized_profit !== undefined) {
+                        if (unrlEl && pos.unrealized_profit !== undefined && !hasFreshTick) {
                             const u = parseFloat(pos.unrealized_profit) || 0;
                             unrlEl.textContent = (u >= 0 ? '+₹' : '-₹') + Math.abs(u).toFixed(2);
                             unrlEl.className = 'text-end font-monospace small pos-live-unrealized ' + (u >= 0 ? 'text-success' : 'text-danger');
                         }
                         const totEl = row.querySelector('.pos-live-total');
-                        if (totEl && pos.total_pnl !== undefined) {
+                        if (totEl && pos.total_pnl !== undefined && !hasFreshTick) {
                             const t = parseFloat(pos.total_pnl) || 0;
                             totEl.textContent = (t >= 0 ? '+₹' : '-₹') + Math.abs(t).toFixed(2);
                             totEl.className = 'text-end font-monospace fw-bold fs-6 pos-live-total ' + (t >= 0 ? 'text-success' : 'text-danger');

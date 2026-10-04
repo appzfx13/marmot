@@ -3,6 +3,7 @@ package strategies
 import (
 	"fmt"
 	"math"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -69,6 +70,67 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 	// Local stateless engine per day — ensures no cross-day ORB/EMA contamination
 	localEngine := NewQuantEngineStrategy(s.GetName())
 
+	// Trailing Stop Loss parameter parsing (user-configured overrides have ultimate precedence)
+	enableTrailingSL := true
+	trailingTriggerR := 1.2
+	if input.Params != nil {
+		if val, exists := input.Params["enable_trailing_sl"]; exists {
+			switch v := val.(type) {
+			case bool:
+				enableTrailingSL = v
+			case string:
+				enableTrailingSL = strings.EqualFold(v, "true") || v == "1" || strings.EqualFold(v, "on")
+			case float64:
+				enableTrailingSL = v != 0
+			case int:
+				enableTrailingSL = v != 0
+			}
+		} else if val, exists := input.Params["trail_breakeven"]; exists {
+			switch v := val.(type) {
+			case bool:
+				enableTrailingSL = v
+			case string:
+				enableTrailingSL = strings.EqualFold(v, "true") || v == "1" || strings.EqualFold(v, "on")
+			case float64:
+				enableTrailingSL = v != 0
+			case int:
+				enableTrailingSL = v != 0
+			}
+		}
+
+		if val, exists := input.Params["trailing_sl_trigger_r"]; exists {
+			switch v := val.(type) {
+			case float64:
+				if v > 0 {
+					trailingTriggerR = v
+				}
+			case int:
+				if v > 0 {
+					trailingTriggerR = float64(v)
+				}
+			case string:
+				if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+					trailingTriggerR = f
+				}
+			}
+		} else if val, exists := input.Params["breakeven_at_r"]; exists {
+			switch v := val.(type) {
+			case float64:
+				if v > 0 {
+					trailingTriggerR = v
+				}
+			case int:
+				if v > 0 {
+					trailingTriggerR = float64(v)
+				}
+			case string:
+				if f, err := strconv.ParseFloat(v, 64); err == nil && f > 0 {
+					trailingTriggerR = f
+				}
+			}
+		}
+	}
+
 	var activeTrade *TradeSignal
 	activeStrikeKey := "" // e.g. "ATM CALL" or "ATM+1 PUT"
 
@@ -103,13 +165,15 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			status := "WIN"
 			exitReason := "TARGET_HIT"
 
-			// Trailing stop loss to breakeven once option reaches +1.2R gain
-			initialRisk := activeTrade.EntryPrice - activeTrade.InitialStopLossPrice
-			if initialRisk > 0 && optHigh >= activeTrade.EntryPrice+(initialRisk*1.2) {
-				trailedPrice := activeTrade.EntryPrice + 1.0 // Lock in entry + slippage buffer
-				if activeTrade.StopLossPrice < trailedPrice {
-					activeTrade.StopLossPrice = trailedPrice
-					activeTrade.TrailingStopLossPrice = trailedPrice
+			// Trailing stop loss to breakeven once option reaches +trailingTriggerR gain (if enabled)
+			if enableTrailingSL {
+				initialRisk := activeTrade.EntryPrice - activeTrade.InitialStopLossPrice
+				if initialRisk > 0 && optHigh >= activeTrade.EntryPrice+(initialRisk*trailingTriggerR) {
+					trailedPrice := activeTrade.EntryPrice + 1.0 // Lock in entry + slippage buffer
+					if activeTrade.StopLossPrice < trailedPrice {
+						activeTrade.StopLossPrice = trailedPrice
+						activeTrade.TrailingStopLossPrice = trailedPrice
+					}
 				}
 			}
 
@@ -163,11 +227,20 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			continue
 		}
 
-		// Determine option type from signal
-		optionType := "CALL"
-		if strings.Contains(strings.ToLower(sig.TriggerReason), "bearish") ||
-			strings.Contains(strings.ToLower(sig.TriggerReason), "put") {
-			optionType = "PUT"
+		// Determine option type from signal (checks explicit OptionType, TradingSymbol, and triggerReason)
+		optionType := sig.OptionType
+		if optionType == "" {
+			upperSymbol := strings.ToUpper(sig.TradingSymbol)
+			lowerReason := strings.ToLower(sig.TriggerReason)
+			if strings.Contains(upperSymbol, "PUT") ||
+				strings.HasSuffix(upperSymbol, "PE") ||
+				strings.Contains(upperSymbol, " PE") ||
+				strings.Contains(lowerReason, "bear") ||
+				strings.Contains(lowerReason, "put") {
+				optionType = "PUT"
+			} else {
+				optionType = "CALL"
+			}
 		}
 
 		// ── 2b. AI Macro Assist Directional Filter ────────────────────────────
@@ -714,19 +787,50 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 				preset.Name, math.Max(highPrice, prevHigh), accHigh, math.Max(upperWickRatio, prevUpperWickRatio)*100, closePrice,
 			)
 		}
+	} else if presetKey == "ema_macd_retest" && len(s.candleBuffer) >= 3 {
+		// EMA 9/21 Retest + MACD Momentum Engine
+		isBullishRetest := emaFast > emaSlow &&
+			lowPrice <= (emaFast + 2.0) &&
+			closePrice > openPrice &&
+			closePrice >= (emaFast - 0.5) &&
+			macdLine >= signalLine &&
+			macdLine >= -0.5 &&
+			displacementRatio >= minDisplacement
+
+		isBearishRetest := emaFast < emaSlow &&
+			highPrice >= (emaFast - 2.0) &&
+			closePrice < openPrice &&
+			closePrice <= (emaFast + 0.5) &&
+			macdLine <= signalLine &&
+			macdLine <= 0.5 &&
+			displacementRatio >= minDisplacement
+
+		if isBullishRetest {
+			isBullishSignal = true
+			triggerReason = fmt.Sprintf(
+				"⚡ [%s] Bullish EMA Retest (Low=%.1f <= EMA9=%.1f) | MACD=%.3f > Sig=%.3f | Disp=%.1f%%",
+				preset.Name, lowPrice, emaFast, macdLine, signalLine, displacementPct,
+			)
+		} else if isBearishRetest {
+			isBearishSignal = true
+			triggerReason = fmt.Sprintf(
+				"⚡ [%s] Bearish EMA Retest (High=%.1f >= EMA9=%.1f) | MACD=%.3f < Sig=%.3f | Disp=%.1f%%",
+				preset.Name, highPrice, emaFast, macdLine, signalLine, displacementPct,
+			)
+		}
 	}
 
 	if !isBullishSignal && !isBearishSignal {
 		if isBullishTrend && isBullishCandle && isBullishORB && isBullishRSI && isBullishMACD && displacementRatio >= minDisplacement {
 			isBullishSignal = true
 			triggerReason = fmt.Sprintf(
-				"⚡ [%s] EMA %d/%d Bull (%.1f>%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
+				"⚡ [%s] EMA %d/%d Bullish (%.1f>%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
 				preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, rsiValue, macdLine, displacementPct,
 			)
 		} else if isBearishTrend && isBearishCandle && isBearishORB && isBearishRSI && isBearishMACD && displacementRatio >= minDisplacement {
 			isBearishSignal = true
 			triggerReason = fmt.Sprintf(
-				"⚡ [%s] EMA %d/%d Bear (%.1f<%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
+				"⚡ [%s] EMA %d/%d Bearish (%.1f<%.1f) | RSI=%.1f | MACD=%.3f | Disp=%.1f%%",
 				preset.Name, preset.EMAFast, preset.EMASlow, emaFast, emaSlow, rsiValue, macdLine, displacementPct,
 			)
 		}
@@ -919,6 +1023,7 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	return &LiveOrderRequest{
 		IndexName:     indexName,
 		TradingSymbol: tradingSymbol,
+		OptionType:    optionType,
 		Transaction:   transaction,
 		OrderType:     orderType,
 		LimitPrice:    limitPrice,

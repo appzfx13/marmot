@@ -828,6 +828,40 @@
                     </div>
                 </div>
                 {% endif %}
+
+                <!-- Trailing Stop Loss Switch & Trigger Multiple -->
+                <div class="row g-3.5 mt-2 pt-3 border-top" style="border-color: var(--border-color) !important;">
+                    <div class="col-12 col-md-6 d-flex align-items-center justify-content-between">
+                        <div>
+                            <label class="form-check-label edit-modal-label small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-1.5" for="edit_enable_trailing_sl" style="font-size: 0.82rem;">
+                                <span class="material-icons text-info align-middle" style="font-size: 1rem;">trending_up</span>
+                                <span>Trailing Stop Loss (Trailing SL)</span>
+                            </label>
+                            <div class="edit-modal-muted" style="font-size: 0.74rem;">
+                                Automatically trail SL to breakeven + buffer once profit threshold is reached
+                            </div>
+                        </div>
+                        <div class="form-check form-switch p-0 m-0">
+                            <input type="checkbox" name="enable_trailing_sl" id="edit_enable_trailing_sl" 
+                                   class="form-check-input edit-rule-toggle m-0" 
+                                   role="switch" 
+                                   {% if enable_trailing_sl_val %}checked{% endif %}
+                                   onchange="toggleTrailingSlInput(this.checked)">
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6" id="trailing_sl_trigger_group" style="{% if not enable_trailing_sl_val %}display: none;{% endif %}">
+                        <label class="form-label edit-modal-label small fw-bold text-uppercase mb-2" for="edit_trailing_sl_trigger_r" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                            Trailing Trigger (R-Multiple)<span class="text-danger ms-1">*</span>
+                        </label>
+                        <div class="input-group">
+                            <input type="number" step="0.1" min="0.5" max="10.0" name="trailing_sl_trigger_r" id="edit_trailing_sl_trigger_r" 
+                                   class="form-control edit-modal-input font-monospace fw-bold text-info" 
+                                   value="{{ trailing_sl_trigger_r_val|default:'1.2' }}" style="font-size: 0.88rem;">
+                            <span class="input-group-text edit-modal-input text-muted small fw-semibold">R (e.g. 1.2 = 1.2x Risk)</span>
+                        </div>
+                        <small class="edit-modal-muted mt-1 d-block" style="font-size: 0.72rem;">When option premium reaches Entry + (Initial Risk × R), SL is trailed to Entry + 1.0 buffer.</small>
+                    </div>
+                </div>
             </div>
 
             <!-- 2.4 AI Dynamic Lot Sizing & Auto Risk Management (Subpanel with Roomy Padding) -->
@@ -1297,6 +1331,13 @@ function toggleMacroAssistSubpanel(isEnabled) {
     if (grid) {
         grid.style.opacity = isEnabled ? '1.0' : '0.55';
         grid.style.pointerEvents = isEnabled ? 'auto' : 'none';
+    }
+}
+
+function toggleTrailingSlInput(isEnabled) {
+    const triggerGroup = document.getElementById('trailing_sl_trigger_group');
+    if (triggerGroup) {
+        triggerGroup.style.display = isEnabled ? 'block' : 'none';
     }
 }
 

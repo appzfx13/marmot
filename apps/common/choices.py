@@ -31,6 +31,7 @@ class StrategyChoices(models.TextChoices):
     HFT_SCALP = 'hft_scalp', 'High-Frequency Micro-Scalp (HFT 1:2.0)'
     MACD_ICT_HYBRID = 'macd_ict_hybrid', 'Advanced HTF MACD + ICT Hybrid (1:2.0 High Winrate)'
     VOLUME_AMD = 'volume_amd', 'Volume + AMD (Accumulation, Manipulation, Distribution)'
+    EMA_MACD_RETEST = 'ema_macd_retest', 'EMA 9/21 Retest + MACD Momentum (1:2.0 RR)'
 
 
 # Strike Selection Choices

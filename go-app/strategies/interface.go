@@ -97,6 +97,7 @@ type StrategyResult struct {
 type LiveOrderRequest struct {
 	IndexName     string  `json:"index_name"`     // e.g. NIFTY
 	TradingSymbol string  `json:"trading_symbol"` // e.g. NIFTY 22400 CE
+	OptionType    string  `json:"option_type,omitempty"` // CALL / PUT
 	Transaction   string  `json:"transaction"`    // BUY / SELL
 	OrderType     string  `json:"order_type"`     // MARKET / LIMIT
 	LimitPrice    float64 `json:"limit_price,omitempty"` // Execution limit price if LIMIT order
