@@ -1901,7 +1901,7 @@
                 (tradeType.includes('PE') || tradeType.includes('PUT') || strikeStr.includes('PE') || strikeStr.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL'));
             const markers = [];
 
-            // 1. Signal Generated Marker (Yellow Arrow)
+            // 1. Signal & Entry Markers (Spot Chart)
             if (signalEpoch && signalEpoch !== entryEpoch) {
                 markers.push({
                     time: findNearestCandleTime(activeSpotCandles, signalEpoch),
@@ -1911,16 +1911,24 @@
                     text: `⚡ SIGNAL (${tl.signal_time || ''}) Spot: ${tl.signal_spot ? tl.signal_spot.toFixed(1) : ''}`,
                     size: 2,
                 });
-            }
-
-            // 2. Limit Tapped / Executed Marker (Blue Arrow)
-            if (entryEpoch) {
+                if (entryEpoch) {
+                    markers.push({
+                        time: findNearestCandleTime(activeSpotCandles, entryEpoch),
+                        position: isBearishSpot ? 'aboveBar' : 'belowBar',
+                        color: '#0284c7',
+                        shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
+                        text: `${isBearishSpot ? '▼' : '▲'} ENTRY ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                        size: 2,
+                    });
+                }
+            } else if (entryEpoch) {
+                // Unified Signal & Entry Badge when on the same bar/tick
                 markers.push({
                     time: findNearestCandleTime(activeSpotCandles, entryEpoch),
                     position: isBearishSpot ? 'aboveBar' : 'belowBar',
-                    color: '#0284c7',
+                    color: '#eab308',
                     shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
-                    text: `${isBearishSpot ? '▼' : '▲'} ENTRY ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    text: `⚡ SIGNAL & ${isBearishSpot ? '▼' : '▲'} ENTRY ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
                     size: 2,
                 });
             }
@@ -1961,7 +1969,7 @@
             const placedEpoch = tl.limit_placed_epoch;
             const markers = [];
 
-            // 1. Signal Time Marker (Yellow Arrow)
+            // 1. Signal Time Marker (Yellow Arrow - distinct from entry)
             if (signalEpoch && signalEpoch !== entryEpoch) {
                 const cmpStr = tl.signal_strike_ltp ? ` CMP: ₹${Number(tl.signal_strike_ltp).toFixed(1)}` : '';
                 markers.push({
@@ -1986,14 +1994,17 @@
                 });
             }
 
-            // 3. Limit Tapped / Filled Marker (Blue Arrow)
+            // 3. Limit Tapped / Filled Marker (Blue Arrow or Combined Signal Arrow)
             if (entryEpoch) {
+                const isSameBar = (signalEpoch && signalEpoch === entryEpoch);
                 markers.push({
                     time: findNearestCandleTime(activeOptCandles, entryEpoch),
                     position: 'belowBar',
-                    color: '#0284c7',
+                    color: isSameBar ? '#eab308' : '#0284c7',
                     shape: 'arrowUp',
-                    text: `▲ ENTRY FILLED ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    text: isSameBar ?
+                        `⚡ SIGNAL & ▲ ENTRY FILLED ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})` :
+                        `▲ ENTRY FILLED ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
                     size: 2,
                 });
             }

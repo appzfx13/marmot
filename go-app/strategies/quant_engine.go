@@ -131,6 +131,76 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 		}
 	}
 
+	// Retest Layering execution parameters
+	enableRetestLayering := false
+	layerCount := 3
+	retestPercentages := []float64{25.0, 50.0, 75.0}
+	layerLots := []int{1, 1, 1}
+
+	if input.Params != nil {
+		if val, exists := input.Params["enable_retest_layering"]; exists {
+			switch v := val.(type) {
+			case bool:
+				enableRetestLayering = v
+			case string:
+				enableRetestLayering = (strings.EqualFold(v, "true") || v == "1" || strings.EqualFold(v, "on"))
+			}
+		}
+		if val, exists := input.Params["layer_count"]; exists {
+			switch v := val.(type) {
+			case int:
+				if v >= 1 { layerCount = v }
+			case float64:
+				if v >= 1 { layerCount = int(v) }
+			}
+		}
+		if val, exists := input.Params["retest_percentages"]; exists {
+			if arr, ok := val.([]interface{}); ok && len(arr) > 0 {
+				var pcts []float64
+				for _, item := range arr {
+					if f, ok := item.(float64); ok {
+						pcts = append(pcts, f)
+					} else if n, ok := item.(int); ok {
+						pcts = append(pcts, float64(n))
+					}
+				}
+				if len(pcts) > 0 {
+					retestPercentages = pcts
+				}
+			} else if farr, ok := val.([]float64); ok && len(farr) > 0 {
+				retestPercentages = farr
+			}
+		}
+		if val, exists := input.Params["layer_lots"]; exists {
+			if arr, ok := val.([]interface{}); ok && len(arr) > 0 {
+				var lots []int
+				for _, item := range arr {
+					if n, ok := item.(int); ok && n >= 1 {
+						lots = append(lots, n)
+					} else if f, ok := item.(float64); ok && f >= 1 {
+						lots = append(lots, int(f))
+					}
+				}
+				if len(lots) > 0 {
+					layerLots = lots
+				}
+			} else if iarr, ok := val.([]int); ok && len(iarr) > 0 {
+				layerLots = iarr
+			}
+		}
+	}
+
+	type pendingLayer struct {
+		LimitPrice float64
+		Quantity   int
+		Filled     bool
+	}
+	var activeLayers []pendingLayer
+	filledCost := 0.0
+	filledQty := 0
+	activeSlPts := 15.0
+	activeRRRatio := 2.0
+
 	var activeTrade *TradeSignal
 	activeStrikeKey := "" // e.g. "ATM CALL" or "ATM+1 PUT"
 
@@ -157,6 +227,30 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 				optLow = optSnap.Low
 				optHigh = optSnap.High
 				optClose = optSnap.Close
+			}
+
+			// Fill any pending limit layers during option pullback before checking exit
+			if enableRetestLayering && len(activeLayers) > 0 {
+				newFill := false
+				for lIdx := range activeLayers {
+					if !activeLayers[lIdx].Filled && optLow <= activeLayers[lIdx].LimitPrice {
+						activeLayers[lIdx].Filled = true
+						filledQty += activeLayers[lIdx].Quantity
+						filledCost += activeLayers[lIdx].LimitPrice * float64(activeLayers[lIdx].Quantity)
+						newFill = true
+					}
+				}
+				if newFill && filledQty > 0 {
+					avgPrice := math.Round((filledCost/float64(filledQty))*100) / 100
+					activeTrade.EntryPrice = avgPrice
+					activeTrade.Quantity = filledQty
+					activeTrade.UtilizedCapital = math.Round(filledCost)
+					activeTrade.TargetPrice = math.Round((avgPrice+activeSlPts*activeRRRatio)*100) / 100
+					activeTrade.StopLossPrice = math.Round((avgPrice-activeSlPts)*100) / 100
+					if activeTrade.StopLossPrice < 0.5 {
+						activeTrade.StopLossPrice = 0.5
+					}
+				}
 			}
 
 			isClosed := false
@@ -208,6 +302,7 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			}
 
 			if isClosed {
+				activeLayers = nil
 				activeTrade.ExitPrice = math.Round(exitOptPrice*100) / 100
 				activeTrade.IndexExitPrice = exitSpotPrice
 				activeTrade.ExitTimestamp = tick.Datetime
@@ -346,6 +441,9 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			slOptPrice = 0.5 // floor: option can't go below 0.05 realistically
 		}
 
+		activeSlPts = slPts
+		activeRRRatio = rrRatio
+
 		activeTrade = &TradeSignal{
 			Timestamp:             tick.Datetime,
 			Strike:                concreteStrike,
@@ -364,6 +462,70 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			Reason:                sig.TriggerReason + macroTag,
 		}
 		activeStrikeKey = concreteStrike
+
+		activeLayers = nil
+		filledCost = 0.0
+		filledQty = 0
+
+		if enableRetestLayering && layerCount > 1 {
+			optSnap := tick.Options[concreteStrike]
+			candleHigh := optSnap.High
+			candleLow := optSnap.Low
+			if candleHigh <= 0 || candleHigh <= candleLow {
+				candleHigh = entryOptPrice * 1.02
+				candleLow = entryOptPrice * 0.98
+			}
+			candleRange := candleHigh - candleLow
+
+			baseLotSize := sig.Quantity / max(1, layerCount)
+			if baseLotSize <= 0 {
+				baseLotSize = sig.Quantity
+			}
+
+			sumPresetLots := sumLots(layerLots)
+			for idx := 0; idx < layerCount; idx++ {
+				pct := 25.0 * float64(idx+1)
+				if idx < len(retestPercentages) {
+					pct = retestPercentages[idx]
+				}
+				layerLimit := math.Round((candleHigh - (candleRange * (pct / 100.0))) * 100) / 100
+				if layerLimit <= 0.5 {
+					layerLimit = math.Round(entryOptPrice*(1.0-(float64(idx+1)*0.01))*100) / 100
+				}
+				layerQty := baseLotSize
+				if idx < len(layerLots) && layerLots[idx] > 0 && sumPresetLots > 0 {
+					layerQty = layerLots[idx] * (sig.Quantity / sumPresetLots)
+					if layerQty <= 0 {
+						layerQty = baseLotSize
+					}
+				}
+
+				isFilled := false
+				if optSnap.Low > 0 && optSnap.Low <= layerLimit {
+					isFilled = true
+					filledQty += layerQty
+					filledCost += layerLimit * float64(layerQty)
+				}
+
+				activeLayers = append(activeLayers, pendingLayer{
+					LimitPrice: layerLimit,
+					Quantity:   layerQty,
+					Filled:     isFilled,
+				})
+			}
+
+			if filledQty > 0 {
+				avgPrice := math.Round((filledCost/float64(filledQty))*100) / 100
+				activeTrade.EntryPrice = avgPrice
+				activeTrade.Quantity = filledQty
+				activeTrade.UtilizedCapital = math.Round(filledCost)
+				activeTrade.TargetPrice = math.Round((avgPrice+slPts*rrRatio)*100) / 100
+				activeTrade.StopLossPrice = math.Round((avgPrice-slPts)*100) / 100
+				if activeTrade.StopLossPrice < 0.5 {
+					activeTrade.StopLossPrice = 0.5
+				}
+			}
+		}
 	}
 
 	totalPnL := 0.0
@@ -1174,4 +1336,12 @@ func isIndexExpiryDay(indexName string, t time.Time) bool {
 		// Default to Thursday for Indian equity derivatives
 		return weekday == time.Thursday
 	}
+}
+
+func sumLots(lots []int) int {
+	s := 0
+	for _, l := range lots {
+		s += l
+	}
+	return s
 }

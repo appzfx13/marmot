@@ -682,7 +682,8 @@
     <form method="POST" 
           action="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
           hx-post="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
-          hx-target="#globalHtmxModalDialog">
+          hx-target="#globalHtmxModalDialog"
+          onsubmit="return validateBacktestForm(event)">
         {% csrf_token %}
 
         <div class="modal-body px-4 px-md-4.5 py-4" data-lenis-prevent style="max-height: 74vh; overflow-y: auto; overscroll-behavior: contain;">
@@ -860,6 +861,64 @@
                             <span class="input-group-text edit-modal-input text-muted small fw-semibold">R (e.g. 1.2 = 1.2x Risk)</span>
                         </div>
                         <small class="edit-modal-muted mt-1 d-block" style="font-size: 0.72rem;">When option premium reaches Entry + (Initial Risk × R), SL is trailed to Entry + 1.0 buffer.</small>
+                    </div>
+                </div>
+
+                <!-- Retest Layering Execution Engine (Limit Grid Pullback) -->
+                <div class="row g-3.5 mt-2 pt-3 border-top" style="border-color: var(--border-color) !important;">
+                    <div class="col-12 col-md-6 d-flex align-items-center justify-content-between">
+                        <div>
+                            <label class="form-check-label edit-modal-label small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-1.5" for="edit_enable_retest_layering" style="font-size: 0.82rem;">
+                                <span class="material-icons text-warning align-middle" style="font-size: 1rem;">layers</span>
+                                <span>Retest Layering (Limit Grid Pullback)</span>
+                            </label>
+                            <div class="edit-modal-muted" style="font-size: 0.74rem;">
+                                Split entry into multi-tiered limit orders on pullback depth instead of a single market order
+                            </div>
+                        </div>
+                        <div class="form-check form-switch p-0 m-0">
+                            <input type="checkbox" name="enable_retest_layering" id="edit_enable_retest_layering" 
+                                   class="form-check-input edit-rule-toggle m-0" 
+                                   role="switch" 
+                                   {% if enable_retest_layering_val %}checked{% endif %}
+                                   onchange="toggleRetestLayering(this.checked)">
+                        </div>
+                    </div>
+                    <div class="col-12 col-md-6" id="retest_layering_settings" style="{% if not enable_retest_layering_val %}display: none;{% endif %}">
+                        <div class="d-flex align-items-center justify-content-between mb-1.5">
+                            <label class="form-label edit-modal-label small fw-bold text-uppercase mb-0" for="edit_layer_count" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                                Layer Count (1–5)<span class="text-danger ms-1">*</span>
+                            </label>
+                            <div class="btn-group btn-group-sm" role="group">
+                                <button type="button" class="btn btn-outline-secondary py-0 px-2" style="font-size: 0.68rem;" onclick="applyLayerPreset(2, [35, 70])">2 L (35/70)</button>
+                                <button type="button" class="btn btn-outline-secondary py-0 px-2" style="font-size: 0.68rem;" onclick="applyLayerPreset(3, [25, 50, 75])">3 L (25/50/75)</button>
+                                <button type="button" class="btn btn-outline-secondary py-0 px-2" style="font-size: 0.68rem;" onclick="applyLayerPreset(4, [20, 40, 60, 80])">4 L (20/40/60/80)</button>
+                            </div>
+                        </div>
+                        <input type="number" min="1" max="5" name="layer_count" id="edit_layer_count" 
+                               class="form-control edit-modal-input font-monospace fw-bold text-warning mb-2" 
+                               value="{{ layer_count_val|default:3 }}" 
+                               oninput="renderLayerInputRows(parseInt(this.value, 10))">
+                    </div>
+                    <!-- Dynamic Layer Inputs Grid -->
+                    <div class="col-12" id="retest_layers_wrapper" style="{% if not enable_retest_layering_val %}display: none;{% endif %}">
+                        <div class="p-2.5 rounded border bg-black bg-opacity-25" style="border-color: rgba(255,255,255,0.08) !important;">
+                            <div class="d-flex align-items-center justify-content-between mb-2">
+                                <span class="small fw-bold text-uppercase edit-modal-label" style="font-size: 0.72rem;">
+                                    <span class="material-icons align-middle text-warning me-1" style="font-size: 0.85rem;">tune</span>
+                                    Pullback Depth & Tranche Lot Allocation
+                                </span>
+                                <span id="layer_validation_badge" class="badge bg-info bg-opacity-10 text-info border border-info border-opacity-25" style="font-size: 0.68rem;">
+                                    Total Lots Match Required
+                                </span>
+                            </div>
+                            <div id="retest_layers_container" class="row g-2">
+                                <!-- Dynamically rendered by renderLayerInputRows() -->
+                            </div>
+                            <small class="edit-modal-muted mt-2 d-block" style="font-size: 0.70rem;">
+                                Pullback % determines limit order depth relative to candle range. Target & Stop Loss adjust dynamically to weighted average entry price.
+                            </small>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1401,8 +1460,123 @@ function selectAllEditRules(shouldCheck) {
     checkboxes.forEach(cb => cb.checked = shouldCheck);
 }
 
+function toggleRetestLayering(isEnabled) {
+    const s = document.getElementById('retest_layering_settings');
+    const w = document.getElementById('retest_layers_wrapper');
+    if (s) s.style.display = isEnabled ? 'block' : 'none';
+    if (w) w.style.display = isEnabled ? 'block' : 'none';
+    if (isEnabled) {
+        const count = parseInt(document.getElementById('edit_layer_count')?.value, 10) || 3;
+        renderLayerInputRows(count);
+    }
+}
+
+function applyLayerPreset(count, pcts) {
+    const inp = document.getElementById('edit_layer_count');
+    if (inp) inp.value = count;
+    renderLayerInputRows(count, pcts);
+}
+
+function renderLayerInputRows(count, customPcts) {
+    count = Math.max(1, Math.min(5, count || 3));
+    const container = document.getElementById('retest_layers_container');
+    if (!container) return;
+    container.innerHTML = '';
+
+    const existingPcts = customPcts || window._savedRetestPcts || [25, 50, 75];
+    const existingLots = window._savedLayerLots || [1, 1, 1];
+
+    for (let i = 0; i < count; i++) {
+        const defaultPct = existingPcts[i] !== undefined ? existingPcts[i] : Math.round((100 / (count + 1)) * (i + 1));
+        const defaultLot = existingLots[i] !== undefined ? existingLots[i] : 1;
+        const col = document.createElement('div');
+        col.className = count <= 3 ? 'col-12 col-md-4' : 'col-12 col-md-3';
+        col.innerHTML = `
+            <div class="p-2 rounded border" style="background: rgba(255,255,255,0.03); border-color: rgba(255,255,255,0.08) !important;">
+                <div class="d-flex align-items-center justify-content-between mb-1">
+                    <span class="small fw-bold text-warning" style="font-size: 0.70rem;">Layer ${i + 1}</span>
+                    <span class="text-muted" style="font-size: 0.65rem;">Limit Tier</span>
+                </div>
+                <div class="row g-1.5">
+                    <div class="col-7">
+                        <label class="small text-muted mb-0" style="font-size: 0.65rem;">Pullback %</label>
+                        <div class="input-group input-group-sm">
+                            <input type="number" min="0" max="100" step="5" name="retest_percentages[]" 
+                                   class="form-control edit-modal-input font-monospace py-0 px-1 text-center" 
+                                   value="${defaultPct}" style="font-size: 0.76rem;" onchange="validateLayerLots()">
+                            <span class="input-group-text py-0 px-1 text-muted" style="font-size: 0.65rem;">%</span>
+                        </div>
+                    </div>
+                    <div class="col-5">
+                        <label class="small text-muted mb-0" style="font-size: 0.65rem;">Lots</label>
+                        <input type="number" min="1" max="50" name="layer_lots[]" 
+                               class="form-control form-control-sm edit-modal-input font-monospace py-0 px-1 text-center text-info" 
+                               value="${defaultLot}" style="font-size: 0.76rem;" onchange="validateLayerLots()">
+                    </div>
+                </div>
+            </div>
+        `;
+        container.appendChild(col);
+    }
+    validateLayerLots();
+}
+
+function validateLayerLots() {
+    const isEnabled = document.getElementById('edit_enable_retest_layering')?.checked;
+    if (!isEnabled) return true;
+
+    const layerCount = parseInt(document.getElementById('edit_layer_count')?.value, 10) || 1;
+    const strategyLots = parseInt(document.getElementById('edit_lots_count')?.value, 10) || 1;
+    const badge = document.getElementById('layer_validation_badge');
+
+    let sumLots = 0;
+    const lotInputs = document.querySelectorAll("input[name='layer_lots[]']");
+    lotInputs.forEach(inp => sumLots += (parseInt(inp.value, 10) || 0));
+
+    if (strategyLots < layerCount) {
+        if (badge) {
+            badge.className = 'badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30';
+            badge.innerText = `Total lot size must be greater than or equal to layer count (${strategyLots} < ${layerCount})`;
+        }
+        return false;
+    }
+
+    if (sumLots !== strategyLots) {
+        if (badge) {
+            badge.className = 'badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30';
+            badge.innerText = `Layer lots sum (${sumLots}) != Strategy lots (${strategyLots})`;
+        }
+    } else {
+        if (badge) {
+            badge.className = 'badge bg-success bg-opacity-20 text-success border border-success border-opacity-30';
+            badge.innerText = `Matched: ${sumLots} Lots across ${layerCount} Layers`;
+        }
+    }
+    return true;
+}
+
+function validateBacktestForm(e) {
+    const isEnabled = document.getElementById('edit_enable_retest_layering')?.checked;
+    if (isEnabled) {
+        const layerCount = parseInt(document.getElementById('edit_layer_count')?.value, 10) || 1;
+        const strategyLots = parseInt(document.getElementById('edit_lots_count')?.value, 10) || 1;
+        if (strategyLots < layerCount) {
+            alert("Total lot size must be greater than or equal to layer count");
+            if (e) e.preventDefault();
+            return false;
+        }
+    }
+    return true;
+}
+
 // Expand dialog dynamically on mount and restore on close
 (function() {
+    window._savedRetestPcts = {{ retest_percentages_val|default:"[25, 50, 75]"|safe }};
+    window._savedLayerLots = {{ layer_lots_val|default:"[1, 1, 1]"|safe }};
+    if (document.getElementById('edit_enable_retest_layering')?.checked) {
+        renderLayerInputRows({{ layer_count_val|default:3 }});
+    }
+
     var dialog = document.getElementById('globalHtmxModalDialog');
     if (dialog) {
         dialog.style.setProperty('max-width', '1240px', 'important');
@@ -1420,6 +1594,5 @@ function selectAllEditRules(shouldCheck) {
         modalEl.addEventListener('hidden.bs.modal', onHide);
     }
 })();
-
 </script>
 

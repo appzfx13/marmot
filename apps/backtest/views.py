@@ -2694,6 +2694,10 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             'rr_ratio_val': params.get('rr_ratio', 2.0),
             'enable_trailing_sl_val': bool(params.get('enable_trailing_sl', True)) if not isinstance(params.get('enable_trailing_sl', True), str) else params.get('enable_trailing_sl', 'true').lower() in ('true', '1', 'on'),
             'trailing_sl_trigger_r_val': float(params.get('trailing_sl_trigger_r', 1.2) or 1.2),
+            'enable_retest_layering_val': bool(params.get('enable_retest_layering', False)) if not isinstance(params.get('enable_retest_layering', False), str) else params.get('enable_retest_layering', 'false').lower() in ('true', '1', 'on'),
+            'layer_count_val': int(params.get('layer_count', 3) or 3),
+            'retest_percentages_val': params.get('retest_percentages', [25.0, 50.0, 75.0]),
+            'layer_lots_val': params.get('layer_lots', [1, 1, 1]),
             'prompt_directives_val': params.get('prompt_directives', ''),
         }
         return render(request, 'admins/partials/backtest_edit_modal.html', context)
@@ -2739,6 +2743,40 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             trailing_sl_trigger_r = float(request.POST.get('trailing_sl_trigger_r', '1.2').strip() or 1.2)
         except ValueError:
             trailing_sl_trigger_r = 1.2
+
+        enable_retest_layering = ('enable_retest_layering' in request.POST)
+        try:
+            layer_count = max(1, min(10, int(request.POST.get('layer_count', '3').strip() or 3)))
+        except ValueError:
+            layer_count = 3
+
+        retest_pcts = []
+        raw_pcts = request.POST.getlist('retest_percentages[]') or request.POST.getlist('retest_percentages')
+        if not raw_pcts:
+            raw_str = request.POST.get('retest_percentages_csv', '')
+            if raw_str:
+                raw_pcts = [p.strip() for p in raw_str.split(',') if p.strip()]
+        for p in raw_pcts[:layer_count]:
+            try:
+                retest_pcts.append(max(0.0, min(100.0, float(p))))
+            except ValueError:
+                retest_pcts.append(50.0)
+        while len(retest_pcts) < layer_count:
+            step = 100.0 / (layer_count + 1)
+            retest_pcts.append(round(step * (len(retest_pcts) + 1), 1))
+
+        layer_lots = []
+        raw_lots = request.POST.getlist('layer_lots[]') or request.POST.getlist('layer_lots')
+        for l in raw_lots[:layer_count]:
+            try:
+                layer_lots.append(max(1, int(l)))
+            except ValueError:
+                layer_lots.append(1)
+        while len(layer_lots) < layer_count:
+            layer_lots.append(1)
+
+        if enable_retest_layering and lots_count < layer_count:
+            lots_count = max(layer_count, sum(layer_lots))
 
         enable_ai_lot_sizing = ('enable_ai_lot_sizing' in request.POST)
         enable_ai_compounding = enable_ai_lot_sizing or ('enable_ai_compounding' in request.POST)
@@ -2849,6 +2887,10 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             "lots_count": lots_count,
             "enable_trailing_sl": enable_trailing_sl,
             "trailing_sl_trigger_r": trailing_sl_trigger_r,
+            "enable_retest_layering": enable_retest_layering,
+            "layer_count": layer_count,
+            "retest_percentages": retest_pcts,
+            "layer_lots": layer_lots,
             "enable_ai_lot_sizing": enable_ai_lot_sizing,
             "enable_ai_compounding": enable_ai_compounding,
             "compounding_batch_trades": compounding_batch_trades,

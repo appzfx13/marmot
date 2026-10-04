@@ -21,6 +21,11 @@ type StrategyConfig struct {
 	CooldownSeconds  int
 	OrderType        string // "MARKET" or "LIMIT"
 	Description      string
+	// Retest Layering execution parameters
+	EnableRetestLayering bool
+	LayerCount           int
+	RetestPercentages    []float64
+	LayerLots            []int
 }
 
 var StrategyPresets = map[string]StrategyConfig{
