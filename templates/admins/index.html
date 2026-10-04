@@ -1784,11 +1784,8 @@
                     <li class="sidebar-menu-item">
                         <a href="{% url 'admins:admin-gateway-emulator' %}"
                             class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-gateway-emulator' %}active{% endif %}"
-                            id="admin-menu-gateway-emulator"
-                            hx-get="{% url 'admins:admin-gateway-emulator' %}"
-                            hx-target="#app-main-container"
-                            hx-swap="innerHTML"
-                            hx-push-url="true">
+                            id="admin-menu-gateway-emulator" hx-get="{% url 'admins:admin-gateway-emulator' %}"
+                            hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-motherboard-fill text-warning"></i>
                             <span>Mock Broker</span>
                         </a>
@@ -1796,11 +1793,8 @@
                     <li class="sidebar-menu-item">
                         <a href="{% url 'admins:admin-gateway-session-list' %}"
                             class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-gateway-session-list' or request.resolver_match.url_name == 'admin-gateway-session-detail' %}active{% endif %}"
-                            id="admin-menu-gateway-sessions"
-                            hx-get="{% url 'admins:admin-gateway-session-list' %}"
-                            hx-target="#app-main-container"
-                            hx-swap="innerHTML"
-                            hx-push-url="true">
+                            id="admin-menu-gateway-sessions" hx-get="{% url 'admins:admin-gateway-session-list' %}"
+                            hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
                             <i class="bi bi-collection-play-fill text-info"></i>
                             <span>Saved Sessions</span>
                         </a>
@@ -1954,7 +1948,8 @@
                             <span>Trade Controls</span>
                         </a>
                     </li>
-                    {% if request.user.role == 'admin' or request.user.role == 'developer' or request.user.is_superuser %}
+                    {% if request.user.role == 'admin' or request.user.role == 'developer' or request.user.is_superuser
+                    %}
                     <li class="sidebar-menu-item">
                         <a href="{% url 'admins:broker-master-list' %}"
                             class="sidebar-menu-link {% if '/admins/masters/brokers/' in request.path %}active{% endif %}"
@@ -2001,7 +1996,8 @@
             <img src="{% if request.user.avatar %}{{ request.user.avatar.url }}{% else %}{% static 'images/avatar.png' %}{% endif %}"
                 alt="Admin" class="sidebar-profile-img">
             <div class="sidebar-profile-info">
-                <div class="sidebar-profile-name">{% if request.user.first_name %}{{ request.user.first_name }}{% else %}{{ request.user.username }}{% endif %}</div>
+                <div class="sidebar-profile-name">{% if request.user.first_name %}{{ request.user.first_name }}{% else
+                    %}{{ request.user.username }}{% endif %}</div>
                 <div class="sidebar-profile-email">{{ request.user.email|default:"Administrator" }}</div>
             </div>
             <button type="button" class="btn btn-sm btn-link text-danger p-0 ms-auto" data-bs-toggle="modal"
@@ -2027,7 +2023,8 @@
                     <i class="bi bi-chevron-bar-left"></i>
                 </button>
                 <!-- Mobile sidebar toggle -->
-                <button class="sidebar-toggle-btn me-2 d-flex d-xl-none align-items-center justify-content-center" id="sidebar-toggle" aria-label="Toggle Navigation">
+                <button class="sidebar-toggle-btn me-2 d-flex d-xl-none align-items-center justify-content-center"
+                    id="sidebar-toggle" aria-label="Toggle Navigation">
                     <i class="bi bi-list"></i>
                 </button>
 
@@ -2129,7 +2126,8 @@
                         aria-expanded="false" id="profile-dropdown">
                         <img src="{% if request.user.avatar %}{{ request.user.avatar.url }}{% else %}{% static 'images/avatar.png' %}{% endif %}"
                             alt="Admin Profile" class="navbar-profile-img">
-                        <span class="navbar-profile-name d-none d-md-inline">{% if request.user.get_full_name %}{{ request.user.get_full_name }}{% else %}{{ request.user.username }}{% endif %}</span>
+                        <span class="navbar-profile-name d-none d-md-inline">{% if request.user.get_full_name %}{{
+                            request.user.get_full_name }}{% else %}{{ request.user.username }}{% endif %}</span>
                         <i class="bi bi-chevron-down navbar-profile-caret"></i>
                     </button>
                     <ul class="dropdown-menu dropdown-menu-end dropdown-menu-profile"
@@ -2687,7 +2685,7 @@
                 return false;
             };
 
-            window.updateLiveOptionContractsDOM = function(incomingSym, ltp) {
+            window.updateLiveOptionContractsDOM = function (incomingSym, ltp) {
                 if (!incomingSym || !ltp) return;
                 const ltpFloat = parseFloat(ltp);
                 if (isNaN(ltpFloat) || ltpFloat <= 0) return;
@@ -2697,7 +2695,7 @@
                 const isIncCE = cleanInc.includes('CE') || cleanInc.includes('CALL');
                 const isIncPE = cleanInc.includes('PE') || cleanInc.includes('PUT');
 
-                document.querySelectorAll('.order-live-ltp[data-symbol]').forEach(function(el) {
+                document.querySelectorAll('.order-live-ltp[data-symbol]').forEach(function (el) {
                     const rawSym = el.getAttribute('data-symbol') || '';
                     const cleanRaw = rawSym.toUpperCase().replace(/[^A-Z0-9]/g, '');
                     const mRawStrike = cleanRaw.match(/(\d{4,5})/);
@@ -2710,7 +2708,7 @@
                     }
                 });
 
-                document.querySelectorAll('.pos-live-ltp[data-symbol]').forEach(function(el) {
+                document.querySelectorAll('.pos-live-ltp[data-symbol]').forEach(function (el) {
                     const rawSym = el.getAttribute('data-symbol') || '';
                     const cleanRaw = rawSym.toUpperCase().replace(/[^A-Z0-9]/g, '');
                     const mRawStrike = cleanRaw.match(/(\d{4,5})/);
@@ -2745,7 +2743,7 @@
 
                 let totalUnrealized = 0;
                 let hasOpen = false;
-                document.querySelectorAll('#live-positions-container tbody tr[data-status="OPEN"]').forEach(function(r) {
+                document.querySelectorAll('#live-positions-container tbody tr[data-status="OPEN"]').forEach(function (r) {
                     hasOpen = true;
                     const p = parseFloat(r.getAttribute('data-pnl')) || 0;
                     totalUnrealized += p;
@@ -3149,7 +3147,7 @@
                                 if (dateStr.includes('-')) {
                                     const dParts = dateStr.split('-');
                                     if (dParts.length === 3) {
-                                        const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                        const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                                         const mIdx = parseInt(dParts[1], 10) - 1;
                                         if (mIdx >= 0 && mIdx < 12) {
                                             dateStr = dParts[2] + ' ' + months[mIdx] + ' ' + dParts[0];
@@ -3269,7 +3267,7 @@
                                     if (!isNaN(d.getTime())) {
                                         displayTs = d.toLocaleTimeString('en-IN', { hour12: false }) + ' IST';
                                     }
-                                } catch (e) {}
+                                } catch (e) { }
                             } else if (rawTs.includes(' ')) {
                                 displayTs = rawTs.split(' ')[1] + ' IST';
                             }
@@ -3407,7 +3405,7 @@
                         if (dateStr.includes('-')) {
                             var dParts = dateStr.split('-');
                             if (dParts.length === 3) {
-                                var months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                                var months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
                                 var mIdx = parseInt(dParts[1], 10) - 1;
                                 if (mIdx >= 0 && mIdx < 12) {
                                     dateStr = dParts[2] + ' ' + months[mIdx] + ' ' + dParts[0];
@@ -3525,9 +3523,9 @@
             function updateStrikeLTP(strike, optType, ltp) {
                 var strikeInt = parseInt(strike, 10);
                 var key = (optType === 'CE' ? 'ce_' : 'pe_') + strikeInt;
-                var el = document.querySelector('[data-tick-key="' + key + '"]') || 
-                         document.querySelector('[data-tick-key="' + (optType === 'CE' ? 'ce_' : 'pe_') + strike + '"]') ||
-                         document.getElementById(optType === 'CE' ? ('oc-ltp-ce-' + strikeInt) : ('oc-ltp-pe-' + strikeInt));
+                var el = document.querySelector('[data-tick-key="' + key + '"]') ||
+                    document.querySelector('[data-tick-key="' + (optType === 'CE' ? 'ce_' : 'pe_') + strike + '"]') ||
+                    document.getElementById(optType === 'CE' ? ('oc-ltp-ce-' + strikeInt) : ('oc-ltp-pe-' + strikeInt));
                 if (!el) return;
                 var prev = parseFloat(el.getAttribute('data-tick-price') || 0);
                 el.setAttribute('data-tick-price', ltp);
@@ -3552,7 +3550,7 @@
                 if (!el) {
                     var key = (optType === 'CE' ? 'ce_oi_' : 'pe_oi_') + strikeInt;
                     el = document.querySelector('[data-tick-key="' + key + '"]') ||
-                         document.querySelector('[data-tick-key="' + (optType === 'CE' ? 'ce_oi_' : 'pe_oi_') + strike + '"]');
+                        document.querySelector('[data-tick-key="' + (optType === 'CE' ? 'ce_oi_' : 'pe_oi_') + strike + '"]');
                 }
                 if (!el) return;
                 var numOI = parseInt(String(oi).replace(/,/g, '').trim(), 10);
@@ -3909,7 +3907,7 @@
             document.body.addEventListener('htmx:afterSwap', function () {
                 if (window.isLiveMockActive && !window.isLiveMockActive()) {
                     if (window._DhanEmulatorWS) {
-                        try { window._DhanEmulatorWS.close(); } catch (e) {}
+                        try { window._DhanEmulatorWS.close(); } catch (e) { }
                         window._DhanEmulatorWS = null;
                     }
                     if (_reconnectTimer) {

@@ -232,6 +232,63 @@ func (j *StrategySignalJob) fetchMockBrokerPositions() []MockBrokerPosition {
 	return posList
 }
 
+type MockBrokerOrderResp struct {
+	OrderID     string  `json:"orderId"`
+	Status      string  `json:"status"`
+	FilledQty   int     `json:"filledQty"`
+	FilledPrice float64 `json:"filledPrice"`
+	CreatedAt   string  `json:"createdAt"`
+	Order       struct {
+		TradingSymbol   string  `json:"tradingSymbol"`
+		SecurityID      string  `json:"securityId"`
+		TransactionType string  `json:"transactionType"`
+		ProductType     string  `json:"productType"`
+		OrderType       string  `json:"orderType"`
+		Quantity        int     `json:"quantity"`
+		Price           float64 `json:"price"`
+		LegName         string  `json:"legName"`
+	} `json:"order"`
+}
+
+func (j *StrategySignalJob) fetchMockBrokerOrders() []SimulatedOrder {
+	client := &http.Client{Timeout: 1 * time.Second}
+	resp, err := client.Get("http://mock_broker:8088/mock/v2/orders")
+	if err != nil || resp.StatusCode != http.StatusOK {
+		if resp != nil {
+			resp.Body.Close()
+		}
+		return nil
+	}
+	defer resp.Body.Close()
+	var rawList []MockBrokerOrderResp
+	_ = json.NewDecoder(resp.Body).Decode(&rawList)
+	var orders []SimulatedOrder
+	for _, mo := range rawList {
+		sym := mo.Order.TradingSymbol
+		if sym == "" {
+			sym = mo.Order.SecurityID
+		}
+		px := mo.FilledPrice
+		if px <= 0 {
+			px = mo.Order.Price
+		}
+		orders = append(orders, SimulatedOrder{
+			OrderID:         mo.OrderID,
+			CreateTime:      mo.CreatedAt,
+			TradingSymbol:   sym,
+			ExchangeSegment: "NSE_FNO",
+			TransactionType: mo.Order.TransactionType,
+			OrderType:       mo.Order.OrderType,
+			ProductType:     mo.Order.ProductType,
+			Quantity:        mo.Order.Quantity,
+			FilledQty:       mo.FilledQty,
+			Price:           px,
+			OrderStatus:     mo.Status,
+		})
+	}
+	return orders
+}
+
 // StrategySignalJob manages the autonomous paper trading loop for an active strategy in Sandbox mode.
 type StrategySignalJob struct {
 	dbService            *services.DBService
@@ -350,6 +407,43 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 	positions := []SimulatedPosition{}
 	orders := []SimulatedOrder{}
 
+	// Hydrate initial state from Dhan mock broker
+	mbPositions := j.fetchMockBrokerPositions()
+	for _, mp := range mbPositions {
+		sym := mp.TradingSymbol
+		if sym == "" {
+			sym = mp.SecurityID
+		}
+		status := "CLOSED"
+		if mp.NetQty != 0 {
+			status = "OPEN"
+		}
+		ltp := mp.SellAvg
+		if ltp <= 0 {
+			ltp = mp.BuyAvg
+		}
+		positions = append(positions, SimulatedPosition{
+			TradingSymbol:    sym,
+			ExchangeSegment:  "NSE_FNO",
+			Status:           status,
+			ProductType:      "INTRADAY",
+			NetQty:           mp.NetQty,
+			BuyQty:           mp.BuyQty,
+			BuyAvg:           mp.BuyAvg,
+			SellQty:          mp.SellQty,
+			SellAvg:          mp.SellAvg,
+			CurrentLTP:       ltp,
+			RealizedProfit:   mp.RealizedProfit,
+			UnrealizedProfit: mp.UnrealizedProfit,
+			TotalPnL:         mp.RealizedProfit + mp.UnrealizedProfit,
+		})
+	}
+
+	mbOrders := j.fetchMockBrokerOrders()
+	for _, mo := range mbOrders {
+		orders = append(orders, mo)
+	}
+
 	tickCounter := 0
 	var prevSpotPrice float64
 	var spotPrice float64
@@ -419,6 +513,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								positions[i].Status = "CLOSED"
 								positions[i].RealizedProfit = mp.RealizedProfit
 								positions[i].UnrealizedProfit = 0
+								positions[i].TotalPnL = mp.RealizedProfit
 								positions[i].SellQty = mp.SellQty
 								positions[i].SellAvg = mp.SellAvg
 								positions[i].NetQty = 0
@@ -775,9 +870,9 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 						positions[i].CurrentLTP = liveLTP
 					}
 
-					posPnl := math.Round((positions[i].CurrentLTP - positions[i].BuyAvg) * float64(positions[i].NetQty))
+					posPnl := math.Round((positions[i].CurrentLTP-positions[i].BuyAvg)*float64(positions[i].NetQty)*100) / 100
 					positions[i].UnrealizedProfit = posPnl
-					positions[i].TotalPnL = posPnl
+					positions[i].TotalPnL = math.Round((positions[i].RealizedProfit+posPnl)*100) / 100
 
 					var sl, tp float64
 					var activeOrderIdx = -1
@@ -840,6 +935,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 									positions[i].Status = "CLOSED"
 									positions[i].RealizedProfit = mp.RealizedProfit
 									positions[i].UnrealizedProfit = 0
+									positions[i].TotalPnL = mp.RealizedProfit
 									positions[i].SellQty = mp.SellQty
 									positions[i].SellAvg = mp.SellAvg
 									positions[i].NetQty = 0
@@ -931,6 +1027,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 							positions[i].Status = "CLOSED"
 							positions[i].RealizedProfit = posPnl
 							positions[i].UnrealizedProfit = 0
+							positions[i].TotalPnL = posPnl
 							positions[i].SellQty = positions[i].BuyQty
 							positions[i].SellAvg = positions[i].CurrentLTP
 							positions[i].NetQty = 0

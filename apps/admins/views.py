@@ -609,6 +609,26 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
                     filtered_files.append(f)
         context['streamer_files'] = filtered_files
 
+        # Resolve active backup task metadata for rich widget presentation
+        active_file = streamer_status.get('active_file', '')
+        active_backup_task = None
+        if active_file:
+            parts = active_file.replace('\\', '/').split('/')
+            for p in reversed(parts):
+                if p.isdigit():
+                    active_backup_task = MarketBackupTask.objects.filter(id=int(p)).first()
+                    if active_backup_task:
+                        break
+                elif p.endswith('.parquet') and len(parts) >= 2:
+                    prev = parts[parts.index(p) - 1]
+                    if prev.isdigit():
+                        active_backup_task = MarketBackupTask.objects.filter(id=int(prev)).first()
+                        if active_backup_task:
+                            break
+        if not active_backup_task and completed_backups.exists():
+            active_backup_task = completed_backups.first()
+        context['active_backup_task'] = active_backup_task
+
         # 5. Load Session PnL, Metrics & Calendar for Live Mock Workspace Parity
         metrics = MockBrokerPnLService.get_session_metrics(user=None, session_id=session_id)
         context['metrics'] = metrics
@@ -1753,6 +1773,31 @@ def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=N
                 d = json.loads(raw)
                 positions_raw = d.get("positions", [])
 
+        if not positions_raw:
+            try:
+                import requests
+                r_pos = requests.get('http://mock_broker:8088/mock/v2/positions', timeout=0.8)
+                if r_pos.status_code == 200:
+                    mb_positions = r_pos.json()
+                    for mp in mb_positions:
+                        positions_raw.append({
+                            'trading_symbol': mp.get('tradingSymbol') or mp.get('securityId'),
+                            'exchange_segment': mp.get('exchangeSegment', 'NSE_FNO'),
+                            'status': 'OPEN' if mp.get('netQty', 0) != 0 else 'CLOSED',
+                            'product_type': mp.get('productType', 'INTRADAY'),
+                            'net_qty': mp.get('netQty', 0),
+                            'buy_qty': mp.get('buyQty', 0),
+                            'buy_avg': mp.get('buyAvg', 0.0),
+                            'sell_qty': mp.get('sellQty', 0),
+                            'sell_avg': mp.get('sellAvg', 0.0),
+                            'current_ltp': mp.get('sellAvg') or mp.get('buyAvg', 0.0),
+                            'realized_profit': round(float(mp.get('realizedProfit', 0.0)), 2),
+                            'unrealized_profit': round(float(mp.get('unrealizedProfit', 0.0)), 2),
+                            'total_pnl': round(float(mp.get('realizedProfit', 0.0)) + float(mp.get('unrealizedProfit', 0.0)), 2),
+                        })
+            except Exception:
+                pass
+
         if positions_raw:
             has_updates = False
             enriched_list = []
@@ -1766,9 +1811,12 @@ def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=N
                         qty = int(ep.get('net_qty', 0))
                         pnl = round((live_ltp - buy_avg) * qty, 2)
                         ep['unrealized_profit'] = pnl
-                        ep['total_pnl'] = pnl
+                        ep['total_pnl'] = round(float(ep.get('realized_profit', 0.0)) + pnl, 2)
                         ep['pnl_percentage'] = round(((live_ltp - buy_avg) / buy_avg) * 100, 2) if buy_avg > 0 else 0.0
                         has_updates = True
+                else:
+                    ep['unrealized_profit'] = 0.0
+                    ep['total_pnl'] = round(float(ep.get('realized_profit', 0.0)), 2)
                 enriched_list.append(ep)
             if has_updates and target_key and raw:
                 try:
@@ -1838,6 +1886,32 @@ def get_sandbox_simulated_orders(user_id=None, strategy_id=None, account_id=None
                         sd = json.loads(s_raw)
                         agg_orders.extend(sd.get("orders", []))
                 orders_raw = agg_orders
+
+        if not orders_raw:
+            try:
+                import requests
+                r_ord = requests.get('http://mock_broker:8088/mock/v2/orders', timeout=0.8)
+                if r_ord.status_code == 200:
+                    mb_orders = r_ord.json()
+                    for mo in mb_orders:
+                        o_inner = mo.get('order', {})
+                        sym = o_inner.get('tradingSymbol') or o_inner.get('securityId') or mo.get('tradingSymbol') or mo.get('securityId')
+                        orders_raw.append({
+                            'order_id': mo.get('orderId'),
+                            'create_time': mo.get('createdAt', ''),
+                            'trading_symbol': sym,
+                            'exchange_segment': o_inner.get('exchangeSegment', 'NSE_FNO'),
+                            'transaction_type': o_inner.get('transactionType', 'BUY'),
+                            'order_type': o_inner.get('orderType', 'MARKET'),
+                            'product_type': o_inner.get('productType', 'INTRADAY'),
+                            'quantity': o_inner.get('quantity', 0),
+                            'filled_qty': mo.get('filledQty', 0),
+                            'price': mo.get('filledPrice') or o_inner.get('price', 0.0),
+                            'order_status': mo.get('status', 'TRADED'),
+                            'leg_name': o_inner.get('legName', ''),
+                        })
+            except Exception:
+                pass
 
         if orders_raw:
             has_updates = False
@@ -2040,11 +2114,11 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
         context['live_strategies'] = sandbox_strategies
         context['sandbox_strategies'] = sandbox_strategies
         context['market_clock'] = get_ist_market_clock()
-        context['calendar_pnl'] = get_current_month_calendar_pnl(sandbox_account or user)
-        context['intraday_graph'] = get_today_intraday_equity_curve(sandbox_account or user)
+        context['calendar_pnl'] = get_current_month_calendar_pnl(sandbox_account or user, trades=raw_ord)
+        context['intraday_graph'] = get_today_intraday_equity_curve(sandbox_account or user, trades=raw_ord)
 
         pos_labels = [p.get('trading_symbol', 'Position') for p in raw_pos]
-        pos_pnls = [round(float(p.get('total_pnl', float(p.get('realized_profit', 0.0)) + float(p.get('unrealized_profit', 0.0)))), 2) for p in raw_pos]
+        pos_pnls = [round(float(p.get('realized_profit', 0.0)) + float(p.get('unrealized_profit', 0.0)), 2) for p in raw_pos]
         pos_colors = ['#10B981' if pnl >= 0 else '#EF4444' for pnl in pos_pnls]
         context['position_chart_labels'] = json.dumps(pos_labels)
         context['position_chart_data'] = json.dumps(pos_pnls)

@@ -59,7 +59,14 @@ def get_ist_market_clock():
 
 
 def _extract_trade_date(trade_dict: dict) -> str:
-    raw = trade_dict.get('exchangeTime') or trade_dict.get('orderTimestamp') or trade_dict.get('createTime') or ''
+    raw = (
+        trade_dict.get('exchangeTime') or
+        trade_dict.get('orderTimestamp') or
+        trade_dict.get('createTime') or
+        trade_dict.get('create_time') or
+        trade_dict.get('execution_time') or
+        ''
+    )
     if raw and len(raw) >= 10:
         return raw[:10].replace('/', '-')
     return ''
@@ -145,6 +152,22 @@ def get_current_month_calendar_pnl(target, trades=None):
         except Exception:
             pass
 
+    if daily_map and not any(k.startswith(f"{year}-{month:02d}") for k in daily_map.keys()):
+        latest_trade_date = max(daily_map.keys())
+        try:
+            sim_dt = datetime.datetime.strptime(latest_trade_date, '%Y-%m-%d')
+            year = sim_dt.year
+            month = sim_dt.month
+            month_name = sim_dt.strftime('%B')
+            first_day = datetime.date(year, month, 1)
+            if month == 12:
+                next_month = datetime.date(year + 1, 1, 1)
+            else:
+                next_month = datetime.date(year, month + 1, 1)
+            num_days = (next_month - first_day).days
+        except Exception:
+            pass
+
     days_list = []
     total_monthly_pnl = 0.0
     profit_days = 0
@@ -217,6 +240,11 @@ def get_today_intraday_equity_curve(target, base_capital=100000.0, trades=None):
     today_trades = []
     if trades is not None:
         today_trades = [t for t in trades if _extract_trade_date(t) == today_str]
+        if not today_trades and trades:
+            trade_dates = [_extract_trade_date(t) for t in trades if _extract_trade_date(t)]
+            if trade_dates:
+                sim_date = max(trade_dates)
+                today_trades = [t for t in trades if _extract_trade_date(t) == sim_date]
     elif account:
         try:
             adapter = BrokerFactory.get_adapter(account)
@@ -228,21 +256,60 @@ def get_today_intraday_equity_curve(target, base_capital=100000.0, trades=None):
         except Exception:
             pass
 
-    if today_trades:
+    executed_trades = []
+    for t in today_trades:
+        st = str(t.get('order_status') or t.get('orderStatus') or 'TRADED').upper()
+        if st in ['TRADED', 'COMPLETE', 'EXECUTED', 'FILLED']:
+            executed_trades.append(t)
+
+    if executed_trades:
+        def get_trade_time(t):
+            return (
+                t.get('exchangeTime') or
+                t.get('orderTimestamp') or
+                t.get('createTime') or
+                t.get('create_time') or
+                t.get('execution_time') or
+                ''
+            )
+
+        sorted_trades = sorted(executed_trades, key=get_trade_time)
         labels = ["09:15"]
         pnl_values = [0.0]
-        running_pnl = 0.0
-        for t in today_trades:
-            raw_time = t.get('exchangeTime') or t.get('orderTimestamp') or ''
+        running_realized = 0.0
+        inventory = {}
+
+        for t in sorted_trades:
+            raw_time = get_trade_time(t)
             t_label = raw_time[11:16] if len(raw_time) >= 16 else "10:00"
-            qty = int(t.get('tradedQuantity', 0) or t.get('quantity', 0) or 0)
+            qty = int(t.get('tradedQuantity', 0) or t.get('filled_qty', 0) or t.get('quantity', 0) or 0)
             px = float(t.get('tradedPrice', 0.0) or t.get('price', 0.0) or 0.0)
-            side = str(t.get('transactionType', 'BUY')).upper()
-            val = round(qty * px, 2)
-            trade_pnl = val if side == 'SELL' else -val
-            running_pnl = round(running_pnl + trade_pnl, 2)
+            side = str(t.get('transactionType') or t.get('transaction_type') or 'BUY').upper()
+            sym = t.get('trading_symbol') or t.get('tradingSymbol') or t.get('securityId') or t.get('security_id') or 'DEFAULT'
+
+            if qty <= 0:
+                continue
+
+            trade_realized = 0.0
+            if side == 'BUY':
+                if sym not in inventory:
+                    inventory[sym] = []
+                inventory[sym].append([qty, px])
+            elif side == 'SELL':
+                rem = qty
+                sym_inv = inventory.get(sym, [])
+                while rem > 0 and sym_inv:
+                    inv_item = sym_inv[0]
+                    match_qty = min(rem, inv_item[0])
+                    trade_realized += (px - inv_item[1]) * match_qty
+                    inv_item[0] -= match_qty
+                    rem -= match_qty
+                    if inv_item[0] <= 0:
+                        sym_inv.pop(0)
+
+            running_realized = round(running_realized + trade_realized, 2)
             labels.append(t_label)
-            pnl_values.append(running_pnl)
+            pnl_values.append(running_realized)
 
         return {
             'has_trades': True,

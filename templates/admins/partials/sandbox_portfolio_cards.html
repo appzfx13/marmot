@@ -3,7 +3,7 @@
 <div id="sandbox-cards-container" 
      class="d-flex flex-column gap-3 mb-0"
      hx-get="{{ cards_partial_url|default:'/admins/dashboard/sandbox/cards/' }}?strategy_id={{ selected_strategy_id|default:'ALL' }}{% if selected_account_id %}&account_id={{ selected_account_id }}{% endif %}"
-     hx-trigger="reloadSandboxCards from:body"
+     hx-trigger="reloadSandboxCards from:body, brokerOrderUpdate from:body"
      hx-target="#sandbox-cards-container"
      hx-swap="outerHTML">
     <!-- ROW 1: Core Execution & Risk Telemetry -->
@@ -14,7 +14,7 @@
                 <div class="position-relative z-index-2">
                     <span class="alert-green-badge">Paper Simulation Online</span>
                     <div class="alert-green-date">{{ broker_name }} &bull; ID: {{ sandbox_account.broker_client_id|default:"SBX-DEMO" }}</div>
-                    <div class="alert-green-text">
+                    <div id="sandbox-open-positions-stream-badge" class="alert-green-text">
                         Realtime Stream &bull; {{ open_positions_count }} Open
                     </div>
                 </div>
@@ -63,7 +63,7 @@
                         <i class="bi {% if live_net_pnl >= 0 %}bi-arrow-up-right text-success{% else %}bi-arrow-down-left text-danger{% endif %}"></i>
                         <span id="sandbox-open-positions-badge">{{ open_positions_count }} Active Pos</span>
                     </div>
-                    <span>{{ todays_orders_count }} Orders</span>
+                    <span id="sandbox-todays-orders-badge">{{ todays_orders_count }} Orders</span>
                 </div>
             </div>
         </div>
@@ -152,7 +152,7 @@
                             <i class="bi bi-check-circle-fill text-success"></i>
                             <span>Realized P&amp;L</span>
                         </span>
-                        <span class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 smaller fw-bold">{{ closed_positions_count }} Closed</span>
+                        <span id="sandbox-closed-positions-badge" class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 smaller fw-bold">{{ closed_positions_count }} Closed</span>
                     </div>
                     <div class="metric-card-date">Booked &amp; Settled Performance</div>
                     <div id="sandbox-realized-pnl" class="metric-card-value font-monospace {% if realized_pnl > 0 %}text-success{% elif realized_pnl < 0 %}text-danger{% endif %}">
@@ -177,7 +177,7 @@
                             <i class="bi bi-water text-info"></i>
                             <span>Unrealized P&amp;L</span>
                         </span>
-                        <span class="badge {% if open_positions_count > 0 %}bg-primary bg-opacity-25 text-primary{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 smaller fw-bold">{{ open_positions_count }} Open</span>
+                        <span id="sandbox-open-positions-count-badge" class="badge {% if open_positions_count > 0 %}bg-primary bg-opacity-25 text-primary{% else %}bg-secondary bg-opacity-25 text-white-50{% endif %} rounded-pill px-2 py-0.5 smaller fw-bold">{{ open_positions_count }} Open</span>
                     </div>
                     <div class="metric-card-date">Mark-to-Market Realtime Float</div>
                     <div id="sandbox-unrealized-pnl" class="metric-card-value font-monospace {% if unrealized_pnl > 0 %}text-success{% elif unrealized_pnl < 0 %}text-danger{% endif %}">
@@ -188,7 +188,7 @@
                     <span>
                         <i class="bi bi-activity text-info me-1"></i>MTM Float
                     </span>
-                    <span class="text-info fw-bold smaller">{{ open_positions_count }} Running</span>
+                    <span id="sandbox-running-positions-badge" class="text-info fw-bold smaller">{{ open_positions_count }} Running</span>
                 </div>
             </div>
         </div>
@@ -227,18 +227,18 @@
                             <i class="bi bi-receipt text-primary"></i>
                             <span>Day Orders</span>
                         </span>
-                        <span class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller fw-bold">{{ traded_orders_count }} Fills</span>
+                        <span id="sandbox-traded-orders-badge" class="badge bg-primary bg-opacity-25 text-primary rounded-pill px-2 py-0.5 smaller fw-bold">{{ traded_orders_count }} Fills</span>
                     </div>
-                    <div class="metric-card-date">Pending: {{ open_orders_count }}</div>
+                    <div class="metric-card-date">Pending: <span id="sandbox-orders-pending-date">{{ open_orders_count }}</span></div>
                     <div class="metric-card-value font-monospace text-primary">
-                        {{ todays_orders_count }} <span class="fs-6 fw-normal text-muted">Orders</span>
+                        <span id="sandbox-orders-main-count">{{ todays_orders_count }}</span> <span class="fs-6 fw-normal text-muted">Orders</span>
                     </div>
                 </div>
                 <div class="metric-card-footer">
-                    <span>
+                    <span id="sandbox-orders-traded-footer">
                         <i class="bi bi-check2-all text-primary me-1"></i>Traded: {{ traded_orders_count }}
                     </span>
-                    <span class="text-primary fw-bold smaller">Pending: {{ open_orders_count }}</span>
+                    <span id="sandbox-orders-pending-footer" class="text-primary fw-bold smaller">Pending: {{ open_orders_count }}</span>
                 </div>
             </div>
         </div>

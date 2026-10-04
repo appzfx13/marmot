@@ -21,7 +21,7 @@
                         hx-swap="outerHTML">
                     <i class="bi bi-play-circle-fill"></i>
                     <span>Open</span>
-                    <span class="filter-count-badge font-monospace">{{ open_positions_count|default:"0" }}</span>
+                    <span id="positions-filter-open-count" class="filter-count-badge font-monospace">{{ open_positions_count|default:"0" }}</span>
                 </button>
 
                 <button type="button" 
@@ -31,7 +31,7 @@
                         hx-swap="outerHTML">
                     <i class="bi bi-check2-circle"></i>
                     <span>Closed</span>
-                    <span class="filter-count-badge font-monospace">{{ closed_positions_count|default:"0" }}</span>
+                    <span id="positions-filter-closed-count" class="filter-count-badge font-monospace">{{ closed_positions_count|default:"0" }}</span>
                 </button>
 
                 <button type="button" 
@@ -41,7 +41,7 @@
                         hx-swap="outerHTML">
                     <i class="bi bi-layers"></i>
                     <span>All</span>
-                    <span class="filter-count-badge font-monospace">{% if all_positions_count %}{{ all_positions_count }}{% else %}{{ open_positions_count|default:"0"|add:closed_positions_count|default:"0" }}{% endif %}</span>
+                    <span id="positions-filter-all-count" class="filter-count-badge font-monospace">{% if all_positions_count %}{{ all_positions_count }}{% else %}{{ open_positions_count|default:"0"|add:closed_positions_count|default:"0" }}{% endif %}</span>
                 </button>
             </div>
         </div>
@@ -362,7 +362,11 @@
     <div id="sandbox-unrealized-pnl" hx-swap-oob="true" class="metric-card-value font-monospace {% if unrealized_pnl > 0 %}text-success{% elif unrealized_pnl < 0 %}text-danger{% endif %}">
         {% if unrealized_pnl > 0 %}+{% endif %}₹{{ unrealized_pnl|floatformat:2 }}
     </div>
+    <div id="sandbox-realized-pnl" hx-swap-oob="true" class="metric-card-value font-monospace {% if realized_pnl > 0 %}text-success{% elif realized_pnl < 0 %}text-danger{% endif %}">
+        {% if realized_pnl > 0 %}+{% endif %}₹{{ realized_pnl|floatformat:2 }}
+    </div>
     <span id="sandbox-open-positions-badge" hx-swap-oob="true">{{ open_positions_count|default:"0" }} Active Pos</span>
+    <span id="sandbox-closed-positions-badge" hx-swap-oob="true" class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 smaller fw-bold">{{ closed_positions_count|default:"0" }} Closed</span>
     <div id="calendarCardPnlValue" hx-swap-oob="true" class="fw-bold font-monospace fs-5 {% if live_net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
         {% if live_net_pnl > 0 %}+{% endif %}₹{{ live_net_pnl|floatformat:2 }}
     </div>

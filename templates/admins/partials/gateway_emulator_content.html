@@ -2,7 +2,7 @@
 
 <div id="gateway-emulator-container" class="w-100 col-12"
      hx-get="{% url 'admins:admin-gateway-emulator' %}"
-     hx-trigger="reloadGatewayEmulator from:body"
+     hx-trigger="reloadGatewayEmulator from:body, brokerOrderUpdate from:body"
      hx-target="this"
      hx-swap="outerHTML">
 
@@ -458,17 +458,40 @@
 
                 <div class="dropdown custom-parquet-dropdown w-100 position-relative">
                     {% if is_dataset_locked %}
-                    <!-- LOCKED STATE: Card is frozen and cannot be opened during simulation -->
+                    <!-- LOCKED STATE: Card is frozen and displays complete verified metadata -->
                     <div class="w-100 text-start d-flex align-items-center justify-content-between p-2.5 rounded-3 font-monospace"
                          style="background: rgba(22, 28, 42, 0.65); color: #cbd5e1; border: 1px dashed rgba(56, 189, 248, 0.3); border-radius: 10px; cursor: default;">
-                        <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                        <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2 w-100">
                             <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                                 style="background: rgba(16, 185, 129, 0.15); width: 40px; height: 40px;">
-                                <i class="bi bi-shield-lock-fill fs-5 text-success"></i>
+                                 style="background: rgba(16, 185, 129, 0.15); width: 44px; height: 44px;">
+                                <i class="bi bi-shield-lock-fill fs-4 text-success"></i>
                             </div>
-                            <div class="d-flex flex-column gap-0.5 overflow-hidden">
+                            <div class="d-flex flex-column gap-1 overflow-hidden w-100">
+                                {% if active_backup_task %}
                                 <div class="d-flex align-items-center gap-1.5 flex-wrap">
-                                    <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold flex-shrink-0" style="color: #10b981; background: rgba(16, 185, 129, 0.15); font-size: 0.62rem;">
+                                    <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold flex-shrink-0" style="color: #10b981; background: rgba(16, 185, 129, 0.15); font-size: 0.65rem;">
+                                        LOCKED &bull; Task #{{ active_backup_task.id }}
+                                    </span>
+                                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-30 rounded-pill px-2 py-0.5 smaller font-monospace fw-bold">
+                                        <i class="bi bi-graph-up me-1"></i>{{ active_backup_task.display_symbol|default:active_backup_task.index_name }}
+                                    </span>
+                                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 smaller font-monospace fw-bold">
+                                        <i class="bi bi-stopwatch me-1"></i>{{ active_backup_task.resolution_label }}
+                                    </span>
+                                    {% if active_backup_task.strike_count %}
+                                    <span class="badge bg-secondary bg-opacity-20 text-white-50 border border-secondary border-opacity-30 rounded-pill px-1.5 py-0.5 smaller font-monospace">
+                                        ATM&plusmn;{{ active_backup_task.strike_count }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap font-monospace" style="font-size: 0.78rem;">
+                                    <span class="text-white fw-bold"><i class="bi bi-calendar3 text-info me-1"></i>{{ active_backup_task.start_date|date:"Y-m-d" }} &rarr; {{ active_backup_task.end_date|date:"Y-m-d" }}</span>
+                                    <span class="text-muted">&bull;</span>
+                                    <span class="text-secondary smaller">{{ active_backup_task.file_size_mb|default:0|floatformat:1 }} MB</span>
+                                </div>
+                                {% else %}
+                                <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                    <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold flex-shrink-0" style="color: #10b981; background: rgba(16, 185, 129, 0.15); font-size: 0.65rem;">
                                         CONFIRMED &amp; LOCKED
                                     </span>
                                     <span class="text-white fw-bold font-monospace text-truncate" style="font-size: 0.82rem;">
@@ -478,34 +501,71 @@
                                 <span class="text-muted smaller text-truncate" style="font-size: 0.68rem;">
                                     {% if streamer_status.is_playing %}Replay running &bull; Stop simulation to unlock{% else %}Locked for replay &bull; Click "Unlock" above to switch dataset{% endif %}
                                 </span>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-1.5 text-muted flex-shrink-0 ms-2">
-                            <i class="bi bi-lock-fill fs-6 text-success"></i>
+                            <i class="bi bi-lock-fill fs-5 text-success"></i>
                         </div>
                     </div>
                     {% else %}
-                    <!-- UNLOCKED STATE: Interactive Dropdown with static popper & high z-index -->
+                    <!-- UNLOCKED STATE: Interactive Dropdown with full dataset metadata -->
                     <button class="btn dropdown-toggle w-100 text-start d-flex align-items-center justify-content-between p-2.5 rounded-3 font-monospace position-relative"
                             type="button" id="backupDatasetDropdownBtn" data-bs-toggle="dropdown" data-bs-display="static" aria-expanded="false"
                             style="background: rgba(22, 28, 42, 0.95); color: #fafafa; border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 10px; outline: none; transition: all 0.2s ease;">
-                        <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2">
+                        <div class="d-flex align-items-center gap-2.5 overflow-hidden me-2 w-100">
                             <div class="rounded-3 d-flex align-items-center justify-content-center flex-shrink-0"
-                                 style="background: rgba(56, 189, 248, 0.15); width: 40px; height: 40px;">
-                                <i class="bi bi-file-earmark-bar-graph-fill fs-5 text-info"></i>
+                                 style="background: rgba(56, 189, 248, 0.15); width: 44px; height: 44px;">
+                                <i class="bi bi-file-earmark-bar-graph-fill fs-4 text-info"></i>
                             </div>
-                            <div class="d-flex flex-column gap-0.5 overflow-hidden">
+                            <div class="d-flex flex-column gap-1 overflow-hidden w-100">
+                                {% if active_backup_task %}
                                 <div class="d-flex align-items-center gap-1.5 flex-wrap">
-                                    <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold flex-shrink-0" style="color: #38bdf8; background: rgba(56, 189, 248, 0.15); font-size: 0.62rem;">
-                                        SELECT DATASET
+                                    <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold flex-shrink-0" style="color: #38bdf8; background: rgba(56, 189, 248, 0.15); font-size: 0.65rem;">
+                                        ACTIVE &bull; Task #{{ active_backup_task.id }}
+                                    </span>
+                                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-30 rounded-pill px-2 py-0.5 smaller font-monospace fw-bold">
+                                        <i class="bi bi-graph-up me-1"></i>{{ active_backup_task.display_symbol|default:active_backup_task.index_name }}
+                                    </span>
+                                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 smaller font-monospace fw-bold">
+                                        <i class="bi bi-stopwatch me-1"></i>{{ active_backup_task.resolution_label }}
+                                    </span>
+                                    {% if active_backup_task.strike_count %}
+                                    <span class="badge bg-secondary bg-opacity-20 text-white-50 border border-secondary border-opacity-30 rounded-pill px-1.5 py-0.5 smaller font-monospace">
+                                        ATM&plusmn;{{ active_backup_task.strike_count }}
+                                    </span>
+                                    {% endif %}
+                                </div>
+                                <div class="d-flex align-items-center gap-2 flex-wrap font-monospace" style="font-size: 0.78rem;">
+                                    <span class="text-white fw-bold"><i class="bi bi-calendar3 text-info me-1"></i>{{ active_backup_task.start_date|date:"Y-m-d" }} &rarr; {{ active_backup_task.end_date|date:"Y-m-d" }}</span>
+                                    <span class="text-muted">&bull;</span>
+                                    <span class="text-secondary smaller">{{ active_backup_task.file_size_mb|default:0|floatformat:1 }} MB</span>
+                                </div>
+                                {% elif streamer_status.active_file %}
+                                <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                    <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold flex-shrink-0" style="color: #38bdf8; background: rgba(56, 189, 248, 0.15); font-size: 0.65rem;">
+                                        SELECTED
                                     </span>
                                     <span class="text-white fw-bold font-monospace text-truncate" style="font-size: 0.82rem;">
-                                        {{ streamer_status.active_file|default:"Select Dataset..." }}
+                                        {{ streamer_status.active_file }}
                                     </span>
                                 </div>
                                 <span class="text-warning smaller text-truncate" style="font-size: 0.68rem;">
-                                    <i class="bi bi-exclamation-circle me-1"></i>Choose dataset &bull; click "Lock Dataset" to begin
+                                    <i class="bi bi-exclamation-circle me-1"></i>Click "Lock Dataset" to confirm and activate controls
                                 </span>
+                                {% else %}
+                                <div class="d-flex align-items-center gap-1.5 flex-wrap">
+                                    <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold flex-shrink-0" style="color: #38bdf8; background: rgba(56, 189, 248, 0.15); font-size: 0.65rem;">
+                                        SELECT DATASET
+                                    </span>
+                                    <span class="text-white fw-bold font-monospace" style="font-size: 0.82rem;">
+                                        Choose Parquet Backup File...
+                                    </span>
+                                </div>
+                                <span class="text-warning smaller text-truncate" style="font-size: 0.68rem;">
+                                    <i class="bi bi-exclamation-circle me-1"></i>Index &bull; Start &rarr; End &bull; Resolution &bull; Strikes
+                                </span>
+                                {% endif %}
                             </div>
                         </div>
                         <div class="d-flex align-items-center gap-1.5 text-info flex-shrink-0 ms-2">
@@ -515,41 +575,57 @@
                     </button>
                     <ul class="dropdown-menu dropdown-menu-dark w-100 shadow-lg p-2 custom-scroll"
                         aria-labelledby="backupDatasetDropdownBtn"
-                        style="background: #10121a; backdrop-filter: blur(25px); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.18); max-height: 380px; overflow-y: auto; z-index: 1085 !important; margin-top: 6px; box-shadow: 0 16px 40px rgba(0,0,0,0.85) !important;">
+                        style="background: #10121a; backdrop-filter: blur(25px); border-radius: 12px; border: 1px solid rgba(255, 255, 255, 0.18); max-height: 420px; overflow-y: auto; z-index: 1085 !important; margin-top: 6px; box-shadow: 0 16px 40px rgba(0,0,0,0.85) !important;">
                         
                         <!-- Strictly Complete Market Backup Datasets Only -->
-                        <li class="dropdown-header text-uppercase smaller text-muted px-2 py-1" style="font-size: 0.65rem;">
-                            <i class="bi bi-check-all text-success me-1"></i>Completed Backup Datasets (Auto-locks on selection)
+                        <li class="dropdown-header text-uppercase smaller text-muted px-2 py-1 d-flex align-items-center justify-content-between" style="font-size: 0.65rem;">
+                            <span><i class="bi bi-check-all text-success me-1"></i>Completed Backup Datasets</span>
+                            <span class="text-info font-monospace">Auto-locks on select</span>
                         </li>
                         {% for b in completed_backups %}
                         <li>
-                            <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="m-0">
-                                {% csrf_token %}
-                                <input type="hidden" name="action" value="select_file">
-                                <input type="hidden" name="file" value="{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet">
-                                <button type="submit" class="dropdown-item rounded-2 py-2 px-2.5 mb-1 d-flex align-items-center justify-content-between font-monospace text-wrap {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}active{% endif %}"
-                                        style="font-size: 0.76rem; border: 1px solid {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.4){% else %}transparent{% endif %}; background: {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.12){% else %}transparent{% endif %}; cursor: pointer;">
-                                    <div class="d-flex flex-column gap-1 me-2 overflow-hidden text-start">
+                            <button type="button"
+                                    hx-post="{% url 'admins:admin-mock-broker-control' %}"
+                                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                    hx-vals='{"action": "select_file", "file": "{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet"}'
+                                    hx-target="#gateway-emulator-container"
+                                    hx-swap="outerHTML"
+                                    class="dropdown-item rounded-2 py-2 px-2.5 mb-1.5 d-flex align-items-center justify-content-between font-monospace text-wrap {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}active{% endif %}"
+                                    style="font-size: 0.76rem; border: 1px solid {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.5){% else %}rgba(255, 255, 255, 0.06){% endif %}; background: {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}rgba(56, 189, 248, 0.14){% else %}rgba(255, 255, 255, 0.02){% endif %}; cursor: pointer; transition: all 0.15s ease;">
+                                <div class="d-flex flex-column gap-1 me-2 overflow-hidden text-start w-100">
+                                    <!-- Top Row: Index Badge, Date Range, and Completion Status -->
+                                    <div class="d-flex align-items-center justify-content-between gap-1.5 flex-wrap">
                                         <div class="d-flex align-items-center gap-1.5 flex-wrap">
                                             <span class="badge rounded-pill px-1.5 py-0.5 smaller fw-bold" style="background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
-                                                Task #{{ b.id }} &bull; {{ b.index_name|default:"NIFTY" }}
+                                                Task #{{ b.id }} &bull; {{ b.display_symbol|default:b.index_name|default:"NIFTY" }}
                                             </span>
-                                            <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-1.5 py-0.5 smaller">
-                                                100% COMPLETE
-                                            </span>
-                                            <strong class="text-white text-truncate">{{ b.start_date }} &rarr; {{ b.end_date }}</strong>
+                                            <strong class="text-white text-truncate" style="font-size: 0.8rem;">
+                                                <i class="bi bi-calendar3 text-info me-1"></i>{{ b.start_date|date:"Y-m-d" }} &rarr; {{ b.end_date|date:"Y-m-d" }}
+                                            </strong>
                                         </div>
-                                        <div class="d-flex align-items-center gap-2 smaller text-muted">
-                                            <span>Path: <code class="text-info">{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet</code></span>
-                                            <span>&bull;</span>
-                                            <span>{{ b.file_size_mb|default:0|floatformat:1 }} MB</span>
-                                        </div>
+                                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-1.5 py-0.5 smaller">
+                                            100% COMPLETE
+                                        </span>
                                     </div>
-                                    {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}
-                                    <i class="bi bi-check-circle-fill text-info fs-6 flex-shrink-0 ms-2"></i>
-                                    {% endif %}
-                                </button>
-                            </form>
+                                    <!-- Bottom Row: Resolution Badge, Strikes Count, and File Size -->
+                                    <div class="d-flex align-items-center gap-2 smaller text-muted flex-wrap">
+                                        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-1.5 py-0.5 smaller font-monospace fw-semibold">
+                                            <i class="bi bi-stopwatch me-1"></i>{{ b.resolution_label }}
+                                        </span>
+                                        {% if b.strike_count %}
+                                        <span class="badge bg-secondary bg-opacity-20 text-light border border-secondary border-opacity-30 rounded-pill px-1.5 py-0.5 smaller font-monospace">
+                                            ATM&plusmn;{{ b.strike_count }}
+                                        </span>
+                                        {% endif %}
+                                        <span><i class="bi bi-file-earmark-binary me-1"></i>{{ b.file_size_mb|default:0|floatformat:1 }} MB</span>
+                                        <span>&bull;</span>
+                                        <span class="text-truncate">Path: <code class="text-info" style="font-size: 0.7rem;">{{ b.created_by_id|default:1 }}/{{ b.id }}/dataset.parquet</code></span>
+                                    </div>
+                                </div>
+                                {% if streamer_status.active_file and b.id|stringformat:'s' in streamer_status.active_file %}
+                                <i class="bi bi-check-circle-fill text-info fs-5 flex-shrink-0 ms-2"></i>
+                                {% endif %}
+                            </button>
                         </li>
                         {% empty %}
                         <li><span class="dropdown-item text-muted smaller">No 100% completed backup tasks found</span></li>
@@ -1217,9 +1293,31 @@
         if (window.htmx) {
             setTimeout(() => {
                 htmx.ajax('GET', '{% url "admins:admin-mock-broker-trades" %}', {target: '#mock-broker-trades-container', swap: 'innerHTML'});
+                document.body.dispatchEvent(new CustomEvent('brokerOrderUpdate'));
             }, 600);
         }
     }
+
+    // Telemetry Sync with Go Strategy Engine / Sandbox
+    function handleGatewayTelemetry(e) {
+        const payload = e.detail?.data || e.detail;
+        if (!payload) return;
+        const balEl = document.getElementById('gateway-available-balance');
+        if (balEl && payload.available_margin != null) {
+            balEl.innerText = '₹' + Number(payload.available_margin).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+        const utilEl = document.getElementById('gateway-utilized-margin');
+        if (utilEl && payload.margin_utilized != null) {
+            utilEl.innerText = 'Utilized: ₹' + Number(payload.margin_utilized).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+        }
+        const pnlEl = document.getElementById('gateway-net-pnl-badge');
+        if (pnlEl && payload.live_net_pnl != null) {
+            const sign = payload.live_net_pnl >= 0 ? '+' : '';
+            pnlEl.innerText = `${sign}₹${Number(payload.live_net_pnl).toFixed(2)} Net Session PnL`;
+        }
+    }
+    window.addEventListener('marmot:sandbox-telemetry', handleGatewayTelemetry);
+    window.addEventListener('marmot:mock-telemetry', handleGatewayTelemetry);
 
     window.confirmGatewayAction = function(formId, modalId) {
         const modals = Array.from(document.querySelectorAll('#' + modalId));

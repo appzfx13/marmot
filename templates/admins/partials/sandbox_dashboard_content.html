@@ -262,15 +262,97 @@
                 positions_len: (payload.positions || []).length,
                 latency_ms: payload.processing_latency_ms
             });
-            if (payload.live_net_pnl !== undefined) updateMetric('sandbox-live-net-pnl', payload.live_net_pnl, '+');
-            if (payload.unrealized_pnl !== undefined) updateMetric('sandbox-unrealized-pnl', payload.unrealized_pnl, '+');
-            if (payload.realized_pnl !== undefined) updateMetric('sandbox-realized-pnl', payload.realized_pnl, '+');
+            if (payload.live_net_pnl !== undefined) {
+                updateMetric('sandbox-live-net-pnl', payload.live_net_pnl, '+');
+                updateMetric('live-positions-net-pnl', payload.live_net_pnl, '+');
+                const calEl = document.getElementById('calendarCardPnlValue');
+                if (calEl) {
+                    const val = parseFloat(payload.live_net_pnl) || 0;
+                    const fmt = '₹' + Math.abs(val).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    calEl.textContent = (val > 0 ? '+' : (val < 0 ? '-' : '')) + fmt;
+                    calEl.className = 'fw-bold font-monospace fs-5 ' + (val >= 0 ? 'text-success' : 'text-danger');
+                }
+            }
+            if (payload.unrealized_pnl !== undefined) {
+                updateMetric('sandbox-unrealized-pnl', payload.unrealized_pnl, '+');
+                updateMetric('live-positions-unrealized-pnl', payload.unrealized_pnl, '+');
+            }
+            if (payload.realized_pnl !== undefined) {
+                updateMetric('sandbox-realized-pnl', payload.realized_pnl, '+');
+                updateMetric('live-positions-realized-pnl', payload.realized_pnl, '+');
+            }
             if (payload.available_margin !== undefined) updateMetric('sandbox-available-margin', payload.available_margin, '');
             if (payload.margin_utilized !== undefined) updateMetric('sandbox-margin-utilized', payload.margin_utilized, '');
+
+            // Synchronize Position Count Badges
             if (payload.open_positions_count !== undefined) {
                 const posBadge = document.getElementById('sandbox-open-positions-badge');
                 if (posBadge) posBadge.textContent = payload.open_positions_count + ' Active Pos';
+                const streamBadge = document.getElementById('sandbox-open-positions-stream-badge');
+                if (streamBadge) streamBadge.textContent = 'Realtime Stream • ' + payload.open_positions_count + ' Open';
+                const openBadge = document.getElementById('sandbox-open-positions-count-badge');
+                if (openBadge) openBadge.textContent = payload.open_positions_count + ' Open';
+                const runningBadge = document.getElementById('sandbox-running-positions-badge');
+                if (runningBadge) runningBadge.textContent = payload.open_positions_count + ' Running';
+                const filterOpen = document.getElementById('positions-filter-open-count');
+                if (filterOpen) filterOpen.textContent = payload.open_positions_count;
             }
+            if (payload.closed_positions_count !== undefined) {
+                const closedBadge = document.getElementById('sandbox-closed-positions-badge');
+                if (closedBadge) closedBadge.textContent = payload.closed_positions_count + ' Closed';
+                const filterClosed = document.getElementById('positions-filter-closed-count');
+                if (filterClosed) filterClosed.textContent = payload.closed_positions_count;
+            }
+            const filterAll = document.getElementById('positions-filter-all-count');
+            if (filterAll && (payload.open_positions_count !== undefined || payload.closed_positions_count !== undefined)) {
+                filterAll.textContent = (payload.open_positions_count || 0) + (payload.closed_positions_count || 0);
+            }
+
+            // Synchronize Order Count Badges
+            if (payload.todays_orders_count !== undefined) {
+                const ordersBadge = document.getElementById('sandbox-todays-orders-badge');
+                if (ordersBadge) ordersBadge.textContent = payload.todays_orders_count + ' Orders';
+                const ordersMain = document.getElementById('sandbox-orders-main-count');
+                if (ordersMain) ordersMain.textContent = payload.todays_orders_count;
+            }
+            if (Array.isArray(payload.orders)) {
+                let traded = 0, pending = 0;
+                payload.orders.forEach(function (o) {
+                    const st = (o.status || o.order_status || '').toUpperCase();
+                    if (st === 'TRADED' || st === 'FILLED' || st === 'COMPLETE') traded++;
+                    else if (st === 'PENDING' || st === 'OPEN' || st === 'TRANSIT') pending++;
+                });
+                const tradedBadge = document.getElementById('sandbox-traded-orders-badge');
+                if (tradedBadge) tradedBadge.textContent = traded + ' Fills';
+                const tradedFooter = document.getElementById('sandbox-orders-traded-footer');
+                if (tradedFooter) tradedFooter.innerHTML = '<i class="bi bi-check2-all text-primary me-1"></i>Traded: ' + traded;
+                const pendingFooter = document.getElementById('sandbox-orders-pending-footer');
+                if (pendingFooter) pendingFooter.textContent = 'Pending: ' + pending;
+                const pendingDate = document.getElementById('sandbox-orders-pending-date');
+                if (pendingDate) pendingDate.textContent = pending;
+                const filterAllOrders = document.getElementById('orders-filter-all-count');
+                if (filterAllOrders) filterAllOrders.textContent = payload.orders.length;
+                const filterPendingOrders = document.getElementById('orders-filter-pending-count');
+                if (filterPendingOrders) filterPendingOrders.textContent = pending;
+                const filterTradedOrders = document.getElementById('orders-filter-traded-count');
+                if (filterTradedOrders) filterTradedOrders.textContent = traded;
+            }
+
+            // Event-Driven Reactive Table Refresh: trigger HTMX reload when positions/orders change
+            const currentPosCount = (payload.positions || []).length;
+            const currentOrderCount = (payload.orders || []).length;
+            const currentClosedCount = payload.closed_positions_count || 0;
+
+            if ((window._lastKnownPosCount !== undefined && window._lastKnownPosCount !== currentPosCount) ||
+                (window._lastKnownOrderCount !== undefined && window._lastKnownOrderCount !== currentOrderCount) ||
+                (window._lastKnownClosedCount !== undefined && window._lastKnownClosedCount !== currentClosedCount)) {
+                console.log('🔄 [SandboxUI] State transition detected, firing event-driven brokerOrderUpdate');
+                document.body.dispatchEvent(new CustomEvent('brokerOrderUpdate'));
+            }
+
+            window._lastKnownPosCount = currentPosCount;
+            window._lastKnownOrderCount = currentOrderCount;
+            window._lastKnownClosedCount = currentClosedCount;
 
             // 0-Latency Micro-Updates for Position P&L Bar Chart
             if (window._positionPnlBarChartInstance && payload.positions && payload.positions.length > 0) {
@@ -279,7 +361,7 @@
                 const colors = [];
                 payload.positions.forEach(function (p) {
                     labels.push(p.trading_symbol || 'Position');
-                    const pnl = parseFloat(p.total_pnl !== undefined ? p.total_pnl : (p.unrealized_profit || 0)) || 0;
+                    const pnl = parseFloat(p.total_pnl !== undefined ? p.total_pnl : ((p.realized_profit || 0) + (p.unrealized_profit || 0))) || 0;
                     pnlData.push(pnl);
                     colors.push(pnl >= 0 ? '#10B981' : '#EF4444');
                 });
