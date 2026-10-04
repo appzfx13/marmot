@@ -500,10 +500,15 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
             streamer_files = []
             streamer_status = {'is_playing': False, 'current_speed': 25, 'progress_pct': 0.0, 'active_file': ''}
 
+            session_id = None
             try:
                 r_health = requests.get('http://mock_broker:8088/health', timeout=2.0)
                 if r_health.status_code == 200:
                     mock_online = True
+                    try:
+                        session_id = r_health.json().get('session_id')
+                    except Exception:
+                        pass
             except Exception:
                 mock_online = False
 
@@ -529,6 +534,7 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
 
             meta = {
                 'mock_online': mock_online,
+                'session_id': session_id,
                 'active_account': active_account,
                 'streamer_files': streamer_files,
                 'streamer_status': streamer_status,
@@ -536,6 +542,7 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
             cache.set(cache_key, meta, timeout=3)
         else:
             mock_online = meta.get('mock_online', False)
+            session_id = meta.get('session_id')
             active_account = meta.get('active_account')
             streamer_files = meta.get('streamer_files', [])
             streamer_status = meta.get('streamer_status', {})
@@ -603,19 +610,19 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
         context['streamer_files'] = filtered_files
 
         # 5. Load Session PnL, Metrics & Calendar for Live Mock Workspace Parity
-        metrics = MockBrokerPnLService.get_session_metrics(user=None)
+        metrics = MockBrokerPnLService.get_session_metrics(user=None, session_id=session_id)
         context['metrics'] = metrics
         context['equity_curve_json'] = json.dumps(metrics.get('equity_curve', []))
 
         selected_year = int(self.request.GET.get('year', datetime.now().year))
-        daily_pnl = MockBrokerPnLService.get_daily_pnl_map(user=None)
+        daily_pnl = MockBrokerPnLService.get_daily_pnl_map(user=None, session_id=session_id)
         context['daily_pnl'] = daily_pnl
         context['months'] = _build_mock_broker_calendar(daily_pnl, selected_year=selected_year)
         context['year'] = selected_year
         context['prev_year'] = selected_year - 1
         context['next_year'] = selected_year + 1
 
-        all_trades = MockBrokerPnLService.get_session_trades(user=None)
+        all_trades = MockBrokerPnLService.get_session_trades(user=None, session_id=session_id)
         filter_date = self.request.GET.get('date', '').strip()
         if filter_date:
             all_trades = [t for t in all_trades if t.get('trade_date') and str(t['trade_date']) == filter_date]
@@ -648,7 +655,10 @@ class AdminMockBrokerStatsView(LoginRequiredMixin, AdminRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         from apps.postback.services import MockBrokerPnLService
-        metrics = MockBrokerPnLService.get_session_metrics(user=None)
+        from django.core.cache import cache
+        meta = cache.get('marmot:admins:mock_broker_meta') or {}
+        session_id = meta.get('session_id')
+        metrics = MockBrokerPnLService.get_session_metrics(user=None, session_id=session_id)
         return render(request, 'admins/partials/mock_broker_stats_partial.html', {'metrics': metrics})
 
 
@@ -658,8 +668,11 @@ class AdminMockBrokerCalendarView(LoginRequiredMixin, AdminRequiredMixin, View):
     def get(self, request, *args, **kwargs):
         from apps.postback.services import MockBrokerPnLService
         from datetime import datetime
+        from django.core.cache import cache
+        meta = cache.get('marmot:admins:mock_broker_meta') or {}
+        session_id = meta.get('session_id')
         selected_year = int(request.GET.get('year', datetime.now().year))
-        daily_pnl = MockBrokerPnLService.get_daily_pnl_map(user=None)
+        daily_pnl = MockBrokerPnLService.get_daily_pnl_map(user=None, session_id=session_id)
         months = _build_mock_broker_calendar(daily_pnl, selected_year=selected_year)
         context = {
             'months': months, 'year': selected_year, 'prev_year': selected_year - 1, 'next_year': selected_year + 1,
@@ -672,7 +685,10 @@ class AdminMockBrokerTradesView(LoginRequiredMixin, AdminRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         from apps.postback.services import MockBrokerPnLService
-        all_trades = MockBrokerPnLService.get_session_trades(user=None)
+        from django.core.cache import cache
+        meta = cache.get('marmot:admins:mock_broker_meta') or {}
+        session_id = meta.get('session_id')
+        all_trades = MockBrokerPnLService.get_session_trades(user=None, session_id=session_id)
         filter_date = request.GET.get('date', '').strip()
         if filter_date:
             all_trades = [t for t in all_trades if t.get('trade_date') and str(t['trade_date']) == filter_date]
@@ -1420,7 +1436,7 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
         from django.http import HttpResponse
         from django.conf import settings
 
-        mock_url = getattr(settings, 'DHAN_MOCK_BASE_URL', 'http://mock_broker:8088/mock/v2').replace('/mock/v2', '/mock/api/session/clear').replace('/v2', '/mock/api/session/clear')
+        mock_url = getattr(settings, 'DHAN_MOCK_BASE_URL', 'http://mock_broker:8088/mock/v2').replace('/mock/v2', '/mock/api/session/clear?account=all').replace('/v2', '/mock/api/session/clear?account=all')
         try:
             resp_mock = requests.post(mock_url, timeout=5)
             is_success = resp_mock.status_code == 200
@@ -1428,19 +1444,51 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
             logger.warning("Failed to call mock_broker clear session: %s", e)
             is_success = False
 
-        # Invalidate Redis telemetry cache and mock session data
+        # 1. Publish IPC command to Go TaskManager to clear active strategy workers and reset in-memory telemetry
         try:
             from apps.market.services import redis_client
-            for pattern in ('marmot:dhan:live_summary:*', 'marmot:admins:mock_broker_meta', 'marmot:mock:telemetry:*', 'marmot:sandbox:telemetry:*'):
+            ipc_payload = json.dumps({
+                "command": "CLEAR_SESSION",
+                "task_id": "sandbox_session",
+                "params": {"execution_mode": "SANDBOX"}
+            })
+            redis_client.publish("marmot:tasks:control", ipc_payload)
+            try:
+                redis_client.xadd("marmot:tasks:control", {"data": ipc_payload}, maxlen=1000)
+            except Exception:
+                pass
+        except Exception as ipc_err:
+            logger.warning("Failed to dispatch CLEAR_SESSION IPC to Go engine: %s", ipc_err)
+
+        # 2. Invalidate Redis telemetry cache and mock session data
+        try:
+            from apps.market.services import redis_client
+            for pattern in ('marmot:dhan:live_summary:*', 'marmot:admins:mock_broker_meta', 'marmot:mock:telemetry:*', 'marmot:sandbox:telemetry:*', 'marmot:mock:orders', 'marmot:mock:positions:*'):
                 for key in redis_client.scan_iter(match=pattern):
                     redis_client.delete(key)
         except Exception as r_err:
             logger.debug("Redis clear session cache error: %s", r_err)
 
-        # Clear mock postbacks to reset settled trade history
+        # 3. Reset Sandbox and Mock user trading accounts to initial capital
+        try:
+            from apps.trade_config.models import UserTradingAccount
+            for acc in UserTradingAccount.objects.filter(user=request.user, account_type__in=['SANDBOX', 'MOCK']):
+                init_cap = float((acc.account_summary or {}).get('initial_capital', 100000.0) or 100000.0)
+                acc.account_summary = {
+                    'initial_capital': init_cap,
+                    'balance': init_cap,
+                    'available_margin': f"{init_cap:,.2f}",
+                    'cash': f"{init_cap:,.2f}",
+                    'margin_utilized': "0.00"
+                }
+                acc.save(update_fields=['account_summary'])
+        except Exception as a_err:
+            logger.debug("UserTradingAccount reset error: %s", a_err)
+
+        # 4. Clear mock and sandbox postbacks to reset settled trade history
         try:
             from apps.common.models import PostbackLog
-            PostbackLog.objects.filter(payload__execution_mode='MOCK').delete()
+            PostbackLog.objects.filter(payload__execution_mode__in=['MOCK', 'SANDBOX']).delete()
         except Exception as p_err:
             logger.debug("PostbackLog mock clear error: %s", p_err)
 
@@ -1454,6 +1502,7 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
             'brokerOrderUpdate': True,
             'reloadLiveDashboard': True,
             'reloadSandboxDashboard': True,
+            'reloadSandboxCards': True,
             'reloadMockBroker': True,
             'reloadLivePositions': True,
             'reloadLiveOrders': True,
@@ -2016,7 +2065,7 @@ class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequi
             'app_id': site_settings.fyers_app_id,
             'status': 'ONLINE' if (site_settings.fyers_feed_is_active and is_fyers_token_valid) else ('AUTH_REQUIRED' if not is_fyers_token_valid else 'STANDBY'),
         }
-        macro_ribbon = get_live_macro_ribbon_data(selected_index)
+        macro_ribbon = get_live_macro_ribbon_data(selected_index, is_mock=True)
         context['macro_ribbon'] = macro_ribbon
         context['selected_macro_card'] = macro_ribbon.get('selected_card')
         context['macro_ai_cards'] = macro_ribbon.get('macro_cards')
@@ -2672,34 +2721,89 @@ def _build_sandbox_journal_calendar(orders: list, year: str):
     return months_data, selected_year, is_overall
 
 
-def _format_sandbox_orders(raw_orders: list) -> list:
-    """Format simulated paper order dicts into unified trade row dictionaries."""
-    formatted = []
+def _pair_sandbox_orders(raw_orders: list) -> list:
+    """Pair simulated paper order dicts (BUY and SELL) into unified trade dictionaries."""
+    buckets = {}
     for o in raw_orders:
-        ts = str(o.get('create_time', '') or o.get('signal_time', '') or '09:15:00')
-        time_part = ts[11:19] if len(ts) >= 19 else (ts if ':' in ts else '09:15:00')
-        date_part = ts[:10] if len(ts) >= 10 else ''
-        qty = int(o.get('quantity', 0) or o.get('qty', 0) or 25)
-        price = float(o.get('price', 0.0) or 0.0)
-        side = str(o.get('transaction_type') or o.get('side') or 'BUY').upper()
-        formatted.append({
-            'time': time_part,
-            'date_str': date_part,
-            'is_fund': False,
-            'type': side,
-            'side_code': 'B' if side == 'BUY' else 'S',
-            'symbol': str(o.get('trading_symbol') or o.get('symbol') or 'NIFTY 25000 CE'),
-            'segment': str(o.get('product_type') or 'OPT'),
-            'exchange_trade_id': str(o.get('order_id') or o.get('id') or 'SBX-SIM'),
-            'order_type': str(o.get('order_type') or 'MARKET'),
-            'qty': qty,
-            'turnover': round(price * qty, 2),
-            'entry': price,
-            'order_id': str(o.get('order_id') or o.get('id') or 'SBX-1'),
-            'realized_profit': float(o.get('realized_profit', 0.0) or 0.0),
-            'status': str(o.get('order_status') or 'FILLED'),
-        })
-    return formatted
+        sym = str(o.get('trading_symbol') or o.get('symbol') or '').upper().strip()
+        buckets.setdefault(sym, []).append(o)
+
+    trades = []
+    serial = 1
+    
+    from datetime import datetime
+    from django.utils import timezone
+    def parse_ts(ts_str):
+        if not ts_str: return None
+        ts_str = str(ts_str).strip().replace('T', ' ').replace('Z', '')
+        # If it looks like just a time (e.g. "15:04:05" or "03:04:05 PM")
+        if len(ts_str) <= 11:
+            now_date = timezone.now().strftime('%Y-%m-%d')
+            try:
+                if 'M' in ts_str:
+                    return datetime.strptime(f"{now_date} {ts_str}", '%Y-%m-%d %I:%M:%S %p')
+                return datetime.strptime(f"{now_date} {ts_str}", '%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                return None
+        try:
+            return datetime.strptime(ts_str[:19], '%Y-%m-%d %H:%M:%S')
+        except ValueError:
+            return None
+
+    for sym, legs in buckets.items():
+        buys = [l for l in legs if str(l.get('transaction_type') or l.get('side') or '').upper() == 'BUY']
+        sells = [l for l in legs if str(l.get('transaction_type') or l.get('side') or '').upper() == 'SELL']
+        
+        while buys and sells:
+            buy_leg = buys.pop(0)
+            sell_leg = sells.pop(0)
+            
+            qty = max(int(buy_leg.get('quantity', 0) or buy_leg.get('qty', 0) or 0), 
+                      int(sell_leg.get('quantity', 0) or sell_leg.get('qty', 0) or 0))
+            
+            entry_price = float(buy_leg.get('price', 0.0) or buy_leg.get('average_price', 0.0) or 0.0)
+            exit_price = float(sell_leg.get('price', 0.0) or sell_leg.get('average_price', 0.0) or 0.0)
+            
+            gross_pnl = (exit_price - entry_price) * qty
+            charges = 40.0  # Simulated brokerage
+            net_pnl = gross_pnl - charges
+            
+            if gross_pnl > 0:
+                exit_reason = 'TP_HIT'
+            elif gross_pnl < 0:
+                exit_reason = 'SL_HIT'
+            else:
+                exit_reason = 'SQUAREOFF'
+                
+            entry_ts_str = str(buy_leg.get('create_time', '') or buy_leg.get('signal_time', ''))
+            exit_ts_str = str(sell_leg.get('create_time', '') or sell_leg.get('signal_time', ''))
+            
+            entry_dt = parse_ts(entry_ts_str)
+            exit_dt = parse_ts(exit_ts_str)
+            
+            duration_secs = int((exit_dt - entry_dt).total_seconds()) if exit_dt and entry_dt else 0
+            
+            trades.append({
+                'serial_no': serial,
+                'symbol': sym,
+                'entry_price': entry_price,
+                'exit_price': exit_price,
+                'qty': qty,
+                'gross_pnl': gross_pnl,
+                'charges': charges,
+                'net_pnl': net_pnl,
+                'is_winner': net_pnl > 0,
+                'exit_reason': exit_reason,
+                'entry_time': entry_dt,
+                'exit_time': exit_dt,
+                'duration_secs': duration_secs,
+            })
+            serial += 1
+
+    trades.sort(key=lambda x: x['entry_time'] or datetime.min, reverse=True)
+    for i, t in enumerate(trades):
+        t['serial_no'] = len(trades) - i
+    return trades
 
 
 class AdminSandboxJournalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
@@ -2952,43 +3056,44 @@ class AdminSandboxJournalOrdersView(LoginRequiredMixin, AdminRequiredMixin, View
         except ValueError:
             page = 1
 
+        paired_trades = _pair_sandbox_orders(raw_orders)
+
         if filter_date:
             filtered = [
-                o for o in raw_orders
-                if str(o.get('create_time', '') or o.get('signal_time', '') or '')[:10] == filter_date
+                t for t in paired_trades
+                if t.get('entry_time') and t['entry_time'].strftime('%Y-%m-%d') == filter_date
             ]
         elif year not in ('all', 'overall', ''):
             filtered = [
-                o for o in raw_orders
-                if str(o.get('create_time', '') or o.get('signal_time', '') or '')[:4] == str(year)
+                t for t in paired_trades
+                if t.get('entry_time') and t['entry_time'].strftime('%Y') == str(year)
             ]
         else:
-            filtered = raw_orders
+            filtered = paired_trades
 
         total_trades = len(filtered)
         page_size = 10
         total_pages = max(1, (total_trades + page_size - 1) // page_size)
         start_idx = (page - 1) * page_size
         end_idx = start_idx + page_size
-        orders_slice = filtered[start_idx:end_idx]
+        trades_slice = filtered[start_idx:end_idx]
         has_more = (end_idx < total_trades)
         next_page = page + 1 if has_more else None
 
         day_summary = None
         if filter_date and filtered:
-            total_pnl = round(sum(float(o.get('realized_profit', 0.0) or 0.0) for o in filtered), 2)
+            total_pnl = round(sum(float(t.get('net_pnl', 0.0) or 0.0) for t in filtered), 2)
+            total_gross = round(sum(float(t.get('gross_pnl', 0.0) or 0.0) for t in filtered), 2)
             day_summary = {
                 'date_str': filter_date,
-                'gross_pnl': total_pnl,
-                'gross_pnl_abs': abs(total_pnl),
+                'gross_pnl': total_gross,
+                'gross_pnl_abs': abs(total_gross),
                 'net_pnl': total_pnl,
                 'net_pnl_abs': abs(total_pnl),
                 'govt_charges': 0.0,
-                'brokerage': round(len(filtered) * 20.0, 2),
+                'brokerage': round(sum(float(t.get('charges', 0.0) or 0.0) for t in filtered), 2),
                 'trades': len(filtered),
             }
-
-        trades_slice = _format_sandbox_orders(orders_slice)
         rows_only = bool(request.GET.get('rows_only') == '1')
 
         context = {

@@ -41,7 +41,36 @@
 
 <script>
     (function() {
-        window._isVirtualClock = false;
+        const isSandboxEnv = window.location.pathname.includes('/sandbox/') || window.location.pathname.includes('/gateway-emulator/');
+        if (isSandboxEnv || window._isVirtualClock) {
+            window._isVirtualClock = true;
+        }
+
+        window._lastVirtualClockEpoch = window._lastVirtualClockEpoch || 0;
+        window.resetVirtualClockGuard = function() {
+            window._lastVirtualClockEpoch = 0;
+        };
+
+        function parseEpochMs(rawTs, dateStr, timeStr) {
+            if (!rawTs && !timeStr) return 0;
+            if (typeof rawTs === 'number') {
+                return rawTs > 1e11 ? rawTs : rawTs * 1000;
+            }
+            let s = String(rawTs || (dateStr + ' ' + timeStr)).trim().replace('Z', '');
+            let parsed = Date.parse(s.replace(' ', 'T'));
+            if (!isNaN(parsed) && parsed > 0) return parsed;
+            if (timeStr && timeStr.includes(':')) {
+                let parts = timeStr.split(':');
+                if (parts.length >= 2) {
+                    let h = parseInt(parts[0], 10) || 0;
+                    let m = parseInt(parts[1], 10) || 0;
+                    let sec = parseInt(parts[2], 10) || 0;
+                    return (h * 3600 + m * 60 + sec) * 1000;
+                }
+            }
+            return 0;
+        }
+
         function updateLiveClock() {
             if (window._isVirtualClock) return; // Preserve historical replay clock
             const timeElem = document.getElementById('live-exchange-clock-time');
@@ -63,6 +92,18 @@
             window._isVirtualClock = true;
             const data = e.detail;
             if (!data) return;
+
+            const incomingEpoch = parseEpochMs(data.timestamp, data.date, data.time);
+            // Strict Monotonic Check: ignore out-of-order packets rewinding within 6 hours unless explicitly reset
+            if (!data.is_reset && incomingEpoch > 0 && window._lastVirtualClockEpoch > 0) {
+                if (incomingEpoch < window._lastVirtualClockEpoch && (window._lastVirtualClockEpoch - incomingEpoch) < 21600000) {
+                    return; // Drop backwards jitter
+                }
+            }
+            if (incomingEpoch > 0) {
+                window._lastVirtualClockEpoch = incomingEpoch;
+            }
+
             const timeElem = document.getElementById('live-exchange-clock-time');
             const dateElem = document.getElementById('live-exchange-clock-date');
             const statusElem = document.getElementById('live-exchange-clock-status');

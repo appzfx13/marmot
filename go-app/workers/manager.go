@@ -190,6 +190,8 @@ func (m *TaskManager) handleMessage(parentCtx context.Context, payloadStr string
 		m.pauseTask(payload.TaskID)
 	case "CANCEL", "STOP", "STOP_STRATEGY":
 		m.cancelTask(payload.TaskID)
+	case "CLEAR_SESSION", "RESET_SANDBOX_STRATEGIES":
+		m.clearSandboxSession(parentCtx, payload)
 	default:
 		log.Printf("⚠️ Unknown command: %s\n", payload.Command)
 	}
@@ -315,3 +317,57 @@ func (m *TaskManager) AutoResumeActiveStrategies(ctx context.Context) {
 		}
 	}
 }
+
+// clearSandboxSession cancels active strategy worker goroutines, purges Redis telemetry, and broadcasts zeroed state.
+func (m *TaskManager) clearSandboxSession(ctx context.Context, payload models.CommandPayload) {
+	m.mu.Lock()
+	for tid, cancel := range m.activeCtx {
+		if strings.HasPrefix(tid, "strategy_") {
+			cancel()
+			delete(m.activeCtx, tid)
+			log.Printf("🧹 [TaskManager:ClearSession] Cancelled running strategy goroutine: %s\n", tid)
+		}
+	}
+	m.mu.Unlock()
+
+	// 1. Purge Redis telemetry keys for sandbox and mock
+	if m.redisService != nil && m.redisService.Client != nil {
+		delCtx := context.Background()
+		for _, pattern := range []string{"marmot:sandbox:telemetry:*", "marmot:mock:telemetry:*"} {
+			keys, _ := m.redisService.Client.Keys(delCtx, pattern).Result()
+			for _, k := range keys {
+				_ = m.redisService.Client.Del(delCtx, k).Err()
+			}
+		}
+	}
+
+	// 2. Broadcast zeroed telemetry via WebSocket hub to immediately snap connected clients to 0
+	if m.hub != nil {
+		zeroPayload, _ := json.Marshal(map[string]interface{}{
+			"type": "mock_telemetry",
+			"data": map[string]interface{}{
+				"live_net_pnl":           0.0,
+				"realized_pnl":           0.0,
+				"unrealized_pnl":         0.0,
+				"open_positions_count":   0,
+				"closed_positions_count": 0,
+				"todays_orders_count":    0,
+				"available_margin":       "100000.00",
+				"cash_balance":           "100000.00",
+				"margin_utilized":        "0.00",
+				"positions":              []interface{}{},
+				"orders":                 []interface{}{},
+			},
+		})
+		m.hub.BroadcastToTask("all", zeroPayload)
+		select {
+		case m.hub.Broadcast <- zeroPayload:
+		default:
+		}
+	}
+
+	// 3. Restart active strategies fresh with clean state
+	time.Sleep(150 * time.Millisecond)
+	m.AutoResumeActiveStrategies(ctx)
+}
+

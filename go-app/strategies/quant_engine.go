@@ -445,19 +445,6 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		return nil // Outside valid market hours
 	}
 
-	// Enforce trade cooldown (default 5 minutes in backtest/quant mode to avoid churning)
-	cooldown := 5 * time.Minute
-	if params != nil {
-		if mode, ok := params["execution_mode"].(string); ok && (strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE")) {
-			cooldown = 15 * time.Second
-		} else if cdSec, ok := params["cooldown_seconds"].(float64); ok && cdSec > 0 {
-			cooldown = time.Duration(cdSec) * time.Second
-		}
-	}
-	if !s.lastSignalTime.IsZero() && candleTime.Sub(s.lastSignalTime) < cooldown {
-		return nil
-	}
-
 	// Need at least 5 candles to compute valid moving averages
 	if len(s.candleBuffer) < 5 {
 		return nil
@@ -487,6 +474,28 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 				}
 			}
 		}
+	}
+
+	// Enforce trade cooldown (default 5 minutes in backtest/quant mode to avoid churning)
+	cooldown := 5 * time.Minute
+	if preset.CooldownSeconds > 0 {
+		cooldown = time.Duration(preset.CooldownSeconds) * time.Second
+	}
+
+	if params != nil {
+		if cdSec, ok := params["cooldown_seconds"].(float64); ok && cdSec > 0 {
+			cooldown = time.Duration(cdSec) * time.Second
+		} else if mode, ok := params["execution_mode"].(string); ok && (strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "LIVE") || strings.EqualFold(mode, "SANDBOX")) {
+			// If not provided in params, fallback to preset or 15 seconds
+			if preset.CooldownSeconds == 0 {
+				cooldown = 15 * time.Second
+			}
+		}
+	}
+	if !s.lastSignalTime.IsZero() && candleTime.Sub(s.lastSignalTime) < cooldown {
+		return nil
+	}
+	if params != nil {
 		// Optimizer overrides
 		if emaF, ok := params["ema_fast"].(int); ok && emaF > 0 {
 			preset.EMAFast = emaF

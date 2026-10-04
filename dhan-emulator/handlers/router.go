@@ -175,7 +175,11 @@ func (h *Handler) handleOptionChain(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]string{"status": "ok", "service": "dhan-emulator"})
+	json.NewEncoder(w).Encode(map[string]string{
+		"status":     "ok",
+		"service":    "dhan-emulator",
+		"session_id": h.engine.SessionID,
+	})
 }
 
 // handleOrders routes POST /orders (place) and GET /orders (list).
@@ -1173,8 +1177,15 @@ func (h *Handler) handleKillSwitch(w http.ResponseWriter, r *http.Request) {
 
 // handleClearSession soft-deletes and resets mock orders and positions for active account.
 func (h *Handler) handleClearSession(w http.ResponseWriter, r *http.Request) {
-	clientID := h.resolveClientID(r)
-	h.engine.ClearAccountSession(clientID)
+	accountParam := r.URL.Query().Get("account")
+	if accountParam == "all" || accountParam == "" {
+		for _, acc := range h.engine.GetAllAccounts() {
+			h.engine.ClearAccountSession(acc.DhanClientID)
+		}
+	} else {
+		clientID := h.resolveClientID(r)
+		h.engine.ClearAccountSession(clientID)
+	}
 	w.Header().Set("HX-Trigger", `{"brokerOrderUpdate": true, "showToast": {"title": "Session Cleared", "message": "Mock orders & positions reset to initial state", "type": "info"}}`)
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]interface{}{

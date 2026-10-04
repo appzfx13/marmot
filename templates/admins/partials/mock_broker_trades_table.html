@@ -1,184 +1,218 @@
-<!-- Closed Trades Table Partial -->
-<div class="glass-card p-3 border rounded-3 position-relative overflow-hidden"
-     style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
+{% load static %}
 
-    <!-- Table Header & Filters -->
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-        <div class="d-flex align-items-center gap-2">
-            <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2" style="font-size: 1.05rem;">
-                <i class="bi bi-receipt text-primary fs-5"></i>
-                <span>Closed Trades &amp; Execution Pairs</span>
-            </h5>
-            <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.75rem;">
-                {{ total_trades_count }} Total Closed
-            </span>
-            {% if filter_date %}
-            <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace" style="font-size: 0.75rem;">
-                <span>Date: {{ filter_date }}</span>
-                <a href="#" hx-get="{% url 'admins:admin-mock-broker-trades' %}" hx-target="#mock-broker-trades-container" hx-swap="innerHTML" class="text-warning text-decoration-none">
-                    <i class="bi bi-x fs-6 align-middle"></i>
-                </a>
-            </span>
-            {% endif %}
+<!-- Closed Trades Card Partial -->
+<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <div class="d-flex align-items-center gap-2">
+        <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2" style="font-size: 1.05rem;">
+            <i class="bi bi-receipt text-primary fs-5"></i>
+            <span>Closed Trades &amp; Execution Pairs</span>
+        </h5>
+        <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.75rem;">
+            {{ total_trades_count }} Total Closed
+        </span>
+        {% if filter_date %}
+        <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-0.5 d-flex align-items-center gap-1 font-monospace" style="font-size: 0.75rem;">
+            <span>Date: {{ filter_date }}</span>
+            <a href="#" hx-get="{% url 'admins:admin-mock-broker-trades' %}" hx-target="#mock-broker-trades-container" hx-swap="innerHTML" class="text-warning text-decoration-none">
+                <i class="bi bi-x fs-6 align-middle"></i>
+            </a>
+        </span>
+        {% endif %}
+    </div>
+
+    <!-- Filter Buttons -->
+    <div class="d-flex align-items-center gap-2">
+        <div class="btn-group btn-group-sm" role="group">
+            <button type="button" class="btn {% if not filter_status %}btn-primary active{% else %}btn-outline-secondary{% endif %}"
+                    hx-get="{% url 'admins:admin-mock-broker-trades' %}{% if filter_date %}?date={{ filter_date }}{% endif %}"
+                    hx-target="#mock-broker-trades-container"
+                    hx-swap="innerHTML">
+                All
+            </button>
+            <button type="button" class="btn {% if filter_status == 'WIN' %}btn-success active{% else %}btn-outline-secondary{% endif %}"
+                    hx-get="{% url 'admins:admin-mock-broker-trades' %}?status=WIN{% if filter_date %}&date={{ filter_date }}{% endif %}"
+                    hx-target="#mock-broker-trades-container"
+                    hx-swap="innerHTML">
+                Winners
+            </button>
+            <button type="button" class="btn {% if filter_status == 'LOSS' %}btn-danger active{% else %}btn-outline-secondary{% endif %}"
+                    hx-get="{% url 'admins:admin-mock-broker-trades' %}?status=LOSS{% if filter_date %}&date={{ filter_date }}{% endif %}"
+                    hx-target="#mock-broker-trades-container"
+                    hx-swap="innerHTML">
+                Losers
+            </button>
         </div>
+    </div>
+</div>
 
-        <!-- Filter Buttons -->
-        <div class="d-flex align-items-center gap-2">
-            <div class="btn-group btn-group-sm" role="group">
-                <button type="button" class="btn {% if not filter_status %}btn-primary active{% else %}btn-outline-secondary{% endif %}"
-                        hx-get="{% url 'admins:admin-mock-broker-trades' %}{% if filter_date %}?date={{ filter_date }}{% endif %}"
-                        hx-target="#mock-broker-trades-container"
-                        hx-swap="innerHTML">
-                    All
-                </button>
-                <button type="button" class="btn {% if filter_status == 'WIN' %}btn-success active{% else %}btn-outline-secondary{% endif %}"
-                        hx-get="{% url 'admins:admin-mock-broker-trades' %}?status=WIN{% if filter_date %}&date={{ filter_date }}{% endif %}"
-                        hx-target="#mock-broker-trades-container"
-                        hx-swap="innerHTML">
-                    Winners
-                </button>
-                <button type="button" class="btn {% if filter_status == 'LOSS' %}btn-danger active{% else %}btn-outline-secondary{% endif %}"
-                        hx-get="{% url 'admins:admin-mock-broker-trades' %}?status=LOSS{% if filter_date %}&date={{ filter_date }}{% endif %}"
-                        hx-target="#mock-broker-trades-container"
-                        hx-swap="innerHTML">
-                    Losers
+<div class="trade-cards-container">
+    {% for trade in trades %}
+    <div id="mock-trade-card-{{ trade.serial_no }}" class="trade-card-item p-3 mb-2 rounded-3 border shadow-sm" data-trade-serial="{{ trade.serial_no }}" style="border-color: var(--border-default) !important; background-color: var(--bg-surface);">
+        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+            <div>
+                <div class="d-flex align-items-center gap-1 mb-1">
+                    <span class="badge rounded-pill font-monospace fw-semibold px-2 py-0" style="font-size: 0.68rem; background: var(--bg-elevated) !important; color: var(--text-primary) !important; border: 1px solid var(--border-default) !important;">#{{ trade.serial_no }}</span>
+                    {% if 'CE' in trade.symbol %}
+                        <span class="badge rounded-pill px-2 py-0 fw-bold" style="font-size: 0.68rem; background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;">CE</span>
+                    {% elif 'PE' in trade.symbol %}
+                        <span class="badge rounded-pill px-2 py-0 fw-bold" style="font-size: 0.68rem; background: rgba(239, 68, 68, 0.18) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;">PE</span>
+                    {% else %}
+                        <span class="badge bg-secondary bg-opacity-25 text-light rounded-pill px-2 py-0 fw-bold" style="font-size: 0.68rem;">{{ trade.symbol|slice:":4" }}</span>
+                    {% endif %}
+                </div>
+                <div class="fw-bold theme-text-main small font-monospace">{{ trade.symbol }}</div>
+            </div>
+
+            <div class="d-flex align-items-center gap-2">
+                <div class="text-end font-monospace">
+                    <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
+                        {% if trade.net_pnl >= 0 %}
+                            <span class="badge rounded-pill font-monospace fw-bold px-2 py-0.5" style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;">
+                                +₹{{ trade.net_pnl|floatformat:2 }}
+                            </span>
+                        {% else %}
+                            <span class="badge rounded-pill font-monospace fw-bold px-2 py-0.5" style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.18) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;">
+                                -₹{{ trade.net_pnl|stringformat:".2f"|cut:"-" }}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border flex-shrink-0"
+                        style="width: 28px; height: 28px; background: var(--bg-elevated); color: var(--text-primary); border-color: var(--border-default) !important;"
+                        type="button"
+                        data-bs-toggle="collapse"
+                        data-bs-target="#trade-mb-exp-{{ trade.serial_no }}"
+                        aria-expanded="false"
+                        aria-controls="trade-mb-exp-{{ trade.serial_no }}"
+                        title="Expand Trade Details">
+                    <span class="material-icons fs-6 text-primary">keyboard_arrow_down</span>
                 </button>
             </div>
         </div>
-    </div>
 
-    <!-- Table Container -->
-    <div class="table-responsive">
-        <table class="table table-hover align-middle mb-0" style="font-size: 0.85rem;">
-            <thead class="theme-text-muted small text-uppercase" style="border-bottom: 1px solid var(--border-color); font-size: 0.72rem;">
-                <tr>
-                    <th scope="col" class="ps-2">#</th>
-                    <th scope="col">Trading Symbol</th>
-                    <th scope="col">Entry Time (Feed)</th>
-                    <th scope="col">Exit Time (Feed)</th>
-                    <th scope="col" class="text-end">Entry (₹)</th>
-                    <th scope="col" class="text-end">Exit (₹)</th>
-                    <th scope="col" class="text-center">Qty</th>
-                    <th scope="col" class="text-end">Gross (₹)</th>
-                    <th scope="col" class="text-end">Charges</th>
-                    <th scope="col" class="text-end">Net PnL</th>
-                    <th scope="col" class="text-center">Exit Reason</th>
-                    <th scope="col" class="text-center">Duration</th>
-                    <th scope="col" class="text-center pe-2">Chart</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for trade in trades %}
-                <tr style="border-bottom: 1px solid var(--border-color); background: transparent;">
-                    <td class="ps-2 font-monospace text-muted">{{ forloop.counter }}</td>
-                    <td class="fw-bold theme-text-main">
-                        <span class="font-monospace">{{ trade.symbol }}</span>
-                    </td>
-                    <td class="font-monospace text-muted" style="font-size: 0.8rem;">
-                        {{ trade.feed_entry_time|default:trade.entry_time|date:"d M H:i:s" }}
-                    </td>
-                    <td class="font-monospace text-muted" style="font-size: 0.8rem;">
-                        {{ trade.feed_exit_time|default:trade.exit_time|date:"d M H:i:s" }}
-                    </td>
-                    <td class="text-end font-monospace theme-text-main">
-                        ₹{{ trade.entry_price|floatformat:2 }}
-                    </td>
-                    <td class="text-end font-monospace theme-text-main">
-                        ₹{{ trade.exit_price|floatformat:2 }}
-                    </td>
-                    <td class="text-center font-monospace">
-                        <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2">
-                            {{ trade.qty }}
-                        </span>
-                    </td>
-                    <td class="text-end font-monospace {% if trade.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold">
-                        {% if trade.gross_pnl >= 0 %}+{% endif %}₹{{ trade.gross_pnl|floatformat:2 }}
-                    </td>
-                    <td class="text-end font-monospace text-warning">
-                        -₹{{ trade.charges|floatformat:2 }}
-                    </td>
-                    <td class="text-end font-monospace {% if trade.is_winner %}text-success{% else %}text-danger{% endif %} fw-bold">
-                        {% if trade.net_pnl >= 0 %}+{% endif %}₹{{ trade.net_pnl|floatformat:2 }}
-                    </td>
-                    <td class="text-center">
-                        {% if trade.exit_reason == 'TP_HIT' %}
-                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
-                            TP HIT
-                        </span>
-                        {% elif trade.exit_reason == 'TRAILING_SL' or trade.exit_reason == 'TRAILING_SL_HIT' %}
-                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
-                            TRAILING SL
-                        </span>
-                        {% elif trade.exit_reason == 'SL_HIT' %}
-                        <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem;">
-                            SL HIT
-                        </span>
-                        {% else %}
-                        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0.5 font-monospace" style="font-size: 0.68rem;">
-                            {{ trade.exit_reason }}
-                        </span>
-                        {% endif %}
-                    </td>
-                    <td class="text-center font-monospace text-muted" style="font-size: 0.78rem;">
-                        {% if trade.duration_secs < 60 %}
-                            {{ trade.duration_secs }}s
-                        {% elif trade.duration_secs < 3600 %}
-                            {% widthratio trade.duration_secs 60 1 %}m
-                        {% else %}
-                            {% widthratio trade.duration_secs 3600 1 %}h
-                        {% endif %}
-                    </td>
-                    <td class="text-center pe-2">
-                        <button type="button"
-                                class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-0.5 smaller fw-semibold d-inline-flex align-items-center gap-1 shadow-sm"
-                                hx-get="{% url 'admins:admin-mock-trade-chart' forloop.counter %}"
-                                hx-target="#globalHtmxModalDialog"
-                                hx-swap="innerHTML"
-                                data-bs-toggle="modal"
-                                data-bs-target="#globalHtmxModal"
-                                title="View Candlestick Trade Chart">
-                            <i class="bi bi-graph-up"></i>
-                            <span>Chart</span>
-                        </button>
-                    </td>
-                </tr>
-                {% empty %}
-                <tr>
-                    <td colspan="12" class="text-center py-5 theme-text-muted">
-                        <i class="bi bi-inbox d-block mb-2 fs-2 opacity-50"></i>
-                        <div class="fw-semibold">No closed trades recorded yet for this filter.</div>
-                        <small class="opacity-75">Execute strategy trades or replay Parquet data to see executed trade pairs.</small>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
+        <!-- Mobile WIN/LOSS and Date Header -->
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            {% if trade.is_winner %}
+                <span class="badge rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;">WIN</span>
+            {% else %}
+                <span class="badge rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.7rem; background: rgba(239, 68, 68, 0.18) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;">LOSS</span>
+            {% endif %}
+            <span class="badge rounded-pill px-2 py-0 font-monospace d-inline-flex align-items-center gap-1 fw-semibold" style="font-size: 0.72rem; background: var(--bg-elevated) !important; color: var(--text-primary) !important; border: 1px solid var(--border-default) !important;">
+                <span class="material-icons" style="font-size: 0.75rem !important;">calendar_today</span>
+                <span>{{ trade.entry_time|date:"d M Y"|default:"—" }}</span>
+            </span>
+        </div>
 
-    <!-- Pagination -->
-    {% if is_paginated %}
-    <div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary border-opacity-10 flex-wrap gap-2">
-        <span class="theme-text-muted small font-monospace">
-            Page {{ page_obj.number }} of {{ paginator.num_pages }} ({{ total_trades_count }} total pairs)
-        </span>
-        <div class="btn-group btn-group-sm">
-            {% if page_obj.has_previous %}
-            <button class="btn btn-outline-secondary"
-                    hx-get="{% url 'admins:admin-mock-broker-trades' %}?page={{ page_obj.previous_page_number }}{% if filter_date %}&date={{ filter_date }}{% endif %}{% if filter_status %}&status={{ filter_status }}{% endif %}"
-                    hx-target="#mock-broker-trades-container"
-                    hx-swap="innerHTML">
-                <i class="bi bi-chevron-left align-middle me-1"></i> Previous
-            </button>
-            {% endif %}
-            {% if page_obj.has_next %}
-            <button class="btn btn-outline-secondary"
-                    hx-get="{% url 'admins:admin-mock-broker-trades' %}?page={{ page_obj.next_page_number }}{% if filter_date %}&date={{ filter_date }}{% endif %}{% if filter_status %}&status={{ filter_status }}{% endif %}"
-                    hx-target="#mock-broker-trades-container"
-                    hx-swap="innerHTML">
-                Next <i class="bi bi-chevron-right align-middle ms-1"></i>
-            </button>
-            {% endif %}
+        <div class="d-flex justify-content-between align-items-center mb-2">
+            <div class="d-flex justify-content-start align-items-center gap-1 small" style="font-size: 0.72rem;">
+                <span class="badge px-1.5 py-0 rounded fw-semibold" style="font-size: 0.68rem; background: rgba(14, 165, 233, 0.18) !important; color: #0284c7 !important; border: 1px solid rgba(14, 165, 233, 0.35) !important;">
+                    <span class="fw-normal opacity-75" style="font-family: var(--font-sans);">In:</span> <span class="font-monospace">{{ trade.entry_time|date:"H:i:s"|default:"—" }}</span>
+                </span>
+                <span class="theme-text-muted small">→</span>
+                <span class="badge px-1.5 py-0 rounded fw-semibold" style="font-size: 0.68rem; background: rgba(245, 158, 11, 0.18) !important; color: #d97706 !important; border: 1px solid rgba(245, 158, 11, 0.35) !important;">
+                    <span class="fw-normal opacity-75" style="font-family: var(--font-sans);">Out:</span> <span class="font-monospace">{{ trade.exit_time|date:"H:i:s"|default:"—" }}</span>
+                </span>
+            </div>
+            <span class="small theme-text-muted"><span class="opacity-75">Reason:</span> <strong class="theme-text-main font-monospace">{{ trade.exit_reason }}</strong></span>
+        </div>
+
+        <!-- Mobile Collapsible Trade Drawer -->
+        <div class="collapse pt-2 mt-2 border-top border-secondary border-opacity-25 small" id="trade-mb-exp-{{ trade.serial_no }}">
+            <div class="glass-card p-3 rounded-3 shadow-sm overflow-hidden" style="min-width: 0; background: var(--bg-elevated); border: 1px solid var(--border-default);">
+                <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 mb-3 pb-2 border-bottom border-secondary border-opacity-20">
+                    <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-2" style="font-size: 0.74rem; letter-spacing: 0.5px;">
+                        <span class="material-icons text-info" style="font-size: 0.95rem;">receipt_long</span>
+                        <span class="theme-text-main">Trade Execution</span>
+                    </span>
+                    <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-35 rounded-pill px-2.5 py-0.5 fw-bold font-monospace" style="font-size: 0.70rem;">{{ trade.symbol }}</span>
+                </div>
+                
+                <div class="d-flex flex-column small">
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                        <span class="theme-text-muted">Execution Date:</span>
+                        <span class="theme-text-main fw-semibold font-monospace">{{ trade.entry_time|date:"d M Y"|default:"—" }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                        <span class="theme-text-muted">Option Price:</span>
+                        <span class="fw-bold font-monospace text-info">₹{{ trade.entry_price|floatformat:2 }} ➔ ₹{{ trade.exit_price|floatformat:2 }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                        <span class="theme-text-muted">Gross PnL:</span>
+                        <span class="{% if trade.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold font-monospace">
+                            {% if trade.gross_pnl >= 0 %}+{% endif %}₹{{ trade.gross_pnl|floatformat:2 }}
+                        </span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                        <span class="theme-text-muted">Charges & Taxes:</span>
+                        <span class="text-warning fw-bold font-monospace">-₹{{ trade.charges|floatformat:2 }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                        <span class="theme-text-muted">Position Size:</span>
+                        <span class="theme-text-main fw-medium"><strong class="font-monospace">{{ trade.qty }}</strong> Qty</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                        <span class="theme-text-muted">Trade Duration:</span>
+                        <span class="theme-text-main fw-semibold font-monospace">
+                            {% if trade.duration_secs < 60 %}
+                                {{ trade.duration_secs }}s
+                            {% elif trade.duration_secs < 3600 %}
+                                {% widthratio trade.duration_secs 60 1 %}m
+                            {% else %}
+                                {% widthratio trade.duration_secs 3600 1 %}h
+                            {% endif %}
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-end mt-3 pt-2">
+                    <button type="button"
+                            class="btn btn-sm btn-outline-info rounded-pill px-3 py-1.5 fw-semibold d-inline-flex align-items-center gap-1 shadow-sm"
+                            hx-get="{% url 'admins:admin-mock-trade-chart' forloop.counter %}"
+                            hx-target="#globalHtmxModalDialog"
+                            hx-swap="innerHTML"
+                            data-bs-toggle="modal"
+                            data-bs-target="#globalHtmxModal"
+                            title="View Candlestick Trade Chart">
+                        <i class="bi bi-graph-up"></i>
+                        <span>View Execution Chart</span>
+                    </button>
+                </div>
+            </div>
         </div>
     </div>
-    {% endif %}
+    {% empty %}
+    <div class="p-5 text-center theme-text-muted border rounded-3 glass-card" style="border-color: var(--border-default) !important;">
+        <i class="bi bi-inbox d-block mb-3 fs-1 opacity-50"></i>
+        <h5 class="fw-bold mb-2">No closed trades recorded</h5>
+        <p class="opacity-75 mb-0 small">Execute strategy trades or replay Parquet data to see executed trade pairs.</p>
+    </div>
+    {% endfor %}
 </div>
+
+<!-- Pagination -->
+{% if is_paginated %}
+<div class="d-flex justify-content-between align-items-center mt-3 pt-2 border-top border-secondary border-opacity-10 flex-wrap gap-2">
+    <span class="theme-text-muted small font-monospace">
+        Page {{ page_obj.number }} of {{ paginator.num_pages }} ({{ total_trades_count }} total pairs)
+    </span>
+    <div class="btn-group btn-group-sm">
+        {% if page_obj.has_previous %}
+        <button class="btn btn-outline-secondary"
+                hx-get="{% url 'admins:admin-mock-broker-trades' %}?page={{ page_obj.previous_page_number }}{% if filter_date %}&date={{ filter_date }}{% endif %}{% if filter_status %}&status={{ filter_status }}{% endif %}"
+                hx-target="#mock-broker-trades-container"
+                hx-swap="innerHTML">
+            <i class="bi bi-chevron-left align-middle me-1"></i> Previous
+        </button>
+        {% endif %}
+        {% if page_obj.has_next %}
+        <button class="btn btn-outline-secondary"
+                hx-get="{% url 'admins:admin-mock-broker-trades' %}?page={{ page_obj.next_page_number }}{% if filter_date %}&date={{ filter_date }}{% endif %}{% if filter_status %}&status={{ filter_status }}{% endif %}"
+                hx-target="#mock-broker-trades-container"
+                hx-swap="innerHTML">
+            Next <i class="bi bi-chevron-right align-middle ms-1"></i>
+        </button>
+        {% endif %}
+    </div>
+</div>
+{% endif %}

@@ -36,6 +36,7 @@ type OrderResponse struct {
 
 // DhanPostbackWebhook represents official Dhan JSON webhook postback payload.
 type DhanPostbackWebhook struct {
+	SessionID         string  `json:"sessionId,omitempty"`
 	DhanClientID      string  `json:"dhanClientId"`
 	OrderID           string  `json:"orderId"`
 	ExchangeOrderID   string  `json:"exchangeOrderId"`

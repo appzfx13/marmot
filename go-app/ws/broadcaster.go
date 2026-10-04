@@ -36,6 +36,9 @@ type LiveTickPayload struct {
 	IsPositive    bool    `json:"is_positive"`
 	FormattedTime string  `json:"formatted_time"`
 	Timestamp     string  `json:"timestamp"`
+	IsMock        bool    `json:"is_mock,omitempty"`
+	IsVirtual     bool    `json:"is_virtual,omitempty"`
+	Source        string  `json:"source,omitempty"`
 	Bid           float64 `json:"bid,omitempty"`
 	Ask           float64 `json:"ask,omitempty"`
 	Volume        int64   `json:"volume,omitempty"`
@@ -212,6 +215,17 @@ func fetchLatestTickFromRedis(ctx context.Context, redisService *services.RedisS
 		fyersSym = fmt.Sprintf("NSE:%s50-INDEX", indexName)
 	}
 
+	isMockActive := false
+	if val, err := redisService.Client.Get(ctx, "marmot:mock_feed:active").Result(); err == nil && val == "true" {
+		isMockActive = true
+	}
+
+	if isMockActive {
+		// Mock ticks flow exclusively via real-time Redis Pub/Sub "marmot:mock_ticks".
+		// Never broadcast static snapshots from the periodic ticker in mock mode.
+		return nil
+	}
+
 	keys := []string{
 		fmt.Sprintf("marmot:fyers:option_chain:%s", indexName),
 		fmt.Sprintf(":1:marmot:fyers:option_chain:%s", indexName),
@@ -250,7 +264,20 @@ func fetchLatestTickFromRedis(ctx context.Context, redisService *services.RedisS
 			chpStr := fmt.Sprintf("%v", rawMap["spot_change_pct"])
 			hpStr := fmt.Sprintf("%v", rawMap["high_price"])
 			lpStr := fmt.Sprintf("%v", rawMap["low_price"])
-			nowStr := time.Now().Format("03:04:05 PM")
+
+			timeStr := ""
+			if ts, ok := rawMap["last_updated"].(string); ok && ts != "" {
+				timeStr = ts
+			} else if ts, ok := rawMap["feed_time"].(string); ok && ts != "" {
+				timeStr = ts
+			} else if ts, ok := rawMap["timestamp"].(string); ok && ts != "" {
+				timeStr = ts
+			}
+			if timeStr == "" {
+				timeStr = time.Now().Format("03:04:05 PM")
+			}
+
+			isKeyMock := strings.HasPrefix(k, "marmot:mock:")
 
 			return &LiveTickPayload{
 				Type:          "live_tick",
@@ -262,8 +289,11 @@ func fetchLatestTickFromRedis(ctx context.Context, redisService *services.RedisS
 				High:          hpStr,
 				Low:           lpStr,
 				IsPositive:    !strings.HasPrefix(chStr, "-"),
-				FormattedTime: nowStr,
-				Timestamp:     nowStr,
+				FormattedTime: timeStr,
+				Timestamp:     timeStr,
+				IsMock:        isKeyMock,
+				IsVirtual:     isKeyMock,
+				Source:        map[bool]string{true: "EMULATOR", false: "FYERS"}[isKeyMock],
 			}
 		}
 	}
@@ -882,7 +912,11 @@ func TargetedOptionChainPoller(ctx context.Context, redisService *services.Redis
 		case <-ctx.Done():
 			return
 		case <-ticker.C:
-			if !IsMarketSessionActive() {
+			isMockActive := false
+			if val, err := redisService.Client.Get(ctx, "marmot:mock_feed:active").Result(); err == nil && val == "true" {
+				isMockActive = true
+			}
+			if !IsMarketSessionActive() && !isMockActive {
 				continue
 			}
 

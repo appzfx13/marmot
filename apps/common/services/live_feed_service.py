@@ -361,10 +361,11 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
                     from django.conf import settings
                     from django.core.cache import cache
                     r = redis.Redis.from_url(settings.REDIS_URL, decode_responses=True)
-                    mock_ex = 2 if is_active else 10
+                    mock_ex = 120 if is_active else 60
                     r.set(f"marmot:mock:option_chain:{idx_clean}", json.dumps(data), ex=mock_ex)
-                    r.set(f"marmot:mock:last_known_option_chain:{idx_clean}", json.dumps(data), ex=30)
+                    r.set(f"marmot:mock:last_known_option_chain:{idx_clean}", json.dumps(data), ex=86400)
                     cache.set(f"marmot:mock:option_chain:{idx_clean}", data, timeout=mock_ex)
+                    cache.set(f"marmot:mock:last_known_option_chain:{idx_clean}", data, timeout=86400)
 
                     if is_active:
                         r.set("marmot:mock_feed:active", "true", ex=mock_ex)
@@ -1092,9 +1093,23 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY', is_mock: bool = Fa
     cfg = index_map.get(idx_upper, index_map['NIFTY'])
 
     if is_mock:
-        mock_oc = cache.get(f"marmot:mock:option_chain:{idx_upper}") or cache.get(f"marmot:mock:option_chain:{cfg['name']}") or {}
-        raw_ltp = float(mock_oc.get('raw_spot_ltp', 0.0) or 0.0)
-        now_time_str = timezone.localtime().strftime("%I:%M %p")
+        mock_oc = cache.get(f"marmot:mock:option_chain:{idx_upper}") or cache.get(f"marmot:mock:option_chain:{cfg['name']}") or cache.get(f"marmot:mock:last_known_option_chain:{idx_upper}") or cache.get(f"marmot:mock:last_known_option_chain:{cfg['name']}") or {}
+        raw_ltp = float(str(mock_oc.get('raw_spot_ltp') or mock_oc.get('spot_ltp') or 0.0).replace(',', '').strip() or 0.0)
+        if raw_ltp <= 0:
+            try:
+                resp = requests.get(f"http://mock_broker:8088/mock/v2/optionchain?index={idx_upper}", timeout=0.3)
+                if resp.status_code == 200:
+                    mock_oc = resp.json()
+                    raw_ltp = float(mock_oc.get('raw_spot_ltp', 0.0) or 0.0)
+            except Exception:
+                pass
+
+        feed_time_str = str(mock_oc.get('last_updated') or mock_oc.get('feed_time') or mock_oc.get('timestamp') or '')
+        if feed_time_str:
+            now_time_str = feed_time_str.split(' ')[-1] if ' ' in feed_time_str else feed_time_str
+        else:
+            now_time_str = timezone.localtime().strftime("%I:%M %p")
+
         if raw_ltp > 0:
             raw_ch = float(str(mock_oc.get('spot_change', '0')).replace('+', ''))
             raw_chp = float(str(mock_oc.get('spot_change_pct', '0')).replace('%', '').replace('+', ''))
@@ -1117,11 +1132,27 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY', is_mock: bool = Fa
                 'is_live': True,
                 'is_cached': False,
             }
-            return {
-                'selected_card': selected_card,
-                'macro_cards': [],
-                'selected_index': cfg['name'],
+        else:
+            selected_card = {
+                'name': cfg['name'],
+                'fyers_sym': f"DHAN_MOCK:{cfg['name']}",
+                'exchange': 'MOCK',
+                'ltp': '—',
+                'change': '0.00',
+                'change_pct': '0.00%',
+                'high': '—',
+                'low': '—',
+                'summary': 'Awaiting Simulated Ticks',
+                'formatted_time': now_time_str,
+                'is_positive': True,
+                'is_live': False,
+                'is_cached': False,
             }
+        return {
+            'selected_card': selected_card,
+            'macro_cards': [],
+            'selected_index': cfg['name'],
+        }
 
     cache_key = f"marmot:fyers_quote:{cfg['fyers_sym']}"
     last_known_key = f"marmot:fyers_last_known_quote:{cfg['fyers_sym']}"

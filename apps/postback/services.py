@@ -190,18 +190,20 @@ class MockBrokerPnLService:
     BROKERAGE_PER_LEG = 20.0  # ₹20 per executed leg (Dhan flat fee)
 
     @classmethod
-    def _get_base_qs(cls, user=None):
+    def _get_base_qs(cls, user=None, session_id=None):
         """Returns TRADED mock postback logs ordered oldest-first."""
         from apps.common.models import PostbackLog
         qs = PostbackLog.objects.filter(order_status='TRADED', payload__execution_mode='MOCK').order_by('created_at')
         if user is not None:
             qs = qs.filter(user=user)
+        if session_id:
+            qs = qs.filter(payload__sessionId=session_id)
         return qs
 
     @classmethod
-    def get_session_trades(cls, user=None):
+    def get_session_trades(cls, user=None, session_id=None):
         """Pairs BUY/SELL legs by correlationId. Returns list of closed trade dicts."""
-        logs = list(cls._get_base_qs(user))
+        logs = list(cls._get_base_qs(user, session_id))
         buckets = {}
         for log in logs:
             payload = log.payload or {}
@@ -235,10 +237,29 @@ class MockBrokerPnLService:
                     exit_reason = 'SQUAREOFF'
                 entry_dt = buy_leg.created_at
                 exit_dt = sell_leg.created_at
-                feed_entry_raw = str(buy_payload.get('logicalTimestamp') or buy_payload.get('exchangeTime') or buy_payload.get('createTime') or '')
-                feed_exit_raw = str(sell_payload.get('logicalTimestamp') or sell_payload.get('exchangeTime') or sell_payload.get('createTime') or '')
-                feed_entry = feed_entry_raw if feed_entry_raw else (entry_dt.strftime('%d %b %H:%M:%S') if entry_dt else '—')
-                feed_exit = feed_exit_raw if feed_exit_raw else (exit_dt.strftime('%d %b %H:%M:%S') if exit_dt else '—')
+                feed_entry_raw = str(buy_payload.get('exchangeTime') or buy_payload.get('createTime') or buy_payload.get('logicalTimestamp') or '')
+                feed_exit_raw = str(sell_payload.get('exchangeTime') or sell_payload.get('createTime') or sell_payload.get('logicalTimestamp') or '')
+                
+                from datetime import datetime
+                from django.utils.timezone import make_aware, is_naive
+                def parse_feed_ts(ts_str):
+                    if not ts_str: return None
+                    ts_str = ts_str.replace('T', ' ').replace('Z', '')
+                    try:
+                        dt = datetime.strptime(ts_str[:19], '%Y-%m-%d %H:%M:%S')
+                        return make_aware(dt) if is_naive(dt) else dt
+                    except ValueError:
+                        return None
+                
+                parsed_entry = parse_feed_ts(feed_entry_raw)
+                parsed_exit = parse_feed_ts(feed_exit_raw)
+                if parsed_entry:
+                    entry_dt = parsed_entry
+                if parsed_exit:
+                    exit_dt = parsed_exit
+
+                feed_entry = entry_dt.strftime('%d %b %H:%M:%S') if entry_dt else '—'
+                feed_exit = exit_dt.strftime('%d %b %H:%M:%S') if exit_dt else '—'
                 duration_secs = int((exit_dt - entry_dt).total_seconds()) if exit_dt and entry_dt else 0
                 trades.append({
                     'symbol': buy_leg.symbol or sell_leg.symbol or '',
@@ -258,15 +279,18 @@ class MockBrokerPnLService:
                     'is_winner': net_pnl > 0,
                     'trade_id': f"{buy_leg.id}_{sell_leg.id}",
                 })
-        trades.sort(key=lambda t: t['entry_time'] or '', reverse=True)
+        
+        # Sort using a default very old datetime if entry_time is somehow None
+        from django.utils.timezone import now
+        trades.sort(key=lambda t: t['entry_time'] or datetime.min.replace(tzinfo=now().tzinfo), reverse=True)
         for idx, t in enumerate(trades):
             t['serial_no'] = len(trades) - idx
         return trades
 
     @classmethod
-    def get_daily_pnl_map(cls, user=None):
+    def get_daily_pnl_map(cls, user=None, session_id=None):
         """Returns {date_str: pnl_float} for calendar heatmap coloring."""
-        trades = cls.get_session_trades(user)
+        trades = cls.get_session_trades(user, session_id)
         daily = {}
         for t in trades:
             if t['trade_date']:
@@ -275,9 +299,9 @@ class MockBrokerPnLService:
         return daily
 
     @classmethod
-    def get_session_metrics(cls, user=None):
+    def get_session_metrics(cls, user=None, session_id=None):
         """Returns full session performance dict with equity curve."""
-        trades = cls.get_session_trades(user)
+        trades = cls.get_session_trades(user, session_id)
         if not trades:
             return {
                 'total_trades': 0, 'winning_trades': 0, 'losing_trades': 0,
@@ -285,7 +309,9 @@ class MockBrokerPnLService:
                 'total_charges': 0.0, 'max_drawdown': 0.0, 'profit_factor': 0.0,
                 'avg_win': 0.0, 'avg_loss': 0.0, 'equity_curve': [],
             }
-        trades_asc = sorted(trades, key=lambda t: t['entry_time'] or '')
+        from django.utils.timezone import now
+        from datetime import datetime
+        trades_asc = sorted(trades, key=lambda t: t['entry_time'] or datetime.min.replace(tzinfo=now().tzinfo))
         gross_profit = sum(t['gross_pnl'] for t in trades_asc if t['gross_pnl'] > 0)
         gross_loss = abs(sum(t['gross_pnl'] for t in trades_asc if t['gross_pnl'] < 0))
         net_pnl = sum(t['net_pnl'] for t in trades_asc)

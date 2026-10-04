@@ -41,6 +41,7 @@ type BroadcastHandler func(msg []byte)
 // MatchingEngine manages the central thread-safe multi-client mock broker state.
 type MatchingEngine struct {
 	mu                 sync.RWMutex
+	SessionID          string
 	accounts           map[string]*ClientAccount
 	accountList        []string
 	activeAccountID    string
@@ -52,6 +53,14 @@ type MatchingEngine struct {
 	broadcaster        BroadcastHandler
 	lastStatsBroadcast time.Time
 	rdb                *redis.Client
+	virtualTime        time.Time
+}
+
+func (m *MatchingEngine) now() time.Time {
+	if !m.virtualTime.IsZero() {
+		return m.virtualTime
+	}
+	return time.Now()
 }
 
 // NewMatchingEngine initializes the MatchingEngine with seeded default accounts.
@@ -61,6 +70,7 @@ func NewMatchingEngine(chaos *ChaosManager, postbackURL string, rdb *redis.Clien
 	}
 	now := time.Now()
 	engine := &MatchingEngine{
+		SessionID:       fmt.Sprintf("sess_%d", now.UnixNano()),
 		accounts:        make(map[string]*ClientAccount),
 		accountList:     make([]string, 0),
 		activeAccountID: "1000000001",
@@ -124,7 +134,7 @@ func (m *MatchingEngine) getOrCreateAccountLocked(clientID string) *ClientAccoun
 			AvailableBalance: 500000.0,
 			SodLimit:         500000.0,
 			UtilizedMargin:   0.0,
-			CreatedAt:        time.Now(),
+			CreatedAt:        m.now(),
 			Orders:           make(map[string]*models.OrderRecord),
 			OrderList:        make([]string, 0),
 			Positions:        make(map[string]*models.PositionItem),
@@ -388,6 +398,10 @@ func (m *MatchingEngine) IngestTick(tick models.MarketTick) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	if !tick.Timestamp.IsZero() {
+		m.virtualTime = tick.Timestamp
+	}
+
 	if tick.SecurityID == "" || tick.LTP <= 0 {
 		return
 	}
@@ -516,7 +530,7 @@ func CalculateOptionBuyingCharges(buyPrice, sellPrice float64, qty int) (totalCh
 func (m *MatchingEngine) PlaceOrder(req models.OrderRequest) (*models.OrderResponse, error) {
 	m.mu.Lock()
 	m.orderCounter++
-	now := time.Now()
+	now := m.now()
 	orderID := fmt.Sprintf("DHN%d%04d", now.Unix(), rand.Intn(10000))
 	exchangeID := fmt.Sprintf("NSE%d%04d", now.Unix(), rand.Intn(10000))
 
@@ -580,7 +594,7 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 	if isChaosError {
 		ord.Status = "REJECTED"
 		ord.RejectMsg = reason
-		ord.UpdatedAt = time.Now()
+		ord.UpdatedAt = m.now()
 		webhook := m.buildPostbackWebhookLocked(ord)
 		m.mu.Unlock()
 		m.dispatchWebhook(webhook)
@@ -610,7 +624,7 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 	if fillPrice <= 0 {
 		ord.Status = "REJECTED"
 		ord.RejectMsg = fmt.Sprintf("MARKET_DATA_UNAVAILABLE: No valid quote found for %s", ord.Order.TradingSymbol)
-		ord.UpdatedAt = time.Now()
+		ord.UpdatedAt = m.now()
 		webhook := m.buildPostbackWebhookLocked(ord)
 		m.mu.Unlock()
 		m.dispatchWebhook(webhook)
@@ -624,7 +638,7 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 	if ord.Order.TransactionType == "BUY" && acc.AvailableBalance < requiredMargin {
 		ord.Status = "REJECTED"
 		ord.RejectMsg = fmt.Sprintf("MARGIN_INSUFFICIENT: Required %.2f, Available %.2f", requiredMargin, acc.AvailableBalance)
-		ord.UpdatedAt = time.Now()
+		ord.UpdatedAt = m.now()
 		webhook := m.buildPostbackWebhookLocked(ord)
 		m.mu.Unlock()
 		m.dispatchWebhook(webhook)
@@ -643,7 +657,7 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 	ord.Status = "TRADED"
 	ord.FilledQty = ord.Order.Quantity
 	ord.FilledPrice = fillPrice
-	ord.UpdatedAt = time.Now()
+	ord.UpdatedAt = m.now()
 	ord.EntryTime = ord.CreatedAt
 	ord.StopLoss = ord.Order.BoStopLossValue
 	if ord.StopLoss == 0 {
@@ -676,7 +690,7 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 			ExchangeSegment: ord.Order.ExchangeSegment,
 			ProductType:     ord.Order.ProductType,
 			Multiplier:      1,
-			EntryTime:       time.Now().Format("15:04:05"),
+			EntryTime:       m.now().Format("15:04:05"),
 			StopLoss:        ord.StopLoss,
 			TakeProfit:      ord.TakeProfit,
 		}
@@ -698,7 +712,7 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 		pos.BuyAvg = totalBuyValue / float64(pos.BuyQty)
 		pos.NetQty = pos.BuyQty - pos.SellQty
 		if pos.EntryTime == "" {
-			pos.EntryTime = time.Now().Format("15:04:05")
+			pos.EntryTime = m.now().Format("15:04:05")
 		}
 	} else {
 		// SELL
@@ -731,8 +745,8 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 		pos.PositionType = "SHORT"
 	} else {
 		pos.PositionType = "CLOSED"
-		pos.ExitTime = time.Now().Format("15:04:05")
-		ord.ExitTime = time.Now()
+		pos.ExitTime = m.now().Format("15:04:05")
+		ord.ExitTime = m.now()
 	}
 
 	webhook := m.buildPostbackWebhookLocked(ord)
@@ -761,7 +775,7 @@ func (m *MatchingEngine) executeOrderAsync(clientID, orderID string, fillPrice f
 	ord.Status = "TRADED"
 	ord.FilledQty = ord.Order.Quantity
 	ord.FilledPrice = fillPrice
-	ord.UpdatedAt = time.Now()
+	ord.UpdatedAt = m.now()
 
 	posKey := ord.Order.SecurityID + "_" + ord.Order.ProductType
 	pos, exists := acc.Positions[posKey]
@@ -787,7 +801,7 @@ func (m *MatchingEngine) executeOrderAsync(clientID, orderID string, fillPrice f
 		pos.BuyAvg = totalBuyValue / float64(pos.BuyQty)
 		pos.NetQty = pos.BuyQty - pos.SellQty
 		if pos.EntryTime == "" {
-			pos.EntryTime = time.Now().Format("15:04:05")
+			pos.EntryTime = m.now().Format("15:04:05")
 		}
 	} else {
 		// SELL
@@ -825,8 +839,8 @@ func (m *MatchingEngine) executeOrderAsync(clientID, orderID string, fillPrice f
 		pos.PositionType = "SHORT"
 	} else {
 		pos.PositionType = "CLOSED"
-		pos.ExitTime = time.Now().Format("15:04:05")
-		ord.ExitTime = time.Now()
+		pos.ExitTime = m.now().Format("15:04:05")
+		ord.ExitTime = m.now()
 		pos.UnrealizedProfit = 0.0
 	}
 
@@ -845,7 +859,7 @@ func (m *MatchingEngine) squareOffPositionAutoLocked(acc *ClientAccount, pos *mo
 	}
 
 	m.orderCounter++
-	now := time.Now()
+	now := m.now()
 	nowStr := now.Format("2006-01-02 15:04:05")
 	orderID := fmt.Sprintf("DHN%d%04d", now.Unix(), rand.Intn(10000))
 	exchangeID := fmt.Sprintf("NSE%d%04d", now.Unix(), rand.Intn(10000))
@@ -932,6 +946,7 @@ func (m *MatchingEngine) squareOffPositionAutoLocked(acc *ClientAccount, pos *mo
 	acc.OrderList = append([]string{orderID}, acc.OrderList...)
 
 	webhook := models.DhanPostbackWebhook{
+		SessionID:         m.SessionID,
 		DhanClientID:      acc.DhanClientID,
 		OrderID:           orderID,
 		ExchangeOrderID:   exchangeID,
@@ -963,12 +978,13 @@ func (m *MatchingEngine) squareOffPositionAutoLocked(acc *ClientAccount, pos *mo
 
 // buildPostbackWebhookLocked creates the official DhanPostbackWebhook struct.
 func (m *MatchingEngine) buildPostbackWebhookLocked(ord *models.OrderRecord) models.DhanPostbackWebhook {
-	nowStr := time.Now().Format("2006-01-02 15:04:05")
+	nowStr := m.now().Format("2006-01-02 15:04:05")
 	sym := ord.Order.TradingSymbol
 	if sym == "" {
 		sym = ord.Order.CorrelationID
 	}
 	return models.DhanPostbackWebhook{
+		SessionID:         m.SessionID,
 		DhanClientID:      ord.Order.DhanClientID,
 		OrderID:           ord.OrderID,
 		ExchangeOrderID:   ord.ExchangeID,
@@ -1067,7 +1083,7 @@ func (m *MatchingEngine) CancelOrder(clientID, orderID string) error {
 	}
 
 	ord.Status = "CANCELLED"
-	ord.UpdatedAt = time.Now()
+	ord.UpdatedAt = m.now()
 	webhook := m.buildPostbackWebhookLocked(ord)
 	go m.dispatchWebhook(webhook)
 	return nil
@@ -1099,7 +1115,7 @@ func (m *MatchingEngine) ModifyOrder(clientID, orderID string, price, triggerPri
 	if qty > 0 {
 		ord.Order.Quantity = qty
 	}
-	ord.UpdatedAt = time.Now()
+	ord.UpdatedAt = m.now()
 	return nil
 }
 
@@ -1241,7 +1257,7 @@ func (m *MatchingEngine) KillSwitch() int {
 		for _, ord := range acc.Orders {
 			if ord.Status == "PENDING" {
 				ord.Status = "CANCELLED"
-				ord.UpdatedAt = time.Now()
+				ord.UpdatedAt = m.now()
 				cancelled++
 				webhook := m.buildPostbackWebhookLocked(ord)
 				go m.dispatchWebhook(webhook)
@@ -1344,7 +1360,7 @@ func (m *MatchingEngine) CreateAccount(id, name, broker string, initialBalance f
 		AvailableBalance: initialBalance,
 		SodLimit:         initialBalance,
 		UtilizedMargin:   0.0,
-		CreatedAt:        time.Now(),
+		CreatedAt:        m.now(),
 		Orders:           make(map[string]*models.OrderRecord),
 		OrderList:        make([]string, 0),
 		Positions:        make(map[string]*models.PositionItem),
@@ -1467,7 +1483,7 @@ func (m *MatchingEngine) GetPerformanceSummary(clientID string) models.Performan
 				tStr = pos.EntryTime
 			}
 			if tStr == "" {
-				tStr = time.Now().Format("15:04:05")
+				tStr = m.now().Format("15:04:05")
 			}
 
 			summary.EquityCurve = append(summary.EquityCurve, models.EquityPoint{

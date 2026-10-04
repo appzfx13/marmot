@@ -1,94 +1,158 @@
-<!-- 10 PAPER TRADES & SIMULATED EXECUTION ROWS SLICE (TRADER TABLE UI ALIGNED) -->
+{% load static %}
+
+<!-- 10 PAPER TRADES & SIMULATED EXECUTION CARDS SLICE -->
 {% for trade in trades %}
-<tr style="border-color: var(--border-color) !important;">
-    <td class="ps-4 py-3 bg-transparent">
-        <div class="theme-text-main fw-bold" style="font-size: 0.84rem;">{{ trade.time }}</div>
-        {% if trade.date_str %}
-        <div class="theme-text-muted opacity-85 fw-medium" style="font-size: 0.70rem;">{{ trade.date_str }}</div>
-        {% endif %}
-    </td>
-    <td class="py-3 bg-transparent">
-        <div class="d-flex align-items-center gap-3 ms-1">
-            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" 
-                 style="width: 36px; height: 36px; background: rgba(56, 189, 248, 0.12); border: 1px solid rgba(56, 189, 248, 0.35);">
-                <span class="material-icons" style="color: #38bdf8; font-size: 1.15rem !important;">candlestick_chart</span>
+<div id="sbx-trade-card-{{ trade.serial_no }}" class="trade-card-item p-3 mb-2 rounded-3 border shadow-sm" data-trade-serial="{{ trade.serial_no }}" style="border-color: var(--border-default) !important; background-color: var(--bg-surface);">
+    <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+        <div>
+            <div class="d-flex align-items-center gap-1 mb-1">
+                <span class="badge rounded-pill font-monospace fw-semibold px-2 py-0" style="font-size: 0.68rem; background: var(--bg-elevated) !important; color: var(--text-primary) !important; border: 1px solid var(--border-default) !important;">#{{ trade.serial_no }}</span>
+                {% if 'CE' in trade.symbol %}
+                    <span class="badge rounded-pill px-2 py-0 fw-bold" style="font-size: 0.68rem; background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;">CE</span>
+                {% elif 'PE' in trade.symbol %}
+                    <span class="badge rounded-pill px-2 py-0 fw-bold" style="font-size: 0.68rem; background: rgba(239, 68, 68, 0.18) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;">PE</span>
+                {% else %}
+                    <span class="badge bg-secondary bg-opacity-25 text-light rounded-pill px-2 py-0 fw-bold" style="font-size: 0.68rem;">{{ trade.symbol|slice:":4" }}</span>
+                {% endif %}
             </div>
-            <div>
-                <div class="fw-bold theme-text-main" style="font-size: 0.88rem;">{{ trade.symbol }}</div>
-                <div class="d-flex align-items-center gap-1.5 mt-1">
-                    <span class="badge bg-secondary bg-opacity-25 theme-text-muted rounded-pill px-2 py-0.5 fw-semibold" style="font-size: 0.65rem;">{{ trade.segment }}</span>
-                    <span class="badge rounded-pill px-2 py-0.5 fw-semibold" style="background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.25); color: #38bdf8; font-size: 0.63rem;">PAPER</span>
-                    {% if trade.exchange_trade_id %}
-                    <span class="theme-text-muted opacity-75 fw-medium" style="font-size: 0.65rem;">Ex: {{ trade.exchange_trade_id }}</span>
+            <div class="fw-bold theme-text-main small font-monospace">{{ trade.symbol }}</div>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <div class="text-end font-monospace">
+                <div class="d-flex align-items-center justify-content-end gap-1 flex-wrap">
+                    {% if trade.net_pnl >= 0 %}
+                        <span class="badge rounded-pill font-monospace fw-bold px-2 py-0.5" style="font-size: 0.75rem; background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;">
+                            +₹{{ trade.net_pnl|floatformat:2 }}
+                        </span>
+                    {% else %}
+                        <span class="badge rounded-pill font-monospace fw-bold px-2 py-0.5" style="font-size: 0.75rem; background: rgba(239, 68, 68, 0.18) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;">
+                            -₹{{ trade.net_pnl|stringformat:".2f"|cut:"-" }}
+                        </span>
                     {% endif %}
                 </div>
             </div>
+
+            <button class="btn btn-sm glass-icon-btn rounded-circle p-0 d-flex align-items-center justify-content-center border flex-shrink-0"
+                    style="width: 28px; height: 28px; background: var(--bg-elevated); color: var(--text-primary); border-color: var(--border-default) !important;"
+                    type="button"
+                    data-bs-toggle="collapse"
+                    data-bs-target="#sbx-trade-exp-{{ trade.serial_no }}"
+                    aria-expanded="false"
+                    aria-controls="sbx-trade-exp-{{ trade.serial_no }}"
+                    title="Expand Trade Details">
+                <span class="material-icons fs-6 text-primary">keyboard_arrow_down</span>
+            </button>
         </div>
-    </td>
-    <td class="py-3 bg-transparent">
-        <span class="badge bg-secondary bg-opacity-20 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-2.5 py-1 fw-bold" style="font-size: 0.70rem;">
-            {{ trade.order_type }}
-        </span>
-    </td>
-    <td class="py-3 text-center bg-transparent">
-        {% if trade.side_code == 'B' or trade.type == 'BUY' %}
-        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1 fw-extrabold" style="font-size: 0.74rem;">BUY</span>
+    </div>
+
+    <!-- Mobile WIN/LOSS and Date Header -->
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        {% if trade.is_winner %}
+            <span class="badge rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.7rem; background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;">WIN</span>
         {% else %}
-        <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-3 py-1 fw-extrabold" style="font-size: 0.74rem;">SELL</span>
+            <span class="badge rounded-pill px-2.5 py-0.5 fw-bold" style="font-size: 0.7rem; background: rgba(239, 68, 68, 0.18) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;">LOSS</span>
         {% endif %}
-    </td>
-    <td class="py-3 text-end bg-transparent">
-        <span class="theme-text-main fw-bold" style="font-size: 0.85rem;">
-            {{ trade.qty }}
+        <span class="badge rounded-pill px-2 py-0 font-monospace d-inline-flex align-items-center gap-1 fw-semibold" style="font-size: 0.72rem; background: var(--bg-elevated) !important; color: var(--text-primary) !important; border: 1px solid var(--border-default) !important;">
+            <span class="material-icons" style="font-size: 0.75rem !important;">calendar_today</span>
+            <span>{{ trade.entry_time|date:"d M Y"|default:"—" }}</span>
         </span>
-    </td>
-    <td class="py-3 text-end bg-transparent">
-        <span class="text-warning fw-bold" style="font-size: 0.86rem;">₹{{ trade.turnover|floatformat:2 }}</span>
-    </td>
-    <td class="py-3 text-end bg-transparent">
-        <span class="theme-text-main fw-bold" style="font-size: 0.85rem;">
-            ₹{{ trade.entry|floatformat:2 }}
-        </span>
-    </td>
-    <td class="pe-4 py-3 text-end bg-transparent">
-        <span class="theme-text-muted fw-bold" style="font-size: 0.76rem;">#{{ trade.order_id }}</span>
-    </td>
-</tr>
+    </div>
+
+    <div class="d-flex justify-content-between align-items-center mb-2">
+        <div class="d-flex justify-content-start align-items-center gap-1 small" style="font-size: 0.72rem;">
+            <span class="badge px-1.5 py-0 rounded fw-semibold" style="font-size: 0.68rem; background: rgba(14, 165, 233, 0.18) !important; color: #0284c7 !important; border: 1px solid rgba(14, 165, 233, 0.35) !important;">
+                <span class="fw-normal opacity-75" style="font-family: var(--font-sans);">In:</span> <span class="font-monospace">{{ trade.entry_time|date:"H:i:s"|default:"—" }}</span>
+            </span>
+            <span class="theme-text-muted small">→</span>
+            <span class="badge px-1.5 py-0 rounded fw-semibold" style="font-size: 0.68rem; background: rgba(245, 158, 11, 0.18) !important; color: #d97706 !important; border: 1px solid rgba(245, 158, 11, 0.35) !important;">
+                <span class="fw-normal opacity-75" style="font-family: var(--font-sans);">Out:</span> <span class="font-monospace">{{ trade.exit_time|date:"H:i:s"|default:"—" }}</span>
+            </span>
+        </div>
+        <span class="small theme-text-muted"><span class="opacity-75">Reason:</span> <strong class="theme-text-main font-monospace">{{ trade.exit_reason }}</strong></span>
+    </div>
+
+    <!-- Mobile Collapsible Trade Drawer -->
+    <div class="collapse pt-2 mt-2 border-top border-secondary border-opacity-25 small" id="sbx-trade-exp-{{ trade.serial_no }}">
+        <div class="glass-card p-3 rounded-3 shadow-sm overflow-hidden" style="min-width: 0; background: var(--bg-elevated); border: 1px solid var(--border-default);">
+            <div class="d-flex justify-content-between align-items-center flex-wrap gap-1 mb-3 pb-2 border-bottom border-secondary border-opacity-20">
+                <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-2" style="font-size: 0.74rem; letter-spacing: 0.5px;">
+                    <span class="material-icons text-info" style="font-size: 0.95rem;">receipt_long</span>
+                    <span class="theme-text-main">Trade Execution</span>
+                </span>
+                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-35 rounded-pill px-2.5 py-0.5 fw-bold font-monospace" style="font-size: 0.70rem;">{{ trade.symbol }}</span>
+            </div>
+            
+            <div class="d-flex flex-column small">
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                    <span class="theme-text-muted">Execution Date:</span>
+                    <span class="theme-text-main fw-semibold font-monospace">{{ trade.entry_time|date:"d M Y"|default:"—" }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                    <span class="theme-text-muted">Option Price:</span>
+                    <span class="fw-bold font-monospace text-info">₹{{ trade.entry_price|floatformat:2 }} ➔ ₹{{ trade.exit_price|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                    <span class="theme-text-muted">Gross PnL:</span>
+                    <span class="{% if trade.gross_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-bold font-monospace">
+                        {% if trade.gross_pnl >= 0 %}+{% endif %}₹{{ trade.gross_pnl|floatformat:2 }}
+                    </span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                    <span class="theme-text-muted">Charges & Taxes:</span>
+                    <span class="text-warning fw-bold font-monospace">-₹{{ trade.charges|floatformat:2 }}</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                    <span class="theme-text-muted">Position Size:</span>
+                    <span class="theme-text-main fw-medium"><strong class="font-monospace">{{ trade.qty }}</strong> Qty</span>
+                </div>
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom border-secondary border-opacity-10">
+                    <span class="theme-text-muted">Trade Duration:</span>
+                    <span class="theme-text-main fw-semibold font-monospace">
+                        {% if trade.duration_secs < 60 %}
+                            {{ trade.duration_secs }}s
+                        {% elif trade.duration_secs < 3600 %}
+                            {% widthratio trade.duration_secs 60 1 %}m
+                        {% else %}
+                            {% widthratio trade.duration_secs 3600 1 %}h
+                        {% endif %}
+                    </span>
+                </div>
+            </div>
+            
+        </div>
+    </div>
+</div>
 {% empty %}
-<tr>
-    <td colspan="8" class="text-center py-5 theme-text-muted" style="font-size: 0.88rem;">
-        <span class="material-icons fs-4 opacity-75 d-block mb-1">receipt_long</span>
-        <span>No simulated paper records found for {% if filter_date %}date <strong>{{ filter_date }}</strong>{% else %}year <strong>{{ filter_year }}</strong>{% endif %}.</span>
-    </td>
-</tr>
+<div class="p-5 text-center theme-text-muted border rounded-3 glass-card" style="border-color: var(--border-default) !important;">
+    <i class="bi bi-inbox d-block mb-3 fs-1 opacity-50"></i>
+    <h5 class="fw-bold mb-2">No closed trades recorded</h5>
+    <p class="opacity-75 mb-0 small">Execute strategy trades or replay Parquet data to see executed trade pairs.</p>
+</div>
 {% endfor %}
 
 {% if has_more %}
-<!-- Table Sentinel Row for Clean Progressive Loading (Trader Table Pattern) -->
-<tr id="sbx-journal-trades-sentinel-{{ page }}" style="border: 0 !important;">
-    <td colspan="8" class="text-center py-3 bg-transparent border-0">
-        <button type="button"
-                hx-get="{% url 'admins:admin-sandbox-journal-orders' %}?page={{ next_page }}{% if filter_date %}&date={{ filter_date }}{% elif filter_year %}&year={{ filter_year }}{% endif %}&rows_only=1"
-                hx-target="#sbx-journal-trades-sentinel-{{ page }}"
-                hx-swap="outerHTML"
-                class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
-                style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
-                title="Load 10 More Paper Records">
-            <span class="load-more-idle d-inline-flex align-items-center gap-2">
-                <span class="material-icons fs-5">keyboard_arrow_down</span>
-                <span class="fw-bold" style="font-size: 0.8rem;">Load 10 More (Page {{ next_page }} of {{ total_pages }})</span>
-            </span>
-            <span class="load-more-loading d-none align-items-center gap-2">
-                <span class="loading-dots me-1"><span></span><span></span><span></span></span>
-                <span class="fw-bold" style="font-size: 0.8rem;">Loading paper records...</span>
-            </span>
-        </button>
-    </td>
-</tr>
+<!-- Sentinel Row for Clean Progressive Loading (Trader Table Pattern) -->
+<div id="sbx-journal-trades-sentinel-{{ page }}" class="text-center py-3">
+    <button type="button"
+            hx-get="{% url 'admins:admin-sandbox-journal-orders' %}?page={{ next_page }}{% if filter_date %}&date={{ filter_date }}{% elif filter_year %}&year={{ filter_year }}{% endif %}&rows_only=1"
+            hx-target="#sbx-journal-trades-sentinel-{{ page }}"
+            hx-swap="outerHTML"
+            class="btn btn-sm btn-load-more glass-card border border-primary border-opacity-25 text-primary rounded-pill px-4 py-2 d-inline-flex align-items-center gap-2 shadow-sm"
+            style="background: rgba(122, 90, 248, 0.12); cursor: pointer;"
+            title="Load 10 More Paper Records">
+        <span class="load-more-idle d-inline-flex align-items-center gap-2">
+            <span class="material-icons fs-5">keyboard_arrow_down</span>
+            <span class="fw-bold" style="font-size: 0.8rem;">Load 10 More (Page {{ next_page }} of {{ total_pages }})</span>
+        </span>
+        <span class="load-more-loading d-none align-items-center gap-2">
+            <span class="loading-dots me-1"><span></span><span></span><span></span></span>
+            <span class="fw-bold" style="font-size: 0.8rem;">Loading paper records...</span>
+        </span>
+    </button>
+</div>
 {% elif total_trades_count > 0 %}
-<tr class="border-0">
-    <td colspan="8" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.76rem;">
-        <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ total_trades_count }} paper records loaded
-    </td>
-</tr>
+<div class="text-center py-3 theme-text-muted" style="font-size: 0.76rem;">
+    <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ total_trades_count }} trade pairs loaded
+</div>
 {% endif %}

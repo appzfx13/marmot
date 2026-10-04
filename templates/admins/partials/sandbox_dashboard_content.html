@@ -12,7 +12,7 @@
             <button type="button" 
                     class="btn btn-outline-danger rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
                     style="font-size: 0.8rem;"
-                    hx-post="{% url 'admins:admin-sandbox-clear-session' %}"
+                    hx-post="{% url 'admins:admin-sandbox-clear-session' %}{% if sandbox_account %}?account_id={{ sandbox_account.id }}{% endif %}{% if selected_strategy %}&strategy_id={{ selected_strategy.id }}{% endif %}"
                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                     hx-swap="none"
                     hx-confirm="Are you sure you want to clear all sandbox simulated positions, orders, and restore starting capital (₹1,00,000)?">

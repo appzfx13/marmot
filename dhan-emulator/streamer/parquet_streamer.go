@@ -1060,6 +1060,15 @@ func (ps *ParquetStreamer) streamLoop() {
 func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 	log.Printf("[STREAMER] Starting native Parquet streaming replay from: %s", fullPath)
 
+	if ps.rdb != nil {
+		_ = ps.rdb.Set(context.Background(), "marmot:mock_feed:active", "true", 0).Err()
+	}
+	defer func() {
+		if ps.rdb != nil {
+			_ = ps.rdb.Del(context.Background(), "marmot:mock_feed:active").Err()
+		}
+	}()
+
 	file, err := os.Open(fullPath)
 	if err != nil {
 		log.Printf("[STREAMER] Error opening Parquet file %s: %v", fullPath, err)
@@ -1220,7 +1229,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 			var volume int64
 
 			for _, rec := range currentBucket {
-				if rec.OptionType == "INDEX" || rec.Strike == "SPOT" {
+				if rec.OptionType == "INDEX" || rec.Strike == "SPOT" || strings.Contains(strings.ToUpper(rec.TradingSymbol), "INDEX") {
 					spotIndexName = rec.IndexName
 					spotPrice = rec.Close
 					if spotPrice <= 0 {
@@ -1232,15 +1241,6 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					closePrice = spotPrice
 					volume = rec.Volume
 					break
-				}
-				if rec.SpotPrice > 1000 && spotPrice == 0 {
-					spotPrice = rec.SpotPrice
-					spotIndexName = rec.IndexName
-					openPrice = rec.SpotPrice
-					highPrice = rec.SpotPrice
-					lowPrice = rec.SpotPrice
-					closePrice = rec.SpotPrice
-					volume = 50000
 				}
 			}
 
@@ -1258,6 +1258,21 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 				lowPrice = cachedSpotTick.Low
 				closePrice = cachedSpotTick.Close
 				volume = cachedSpotTick.Volume
+			} else if spotPrice <= 0 {
+				// Cold-start fallback before first INDEX row encountered: only accept rec.SpotPrice if NOT equal to its option strike
+				for _, rec := range currentBucket {
+					strikeNum, _ := strconv.ParseFloat(rec.Strike, 64)
+					if rec.SpotPrice > 1000 && math.Abs(rec.SpotPrice-strikeNum) > 50.0 {
+						spotPrice = rec.SpotPrice
+						spotIndexName = rec.IndexName
+						openPrice = rec.SpotPrice
+						highPrice = rec.SpotPrice
+						lowPrice = rec.SpotPrice
+						closePrice = rec.SpotPrice
+						volume = 50000
+						break
+					}
+				}
 			}
 
 			if spotPrice > 1000 {
@@ -1413,9 +1428,9 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 						secID = "25"
 					}
 				} else if strings.HasPrefix(strings.ToUpper(rec.Strike), "ATM") {
-					sp := rec.SpotPrice
+					sp := spotPrice
 					if sp <= 1000 {
-						sp = spotPrice
+						sp = rec.SpotPrice
 					}
 					if sp > 1000 {
 						offset := 0
@@ -1624,7 +1639,7 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 			var openPrice, highPrice, lowPrice, closePrice float64
 			var volume int64
 			for _, rec := range currentBucket {
-				if rec.OptionType == "INDEX" || rec.Strike == "SPOT" {
+				if rec.OptionType == "INDEX" || rec.Strike == "SPOT" || strings.Contains(strings.ToUpper(rec.TradingSymbol), "INDEX") {
 					spotIndexName = rec.IndexName
 					spotPrice = rec.Close
 					if spotPrice <= 0 {
@@ -1637,26 +1652,37 @@ func (ps *ParquetStreamer) streamParquetFile(fullPath string) {
 					volume = rec.Volume
 					break
 				}
-				if rec.SpotPrice > 1000 && spotPrice == 0 {
-					spotPrice = rec.SpotPrice
-					spotIndexName = rec.IndexName
-					openPrice = rec.SpotPrice
-					highPrice = rec.SpotPrice
-					lowPrice = rec.SpotPrice
-					closePrice = rec.SpotPrice
-					volume = 50000
-				}
 			}
 			if spotPrice <= 0 {
 				ps.mu.RLock()
-				spotPrice = ps.lastSpotPrice
-				spotIndexName = ps.lastSpotTick.TradingSymbol
-				openPrice = ps.lastSpotTick.Open
-				highPrice = ps.lastSpotTick.High
-				lowPrice = ps.lastSpotTick.Low
-				closePrice = ps.lastSpotTick.Close
-				volume = ps.lastSpotTick.Volume
+				cachedSpotPrice := ps.lastSpotPrice
+				cachedSpotTick := ps.lastSpotTick
 				ps.mu.RUnlock()
+
+				if cachedSpotPrice > 1000 {
+					spotPrice = cachedSpotPrice
+					spotIndexName = cachedSpotTick.TradingSymbol
+					openPrice = cachedSpotTick.Open
+					highPrice = cachedSpotTick.High
+					lowPrice = cachedSpotTick.Low
+					closePrice = cachedSpotTick.Close
+					volume = cachedSpotTick.Volume
+				} else {
+					// Cold-start fallback before first INDEX row encountered: only accept rec.SpotPrice if NOT equal to its option strike
+					for _, rec := range currentBucket {
+						strikeNum, _ := strconv.ParseFloat(rec.Strike, 64)
+						if rec.SpotPrice > 1000 && math.Abs(rec.SpotPrice-strikeNum) > 50.0 {
+							spotPrice = rec.SpotPrice
+							spotIndexName = rec.IndexName
+							openPrice = rec.SpotPrice
+							highPrice = rec.SpotPrice
+							lowPrice = rec.SpotPrice
+							closePrice = rec.SpotPrice
+							volume = 50000
+							break
+						}
+					}
+				}
 			}
 			if spotIndexName == "" {
 				spotIndexName = "NIFTY"

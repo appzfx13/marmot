@@ -278,6 +278,7 @@ type SimulatedOrder struct {
 	OMSErrorDesc    string                 `json:"oms_error_desc"`
 	SignalTime      string                 `json:"signal_time,omitempty"`
 	ExecutionTime   string                 `json:"execution_time,omitempty"`
+	TradeDuration   string                 `json:"trade_duration,omitempty"`
 	LimitEntryPrice float64                `json:"limit_entry_price,omitempty"`
 	LimitTappedTime string                 `json:"limit_tapped_time,omitempty"`
 	TargetPrice          float64                `json:"target_price,omitempty"`
@@ -352,6 +353,8 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 	tickCounter := 0
 	var prevSpotPrice float64
 	var spotPrice float64
+	var latestLogicalTime time.Time
+	latestLogicalTime = nowIST()
 
 	var candleSub *redis.PubSub
 	var candleChan <-chan *redis.Message
@@ -390,6 +393,13 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			}
 
 			loopStart := time.Now()
+			if dtStr, ok := cData["datetime"].(string); ok && len(dtStr) >= 19 {
+				parsed, err := time.Parse("2006-01-02 15:04:05", dtStr[:19])
+				if err == nil {
+					latestLogicalTime = parsed
+				}
+			}
+			
 			cSpot, _ := cData["spot_price"].(float64)
 			if cSpot <= 0 {
 				cSpot, _ = cData["close"].(float64)
@@ -419,16 +429,41 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 								}
 								exitTime := mp.ExitTime
 								if exitTime == "" {
-									if dt, ok := cData["datetime"].(string); ok && len(dt) >= 19 {
-										exitTime = dt[11:19]
-									} else {
-										exitTime = nowIST().Format("03:04:05 PM")
+									exitTime = latestLogicalTime.Format("15:04:05")
+								}
+								
+								// Calculate trade duration
+								durationStr := ""
+								for _, o := range orders {
+									if o.TradingSymbol == positions[i].TradingSymbol && o.TransactionType == "BUY" && o.OrderStatus == "TRADED" {
+										entryTime, err := time.Parse("15:04:05", o.ExecutionTime)
+										if err != nil {
+											entryTime, err = time.Parse("03:04:05 PM", o.ExecutionTime)
+										}
+										exitTimeParsed, err2 := time.Parse("15:04:05", exitTime)
+										if err2 != nil {
+											exitTimeParsed, err2 = time.Parse("03:04:05 PM", exitTime)
+										}
+										if err == nil && err2 == nil {
+											diff := exitTimeParsed.Sub(entryTime)
+											if diff < 0 {
+												diff = -diff
+											}
+											if diff.Hours() >= 1 {
+												durationStr = fmt.Sprintf("%dh %dm %ds", int(diff.Hours()), int(diff.Minutes())%60, int(diff.Seconds())%60)
+											} else {
+												durationStr = fmt.Sprintf("%dm %ds", int(diff.Minutes()), int(diff.Seconds())%60)
+											}
+										}
+										break
 									}
 								}
+
 								exitOrder := SimulatedOrder{
 									OrderID:         fmt.Sprintf("DHN-EXIT-%d", time.Now().Unix()%100000),
 									CreateTime:      exitTime,
 									ExecutionTime:   exitTime,
+									TradeDuration:   durationStr,
 									TradingSymbol:   positions[i].TradingSymbol,
 									ExchangeSegment: "NSE_FNO",
 									TransactionType: "SELL",
@@ -533,11 +568,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 
 					orderTime := sig.Timestamp
 					if orderTime == "" {
-						if dt, ok := cData["datetime"].(string); ok && len(dt) >= 19 {
-							orderTime = dt[11:19]
-						} else {
-							orderTime = nowIST().Format("03:04:05 PM")
-						}
+						orderTime = latestLogicalTime.Format("15:04:05")
 					}
 
 					newOrderID := fmt.Sprintf("SBX-%d%02d", time.Now().Unix()%100000, rand.Intn(90)+10)
@@ -642,13 +673,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 			}
 			isMarketOpen := isSegmentMarketOpen(segment)
 			if isMockMode(params.ExecutionMode) {
-				mockActive := false
-				if j.redisService != nil && j.redisService.Client != nil {
-					if val, err := j.redisService.Client.Get(ctx, "marmot:mock_feed:active").Result(); err == nil && val == "true" {
-						mockActive = true
-					}
-				}
-				isMarketOpen = mockActive || isMarketOpen
+				isMarketOpen = true // In Sandbox/Mock Replay mode, market-closed rules never apply
 			}
 			if !isMarketOpen {
 				// When market/streamer is paused or closed, throttle evaluation to avoid CPU and Redis write churn
@@ -678,7 +703,7 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				if orders[k].OrderStatus == "PENDING" && orders[k].CurrentLTP > 0 {
 					if orders[k].TransactionType == "BUY" && orders[k].CurrentLTP <= orders[k].LimitEntryPrice {
 						orders[k].OrderStatus = "TRADED"
-						orders[k].ExecutionTime = nowIST().Format("03:04:05 PM")
+						orders[k].ExecutionTime = latestLogicalTime.Format("15:04:05")
 						orders[k].FilledQty = orders[k].Quantity
 						
 						diff := orders[k].LimitEntryPrice - orders[k].CurrentLTP
@@ -825,12 +850,41 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 									}
 									exitTime := mp.ExitTime
 									if exitTime == "" {
-										exitTime = nowIST().Format("03:04:05 PM")
+										exitTime = latestLogicalTime.Format("15:04:05")
 									}
+									
+									// Calculate trade duration
+									durationStr := ""
+									for _, o := range orders {
+										if o.TradingSymbol == positions[i].TradingSymbol && o.TransactionType == "BUY" && o.OrderStatus == "TRADED" {
+											entryTime, err := time.Parse("15:04:05", o.ExecutionTime)
+											if err != nil {
+												entryTime, err = time.Parse("03:04:05 PM", o.ExecutionTime)
+											}
+											exitTimeParsed, err2 := time.Parse("15:04:05", exitTime)
+											if err2 != nil {
+												exitTimeParsed, err2 = time.Parse("03:04:05 PM", exitTime)
+											}
+											if err == nil && err2 == nil {
+												diff := exitTimeParsed.Sub(entryTime)
+												if diff < 0 {
+													diff = -diff
+												}
+												if diff.Hours() >= 1 {
+													durationStr = fmt.Sprintf("%dh %dm %ds", int(diff.Hours()), int(diff.Minutes())%60, int(diff.Seconds())%60)
+												} else {
+													durationStr = fmt.Sprintf("%dm %ds", int(diff.Minutes()), int(diff.Seconds())%60)
+												}
+											}
+											break
+										}
+									}
+									
 									exitOrder := SimulatedOrder{
 										OrderID:         fmt.Sprintf("DHN-EXIT-%d", time.Now().Unix()%100000),
 										CreateTime:      exitTime,
 										ExecutionTime:   exitTime,
+										TradeDuration:   durationStr,
 										TradingSymbol:   positions[i].TradingSymbol,
 										ExchangeSegment: "NSE_FNO",
 										TransactionType: "SELL",
@@ -960,11 +1014,12 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				prevSpotPrice = spotPrice
 
 				candle := map[string]interface{}{
-					"close":  barClose,
-					"open":   barOpen,
-					"high":   barHigh,
-					"low":    barLow,
-					"volume": 125000,
+					"datetime": latestLogicalTime.Format("2006-01-02 15:04:05"),
+					"close":    barClose,
+					"open":     barOpen,
+					"high":     barHigh,
+					"low":      barLow,
+					"volume":   125000,
 				}
 				sig := strat.EvaluateLiveSignal(candle, nil, indexName, params.Params)
 				if sig != nil {
@@ -1572,6 +1627,74 @@ func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName stri
 		return res
 	}
 
+	isMock := isMockMode(j.payload.Params.ExecutionMode) || !isRealLiveMode(j.payload.Params.ExecutionMode)
+	if val, err := j.redisService.Client.Get(ctx, "marmot:mock_feed:active").Result(); err == nil && val == "true" {
+		isMock = true
+	}
+
+	if isMock {
+		// In Mock / Sandbox mode: prioritize local mock broker emulator and mock Redis keys
+		mockKeys := []string{
+			fmt.Sprintf("marmot:mock:option_chain:%s", indexName),
+			fmt.Sprintf("marmot:mock:last_known_option_chain:%s", indexName),
+		}
+		for _, k := range mockKeys {
+			data, err := j.redisService.Client.Get(ctx, k).Result()
+			if err == nil && len(data) > 0 {
+				var rawMap map[string]interface{}
+				if unmarshalErr := json.Unmarshal([]byte(data), &rawMap); unmarshalErr == nil {
+					var price float64
+					if v, ok := rawMap["raw_spot_ltp"].(float64); ok && v > 0 {
+						price = v
+					} else if s, ok := rawMap["spot_ltp"].(string); ok {
+						cleanStr := strings.ReplaceAll(strings.ReplaceAll(s, ",", ""), "₹", "")
+						_, _ = fmt.Sscanf(cleanStr, "%f", &price)
+					}
+					if price > 0 {
+						res.SpotPrice = price
+						res.OpenPrice = price
+						res.HighPrice = price
+						res.LowPrice = price
+						step := StrikeIntervalForIndex(indexName)
+						if step <= 0 {
+							step = 50
+						}
+						if v, ok := rawMap["atm_strike"].(float64); ok && v > 0 {
+							res.ATMStrike = int(v)
+						} else {
+							res.ATMStrike = int(math.Round(price/float64(step)) * float64(step))
+						}
+						return res
+					}
+				}
+			}
+		}
+
+		// Direct query to local mock broker emulator
+		resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
+		if err == nil && resp.StatusCode == http.StatusOK {
+			var mockData map[string]interface{}
+			if jsonErr := json.NewDecoder(resp.Body).Decode(&mockData); jsonErr == nil {
+				resp.Body.Close()
+				if p, ok := mockData["raw_spot_ltp"].(float64); ok && p > 0 {
+					res.SpotPrice = p
+					res.OpenPrice = p
+					res.HighPrice = p
+					res.LowPrice = p
+					res.ATMStrike = int(math.Round(p/50.0) * 50.0)
+					if b, mErr := json.Marshal(mockData); mErr == nil && j.redisService != nil && j.redisService.Client != nil {
+						_ = j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:mock:option_chain:%s", indexName), b, 5*time.Minute).Err()
+						_ = j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:mock:last_known_option_chain:%s", indexName), b, 24*time.Hour).Err()
+					}
+					return res
+				}
+			} else {
+				resp.Body.Close()
+			}
+		}
+		return res
+	}
+
 	keysToTry := []string{
 		fmt.Sprintf("marmot:fyers_quote:NSE:%s50-INDEX", indexName),
 		fmt.Sprintf("marmot:fyers_quote:NSE:%s-INDEX", indexName),
@@ -1630,28 +1753,6 @@ func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName stri
 					return res
 				}
 			}
-		}
-	}
-
-	// Fallback to local mock broker emulator endpoint
-	resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
-	if err == nil && resp.StatusCode == http.StatusOK {
-		var mockData map[string]interface{}
-		if jsonErr := json.NewDecoder(resp.Body).Decode(&mockData); jsonErr == nil {
-			resp.Body.Close()
-			if p, ok := mockData["raw_spot_ltp"].(float64); ok && p > 0 {
-				res.SpotPrice = p
-				res.OpenPrice = p
-				res.HighPrice = p
-				res.LowPrice = p
-				res.ATMStrike = int(math.Round(p/50.0) * 50.0)
-				if b, mErr := json.Marshal(mockData); mErr == nil && j.redisService != nil && j.redisService.Client != nil {
-					_ = j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:mock:option_chain:%s", indexName), b, 1*time.Second).Err()
-				}
-				return res
-			}
-		} else {
-			resp.Body.Close()
 		}
 	}
 
