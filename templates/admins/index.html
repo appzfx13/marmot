@@ -2721,12 +2721,111 @@
             window.extractOptionStrike = extractOptionStrike;
             window.extractOptionType = extractOptionType;
 
-            window.updateLiveOptionContractsDOM = function (incomingSym, ltp) {
+            // Format price to ₹X,XX,XXX.XX (Indian locale)
+            function fmtPrice(n) {
+                return '₹' + Number(n).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            }
+
+            // Flash helper: momentary color pulse on DOM element
+            function flashEl(el, color) {
+                if (!el) return;
+                el.style.transition = 'color 0.12s ease';
+                el.style.color = color;
+                clearTimeout(el._flashTimer);
+                el._flashTimer = setTimeout(function () { el.style.color = ''; }, 380);
+            }
+
+            // Update CE or PE strike LTP in the option chain table
+            function updateStrikeLTP(strike, optType, ltp, chg) {
+                var strikeInt = parseInt(strike, 10);
+                if (isNaN(strikeInt) || strikeInt <= 0) return;
+                var ltpFloat = parseFloat(ltp);
+                if (isNaN(ltpFloat) || ltpFloat <= 0) return;
+
+                var key = (optType === 'CE' ? 'ce_' : 'pe_') + strikeInt;
+                var el = document.getElementById(optType === 'CE' ? ('oc-ltp-ce-' + strikeInt) : ('oc-ltp-pe-' + strikeInt)) ||
+                    document.querySelector('[data-tick-key="' + key + '"]') ||
+                    document.querySelector('[data-tick-key="' + (optType === 'CE' ? 'ce_' : 'pe_') + strike + '"]');
+                if (el) {
+                    var prev = parseFloat(el.getAttribute('data-tick-price') || 0);
+                    el.setAttribute('data-tick-price', ltpFloat.toFixed(2));
+                    el.textContent = fmtPrice(ltpFloat);
+                    el.classList.remove('text-muted', 'fw-normal');
+                    el.classList.add('fw-bold');
+
+                    if (window._optionChainLtpMap) {
+                        window._optionChainLtpMap[key] = ltpFloat;
+                    }
+
+                    if (prev > 0 && Math.abs(ltpFloat - prev) >= 0.01) {
+                        el.classList.remove('tick-flash-up', 'tick-flash-down');
+                        void el.offsetWidth;
+                        el.classList.add(ltpFloat >= prev ? 'tick-flash-up' : 'tick-flash-down');
+                        clearTimeout(el._flashTimer);
+                        el._flashTimer = setTimeout(function () {
+                            el.classList.remove('tick-flash-up', 'tick-flash-down');
+                        }, 700);
+                    }
+                }
+
+                // Also update change pill if present
+                var chgEl = document.getElementById(optType === 'CE' ? ('oc-chg-ce-' + strikeInt) : ('oc-chg-pe-' + strikeInt));
+                if (chgEl && chg !== undefined && chg !== null && chg !== '') {
+                    var chgNum = parseFloat(chg);
+                    if (!isNaN(chgNum)) {
+                        chgEl.textContent = (chgNum >= 0 ? '+' : '') + chgNum.toFixed(1);
+                        chgEl.className = 'smaller ms-1 ' + (chgNum >= 0 ? 'text-success' : 'text-danger');
+                    }
+                }
+            }
+
+            // Update CE or PE strike Open Interest (OI) in the option chain table
+            function updateStrikeOI(strike, optType, oi) {
+                var strikeInt = parseInt(strike, 10);
+                if (isNaN(strikeInt) || strikeInt <= 0) return;
+                var el = document.getElementById(optType === 'CE' ? ('oc-oi-ce-' + strikeInt) : ('oc-oi-pe-' + strikeInt));
+                if (!el) {
+                    var key = (optType === 'CE' ? 'ce_oi_' : 'pe_oi_') + strikeInt;
+                    el = document.querySelector('[data-tick-key="' + key + '"]') ||
+                        document.querySelector('[data-tick-key="' + (optType === 'CE' ? 'ce_oi_' : 'pe_oi_') + strike + '"]');
+                }
+                if (!el) return;
+                var numOI = parseInt(String(oi).replace(/,/g, '').trim(), 10);
+                if (!isNaN(numOI) && numOI > 0 && numOI !== 100000) {
+                    var prev = parseInt(String(el.getAttribute('data-tick-oi') || el.textContent).replace(/,/g, '').trim() || 0, 10);
+                    el.setAttribute('data-tick-oi', numOI);
+                    el.textContent = numOI.toLocaleString('en-IN');
+                    if (prev > 0 && Math.abs(numOI - prev) > 0) {
+                        flashEl(el, numOI >= prev ? '#22c55e' : '#ef4444');
+                    }
+                }
+            }
+
+            window.fmtPrice = fmtPrice;
+            window.flashEl = flashEl;
+            window.updateStrikeLTP = updateStrikeLTP;
+            window.updateStrikeOI = updateStrikeOI;
+
+            window.updateLiveOptionContractsDOM = function (incomingSym, ltp, extra) {
                 if (!incomingSym || !ltp) return;
                 const ltpFloat = parseFloat(ltp);
                 if (isNaN(ltpFloat) || ltpFloat <= 0) return;
                 const incStrike = extractOptionStrike(incomingSym);
                 const incOptType = extractOptionType(incomingSym);
+
+                if (incStrike && incOptType) {
+                    const strikeNum = parseInt(incStrike, 10);
+                    if (!isNaN(strikeNum) && strikeNum > 0) {
+                        const chg = extra ? (extra.change !== undefined ? extra.change : extra.chg) : null;
+                        if (typeof updateStrikeLTP === 'function') {
+                            updateStrikeLTP(strikeNum, incOptType, ltpFloat, chg);
+                        }
+                        const oi = extra ? (extra.oi !== undefined ? extra.oi : (extra.OI !== undefined ? extra.OI : extra.openInterest)) : null;
+                        if (oi && typeof updateStrikeOI === 'function') {
+                            updateStrikeOI(strikeNum, incOptType, oi);
+                        }
+                    }
+                }
 
                 document.querySelectorAll('.order-live-ltp[data-symbol]').forEach(function (el) {
                     const rawSym = el.getAttribute('data-symbol') || '';
@@ -2900,7 +2999,7 @@
                                     } else {
                                         const optLtp = parseFloat(data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : 0));
                                         if (optLtp > 0 && window.updateLiveOptionContractsDOM) {
-                                            window.updateLiveOptionContractsDOM(sym, optLtp);
+                                            window.updateLiveOptionContractsDOM(sym, optLtp, data.data || data);
                                         }
                                     }
                                     if (window.handleEmulatorTick) {
@@ -3563,26 +3662,46 @@
             }
 
             // Update CE or PE strike LTP in the option chain table
-            function updateStrikeLTP(strike, optType, ltp) {
+            function updateStrikeLTP(strike, optType, ltp, chg) {
                 var strikeInt = parseInt(strike, 10);
+                if (isNaN(strikeInt) || strikeInt <= 0) return;
+                var ltpFloat = parseFloat(ltp);
+                if (isNaN(ltpFloat) || ltpFloat <= 0) return;
+
                 var key = (optType === 'CE' ? 'ce_' : 'pe_') + strikeInt;
-                var el = document.querySelector('[data-tick-key="' + key + '"]') ||
-                    document.querySelector('[data-tick-key="' + (optType === 'CE' ? 'ce_' : 'pe_') + strike + '"]') ||
-                    document.getElementById(optType === 'CE' ? ('oc-ltp-ce-' + strikeInt) : ('oc-ltp-pe-' + strikeInt));
-                if (!el) return;
-                var prev = parseFloat(el.getAttribute('data-tick-price') || 0);
-                el.setAttribute('data-tick-price', ltp);
-                if (ltp > 0) {
-                    el.textContent = fmtPrice(ltp);
+                var el = document.getElementById(optType === 'CE' ? ('oc-ltp-ce-' + strikeInt) : ('oc-ltp-pe-' + strikeInt)) ||
+                    document.querySelector('[data-tick-key="' + key + '"]') ||
+                    document.querySelector('[data-tick-key="' + (optType === 'CE' ? 'ce_' : 'pe_') + strike + '"]');
+                if (el) {
+                    var prev = parseFloat(el.getAttribute('data-tick-price') || 0);
+                    el.setAttribute('data-tick-price', ltpFloat.toFixed(2));
+                    el.textContent = fmtPrice(ltpFloat);
                     el.classList.remove('text-muted', 'fw-normal');
                     el.classList.add('fw-bold');
-                    if (prev > 0 && Math.abs(ltp - prev) >= 0.01) {
-                        flashEl(el, ltp >= prev ? '#22c55e' : '#ef4444');
+
+                    if (window._optionChainLtpMap) {
+                        window._optionChainLtpMap[key] = ltpFloat;
                     }
-                } else {
-                    el.innerHTML = '&mdash;';
-                    el.classList.remove('fw-bold');
-                    el.classList.add('text-muted', 'fw-normal');
+
+                    if (prev > 0 && Math.abs(ltpFloat - prev) >= 0.01) {
+                        el.classList.remove('tick-flash-up', 'tick-flash-down');
+                        void el.offsetWidth;
+                        el.classList.add(ltpFloat >= prev ? 'tick-flash-up' : 'tick-flash-down');
+                        clearTimeout(el._flashTimer);
+                        el._flashTimer = setTimeout(function () {
+                            el.classList.remove('tick-flash-up', 'tick-flash-down');
+                        }, 700);
+                    }
+                }
+
+                // Also update change pill if present
+                var chgEl = document.getElementById(optType === 'CE' ? ('oc-chg-ce-' + strikeInt) : ('oc-chg-pe-' + strikeInt));
+                if (chgEl && chg !== undefined && chg !== null && chg !== '') {
+                    var chgNum = parseFloat(chg);
+                    if (!isNaN(chgNum)) {
+                        chgEl.textContent = (chgNum >= 0 ? '+' : '') + chgNum.toFixed(1);
+                        chgEl.className = 'smaller ms-1 ' + (chgNum >= 0 ? 'text-success' : 'text-danger');
+                    }
                 }
             }
 
