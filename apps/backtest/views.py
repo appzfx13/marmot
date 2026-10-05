@@ -305,8 +305,21 @@ def get_backtest_trades_context(backtest, request):
         trade_item['entry_time'] = raw_ts[11:16] if len(raw_ts) >= 16 else (raw_ts or '-')
         trade_item['entry_spot'] = trade_item.get('index_entry_price', trade_item.get('entry_price', 0))
         trade_item['exit_spot'] = trade_item.get('index_exit_price', trade_item.get('exit_price', 0))
-        trade_item['quantity'] = trade_item.get('quantity', trade_item.get('lots_count', 1))
-        trade_item['lots_count'] = trade_item.get('lots_count', trade_item.get('quantity', 1))
+        idx_name = getattr(backtest, 'index_name', '') or trade_item.get('symbol', 'NIFTY')
+        trade_date = raw_ts[:10] if len(raw_ts) >= 10 else None
+        lot_sz = get_historical_lot_size(idx_name, trade_date) if idx_name else 50
+        trade_item['lot_size'] = lot_sz
+        raw_qty = int(trade_item.get('quantity') or 0)
+        raw_lots = trade_item.get('lots_count')
+        if raw_lots is not None and int(raw_lots) > 0:
+            trade_item['lots_count'] = int(raw_lots)
+            trade_item['quantity'] = raw_qty if raw_qty > 0 else trade_item['lots_count'] * lot_sz
+        elif raw_qty > 0:
+            trade_item['quantity'] = raw_qty
+            trade_item['lots_count'] = max(1, round(raw_qty / lot_sz))
+        else:
+            trade_item['quantity'] = lot_sz
+            trade_item['lots_count'] = 1
         trade_item['reason'] = trade_item.get('reason') or trade_item.get('entry_reason') or 'Order Flow Signal'
         trade_item['entry_reason'] = trade_item.get('entry_reason') or trade_item.get('reason') or 'Order Flow Signal'
 

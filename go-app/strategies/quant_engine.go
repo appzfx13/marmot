@@ -250,6 +250,9 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 					if activeTrade.StopLossPrice < 0.5 {
 						activeTrade.StopLossPrice = 0.5
 					}
+					activeTrade.InitialTargetPrice = activeTrade.TargetPrice
+					activeTrade.InitialStopLossPrice = activeTrade.StopLossPrice
+					activeTrade.TrailingStopLossPrice = activeTrade.StopLossPrice
 				}
 			}
 
@@ -312,6 +315,14 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 				trades = append(trades, *activeTrade)
 				activeTrade = nil
 				activeStrikeKey = ""
+
+				exitTime := time.Unix(tick.Timestamp, 0).In(istLocation)
+				if len(tick.Datetime) >= 19 {
+					if pt, err := time.ParseInLocation("2006-01-02 15:04:05", tick.Datetime[:19], istLocation); err == nil {
+						exitTime = pt
+					}
+				}
+				localEngine.lastSignalTime = exitTime
 			}
 			continue
 		}
@@ -414,25 +425,60 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			continue // No valid option premium for entry — skip tick
 		}
 
-		// SL/TP in option premium points with dynamic default based on index
-		slPts := 15.0
-		switch strings.ToUpper(input.IndexName) {
-		case "BANKNIFTY", "SENSEX", "BANKEX":
-			slPts = 30.0 // Premium points (approx 60 spot pts)
-		case "NIFTY", "FINNIFTY":
-			slPts = 12.0 // Premium points (approx 24 spot pts)
-		case "MIDCPNIFTY":
-			slPts = 8.0
+		// Load strategy preset dynamically (from s.GetName() or params["strategy_name"] or params["rules"])
+		presetKey := "momentum_scalp"
+		if s.GetName() != "" && s.GetName() != "quant_engine" {
+			presetKey = s.GetName()
 		}
-		
-		rrRatio := 2.5
-		if p, ok := input.Params["sl_pts"].(float64); ok && p > 0 {
-			slPts = p
-		} else if p2, ok := input.Params["stop_loss_points"].(float64); ok && p2 > 0 {
-			slPts = p2
+		if input.Params != nil {
+			if stratName, ok := input.Params["strategy_name"].(string); ok && stratName != "" {
+				presetKey = strings.ToLower(strings.TrimSpace(stratName))
+			}
+			if s.GetName() == "" || s.GetName() == "quant_engine" {
+				if rawRules, ok := input.Params["rules"].([]interface{}); ok && len(rawRules) > 0 {
+					if rMap, isMap := rawRules[0].(map[string]interface{}); isMap {
+						ruleType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
+						if ruleType != "" && ruleType != "<nil>" {
+							presetKey = ruleType
+						}
+					}
+				}
+			}
 		}
-		if r, ok := input.Params["rr_ratio"].(float64); ok && r > 0 {
-			rrRatio = r
+		preset := GetStrategyPreset(presetKey)
+
+		// SL/TP in option premium points with dynamic default based on preset and index
+		slPts := preset.SLPts
+		if slPts <= 0 {
+			switch strings.ToUpper(input.IndexName) {
+			case "BANKNIFTY", "SENSEX", "BANKEX":
+				slPts = 30.0 // Premium points (approx 60 spot pts)
+			case "NIFTY", "FINNIFTY":
+				slPts = 12.0 // Premium points (approx 24 spot pts)
+			case "MIDCPNIFTY":
+				slPts = 8.0
+			default:
+				slPts = 15.0
+			}
+		}
+
+		rrRatio := preset.RR
+		if rrRatio <= 0 {
+			rrRatio = 2.0
+		}
+
+		// User overrides in input.Params take highest priority
+		if input.Params != nil {
+			if p, ok := parseParamFloat(input.Params["sl_pts"]); ok && p > 0 {
+				slPts = p
+			} else if p2, ok := parseParamFloat(input.Params["stop_loss_points"]); ok && p2 > 0 {
+				slPts = p2
+			}
+			if r, ok := parseParamFloat(input.Params["rr_ratio"]); ok && r > 0 {
+				rrRatio = r
+			} else if r2, ok := parseParamFloat(input.Params["risk_reward"]); ok && r2 > 0 {
+				rrRatio = r2
+			}
 		}
 
 		targetOptPrice := math.Round((entryOptPrice+slPts*rrRatio)*100) / 100
@@ -524,6 +570,9 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 				if activeTrade.StopLossPrice < 0.5 {
 					activeTrade.StopLossPrice = 0.5
 				}
+				activeTrade.InitialTargetPrice = activeTrade.TargetPrice
+				activeTrade.InitialStopLossPrice = activeTrade.StopLossPrice
+				activeTrade.TrailingStopLossPrice = activeTrade.StopLossPrice
 			}
 		}
 	}
@@ -1344,4 +1393,21 @@ func sumLots(lots []int) int {
 		s += l
 	}
 	return s
+}
+
+func parseParamFloat(val interface{}) (float64, bool) {
+	if val == nil {
+		return 0, false
+	}
+	switch v := val.(type) {
+	case float64:
+		return v, true
+	case int:
+		return float64(v), true
+	case string:
+		if f, err := strconv.ParseFloat(v, 64); err == nil {
+			return f, true
+		}
+	}
+	return 0, false
 }

@@ -591,6 +591,22 @@ class AdminGatewayEmulatorView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
         context['fyers_last_tick'] = fyers_last_tick
         context['fyers_chain_info'] = fyers_chain_info
 
+        # Resolve Live Feed state (persisted in session and Redis, defaults to False / Standby)
+        live_feed_session = self.request.session.get('gateway_live_feed_enabled', None)
+        if live_feed_session is not None:
+            live_feed_enabled = bool(live_feed_session)
+        else:
+            try:
+                feed_redis_val = redis_client.get("marmot:gateway:live_feed_enabled")
+                if feed_redis_val is not None:
+                    val_str = feed_redis_val.decode('utf-8') if isinstance(feed_redis_val, bytes) else str(feed_redis_val)
+                    live_feed_enabled = val_str in ('1', 'true', 'True')
+                else:
+                    live_feed_enabled = False
+            except Exception:
+                live_feed_enabled = False
+        context['live_feed_enabled'] = live_feed_enabled
+
         # 4. Pull Completed Market Backup Tasks for Dataset Dropdown (Strictly Complete Backups Only)
         completed_backups = MarketBackupTask.objects.filter(
             is_deleted=False, status=MarketBackupTask.StatusChoices.COMPLETED
@@ -768,7 +784,72 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
         toast_msg = 'Command processed.'
         toast_type = 'success'
         try:
-            if action in ('toggle', 'start', 'play'):
+            if action in ('toggle_live_feed', 'live_feed_toggle'):
+                from apps.market.services import redis_client
+                import json
+                current_state = request.session.get('gateway_live_feed_enabled', None)
+                if current_state is None:
+                    try:
+                        rfv = redis_client.get('marmot:gateway:live_feed_enabled')
+                        if rfv is not None:
+                            val_str = rfv.decode('utf-8') if isinstance(rfv, bytes) else str(rfv)
+                            current_state = val_str in ('1', 'true', 'True')
+                        else:
+                            current_state = False
+                    except Exception:
+                        current_state = False
+                new_state = not current_state
+                request.session['gateway_live_feed_enabled'] = new_state
+                try:
+                    redis_client.set('marmot:gateway:live_feed_enabled', '1' if new_state else '0')
+                    redis_client.publish('marmot:tasks:control', json.dumps({
+                        'action': 'live_feed_status',
+                        'enabled': new_state,
+                        'reason': 'user_toggle'
+                    }))
+                except Exception:
+                    pass
+                if new_state:
+                    toast_title = 'Live Feed Activated'
+                    toast_msg = 'FYERS realtime ingestion stream is now active.'
+                    toast_type = 'success'
+                else:
+                    toast_title = 'Live Feed Paused'
+                    toast_msg = 'FYERS realtime ingestion stream is paused in standby mode.'
+                    toast_type = 'warning'
+            elif action == 'live_feed_on':
+                from apps.market.services import redis_client
+                import json
+                request.session['gateway_live_feed_enabled'] = True
+                try:
+                    redis_client.set('marmot:gateway:live_feed_enabled', '1')
+                    redis_client.publish('marmot:tasks:control', json.dumps({
+                        'action': 'live_feed_status',
+                        'enabled': True,
+                        'reason': 'user_enable'
+                    }))
+                except Exception:
+                    pass
+                toast_title = 'Live Feed Activated'
+                toast_msg = 'FYERS realtime ingestion stream is now active.'
+                toast_type = 'success'
+            elif action == 'live_feed_off':
+                from apps.market.services import redis_client
+                import json
+                request.session['gateway_live_feed_enabled'] = False
+                try:
+                    redis_client.set('marmot:gateway:live_feed_enabled', '0')
+                    redis_client.publish('marmot:tasks:control', json.dumps({
+                        'action': 'live_feed_status',
+                        'enabled': False,
+                        'reason': 'user_disable'
+                    }))
+                except Exception:
+                    pass
+                toast_title = 'Live Feed Paused'
+                toast_msg = 'FYERS realtime ingestion stream is paused in standby mode.'
+                toast_type = 'warning'
+            elif action in ('toggle', 'start', 'play'):
                 requests.post('http://mock_broker:8088/mock/api/streamer/toggle', timeout=3)
                 toast_title = 'Streamer Toggled'
                 toast_msg = 'Playback play/pause state flipped.'
