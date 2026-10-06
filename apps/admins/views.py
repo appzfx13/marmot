@@ -1636,6 +1636,29 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
         return resp
 
 
+class AdminUnlockPrimaryFreezeView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Unlocks Level 1 Dhan Warning Freeze, deactivates broker kill switch, and restores trading."""
+
+    def post(self, request, *args, **kwargs):
+        from apps.trade_core.services.account_guardian_service import AccountGuardianService
+        res = AccountGuardianService.unlock_primary_freeze(request.user)
+
+        resp = HttpResponse()
+        is_success = res.get('success', False)
+        toast_msg = res.get('message', 'Dhan Freeze status updated.')
+
+        resp['HX-Trigger'] = json.dumps({
+            'reloadLiveDashboard': True,
+            'reloadSandboxDashboard': True,
+            'showToast': {
+                'title': 'Dhan Freeze Unlocked' if is_success else 'Unlock Restricted',
+                'message': toast_msg,
+                'type': 'success' if is_success else 'danger',
+            }
+        })
+        return resp
+
+
 class AdminLiveOrderCancelView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Cancels an active live broker order."""
 
@@ -4478,11 +4501,10 @@ class AdminTradeExecConfigToggleView(LoginRequiredMixin, AdminRequiredMixin, Vie
     """Live HTMX toggle endpoint for TradeExecConfig boolean fields from detail and list views."""
 
     ALLOWED_FIELDS = {
+        'primary_loss_status': 'Level 1 Warning Loss Limit rule',
+        'final_loss_status': 'Level 2 Hard Day Loss Limit rule',
         'max_loss_status': 'Max Loss Limit rule',
         'max_profit_status': 'Max Profit Limit rule',
-        'auto_lot_status': 'Auto Lot Sizing',
-        'auto_sl_status': 'Auto Stop Loss',
-        'layer_status': 'Order Layering',
         'is_active': 'Master Active status',
     }
 

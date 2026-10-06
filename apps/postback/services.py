@@ -143,22 +143,6 @@ class PostbackService:
             ip_address=ip_address
         )
 
-        exit_reason = parsed.get('exit_reason')
-        if target_user and exit_reason:
-            try:
-                from apps.trade_config.models import TradeExecConfig
-                active_configs = TradeExecConfig.objects.filter(admins_user=target_user, is_active=True, is_deleted=False)
-                for config in active_configs:
-                    remarks = f"Order #{log.order_id} ({log.symbol}) exited via {exit_reason} at {log.price}."
-                    config.execution_remarks = remarks
-                    if not isinstance(config.api_response_log, dict):
-                        config.api_response_log = {}
-                    config.api_response_log['last_exit_trigger'] = exit_reason
-                    config.api_response_log['last_exit_order_id'] = log.order_id
-                    config.api_response_log['last_exit_price'] = log.price
-                    config.save(update_fields=['execution_remarks', 'api_response_log', 'updated_at'])
-            except Exception as e:
-                logger.warning(f"Failed to update TradeExecConfig on postback: {e}")
 
         try:
             import json

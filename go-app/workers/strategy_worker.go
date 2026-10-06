@@ -118,8 +118,39 @@ func (j *StrategySignalJob) getDhanLiveCredentials(ctx context.Context) (string,
 	return "", ""
 }
 
+// isTradingHaltedByGuardian checks if user trading is halted by Level 1 or Level 2 Account Guardian.
+func (j *StrategySignalJob) isTradingHaltedByGuardian(ctx context.Context, userID string) (bool, string) {
+	if userID == "" {
+		userID = "1"
+	}
+	raw, err := j.redisService.Client.Get(ctx, fmt.Sprintf("marmot:risk:%s", userID)).Result()
+	if err == nil && raw != "" {
+		var riskData map[string]interface{}
+		if json.Unmarshal([]byte(raw), &riskData) == nil {
+			if ff, ok := riskData["final_freeze"].(bool); ok && ff {
+				return true, "Level 2 Hard Day Freeze Active (Account Locked for the Day)"
+			}
+			if pf, ok := riskData["primary_freeze"].(bool); ok && pf {
+				return true, "Level 1 Warning Freeze Active (Dhan Orders Paused)"
+			}
+			if te, ok := riskData["trade_eligibility"].(bool); ok && !te {
+				return true, "Trade Eligibility Disabled"
+			}
+			if ib, ok := riskData["is_blocked"].(bool); ok && ib {
+				return true, "User Account Blocked"
+			}
+		}
+	}
+	return false, ""
+}
+
 // dispatchOrderToDhanLive dispatches a direct, ultra-low latency REST order to Dhan HQ Production API.
 func (j *StrategySignalJob) dispatchOrderToDhanLive(ctx context.Context, req DhanOrderPayload, clientID string) {
+	if halted, reason := j.isTradingHaltedByGuardian(ctx, "1"); halted {
+		log.Printf("🛡️ [Account Guardian Gate] Direct Live Order Blocked: %s (Req: %s %s)", reason, req.TransactionType, req.TradingSymbol)
+		return
+	}
+
 	go func() {
 		cid, token := j.getDhanLiveCredentials(ctx)
 		if clientID != "" {
@@ -174,6 +205,11 @@ func (j *StrategySignalJob) dispatchOrderToDhanLive(ctx context.Context, req Dha
 
 // dispatchOrderToMockBroker sends a synchronous order request to the Dhan mock broker via Redis.
 func (j *StrategySignalJob) dispatchOrderToMockBroker(ctx context.Context, req DhanOrderPayload) {
+	if halted, reason := j.isTradingHaltedByGuardian(ctx, "1"); halted {
+		log.Printf("🛡️ [Account Guardian Gate] Mock Broker Order Blocked: %s (Req: %s %s)", reason, req.TransactionType, req.SecurityID)
+		return
+	}
+
 	if req.DhanClientID == "" || req.DhanClientID == "1000000001" {
 		req.DhanClientID = j.getActiveMockAccountID()
 	}

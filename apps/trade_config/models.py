@@ -6,10 +6,8 @@ from apps.common.choices import (
     ForexInstrumentChoices,
     LiveStrategyStatusChoices,
     MarketTypeChoices,
-    RiskTypeChoices,
     SessionRatingChoices,
     StrategyChoices,
-    TaskStatusChoices,
 )
 from apps.common.models import BaseModel
 from apps.users.models import User
@@ -86,30 +84,16 @@ class TradeExecConfig(BaseModel):
     forex_max_contracts = models.PositiveSmallIntegerField(null=True, blank=True, default=1, help_text="Max contracts allowed per trade entry")
     # General Status
     is_active = models.BooleanField(default=True, help_text="Master toggle to enable or disable auto trade execution features")
-    # Risk Controls (Max Limits)
-    max_loss_status = models.BooleanField(default=False, help_text="Enable maximum loss limit rule for auto-freeze")
-    max_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Maximum allowed loss limit before auto-freeze triggers")
+    # ─── Risk Controls (Two-Level Account Guardian Limits) ───────────────────
+    primary_loss_status = models.BooleanField(default=True, help_text="Enable Level 1 Warning Loss Limit for soft auto-freeze")
+    primary_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, default=1000.00, null=True, blank=True, help_text="Level 1 warning loss threshold")
+    final_loss_status = models.BooleanField(default=True, help_text="Enable Level 2 Hard Loss Limit for full-day account freeze")
+    final_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, default=2000.00, null=True, blank=True, help_text="Level 2 hard day loss threshold")
+    # Legacy Single-Limit Compatibility
+    max_loss_status = models.BooleanField(default=True, help_text="Legacy max loss limit status (synced to final_loss_status)")
+    max_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Legacy max loss limit (synced to final_loss_limit)")
     max_profit_status = models.BooleanField(default=False, help_text="Enable maximum profit limit rule")
-    max_profit_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Target max profit limit for the session")
-
-    # Lot & Position Sizing
-    auto_lot_status = models.BooleanField(default=False, help_text="Enable automatic lot size calculation based on risk parameters")
-    default_lot_size = models.PositiveIntegerField(default=1, blank=True, help_text="Default lot size to use when auto lot status is disabled")
-    # Stop Loss Sizing
-    auto_sl_status = models.BooleanField(default=False, help_text="Automatically attach default stop loss to outgoing orders")
-    default_risk_value = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, blank=True, help_text="Default risk value")
-    default_risk_type = models.CharField(max_length=20, choices=RiskTypeChoices.choices, default=RiskTypeChoices.PERCENTAGE, blank=True, help_text="Risk calculation mode")
-    # Layering / Pyramiding Logic
-    layer_status = models.BooleanField(default=False, help_text="Enable order layering (pyramiding into winning positions)")
-    layer_add_in_lot_count = models.PositiveSmallIntegerField(default=0, blank=True, help_text="Number of additional lots to add per layer entry")
-    layer_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, blank=True, help_text="Percentage step/distance required per layer")
-
-    # Realtime Execution Telemetry & Feedback Logs
-    execution_status = models.CharField(max_length=20, choices=TaskStatusChoices.choices, default=TaskStatusChoices.CREATED, help_text="Realtime execution status")
-    realtime_pnl = models.DecimalField(max_digits=12, decimal_places=2, default=0.00, help_text="Realtime strategy execution PnL")
-    execution_remarks = models.TextField(blank=True, null=True, help_text="Execution notes and strategy remarks")
-    api_response_log = models.JSONField(default=dict, blank=True, help_text="Live API response telemetry log for Sandbox & Live trades")
-
+    max_profit_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Target max profit limit for session")
     class Meta:
         verbose_name = "Trade Execution Configuration"
         verbose_name_plural = "Trade Execution Configurations"
@@ -117,12 +101,21 @@ class TradeExecConfig(BaseModel):
 
     def clean(self):
         super().clean()
-        if self.max_loss_status and (self.max_loss_limit is None or self.max_loss_limit < 0):
-            raise ValidationError({'max_loss_limit': 'Max Loss Limit value is required when Max Loss rule is enabled.'})
-        if self.max_profit_status and (self.max_profit_limit is None or self.max_profit_limit < 0):
+        if self.primary_loss_status and (self.primary_loss_limit is None or self.primary_loss_limit <= 0):
+            raise ValidationError({'primary_loss_limit': 'Level 1 Warning Loss Limit must be greater than 0.'})
+        if self.final_loss_status and (self.final_loss_limit is None or self.final_loss_limit <= 0):
+            raise ValidationError({'final_loss_limit': 'Level 2 Hard Day Loss Limit must be greater than 0.'})
+        if self.primary_loss_status and self.final_loss_status and self.primary_loss_limit and self.final_loss_limit:
+            if self.primary_loss_limit >= self.final_loss_limit:
+                raise ValidationError({'final_loss_limit': 'Level 2 Hard Loss Limit must be strictly greater than Level 1 Warning Limit.'})
+        if self.max_profit_status and (self.max_profit_limit is None or self.max_profit_limit <= 0):
             raise ValidationError({'max_profit_limit': 'Max Profit Limit value is required when Max Profit rule is enabled.'})
 
     def save(self, *args, **kwargs):
+        # Keep legacy max_loss fields in sync with final_loss for external queries
+        if self.final_loss_limit:
+            self.max_loss_limit = self.final_loss_limit
+            self.max_loss_status = self.final_loss_status
         super().save(*args, **kwargs)
         if self.is_active and not self.is_deleted:
             TradeExecConfig.objects.filter(
@@ -130,6 +123,11 @@ class TradeExecConfig(BaseModel):
                 is_active=True,
                 is_deleted=False
             ).exclude(pk=self.pk).update(is_active=False)
+        try:
+            from apps.trade_core.services.account_guardian_service import AccountGuardianService
+            AccountGuardianService.sync_user_risk_to_redis(self.admins_user)
+        except Exception:
+            pass
 
     def __str__(self):
         return f"{self.name} - Exec Config: {self.admins_user.username} (Active: {self.is_active})"

@@ -364,44 +364,65 @@
                             {{ form.is_active }}
                         </div>
                         <div class="theme-text-muted small mt-1" style="font-size:0.75rem;">
-                            Master switch to enable/disable automated strategy order triggers.
-                        </div>
-                    </div>
-                </div>
-
-                <!-- SECTION 2: RISK CONTROL LIMITS -->
+                            Master switch to enable/disable automated strategy order                <!-- SECTION 2: TWO-LEVEL ACCOUNT GUARDIAN (RISK CONTROL LIMITS) -->
                 <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
                     <span class="material-icons text-primary fs-5">shield</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Risk Control Limits</h6>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Two-Level Account Guardian (Circuit Breaker Limits)</h6>
+                    <span class="ms-2 badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 small">Auto-Freeze Guard</span>
                 </div>
 
                 <div class="row g-3 mb-4">
-                    <!-- Max Loss Limit Card (Single-Line Inline) -->
+                    <!-- Level 1: Warning Loss Limit Card -->
                     <div class="col-12 col-lg-6">
-                        <div class="config-card-unit p-3">
+                        <div class="config-card-unit p-3 border-warning border-opacity-25">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
                                 <!-- Left: Switch and Title -->
                                 <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
-                                    {{ form.max_loss_status }}
-                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_max_loss_status">
-                                        <span class="material-icons text-danger fs-5">gpp_maybe</span>
-                                        <span>Enable Max Loss Limit</span>
+                                    {{ form.primary_loss_status }}
+                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_primary_loss_status">
+                                        <span class="material-icons text-warning fs-5">warning_amber</span>
+                                        <span>Level 1: Warning Freeze Limit</span>
                                     </label>
                                 </div>
 
                                 <!-- Right: Amount Input Field -->
-                                <div id="max_loss_dep_body" class="toggle-dep-container" style="min-width: 150px; max-width: 200px; flex: 1;">
-                                    {{ form.max_loss_limit }}
-                                    {% if form.max_loss_limit.errors %}<div class="text-danger small mt-1">{{ form.max_loss_limit.errors.0 }}</div>{% endif %}
+                                <div id="primary_loss_dep_body" class="toggle-dep-container" style="min-width: 150px; max-width: 200px; flex: 1;">
+                                    {{ form.primary_loss_limit }}
+                                    {% if form.primary_loss_limit.errors %}<div class="text-danger small mt-1">{{ form.primary_loss_limit.errors.0 }}</div>{% endif %}
                                 </div>
                             </div>
                             <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
-                                Maximum allowed session loss limit before auto-freeze triggers.
+                                Level 1 soft warning threshold (e.g. ₹1,000 / $100). Triggers soft freeze with one-click <strong>Unlock Dhan Freeze</strong> on Live Dashboard.
                             </div>
                         </div>
                     </div>
 
-                    <!-- Max Profit Limit Card (Single-Line Inline) -->
+                    <!-- Level 2: Hard Day Freeze Card -->
+                    <div class="col-12 col-lg-6">
+                        <div class="config-card-unit p-3 border-danger border-opacity-25">
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                                <!-- Left: Switch and Title -->
+                                <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                                    {{ form.final_loss_status }}
+                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_final_loss_status">
+                                        <span class="material-icons text-danger fs-5">gpp_bad</span>
+                                        <span>Level 2: Hard Day Freeze Limit</span>
+                                    </label>
+                                </div>
+
+                                <!-- Right: Amount Input Field -->
+                                <div id="final_loss_dep_body" class="toggle-dep-container" style="min-width: 150px; max-width: 200px; flex: 1;">
+                                    {{ form.final_loss_limit }}
+                                    {% if form.final_loss_limit.errors %}<div class="text-danger small mt-1">{{ form.final_loss_limit.errors.0 }}</div>{% endif %}
+                                </div>
+                            </div>
+                            <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
+                                Level 2 hard day limit (e.g. ₹2,000 / $200). If hit after unfreezing Level 1, locks account for the <strong>entire day</strong> (no unlock button).
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Max Profit Limit Card -->
                     <div class="col-12 col-lg-6">
                         <div class="config-card-unit p-3">
                             <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
@@ -410,7 +431,7 @@
                                     {{ form.max_profit_status }}
                                     <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_max_profit_status">
                                         <span class="material-icons text-success fs-5">verified</span>
-                                        <span>Enable Max Profit Limit</span>
+                                        <span>Target Session Profit Limit</span>
                                     </label>
                                 </div>
 
@@ -421,71 +442,26 @@
                                 </div>
                             </div>
                             <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
-                                Target session profit limit for automatic trade locking.
+                                Optional target session profit limit for locking profits and preventing giveback.
                             </div>
                         </div>
                     </div>
-                </div>
 
-                <!-- SECTION 3: INDEX / F&O RULES -->
-                <div id="section_index" class="market-section">
-                    <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-                        <span class="material-icons text-primary fs-5">calculate</span>
-                        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Lot &amp; Stop Loss Rules</h6>
-                        <span class="ms-2 badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small">INDEX / F&amp;O</span>
-                    </div>
-
-                    <div class="row g-3 mb-4">
-                        <!-- Auto Lot Card -->
-                        <div class="col-12 col-lg-6">
-                            <div class="config-card-unit">
-                                <div class="form-check form-switch toggle-header-strip">
-                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_auto_lot_status">
-                                        <span class="material-icons text-primary fs-5">widgets</span>
-                                        <span>Auto Lot Size Calculation</span>
-                                    </label>
-                                    {{ form.auto_lot_status }}
-                                </div>
-                                <div id="auto_lot_dep_body" class="toggle-dep-container">
-                                    <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_lot_size.id_for_label }}">Default Lot Size (Lots)</label>
-                                    {{ form.default_lot_size }}
-                                    <div class="theme-text-muted small mt-1">Base quantity lot count used for initial order execution.</div>
-                                    {% if form.default_lot_size.errors %}<div class="text-danger small mt-1">{{ form.default_lot_size.errors.0 }}</div>{% endif %}
-                                </div>
-                            </div>
-                        </div>
-
-                        <!-- Auto Stop Loss Card -->
-                        <div class="col-12 col-lg-6">
-                            <div class="config-card-unit">
-                                <div class="form-check form-switch toggle-header-strip">
-                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_auto_sl_status">
-                                        <span class="material-icons text-danger fs-5">security</span>
-                                        <span>Auto Attach Stop Loss</span>
-                                    </label>
-                                    {{ form.auto_sl_status }}
-                                </div>
-                                <div id="auto_sl_dep_body" class="toggle-dep-container">
-                                    <div class="row g-2">
-                                        <div class="col-12 col-sm-6">
-                                            <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_value.id_for_label }}">Default Risk Value</label>
-                                            {{ form.default_risk_value }}
-                                            {% if form.default_risk_value.errors %}<div class="text-danger small mt-1">{{ form.default_risk_value.errors.0 }}</div>{% endif %}
-                                        </div>
-                                        <div class="col-12 col-sm-6">
-                                            <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.default_risk_type.id_for_label }}">Risk Calculation Mode</label>
-                                            {{ form.default_risk_type }}
-                                            {% if form.default_risk_type.errors %}<div class="text-danger small mt-1">{{ form.default_risk_type.errors.0 }}</div>{% endif %}
-                                        </div>
-                                    </div>
-                                    <div class="theme-text-muted small mt-1">Automatically attach defensive SL bracket upon trade entry fill.</div>
+                    <!-- Engine Info Note -->
+                    <div class="col-12 col-lg-6">
+                        <div class="config-card-unit p-3 d-flex align-items-center gap-3">
+                            <span class="material-icons text-info fs-3">bolt</span>
+                            <div>
+                                <div class="theme-text-main fw-bold small">Go Strategy Engine Autonomous Sizing</div>
+                                <div class="theme-text-muted small" style="font-size:0.75rem;">
+                                    Lot sizing, SL/TP brackets, and strike sweeps are managed natively by Go strategy presets and dynamic lot sizes.
                                 </div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- SECTION 4: FOREX / CME MICRO FUTURES SETTINGS -->
+                <!-- SECTION 3: FOREX / CME MICRO FUTURES SETTINGS -->
                 <div id="section_forex" class="market-section">
                     <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
                         <span class="material-icons fs-5 text-success">currency_exchange</span>
@@ -561,50 +537,7 @@
                             </table>
                         </div>
                     </div>
-                </div>
-
-                <!-- SECTION 5: LAYERING & ADVANCED FEATURES (Equalized 3-Column Grid) -->
-                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-                    <span class="material-icons text-primary fs-5">layers</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Layering &amp; Advanced Features</h6>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <!-- Layering Card -->
-                    <div class="col-12 col-lg-4">
-                        <div class="config-card-unit">
-                            <div class="form-check form-switch toggle-header-strip">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_layer_status">
-                                    <span class="material-icons text-primary fs-5">stacked_line_chart</span>
-                                    <span>Enable Order Layering</span>
-                                </label>
-                                {{ form.layer_status }}
-                            </div>
-                            <div id="layer_lots_dep_body" class="toggle-dep-container">
-                                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.layer_add_in_lot_count.id_for_label }}">Lots Per Layer Entry</label>
-                                {{ form.layer_add_in_lot_count }}
-                                <div class="theme-text-muted small mt-1">Additional lots added on each pyramiding trigger.</div>
-                                {% if form.layer_add_in_lot_count.errors %}<div class="text-danger small mt-1">{{ form.layer_add_in_lot_count.errors.0 }}</div>{% endif %}
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Layer Step Distance Card -->
-                    <div class="col-12 col-lg-4">
-                        <div class="config-card-unit">
-                            <div class="toggle-header-strip">
-                                <span class="theme-text-main small fw-bold d-flex align-items-center gap-2">
-                                    <span class="material-icons text-info fs-5">straighten</span>
-                                    <span>Layer Step Parameters</span>
-                                </span>
-                                <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 small">Pyramiding</span>
-                            </div>
-                            <div id="layer_step_dep_body" class="toggle-dep-container">
-                                <label class="form-label theme-text-muted small fw-bold text-uppercase" for="{{ form.layer_percentage.id_for_label }}">Layer Step Distance (%)</label>
-                                {{ form.layer_percentage }}
-                                <div class="theme-text-muted small mt-1">Price movement percentage required to trigger next layer entry.</div>
-                                {% if form.layer_percentage.errors %}<div class="text-danger small mt-1">{{ form.layer_percentage.errors.0 }}</div>{% endif %}
-                            </div>
+                </div>        </div>
                         </div>
                     </div>
                 </div>
@@ -667,18 +600,14 @@
 <script>
 window.applyMarketType = function(val) {
     const isForex = (val === 'FOREX_FUTURES');
-    const sectionIndex  = document.getElementById('section_index');
     const sectionForex  = document.getElementById('section_forex');
     const tabIndexFO    = document.getElementById('tabIndexFO');
     const tabForex      = document.getElementById('tabForex');
     const marketSelect  = document.getElementById('id_market_type');
 
-    if (sectionIndex) sectionIndex.classList.toggle('hidden', isForex);
     if (sectionForex) sectionForex.classList.toggle('hidden', !isForex);
-
     if (tabIndexFO) tabIndexFO.className = 'market-tab-btn flex-grow-1 p-3 text-start' + (!isForex ? ' active-index' : '');
     if (tabForex) tabForex.className   = 'market-tab-btn flex-grow-1 p-3 text-start' + (isForex  ? ' active-forex' : '');
-
     if (marketSelect) marketSelect.value = val;
 };
 
@@ -687,55 +616,31 @@ window.setMarketType = function(val) {
 };
 
 window.syncAllFormToggleStates = function() {
-    // 1. Max Loss Limit
-    const lossCheck = document.getElementById('id_max_loss_status');
-    const lossInput = document.getElementById('id_max_loss_limit');
-    const lossDep   = document.getElementById('max_loss_dep_body');
-    if (lossCheck && lossInput) {
-        lossInput.disabled = !lossCheck.checked;
-        if (lossDep) lossDep.classList.toggle('is-dimmed', !lossCheck.checked);
+    // 1. Level 1: Warning Loss Limit
+    const primaryCheck = document.getElementById('id_primary_loss_status');
+    const primaryInput = document.getElementById('id_primary_loss_limit');
+    const primaryDep   = document.getElementById('primary_loss_dep_body');
+    if (primaryCheck && primaryInput) {
+        primaryInput.disabled = !primaryCheck.checked;
+        if (primaryDep) primaryDep.classList.toggle('is-dimmed', !primaryCheck.checked);
     }
 
-    // 2. Max Profit Limit
+    // 2. Level 2: Hard Day Freeze Limit
+    const finalCheck = document.getElementById('id_final_loss_status');
+    const finalInput = document.getElementById('id_final_loss_limit');
+    const finalDep   = document.getElementById('final_loss_dep_body');
+    if (finalCheck && finalInput) {
+        finalInput.disabled = !finalCheck.checked;
+        if (finalDep) finalDep.classList.toggle('is-dimmed', !finalCheck.checked);
+    }
+
+    // 3. Max Profit Limit
     const profitCheck = document.getElementById('id_max_profit_status');
     const profitInput = document.getElementById('id_max_profit_limit');
     const profitDep   = document.getElementById('max_profit_dep_body');
     if (profitCheck && profitInput) {
         profitInput.disabled = !profitCheck.checked;
         if (profitDep) profitDep.classList.toggle('is-dimmed', !profitCheck.checked);
-    }
-
-    // 3. Auto Lot Size Calculation
-    const autoLotCheck = document.getElementById('id_auto_lot_status');
-    const lotInput     = document.getElementById('id_default_lot_size');
-    const autoLotDep   = document.getElementById('auto_lot_dep_body');
-    if (autoLotCheck && lotInput) {
-        lotInput.disabled = !autoLotCheck.checked;
-        if (autoLotDep) autoLotDep.classList.toggle('is-dimmed', !autoLotCheck.checked);
-    }
-
-    // 4. Auto Attach Stop Loss
-    const autoSLCheck = document.getElementById('id_auto_sl_status');
-    const riskVal     = document.getElementById('id_default_risk_value');
-    const riskType    = document.getElementById('id_default_risk_type');
-    const autoSLDep   = document.getElementById('auto_sl_dep_body');
-    if (autoSLCheck) {
-        if (riskVal) riskVal.disabled = !autoSLCheck.checked;
-        if (riskType) riskType.disabled = !autoSLCheck.checked;
-        if (autoSLDep) autoSLDep.classList.toggle('is-dimmed', !autoSLCheck.checked);
-    }
-
-    // 5. Order Layering (Pyramiding)
-    const layerCheck   = document.getElementById('id_layer_status');
-    const layerLots    = document.getElementById('id_layer_add_in_lot_count');
-    const layerPct     = document.getElementById('id_layer_percentage');
-    const layerLotsDep = document.getElementById('layer_lots_dep_body');
-    const layerStepDep = document.getElementById('layer_step_dep_body');
-    if (layerCheck) {
-        if (layerLots) layerLots.disabled = !layerCheck.checked;
-        if (layerPct) layerPct.disabled = !layerCheck.checked;
-        if (layerLotsDep) layerLotsDep.classList.toggle('is-dimmed', !layerCheck.checked);
-        if (layerStepDep) layerStepDep.classList.toggle('is-dimmed', !layerCheck.checked);
     }
 };
 
@@ -758,11 +663,9 @@ document.addEventListener('click', function(e) {
 
 document.addEventListener('change', function(e) {
     if (e.target && (
-        e.target.id === 'id_max_loss_status' ||
-        e.target.id === 'id_max_profit_status' ||
-        e.target.id === 'id_auto_lot_status' ||
-        e.target.id === 'id_auto_sl_status' ||
-        e.target.id === 'id_layer_status'
+        e.target.id === 'id_primary_loss_status' ||
+        e.target.id === 'id_final_loss_status' ||
+        e.target.id === 'id_max_profit_status'
     )) {
         window.syncAllFormToggleStates();
     }

@@ -1761,6 +1761,27 @@ class UserKillSwitchView(HtmxModalMixin, LoginRequiredMixin, View):
         return response
 
 
+class UserUnlockPrimaryFreezeView(LoginRequiredMixin, View):
+    """Unlocks Level 1 Dhan Warning Freeze for standard traders."""
+
+    def post(self, request, *args, **kwargs):
+        from apps.trade_core.services.account_guardian_service import AccountGuardianService
+        res = AccountGuardianService.unlock_primary_freeze(request.user)
+
+        response = HttpResponse()
+        is_success = res.get('success', False)
+        msg = res.get('message', 'Dhan Freeze status updated.')
+
+        response['HX-Trigger'] = json.dumps({
+            'reloadLiveDashboard': True,
+            'showToast': {
+                'message': msg,
+                'level': 'success' if is_success else 'danger',
+            }
+        })
+        return response
+
+
 class LogoutView(View):
     """
     Logs out the user and redirects to login page.

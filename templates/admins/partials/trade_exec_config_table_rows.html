@@ -31,10 +31,13 @@
     {% endif %}
     </td>
 
-    <!-- Max Loss -->
+    <!-- Two-Level Guardian Loss Limits -->
     <td class="py-3 text-end fw-semibold bg-transparent">
-        {% if config.max_loss_status and config.max_loss_limit is not None %}
-            <span class="text-danger">${{ config.max_loss_limit }}</span>
+        {% if config.primary_loss_status or config.final_loss_status %}
+            <div class="d-flex flex-column align-items-end">
+                <span class="text-warning small" style="font-size:0.75rem;">L1: {% if config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ config.primary_loss_limit|default:1000 }}</span>
+                <span class="text-danger fw-bold" style="font-size:0.8rem;">L2: {% if config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ config.final_loss_limit|default:2000 }}</span>
+            </div>
         {% else %}
             <span class="theme-text-muted opacity-50 small">—</span>
         {% endif %}
@@ -49,13 +52,22 @@
         {% endif %}
     </td>
 
-    <!-- Lot Size -->
-    <td class="py-3 text-center fw-bold theme-text-main bg-transparent">{{ config.default_lot_size }}</td>
+    <!-- Market Segment -->
+    <td class="py-3 text-center bg-transparent">
+        {% if config.market_type == 'FOREX_FUTURES' %}
+            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 small">Forex CME</span>
+        {% else %}
+            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 small">Index F&amp;O</span>
+        {% endif %}
+    </td>
 
-    <!-- Risk Mode -->
+    <!-- Account Environment -->
     <td class="py-3 bg-transparent">
-        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill text-uppercase fw-bold px-3 py-1">{{ config.default_risk_type }}</span>
-        <small class="theme-text-muted ms-1">({{ config.default_risk_value }})</small>
+        {% if config.account_type == 'LIVE' %}
+            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 small">LIVE</span>
+        {% else %}
+            <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2.5 py-1 small">MOCK</span>
+        {% endif %}
     </td>
 
     <!-- Actions -->

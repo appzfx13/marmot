@@ -231,35 +231,56 @@
                         <div class="d-flex align-items-center justify-content-between mb-2">
                             <span class="metric-card-badge">
                                 <i class="bi bi-shield-lock-fill text-danger"></i>
-                                <span>Risk Shield</span>
+                                <span>Account Guardian</span>
                             </span>
-                            {% if request.user.primary_freeze or request.user.final_freeze %}
-                                <span class="badge bg-danger text-white rounded-pill px-2 py-0.5 smaller fw-bold">Frozen</span>
+                            {% if request.user.final_freeze %}
+                                <span class="badge bg-danger text-white rounded-pill px-2 py-0.5 smaller fw-bold">L2 Day Locked</span>
+                            {% elif request.user.primary_freeze %}
+                                <span class="badge bg-warning text-dark rounded-pill px-2 py-0.5 smaller fw-bold">L1 Warning Freeze</span>
                             {% else %}
-                                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">Active</span>
+                                <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller fw-bold">2-Tier Active</span>
                             {% endif %}
                         </div>
                         <div class="metric-card-date">Tiered Capital Protection</div>
-                        <div class="d-flex align-items-center justify-content-between my-0.5">
-                            <div class="metric-card-value fs-5">
-                                {% if request.user.primary_freeze or request.user.final_freeze %}Trading Paused{% else %}Normal Arm{% endif %}
+                        <div class="d-flex align-items-center justify-content-between my-0.5 flex-wrap gap-2">
+                            <div class="metric-card-value fs-5 {% if request.user.final_freeze %}text-danger{% elif request.user.primary_freeze %}text-warning{% endif %}">
+                                {% if request.user.final_freeze %}Day Locked{% elif request.user.primary_freeze %}Paused (L1){% else %}Normal Arm{% endif %}
                             </div>
-                            <button type="button" 
-                                    class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm text-white"
-                                    hx-get="{% url 'users:user-kill-switch' %}"
-                                    hx-target="#globalHtmxModalDialog"
-                                    hx-swap="innerHTML"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#globalHtmxModal"
-                                    title="Kill Switch">
-                                <i class="bi bi-lightning-fill"></i>
-                                <span>Kill</span>
-                            </button>
+                            {% if request.user.final_freeze %}
+                                <span class="badge bg-danger rounded-pill px-2.5 py-1 text-white fw-bold d-inline-flex align-items-center gap-1 shadow-sm" style="font-size: 0.75rem;">
+                                    <i class="bi bi-lock-fill"></i>
+                                    <span>Locked Full Day</span>
+                                </span>
+                            {% elif request.user.primary_freeze %}
+                                <button type="button" 
+                                        class="btn btn-sm btn-warning rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm text-dark"
+                                        hx-post="{% url 'users:user-unlock-primary-freeze' %}"
+                                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                                        hx-swap="none"
+                                        title="Deactivate Dhan Kill Switch and resume trading">
+                                    <i class="bi bi-unlock-fill"></i>
+                                    <span>Unlock Dhan Freeze</span>
+                                </button>
+                            {% else %}
+                                <button type="button" 
+                                        class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm text-white"
+                                        hx-get="{% url 'users:user-kill-switch' %}"
+                                        hx-target="#globalHtmxModalDialog"
+                                        hx-swap="innerHTML"
+                                        data-bs-toggle="modal"
+                                        data-bs-target="#globalHtmxModal"
+                                        title="Kill Switch">
+                                    <i class="bi bi-lightning-fill"></i>
+                                    <span>Kill</span>
+                                </button>
+                            {% endif %}
                         </div>
                     </div>
                     <div class="metric-card-footer">
                         <span>Gate: {% if request.user.trade_eligibility and not request.user.is_blocked %}Enabled{% else %}Blocked{% endif %}</span>
-                        <span class="text-danger fw-bold smaller">Instant Freeze</span>
+                        <span class="{% if request.user.final_freeze %}text-danger{% elif request.user.primary_freeze %}text-warning{% else %}text-info{% endif %} fw-bold smaller">
+                            {% if request.user.final_freeze %}L2 Hit (Stop){% elif request.user.primary_freeze %}L1 Hit (Unlockable){% else %}L1/L2 Active{% endif %}
+                        </span>
                     </div>
                 </div>
             </div>

@@ -38,6 +38,7 @@ from .views import (
     UserAccountTotpTokenView,
     UserAccountSettingsView,
     UserKillSwitchView,
+    UserUnlockPrimaryFreezeView,
     LogoutView,
     UserProfileView,
     UserProfilePasswordChangeView
@@ -92,6 +93,7 @@ urlpatterns = [
     path('account/<int:pk>/refresh-token/', UserAccountRefreshTokenView.as_view(), name='user-account-refresh-token'),
     path('accounts/', UserAccountSettingsView.as_view(), name='user-accounts'),
     path('kill-switch/', UserKillSwitchView.as_view(), name='user-kill-switch'),
+    path('unlock-primary-freeze/', UserUnlockPrimaryFreezeView.as_view(), name='user-unlock-primary-freeze'),
     path('logout/', LogoutView.as_view(), name='marmot-logout'),
     path('profile/', UserProfileView.as_view(), name='marmot-profile'),
     path('profile/<int:pk>/', UserProfileView.as_view(), name='marmot-profile-user'),

@@ -42,15 +42,20 @@
             </div>
             <div class="col-6">
                 <div class="p-2 rounded-3" style="background-color: var(--glass-bg);">
-                    <small class="theme-text-muted d-block" style="font-size: 0.7rem;">LOT SIZE</small>
-                    <span class="fw-bold theme-text-main small">{{ config.default_lot_size }}</span>
+                    <small class="theme-text-muted d-block" style="font-size: 0.7rem;">MARKET</small>
+                    {% if config.market_type == 'FOREX_FUTURES' %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0 mt-1" style="font-size: 0.7rem;">Forex CME</span>
+                    {% else %}
+                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2 py-0 mt-1" style="font-size: 0.7rem;">Index F&amp;O</span>
+                    {% endif %}
                 </div>
             </div>
             <div class="col-6">
                 <div class="p-2 rounded-3" style="background-color: var(--glass-bg);">
-                    <small class="theme-text-muted d-block" style="font-size: 0.7rem;">MAX LOSS</small>
-                    {% if config.max_loss_status and config.max_loss_limit is not None %}
-                        <span class="text-danger fw-bold small">${{ config.max_loss_limit }}</span>
+                    <small class="theme-text-muted d-block" style="font-size: 0.7rem;">GUARDIAN LIMITS</small>
+                    {% if config.primary_loss_status or config.final_loss_status %}
+                        <span class="text-warning fw-bold small">L1: {% if config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ config.primary_loss_limit|default:1000 }}</span>
+                        <span class="text-danger fw-bold small ms-1">L2: {% if config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ config.final_loss_limit|default:2000 }}</span>
                     {% else %}
                         <span class="theme-text-muted opacity-50 small">—</span>
                     {% endif %}
@@ -66,11 +71,14 @@
                     {% endif %}
                 </div>
             </div>
-            <div class="col-12">
+            <div class="col-6">
                 <div class="p-2 rounded-3" style="background-color: var(--glass-bg);">
-                    <small class="theme-text-muted d-block" style="font-size: 0.7rem;">RISK MODE</small>
-                    <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill text-uppercase fw-bold px-2 py-0 mt-1" style="font-size: 0.7rem;">{{ config.default_risk_type }}</span>
-                    <small class="theme-text-muted ms-1">({{ config.default_risk_value }})</small>
+                    <small class="theme-text-muted d-block" style="font-size: 0.7rem;">MODE</small>
+                    {% if config.account_type == 'LIVE' %}
+                        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2 py-0 mt-1" style="font-size: 0.7rem;">LIVE</span>
+                    {% else %}
+                        <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 rounded-pill px-2 py-0 mt-1" style="font-size: 0.7rem;">MOCK</span>
+                    {% endif %}
                 </div>
             </div>
         </div>

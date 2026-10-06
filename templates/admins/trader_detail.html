@@ -211,20 +211,21 @@
                         <table class="table align-middle mb-0 border-0" style="--bs-table-bg: transparent; color: var(--text-main);">
                             <tbody>
                                 <tr style="border-color: var(--border-color) !important;">
-                                    <td class="ps-0 py-3 theme-text-muted text-nowrap" style="width: 25%;">Max Loss Limit</td>
-                                    <td class="pe-0 py-3 text-danger fw-semibold">₹{{ exec_config.max_loss_limit }}</td>
-                                    <td class="py-3 theme-text-muted text-nowrap" style="width: 25%;">Max Profit Limit</td>
-                                    <td class="pe-0 py-3 text-success fw-semibold">₹{{ exec_config.max_profit_limit }}</td>
+                                    <td class="ps-0 py-3 theme-text-muted text-nowrap" style="width: 25%;">L1 Warning Limit</td>
+                                    <td class="pe-0 py-3 text-warning fw-semibold">₹{{ exec_config.primary_loss_limit|default:"1000.00" }}</td>
+                                    <td class="py-3 theme-text-muted text-nowrap" style="width: 25%;">L2 Hard Freeze</td>
+                                    <td class="pe-0 py-3 text-danger fw-semibold">₹{{ exec_config.final_loss_limit|default:"2000.00" }}</td>
                                 </tr>
                                 <tr style="border-color: var(--border-color) !important;">
-                                    <td class="ps-0 py-3 theme-text-muted text-nowrap">Default Lot Size</td>
-                                    <td class="pe-0 py-3 theme-text-main fw-bold">{{ exec_config.default_lot_size }}</td>
-                                    <td class="py-3 theme-text-muted text-nowrap">Risk Mode</td>
+                                    <td class="ps-0 py-3 theme-text-muted text-nowrap">Target Profit</td>
+                                    <td class="pe-0 py-3 text-success fw-semibold">{% if exec_config.max_profit_limit %}₹{{ exec_config.max_profit_limit }}{% else %}—{% endif %}</td>
+                                    <td class="py-3 theme-text-muted text-nowrap">Guardian Status</td>
                                     <td class="pe-0 py-3">
-                                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill text-uppercase fw-bold px-3 py-1">
-                                            {{ exec_config.default_risk_type }}
-                                        </span>
-                                        <span class="small theme-text-muted ms-1">({{ exec_config.default_risk_value }})</span>
+                                        {% if exec_config.is_active %}
+                                            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-3 py-1">Active</span>
+                                        {% else %}
+                                            <span class="badge bg-secondary bg-opacity-25 theme-text-muted border border-secondary border-opacity-25 rounded-pill px-3 py-1">Disabled</span>
+                                        {% endif %}
                                     </td>
                                 </tr>
                             </tbody>

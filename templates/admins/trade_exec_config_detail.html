@@ -360,49 +360,74 @@
                 </div>
             </div>
 
-            <!-- SECTION 2: RISK CONTROL LIMITS (Single-Line Inline) -->
+            <!-- SECTION 2: RISK CONTROL LIMITS (Two-Level Account Guardian & Profit Limits) -->
             <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
                 <span class="material-icons text-primary fs-5">shield</span>
-                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Risk Control Limits</h6>
+                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Two-Level Account Guardian &amp; Profit Limits</h6>
+                <span class="ms-auto badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small">Risk Firewall</span>
             </div>
 
             <div class="row g-3 mb-4">
-                <!-- Max Loss Limit Card (Single-Line Inline) -->
-                <div class="col-12 col-lg-6">
+                <!-- Level 1 Warning Loss Limit Card -->
+                <div class="col-12 col-lg-4">
                     <div class="config-card-unit p-3">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                            <!-- Left: Switch and Title -->
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                             <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
                                 <input class="form-check-input"
                                        type="checkbox"
                                        role="switch"
-                                       id="detail_max_loss_status"
-                                       {% if object.max_loss_status %}checked{% endif %}
+                                       id="detail_primary_loss_status"
+                                       {% if object.primary_loss_status %}checked{% endif %}
                                        disabled>
-                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_max_loss_status">
-                                    <span class="material-icons text-danger fs-5">gpp_maybe</span>
-                                    <span>Enable Max Loss Limit</span>
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-1" for="detail_primary_loss_status">
+                                    <span class="material-icons text-warning fs-5">warning</span>
+                                    <span>Level 1 Warning Limit</span>
                                 </label>
                             </div>
-
-                            <!-- Right: Amount Box -->
-                            <div id="max_loss_dep_body" class="toggle-dep-container {% if not object.max_loss_status %}is-dimmed{% endif %}" style="min-width: 150px; max-width: 200px; flex: 1;">
-                                <div class="readonly-field-box font-monospace fw-bold text-danger justify-content-end">
-                                    {{ object.max_loss_limit|default:"0.00" }}
-                                </div>
+                        </div>
+                        <div class="toggle-dep-container {% if not object.primary_loss_status %}is-dimmed{% endif %}">
+                            <div class="readonly-field-box font-monospace fw-bold text-warning justify-content-end">
+                                {% if object.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ object.primary_loss_limit|default:"1000.00" }}
                             </div>
                         </div>
                         <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
-                            Maximum allowed session loss limit before auto-freeze triggers.
+                            Auto soft-freeze warning trigger (unlockable via live dashboard).
                         </div>
                     </div>
                 </div>
 
-                <!-- Max Profit Limit Card (Single-Line Inline) -->
-                <div class="col-12 col-lg-6">
+                <!-- Level 2 Hard Loss Limit Card -->
+                <div class="col-12 col-lg-4">
                     <div class="config-card-unit p-3">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                            <!-- Left: Switch and Title -->
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
+                            <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                                <input class="form-check-input"
+                                       type="checkbox"
+                                       role="switch"
+                                       id="detail_final_loss_status"
+                                       {% if object.final_loss_status %}checked{% endif %}
+                                       disabled>
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-1" for="detail_final_loss_status">
+                                    <span class="material-icons text-danger fs-5">gpp_bad</span>
+                                    <span>Level 2 Hard Freeze</span>
+                                </label>
+                            </div>
+                        </div>
+                        <div class="toggle-dep-container {% if not object.final_loss_status %}is-dimmed{% endif %}">
+                            <div class="readonly-field-box font-monospace fw-bold text-danger justify-content-end">
+                                {% if object.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ object.final_loss_limit|default:"2000.00" }}
+                            </div>
+                        </div>
+                        <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
+                            Full-day trading freeze trigger halting all orders until next session.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Max Profit Limit Card -->
+                <div class="col-12 col-lg-4">
+                    <div class="config-card-unit p-3">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                             <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
                                 <input class="form-check-input"
                                        type="checkbox"
@@ -410,17 +435,15 @@
                                        id="detail_max_profit_status"
                                        {% if object.max_profit_status %}checked{% endif %}
                                        disabled>
-                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_max_profit_status">
+                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-1" for="detail_max_profit_status">
                                     <span class="material-icons text-success fs-5">verified</span>
-                                    <span>Enable Max Profit Limit</span>
+                                    <span>Max Profit Target</span>
                                 </label>
                             </div>
-
-                            <!-- Right: Amount Box -->
-                            <div id="max_profit_dep_body" class="toggle-dep-container {% if not object.max_profit_status %}is-dimmed{% endif %}" style="min-width: 150px; max-width: 200px; flex: 1;">
-                                <div class="readonly-field-box font-monospace fw-bold text-success justify-content-end">
-                                    {{ object.max_profit_limit|default:"0.00" }}
-                                </div>
+                        </div>
+                        <div class="toggle-dep-container {% if not object.max_profit_status %}is-dimmed{% endif %}">
+                            <div class="readonly-field-box font-monospace fw-bold text-success justify-content-end">
+                                {% if object.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ object.max_profit_limit|default:"0.00" }}
                             </div>
                         </div>
                         <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
@@ -429,79 +452,6 @@
                     </div>
                 </div>
             </div>
-
-            <!-- SECTION 3: INDEX / F&O RULES (Rendered if INDEX_FO) -->
-            {% if object.market_type == 'INDEX_FO' %}
-            <div class="market-section">
-                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-                    <span class="material-icons text-primary fs-5">calculate</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Lot &amp; Stop Loss Rules</h6>
-                    <span class="ms-2 badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small">INDEX / F&amp;O</span>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <!-- Auto Lot Card -->
-                    <div class="col-12 col-lg-6">
-                        <div class="config-card-unit">
-                            <div class="form-check form-switch toggle-header-strip">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_auto_lot_status">
-                                    <span class="material-icons text-primary fs-5">widgets</span>
-                                    <span>Auto Lot Size Calculation</span>
-                                </label>
-                                <input class="form-check-input"
-                                       type="checkbox"
-                                       role="switch"
-                                       id="detail_auto_lot_status"
-                                       {% if object.auto_lot_status %}checked{% endif %}
-                                       disabled>
-                            </div>
-                            <div class="toggle-dep-container {% if not object.auto_lot_status %}is-dimmed{% endif %}">
-                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Default Lot Size (Lots)</label>
-                                <div class="readonly-field-box font-monospace fw-bold">
-                                    {{ object.default_lot_size }} Lots
-                                </div>
-                                <div class="theme-text-muted small mt-1">Base quantity lot count used for initial order execution.</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Auto Stop Loss Card -->
-                    <div class="col-12 col-lg-6">
-                        <div class="config-card-unit">
-                            <div class="form-check form-switch toggle-header-strip">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_auto_sl_status">
-                                    <span class="material-icons text-danger fs-5">security</span>
-                                    <span>Auto Attach Stop Loss</span>
-                                </label>
-                                <input class="form-check-input"
-                                       type="checkbox"
-                                       role="switch"
-                                       id="detail_auto_sl_status"
-                                       {% if object.auto_sl_status %}checked{% endif %}
-                                       disabled>
-                            </div>
-                            <div class="toggle-dep-container {% if not object.auto_sl_status %}is-dimmed{% endif %}">
-                                <div class="row g-2">
-                                    <div class="col-12 col-sm-6">
-                                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Default Risk Value</label>
-                                        <div class="readonly-field-box font-monospace fw-bold">
-                                            {{ object.default_risk_value }}
-                                        </div>
-                                    </div>
-                                    <div class="col-12 col-sm-6">
-                                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Risk Calculation Mode</label>
-                                        <div class="readonly-field-box fw-semibold">
-                                            {{ object.get_default_risk_type_display|default:object.default_risk_type }}
-                                        </div>
-                                    </div>
-                                </div>
-                                <div class="theme-text-muted small mt-1">Automatically attach defensive SL bracket upon trade entry fill.</div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
 
             <!-- SECTION 4: FOREX / CME MICRO FUTURES SETTINGS (Rendered if FOREX_FUTURES) -->
             {% if object.market_type == 'FOREX_FUTURES' %}
@@ -589,58 +539,6 @@
             </div>
             {% endif %}
 
-            <!-- SECTION 5: LAYERING & ADVANCED FEATURES (3-Column Grid) -->
-            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-                <span class="material-icons text-primary fs-5">layers</span>
-                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Layering &amp; Advanced Features</h6>
-            </div>
-
-            <div class="row g-3 mb-4">
-                <!-- Layering Card -->
-                <div class="col-12 col-lg-4">
-                    <div class="config-card-unit">
-                        <div class="form-check form-switch toggle-header-strip">
-                            <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_layer_status">
-                                <span class="material-icons text-primary fs-5">stacked_line_chart</span>
-                                <span>Enable Order Layering</span>
-                            </label>
-                            <input class="form-check-input"
-                                   type="checkbox"
-                                   role="switch"
-                                   id="detail_layer_status"
-                                   {% if object.layer_status %}checked{% endif %}
-                                   disabled>
-                        </div>
-                        <div class="toggle-dep-container {% if not object.layer_status %}is-dimmed{% endif %}">
-                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Lots Per Layer Entry</label>
-                            <div class="readonly-field-box font-monospace fw-bold">
-                                {{ object.layer_add_in_lot_count }} Lots
-                            </div>
-                            <div class="theme-text-muted small mt-1">Additional lots added on each pyramiding trigger.</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Layer Step Distance Card -->
-                <div class="col-12 col-lg-4">
-                    <div class="config-card-unit">
-                        <div class="toggle-header-strip">
-                            <span class="theme-text-main small fw-bold d-flex align-items-center gap-2">
-                                <span class="material-icons text-info fs-5">straighten</span>
-                                <span>Layer Step Parameters</span>
-                            </span>
-                            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 small">Pyramiding</span>
-                        </div>
-                        <div class="toggle-dep-container {% if not object.layer_status %}is-dimmed{% endif %}">
-                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Layer Step Distance (%)</label>
-                            <div class="readonly-field-box font-monospace fw-bold">
-                                {{ object.layer_percentage }}%
-                            </div>
-                            <div class="theme-text-muted small mt-1">Price movement percentage required to trigger next layer entry.</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Action Buttons -->
             <div class="d-flex align-items-center justify-content-end gap-3 pt-3 border-top" style="border-color: var(--border-color) !important;">
