@@ -5,8 +5,8 @@
 
 {% block dashboard_content %}
 <div id="live-dashboard-container" class="w-100 col-12"
-     hx-get="{% url 'admins:admin-live-dashboard' %}"
-     hx-trigger="reloadLiveDashboard from:body"
+     hx-get="{% if env_mode == 'MOCK' %}{% url 'admins:admin-sandbox-dashboard' %}{% else %}{% url 'admins:admin-live-dashboard' %}{% endif %}"
+     hx-trigger="reloadLiveDashboard from:body, reloadSandboxDashboard from:body"
      hx-target="this"
      hx-swap="innerHTML">
     {% include "admins/partials/live_dashboard_content.html" %}

@@ -544,15 +544,21 @@ def get_live_index_option_chain(index_name: str = 'NIFTY', is_mock: bool = False
 
     if is_mock:
         chain = get_mock_index_option_chain(idx_clean, strike_step, spot_symbol, today)
-        if chain and (chain.get('emulator_connected') or float(chain.get('raw_spot_ltp') or 0) > 0 or chain.get('feed_status') in ('ACTIVE', 'STANDBY')):
+        # If Parquet streamer is actively replaying ticks with real spot price, prioritize Parquet
+        if chain and float(chain.get('raw_spot_ltp') or 0) > 0 and chain.get('feed_status') in ('ACTIVE', 'STREAMING'):
             return chain
+        # If in Live Data Simulation mode or Parquet is on standby, bridge live FYERS option chain
         live_chain = get_live_index_option_chain(index_name=index_name, is_mock=False)
-        if live_chain and (live_chain.get('is_live') or live_chain.get('is_fyers_live')):
+        if live_chain and (live_chain.get('is_live') or live_chain.get('is_fyers_live') or float(live_chain.get('raw_spot_ltp') or 0) > 0):
             live_chain = dict(live_chain)
             live_chain['is_mock_mode'] = True
+            live_chain['is_mock_live'] = True
+            live_chain['emulator_connected'] = chain.get('emulator_connected', True) if chain else True
             live_chain['feed_status'] = 'LIVE_SIMULATION'
             live_chain['fyers_symbol'] = f"DHAN_MOCK:{idx_clean}"
             return live_chain
+        if chain and chain.get('emulator_connected'):
+            return chain
         return chain
 
     cache_key = f"marmot:fyers:option_chain:{idx_clean}"
@@ -1170,6 +1176,12 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY', is_mock: bool = Fa
                     raw_ltp = float(mock_oc.get('raw_spot_ltp', 0.0) or 0.0)
             except Exception:
                 pass
+
+        if raw_ltp <= 0:
+            live_oc = get_live_index_option_chain(index_name=idx_upper, is_mock=False)
+            if live_oc and float(live_oc.get('raw_spot_ltp') or 0) > 0:
+                mock_oc = live_oc
+                raw_ltp = float(live_oc.get('raw_spot_ltp', 0.0))
 
         feed_time_str = str(mock_oc.get('last_updated') or mock_oc.get('feed_time') or mock_oc.get('timestamp') or '')
         if feed_time_str:

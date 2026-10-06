@@ -722,6 +722,24 @@ func processOptionTick(ctx context.Context, sym string, data map[string]interfac
 		_ = redisService.Client.Set(ctx, fmt.Sprintf("marmot:fyers_quote:%s", sym), qBytes, 24*time.Hour).Err()
 	}
 
+	if feedVal, err := redisService.Client.Get(ctx, "marmot:gateway:live_feed_enabled").Result(); err == nil && (feedVal == "1" || feedVal == "true") {
+		optEnvelope := map[string]interface{}{
+			"type":          "mock_tick",
+			"is_mock":       true,
+			"is_virtual":    true,
+			"source":        "EMULATOR",
+			"tradingSymbol": sym,
+			"securityId":    sym,
+			"ltp":           ltp,
+			"oi":            oi,
+			"volume":        volume,
+			"timestamp":     nowStr,
+		}
+		if oBytes, oErr := json.Marshal(optEnvelope); oErr == nil {
+			_ = redisService.Client.Publish(ctx, "marmot:mock_ticks", oBytes).Err()
+		}
+	}
+
 	if prevLTP[sym] != ltp {
 		prevLTP[sym] = ltp
 		log.Printf("⚡ [FYERS Option Tick] %s: ₹%.2f (Chg: %.2f | %.2f%%) | Bid: ₹%.2f Ask: ₹%.2f | Vol: %d OI: %d\n",
@@ -820,6 +838,29 @@ func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisS
 			"payload": string(chainBytes),
 		},
 	}).Err()
+
+	if feedVal, err := redisService.Client.Get(ctx, "marmot:gateway:live_feed_enabled").Result(); err == nil && (feedVal == "1" || feedVal == "true") {
+		mockEnvelope := map[string]interface{}{
+			"type":          "mock_tick",
+			"is_mock":       true,
+			"is_virtual":    true,
+			"source":        "EMULATOR",
+			"index":         idxName,
+			"tradingSymbol": sym,
+			"securityId":    sym,
+			"ltp":           ltp,
+			"change":        fmt.Sprintf("%.2f", ch),
+			"changePercent": fmt.Sprintf("%.2f%%", chp),
+			"open":          open,
+			"high":          high,
+			"low":           low,
+			"prevClose":     prevClose,
+			"timestamp":     nowStr,
+		}
+		if mBytes, mErr := json.Marshal(mockEnvelope); mErr == nil {
+			_ = redisService.Client.Publish(ctx, "marmot:mock_ticks", mBytes).Err()
+		}
+	}
 
 	// Write to Memory Buffer for Chunked Parquet disk writing
 	tickWriter.Write(parquet.Tick{

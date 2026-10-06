@@ -2985,8 +2985,17 @@
                                         }
                                     }
                                 } else if (data.type === 'live_tick') {
-                                    // STRICT ISOLATION: Real-world live ticks only update Live Dashboard, never Sandbox/Mock Replay
+                                    // Live ticks update Live Dashboard; for Sandbox/Mock, allow live ticks unless historical Parquet is replaying
                                     if (window.isLiveMockActive && window.isLiveMockActive()) {
+                                        const replayBadge = document.getElementById('mock-feed-status-text');
+                                        const isReplaying = (replayBadge && replayBadge.textContent.toUpperCase().includes('REPLAYING')) || window._mockReplayActive;
+                                        if (isReplaying) {
+                                            return; // Strict isolation: keep historical parquet replay pure
+                                        }
+                                        if (window.handleEmulatorTick) {
+                                            window.handleEmulatorTick(data.data || data);
+                                        }
+                                        window.dispatchEvent(new CustomEvent('marmot:live_tick', { detail: data }));
                                         return;
                                     }
                                     const sym = (data.symbol || data.fyers_sym || (data.data ? (data.data.symbol || data.data.fyers_sym) : '') || '').toUpperCase().trim();

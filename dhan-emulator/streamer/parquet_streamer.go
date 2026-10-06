@@ -108,6 +108,10 @@ func NewParquetStreamer(eng *engine.MatchingEngine, backupDir string) *ParquetSt
 		regulator:         NewFrequencyRegulator(1, "COMPRESSED"),
 	}
 
+	if ps.rdb != nil {
+		go ps.startLiveFeedSubscriber()
+	}
+
 	// Auto-select primary parquet dataset prioritizing verified complete Spot + Options files
 	files := ps.ListParquetDetails()
 	if len(files) > 0 {
@@ -789,6 +793,18 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 	}
 
 	if spotLTP <= 0 {
+		if ps.rdb != nil {
+			if rawChain, err := ps.rdb.Get(context.Background(), fmt.Sprintf("marmot:fyers:option_chain:%s", idxClean)).Result(); err == nil && rawChain != "" {
+				var liveChain models.OptionChainResponse
+				if json.Unmarshal([]byte(rawChain), &liveChain) == nil && liveChain.RawSpotLTP > 0 {
+					liveChain.IsLive = true
+					liveChain.IsMockLive = true
+					liveChain.FeedStatus = "LIVE_SIMULATION"
+					liveChain.FyersSymbol = fmt.Sprintf("DHAN_MOCK:%s", idxClean)
+					return liveChain
+				}
+			}
+		}
 		return models.OptionChainResponse{
 			IsLive:        false,
 			IsMockLive:    true,
@@ -998,7 +1014,11 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 
 	feedStatus := "ACTIVE"
 	if !ps.isPlaying {
-		feedStatus = "STANDBY"
+		if spotLTP > 0 {
+			feedStatus = "LIVE_SIMULATION"
+		} else {
+			feedStatus = "STANDBY"
+		}
 	}
 
 	vix := ps.currentVIX
@@ -2090,4 +2110,90 @@ func (ps *ParquetStreamer) ListParquetDetails() []ParquetFileInfo {
 	})
 
 	return results
+}
+
+func (ps *ParquetStreamer) startLiveFeedSubscriber() {
+	if ps.rdb == nil {
+		return
+	}
+	ctx := context.Background()
+	pubsub := ps.rdb.Subscribe(ctx, "marmot:mock_ticks", "marmot:live_ticks")
+	defer pubsub.Close()
+	ch := pubsub.Channel()
+	log.Println("[STREAMER] Live Redis tick subscriber initialized for marmot:mock_ticks / marmot:live_ticks")
+
+	for msg := range ch {
+		if msg == nil || len(msg.Payload) == 0 {
+			continue
+		}
+		if ps.isPlaying {
+			continue
+		}
+		var tickMap map[string]interface{}
+		if err := json.Unmarshal([]byte(msg.Payload), &tickMap); err != nil {
+			continue
+		}
+		var ltp float64
+		if v, ok := tickMap["ltp"].(float64); ok {
+			ltp = v
+		} else if v, ok := tickMap["spot_price"].(float64); ok {
+			ltp = v
+		}
+		if ltp <= 0 {
+			continue
+		}
+		sym, _ := tickMap["tradingSymbol"].(string)
+		if sym == "" {
+			sym, _ = tickMap["symbol"].(string)
+		}
+		if sym == "" {
+			sym, _ = tickMap["index"].(string)
+		}
+		secId, _ := tickMap["securityId"].(string)
+		if secId == "" {
+			secId = sym
+		}
+		t := models.MarketTick{
+			SecurityID:    secId,
+			TradingSymbol: sym,
+			LTP:           ltp,
+			Timestamp:     time.Now(),
+		}
+		if o, ok := tickMap["open"].(float64); ok {
+			t.Open = o
+		}
+		if h, ok := tickMap["high"].(float64); ok {
+			t.High = h
+		}
+		if l, ok := tickMap["low"].(float64); ok {
+			t.Low = l
+		}
+		if c, ok := tickMap["prevClose"].(float64); ok {
+			t.Close = c
+		}
+		if oi, ok := tickMap["oi"].(float64); ok {
+			t.OI = int64(oi)
+		}
+		if vol, ok := tickMap["volume"].(float64); ok {
+			t.Volume = int64(vol)
+		}
+
+		ps.mu.Lock()
+		ps.latestTicks[t.SecurityID] = t
+		if t.TradingSymbol != "" {
+			ps.latestTicks[t.TradingSymbol] = t
+		}
+		ps.currentDatetime = time.Now().Format("2006-01-02 15:04:05")
+		ps.mu.Unlock()
+
+		ps.engine.IngestTick(t)
+
+		ps.writeMu.Lock()
+		if len(ps.clients) > 0 {
+			for client := range ps.clients {
+				_ = client.WriteMessage(websocket.TextMessage, []byte(msg.Payload))
+			}
+		}
+		ps.writeMu.Unlock()
+	}
 }

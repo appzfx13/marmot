@@ -151,7 +151,12 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
-        is_mock = getattr(self, 'is_mock_view', False)
+        is_mock = getattr(self, 'is_mock_view', False) or (
+            self.request.GET.get('env', '').upper() == 'MOCK' or
+            self.request.GET.get('mode', '').upper() == 'MOCK' or
+            '/live-mock/' in self.request.path or
+            '/sandbox/' in self.request.path
+        )
 
         if is_mock:
             account_type = AccountTypeChoices.MOCK
@@ -455,8 +460,8 @@ def _build_mock_broker_calendar(daily_map: dict, selected_year: int = 2026):
 
 class AdminSandboxDashboardView(AdminLiveDashboardView):
     """Admin Sandbox Trading & Strategy Simulation Dashboard running on Dhan Mock Emulator (:8088)."""
-    template_name = 'admins/sandbox_dashboard.html'
-    partial_template_name = 'admins/partials/sandbox_dashboard_content.html'
+    template_name = 'admins/live_dashboard.html'
+    partial_template_name = 'admins/partials/live_dashboard_content.html'
     is_mock_view = True
 
 
@@ -1300,7 +1305,14 @@ class AdminLiveMacroRibbonView(LoginRequiredMixin, View):
 
     def get(self, request, *args, **kwargs):
         selected_index = request.GET.get('index', 'NIFTY').upper().strip()
-        is_mock = request.GET.get('env') == 'MOCK' or request.session.get('active_tab') == 'live-mock' or 'live-mock' in request.META.get('HTTP_REFERER', '')
+        is_mock = (
+            request.GET.get('env') == 'MOCK'
+            or request.session.get('active_tab') == 'live-mock'
+            or 'live-mock' in request.META.get('HTTP_REFERER', '')
+            or 'sandbox' in request.META.get('HTTP_REFERER', '')
+            or 'live-mock' in request.headers.get('Hx-Current-Url', '')
+            or 'sandbox' in request.headers.get('Hx-Current-Url', '')
+        )
         macro_ribbon = get_live_macro_ribbon_data(selected_index, is_mock=is_mock)
         context = {
             'macro_ribbon': macro_ribbon,
@@ -1345,6 +1357,8 @@ class AdminLivePositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View
             'ENV=MOCK' in request.GET.get('env', '').upper() or
             request.session.get('active_tab') == 'live-mock' or
             'live-mock' in request.META.get('HTTP_REFERER', '') or
+            'sandbox' in request.META.get('HTTP_REFERER', '') or
+            'sandbox' in request.headers.get('Hx-Current-Url', '') or
             'ENV=MOCK' in request.META.get('HTTP_REFERER', '').upper()
         )
         if is_mock:
@@ -1412,6 +1426,8 @@ class AdminLiveHoldingsPartialView(LoginRequiredMixin, AdminRequiredMixin, View)
             'ENV=MOCK' in request.GET.get('env', '').upper() or
             request.session.get('active_tab') == 'live-mock' or
             'live-mock' in request.META.get('HTTP_REFERER', '') or
+            'sandbox' in request.META.get('HTTP_REFERER', '') or
+            'sandbox' in request.headers.get('Hx-Current-Url', '') or
             'ENV=MOCK' in request.META.get('HTTP_REFERER', '').upper()
         )
         if is_mock:
@@ -1466,6 +1482,8 @@ class AdminLiveOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
             'ENV=MOCK' in request.GET.get('env', '').upper() or
             request.session.get('active_tab') == 'live-mock' or
             'live-mock' in request.META.get('HTTP_REFERER', '') or
+            'sandbox' in request.META.get('HTTP_REFERER', '') or
+            'sandbox' in request.headers.get('Hx-Current-Url', '') or
             'ENV=MOCK' in request.META.get('HTTP_REFERER', '').upper()
         )
         if is_mock:
@@ -2017,7 +2035,7 @@ def get_sandbox_simulated_orders(user_id=None, strategy_id=None, account_id=None
     return []
 
 
-class AdminSandboxDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
+class AdminSandboxLegacyDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, TemplateView):
     """Standalone Admin Sandbox Paper-Trading Dashboard mirroring Live UI with zero financial risk."""
     template_name = 'admins/sandbox_dashboard.html'
     partial_template_name = 'admins/partials/sandbox_dashboard_content.html'
