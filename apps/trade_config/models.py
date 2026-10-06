@@ -77,6 +77,7 @@ class TradeExecConfig(BaseModel):
     # General Status
     is_active = models.BooleanField(default=True, help_text="Master toggle to enable or disable auto trade execution features")
     # ─── Risk Controls (Two-Level Account Guardian Limits) ───────────────────
+    max_loss_status = models.BooleanField(default=True, help_text="Master toggle to enable Account Guardian circuit breaker")
     primary_loss_status = models.BooleanField(default=True, help_text="Enable Level 1 Warning Loss Limit for soft auto-freeze")
     primary_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, default=1000.00, null=True, blank=True, help_text="Level 1 warning loss threshold")
     final_loss_status = models.BooleanField(default=True, help_text="Enable Level 2 Hard Loss Limit for full-day account freeze")
@@ -90,13 +91,14 @@ class TradeExecConfig(BaseModel):
 
     def clean(self):
         super().clean()
-        if self.primary_loss_status and (self.primary_loss_limit is None or self.primary_loss_limit <= 0):
-            raise ValidationError({'primary_loss_limit': 'Level 1 Warning Loss Limit must be greater than 0.'})
-        if self.final_loss_status and (self.final_loss_limit is None or self.final_loss_limit <= 0):
-            raise ValidationError({'final_loss_limit': 'Level 2 Hard Day Loss Limit must be greater than 0.'})
-        if self.primary_loss_status and self.final_loss_status and self.primary_loss_limit and self.final_loss_limit:
-            if self.primary_loss_limit >= self.final_loss_limit:
-                raise ValidationError({'final_loss_limit': 'Level 2 Hard Loss Limit must be strictly greater than Level 1 Warning Limit.'})
+        if self.max_loss_status:
+            if self.primary_loss_status and (self.primary_loss_limit is None or self.primary_loss_limit <= 0):
+                raise ValidationError({'primary_loss_limit': 'Level 1 Warning Loss Limit must be greater than 0.'})
+            if self.final_loss_status and (self.final_loss_limit is None or self.final_loss_limit <= 0):
+                raise ValidationError({'final_loss_limit': 'Level 2 Hard Day Loss Limit must be greater than 0.'})
+            if self.primary_loss_status and self.final_loss_status and self.primary_loss_limit and self.final_loss_limit:
+                if self.primary_loss_limit >= self.final_loss_limit:
+                    raise ValidationError({'final_loss_limit': 'Level 2 Hard Loss Limit must be strictly greater than Level 1 Warning Limit.'})
         if self.max_profit_status and (self.max_profit_limit is None or self.max_profit_limit <= 0):
             raise ValidationError({'max_profit_limit': 'Max Profit Limit value is required when Max Profit rule is enabled.'})
 

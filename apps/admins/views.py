@@ -4505,6 +4505,7 @@ class AdminTradeExecConfigToggleView(LoginRequiredMixin, AdminRequiredMixin, Vie
     """Live HTMX toggle endpoint for TradeExecConfig boolean fields from detail and list views."""
 
     ALLOWED_FIELDS = {
+        'max_loss_status': 'Master Account Guardian toggle',
         'primary_loss_status': 'Level 1 Warning Loss Limit rule',
         'final_loss_status': 'Level 2 Hard Day Loss Limit rule',
         'max_profit_status': 'Max Profit Limit rule',

@@ -1054,7 +1054,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         token = str(self.get_access_token() or '').strip().strip('"').strip("'")
         client_id = str(self.client_id or '').strip().strip('"').strip("'")
         if not token or not client_id:
-            return {'success': False, 'broker': 'DHAN', 'message': f'Missing token or client ID for {self.account_name}'}
+            return {'success': False, 'broker': 'DHAN', 'message': f'Missing token or client ID for {getattr(self.account, "account_name", self.client_id)}'}
 
         try:
             url = f"{self.base_url}/killswitch?killSwitchStatus=DEACTIVATE"

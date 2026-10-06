@@ -127,6 +127,9 @@ func (j *StrategySignalJob) isTradingHaltedByGuardian(ctx context.Context, userI
 	if err == nil && raw != "" {
 		var riskData map[string]interface{}
 		if json.Unmarshal([]byte(raw), &riskData) == nil {
+			if mls, ok := riskData["max_loss_status"].(bool); ok && !mls {
+				return false, "" // Guardian circuit breaker disabled by user
+			}
 			if ff, ok := riskData["final_freeze"].(bool); ok && ff {
 				return true, "Level 2 Hard Day Freeze Active (Account Locked for the Day)"
 			}

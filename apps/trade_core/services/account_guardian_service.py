@@ -41,6 +41,7 @@ class AccountGuardianService:
             payload = {
                 "user_id": user.id,
                 "username": user.username,
+                "max_loss_status": bool(config.max_loss_status) if config else False,
                 "primary_loss_limit": l1_limit,
                 "final_loss_limit": l2_limit,
                 "max_profit_limit": profit_limit,
@@ -236,8 +237,11 @@ class AccountGuardianService:
             is_deleted=False
         ).first()
 
-        l1_limit = float(config.primary_loss_limit) if config and config.primary_loss_limit else 1000.0
-        l2_limit = float(config.final_loss_limit) if config and config.final_loss_limit else 2000.0
+        if not config or not config.max_loss_status:
+            return {"status": "GUARDIAN_DISABLED", "action_taken": None, "pnl": pnl}
+
+        l1_limit = float(config.primary_loss_limit) if config.primary_loss_limit else 1000.0
+        l2_limit = float(config.final_loss_limit) if config.final_loss_limit else 2000.0
 
         loss = abs(pnl) if pnl < 0 else 0.0
 

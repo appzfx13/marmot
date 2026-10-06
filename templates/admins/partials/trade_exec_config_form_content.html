@@ -364,14 +364,29 @@
                             {{ form.is_active }}
                         </div>
                         <div class="theme-text-muted small mt-1" style="font-size:0.75rem;">
-                            Master switch to enable/disable automated strategy order                <!-- SECTION 2: TWO-LEVEL ACCOUNT GUARDIAN (RISK CONTROL LIMITS) -->
-                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-                    <span class="material-icons text-primary fs-5">shield</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Two-Level Account Guardian (Circuit Breaker Limits)</h6>
-                    <span class="ms-2 badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 small">Auto-Freeze Guard</span>
+                            Master switch to enable/disable automated strategy order executions for this user.
+                        </div>
+                    </div>
                 </div>
 
-                <div class="row g-3 mb-4">
+                <!-- SECTION 2: TWO-LEVEL ACCOUNT GUARDIAN (RISK CONTROL LIMITS) -->
+                <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-primary fs-5">shield</span>
+                        <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Two-Level Account Guardian (Circuit Breaker Limits)</h6>
+                        <span class="ms-2 badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 small">Auto-Freeze Guard</span>
+                    </div>
+                    <div class="d-flex align-items-center gap-2">
+                        <label class="form-check-label theme-text-muted small fw-bold mb-0 cursor-pointer" for="id_max_loss_status">
+                            Master Guardian:
+                        </label>
+                        <div class="form-check form-switch mb-0">
+                            {{ form.max_loss_status }}
+                        </div>
+                    </div>
+                </div>
+
+                <div class="row g-3 mb-4" id="account_guardian_controls">
                     <!-- Level 1: Warning Loss Limit Card -->
                     <div class="col-12 col-lg-6">
                         <div class="config-card-unit p-3 border-warning border-opacity-25">
@@ -535,13 +550,23 @@ window.setMarketType = function(val) {
 };
 
 window.syncAllFormToggleStates = function() {
+    // 0. Master Account Guardian Circuit Breaker
+    const guardianCheck = document.getElementById('id_max_loss_status');
+    const guardianActive = guardianCheck ? guardianCheck.checked : true;
+    const guardianControls = document.getElementById('account_guardian_controls');
+    if (guardianControls) {
+        guardianControls.style.opacity = guardianActive ? '1' : '0.45';
+        guardianControls.style.pointerEvents = guardianActive ? 'auto' : 'none';
+    }
+
     // 1. Level 1: Warning Loss Limit
     const primaryCheck = document.getElementById('id_primary_loss_status');
     const primaryInput = document.getElementById('id_primary_loss_limit');
     const primaryDep   = document.getElementById('primary_loss_dep_body');
     if (primaryCheck && primaryInput) {
-        primaryInput.disabled = !primaryCheck.checked;
-        if (primaryDep) primaryDep.classList.toggle('is-dimmed', !primaryCheck.checked);
+        primaryCheck.disabled = !guardianActive;
+        primaryInput.disabled = !guardianActive || !primaryCheck.checked;
+        if (primaryDep) primaryDep.classList.toggle('is-dimmed', !guardianActive || !primaryCheck.checked);
     }
 
     // 2. Level 2: Hard Day Freeze Limit
@@ -549,8 +574,9 @@ window.syncAllFormToggleStates = function() {
     const finalInput = document.getElementById('id_final_loss_limit');
     const finalDep   = document.getElementById('final_loss_dep_body');
     if (finalCheck && finalInput) {
-        finalInput.disabled = !finalCheck.checked;
-        if (finalDep) finalDep.classList.toggle('is-dimmed', !finalCheck.checked);
+        finalCheck.disabled = !guardianActive;
+        finalInput.disabled = !guardianActive || !finalCheck.checked;
+        if (finalDep) finalDep.classList.toggle('is-dimmed', !guardianActive || !finalCheck.checked);
     }
 
     // 3. Max Profit Limit
@@ -582,6 +608,7 @@ document.addEventListener('click', function(e) {
 
 document.addEventListener('change', function(e) {
     if (e.target && (
+        e.target.id === 'id_max_loss_status' ||
         e.target.id === 'id_primary_loss_status' ||
         e.target.id === 'id_final_loss_status' ||
         e.target.id === 'id_max_profit_status'
