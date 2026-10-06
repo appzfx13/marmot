@@ -4393,8 +4393,12 @@ class AdminTradeExecConfigScrollView(LoginRequiredMixin, AdminRequiredMixin, Bas
         if filterset.is_valid():
             queryset = filterset.qs
 
-        sort = self.request.GET.get('sort', 'name').strip()
-        allowed_sort = ['name', '-name', 'max_loss_limit', '-max_loss_limit', 'max_profit_limit', '-max_profit_limit']
+        allowed_sort = [
+            'name', '-name',
+            'primary_loss_limit', '-primary_loss_limit',
+            'final_loss_limit', '-final_loss_limit',
+            'max_profit_limit', '-max_profit_limit',
+        ]
         if sort in allowed_sort:
             return queryset.order_by(sort)
         return queryset.order_by('name')
@@ -4503,7 +4507,6 @@ class AdminTradeExecConfigToggleView(LoginRequiredMixin, AdminRequiredMixin, Vie
     ALLOWED_FIELDS = {
         'primary_loss_status': 'Level 1 Warning Loss Limit rule',
         'final_loss_status': 'Level 2 Hard Day Loss Limit rule',
-        'max_loss_status': 'Max Loss Limit rule',
         'max_profit_status': 'Max Profit Limit rule',
         'is_active': 'Master Active status',
     }

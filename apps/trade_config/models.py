@@ -3,7 +3,6 @@ from django.db import models
 
 from apps.common.choices import (
     AccountTypeChoices,
-    ForexInstrumentChoices,
     LiveStrategyStatusChoices,
     MarketTypeChoices,
     SessionRatingChoices,
@@ -75,13 +74,6 @@ class TradeExecConfig(BaseModel):
     # ─── Market Type ────────────────────────────────────────────────────────
     market_type = models.CharField(max_length=20, choices=MarketTypeChoices.choices, default=MarketTypeChoices.INDEX_FO, help_text="Market segment")
 
-    # ─── Forex / CME Futures Fields (nullable, used when FOREX_FUTURES) ─────
-    forex_instrument = models.CharField(max_length=10, choices=ForexInstrumentChoices.choices, null=True, blank=True, help_text="CME Micro Futures instrument")
-    forex_broker_api_key = models.TextField(null=True, blank=True, help_text="Rithmic / OANDA / CME API Key for Forex/Futures execution")
-    forex_account_id = models.CharField(max_length=255, null=True, blank=True, help_text="Forex broker account / sub-account ID")
-    forex_contract_size = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True, help_text="Contract/lot size for selected CME instrument")
-    forex_tick_value = models.DecimalField(max_digits=10, decimal_places=4, null=True, blank=True, help_text="Value per tick in USD (e.g. $1 MGC, $1.25 MES)")
-    forex_max_contracts = models.PositiveSmallIntegerField(null=True, blank=True, default=1, help_text="Max contracts allowed per trade entry")
     # General Status
     is_active = models.BooleanField(default=True, help_text="Master toggle to enable or disable auto trade execution features")
     # ─── Risk Controls (Two-Level Account Guardian Limits) ───────────────────
@@ -89,9 +81,6 @@ class TradeExecConfig(BaseModel):
     primary_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, default=1000.00, null=True, blank=True, help_text="Level 1 warning loss threshold")
     final_loss_status = models.BooleanField(default=True, help_text="Enable Level 2 Hard Loss Limit for full-day account freeze")
     final_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, default=2000.00, null=True, blank=True, help_text="Level 2 hard day loss threshold")
-    # Legacy Single-Limit Compatibility
-    max_loss_status = models.BooleanField(default=True, help_text="Legacy max loss limit status (synced to final_loss_status)")
-    max_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Legacy max loss limit (synced to final_loss_limit)")
     max_profit_status = models.BooleanField(default=False, help_text="Enable maximum profit limit rule")
     max_profit_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Target max profit limit for session")
     class Meta:
@@ -112,10 +101,6 @@ class TradeExecConfig(BaseModel):
             raise ValidationError({'max_profit_limit': 'Max Profit Limit value is required when Max Profit rule is enabled.'})
 
     def save(self, *args, **kwargs):
-        # Keep legacy max_loss fields in sync with final_loss for external queries
-        if self.final_loss_limit:
-            self.max_loss_limit = self.final_loss_limit
-            self.max_loss_status = self.final_loss_status
         super().save(*args, **kwargs)
         if self.is_active and not self.is_deleted:
             TradeExecConfig.objects.filter(

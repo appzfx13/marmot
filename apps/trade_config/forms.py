@@ -1,6 +1,6 @@
 from django import forms
 
-from apps.common.choices import AccountTypeChoices, ForexInstrumentChoices, MarketTypeChoices
+from apps.common.choices import AccountTypeChoices, MarketTypeChoices
 from .models import BrokerMaster, TradeExecConfig, UserTradingAccount
 
 _FIELD_CSS  = 'form-control theme-text-main'
@@ -52,13 +52,6 @@ class TradeExecConfigForm(forms.ModelForm):
             'final_loss_limit',
             'max_profit_status',
             'max_profit_limit',
-            # ── Forex / CME Futures (shown only for FOREX_FUTURES) ───────────
-            'forex_instrument',
-            'forex_broker_api_key',
-            'forex_account_id',
-            'forex_contract_size',
-            'forex_tick_value',
-            'forex_max_contracts',
         ]
         widgets = {
             # General
@@ -76,13 +69,6 @@ class TradeExecConfigForm(forms.ModelForm):
             'final_loss_limit':     forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '100', 'placeholder': 'e.g. 2000.00', 'id': 'id_final_loss_limit'}),
             'max_profit_status':    forms.CheckboxInput(attrs={'class': _CHECK_CSS, 'role': 'switch', 'id': 'id_max_profit_status'}),
             'max_profit_limit':     forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '500', 'placeholder': 'e.g. 10000.00', 'id': 'id_max_profit_limit'}),
-            # Forex / CME
-            'forex_instrument':     forms.Select(attrs={'class': _SELECT_CSS}),
-            'forex_broker_api_key': forms.TextInput(attrs={'class': _FIELD_CSS, 'placeholder': 'Rithmic / OANDA API Key'}),
-            'forex_account_id':     forms.TextInput(attrs={'class': _FIELD_CSS, 'placeholder': 'Broker Account ID'}),
-            'forex_contract_size':  forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '0.0001', 'placeholder': 'e.g. 10 for MGC'}),
-            'forex_tick_value':     forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '0.0001', 'placeholder': 'e.g. 1.00 for MGC'}),
-            'forex_max_contracts':  forms.NumberInput(attrs={'class': _FIELD_CSS, 'min': '1', 'placeholder': 'Max contracts per trade'}),
         }
 
     def __init__(self, *args, **kwargs):
@@ -92,9 +78,6 @@ class TradeExecConfigForm(forms.ModelForm):
         self.fields['primary_loss_limit'].required = False
         self.fields['final_loss_limit'].required = False
         self.fields['max_profit_limit'].required = False
-        self.fields['forex_contract_size'].required = False
-        self.fields['forex_tick_value'].required = False
-        self.fields['forex_max_contracts'].required = False
 
     def clean(self):
         cleaned_data = super().clean()
