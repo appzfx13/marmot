@@ -4462,9 +4462,6 @@ class AdminTradeExecConfigToggleView(LoginRequiredMixin, AdminRequiredMixin, Vie
     ALLOWED_FIELDS = {
         'max_loss_status': 'Max Loss Limit rule',
         'max_profit_status': 'Max Profit Limit rule',
-        'auto_lot_status': 'Auto Lot Sizing',
-        'auto_sl_status': 'Auto Stop Loss',
-        'layer_status': 'Order Layering',
         'is_active': 'Master Active status',
     }
 

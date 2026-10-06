@@ -22,6 +22,19 @@
         {% endif %}
     </td>
 
+    <!-- Market Segment -->
+    <td class="py-3 bg-transparent">
+        {% if config.market_type == 'FOREX_FUTURES' %}
+            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 small">
+                🌐 FOREX
+            </span>
+        {% else %}
+            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 small">
+                🇮🇳 INDEX F&amp;O
+            </span>
+        {% endif %}
+    </td>
+
     <!-- Interactive Status Toggle for is_active -->
     <td class="py-3 bg-transparent">
     {% if config.is_active %}
@@ -31,10 +44,16 @@
     {% endif %}
     </td>
 
-    <!-- Max Loss -->
+    <!-- Max Loss Limit (Amount vs %) -->
     <td class="py-3 text-end fw-semibold bg-transparent">
-        {% if config.max_loss_status and config.max_loss_limit is not None %}
-            <span class="text-danger">${{ config.max_loss_limit }}</span>
+        {% if config.max_loss_status %}
+            {% if config.max_loss_type == 'PERCENTAGE' %}
+                <span class="text-danger fw-bold">{{ config.max_loss_percentage }}%</span>
+                <span class="theme-text-muted small d-block" style="font-size:0.70rem;">{{ config.get_max_loss_reference_display }}</span>
+            {% else %}
+                <span class="text-danger fw-bold">{% if config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ config.max_loss_limit|default:"0.00" }}</span>
+                <span class="theme-text-muted small d-block" style="font-size:0.70rem;">Fixed Amount</span>
+            {% endif %}
         {% else %}
             <span class="theme-text-muted opacity-50 small">—</span>
         {% endif %}
@@ -43,19 +62,10 @@
     <!-- Max Profit -->
     <td class="py-3 text-end fw-semibold bg-transparent">
         {% if config.max_profit_status and config.max_profit_limit is not None %}
-            <span class="text-success">${{ config.max_profit_limit }}</span>
+            <span class="text-success fw-bold">{% if config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ config.max_profit_limit }}</span>
         {% else %}
             <span class="theme-text-muted opacity-50 small">—</span>
         {% endif %}
-    </td>
-
-    <!-- Lot Size -->
-    <td class="py-3 text-center fw-bold theme-text-main bg-transparent">{{ config.default_lot_size }}</td>
-
-    <!-- Risk Mode -->
-    <td class="py-3 bg-transparent">
-        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill text-uppercase fw-bold px-3 py-1">{{ config.default_risk_type }}</span>
-        <small class="theme-text-muted ms-1">({{ config.default_risk_value }})</small>
     </td>
 
     <!-- Actions -->

@@ -76,6 +76,18 @@ class RiskTypeChoices(models.TextChoices):
     POINTS = "points", "Points"
 
 
+# Max Daily Loss Type Choices
+class MaxLossTypeChoices(models.TextChoices):
+    AMOUNT = "AMOUNT", "Amount-Based (Fixed Currency)"
+    PERCENTAGE = "PERCENTAGE", "Percentage-Based (%)"
+
+
+# Capital Reference Choices for Percentage Loss Limit
+class CapitalReferenceChoices(models.TextChoices):
+    OPENING_BALANCE = "OPENING_BALANCE", "Day Opening Balance"
+    AVAILABLE_CAPITAL = "AVAILABLE_CAPITAL", "Current Available Margin / Capital"
+
+
 # Gateway Service Choices
 class GatewayServiceChoices(models.TextChoices):
     TWILIO_SMS = "TWILIO", "Twilio SMS"

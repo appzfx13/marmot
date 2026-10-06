@@ -3,10 +3,11 @@ from django.db import models
 
 from apps.common.choices import (
     AccountTypeChoices,
+    CapitalReferenceChoices,
     ForexInstrumentChoices,
     LiveStrategyStatusChoices,
     MarketTypeChoices,
-    RiskTypeChoices,
+    MaxLossTypeChoices,
     SessionRatingChoices,
     StrategyChoices,
     TaskStatusChoices,
@@ -88,21 +89,12 @@ class TradeExecConfig(BaseModel):
     is_active = models.BooleanField(default=True, help_text="Master toggle to enable or disable auto trade execution features")
     # Risk Controls (Max Limits)
     max_loss_status = models.BooleanField(default=False, help_text="Enable maximum loss limit rule for auto-freeze")
-    max_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Maximum allowed loss limit before auto-freeze triggers")
+    max_loss_type = models.CharField(max_length=20, choices=MaxLossTypeChoices.choices, default=MaxLossTypeChoices.AMOUNT, help_text="Max loss limit calculation mode")
+    max_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Max loss limit amount before auto-freeze triggers")
+    max_loss_percentage = models.DecimalField(max_digits=5, decimal_places=2, null=True, blank=True, help_text="Max allowed daily loss percentage")
+    max_loss_reference = models.CharField(max_length=20, choices=CapitalReferenceChoices.choices, default=CapitalReferenceChoices.OPENING_BALANCE, blank=True, help_text="Capital baseline")
     max_profit_status = models.BooleanField(default=False, help_text="Enable maximum profit limit rule")
     max_profit_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Target max profit limit for the session")
-
-    # Lot & Position Sizing
-    auto_lot_status = models.BooleanField(default=False, help_text="Enable automatic lot size calculation based on risk parameters")
-    default_lot_size = models.PositiveIntegerField(default=1, blank=True, help_text="Default lot size to use when auto lot status is disabled")
-    # Stop Loss Sizing
-    auto_sl_status = models.BooleanField(default=False, help_text="Automatically attach default stop loss to outgoing orders")
-    default_risk_value = models.DecimalField(max_digits=10, decimal_places=2, default=0.00, blank=True, help_text="Default risk value")
-    default_risk_type = models.CharField(max_length=20, choices=RiskTypeChoices.choices, default=RiskTypeChoices.PERCENTAGE, blank=True, help_text="Risk calculation mode")
-    # Layering / Pyramiding Logic
-    layer_status = models.BooleanField(default=False, help_text="Enable order layering (pyramiding into winning positions)")
-    layer_add_in_lot_count = models.PositiveSmallIntegerField(default=0, blank=True, help_text="Number of additional lots to add per layer entry")
-    layer_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=0.00, blank=True, help_text="Percentage step/distance required per layer")
 
     # Realtime Execution Telemetry & Feedback Logs
     execution_status = models.CharField(max_length=20, choices=TaskStatusChoices.choices, default=TaskStatusChoices.CREATED, help_text="Realtime execution status")
@@ -117,10 +109,17 @@ class TradeExecConfig(BaseModel):
 
     def clean(self):
         super().clean()
-        if self.max_loss_status and (self.max_loss_limit is None or self.max_loss_limit < 0):
-            raise ValidationError({'max_loss_limit': 'Max Loss Limit value is required when Max Loss rule is enabled.'})
-        if self.max_profit_status and (self.max_profit_limit is None or self.max_profit_limit < 0):
-            raise ValidationError({'max_profit_limit': 'Max Profit Limit value is required when Max Profit rule is enabled.'})
+        if self.max_loss_status:
+            if self.max_loss_type == MaxLossTypeChoices.AMOUNT:
+                if self.max_loss_limit is None or self.max_loss_limit <= 0:
+                    raise ValidationError({'max_loss_limit': 'Max Loss Limit amount is required and must be greater than 0.'})
+            elif self.max_loss_type == MaxLossTypeChoices.PERCENTAGE:
+                if self.max_loss_percentage is None or self.max_loss_percentage <= 0:
+                    raise ValidationError({'max_loss_percentage': 'Max Loss Percentage is required and must be greater than 0%.'})
+                if not self.max_loss_reference:
+                    raise ValidationError({'max_loss_reference': 'Capital reference method is required for percentage-based loss calculation.'})
+        if self.max_profit_status and (self.max_profit_limit is None or self.max_profit_limit <= 0):
+            raise ValidationError({'max_profit_limit': 'Max Profit Limit value is required and must be greater than 0.'})
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)

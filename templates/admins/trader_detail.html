@@ -212,19 +212,34 @@
                             <tbody>
                                 <tr style="border-color: var(--border-color) !important;">
                                     <td class="ps-0 py-3 theme-text-muted text-nowrap" style="width: 25%;">Max Loss Limit</td>
-                                    <td class="pe-0 py-3 text-danger fw-semibold">₹{{ exec_config.max_loss_limit }}</td>
+                                    <td class="pe-0 py-3 text-danger fw-semibold">
+                                        {% if exec_config.max_loss_status %}
+                                            {% if exec_config.max_loss_type == 'PERCENTAGE' %}
+                                                {{ exec_config.max_loss_percentage }}% ({{ exec_config.get_max_loss_reference_display }})
+                                            {% else %}
+                                                {% if exec_config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ exec_config.max_loss_limit|default:"0.00" }}
+                                            {% endif %}
+                                        {% else %}
+                                            <span class="theme-text-muted">Disabled</span>
+                                        {% endif %}
+                                    </td>
                                     <td class="py-3 theme-text-muted text-nowrap" style="width: 25%;">Max Profit Limit</td>
-                                    <td class="pe-0 py-3 text-success fw-semibold">₹{{ exec_config.max_profit_limit }}</td>
+                                    <td class="pe-0 py-3 text-success fw-semibold">
+                                        {% if exec_config.max_profit_status %}
+                                            {% if exec_config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ exec_config.max_profit_limit|default:"0.00" }}
+                                        {% else %}
+                                            <span class="theme-text-muted">Disabled</span>
+                                        {% endif %}
+                                    </td>
                                 </tr>
                                 <tr style="border-color: var(--border-color) !important;">
-                                    <td class="ps-0 py-3 theme-text-muted text-nowrap">Default Lot Size</td>
-                                    <td class="pe-0 py-3 theme-text-main fw-bold">{{ exec_config.default_lot_size }}</td>
-                                    <td class="py-3 theme-text-muted text-nowrap">Risk Mode</td>
+                                    <td class="ps-0 py-3 theme-text-muted text-nowrap">Market Segment</td>
+                                    <td class="pe-0 py-3 theme-text-main fw-bold">{{ exec_config.get_market_type_display }}</td>
+                                    <td class="py-3 theme-text-muted text-nowrap">Loss Calculation Mode</td>
                                     <td class="pe-0 py-3">
                                         <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill text-uppercase fw-bold px-3 py-1">
-                                            {{ exec_config.default_risk_type }}
+                                            {{ exec_config.get_max_loss_type_display }}
                                         </span>
-                                        <span class="small theme-text-muted ms-1">({{ exec_config.default_risk_value }})</span>
                                     </td>
                                 </tr>
                             </tbody>

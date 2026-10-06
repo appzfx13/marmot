@@ -43,24 +43,17 @@ class TradeExecConfigForm(forms.ModelForm):
             'trading_account',
             'account_type',
             'is_active',
-            # ── Market Type selector (NEW) ────────────────────────────────────
+            # ── Market Type selector ─────────────────────────────────────────
             'market_type',
             # ── Risk Controls (shared across both market types) ───────────────
             'max_loss_status',
+            'max_loss_type',
             'max_loss_limit',
+            'max_loss_percentage',
+            'max_loss_reference',
             'max_profit_status',
             'max_profit_limit',
-            # ── Lot & SL (INDEX/F&O specific, hidden for FOREX) ──────────────
-            'auto_lot_status',
-            'default_lot_size',
-            'auto_sl_status',
-            'default_risk_value',
-            'default_risk_type',
-            # ── Layering & Features (shared) ─────────────────────────────────
-            'layer_status',
-            'layer_add_in_lot_count',
-            'layer_percentage',
-            # ── Forex / CME Futures (NEW, shown only for FOREX_FUTURES) ───────
+            # ── Forex / CME Futures (shown only for FOREX_FUTURES) ───────────
             'forex_instrument',
             'forex_broker_api_key',
             'forex_account_id',
@@ -79,20 +72,13 @@ class TradeExecConfigForm(forms.ModelForm):
             'market_type':          forms.Select(attrs={'class': _SELECT_CSS, 'id': 'id_market_type'}),
             # Risk
             'max_loss_status':      forms.CheckboxInput(attrs={'class': _CHECK_CSS, 'role': 'switch', 'id': 'id_max_loss_status'}),
+            'max_loss_type':        forms.Select(attrs={'class': _SELECT_CSS, 'id': 'id_max_loss_type'}),
             'max_loss_limit':       forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '500', 'placeholder': 'e.g. 5000.00', 'id': 'id_max_loss_limit'}),
+            'max_loss_percentage':  forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '0.1', 'min': '0.1', 'max': '100', 'placeholder': 'e.g. 2.50', 'id': 'id_max_loss_percentage'}),
+            'max_loss_reference':   forms.Select(attrs={'class': _SELECT_CSS, 'id': 'id_max_loss_reference'}),
             'max_profit_status':    forms.CheckboxInput(attrs={'class': _CHECK_CSS, 'role': 'switch', 'id': 'id_max_profit_status'}),
             'max_profit_limit':     forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '500', 'placeholder': 'e.g. 10000.00', 'id': 'id_max_profit_limit'}),
-            # Lot / SL (INDEX/F&O)
-            'auto_lot_status':      forms.CheckboxInput(attrs={'class': _CHECK_CSS, 'role': 'switch', 'id': 'id_auto_lot_status'}),
-            'default_lot_size':     forms.NumberInput(attrs={'class': _FIELD_CSS, 'min': '1'}),
-            'auto_sl_status':       forms.CheckboxInput(attrs={'class': _CHECK_CSS, 'role': 'switch', 'id': 'id_auto_sl_status'}),
-            'default_risk_value':   forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '0.1'}),
-            'default_risk_type':    forms.Select(attrs={'class': _SELECT_CSS}),
-            # Layering
-            'layer_status':         forms.CheckboxInput(attrs={'class': _CHECK_CSS, 'role': 'switch', 'id': 'id_layer_status'}),
-            'layer_add_in_lot_count': forms.NumberInput(attrs={'class': _FIELD_CSS}),
-            'layer_percentage':     forms.NumberInput(attrs={'class': _FIELD_CSS, 'step': '0.1'}),
-            # Forex / CME (NEW)
+            # Forex / CME
             'forex_instrument':     forms.Select(attrs={'class': _SELECT_CSS}),
             'forex_broker_api_key': forms.TextInput(attrs={'class': _FIELD_CSS, 'placeholder': 'Rithmic / OANDA API Key'}),
             'forex_account_id':     forms.TextInput(attrs={'class': _FIELD_CSS, 'placeholder': 'Broker Account ID'}),
@@ -106,39 +92,34 @@ class TradeExecConfigForm(forms.ModelForm):
         self.fields['account_type'].required = False
         self.fields['trading_account'].required = False
         self.fields['max_loss_limit'].required = False
+        self.fields['max_loss_percentage'].required = False
+        self.fields['max_loss_reference'].required = False
         self.fields['max_profit_limit'].required = False
-        self.fields['default_risk_value'].required = False
-        self.fields['default_risk_type'].required = False
-        self.fields['default_lot_size'].required = False
-        self.fields['layer_add_in_lot_count'].required = False
-        self.fields['layer_percentage'].required = False
         self.fields['forex_contract_size'].required = False
         self.fields['forex_tick_value'].required = False
         self.fields['forex_max_contracts'].required = False
 
     def clean(self):
         cleaned_data = super().clean()
-        auto_sl_status = cleaned_data.get('auto_sl_status')
-        default_risk_value = cleaned_data.get('default_risk_value')
-        layer_status = cleaned_data.get('layer_status')
-        layer_percentage = cleaned_data.get('layer_percentage')
+        max_loss_status = cleaned_data.get('max_loss_status')
+        max_loss_type = cleaned_data.get('max_loss_type')
+        max_loss_limit = cleaned_data.get('max_loss_limit')
+        max_loss_percentage = cleaned_data.get('max_loss_percentage')
+        max_loss_reference = cleaned_data.get('max_loss_reference')
 
-        if auto_sl_status and (default_risk_value is None or default_risk_value <= 0):
-            self.add_error('default_risk_value', 'Risk value must be greater than 0 when Auto Stop Loss is enabled.')
+        if max_loss_status:
+            if max_loss_type == 'AMOUNT':
+                if max_loss_limit is None or max_loss_limit <= 0:
+                    self.add_error('max_loss_limit', 'Max Loss Limit amount is required and must be greater than 0.')
+            elif max_loss_type == 'PERCENTAGE':
+                if max_loss_percentage is None or max_loss_percentage <= 0:
+                    self.add_error('max_loss_percentage', 'Max Loss Percentage is required and must be greater than 0%.')
+                if not max_loss_reference:
+                    self.add_error('max_loss_reference', 'Capital reference method is required for percentage-based loss calculation.')
 
-        if layer_status and (layer_percentage is None or layer_percentage <= 0):
-            self.add_error('layer_percentage', 'Layer step distance (%) is required when Order Layering is enabled.')
-
-        # Safe defaults for un-checked numeric values
-        if not cleaned_data.get('default_risk_value'):
-            cleaned_data['default_risk_value'] = 0.00
-        if not cleaned_data.get('default_risk_type'):
-            cleaned_data['default_risk_type'] = RiskTypeChoices.PERCENTAGE
-        if not cleaned_data.get('default_lot_size'):
-            cleaned_data['default_lot_size'] = 1
-        if not cleaned_data.get('layer_add_in_lot_count'):
-            cleaned_data['layer_add_in_lot_count'] = 0
-        if not cleaned_data.get('layer_percentage'):
-            cleaned_data['layer_percentage'] = 0.00
+        max_profit_status = cleaned_data.get('max_profit_status')
+        max_profit_limit = cleaned_data.get('max_profit_limit')
+        if max_profit_status and (max_profit_limit is None or max_profit_limit <= 0):
+            self.add_error('max_profit_limit', 'Max Profit Limit value is required and must be greater than 0.')
 
         return cleaned_data

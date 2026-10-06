@@ -367,10 +367,10 @@
             </div>
 
             <div class="row g-3 mb-4">
-                <!-- Max Loss Limit Card (Single-Line Inline) -->
-                <div class="col-12 col-lg-6">
+                <!-- Max Loss Limit Card (Dual-Mode: Amount vs Percentage) -->
+                <div class="col-12 col-lg-7">
                     <div class="config-card-unit p-3">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
+                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
                             <!-- Left: Switch and Title -->
                             <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
                                 <input class="form-check-input"
@@ -381,266 +381,119 @@
                                        disabled>
                                 <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_max_loss_status">
                                     <span class="material-icons text-danger fs-5">gpp_maybe</span>
-                                    <span>Enable Max Loss Limit</span>
+                                    <span>Per-Day Max Loss Limit</span>
                                 </label>
                             </div>
 
-                            <!-- Right: Amount Box -->
-                            <div id="max_loss_dep_body" class="toggle-dep-container {% if not object.max_loss_status %}is-dimmed{% endif %}" style="min-width: 150px; max-width: 200px; flex: 1;">
-                                <div class="readonly-field-box font-monospace fw-bold text-danger justify-content-end">
-                                    {{ object.max_loss_limit|default:"0.00" }}
-                                </div>
+                            <!-- Right: Mode Badge -->
+                            <div>
+                                {% if object.max_loss_status %}
+                                    <span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 px-2.5 py-1 font-monospace small">
+                                        {{ object.get_max_loss_type_display }}
+                                    </span>
+                                {% else %}
+                                    <span class="badge bg-secondary bg-opacity-25 text-secondary border border-secondary border-opacity-25 px-2.5 py-1 small">
+                                        Disabled
+                                    </span>
+                                {% endif %}
                             </div>
                         </div>
-                        <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
-                            Maximum allowed session loss limit before auto-freeze triggers.
-                        </div>
-                    </div>
-                </div>
 
-                <!-- Max Profit Limit Card (Single-Line Inline) -->
-                <div class="col-12 col-lg-6">
-                    <div class="config-card-unit p-3">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                            <!-- Left: Switch and Title -->
-                            <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
-                                <input class="form-check-input"
-                                       type="checkbox"
-                                       role="switch"
-                                       id="detail_max_profit_status"
-                                       {% if object.max_profit_status %}checked{% endif %}
-                                       disabled>
-                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_max_profit_status">
-                                    <span class="material-icons text-success fs-5">verified</span>
-                                    <span>Enable Max Profit Limit</span>
-                                </label>
-                            </div>
-
-                            <!-- Right: Amount Box -->
-                            <div id="max_profit_dep_body" class="toggle-dep-container {% if not object.max_profit_status %}is-dimmed{% endif %}" style="min-width: 150px; max-width: 200px; flex: 1;">
-                                <div class="readonly-field-box font-monospace fw-bold text-success justify-content-end">
-                                    {{ object.max_profit_limit|default:"0.00" }}
-                                </div>
-                            </div>
-                        </div>
-                        <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
-                            Target session profit limit for automatic trade locking.
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- SECTION 3: INDEX / F&O RULES (Rendered if INDEX_FO) -->
-            {% if object.market_type == 'INDEX_FO' %}
-            <div class="market-section">
-                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-                    <span class="material-icons text-primary fs-5">calculate</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Lot &amp; Stop Loss Rules</h6>
-                    <span class="ms-2 badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small">INDEX / F&amp;O</span>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <!-- Auto Lot Card -->
-                    <div class="col-12 col-lg-6">
-                        <div class="config-card-unit">
-                            <div class="form-check form-switch toggle-header-strip">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_auto_lot_status">
-                                    <span class="material-icons text-primary fs-5">widgets</span>
-                                    <span>Auto Lot Size Calculation</span>
-                                </label>
-                                <input class="form-check-input"
-                                       type="checkbox"
-                                       role="switch"
-                                       id="detail_auto_lot_status"
-                                       {% if object.auto_lot_status %}checked{% endif %}
-                                       disabled>
-                            </div>
-                            <div class="toggle-dep-container {% if not object.auto_lot_status %}is-dimmed{% endif %}">
-                                <label class="form-label theme-text-muted small fw-bold text-uppercase">Default Lot Size (Lots)</label>
-                                <div class="readonly-field-box font-monospace fw-bold">
-                                    {{ object.default_lot_size }} Lots
-                                </div>
-                                <div class="theme-text-muted small mt-1">Base quantity lot count used for initial order execution.</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Auto Stop Loss Card -->
-                    <div class="col-12 col-lg-6">
-                        <div class="config-card-unit">
-                            <div class="form-check form-switch toggle-header-strip">
-                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_auto_sl_status">
-                                    <span class="material-icons text-danger fs-5">security</span>
-                                    <span>Auto Attach Stop Loss</span>
-                                </label>
-                                <input class="form-check-input"
-                                       type="checkbox"
-                                       role="switch"
-                                       id="detail_auto_sl_status"
-                                       {% if object.auto_sl_status %}checked{% endif %}
-                                       disabled>
-                            </div>
-                            <div class="toggle-dep-container {% if not object.auto_sl_status %}is-dimmed{% endif %}">
-                                <div class="row g-2">
-                                    <div class="col-12 col-sm-6">
-                                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Default Risk Value</label>
-                                        <div class="readonly-field-box font-monospace fw-bold">
-                                            {{ object.default_risk_value }}
-                                        </div>
+                        <!-- Details Container -->
+                        <div class="pt-3 {% if not object.max_loss_status %}opacity-50{% endif %}">
+                            {% if object.max_loss_type == 'PERCENTAGE' %}
+                            <div class="row g-2">
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Max Loss Percentage</label>
+                                    <div class="readonly-field-box font-monospace fw-bold text-danger">
+                                        {{ object.max_loss_percentage }}%
                                     </div>
-                                    <div class="col-12 col-sm-6">
-                                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Risk Calculation Mode</label>
-                                        <div class="readonly-field-box fw-semibold">
-                                            {{ object.get_default_risk_type_display|default:object.default_risk_type }}
-                                        </div>
-                                    </div>
+                                    <div class="theme-text-muted small mt-1" style="font-size: 0.75rem;">Allowed session drawdown.</div>
                                 </div>
-                                <div class="theme-text-muted small mt-1">Automatically attach defensive SL bracket upon trade entry fill.</div>
+                                <div class="col-12 col-sm-6">
+                                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Capital Reference Basis</label>
+                                    <div class="readonly-field-box fw-semibold">
+                                        {{ object.get_max_loss_reference_display }}
+                                    </div>
+                                    <div class="theme-text-muted small mt-1" style="font-size: 0.75rem;">Baseline capital method.</div>
+                                </div>
                             </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            {% endif %}
-
-            <!-- SECTION 4: FOREX / CME MICRO FUTURES SETTINGS (Rendered if FOREX_FUTURES) -->
-            {% if object.market_type == 'FOREX_FUTURES' %}
-            <div class="market-section">
-                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-                    <span class="material-icons fs-5 text-success">currency_exchange</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Forex / CME Micro Futures Settings</h6>
-                    <span class="ms-2 badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small">FOREX / FUTURES</span>
-                </div>
-
-                <div class="row g-3 mb-4">
-                    <div class="col-12 col-md-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase">CME Micro Instrument</label>
-                        <div class="readonly-field-box fw-bold text-success">
-                            {{ object.forex_instrument|default:"Not Set" }}
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Max Contracts Per Trade</label>
-                        <div class="readonly-field-box font-monospace">
-                            {{ object.forex_max_contracts|default:"1" }}
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-md-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Contract Size (units)</label>
-                        <div class="readonly-field-box font-monospace">
-                            {{ object.forex_contract_size|default:"-" }}
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Tick Value (USD)</label>
-                        <div class="readonly-field-box font-monospace">
-                            ${{ object.forex_tick_value|default:"-" }}
-                        </div>
-                    </div>
-
-                    <div class="col-12 col-md-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase">Broker Account ID</label>
-                        <div class="readonly-field-box font-monospace">
-                            {{ object.forex_account_id|default:"Not configured" }}
-                        </div>
-                    </div>
-                    <div class="col-12 col-md-6">
-                        <label class="form-label theme-text-muted small fw-bold text-uppercase">API Key / Token Status</label>
-                        <div class="readonly-field-box">
-                            {% if object.forex_broker_api_key %}
-                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 px-2 py-1 small">Configured &amp; Encrypted</span>
                             {% else %}
-                                <span class="badge bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25 px-2 py-1 small">Not Provided</span>
+                            <div class="row g-2">
+                                <div class="col-12">
+                                    <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Max Loss Limit Amount</label>
+                                    <div class="readonly-field-box font-monospace fw-bold text-danger">
+                                        {% if object.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ object.max_loss_limit|default:"0.00" }}
+                                    </div>
+                                    <div class="theme-text-muted small mt-1" style="font-size: 0.75rem;">Hard cash loss ceiling before auto-freeze.</div>
+                                </div>
+                            </div>
                             {% endif %}
                         </div>
                     </div>
                 </div>
 
-                <!-- Quick Reference Table -->
-                <div class="p-3 mb-4 rounded-3 border" style="background: rgba(255, 255, 255, 0.015); border-color: var(--border-color) !important;">
-                    <div class="theme-text-main small fw-bold mb-2 d-flex align-items-center gap-1">
-                        <span class="material-icons fs-6 text-primary me-1">info</span>
-                        <span>CME Micro Futures Quick Reference Guide</span>
+                <!-- Max Profit Limit Card -->
+                <div class="col-12 col-lg-5">
+                    <div class="config-card-unit p-3 h-100 d-flex flex-column justify-content-between">
+                        <div>
+                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
+                                <!-- Left: Switch and Title -->
+                                <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
+                                    <input class="form-check-input"
+                                           type="checkbox"
+                                           role="switch"
+                                           id="detail_max_profit_status"
+                                           {% if object.max_profit_status %}checked{% endif %}
+                                           disabled>
+                                    <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_max_profit_status">
+                                        <span class="material-icons text-success fs-5">verified</span>
+                                        <span>Max Profit Ceiling</span>
+                                    </label>
+                                </div>
+                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small">Target Lock</span>
+                            </div>
+
+                            <!-- Right: Amount Box -->
+                            <div class="pt-3 {% if not object.max_profit_status %}opacity-50{% endif %}">
+                                <label class="form-label theme-text-muted small fw-bold text-uppercase mb-1">Target Profit Amount</label>
+                                <div class="readonly-field-box font-monospace fw-bold text-success">
+                                    {% if object.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ object.max_profit_limit|default:"0.00" }}
+                                </div>
+                                <div class="theme-text-muted small mt-1" style="font-size: 0.75rem;">
+                                    Session profit target for automatic trade locking.
+                                </div>
+                            </div>
+                        </div>
                     </div>
-                    <div class="table-responsive">
-                        <table class="table table-sm table-borderless mb-0 align-middle" style="font-size:0.775rem;">
-                            <thead>
-                                <tr class="border-bottom" style="border-color: var(--border-color) !important;">
-                                    <th class="theme-text-main fw-bold">Instrument</th>
-                                    <th class="theme-text-main fw-bold">Market</th>
-                                    <th class="theme-text-main fw-bold">Size</th>
-                                    <th class="theme-text-main fw-bold">Tick Value</th>
-                                    <th class="theme-text-main fw-bold">Margin Approx.</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                <tr><td><strong class="theme-text-main">MGC</strong></td><td>XAUUSD / Gold</td><td>10 oz</td><td>$1.00</td><td>~$800</td></tr>
-                                <tr><td><strong class="theme-text-main">M6E</strong></td><td>EURUSD</td><td>12,500 EUR</td><td>$1.25</td><td>~$220</td></tr>
-                                <tr><td><strong class="theme-text-main">M6J</strong></td><td>USDJPY</td><td>1.25M JPY</td><td>$1.25</td><td>~$200</td></tr>
-                                <tr><td><strong class="theme-text-main">MYM</strong></td><td>US30 / Dow</td><td>$0.50/pt</td><td>$0.50</td><td>~$800</td></tr>
-                                <tr><td><strong class="theme-text-main">MNQ</strong></td><td>NAS100</td><td>$2.00/pt</td><td>$2.00</td><td>~$1,700</td></tr>
-                                <tr><td><strong class="theme-text-main">MES</strong></td><td>SPX500</td><td>$5.00/pt</td><td>$1.25</td><td>~$700</td></tr>
-                                <tr><td><strong class="theme-text-main">MCL</strong></td><td>USOIL / Crude</td><td>100 bbl</td><td>$1.00</td><td>~$500</td></tr>
-                            </tbody>
-                        </table>
+                </div>
+            </div>
+
+            <!-- SECTION 3: INDEX / F&O INFORMATION CONTEXT (Rendered if INDEX_FO) -->
+            {% if object.market_type == 'INDEX_FO' %}
+            <div class="market-section">
+                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
+                    <span class="material-icons text-primary fs-5">candlestick_chart</span>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Index F&amp;O Execution Parameters</h6>
+                    <span class="ms-2 badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small">INDEX / F&amp;O</span>
+                </div>
+
+                <div class="p-3.5 mb-4 rounded-3 border" style="background: rgba(255, 255, 255, 0.015); border-color: var(--border-color) !important;">
+                    <div class="d-flex align-items-center gap-3">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
+                             style="width: 40px; height: 40px; background: rgba(180, 241, 5, 0.15); color: var(--brand-lime); border: 1px solid rgba(180, 241, 5, 0.3);">
+                            <span class="material-icons fs-5">psychology</span>
+                        </div>
+                        <div>
+                            <div class="theme-text-main small fw-bold mb-0.5">Strategy Engine Autonomous Control</div>
+                            <div class="theme-text-muted small" style="font-size: 0.80rem;">
+                                Index option lot sizing (historical date-aware exchange revisions), strike sweeping (ATM±3 liquid selection), and dynamic SL/TP bracket orders are evaluated directly by the Go Quantitative Engine for optimal execution.
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
             {% endif %}
-
-            <!-- SECTION 5: LAYERING & ADVANCED FEATURES (3-Column Grid) -->
-            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
-                <span class="material-icons text-primary fs-5">layers</span>
-                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Layering &amp; Advanced Features</h6>
-            </div>
-
-            <div class="row g-3 mb-4">
-                <!-- Layering Card -->
-                <div class="col-12 col-lg-4">
-                    <div class="config-card-unit">
-                        <div class="form-check form-switch toggle-header-strip">
-                            <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-2" for="detail_layer_status">
-                                <span class="material-icons text-primary fs-5">stacked_line_chart</span>
-                                <span>Enable Order Layering</span>
-                            </label>
-                            <input class="form-check-input"
-                                   type="checkbox"
-                                   role="switch"
-                                   id="detail_layer_status"
-                                   {% if object.layer_status %}checked{% endif %}
-                                   disabled>
-                        </div>
-                        <div class="toggle-dep-container {% if not object.layer_status %}is-dimmed{% endif %}">
-                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Lots Per Layer Entry</label>
-                            <div class="readonly-field-box font-monospace fw-bold">
-                                {{ object.layer_add_in_lot_count }} Lots
-                            </div>
-                            <div class="theme-text-muted small mt-1">Additional lots added on each pyramiding trigger.</div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Layer Step Distance Card -->
-                <div class="col-12 col-lg-4">
-                    <div class="config-card-unit">
-                        <div class="toggle-header-strip">
-                            <span class="theme-text-main small fw-bold d-flex align-items-center gap-2">
-                                <span class="material-icons text-info fs-5">straighten</span>
-                                <span>Layer Step Parameters</span>
-                            </span>
-                            <span class="badge bg-info bg-opacity-25 text-info border border-info border-opacity-25 small">Pyramiding</span>
-                        </div>
-                        <div class="toggle-dep-container {% if not object.layer_status %}is-dimmed{% endif %}">
-                            <label class="form-label theme-text-muted small fw-bold text-uppercase">Layer Step Distance (%)</label>
-                            <div class="readonly-field-box font-monospace fw-bold">
-                                {{ object.layer_percentage }}%
-                            </div>
-                            <div class="theme-text-muted small mt-1">Price movement percentage required to trigger next layer entry.</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
 
             <!-- Action Buttons -->
             <div class="d-flex align-items-center justify-content-end gap-3 pt-3 border-top" style="border-color: var(--border-color) !important;">
