@@ -603,7 +603,29 @@ func (m *MatchingEngine) processAsyncLifecycle(clientID, orderID string) {
 		return
 	}
 
-	// 2. Resolve Fill Price from real-time or historical market tick
+	// 2. Spot Index Guardrail: Under SEBI / NSE exchange regulations, underlying spot indices cannot be traded directly.
+	cleanSym := strings.ToUpper(strings.TrimSpace(ord.Order.TradingSymbol))
+	cleanSec := strings.ToUpper(strings.TrimSpace(ord.Order.SecurityID))
+	isPureSpot := false
+	for _, spotName := range []string{"NIFTY", "BANKNIFTY", "FINNIFTY", "MIDCPNIFTY", "SENSEX", "NIFTY 50", "NIFTY50", "NIFTY BANK"} {
+		if cleanSym == spotName || cleanSec == spotName {
+			isPureSpot = true
+			break
+		}
+	}
+	if isPureSpot {
+		ord.Status = "REJECTED"
+		ord.RejectMsg = fmt.Sprintf("EXCHANGE_ERROR: %s is an underlying spot index and cannot be traded directly. Trade Index Options or Futures.", cleanSym)
+		ord.UpdatedAt = m.now()
+		webhook := m.buildPostbackWebhookLocked(ord)
+		m.mu.Unlock()
+		m.dispatchWebhook(webhook)
+		m.BroadcastAccountStats(clientID)
+		m.BroadcastOrderEvent(clientID, ord)
+		return
+	}
+
+	// 3. Resolve Fill Price from real-time or historical market tick
 	fillPrice := ord.Order.Price
 	if fillPrice <= 0 {
 		if ltp, hasLtp := m.ltpMap[ord.Order.SecurityID]; hasLtp && ltp > 0 {
