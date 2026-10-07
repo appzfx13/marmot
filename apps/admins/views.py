@@ -1506,7 +1506,7 @@ class AdminLiveOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
                 logger.warning("Error fetching live orders partial: %s", e)
 
         filter_status = request.GET.get('status', 'ALL').upper()
-        raw_orders = orders_res.get('orders', [])
+        raw_orders = [enrich_trading_symbol_dict(o) for o in orders_res.get('orders', [])]
         from apps.common.services.live_feed_service import get_live_contract_market_quote
         for ord_dict in raw_orders:
             if not ord_dict.get('current_ltp') or float(ord_dict.get('current_ltp') or 0.0) <= 0:
@@ -1824,7 +1824,16 @@ def format_standard_option_symbol(symbol_str: str) -> str:
     """Standardizes option symbol format to clean Indian market convention: 'NIFTY 22 SEP 23750 CALL'."""
     if not symbol_str:
         return ""
-    parts = str(symbol_str).strip().split()
+    clean_sym = str(symbol_str).strip()
+    if clean_sym.isdigit():
+        try:
+            from apps.trade_core.brokers.dhan_scrip import DhanScripResolver
+            _, resolved_sym, _, _ = DhanScripResolver.resolve(clean_sym)
+            if resolved_sym and not str(resolved_sym).strip().isdigit():
+                clean_sym = resolved_sym
+        except Exception:
+            pass
+    parts = clean_sym.split()
     if len(parts) == 3:
         idx, strike, opt_type = parts[0], parts[1], parts[2].upper()
         clean_opt = "CALL" if opt_type in ["CE", "CALL"] else ("PUT" if opt_type in ["PE", "PUT"] else opt_type)
@@ -1833,7 +1842,7 @@ def format_standard_option_symbol(symbol_str: str) -> str:
         idx, day, mon, strike, opt_type = parts[0], parts[1], parts[2], parts[3], parts[4].upper()
         clean_opt = "CALL" if opt_type in ["CE", "CALL"] else ("PUT" if opt_type in ["PE", "PUT"] else opt_type)
         return f"{idx} {day} {mon} {strike} {clean_opt}"
-    return symbol_str
+    return clean_sym
 
 
 def enrich_trading_symbol_dict(item: dict) -> dict:
@@ -1845,7 +1854,8 @@ def enrich_trading_symbol_dict(item: dict) -> dict:
     clean_sym = format_standard_option_symbol(raw_sym)
     enriched['trading_symbol'] = clean_sym
     enriched['tradingSymbol'] = clean_sym
-    enriched['option_type'] = 'CALL' if 'CALL' in clean_sym or ' CE' in raw_sym else ('PUT' if 'PUT' in clean_sym or ' PE' in raw_sym else '')
+    opt_upper = str(clean_sym).upper()
+    enriched['option_type'] = 'CALL' if ('CALL' in opt_upper or 'CE' in opt_upper) else ('PUT' if ('PUT' in opt_upper or 'PE' in opt_upper) else '')
     enriched.setdefault('leg_name', '')
     enriched.setdefault('trigger_reason', '')
     return enriched

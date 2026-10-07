@@ -653,7 +653,20 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                     raw_u_time = ord_item.get("updatedAt") or ord_item.get("updateTime") or ord_item.get("exitTime") or ""
                     c_time = _format_precise_time(raw_c_time)
                     u_time = _format_precise_time(raw_u_time)
-                    sym = ord_item.get("tradingSymbol") or sub_order.get("securityId") or ord_item.get("securityId", "")
+                    sym = (
+                        ord_item.get("tradingSymbol")
+                        or sub_order.get("tradingSymbol")
+                        or sub_order.get("securityId")
+                        or ord_item.get("securityId", "")
+                    )
+                    if str(sym).strip().isdigit():
+                        try:
+                            from apps.trade_core.brokers.dhan_scrip import DhanScripResolver
+                            _, resolved_sym, _, _ = DhanScripResolver.resolve(str(sym).strip())
+                            if resolved_sym and not str(resolved_sym).strip().isdigit():
+                                sym = resolved_sym
+                        except Exception:
+                            pass
                     sec_id = ord_item.get("securityId") or sub_order.get("securityId", "")
                     tx_type = str(ord_item.get("transactionType") or sub_order.get("transactionType", "BUY")).upper()
                     ord_type = ord_item.get("orderType") or sub_order.get("orderType", "MARKET")
