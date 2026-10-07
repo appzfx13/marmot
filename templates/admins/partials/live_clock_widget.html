@@ -41,14 +41,22 @@
 
 <script>
     (function() {
-        const isSandboxEnv = window.location.pathname.includes('/sandbox/') || window.location.pathname.includes('/gateway-emulator/');
-        if (isSandboxEnv || window._isVirtualClock) {
-            window._isVirtualClock = true;
-        }
+        // Only engage virtual clock if actively in historical replay mode
+        window._isVirtualClock = !!window._isVirtualClock;
 
         window._lastVirtualClockEpoch = window._lastVirtualClockEpoch || 0;
         window.resetVirtualClockGuard = function() {
             window._lastVirtualClockEpoch = 0;
+            window._isVirtualClock = false;
+            const statusElem = document.getElementById('live-exchange-clock-status');
+            const zoneElem = document.getElementById('live-exchange-clock-zone');
+            const spdBadge = document.getElementById('live-replay-speed-badge');
+            if (statusElem && statusElem.classList.contains('virtual-clock-active')) {
+                statusElem.className = 'badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5';
+                statusElem.innerHTML = '<span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span><span>MARKET OPEN</span>';
+            }
+            if (zoneElem) zoneElem.textContent = 'NSE/BSE Exchange Zone';
+            if (spdBadge) spdBadge.style.display = 'none';
         };
 
         function parseEpochMs(rawTs, dateStr, timeStr) {
@@ -85,6 +93,7 @@
             timeElem.textContent = `${hours}:${minutes}:${seconds}`;
         }
         if (window._liveClockInterval) clearInterval(window._liveClockInterval);
+        updateLiveClock();
         window._liveClockInterval = setInterval(updateLiveClock, 1000);
 
         // Bind directly to historical Parquet / Virtual Clock stream
@@ -109,10 +118,10 @@
             const statusElem = document.getElementById('live-exchange-clock-status');
             const zoneElem = document.getElementById('live-exchange-clock-zone');
 
-            if (timeElem && data.time) {
+            if (timeElem && data.time && data.time.includes(':')) {
                 timeElem.textContent = data.time;
             }
-            if (dateElem && data.date) {
+            if (dateElem && data.date && (data.date.includes('-') || data.date.includes('/') || data.date.includes(' '))) {
                 dateElem.textContent = data.date;
             }
             if (zoneElem) {

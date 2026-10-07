@@ -2622,17 +2622,19 @@
 
                                 if (isMockFeed) {
                                     if (window.isLiveMockActive && window.isLiveMockActive()) {
-                                        const raw = data.data || data;
-                                        if (window.handleEmulatorTick) {
-                                            window.handleEmulatorTick(raw);
-                                        } else {
-                                            const sym = (raw.tradingSymbol || raw.symbol || raw.fyers_symbol || raw.sym || '').toUpperCase().trim();
-                                            const secId = String(raw.securityId || raw.instrument_token || '');
-                                            const isOpt = sym.endsWith('CE') || sym.endsWith('PE') || sym.includes(' CE') || sym.includes(' PE') || secId.endsWith('_CE') || secId.endsWith('_PE');
-                                            if (!isOpt && !sym.includes('VIX')) {
-                                                const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
-                                                if (spot && window.updateLiveSpotDOM) {
-                                                    window.updateLiveSpotDOM(spot, raw);
+                                        if (data.type === 'mock_tick') {
+                                            const raw = data.data || data;
+                                            if (window.handleEmulatorTick) {
+                                                window.handleEmulatorTick(raw);
+                                            } else {
+                                                const sym = (raw.tradingSymbol || raw.symbol || raw.fyers_symbol || raw.sym || '').toUpperCase().trim();
+                                                const secId = String(raw.securityId || raw.instrument_token || '');
+                                                const isOpt = sym.endsWith('CE') || sym.endsWith('PE') || sym.includes(' CE') || sym.includes(' PE') || secId.endsWith('_CE') || secId.endsWith('_PE');
+                                                if (!isOpt && !sym.includes('VIX')) {
+                                                    const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
+                                                    if (spot && window.updateLiveSpotDOM) {
+                                                        window.updateLiveSpotDOM(spot, raw);
+                                                    }
                                                 }
                                             }
                                         }
@@ -2805,7 +2807,7 @@
                 const ltpEl = document.getElementById('live-macro-spot-ltp');
                 if (ltpEl) {
                     const cardIdx = (ltpEl.getAttribute('data-index') || 'NIFTY').toUpperCase().trim();
-                    if (!tickIndex || tickIndex === cardIdx) {
+                    if (tickIndex && tickIndex === cardIdx) {
                         const prevVal = parseFloat(ltpEl.getAttribute('data-val') || 0);
                         ltpEl.setAttribute('data-val', numPrice);
                         ltpEl.textContent = formattedPrice;

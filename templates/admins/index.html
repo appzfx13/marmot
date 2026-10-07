@@ -2969,17 +2969,20 @@
                                 if (isMockFeed) {
                                     // STRICT ISOLATION: Mock broker feed ONLY feeds into Live Mock Dashboard
                                     if (window.isLiveMockActive && window.isLiveMockActive()) {
-                                        const raw = data.data || data;
-                                        if (window.handleEmulatorTick) {
-                                            window.handleEmulatorTick(raw);
-                                        } else {
-                                            const sym = (raw.tradingSymbol || raw.symbol || raw.fyers_symbol || raw.sym || '').toUpperCase().trim();
-                                            const secId = String(raw.securityId || raw.instrument_token || '');
-                                            const isOpt = sym.endsWith('CE') || sym.endsWith('PE') || sym.includes(' CE') || sym.includes(' PE') || secId.endsWith('_CE') || secId.endsWith('_PE');
-                                            if (!isOpt && !sym.includes('VIX')) {
-                                                const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
-                                                if (spot && spot > 1000 && window.updateLiveSpotDOM) {
-                                                    window.updateLiveSpotDOM(spot, raw);
+                                        // mock_telemetry carries strategy-specific simulation metrics, not an index spot tick. It is handled exclusively by marmot:sandbox-telemetry below.
+                                        if (data.type === 'mock_tick') {
+                                            const raw = data.data || data;
+                                            if (window.handleEmulatorTick) {
+                                                window.handleEmulatorTick(raw);
+                                            } else {
+                                                const sym = (raw.tradingSymbol || raw.symbol || raw.fyers_symbol || raw.sym || '').toUpperCase().trim();
+                                                const secId = String(raw.securityId || raw.instrument_token || '');
+                                                const isOpt = sym.endsWith('CE') || sym.endsWith('PE') || sym.includes(' CE') || sym.includes(' PE') || secId.endsWith('_CE') || secId.endsWith('_PE');
+                                                if (!isOpt && !sym.includes('VIX')) {
+                                                    const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
+                                                    if (spot && spot > 1000 && window.updateLiveSpotDOM) {
+                                                        window.updateLiveSpotDOM(spot, raw);
+                                                    }
                                                 }
                                             }
                                         }
@@ -3257,7 +3260,7 @@
                 const ltpEl = document.getElementById('live-macro-spot-ltp');
                 if (ltpEl) {
                     const cardIdx = (ltpEl.getAttribute('data-index') || 'NIFTY').toUpperCase().trim();
-                    if (!tickIndex || tickIndex === cardIdx) {
+                    if (tickIndex && tickIndex === cardIdx) {
                         const prevVal = parseFloat(ltpEl.getAttribute('data-val') || 0);
                         ltpEl.setAttribute('data-val', numPrice);
                         ltpEl.textContent = formattedPrice;
@@ -3288,10 +3291,10 @@
                                     const parts = cleanTs.split('T');
                                     dateStr = parts[0];
                                     timeStr = parts[1].split('.')[0];
-                                } else if (cleanTs.includes(' ')) {
-                                    const parts = cleanTs.split(' ');
-                                    dateStr = parts[0];
-                                    timeStr = parts[1].split('.')[0];
+                                } else if (cleanTs.includes(' ') && (cleanTs.includes('-') || cleanTs.includes('/'))) {
+                                    const firstSpace = cleanTs.indexOf(' ');
+                                    dateStr = cleanTs.substring(0, firstSpace);
+                                    timeStr = cleanTs.substring(firstSpace + 1).split('.')[0];
                                 } else {
                                     timeStr = cleanTs;
                                 }
@@ -3305,7 +3308,7 @@
                                         }
                                     }
                                 }
-                                displayTs = timeStr + (timeStr.endsWith('IST') ? '' : ' IST');
+                                displayTs = (dateStr ? (dateStr + ' ') : '') + timeStr + (timeStr.endsWith('IST') ? '' : ' IST');
                             }
                             const timeEl = document.getElementById('live-macro-spot-time');
                             if (timeEl) timeEl.innerHTML = '<i class="bi bi-clock me-0.5"></i>' + displayTs;
@@ -3321,7 +3324,7 @@
                                 if (cardSpdVal) cardSpdVal.textContent = payload.speed;
                             }
 
-                            if (payload.is_virtual || window._isVirtualClock) {
+                            if (payload && payload.is_virtual) {
                                 window.dispatchEvent(new CustomEvent('marmot:virtual_clock', {
                                     detail: {
                                         time: timeStr || displayTs.replace(' IST', ''),
@@ -3479,7 +3482,7 @@
                 if (!el) return;
                 var cardIdx = (el.getAttribute('data-index') || 'NIFTY').toUpperCase();
                 var tickIdx = (payload.index || '').toUpperCase();
-                if (tickIdx && tickIdx !== cardIdx) return;
+                if (!tickIdx || tickIdx !== cardIdx) return;
                 var prev = parseFloat(el.getAttribute('data-val') || 0);
                 el.setAttribute('data-val', spot);
                 el.textContent = fmtPrice(spot);
@@ -3495,7 +3498,7 @@
                 if (!ocEl) return;
                 var activeIdx = ((document.getElementById('backupIndexSelect') || {}).value || ocEl.getAttribute('data-index') || 'NIFTY').toUpperCase();
                 var tickIdx = (payload.index || '').toUpperCase();
-                if (tickIdx && tickIdx !== activeIdx) return;
+                if (!tickIdx || tickIdx !== activeIdx) return;
 
                 var prev = parseFloat(ocEl.getAttribute('data-tick-price') || ocEl.getAttribute('data-val') || 0);
                 ocEl.setAttribute('data-tick-price', spot);
@@ -3546,10 +3549,10 @@
                             var parts = cleanTs.split('T');
                             dateStr = parts[0];
                             timeStr = parts[1].split('.')[0];
-                        } else if (cleanTs.includes(' ')) {
-                            var parts = cleanTs.split(' ');
-                            dateStr = parts[0];
-                            timeStr = parts[1].split('.')[0];
+                        } else if (cleanTs.includes(' ') && (cleanTs.includes('-') || cleanTs.includes('/'))) {
+                            var firstSpace = cleanTs.indexOf(' ');
+                            dateStr = cleanTs.substring(0, firstSpace);
+                            timeStr = cleanTs.substring(firstSpace + 1).split('.')[0];
                         } else {
                             timeStr = cleanTs;
                         }
@@ -3563,7 +3566,7 @@
                                 }
                             }
                         }
-                        displayTs = dateStr + ' ' + timeStr + (timeStr.endsWith('IST') ? '' : ' IST');
+                        displayTs = (dateStr ? (dateStr + ' ') : '') + timeStr + (timeStr.endsWith('IST') ? '' : ' IST');
                     }
                     var tEl = document.getElementById('live-option-chain-time');
                     if (tEl) tEl.textContent = displayTs;
@@ -3583,15 +3586,17 @@
                         }
                     }
 
-                    // Sync to Top HUD Exchange Clock Widget
-                    window.dispatchEvent(new CustomEvent('marmot:virtual_clock', {
-                        detail: {
-                            time: timeStr || displayTs.replace(' IST', ''),
-                            date: dateStr,
-                            timestamp: ts,
-                            speed: payload.speed || null
-                        }
-                    }));
+                    // Sync to Top HUD Exchange Clock Widget (only in virtual replay mode)
+                    if (payload && payload.is_virtual) {
+                        window.dispatchEvent(new CustomEvent('marmot:virtual_clock', {
+                            detail: {
+                                time: timeStr || displayTs.replace(' IST', ''),
+                                date: dateStr,
+                                timestamp: ts,
+                                speed: payload.speed || null
+                            }
+                        }));
+                    }
 
                     var ocLastUpEl = document.getElementById('option-chain-last-updated');
                     if (ocLastUpEl && displayTs) {
@@ -3740,39 +3745,59 @@
             // Parse Dhan emulator tick payload and route updates
             function handleEmulatorTick(data) {
                 if (window.isLiveMockActive && !window.isLiveMockActive()) return;
+                if (!data || data.type === 'mock_telemetry' || data.strategy_id || data.task_id) return;
                 var ltp = parseFloat(data.ltp || data.lastTradedPrice || data.lp || data.spot_price || 0);
                 if (!ltp || ltp <= 0) return;
 
-                var sym = (data.tradingSymbol || data.symbol || data.fyers_symbol || data.sym || data.index || '').toUpperCase().trim();
+                var sym = (data.tradingSymbol || data.symbol || data.fyers_symbol || data.sym || '').toUpperCase().trim();
                 var secId = String(data.securityId || data.instrument_token || '');
+                var dataIdx = String(data.index || '').toUpperCase().trim();
 
                 // Volatility index tick detection (INDIA VIX) - update VIX HUD and return immediately
-                if (sym.includes('VIX') || secId === 'INDIAVIX' || secId === '442') {
+                if (sym.includes('VIX') || secId === 'INDIAVIX' || secId === '442' || dataIdx === 'INDIAVIX') {
                     var vixEl = document.getElementById('live-option-chain-vix') || document.getElementById('emulator-vix-ltp');
                     if (vixEl) vixEl.textContent = ltp.toFixed(2);
                     return;
                 }
 
                 // Spot index tick detection vs Option tick detection
-                var isOptionSymbol = sym.endsWith('CE') || sym.endsWith('PE') || sym.endsWith(' C') || sym.endsWith(' P') || sym.includes(' CE') || sym.includes(' PE') || secId.endsWith('_CE') || secId.endsWith('_PE');
+                var isOptionSymbol = sym.endsWith('CE') || sym.endsWith('PE') || sym.endsWith(' C') || sym.endsWith(' P') || sym.includes(' CE') || sym.includes(' PE') || secId.endsWith('_CE') || secId.endsWith('_PE') || Boolean(data.option_type);
                 var isSpotTick = !isOptionSymbol && !sym.includes('VIX') && secId !== 'INDIAVIX' && secId !== '442' && (
                     secId === '13' || secId === '25' || secId === '27' ||
+                    dataIdx === 'NIFTY' || dataIdx === 'BANKNIFTY' || dataIdx === 'FINNIFTY' || dataIdx === 'MIDCPNIFTY' || dataIdx === 'SENSEX' || dataIdx === 'GIFTNIFTY' ||
                     sym === 'NIFTY 50' || sym === 'NIFTY50' || sym === 'NIFTY' ||
-                    sym === 'BANKNIFTY' || sym === 'SENSEX' || sym === 'MIDCPNIFTY' ||
+                    sym === 'BANKNIFTY' || sym === 'SENSEX' || sym === 'MIDCPNIFTY' || sym === 'FINNIFTY' || sym === 'GIFTNIFTY' ||
                     (sym.length > 0 && !sym.match(/\d{5,}/))
                 );
 
                 if (isSpotTick) {
-                    // Normalise index name from symbol
-                    var idx = 'NIFTY';
-                    if (sym.includes('BANK') || sym === 'BANKNIFTY') idx = 'BANKNIFTY';
-                    else if (sym.includes('SENSEX')) idx = 'SENSEX';
-                    else if (sym.includes('MIDCP')) idx = 'MIDCPNIFTY';
+                    // Normalise index name from symbol or data.index
+                    var idx = '';
+                    if (dataIdx && (dataIdx === 'NIFTY' || dataIdx === 'BANKNIFTY' || dataIdx === 'FINNIFTY' || dataIdx === 'MIDCPNIFTY' || dataIdx === 'SENSEX' || dataIdx === 'GIFTNIFTY')) {
+                        idx = dataIdx;
+                    } else if (sym.includes('FIN') || secId.includes('FIN')) {
+                        idx = 'FINNIFTY';
+                    } else if (sym.includes('BANK') || sym === 'BANKNIFTY' || secId.includes('BANK') || secId === '25') {
+                        idx = 'BANKNIFTY';
+                    } else if (sym.includes('MIDCP') || secId.includes('MIDCP')) {
+                        idx = 'MIDCPNIFTY';
+                    } else if (sym.includes('SENSEX') || secId.includes('SENSEX')) {
+                        idx = 'SENSEX';
+                    } else if (sym.includes('GIFT') || secId.includes('GIFT')) {
+                        idx = 'GIFTNIFTY';
+                    } else if (sym.includes('NIFTY') || sym === 'NIFTY 50' || sym === 'NIFTY50' || secId === '13' || secId === 'NSE:NIFTY50-INDEX') {
+                        idx = 'NIFTY';
+                    } else if (dataIdx) {
+                        idx = dataIdx;
+                    }
 
+                    if (!idx) return; // Drop unmapped non-index ticks
+
+                    var isReplay = Boolean(data.is_replay || data.replay_active || (data.speed && data.speed > 1));
                     var payload = {
                         index: idx,
                         is_mock: true,
-                        is_virtual: true,
+                        is_virtual: isReplay,
                         source: 'EMULATOR',
                         change: data.change !== undefined ? data.change : '',
                         change_pct: data.changePercent !== undefined ? (data.changePercent + '%') : '',
@@ -3804,41 +3829,60 @@
                 }
 
                 if (optType) {
-                    var strike = parseInt(data.strike || 0, 10);
-                    // 1. Try parsing numeric strike from secId (e.g. "24500_CE" or "24500")
-                    if (!strike) {
-                        var secMatch = secId.match(/^(\d{4,6})/);
-                        if (secMatch) {
-                            strike = parseInt(secMatch[1], 10);
-                        }
+                    var contractIdx = '';
+                    if (dataIdx && (dataIdx === 'NIFTY' || dataIdx === 'BANKNIFTY' || dataIdx === 'FINNIFTY' || dataIdx === 'MIDCPNIFTY' || dataIdx === 'SENSEX' || dataIdx === 'GIFTNIFTY')) {
+                        contractIdx = dataIdx;
+                    } else if (sym.includes('FIN')) {
+                        contractIdx = 'FINNIFTY';
+                    } else if (sym.includes('BANK')) {
+                        contractIdx = 'BANKNIFTY';
+                    } else if (sym.includes('MIDCP')) {
+                        contractIdx = 'MIDCPNIFTY';
+                    } else if (sym.includes('SENSEX')) {
+                        contractIdx = 'SENSEX';
+                    } else if (sym.includes('NIFTY')) {
+                        contractIdx = 'NIFTY';
                     }
-                    // 2. Fyers format: e.g. "NSE:NIFTY26O0622700CE", "NSE:BANKNIFTY26O0754800CE"
-                    if (!strike) {
-                        var fyersMatch = sym.match(/^[A-Z]+:[A-Z]+(?:\d{2})(?:[1-9OND]|[A-Z]{3})(?:\d{2})?(\d{4,5})(?:CE|PE)$/i);
-                        if (fyersMatch) {
-                            strike = parseInt(fyersMatch[1], 10);
-                        }
-                    }
-                    // 3. Fallback: extract numeric strike from symbol (e.g. "NIFTY 24500 CE", "NIFTY 24500.0 CE")
-                    if (!strike) {
-                        var strikeMatch = sym.match(/(\d{4,6})(?:\.0+)?\s*(?:CE|PE|C|P)$/i);
-                        if (strikeMatch) {
-                            var rawStrike = parseInt(strikeMatch[1], 10);
-                            strike = rawStrike > 100000 ? (rawStrike % 100000) : rawStrike;
-                        }
-                    }
-                    if (strike > 0 && ltp > 0) {
-                        updateStrikeLTP(strike, optType, ltp);
-                        if (window.updateLiveOptionContractsDOM) {
-                            window.updateLiveOptionContractsDOM(strike + ' ' + optType, ltp);
-                            if (sym) {
-                                window.updateLiveOptionContractsDOM(sym, ltp);
+
+                    var activeOcIdx = ((document.getElementById('backupIndexSelect') || {}).value || (document.getElementById('live-option-chain-spot-ltp') || {}).getAttribute('data-index') || 'NIFTY').toUpperCase();
+                    // Only update active Option Chain table if contract belongs to displayed index
+                    if (!contractIdx || contractIdx === activeOcIdx) {
+                        var strike = parseInt(data.strike || 0, 10);
+                        // 1. Try parsing numeric strike from secId (e.g. "24500_CE" or "24500")
+                        if (!strike) {
+                            var secMatch = secId.match(/^(\d{4,6})/);
+                            if (secMatch) {
+                                strike = parseInt(secMatch[1], 10);
                             }
                         }
-                    }
-                    var oi = parseInt(data.oi || data.OI || data.openInterest || 0, 10);
-                    if (strike > 0 && oi > 0) {
-                        updateStrikeOI(strike, optType, oi);
+                        // 2. Fyers format: e.g. "NSE:NIFTY26O0622700CE", "NSE:BANKNIFTY26O0754800CE"
+                        if (!strike) {
+                            var fyersMatch = sym.match(/^[A-Z]+:[A-Z]+(?:\d{2})(?:[1-9OND]|[A-Z]{3})(?:\d{2})?(\d{4,5})(?:CE|PE)$/i);
+                            if (fyersMatch) {
+                                strike = parseInt(fyersMatch[1], 10);
+                            }
+                        }
+                        // 3. Fallback: extract numeric strike from symbol (e.g. "NIFTY 24500 CE", "NIFTY 24500.0 CE")
+                        if (!strike) {
+                            var strikeMatch = sym.match(/(\d{4,6})(?:\.0+)?\s*(?:CE|PE|C|P)$/i);
+                            if (strikeMatch) {
+                                var rawStrike = parseInt(strikeMatch[1], 10);
+                                strike = rawStrike > 100000 ? (rawStrike % 100000) : rawStrike;
+                            }
+                        }
+                        if (strike > 0 && ltp > 0) {
+                            updateStrikeLTP(strike, optType, ltp);
+                            if (window.updateLiveOptionContractsDOM) {
+                                window.updateLiveOptionContractsDOM(strike + ' ' + optType, ltp);
+                                if (sym) {
+                                    window.updateLiveOptionContractsDOM(sym, ltp);
+                                }
+                            }
+                        }
+                        var oi = parseInt(data.oi || data.OI || data.openInterest || 0, 10);
+                        if (strike > 0 && oi > 0) {
+                            updateStrikeOI(strike, optType, oi);
+                        }
                     }
                 }
             }

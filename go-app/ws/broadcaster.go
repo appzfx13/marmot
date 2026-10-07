@@ -274,7 +274,7 @@ func fetchLatestTickFromRedis(ctx context.Context, redisService *services.RedisS
 				timeStr = ts
 			}
 			if timeStr == "" {
-				timeStr = time.Now().Format("03:04:05 PM")
+				timeStr = time.Now().Format("15:04:05")
 			}
 
 			isKeyMock := strings.HasPrefix(k, "marmot:mock:")
@@ -292,7 +292,7 @@ func fetchLatestTickFromRedis(ctx context.Context, redisService *services.RedisS
 				FormattedTime: timeStr,
 				Timestamp:     timeStr,
 				IsMock:        isKeyMock,
-				IsVirtual:     isKeyMock,
+				IsVirtual:     false,
 				Source:        map[bool]string{true: "EMULATOR", false: "FYERS"}[isKeyMock],
 			}
 		}
@@ -695,7 +695,7 @@ func processOptionTick(ctx context.Context, sym string, data map[string]interfac
 	totBuyQty := extractInt64(targetMap, "tot_buy_qty")
 	totSellQty := extractInt64(targetMap, "tot_sell_qty")
 
-	nowStr := time.Now().Format("03:04:05 PM")
+	nowStr := time.Now().Format("15:04:05")
 	quotePayload := map[string]interface{}{
 		"symbol":           sym,
 		"fyers_symbol":     sym,
@@ -726,7 +726,7 @@ func processOptionTick(ctx context.Context, sym string, data map[string]interfac
 		optEnvelope := map[string]interface{}{
 			"type":          "mock_tick",
 			"is_mock":       true,
-			"is_virtual":    true,
+			"is_virtual":    false,
 			"source":        "EMULATOR",
 			"tradingSymbol": sym,
 			"securityId":    sym,
@@ -801,7 +801,7 @@ func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisS
 		step = 100
 	}
 	atmStrike := int(math.Round(ltp/float64(step)) * float64(step))
-	nowStr := time.Now().Format("03:04:05 PM")
+	nowStr := time.Now().Format("15:04:05")
 
 	chainPayload := map[string]interface{}{
 		"is_live":         true,
@@ -843,7 +843,7 @@ func publishIndexQuoteToRedis(ctx context.Context, redisService *services.RedisS
 		mockEnvelope := map[string]interface{}{
 			"type":          "mock_tick",
 			"is_mock":       true,
-			"is_virtual":    true,
+			"is_virtual":    false,
 			"source":        "EMULATOR",
 			"index":         idxName,
 			"tradingSymbol": sym,

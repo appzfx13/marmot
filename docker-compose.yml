@@ -61,6 +61,7 @@ services:
       - MALLOC_ARENA_MAX=2
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
+      - TZ=Asia/Kolkata
     stdin_open: true
     tty: true
     depends_on:
@@ -87,6 +88,7 @@ services:
       - MALLOC_ARENA_MAX=2
       - PYTHONDONTWRITEBYTECODE=1
       - PYTHONUNBUFFERED=1
+      - TZ=Asia/Kolkata
     depends_on:
       db:
         condition: service_healthy
@@ -120,6 +122,7 @@ services:
       - GOMAXPROCS=2
       - GOMEMLIMIT=1536MiB
       - GOGC=100
+      - TZ=Asia/Kolkata
     depends_on:
       db:
         condition: service_healthy
@@ -134,6 +137,8 @@ services:
     container_name: nginx_proxy
     restart: always
     mem_limit: 256m
+    environment:
+      - TZ=Asia/Kolkata
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
       - static_volume:/app/staticfiles:ro
@@ -181,6 +186,7 @@ services:
       - MARMOT_POSTBACK_URL=http://web:8000/api/mock/dhan/postback/
       - PARQUET_DIR=/app/backup
       - EMULATOR_AUTO_PLAY=false
+      - TZ=Asia/Kolkata
     networks:
       - app_network
 

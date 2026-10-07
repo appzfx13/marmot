@@ -4,7 +4,8 @@ ENV GOTOOLCHAIN=auto
 
 WORKDIR /app
 
-RUN apk add --no-cache git dos2unix
+RUN apk add --no-cache git dos2unix tzdata
+ENV TZ=Asia/Kolkata
 
 COPY entrypoint.sh /entrypoint.sh
 RUN dos2unix /entrypoint.sh && chmod +x /entrypoint.sh
