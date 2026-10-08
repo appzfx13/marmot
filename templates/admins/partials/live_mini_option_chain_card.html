@@ -466,23 +466,13 @@
 
     // 3. Dynamic WebSocket Subscription for Active ATM±3 Strike Contracts
     function subscribeActiveOptionStrikes() {
-        if (!window.MarmotWS || !window.MarmotWS.ws || window.MarmotWS.ws.readyState !== WebSocket.OPEN) {
-            return;
-        }
         var visibleRows = document.querySelectorAll('#live-option-chain-container tbody tr:not(.d-none)');
-        if (!window._subscribedOptionSymbols) {
-            window._subscribedOptionSymbols = new Set();
-        }
         visibleRows.forEach(function(row) {
             var ceSym = row.getAttribute('data-ce-sym');
             var peSym = row.getAttribute('data-pe-sym');
             [ceSym, peSym].forEach(function(sym) {
-                if (sym && !window._subscribedOptionSymbols.has(sym)) {
-                    try {
-                        window.MarmotWS.ws.send(JSON.stringify({ type: 'subscribe_symbol', symbol: sym }));
-                        window._subscribedOptionSymbols.add(sym);
-                        console.log('📡 [OptionChain] Subscribed strike to WS:', sym);
-                    } catch (err) {}
+                if (sym && window.MarmotWS && typeof window.MarmotWS.subscribeSymbol === 'function') {
+                    window.MarmotWS.subscribeSymbol(sym);
                 }
             });
         });
@@ -490,11 +480,11 @@
 
     subscribeActiveOptionStrikes();
     setTimeout(subscribeActiveOptionStrikes, 1000);
-    window.addEventListener('marmot:ws_connected', function() {
-        if (window._subscribedOptionSymbols) {
-            window._subscribedOptionSymbols.clear();
+    window.addEventListener('marmot:ws_connected', subscribeActiveOptionStrikes);
+    document.body.addEventListener('htmx:afterSwap', function (e) {
+        if (e.target && (e.target.id === 'live-option-chain-container' || (e.target.querySelector && e.target.querySelector('#live-option-chain-container')))) {
+            subscribeActiveOptionStrikes();
         }
-        subscribeActiveOptionStrikes();
     });
 })();
 </script>

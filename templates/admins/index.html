@@ -2923,8 +2923,12 @@
                 useFallback: false,
                 fallbackIntervals: {},
 
+                symbols: {},
+
                 subscribeSymbol: function (symbol) {
                     if (!symbol) return;
+                    this.symbols = this.symbols || {};
+                    this.symbols[String(symbol)] = true;
                     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
                         this.ws.send(JSON.stringify({ type: 'subscribe_symbol', symbol: String(symbol) }));
                     }
@@ -2952,6 +2956,13 @@
                                     window.MarmotWS.ws.send(JSON.stringify({ type: 'subscribe', task_id: String(taskId) }));
                                 }
                             });
+                            if (window.MarmotWS.symbols) {
+                                Object.keys(window.MarmotWS.symbols).forEach(function (sym) {
+                                    if (window.MarmotWS.ws && window.MarmotWS.ws.readyState === WebSocket.OPEN) {
+                                        window.MarmotWS.ws.send(JSON.stringify({ type: 'subscribe_symbol', symbol: String(sym) }));
+                                    }
+                                });
+                            }
                             window.dispatchEvent(new CustomEvent('marmot:ws_connected'));
                         };
                         this.ws.onmessage = function (event) {
@@ -2974,15 +2985,19 @@
                                             const raw = data.data || data;
                                             if (window.handleEmulatorTick) {
                                                 window.handleEmulatorTick(raw);
-                                            } else {
-                                                const sym = (raw.tradingSymbol || raw.symbol || raw.fyers_symbol || raw.sym || '').toUpperCase().trim();
-                                                const secId = String(raw.securityId || raw.instrument_token || '');
-                                                const isOpt = sym.endsWith('CE') || sym.endsWith('PE') || sym.includes(' CE') || sym.includes(' PE') || secId.endsWith('_CE') || secId.endsWith('_PE');
-                                                if (!isOpt && !sym.includes('VIX')) {
-                                                    const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
-                                                    if (spot && spot > 1000 && window.updateLiveSpotDOM) {
-                                                        window.updateLiveSpotDOM(spot, raw);
-                                                    }
+                                            }
+                                            const sym = (raw.tradingSymbol || raw.symbol || raw.fyers_symbol || raw.sym || '').toUpperCase().trim();
+                                            const secId = String(raw.securityId || raw.instrument_token || '');
+                                            const isOpt = sym.endsWith('CE') || sym.endsWith('PE') || sym.includes(' CE') || sym.includes(' PE') || secId.endsWith('_CE') || secId.endsWith('_PE');
+                                            if (!isOpt && !sym.includes('VIX')) {
+                                                const spot = data.spot_price || (data.data ? data.data.spot_price : null) || (data.ltp ? parseFloat(String(data.ltp).replace(/,/g, '')) : null);
+                                                if (spot && spot > 1000 && window.updateLiveSpotDOM) {
+                                                    window.updateLiveSpotDOM(spot, raw);
+                                                }
+                                            } else if (isOpt) {
+                                                const optLtp = parseFloat(raw.ltp || raw.spot_price || data.ltp || 0);
+                                                if (optLtp > 0 && window.updateLiveOptionContractsDOM) {
+                                                    window.updateLiveOptionContractsDOM(sym || secId, optLtp, raw);
                                                 }
                                             }
                                         }
@@ -2995,11 +3010,6 @@
                                         if (isReplaying) {
                                             return; // Strict isolation: keep historical parquet replay pure
                                         }
-                                        if (window.handleEmulatorTick) {
-                                            window.handleEmulatorTick(data.data || data);
-                                        }
-                                        window.dispatchEvent(new CustomEvent('marmot:live_tick', { detail: data }));
-                                        return;
                                     }
                                     const sym = (data.symbol || data.fyers_sym || (data.data ? (data.data.symbol || data.data.fyers_sym) : '') || '').toUpperCase().trim();
                                     const isOption = sym.endsWith('CE') || sym.endsWith('PE') || sym.includes(' CE') || sym.includes(' PE');
@@ -3228,7 +3238,10 @@
                     return; // Refuse to update Live Dashboard with mock/emulator ticks
                 }
                 if (!isMockPayload && isMockActive) {
-                    return; // Refuse to update Live Mock / Sandbox Dashboard with real live market ticks
+                    const isReplaying = (document.getElementById('mock-feed-status-text') && document.getElementById('mock-feed-status-text').textContent.toUpperCase().includes('REPLAYING')) || window._mockReplayActive;
+                    if (isReplaying) {
+                        return; // Refuse to contaminate historical Parquet replay with real live market ticks
+                    }
                 }
 
                 // Strict Monotonic Timestamp Guard: Drop stale out-of-order ticks
@@ -3848,7 +3861,12 @@
                     // Only update active Option Chain table if contract belongs to displayed index
                     if (!contractIdx || contractIdx === activeOcIdx) {
                         var strike = parseInt(data.strike || 0, 10);
-                        // 1. Try parsing numeric strike from secId (e.g. "24500_CE" or "24500")
+                        // 1. Try extracting using centralized extractOptionStrike
+                        if (!strike && typeof extractOptionStrike === 'function') {
+                            var extracted = extractOptionStrike(secId || sym);
+                            if (extracted) strike = parseInt(extracted, 10);
+                        }
+                        // 2. Try parsing numeric strike from secId (e.g. "24500_CE" or "24500")
                         if (!strike) {
                             var secMatch = secId.match(/^(\d{4,6})/);
                             if (secMatch) {

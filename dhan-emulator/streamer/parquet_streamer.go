@@ -870,6 +870,27 @@ func (ps *ParquetStreamer) GetOptionChain(indexName string) models.OptionChainRe
 		checkTicks(ps.latestTicks)
 	}
 
+	if !ps.isPlaying && !hasAvailTicks {
+		if ps.rdb != nil {
+			for _, k := range []string{fmt.Sprintf("marmot:fyers:option_chain:%s", idxClean), fmt.Sprintf("marmot:fyers:last_known_option_chain:%s", idxClean)} {
+				if rawChain, err := ps.rdb.Get(context.Background(), k).Result(); err == nil && rawChain != "" {
+					var liveChain models.OptionChainResponse
+					if json.Unmarshal([]byte(rawChain), &liveChain) == nil && liveChain.RawSpotLTP > 0 && len(liveChain.Strikes) > 0 {
+						liveChain.IsLive = true
+						liveChain.IsMockLive = true
+						liveChain.FeedStatus = "LIVE_SIMULATION"
+						liveChain.FyersSymbol = fmt.Sprintf("DHAN_MOCK:%s", idxClean)
+						if spotLTP > 0 {
+							liveChain.SpotLTP = formatIndianFloat(spotLTP)
+							liveChain.RawSpotLTP = spotLTP
+						}
+						return liveChain
+					}
+				}
+			}
+		}
+	}
+
 	// 3. Build 31 strikes window centered strictly on true ATM strike (zero artificial clamping)
 	var strikes []models.OptionStrikeRow
 	totalStrikes := 31
