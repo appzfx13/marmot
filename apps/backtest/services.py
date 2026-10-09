@@ -505,6 +505,31 @@ GO_STRATEGY_PRESETS = [
         'is_system_preset': True,
         'is_active': True,
     },
+    {
+        'rule_type': 'macd_1m_retest',
+        'name': 'MACD 1-Min Crossover + Retest (1:2.0 RR)',
+        'market_type': 'ALL',
+        'description': '1-minute MACD (12/26/9) crossover confirmed by 1-minute candle retest to fast EMA with Strike Sweep ATM±3 mid-price entry and 1:2.0 RR.',
+        'parameters': {
+            'ema_fast': 12,
+            'ema_slow': 26,
+            'macd_fast': 12,
+            'macd_slow': 26,
+            'macd_signal': 9,
+            'entry_window_from': 9 * 60 + 18,
+            'entry_window_to': 15 * 60,
+            'sl_pts': 15.0,
+            'rr_ratio': 2.0,
+            'use_orb_filter': False,
+            'min_displacement': 0.35,
+            'trail_breakeven': True,
+            'breakeven_at_r': 1.0,
+            'cooldown_seconds': 60,
+            'order_type': 'LIMIT',
+        },
+        'is_system_preset': True,
+        'is_active': True,
+    },
 ]
 
 

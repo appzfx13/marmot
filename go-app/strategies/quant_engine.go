@@ -670,8 +670,14 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	}
 
 	// 2. Mathematical Consistency: 1-Minute OHLC Time-Bar Resampling
-	// Aggregates sub-second and 1-second live ticks into standard 1-minute OHLC bars,
-	// ensuring live trading and historical 1M replay evaluate mathematically identical candles.
+	// Ingest historical/previous candles to pre-warm indicator buffers on cold start
+	if len(s.candleBuffer) == 0 && len(prevCandles) > 0 {
+		s.candleBuffer = append(s.candleBuffer, prevCandles...)
+		if len(s.candleBuffer) > 100 {
+			s.candleBuffer = s.candleBuffer[len(s.candleBuffer)-100:]
+		}
+	}
+
 	barKey := candleTime.Format("2006-01-02 15:04")
 	if s.currentBarKey == barKey && len(s.candleBuffer) > 0 {
 		// Intra-minute tick: update active running bar in place
@@ -704,7 +710,7 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 			"volume":    s.runningVolume,
 		}
 		s.candleBuffer = append(s.candleBuffer, newBar)
-		if len(s.candleBuffer) > 30 {
+		if len(s.candleBuffer) > 100 {
 			s.candleBuffer = s.candleBuffer[1:]
 		}
 	}
@@ -1029,6 +1035,41 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 				preset.Name, highPrice, emaFast, macdLine, signalLine, displacementPct,
 			)
 		}
+	} else if (presetKey == "macd_1m_retest" || presetKey == "morning_macd_retest") && len(s.candleBuffer) >= 3 {
+		// MACD 1-Min Crossover + 1-Min Retest Engine
+		retestTolerance := 6.0
+		if strings.Contains(strings.ToUpper(indexName), "BANK") {
+			retestTolerance = 15.0
+		}
+
+		// Trend & Momentum direction: Fast EMA above Slow EMA, OR MACD line above Signal line
+		isTrendBullish := emaFast >= emaSlow || macdLine >= signalLine
+		isTrendBearish := emaFast <= emaSlow || macdLine <= signalLine
+
+		// Retest Pullback: Price tests within retestTolerance of EMAFast or EMASlow
+		isBullishRetest := isTrendBullish &&
+			lowPrice <= (emaFast + retestTolerance) &&
+			closePrice > openPrice &&
+			displacementRatio >= minDisplacement
+
+		isBearishRetest := isTrendBearish &&
+			highPrice >= (emaFast - retestTolerance) &&
+			closePrice < openPrice &&
+			displacementRatio >= minDisplacement
+
+		if isBullishRetest {
+			isBullishSignal = true
+			triggerReason = fmt.Sprintf(
+				"⚡ [%s] Bullish MACD 1m Retest (Low=%.1f <= EMA12+%.1f) | MACD=%.3f >= Sig=%.3f | Disp=%.1f%%",
+				preset.Name, lowPrice, retestTolerance, macdLine, signalLine, displacementPct,
+			)
+		} else if isBearishRetest {
+			isBearishSignal = true
+			triggerReason = fmt.Sprintf(
+				"⚡ [%s] Bearish MACD 1m Retest (High=%.1f >= EMA12-%.1f) | MACD=%.3f <= Sig=%.3f | Disp=%.1f%%",
+				preset.Name, highPrice, retestTolerance, macdLine, signalLine, displacementPct,
+			)
+		}
 	}
 
 	if !isBullishSignal && !isBearishSignal {
@@ -1351,6 +1392,8 @@ func (s *QuantEngineStrategy) calculateMACD(candles []map[string]interface{}, fa
 	var signalLine float64
 	if len(macdSeries) >= signalP {
 		signalLine = s.calculateEMA(macdSeries, signalP)
+	} else if len(macdSeries) > 0 {
+		signalLine = s.calculateEMA(macdSeries, len(macdSeries))
 	}
 	return macdLine, signalLine, macdLine - signalLine
 }

@@ -1140,6 +1140,11 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 					params.Params["active_expiry"] = activeExp
 				}
 
+				// Inject live option chain for Strike Sweep optimal entry (Rule 13)
+				if optChain := j.fetchOptionChainSnaps(ctx, indexName); len(optChain) > 0 {
+					params.Params["option_chain"] = optChain
+				}
+
 				if prevSpotPrice == 0 {
 					prevSpotPrice = spotPrice
 				}

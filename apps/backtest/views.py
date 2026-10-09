@@ -661,6 +661,7 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
             'ict_smc_v2': {'icon': 'offline_bolt', 'color': '#8b5cf6', 'role': 'ICT v2: Confirmed OTE Retest & Mitigation (Zero Drawdown)'},
             'ict_smc_v3': {'icon': 'verified_user', 'color': '#10b981', 'role': 'ICT v3: Institutional Displacement, HTF Bias & Liquidity Sweep'},
             'morning_macd_retest': {'icon': 'candlestick_chart', 'color': '#f59e0b', 'role': 'Morning 3-Min HTF & Option Strike MACD Retest Guardrail'},
+            'macd_1m_retest': {'icon': 'speed', 'color': '#0ea5e9', 'role': 'MACD 1-Min Crossover + 1-Min Retest Setup'},
             'algo_micro_scalp': {'icon': 'bolt', 'color': '#06b6d4', 'role': 'Institutional VWAP Micro-Scalp & Auto Risk Guard'},
         }
 
@@ -671,8 +672,8 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
             # Attributed trades filtering logic
             if rtype in ['risk_management', 'intraday']:
                 t_subset = all_trades
-            elif rtype == 'morning_macd_retest':
-                t_subset = [t for t in all_trades if 'macd' in str(t.get('reason', '')).lower() or 'morning' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
+            elif rtype in ['morning_macd_retest', 'macd_1m_retest']:
+                t_subset = [t for t in all_trades if 'macd' in str(t.get('reason', '')).lower() or 'morning' in str(t.get('reason', '')).lower() or 'retest' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
             elif rtype in ['ict_smc_matrix', 'ict_smc_v2', 'ict_smc_v3']:
                 t_subset = [t for t in all_trades if 'ict' in str(t.get('reason', '')).lower() or 'fvg' in str(t.get('reason', '')).lower() or 'ote' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
             elif rtype == 'algo_micro_scalp':
@@ -1854,6 +1855,7 @@ class BacktestRuleAblationAuditView(LoginRequiredMixin, AdminRequiredMixin, View
             'ict_smc_v2': {'icon': 'offline_bolt', 'color': '#8b5cf6', 'role': 'ICT v2: Confirmed OTE Retest & Mitigation (Zero Drawdown)'},
             'ict_smc_v3': {'icon': 'verified_user', 'color': '#10b981', 'role': 'ICT v3: Institutional Displacement, HTF Bias & Liquidity Sweep'},
             'morning_macd_retest': {'icon': 'candlestick_chart', 'color': '#f59e0b', 'role': 'Morning 3-Min HTF & Option Strike MACD Retest Guardrail'},
+            'macd_1m_retest': {'icon': 'speed', 'color': '#0ea5e9', 'role': 'MACD 1-Min Crossover + 1-Min Retest Setup'},
             'algo_micro_scalp': {'icon': 'bolt', 'color': '#06b6d4', 'role': 'Institutional VWAP Micro-Scalp & Auto Risk Guard'},
         }
         meta = rule_meta.get(rtype, {'icon': 'check_circle', 'color': '#3b82f6', 'role': rule.get_rule_type_display()})
@@ -2284,6 +2286,35 @@ The **Go Quantitative Strategy Engine** executes deterministic, auditable rule-b
                 "order_type": "LIMIT",
             },
             "user_manual": "# EMA 9/21 Retest + MACD Momentum Strategy Manual\n\n## 1. Overview\nThe EMA 9/21 Retest + MACD Momentum strategy captures high-probability trend continuation moves by requiring price to pull back and retest the fast EMA 9 after an established trend crossover, confirmed by MACD momentum.\n\n## 2. Signal Generation Logic\n- Trend Alignment: EMA 9 > EMA 21 (Bullish) or EMA 9 < EMA 21 (Bearish).\n- Retest Trigger: Price pulls back to test EMA 9 level (Low <= EMA 9 <= High) and closes in trend direction.\n- MACD Momentum Gatekeeper: MACD line > Signal line & MACD >= 0 (CALL) or MACD line < Signal line & MACD <= 0 (PUT).\n- Optimal Entry Strike Sweep: Sweeps ATM±3 strikes for highest liquidity (OI/Volume) and limit entry mid-price.\n- Risk Management: 15 pt Stop Loss, 30 pt Target (1:2.0 RR), trailing stop to breakeven at 1.2R.\n",
+        },
+        {
+            "name": "MACD 1-Min Crossover + Retest (1:2.0 RR)",
+            "code_name": "macd_1m_retest",
+            "category": "Momentum & Retest",
+            "target_index": "NIFTY, BANKNIFTY, FINNIFTY",
+            "description": "1-minute MACD crossover confirmed by a 1-minute pullback retest to fast EMA with Strike Sweep ATM±3 entry and 1:2.0 RR.",
+            "go_file_path": "go-app/strategies/preset_macd_1m_retest.go",
+            "default_parameters": {
+                "lots_count": 1,
+                "strike_selection": "ATM",
+                "risk_reward_ratio": 2.0,
+                "rr_ratio": 2.0,
+                "stop_loss_points": 15.0,
+                "sl_pts": 15.0,
+                "ema_fast": 12,
+                "ema_slow": 26,
+                "macd_fast": 12,
+                "macd_slow": 26,
+                "macd_signal": 9,
+                "min_displacement": 0.35,
+                "trail_breakeven": True,
+                "breakeven_at_r": 1.0,
+                "entry_window_from": "09:18",
+                "entry_window_to": "15:00",
+                "cooldown_seconds": 60,
+                "order_type": "LIMIT",
+            },
+            "user_manual": "# MACD 1-Min Crossover + 1-Min Retest Strategy Manual\n\n## 1. Overview\nDesigned for rapid deterministic testing and high-fidelity verification. Detects 1-minute MACD (12/26/9) crossovers followed by a 1-minute retest of fast EMA.\n\n## 2. Signal Generation Logic\n- MACD Crossover: EMA 12 > EMA 26 (Bullish) or EMA 12 < EMA 26 (Bearish) with MACD line alignment.\n- 1-Min Retest: Subsequent 1-minute candle retests fast EMA 12, verifying support/resistance rejection.\n- Displacement Gatekeeper: Candle body displacement ratio >= 0.35 to avoid flat doji chop.\n- Strike Sweep: Sweeps ATM±3 strikes for optimal limit mid-price fill.\n- Trailing Guardrail: 15 pt SL, 1:2.0 RR with trailing stop to breakeven at 1.0R.\n",
         },
     ]
 

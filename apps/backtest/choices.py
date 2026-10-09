@@ -41,3 +41,4 @@ class BacktestRuleTypeChoices(models.TextChoices):
     HFT_SCALP = 'hft_scalp', 'High-Frequency Micro-Scalp (HFT 1:2.0)'
     VOLUME_AMD = 'volume_amd', 'Volume + AMD (Accumulation, Manipulation, Distribution) Pattern'
     EMA_MACD_RETEST = 'ema_macd_retest', 'EMA 9/21 Retest + MACD Momentum'
+    MACD_1M_RETEST = 'macd_1m_retest', 'MACD 1-Min Crossover + Retest'
