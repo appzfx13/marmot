@@ -96,8 +96,7 @@ HISTORICAL_INDEX_LOT_SIZES = {
 # Historical Index Expiry Timelines & Day-of-Week (2020 to Present)
 HISTORICAL_INDEX_EXPIRY_DAYS = {
     'NIFTY': [
-        ('2025-09-01', 'Tuesday', 1),   # Shifted to Tuesday in Sept 2025
-        ('2020-01-01', 'Thursday', 3),  # 2020 to Aug 2025: Thursday
+        ('2020-01-01', 'Thursday', 3),  # Thursday weekly and monthly contracts
         ('1990-01-01', 'Thursday', 3),
     ],
     'BANKNIFTY': [

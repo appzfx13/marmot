@@ -716,19 +716,19 @@
                         <td colspan="2" id="hudExecutionTimeline" style="font-size: 0.65rem; padding: 5px 9px; line-height: 1.4;">
                             <div class="d-flex align-items-center flex-wrap gap-1">
                                 <span class="badge rounded-pill" id="hudSignalBadge" style="background: rgba(245, 158, 11, 0.2); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.45);" title="Signal Generation Time">
-                                    ⚡ <span id="hudDecisionTime">{{ trade.decision_timestamp|slice:"11:16"|default:trade.entry_time }}</span>
+                                    ⚡ <span id="hudDecisionTime">{{ trade.decision_time|default:trade.entry_time }}</span>
                                 </span>
                                 <span class="theme-text-muted">➔</span>
                                 <span class="badge rounded-pill" id="hudPlacedBadge" style="background: rgba(56, 189, 248, 0.2); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.45);" title="Limit Order Placed Time">
-                                    📝 <span id="hudPlacedTime">{{ trade.order_placed_timestamp|slice:"11:16"|default:trade.entry_time }}</span>
+                                    📝 <span id="hudPlacedTime">{{ trade.order_placed_time|default:trade.entry_time }}</span>
                                 </span>
                                 <span class="theme-text-muted">➔</span>
                                 <span class="badge rounded-pill" id="hudTappedBadge" style="background: rgba(16, 185, 129, 0.2); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.45);" title="Limit Tapped / Filled Time">
-                                    🎯 <span id="hudFillTime">{{ trade.timestamp|slice:"11:16" }}</span>
+                                    🎯 <span id="hudFillTime">{{ trade.entry_time }}</span>
                                 </span>
                                 <span class="theme-text-muted">➔</span>
                                 <span class="badge rounded-pill" id="hudExitBadge" style="{% if trade.status == 'WIN' or trade.net_pnl > 0 %}background: rgba(16, 185, 129, 0.25); color: #10b981; border: 1px solid rgba(16, 185, 129, 0.5);{% else %}background: rgba(239, 68, 68, 0.25); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.5);{% endif %}" title="Exit Time (TP/SL)">
-                                    🏁 <span id="hudExitTime">{{ trade.exit_timestamp|slice:"11:16"|default:"-" }}</span>
+                                    🏁 <span id="hudExitTime">{{ trade.exit_time|default:"-" }}</span>
                                 </span>
                             </div>
                         </td>
@@ -1598,18 +1598,10 @@
 
             const entryEpoch = rawTradeData.entry.epoch;
             const exitEpoch = rawTradeData.exit.epoch;
-            let enCandle = null;
-            let exCandle = null;
-            let minEnDiff = Infinity;
-            let minExDiff = Infinity;
-
-            for (let i = 0; i < activeOptCandles.length; i++) {
-                const c = activeOptCandles[i];
-                const dEn = Math.abs(c.time - entryEpoch);
-                if (dEn < minEnDiff) { minEnDiff = dEn; enCandle = c; }
-                const dEx = Math.abs(c.time - exitEpoch);
-                if (dEx < minExDiff) { minExDiff = dEx; exCandle = c; }
-            }
+            const enIdx = findCandleIndex(activeOptCandles, entryEpoch);
+            const exIdx = findCandleIndex(activeOptCandles, exitEpoch);
+            const enCandle = (enIdx >= 0) ? activeOptCandles[enIdx] : null;
+            const exCandle = (exIdx >= 0) ? activeOptCandles[exIdx] : null;
 
             const candleEntryOpen = enCandle ? Number(enCandle.open) : origEntryP;
             const candleExitClose = exCandle ? Number(exCandle.close) : origExitP;
@@ -1874,18 +1866,21 @@
             focusTradeWindow();
         }
 
-        function findNearestCandleTime(candles, targetTime) {
-            if (!candles || candles.length === 0) return targetTime;
-            let closest = candles[0].time;
-            let minDiff = Math.abs(candles[0].time - targetTime);
-            for (let i = 1; i < candles.length; i++) {
-                const diff = Math.abs(candles[i].time - targetTime);
-                if (diff < minDiff) {
-                    minDiff = diff;
-                    closest = candles[i].time;
+        function findCandleIndex(candles, targetTime) {
+            if (!candles || candles.length === 0) return -1;
+            if (targetTime <= candles[0].time) return 0;
+            if (targetTime >= candles[candles.length - 1].time) return candles.length - 1;
+            for (let i = candles.length - 1; i >= 0; i--) {
+                if (candles[i].time <= targetTime) {
+                    return i;
                 }
             }
-            return closest;
+            return 0;
+        }
+
+        function findNearestCandleTime(candles, targetTime) {
+            const idx = findCandleIndex(candles, targetTime);
+            return (idx >= 0 && candles[idx]) ? candles[idx].time : targetTime;
         }
 
         function applySpotMarkers(spotEntryP) {
@@ -1908,8 +1903,8 @@
                     position: isBearishSpot ? 'aboveBar' : 'belowBar',
                     color: '#eab308',
                     shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
-                    text: `⚡ SIGNAL (${tl.signal_time || ''}) Spot: ${tl.signal_spot ? tl.signal_spot.toFixed(1) : ''}`,
-                    size: 2,
+                    text: `⚡ SIGNAL (${tl.signal_time || ''})`,
+                    size: 1,
                 });
                 if (entryEpoch) {
                     markers.push({
@@ -1918,7 +1913,7 @@
                         color: '#0284c7',
                         shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
                         text: `${isBearishSpot ? '▼' : '▲'} ENTRY ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
-                        size: 2,
+                        size: 1,
                     });
                 }
             } else if (entryEpoch) {
@@ -1928,8 +1923,8 @@
                     position: isBearishSpot ? 'aboveBar' : 'belowBar',
                     color: '#eab308',
                     shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
-                    text: `⚡ SIGNAL & ${isBearishSpot ? '▼' : '▲'} ENTRY ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
-                    size: 2,
+                    text: `⚡ ENTRY ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    size: 1,
                 });
             }
 
@@ -1938,12 +1933,12 @@
                 const isWin = (rawTradeData.pnl >= 0);
                 const exitType = (rawTradeData.exit && rawTradeData.exit.exit_type) || '';
                 let exitColor = isWin ? '#10b981' : '#ef4444';
-                let exitTag = '🎯 TP HIT';
+                let exitTag = '🎯 TP';
                 if (exitType === 'TRAILING_SL') {
-                    exitTag = '🛡️ TRAIL SL';
+                    exitTag = '🛡️ TRAIL';
                     exitColor = '#38bdf8';
                 } else if (!isWin) {
-                    exitTag = '🛑 SL HIT';
+                    exitTag = '🛑 SL';
                 }
 
                 markers.push({
@@ -1952,7 +1947,7 @@
                     color: exitColor,
                     shape: isBearishSpot ? 'arrowUp' : 'arrowDown',
                     text: `${exitTag} ${spotExitP.toFixed(1)} (${tl.exit_time || rawTradeData.exit.time})`,
-                    size: 2,
+                    size: 1,
                 });
             }
 
@@ -1971,14 +1966,13 @@
 
             // 1. Signal Time Marker (Yellow Arrow - distinct from entry)
             if (signalEpoch && signalEpoch !== entryEpoch) {
-                const cmpStr = tl.signal_strike_ltp ? ` CMP: ₹${Number(tl.signal_strike_ltp).toFixed(1)}` : '';
                 markers.push({
                     time: findNearestCandleTime(activeOptCandles, signalEpoch),
                     position: 'belowBar',
                     color: '#eab308',
                     shape: 'arrowUp',
-                    text: `⚡ SIGNAL (${tl.signal_time || ''})${cmpStr}`,
-                    size: 2,
+                    text: `⚡ SIGNAL (${tl.signal_time || ''})`,
+                    size: 1,
                 });
             }
 
@@ -1989,7 +1983,7 @@
                     position: 'belowBar',
                     color: '#38bdf8',
                     shape: 'square',
-                    text: `📝 LIMIT PLACED (${tl.limit_placed_time || ''}) @ ₹${optLevels.entryP.toFixed(1)}`,
+                    text: `📝 LIMIT (${tl.limit_placed_time || ''}) @ ₹${optLevels.entryP.toFixed(1)}`,
                     size: 1,
                 });
             }
@@ -2003,9 +1997,9 @@
                     color: isSameBar ? '#eab308' : '#0284c7',
                     shape: 'arrowUp',
                     text: isSameBar ?
-                        `⚡ SIGNAL & ▲ ENTRY FILLED ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})` :
-                        `▲ ENTRY FILLED ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
-                    size: 2,
+                        `⚡ ENTRY ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})` :
+                        `▲ ENTRY ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    size: 1,
                 });
             }
 
@@ -2018,13 +2012,13 @@
                 let exitLabel = '';
 
                 if (exitType === 'TRAILING_SL' || (isWin && optLevels.exitP < (optLevels.targetP - 0.5))) {
-                    exitLabel = `🛡️ TRAIL SL (+₹${diffPts})`;
+                    exitLabel = `🛡️ TRAIL (+₹${diffPts})`;
                     exitColor = '#38bdf8';
                 } else if (isWin) {
-                    exitLabel = `🎯 TP HIT (+₹${diffPts})`;
+                    exitLabel = `🎯 TP (+₹${diffPts})`;
                     exitColor = '#10b981';
                 } else {
-                    exitLabel = `🛑 SL HIT (-₹${diffPts})`;
+                    exitLabel = `🛑 SL (-₹${diffPts})`;
                     exitColor = '#ef4444';
                 }
 
@@ -2034,7 +2028,7 @@
                     color: exitColor,
                     shape: 'arrowDown',
                     text: `${exitLabel} @ ₹${optLevels.exitP.toFixed(2)} (${tl.exit_time || rawTradeData.exit.time})`,
-                    size: 2,
+                    size: 1,
                 });
             }
 
@@ -2075,18 +2069,8 @@
             const entryEpoch = rawTradeData.entry.epoch;
             const exitEpoch = rawTradeData.exit.epoch;
 
-            let enIdx = -1;
-            let exIdx = -1;
-            let minEnDiff = Infinity;
-            let minExDiff = Infinity;
-
-            for (let i = 0; i < candlesList.length; i++) {
-                const t = candlesList[i].time;
-                const enDiff = Math.abs(t - entryEpoch);
-                if (enDiff < minEnDiff) { minEnDiff = enDiff; enIdx = i; }
-                const exDiff = Math.abs(t - exitEpoch);
-                if (exDiff < minExDiff) { minExDiff = exDiff; exIdx = i; }
-            }
+            const enIdx = findCandleIndex(candlesList, entryEpoch);
+            const exIdx = findCandleIndex(candlesList, exitEpoch);
 
             // 1. Day Boundary Dividers for all days in candlesList (+4 days context)
             const seenDates = new Set();
@@ -2278,31 +2262,37 @@
                 ctx.stroke();
                 ctx.restore();
 
-                // 5. Centered Realized Outcome Badge (TradingView Center Pill, matching Image 2)
+                // 5. Realized Outcome Badge (Positioned at right edge of box away from central candles)
                 if (boxWidth >= 30) {
                     ctx.save();
-                    const midX = enX + (boxWidth / 2);
-                    const pillY = Math.max(35, Math.min(h - 35, enY));
                     const isWin = (rawTradeData.pnl >= 0);
                     const pnlStr = (paneType === 'SPOT') ?
                         `Closed P&L: ${isWin ? '+' : ''}${Number(rawTradeData.index_points || 0).toFixed(1)} pts (${rawTradeData.status})` :
                         `Closed P&L: ${isWin ? '+' : ''}₹${Number(rawTradeData.pnl || 0).toFixed(2)}, Qty: ${rawTradeData.quantity || 65}`;
-                    const rrStr = `Risk/Reward Ratio: ${rawTradeData.risk_reward || '1:2.0'}`;
+                    const rrStr = `R:R: ${rawTradeData.risk_reward || '1:2.0'}`;
 
                     ctx.font = 'bold 8.5px JetBrains Mono, monospace';
-                    const pW = Math.max(ctx.measureText(pnlStr).width, ctx.measureText(rrStr).width) + 20;
-                    const bX = Math.max(6, Math.min(w - pW - 6, midX - (pW / 2)));
+                    const pW = Math.max(ctx.measureText(pnlStr).width, ctx.measureText(rrStr).width) + 16;
+                    // Position at exit edge (exX) so candle wicks between entry and exit are never occluded
+                    const bX = Math.max(enX + 6, Math.min(w - pW - 6, exX - pW - 4));
+                    // Place inside profit zone if win, or risk zone if loss, away from exact entry line
+                    let pillY = enY;
+                    if (isWin && tgY !== null) {
+                        pillY = (tgY < enY) ? Math.min(enY - 18, Math.max(16, tgY + 16)) : Math.max(enY + 18, Math.min(h - 20, tgY - 16));
+                    } else if (!isWin && slY !== null) {
+                        pillY = (slY > enY) ? Math.max(enY + 18, Math.min(h - 20, slY - 16)) : Math.min(enY - 18, Math.max(16, slY + 16));
+                    }
 
-                    ctx.fillStyle = 'rgba(15, 23, 42, 0.95)';
+                    ctx.fillStyle = 'rgba(15, 23, 42, 0.90)';
                     ctx.beginPath();
                     if (ctx.roundRect) {
-                        ctx.roundRect(bX, pillY - 14, pW, 28, 5);
+                        ctx.roundRect(bX, pillY - 13, pW, 26, 4);
                     } else {
-                        ctx.rect(bX, pillY - 14, pW, 28);
+                        ctx.rect(bX, pillY - 13, pW, 26);
                     }
                     ctx.fill();
-                    ctx.strokeStyle = isWin ? '#10b981' : '#00f2fe';
-                    ctx.lineWidth = 1.4;
+                    ctx.strokeStyle = isWin ? 'rgba(16, 185, 129, 0.8)' : 'rgba(239, 68, 68, 0.8)';
+                    ctx.lineWidth = 1.2;
                     ctx.stroke();
 
                     ctx.fillStyle = isWin ? '#34d399' : '#f87171';
@@ -2312,7 +2302,7 @@
 
                     ctx.fillStyle = '#94a3b8';
                     ctx.font = '7.5px JetBrains Mono, monospace';
-                    ctx.fillText(rrStr, bX + (pW / 2), pillY + 3);
+                    ctx.fillText(rrStr, bX + (pW / 2), pillY + 2);
                     ctx.restore();
                 }
 

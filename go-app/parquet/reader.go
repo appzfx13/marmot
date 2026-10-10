@@ -232,12 +232,11 @@ func LoadTicksByDateRange(filePath string, startDate string, endDate string) (ma
 			continue // skip ticks with no valid spot data
 		}
 
-		// Keep strictly ATM±3 options (7 strikes x 2 types = 14 snaps) needed by strategy sweep engine.
-		// Deep ITM/OTM options outside ATM±3 are never swept or evaluated by any strategy.
+		// Enrich options map with ATM relative keys ("ATM CALL", "ATM+1 PUT", etc.) for sweep evaluation.
+		// Retain ALL option contracts in b.options so active positions are never pruned when spot drifts.
 		step := strikeStepForIndex(b.indexName)
 		opts := b.options
-		if step > 0 && len(b.options) > 14 {
-			pruned := make(map[string]strategies.OptionSnap, 28)
+		if step > 0 {
 			atmNum := int(math.Round(b.spotClose/float64(step))) * step
 			for _, optType := range []string{"CALL", "PUT"} {
 				for offset := -3; offset <= 3; offset++ {
@@ -246,23 +245,8 @@ func LoadTicksByDateRange(filePath string, startDate string, endDate string) (ma
 					if snap, ok := b.options[numKey]; ok {
 						label := offsetLabels[offset]
 						relKey := label + " " + optType
-						pruned[relKey] = snap
-						pruned[numKey] = snap
-					}
-				}
-			}
-			opts = pruned
-		} else if step > 0 {
-			atmNum := int(math.Round(b.spotClose/float64(step))) * step
-			for _, optType := range []string{"CALL", "PUT"} {
-				for offset := -3; offset <= 3; offset++ {
-					numStrike := atmNum + (offset * step)
-					numKey := strconv.Itoa(numStrike) + " " + optType
-					if snap, ok := b.options[numKey]; ok {
-						label := offsetLabels[offset]
-						relKey := label + " " + optType
-						if _, exists := b.options[relKey]; !exists {
-							b.options[relKey] = snap
+						if _, exists := opts[relKey]; !exists {
+							opts[relKey] = snap
 						}
 					}
 				}

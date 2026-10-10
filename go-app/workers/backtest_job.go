@@ -128,6 +128,24 @@ func (j *BacktestJob) Run(ctx context.Context) {
 		log.Printf("⚠️  [Backtest #%s] No dataset.parquet found, will use synthetic ticks\n", taskID)
 	}
 
+	totalOptionsInDataset := 0
+	for _, dayTicks := range candlesByDate {
+		for _, t := range dayTicks {
+			totalOptionsInDataset += len(t.Options)
+			if totalOptionsInDataset > 0 {
+				break
+			}
+		}
+		if totalOptionsInDataset > 0 {
+			break
+		}
+	}
+	if totalOptionsInDataset == 0 && len(candlesByDate) > 0 {
+		warnNotice := fmt.Sprintf("⚠️ Dataset '%s' contains 0 option contracts. Index F&O strategies require option chains (strike_count > 0) to execute option trades.", filepath.Base(parquetFilePath))
+		log.Printf("⚠️  [Backtest #%s] %s\n", taskID, warnNotice)
+		_, _ = j.dbService.Pool.Exec(ctx, `UPDATE backtest_backtesttask SET error_logs = $1 WHERE id = $2`, warnNotice, taskID)
+	}
+
 	// ── AI Macro Assist Loading ───────────────────────────────────────────────
 	useMacroAssist := false
 	if val, ok := params.Params["use_macro_assist"]; ok {

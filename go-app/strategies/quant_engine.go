@@ -203,6 +203,7 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 
 	var activeTrade *TradeSignal
 	activeStrikeKey := "" // e.g. "ATM CALL" or "ATM+1 PUT"
+	lastKnownOptPrice := 0.0
 
 	for i, tick := range ticks {
 		// ── Build spot candle for signal evaluation ──────────────────────────
@@ -219,14 +220,15 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 		if activeTrade != nil {
 			optSnap, hasOpt := tick.Options[activeStrikeKey]
 
-			// Fallback: hold at last known premium if option row missing for this tick
-			optLow := activeTrade.EntryPrice
-			optHigh := activeTrade.EntryPrice
-			optClose := activeTrade.EntryPrice
+			// Hold at last known premium if option quote is temporarily missing for this tick
+			optLow := lastKnownOptPrice
+			optHigh := lastKnownOptPrice
+			optClose := lastKnownOptPrice
 			if hasOpt && optSnap.Close > 0 {
 				optLow = optSnap.Low
 				optHigh = optSnap.High
 				optClose = optSnap.Close
+				lastKnownOptPrice = optSnap.Close
 			}
 
 			// Fill any pending limit layers during option pullback before checking exit
@@ -315,6 +317,7 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 				trades = append(trades, *activeTrade)
 				activeTrade = nil
 				activeStrikeKey = ""
+				lastKnownOptPrice = 0.0
 
 				exitTime := time.Unix(tick.Timestamp, 0).In(istLocation)
 				if len(tick.Datetime) >= 19 {
@@ -498,6 +501,7 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			Reason:                sig.TriggerReason + macroTag,
 		}
 		activeStrikeKey = concreteStrike
+		lastKnownOptPrice = entryOptPrice
 
 		activeLayers = nil
 		filledCost = 0.0

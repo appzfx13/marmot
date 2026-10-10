@@ -1165,23 +1165,28 @@ func getExpiryWeekdayForIndex(indexName string, tradeDate time.Time) time.Weekda
 	case "BANKEX":
 		return time.Monday
 	default: // NIFTY
-		if dStr >= "2025-09-01" {
-			return time.Tuesday
-		}
 		return time.Thursday
 	}
 }
 
-// generateIndexExpiries returns every weekly expiry day in [startDate, endDate] (IST) for the specified index
+// generateIndexExpiries returns every unique expiry day governing trade dates in [startDate, endDate] (IST)
 func generateIndexExpiries(indexName, startDate, endDate string, ist *time.Location) []time.Time {
 	start, _ := time.ParseInLocation("2006-01-02", startDate, ist)
 	end, _ := time.ParseInLocation("2006-01-02", endDate, ist)
+	seen := make(map[string]bool)
 	var result []time.Time
 	curr := start
 	for !curr.After(end) {
-		targetWeekday := getExpiryWeekdayForIndex(indexName, curr)
-		if curr.Weekday() == targetWeekday {
-			result = append(result, curr)
+		exp := curr
+		targetWeekday := getExpiryWeekdayForIndex(indexName, exp)
+		for exp.Weekday() != targetWeekday {
+			exp = exp.AddDate(0, 0, 1)
+			targetWeekday = getExpiryWeekdayForIndex(indexName, exp)
+		}
+		expKey := exp.Format("2006-01-02")
+		if !seen[expKey] {
+			seen[expKey] = true
+			result = append(result, exp)
 		}
 		curr = curr.AddDate(0, 0, 1)
 	}

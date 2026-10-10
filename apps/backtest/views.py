@@ -1092,19 +1092,35 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
                 except Exception as e:
                     logger.error(f"Error loading PyArrow Parquet candles for trade {trade_num}: {e}")
 
-        entry_time_str = raw_ts[11:16] if len(raw_ts) >= 16 else "09:15"
-        exit_time_str = exit_ts[11:16] if len(exit_ts) >= 16 else "15:15"
-
         import datetime as dt
-        try:
-            entry_epoch = int(dt.datetime.strptime(f"{trade_date} {entry_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
-        except Exception:
-            entry_epoch = candles[0]['time'] if candles else 0
 
-        try:
-            exit_epoch = int(dt.datetime.strptime(f"{trade_date} {exit_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
-        except Exception:
-            exit_epoch = candles[-1]['time'] if candles else 0
+        def _parse_ts_epoch(ts_val, fallback_time="", default_epoch=0):
+            ts_s = str(ts_val or '').replace('T', ' ').strip()
+            if len(ts_s) >= 19:
+                try:
+                    return int(dt.datetime.strptime(ts_s[:19], "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
+                except Exception:
+                    pass
+            if len(ts_s) >= 16:
+                try:
+                    return int(dt.datetime.strptime(ts_s[:16], "%Y-%m-%d %H:%M").replace(tzinfo=dt.timezone.utc).timestamp())
+                except Exception:
+                    pass
+            time_part = fallback_time or (ts_s[11:] if len(ts_s) >= 11 else ts_s)
+            if time_part:
+                for fmt, s in [("%Y-%m-%d %H:%M:%S", f"{trade_date} {time_part[:8]}"),
+                               ("%Y-%m-%d %H:%M", f"{trade_date} {time_part[:5]}")]:
+                    try:
+                        return int(dt.datetime.strptime(s, fmt).replace(tzinfo=dt.timezone.utc).timestamp())
+                    except Exception:
+                        pass
+            return default_epoch
+
+        entry_time_str = raw_ts[11:19] if len(raw_ts) >= 19 else (raw_ts[11:16] if len(raw_ts) >= 16 else "09:15:00")
+        exit_time_str = exit_ts[11:19] if len(exit_ts) >= 19 else (exit_ts[11:16] if len(exit_ts) >= 16 else "15:15:00")
+
+        entry_epoch = _parse_ts_epoch(raw_ts, entry_time_str, candles[0]['time'] if candles else 0)
+        exit_epoch = _parse_ts_epoch(exit_ts, exit_time_str, candles[-1]['time'] if candles else 0)
 
         try:
             day_boundary_epoch = int(dt.datetime.strptime(f"{trade_date} 09:15:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
@@ -1116,24 +1132,14 @@ class BacktestTradeCandlesView(LoginRequiredMixin, AdminRequiredMixin, View):
 
         retest_duration_min = int(target_trade.get('retest_duration_minutes') or 1)
         decision_raw = str(target_trade.get('decision_timestamp') or '')
-        decision_time_str = decision_raw[11:16] if len(decision_raw) >= 16 else ""
-        if not decision_time_str:
-            decision_time_str = entry_time_str
+        decision_time_str = decision_raw[11:19] if len(decision_raw) >= 19 else (decision_raw[11:16] if len(decision_raw) >= 16 else entry_time_str)
+        decision_epoch = _parse_ts_epoch(decision_raw, decision_time_str, entry_epoch)
 
         decision_spot = float(target_trade.get('decision_spot_price') or index_entry)
         decision_strike_ltp = float(target_trade.get('decision_strike_ltp') or entry_price)
         order_placed_raw = str(target_trade.get('order_placed_timestamp') or '')
-        order_placed_time_str = order_placed_raw[11:16] if len(order_placed_raw) >= 16 else decision_time_str
-
-        try:
-            decision_epoch = int(dt.datetime.strptime(f"{trade_date} {decision_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
-        except Exception:
-            decision_epoch = entry_epoch
-
-        try:
-            order_placed_epoch = int(dt.datetime.strptime(f"{trade_date} {order_placed_time_str}:00", "%Y-%m-%d %H:%M:%S").replace(tzinfo=dt.timezone.utc).timestamp())
-        except Exception:
-            order_placed_epoch = decision_epoch
+        order_placed_time_str = order_placed_raw[11:19] if len(order_placed_raw) >= 19 else (order_placed_raw[11:16] if len(order_placed_raw) >= 16 else decision_time_str)
+        order_placed_epoch = _parse_ts_epoch(order_placed_raw, order_placed_time_str, decision_epoch)
 
         is_bearish_spot = ('PE' in trade_type or 'PUT' in trade_type or 'PE' in strike or 'PUT' in strike or 'SHORT' in trade_type or 'SELL' in trade_type)
 
@@ -1299,10 +1305,15 @@ class BacktestTradeChartView(LoginRequiredMixin, AdminRequiredMixin, View):
             ex = float(target_trade.get('index_exit_price', target_trade.get('exit_price', 0)))
             target_trade['index_points'] = round(ex - en, 2)
 
-        target_trade['entry_time'] = str(target_trade.get('timestamp') or target_trade.get('entry_time') or '')[11:16]
-        target_trade['exit_time'] = str(target_trade.get('exit_timestamp') or target_trade.get('exit_time') or target_trade.get('timestamp') or '')[11:16]
-        target_trade['decision_time'] = str(target_trade.get('decision_timestamp') or target_trade.get('timestamp') or '')[11:16]
-        target_trade['order_placed_time'] = str(target_trade.get('order_placed_timestamp') or target_trade['decision_time'])[11:16]
+        raw_en_s = str(target_trade.get('timestamp') or target_trade.get('entry_time') or '')
+        raw_ex_s = str(target_trade.get('exit_timestamp') or target_trade.get('exit_time') or raw_en_s or '')
+        raw_dc_s = str(target_trade.get('decision_timestamp') or raw_en_s or '')
+        raw_op_s = str(target_trade.get('order_placed_timestamp') or raw_dc_s or '')
+
+        target_trade['entry_time'] = raw_en_s[11:19] if len(raw_en_s) >= 19 else raw_en_s[11:16]
+        target_trade['exit_time'] = raw_ex_s[11:19] if len(raw_ex_s) >= 19 else raw_ex_s[11:16]
+        target_trade['decision_time'] = raw_dc_s[11:19] if len(raw_dc_s) >= 19 else raw_dc_s[11:16]
+        target_trade['order_placed_time'] = raw_op_s[11:19] if len(raw_op_s) >= 19 else raw_op_s[11:16]
 
         prev_trade_num = all_trades[current_index - 1]['serial_no'] if current_index > 0 else None
         next_trade_num = all_trades[current_index + 1]['serial_no'] if current_index < len(all_trades) - 1 else None
