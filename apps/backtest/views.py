@@ -64,6 +64,7 @@ class BacktestDashboardView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         context = super().get_context_data(**kwargs)
         context['page_title'] = "Backtest Management"
         context['ws_url'] = settings.MARMOT_WS_URL
+        context['total_count'] = context['paginator'].count if context.get('paginator') else (len(context.get('backtests', [])) if context.get('backtests') is not None else 0)
         return context
 
 
@@ -2359,6 +2360,7 @@ class StrategyListView(HTMXPartialMixin, LoginRequiredMixin, ListView):
         context['can_delete'] = is_admin
         context['can_edit'] = is_admin
         context['current_q'] = self.request.GET.get('q', '').strip()
+        context['total_count'] = context['paginator'].count if context.get('paginator') else (len(context.get('strategies', [])) if context.get('strategies') is not None else 0)
         return context
 
 

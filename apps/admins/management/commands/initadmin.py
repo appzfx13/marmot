@@ -62,8 +62,40 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS("\nAdmin & Developer user initialization completed successfully!"))
 
+        # -------------------------------------------------------------
+        # 2. Seed Exactly 3 Sample Traders & Prune Excess Dummy Users
+        # -------------------------------------------------------------
+        self.stdout.write("\n--- Setting up Sample Traders (3 Users) ---")
+        allowed_test_usernames = [f"test_traders_{i:02d}" for i in range(1, 4)]
+
+        # Prune existing excess test accounts
+        pruned_count = User._base_manager.filter(username__startswith='test_').exclude(username__in=allowed_test_usernames).delete()[0]
+        if pruned_count > 0:
+            self.stdout.write(self.style.WARNING(f"Pruned {pruned_count} obsolete legacy test users."))
+
+        # Create or update 3 sample traders
+        for i, username in enumerate(allowed_test_usernames, start=1):
+            user, created = User._base_manager.get_or_create(username=username)
+            user.email = f"{username}@{email_domain}"
+            user.set_password("TestPassword123!")
+            user.phone_number = f"+19000040{i}"
+            user.role = MemberRoleChoices.TRADERS
+            user.first_name = "Sample Trader"
+            user.last_name = f"{i:02d}"
+            user.is_email_verified = True
+            user.is_mobile_verified = True
+            user.is_active = True
+            user.trade_eligibility = True
+            user.description = f"Sample active trader profile {i:02d}."
+            user.save()
+
+            if created:
+                self.stdout.write(self.style.SUCCESS(f"Sample Trader '{user.username}' created."))
+            else:
+                self.stdout.write(self.style.SUCCESS(f"Sample Trader '{user.username}' updated."))
+
         tunnel_url = fetch_tunnel_url()
         if tunnel_url:
-            self.stdout.write(self.style.SUCCESS(f"CLOUDFLARE Tunnel URL: {tunnel_url}"))
+            self.stdout.write(self.style.SUCCESS(f"\nCLOUDFLARE Tunnel URL: {tunnel_url}"))
         else:
-            self.stdout.write(self.style.WARNING("CLOUDFLARE Tunnel URL: Not available or cloudflare tunnel offline."))
+            self.stdout.write(self.style.WARNING("\nCLOUDFLARE Tunnel URL: Not available or cloudflare tunnel offline."))

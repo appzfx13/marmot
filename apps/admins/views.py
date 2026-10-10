@@ -4207,9 +4207,9 @@ class AdminTraderListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
 
         # Preserve search and filter parameters for HTMX pagination and sorting links
         query_params = self.request.GET.copy()
-        query_params.pop('page', None)
         query_params.pop('sort', None)  # Prevent duplicate sort params in current_filters string
         context['current_filters'] = query_params.urlencode()
+        context['total_count'] = context['paginator'].count if context.get('paginator') else (len(context.get('traders', [])) if context.get('traders') is not None else 0)
 
         return context
 
@@ -4388,6 +4388,7 @@ class AdminTradeExecConfigListView(LoginRequiredMixin, AdminRequiredMixin, Filte
         if 'page' in query_params:
             del query_params['page']
         context['current_filters'] = query_params.urlencode()
+        context['total_count'] = context['paginator'].count if context.get('paginator') else (context.get('filter').qs.count() if context.get('filter') else 0)
         return context
 
 
@@ -4657,6 +4658,7 @@ class PostbackLogListView(LoginRequiredMixin, DeveloperOrAdminRequiredMixin, Lis
         context['current_user_id'] = self.request.GET.get('user_id', '')
         context['current_start_date'] = self.request.GET.get('start_date', '')
         context['current_end_date'] = self.request.GET.get('end_date', '')
+        context['total_count'] = context['paginator'].count if context.get('paginator') else (len(context.get('postbacks', [])) if context.get('postbacks') is not None else 0)
         return context
 
 
@@ -4741,6 +4743,7 @@ class AdminBrokerMasterListView(HTMXPartialMixin, AdminRequiredMixin, ListView):
         context['active_tab'] = 'broker_master'
         context['total_brokers'] = BrokerMaster.objects.filter(is_deleted=False).count()
         context['active_brokers_count'] = BrokerMaster.objects.filter(is_deleted=False, is_active=True).count()
+        context['total_count'] = context['total_brokers']
         return context
 
 

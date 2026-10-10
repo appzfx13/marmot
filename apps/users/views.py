@@ -1124,6 +1124,7 @@ class UserBackupListView(HTMXPartialMixin, MarmotRoleRequiredMixin, TemplateView
         user_backups = MarketBackupTask.objects.filter(is_deleted=False, created_by=user).order_by('-id')
         context['backup_tasks'] = user_backups
         context['total_backups'] = user_backups.count()
+        context['total_count'] = context['total_backups']
         return context
 
 

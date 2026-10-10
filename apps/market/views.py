@@ -92,6 +92,7 @@ class MarketBackupListView(LoginRequiredMixin, AdminRequiredMixin, ListView):
             context['has_active_tasks'] = any(b.status in ['running', 'pending'] for b in backups)
         else:
             context['has_active_tasks'] = False
+        context['total_count'] = context['paginator'].count if context.get('paginator') else (len(backups) if backups is not None else 0)
         return context
 
 
@@ -323,6 +324,7 @@ class MacroBackupListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMix
             context['has_active_tasks'] = any(b.status in ['running', 'pending'] for b in backups)
         else:
             context['has_active_tasks'] = False
+        context['total_count'] = context['paginator'].count if context.get('paginator') else (len(backups) if backups is not None else 0)
         return context
 
 
@@ -823,6 +825,7 @@ class DailyTicksListView(LoginRequiredMixin, AdminRequiredMixin, View):
             'total_spot_days': metadata['total_spot_days'],
             'total_merged_days': metadata['total_merged_days'],
             'total_storage_mb': metadata['total_storage_mb'],
+            'total_count': metadata['total_days'],
         }
         if request.headers.get('HX-Request'):
             return render(request, self.partial_template_name, context)
