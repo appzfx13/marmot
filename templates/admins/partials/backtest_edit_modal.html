@@ -1291,83 +1291,7 @@
                 </div>
             </div>
 
-            <!-- 3. Strategy Rules Selection (Generous Padding & Smooth Native Scrolling) -->
-            <div class="mb-4 p-3.5 p-md-4 rounded-3 border edit-modal-subpanel">
-                <div class="d-flex align-items-center justify-content-between mb-3 pb-2.5 border-bottom flex-wrap gap-2" style="border-color: var(--border-color) !important;">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="material-icons text-primary" style="font-size: 1.2rem;">checklist</span>
-                        <span class="edit-modal-section-title">
-                            Active Strategy Rules & Execution Guardrails
-                        </span>
-                        <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-30 rounded-pill px-2.5 py-0.5 ms-1 font-monospace" style="font-size: 0.70rem;">
-                            {% if is_forex or backtest.market_type == 'FOREX_FUTURES' %}Forex Rules ({{ available_rules|length }}){% else %}Index Rules ({{ available_rules|length }}){% endif %}
-                        </span>
-                    </div>
-                    <div class="d-flex align-items-center gap-2">
-                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fw-medium" style="font-size: 0.74rem;" onclick="selectAllEditRules(true)">
-                            Select All
-                        </button>
-                        <button type="button" class="btn btn-sm btn-outline-secondary rounded-pill px-3 py-1 fw-medium" style="font-size: 0.74rem;" onclick="selectAllEditRules(false)">
-                            Clear
-                        </button>
-                    </div>
-                </div>
 
-                <!-- Smooth Native Scrollable Rules List Container with Roomy Padding -->
-                <div class="edit-rules-scroller p-3 p-md-3.5 rounded-3" 
-                     id="editModalRulesContainer"
-                     data-lenis-prevent
-                     style="max-height: 320px; overflow-y: auto; overscroll-behavior: auto; -webkit-overflow-scrolling: touch; border: 1px solid var(--border-color) !important;">
-                    <div class="row g-3">
-                        {% for rule in available_rules %}
-                        <div class="col-12 col-md-6 col-xl-4">
-                            <label class="edit-modal-rule-item w-100 d-flex align-items-center justify-content-between gap-3 p-3 px-3.5 rounded-3 border h-100 transition-all" 
-                                   style="cursor: pointer; min-height: 66px;">
-                                <div class="flex-grow-1 overflow-hidden" style="min-width: 0;">
-                                    <div class="fw-bold small text-truncate mb-1" title="{{ rule.name }}" style="font-size: 0.82rem;">
-                                        {{ rule.name }}
-                                    </div>
-                                    <div class="edit-modal-muted text-truncate" style="font-size: 0.73rem; line-height: 1.35;">
-                                        {{ rule.description|default:rule.prompt_directive|truncatechars:85 }}
-                                    </div>
-                                </div>
-                                <div class="form-check form-switch p-0 m-0 flex-shrink-0 d-flex align-items-center ms-1">
-                                    <input type="checkbox" name="rules" value="{{ rule.id }}" 
-                                           class="form-check-input edit-rule-checkbox edit-rule-toggle m-0" 
-                                           role="switch" 
-                                           {% if rule.id in active_rule_ids %}checked{% endif %}>
-                                </div>
-                            </label>
-                        </div>
-                        {% empty %}
-                        <div class="col-12 p-4 text-center">
-                            <span class="edit-modal-muted small fst-italic">No strategy rules configured yet.</span>
-                        </div>
-                        {% endfor %}
-                    </div>
-                </div>
-            </div>
-
-            <!-- 4. Natural Language AI Directives Prompt -->
-            <div class="mb-4 p-3.5 p-md-4 rounded-3 border edit-modal-subpanel">
-                <div class="d-flex align-items-center justify-content-between mb-3 pb-2.5 border-bottom flex-wrap gap-2" style="border-color: var(--border-color) !important;">
-                    <div class="d-flex align-items-center gap-2">
-                        <span class="material-icons text-info" style="font-size: 1.2rem;">terminal</span>
-                        <span class="edit-modal-section-title">
-                            AI Strategy Directives Prompt (Optional)
-                        </span>
-                    </div>
-                    <span class="badge bg-secondary bg-opacity-30 border border-secondary border-opacity-40 rounded-pill px-2.5 py-0.5 fw-normal font-monospace" style="font-size: 0.68rem;">
-                        Natural Language Directives
-                    </span>
-                </div>
-                <div>
-                    <textarea name="prompt_directives" id="edit_prompt_directives" rows="3" class="form-control edit-modal-input" 
-                              placeholder="e.g. Strictly square off all open positions before 15:15 PM. Prohibit taking fresh entries post 14:45 PM. Prioritize retest limit entries on 3-min HTF momentum."
-                              style="font-size: 0.82rem; min-height: 80px;">{{ prompt_directives_val }}</textarea>
-                    <small class="edit-modal-muted mt-2 d-block" style="font-size: 0.73rem; line-height: 1.4;">Custom natural language directives parsed by TensorTrade RL and Go worker engines.</small>
-                </div>
-            </div>
 
         </div>
 
@@ -1455,10 +1379,6 @@ function selectCompoundingProfile(profileKey, riskPct, utilPct, lotsCap, descrip
     }
 }
 
-function selectAllEditRules(shouldCheck) {
-    const checkboxes = document.querySelectorAll('.edit-rule-checkbox');
-    checkboxes.forEach(cb => cb.checked = shouldCheck);
-}
 
 function toggleRetestLayering(isEnabled) {
     const s = document.getElementById('retest_layering_settings');

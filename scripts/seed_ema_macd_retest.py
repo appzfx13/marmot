@@ -1,5 +1,5 @@
 """
-Seed EMA 9/21 Retest + MACD Momentum Strategy entries into Django BacktestRule and LiveStrategy tables.
+Seed EMA 9/21 Retest + MACD Momentum Strategy entries into LiveStrategy table.
 Can be executed via: python manage.py shell < scripts/seed_ema_macd_retest.py
 or directly inside the django_app container.
 """
@@ -16,41 +16,28 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'marmot.settings')
 django.setup()
 
 from apps.users.models import User
-from apps.backtest.models import BacktestRule
 from apps.trade_config.models import LiveStrategy, UserTradingAccount
 from apps.common.choices import StrategyChoices, MarketTypeChoices, LiveStrategyStatusChoices, AccountTypeChoices
 
 
 def seed_ema_macd_retest():
-    # 1. Ensure BacktestRule exists
-    rule, r_created = BacktestRule.objects.update_or_create(
-        rule_type='ema_macd_retest',
-        defaults={
-            'name': 'EMA 9/21 Retest + MACD Momentum (1:2.0 RR)',
-            'market_type': 'ALL',
-            'description': 'EMA 9/21 trend alignment with price pullback retest to EMA 9 and MACD zero-line momentum gatekeeper. Features Strike Sweep ATM±3 mid-price entry and 1:2.0 RR with trailing breakeven.',
-            'parameters': {
-                'ema_fast': 9,
-                'ema_slow': 21,
-                'macd_fast': 12,
-                'macd_slow': 26,
-                'macd_signal': 9,
-                'entry_window_from': 9 * 60 + 20,
-                'entry_window_to': 14 * 60 + 45,
-                'sl_pts': 15.0,
-                'rr_ratio': 2.0,
-                'use_orb_filter': False,
-                'min_displacement': 0.40,
-                'trail_breakeven': True,
-                'breakeven_at_r': 1.2,
-                'cooldown_seconds': 300,
-                'order_type': 'LIMIT',
-            },
-            'is_system_preset': True,
-            'is_active': True,
-        }
-    )
-    print(f"[{'CREATED' if r_created else 'UPDATED'}] BacktestRule: {rule.name} (id={rule.id})")
+    ema_params = {
+        'ema_fast': 9,
+        'ema_slow': 21,
+        'macd_fast': 12,
+        'macd_slow': 26,
+        'macd_signal': 9,
+        'entry_window_from': 9 * 60 + 20,
+        'entry_window_to': 14 * 60 + 45,
+        'sl_pts': 15.0,
+        'rr_ratio': 2.0,
+        'use_orb_filter': False,
+        'min_displacement': 0.40,
+        'trail_breakeven': True,
+        'breakeven_at_r': 1.2,
+        'cooldown_seconds': 300,
+        'order_type': 'LIMIT',
+    }
 
     # 2. Seed LiveStrategy entry for active users/admin
     users = User.objects.filter(is_active=True)
@@ -69,7 +56,7 @@ def seed_ema_macd_retest():
                     'rule_type': 'ema_macd_retest',
                     'name': 'EMA 9/21 Retest + MACD Momentum (1:2.0 RR)',
                 }],
-                'frozen_parameters': rule.parameters,
+                'frozen_parameters': ema_params,
                 'is_active': False,
                 'execution_mode': AccountTypeChoices.MOCK if trading_acc and trading_acc.account_type == AccountTypeChoices.MOCK else AccountTypeChoices.LIVE,
                 'status': LiveStrategyStatusChoices.STANDBY,

@@ -134,12 +134,10 @@ def send_backtest_control_command(task_id, command):
                 run_number=run_num,
                 status=task.status,
                 metrics=task.metrics,
-                applied_rules=[r.name for r in task.rules.all()],
+                applied_rules=[],
                 notes=f"Snapshot of run #{run_num} before re-run execution.",
                 created_by=task.created_by
             )
-        # Sync task.parameters['rules'] from current M2M so Go always receives
-        # the latest attached rules, not the stale snapshot from task creation.
         current_params = dict(task.parameters or {})
         current_params['use_macro_assist'] = bool(task.use_macro_assist)
         current_params['use_vix_assist'] = bool(task.use_vix_assist)
@@ -153,16 +151,6 @@ def send_backtest_control_command(task_id, command):
             current_params['vix_backup_task_id'] = str(task.vix_backup_task.id)
             if task.vix_backup_task.parquet_file_path:
                 current_params['vix_parquet_path'] = task.vix_backup_task.parquet_file_path
-        current_params['rules'] = [
-            {
-                'id': r.id,
-                'name': r.name,
-                'rule_type': r.rule_type,
-                'prompt_directive': r.prompt_directive or '',
-                'parameters': r.parameters or {},
-            }
-            for r in task.rules.filter(is_active=True)
-        ]
         task.parameters = current_params
         task.status = BacktestTask.StatusChoices.RUNNING
         task.progress = 5
@@ -534,20 +522,5 @@ GO_STRATEGY_PRESETS = [
 
 
 def ensure_strategy_presets_exist() -> int:
-    """Checks and seeds Go strategy presets in BacktestRule table if not existing."""
-    from apps.backtest.models import BacktestRule
-    created_count = 0
-    for item in GO_STRATEGY_PRESETS:
-        rule_type = item['rule_type']
-        if not BacktestRule.objects.filter(rule_type=rule_type).exists():
-            BacktestRule.objects.create(
-                rule_type=rule_type,
-                name=item['name'],
-                market_type=item['market_type'],
-                description=item['description'],
-                parameters=item['parameters'],
-                is_system_preset=item['is_system_preset'],
-                is_active=item['is_active'],
-            )
-            created_count += 1
-    return created_count
+    """Strategy presets are natively registered in Go engine registry."""
+    return 0

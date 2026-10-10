@@ -425,7 +425,7 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 			continue // No valid option premium for entry — skip tick
 		}
 
-		// Load strategy preset dynamically (from s.GetName() or params["strategy_name"] or params["rules"])
+		// Load strategy preset dynamically (from s.GetName() or params["strategy_name"])
 		presetKey := "momentum_scalp"
 		if s.GetName() != "" && s.GetName() != "quant_engine" {
 			presetKey = s.GetName()
@@ -433,16 +433,6 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 		if input.Params != nil {
 			if stratName, ok := input.Params["strategy_name"].(string); ok && stratName != "" {
 				presetKey = strings.ToLower(strings.TrimSpace(stratName))
-			}
-			if s.GetName() == "" || s.GetName() == "quant_engine" {
-				if rawRules, ok := input.Params["rules"].([]interface{}); ok && len(rawRules) > 0 {
-					if rMap, isMap := rawRules[0].(map[string]interface{}); isMap {
-						ruleType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
-						if ruleType != "" && ruleType != "<nil>" {
-							presetKey = ruleType
-						}
-					}
-				}
 			}
 		}
 		preset := GetStrategyPreset(presetKey)
@@ -740,7 +730,7 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		return nil
 	}
 
-	// Load strategy preset from strategy name or first attached BacktestRule rule_type.
+	// Load strategy preset from strategy name.
 	// Falls back to "momentum_scalp" default if no specific preset key matches.
 	presetKey := "momentum_scalp"
 	if s.GetName() != "" && s.GetName() != "quant_engine" {
@@ -751,18 +741,6 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		if stratName, ok := params["strategy_name"].(string); ok && stratName != "" {
 			presetKey = strings.ToLower(strings.TrimSpace(stratName))
 			preset = GetStrategyPreset(presetKey)
-		}
-		// Only allow attached rules to define presetKey if strategy is generic "quant_engine"
-		if s.GetName() == "" || s.GetName() == "quant_engine" {
-			if rawRules, ok := params["rules"].([]interface{}); ok && len(rawRules) > 0 {
-				if rMap, isMap := rawRules[0].(map[string]interface{}); isMap {
-					ruleType := strings.ToLower(fmt.Sprintf("%v", rMap["rule_type"]))
-					if ruleType != "" && ruleType != "<nil>" {
-						presetKey = ruleType
-						preset = GetStrategyPreset(presetKey)
-					}
-				}
-			}
 		}
 	}
 

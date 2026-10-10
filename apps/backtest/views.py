@@ -21,8 +21,8 @@ from apps.users.mixins import HTMXPartialMixin
 from apps.admins.permissions import AdminRequiredMixin
 from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 
-from .models import BacktestTask, BacktestRule, TradingStrategy
-from .forms import IndexBacktestTaskForm, ForexBacktestTaskForm, BacktestRuleForm
+from .models import BacktestTask, TradingStrategy
+from .forms import IndexBacktestTaskForm, ForexBacktestTaskForm
 from .services import create_and_start_backtest_task, send_backtest_control_command
 from apps.common.choices import LiveStrategyStatusChoices, AccountTypeChoices
 from apps.trade_config.models import LiveStrategy, UserTradingAccount
@@ -50,10 +50,9 @@ class BacktestDashboardView(LoginRequiredMixin, AdminRequiredMixin, ListView):
         q = self.request.GET.get('q', '').strip()
         if q:
             clean_q = q.replace('+', ' ').strip()
-            words = [w for w in clean_q.split() if len(w) >= 2]
-            q_filter = Q(strategy_name__icontains=q) | Q(id__icontains=q) | Q(rules__name__icontains=q) | Q(rules__rule_type__icontains=q)
+            q_filter = Q(strategy_name__icontains=q) | Q(id__icontains=q) | Q(index_name__icontains=q)
             for w in words:
-                q_filter |= Q(strategy_name__icontains=w) | Q(rules__name__icontains=w) | Q(rules__rule_type__icontains=w)
+                q_filter |= Q(strategy_name__icontains=w) | Q(index_name__icontains=w)
             queryset = queryset.filter(q_filter).distinct()
         status = self.request.GET.get('status', '').strip()
         if status:
@@ -149,20 +148,7 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
             return self.render_to_response(context)
 
     def form_valid(self, form):
-        selected_rules = form.cleaned_data.get('rules')
-        prompt_directives = form.cleaned_data.get('prompt_directives', '').strip()
         market_type = form.cleaned_data.get('market_type', 'INDEX_FO')
-        rule_list = []
-        if selected_rules:
-            for r in selected_rules:
-                rule_list.append({
-                    'id': r.id,
-                    'name': r.name,
-                    'rule_type': r.rule_type,
-                    'prompt_directive': r.prompt_directive,
-                    'parameters': r.parameters or {}
-                })
-
         strategy_name = form.cleaned_data.get('strategy_name')
         strat_obj = TradingStrategy.objects.filter(code_name=strategy_name).first()
         strat_params = dict(strat_obj.default_parameters or {}) if strat_obj else {}
@@ -173,8 +159,6 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
             "stop_loss_points": form.cleaned_data.get('stop_loss_points') or strat_params.get('sl_pts', 15.0),
             "sl_pts": form.cleaned_data.get('stop_loss_points') or strat_params.get('sl_pts', 15.0),
             "lots_count": form.cleaned_data.get('lots_count') or strat_params.get('lots_count', 1),
-            "rules": rule_list,
-            "prompt_directives": prompt_directives,
         })
 
         # Strike selection & step interval
@@ -237,8 +221,6 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
         self.object.market_type = market_type
         self.object.save(update_fields=['market_type'])
 
-        if selected_rules:
-            self.object.rules.set(selected_rules)
 
         messages.success(self.request, self.success_message)
         return HttpResponseRedirect(self.get_success_url())
@@ -643,94 +625,7 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
             'squareoff_count': squareoff_count,
         }
 
-        # Active Strategy Rules Efficacy & Precision Attribution Breakdown (strictly attached rules only)
-        task_rules_qs = self.object.rules.filter(is_deleted=False)
-
         rules_performance = []
-        rule_meta = {
-            'risk_management': {'icon': 'shield', 'color': '#10b981', 'role': 'Pre-defined Risk & Target Bracket Placement'},
-            'retest_limit': {'icon': 'timelapse', 'color': '#38bdf8', 'role': 'Limit Orders on Retest (Zero Chasing)'},
-            'intraday': {'icon': 'alarm_on', 'color': '#f59e0b', 'role': 'Auto 15:15 IST Square-off (Zero Overnight Risk)'},
-            'trendline_retest': {'icon': 'timeline', 'color': '#a855f7', 'role': 'Breakout Confirmation & Retest Filter'},
-            'india_vix': {'icon': 'speed', 'color': '#ec4899', 'role': 'India VIX Regime & IV Spread Filter'},
-            'loss_rca': {'icon': 'troubleshoot', 'color': '#f43f5e', 'role': 'Stop-Loss Root Cause Diagnostics Engine'},
-            'atr_noise_filter': {'icon': 'tune', 'color': '#06b6d4', 'role': 'Dynamic ATR Volatility & Anti-Noise Guardrail'},
-            'candle_close_sl': {'icon': 'stacked_line_chart', 'color': '#8b5cf6', 'role': 'Candle Close SL & Anti-Wick Hunt Shield'},
-            'liquidity_sweep': {'icon': 'waves', 'color': '#14b8a6', 'role': 'SMC Liquidity Sweep & False Breakout Trap Filter'},
-            'pdh_pdl': {'icon': 'vertical_align_center', 'color': '#0ea5e9', 'role': 'Previous Day High/Low (PDH/PDL) Range & Sweep Filter'},
-            'ict_smc_matrix': {'icon': 'hub', 'color': '#6366f1', 'role': 'ICT Institutional Killzone, MSS, FVG & OTE Matrix'},
-            'ict_smc_v2': {'icon': 'offline_bolt', 'color': '#8b5cf6', 'role': 'ICT v2: Confirmed OTE Retest & Mitigation (Zero Drawdown)'},
-            'ict_smc_v3': {'icon': 'verified_user', 'color': '#10b981', 'role': 'ICT v3: Institutional Displacement, HTF Bias & Liquidity Sweep'},
-            'morning_macd_retest': {'icon': 'candlestick_chart', 'color': '#f59e0b', 'role': 'Morning 3-Min HTF & Option Strike MACD Retest Guardrail'},
-            'macd_1m_retest': {'icon': 'speed', 'color': '#0ea5e9', 'role': 'MACD 1-Min Crossover + 1-Min Retest Setup'},
-            'algo_micro_scalp': {'icon': 'bolt', 'color': '#06b6d4', 'role': 'Institutional VWAP Micro-Scalp & Auto Risk Guard'},
-        }
-
-        for r in task_rules_qs:
-            rtype = r.rule_type
-            meta = rule_meta.get(rtype, {'icon': 'check_circle', 'color': '#3b82f6', 'role': r.get_rule_type_display()})
-            
-            # Attributed trades filtering logic
-            if rtype in ['risk_management', 'intraday']:
-                t_subset = all_trades
-            elif rtype in ['morning_macd_retest', 'macd_1m_retest']:
-                t_subset = [t for t in all_trades if 'macd' in str(t.get('reason', '')).lower() or 'morning' in str(t.get('reason', '')).lower() or 'retest' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-            elif rtype in ['ict_smc_matrix', 'ict_smc_v2', 'ict_smc_v3']:
-                t_subset = [t for t in all_trades if 'ict' in str(t.get('reason', '')).lower() or 'fvg' in str(t.get('reason', '')).lower() or 'ote' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-            elif rtype == 'algo_micro_scalp':
-                t_subset = [t for t in all_trades if 'scalp' in str(t.get('reason', '')).lower() or 'vwap' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-            elif rtype == 'pdh_pdl':
-                t_subset = [t for t in all_trades if 'pdh' in str(t.get('reason', '')).lower() or 'pdl' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-            elif rtype == 'trendline_retest':
-                t_subset = [t for t in all_trades if 'trend' in str(t.get('reason', '')).lower() or 'breakout' in str(t.get('reason', '')).lower() or not t.get('is_0dte')] or all_trades
-            elif rtype == 'india_vix':
-                t_subset = [t for t in all_trades if 'vix' in str(t.get('reason', '')).lower() or float(t.get('utilized_capital', 0)) > 0] or all_trades
-            elif rtype in ['atr_noise_filter', 'candle_close_sl']:
-                t_subset = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) > 0 or 'sl' in str(t.get('exit_reason', '')).lower()] or all_trades
-            elif rtype == 'liquidity_sweep':
-                t_subset = [t for t in all_trades if 'sweep' in str(t.get('reason', '')).lower() or 'trap' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-            elif rtype == 'loss_rca':
-                t_subset = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) < 0] or all_trades
-            else:
-                t_subset = all_trades
-
-            sub_count = len(t_subset)
-            w_trades = [t for t in t_subset if float(t.get('net_pnl', t.get('pnl', 0))) > 0]
-            l_trades = [t for t in t_subset if float(t.get('net_pnl', t.get('pnl', 0))) < 0]
-            w_cnt = len(w_trades)
-            l_cnt = len(l_trades)
-            acc = round((w_cnt / max(1, sub_count) * 100.0), 1) if sub_count > 0 else 0.0
-            pnl_sum = round(sum(float(t.get('net_pnl', t.get('pnl', 0))) for t in t_subset), 2)
-
-            # Prevented noise & trap estimations
-            prevented = 0
-            if rtype == 'atr_noise_filter':
-                prevented = max(1, int(round(w_cnt * 0.16)))
-            elif rtype == 'candle_close_sl':
-                prevented = max(1, int(round(w_cnt * 0.14)))
-            elif rtype == 'liquidity_sweep':
-                prevented = max(1, int(round(w_cnt * 0.20)))
-            elif rtype == 'loss_rca':
-                prevented = sl_hit_count
-            elif rtype == 'intraday':
-                prevented = squareoff_count
-
-            rules_performance.append({
-                'id': r.id,
-                'name': r.name,
-                'rule_type': rtype,
-                'rule_type_display': r.get_rule_type_display(),
-                'role': meta['role'],
-                'icon': meta['icon'],
-                'color': meta['color'],
-                'triggered_count': sub_count,
-                'winning_count': w_cnt,
-                'losing_count': l_cnt,
-                'accuracy_pct': acc,
-                'net_pnl': pnl_sum,
-                'prevented_count': prevented,
-                'is_active': r.is_active,
-            })
 
         # Sanitize AI suggested future rules to guarantee preventive_prompt key exists
         if self.object.results and isinstance(self.object.results, dict) and 'ai_suggested_future_rules' in self.object.results:
@@ -902,9 +797,9 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
 
         FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
         context['is_forex'] = (self.object.market_type == 'FOREX_FUTURES' or (self.object.index_name and self.object.index_name.upper() in FOREX_SYMBOLS))
-        context['rules_performance'] = rules_performance
+        context['rules_performance'] = []
         context['equity_curve_json'] = json.dumps(equity_curve_points)
-        context['attached_rule_names'] = list(self.object.rules.values_list('name', flat=True))
+        context['attached_rule_names'] = []
         context['trades_page'] = trade_data['trades_page']
         context['is_trades_paginated'] = trade_data['trades_page'].has_other_pages()
         context['total_trades_count'] = trade_data['total_trades_count']
@@ -1465,72 +1360,7 @@ class BacktestTradeAiAnalysisView(LoginRequiredMixin, AdminRequiredMixin, View):
         return render(request, 'admins/partials/backtest_trade_ai_card.html', context)
 
 
-class BacktestAdoptTradeRuleView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """Adopts and persists an AI-synthesized trade rule into the BacktestRule database."""
 
-    def get(self, request, pk, trade_num, *args, **kwargs):
-        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
-        context = {
-            'backtest': backtest,
-            'trade_num': trade_num,
-            'rule_name': request.GET.get('name', f"AI Rule: Trade #{trade_num} Guardrail"),
-            'rule_type': request.GET.get('rule_type', 'ict_smc_v3'),
-            'description': request.GET.get('description', ''),
-            'prompt_directive': request.GET.get('prompt_directive', ''),
-            'parameters': request.GET.get('parameters', '{}'),
-        }
-        return render(request, 'admins/partials/backtest_adopt_rule_modal.html', context)
-
-    def post(self, request, pk, trade_num, *args, **kwargs):
-        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
-        name = request.POST.get('name', '').strip() or f"AI Rule: Trade #{trade_num} Guardrail"
-        rule_type = request.POST.get('rule_type', 'ict_smc_v3').strip()
-        description = request.POST.get('description', '').strip()
-        prompt_directive = request.POST.get('prompt_directive', '').strip()
-        market_type = request.POST.get('market_type', 'ALL').strip()
-        raw_params = request.POST.get('parameters', '{}')
-
-        import json
-        import ast
-        try:
-            if isinstance(raw_params, str):
-                try:
-                    parameters = json.loads(raw_params)
-                except Exception:
-                    parameters = ast.literal_eval(raw_params)
-            else:
-                parameters = raw_params
-            if not isinstance(parameters, dict):
-                parameters = {}
-        except Exception:
-            parameters = {}
-
-        new_rule = BacktestRule.objects.create(
-            name=name,
-            market_type=market_type,
-            rule_type=rule_type,
-            description=description,
-            prompt_directive=prompt_directive,
-            parameters=parameters,
-            is_system_preset=False,
-            is_active=True,
-        )
-
-        backtest.rules.add(new_rule)
-        context = {
-            'rule': new_rule,
-            'backtest': backtest,
-            'trade_num': trade_num,
-            'success': True,
-        }
-        response = render(request, 'admins/partials/backtest_adopt_rule_success.html', context)
-        response['HX-Trigger'] = json.dumps({
-            'showToast': {
-                'message': f"Rule '{new_rule.name}' adopted into Backtest #{backtest.id}! Ready for re-run.",
-                'level': 'success'
-            }
-        })
-        return response
 
 
 class BacktestLogsModalView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -1550,13 +1380,7 @@ class BacktestLogsModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             trace_lines.append(f"[{created_ts}] [INFO] [AI-ENGINE] Observation Space: RL State Vector [1m OHLCV, IV, Greeks, Multi-Timeframe Trend]")
             if backtest.use_macro_assist:
                 trace_lines.append(f"[{created_ts}] [INFO] [MACRO-AI] Gemini AI Macro Assist Enabled (Timeframe: {backtest.macro_timeframe or '1h'})")
-
-            rules = list(backtest.rules.all())
-            if rules:
-                rule_names = ", ".join([r.name for r in rules])
-                trace_lines.append(f"[{created_ts}] [INFO] [GUARDRAILS] Active Applied Rules ({len(rules)}): {rule_names}")
-            else:
-                trace_lines.append(f"[{created_ts}] [INFO] [GUARDRAILS] Standard Execution Rules Applied")
+            trace_lines.append(f"[{created_ts}] [INFO] [GUARDRAILS] Engine Preset Config Applied")
 
             m = backtest.safe_metrics
             total_tr = m.get('total_trades', 0)
@@ -1579,351 +1403,6 @@ class BacktestLogsModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         return render(request, 'admins/partials/backtest_logs_modal.html', context)
 
 
-class BacktestApplyAiRuleView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """1-Click Auto Rule Creation: Creates BacktestRule in DB and attaches it to BacktestTask."""
-    def post(self, request, pk, *args, **kwargs):
-        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
-        rule_name = request.POST.get('rule_name', '').strip()
-        rule_type = request.POST.get('rule_type', 'risk_management').strip()
-        prompt_directive = request.POST.get('prompt_directive', '').strip()
-        params_raw = request.POST.get('parameters', '').strip()
-        rule_params = {}
-        if params_raw:
-            try:
-                rule_params = json.loads(params_raw)
-            except Exception:
-                rule_params = {}
-
-        if not rule_name:
-            rule_name = f"Auto Guardrail: SL Prevention #{backtest.rules.count() + 1}"
-
-        rule, created = BacktestRule.objects.get_or_create(
-            name=rule_name,
-            defaults={
-                'rule_type': rule_type,
-                'prompt_directive': prompt_directive,
-                'parameters': rule_params,
-                'description': f"Synthesized AI Guardrail from Stop-Loss RCA on Backtest #{backtest.id}.",
-                'is_active': True,
-                'created_by': request.user if request.user.is_authenticated else None,
-            }
-        )
-
-        backtest.rules.add(rule)
-
-        btn_html = f"""<button type="button" class="btn btn-sm btn-success rounded-pill px-3 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm" disabled style="font-size: 0.75rem; background: #059669; border-color: #059669;"><span class="material-icons" style="font-size: 0.88rem;">check_circle</span><span>✓ Rule Added — Ready to Rerun</span></button>"""
-        from django.template.loader import render_to_string
-        oob_badges_html = render_to_string(
-            'admins/partials/backtest_active_rules_badges.html',
-            {'backtest': backtest, 'is_oob': True},
-            request=request
-        )
-        response = HttpResponse(btn_html + "\n" + oob_badges_html)
-        response['HX-Trigger'] = json.dumps({
-            'showToast': {
-                'message': f"Rule '{rule.name}' attached to Backtest #{backtest.id}! Ready for re-run.",
-                'level': 'success'
-            }
-        })
-        return response
-
-
-class BacktestSynthesizeAiRulesView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """Triggers live Google Gemini 3.6 Flash deep forensic reasoning on backtest loss trades."""
-    def get(self, request, pk, *args, **kwargs):
-        return self.post(request, pk, *args, **kwargs)
-
-    def post(self, request, pk, *args, **kwargs):
-        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
-        from apps.common.services.gemini_service import GeminiAIService
-        from django.template.loader import render_to_string
-
-        synthesis_result = GeminiAIService.deep_analyze_and_synthesize_loss_rules(backtest)
-        new_rules = synthesis_result.get("rules", [])
-        is_live = synthesis_result.get("is_live_ai", False)
-        err_msg = synthesis_result.get("error", "")
-
-        if is_live and new_rules:
-            if not isinstance(backtest.results, dict):
-                backtest.results = {}
-            backtest.results["ai_suggested_future_rules"] = new_rules
-            backtest.results["ai_synthesis_source"] = "gemini-3.6-flash"
-            backtest.save(update_fields=["results"])
-
-        context = {
-            "backtest": backtest,
-            "is_live_gemini": is_live,
-            "gemini_error": err_msg if not is_live else "",
-            "gemini_error_code": synthesis_result.get("error_code", "API_ERROR") if not is_live else "",
-            "attached_rule_names": list(backtest.rules.values_list('name', flat=True)),
-        }
-        html = render_to_string("admins/partials/backtest_ai_rules_panel.html", context, request=request)
-        response = HttpResponse(html)
-        toast_msg = f"✨ Gemini 3.6 Flash synthesized {len(new_rules)} custom guardrails!" if is_live else (err_msg[:100] if err_msg else "AI rule generation failed.")
-        toast_lvl = "success" if is_live else "warning"
-        response["HX-Trigger"] = json.dumps({
-            "showToast": {
-                "message": toast_msg,
-                "level": toast_lvl,
-            }
-        })
-        return response
-
-
-class BacktestRuleAblationAuditView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """Computes counterfactual ablation metrics for a specific rule (WITH vs WITHOUT)."""
-
-    def get(self, request, pk, rule_id, *args, **kwargs):
-        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
-        rule = get_object_or_404(BacktestRule, pk=rule_id, is_deleted=False)
-
-        trade_data = get_backtest_trades_context(backtest, request)
-        all_trades = trade_data.get('all_trades', [])
-        init_cap = float(backtest.initial_capital or 100000.0)
-
-        # Baseline (WITH Rule) Metrics
-        with_trades_count = len(all_trades)
-        with_winners = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) > 0]
-        with_losers = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) < 0]
-        with_win_rate = round((len(with_winners) / max(1, with_trades_count)) * 100.0, 1) if with_trades_count > 0 else 0.0
-        with_gross_profit = sum(float(t.get('gross_pnl', t.get('net_pnl', 0))) for t in with_winners)
-        with_gross_loss = abs(sum(float(t.get('gross_pnl', t.get('net_pnl', 0))) for t in with_losers))
-        with_net_pnl = round(sum(float(t.get('net_pnl', t.get('pnl', 0))) for t in all_trades), 2)
-        with_pf = round((with_gross_profit / with_gross_loss) if with_gross_loss > 0 else (with_gross_profit if with_gross_profit > 0 else 1.0), 2)
-
-        def calc_max_dd(trades_list, start_cap):
-            eq = start_cap
-            peak = start_cap
-            max_dd = 0.0
-            for t in trades_list:
-                eq += float(t.get('net_pnl', t.get('pnl', 0)))
-                if eq > peak:
-                    peak = eq
-                dd = (peak - eq) / peak * 100.0 if peak > 0 else 0.0
-                if dd > max_dd:
-                    max_dd = dd
-            return round(max_dd, 2)
-
-        with_max_dd = calc_max_dd(all_trades, init_cap)
-
-        # Target Rule Subset & Performance
-        rtype = rule.rule_type
-        if rtype in ['risk_management', 'intraday']:
-            t_subset = all_trades
-        elif rtype == 'morning_macd_retest':
-            t_subset = [t for t in all_trades if 'macd' in str(t.get('reason', '')).lower() or 'morning' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-        elif rtype in ['ict_smc_matrix', 'ict_smc_v2', 'ict_smc_v3']:
-            t_subset = [t for t in all_trades if 'ict' in str(t.get('reason', '')).lower() or 'fvg' in str(t.get('reason', '')).lower() or 'ote' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-        elif rtype == 'pdh_pdl':
-            t_subset = [t for t in all_trades if 'pdh' in str(t.get('reason', '')).lower() or 'pdl' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-        elif rtype == 'trendline_retest':
-            t_subset = [t for t in all_trades if 'trend' in str(t.get('reason', '')).lower() or 'breakout' in str(t.get('reason', '')).lower() or not t.get('is_0dte')] or all_trades
-        elif rtype == 'india_vix':
-            t_subset = [t for t in all_trades if 'vix' in str(t.get('reason', '')).lower() or float(t.get('utilized_capital', 0)) > 0] or all_trades
-        elif rtype in ['atr_noise_filter', 'candle_close_sl']:
-            t_subset = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) > 0 or 'sl' in str(t.get('exit_reason', '')).lower()] or all_trades
-        elif rtype == 'liquidity_sweep':
-            t_subset = [t for t in all_trades if 'sweep' in str(t.get('reason', '')).lower() or 'trap' in str(t.get('reason', '')).lower() or float(t.get('net_pnl', t.get('pnl', 0))) > 0] or all_trades
-        elif rtype == 'loss_rca':
-            t_subset = [t for t in all_trades if float(t.get('net_pnl', t.get('pnl', 0))) < 0] or all_trades
-        else:
-            t_subset = all_trades
-
-        sub_count = len(t_subset)
-        w_trades = [t for t in t_subset if float(t.get('net_pnl', t.get('pnl', 0))) > 0]
-        l_trades = [t for t in t_subset if float(t.get('net_pnl', t.get('pnl', 0))) < 0]
-        w_cnt = len(w_trades)
-        l_cnt = len(l_trades)
-        rule_accuracy = round((w_cnt / max(1, sub_count) * 100.0), 1) if sub_count > 0 else 0.0
-
-        prevented_trades = 0
-        if rtype == 'atr_noise_filter':
-            prevented_trades = max(1, int(round(w_cnt * 0.16)))
-        elif rtype == 'candle_close_sl':
-            prevented_trades = max(1, int(round(w_cnt * 0.14)))
-        elif rtype == 'liquidity_sweep':
-            prevented_trades = max(1, int(round(w_cnt * 0.20)))
-        elif rtype == 'loss_rca':
-            prevented_trades = max(1, int(round(len(with_losers) * 0.25)))
-        elif rtype == 'intraday':
-            prevented_trades = max(1, int(round(len(all_trades) * 0.12)))
-        elif rtype in ['ict_smc_matrix', 'ict_smc_v2', 'ict_smc_v3', 'morning_macd_retest', 'pdh_pdl']:
-            prevented_trades = max(1, int(round(w_cnt * 0.18)))
-
-        avg_loss = (abs(with_gross_loss) / len(with_losers)) if with_losers else 1500.0
-        saved_loss_amt = round(prevented_trades * avg_loss, 2)
-        sacrificed_profit_amt = round(abs(sum(float(t.get('net_pnl', t.get('pnl', 0))) for t in l_trades)), 2)
-
-        # Counterfactual (WITHOUT Rule) Calculations
-        if sub_count == 0:
-            delta_pnl = 0.0
-            delta_win_rate = 0.0
-            delta_max_dd = 0.0
-            without_net_pnl = with_net_pnl
-            without_win_rate = with_win_rate
-            without_max_dd = with_max_dd
-            without_trades_count = with_trades_count
-            without_pf = with_pf
-        elif rule_accuracy >= 50.0 and saved_loss_amt >= sacrificed_profit_amt:
-            delta_pnl = round(saved_loss_amt - (sacrificed_profit_amt * 0.4), 2)
-            delta_win_rate = round(min(15.0, max(1.0, (prevented_trades / max(1, with_trades_count)) * 100.0 * 1.5)), 1)
-            delta_max_dd = round(min(12.0, max(0.5, (saved_loss_amt / init_cap * 100.0) * 0.75)), 2)
-            without_net_pnl = round(with_net_pnl - delta_pnl, 2)
-            without_win_rate = round(max(5.0, with_win_rate - delta_win_rate), 1)
-            without_max_dd = round(with_max_dd + delta_max_dd, 2)
-            without_trades_count = with_trades_count + prevented_trades
-            without_pf = round(max(0.2, with_pf * 0.82), 2)
-        elif rule_accuracy < 45.0 and sacrificed_profit_amt > saved_loss_amt:
-            delta_pnl = round(saved_loss_amt - sacrificed_profit_amt, 2)
-            delta_win_rate = round(-min(10.0, max(0.5, (l_cnt / max(1, sub_count)) * 5.0)), 1)
-            delta_max_dd = round(min(5.0, max(0.2, (sacrificed_profit_amt / init_cap * 100.0) * 0.3)), 2)
-            without_net_pnl = round(with_net_pnl - delta_pnl, 2)
-            without_win_rate = round(min(98.0, with_win_rate - delta_win_rate), 1)
-            without_max_dd = round(max(0.5, with_max_dd - delta_max_dd), 2)
-            without_trades_count = max(1, with_trades_count - l_cnt)
-            without_pf = round(with_pf * 1.15, 2)
-        else:
-            delta_pnl = round(saved_loss_amt - sacrificed_profit_amt, 2)
-            delta_win_rate = round(max(0.2, (saved_loss_amt / max(1.0, saved_loss_amt + sacrificed_profit_amt)) * 4.0), 1)
-            delta_max_dd = round(min(8.0, max(0.8, (saved_loss_amt / init_cap * 100.0) * 0.6)), 2)
-            without_net_pnl = round(with_net_pnl - delta_pnl, 2)
-            without_win_rate = round(max(5.0, with_win_rate - delta_win_rate), 1)
-            without_max_dd = round(with_max_dd + delta_max_dd, 2)
-            without_trades_count = with_trades_count + prevented_trades
-            without_pf = round(max(0.2, with_pf * 0.92), 2)
-
-        delta_pf = round(with_pf - without_pf, 2)
-        delta_trades = with_trades_count - without_trades_count
-        net_rule_edge = round(saved_loss_amt - sacrificed_profit_amt, 2)
-
-        if sub_count == 0 or (delta_pnl == 0 and prevented_trades == 0):
-            verdict = {
-                'code': 'DORMANT',
-                'title': 'Dormant (Dead Weight)',
-                'badge_class': 'bg-secondary bg-opacity-25 text-light border border-secondary',
-                'icon': 'pause_circle_outline',
-                'color': '#94a3b8',
-                'recommendation': 'REMOVE / PRUNE',
-                'is_toxic': True,
-                'description': 'This rule was never triggered during the backtest period and contributed zero alpha, zero loss mitigation, or risk reduction. It adds unnecessary cognitive complexity.'
-            }
-        elif delta_pnl < 0 and delta_win_rate <= 0:
-            verdict = {
-                'code': 'TOXIC_DRAG',
-                'title': 'Toxic Drag (Value Destroyer)',
-                'badge_class': 'bg-danger bg-opacity-20 text-danger border border-danger border-opacity-40',
-                'icon': 'dangerous',
-                'color': '#ef4444',
-                'recommendation': 'REMOVE FROM STRATEGY',
-                'is_toxic': True,
-                'description': f"This rule costs more in false signals / sacrificed drag (₹{sacrificed_profit_amt:,.2f}) than it saves in losses (₹{saved_loss_amt:,.2f}). Pruning this rule would improve net PnL by ₹{abs(delta_pnl):,.2f}."
-            }
-        elif delta_pnl < 0 and delta_max_dd > 1.2:
-            verdict = {
-                'code': 'VOLATILITY_HEDGE',
-                'title': 'Volatility Hedge (Risk Buffer)',
-                'badge_class': 'bg-warning bg-opacity-20 text-warning border border-warning border-opacity-40',
-                'icon': 'security',
-                'color': '#f59e0b',
-                'recommendation': 'KEEP AS INSURANCE',
-                'is_toxic': False,
-                'description': f"This rule creates a minor PnL drag of ₹{abs(delta_pnl):,.2f}, but functions as an active insurance hedge by capping peak strategy drawdown by {abs(delta_max_dd):.1f}%."
-            }
-        else:
-            verdict = {
-                'code': 'ALPHA_PRESERVER',
-                'title': 'Alpha Preserver (High Edge)',
-                'badge_class': 'bg-success bg-opacity-20 text-success border border-success border-opacity-40',
-                'icon': 'verified',
-                'color': '#10b981',
-                'recommendation': 'KEEP IN STRATEGY',
-                'is_toxic': False,
-                'description': f"This rule actively preserves alpha by preventing ₹{saved_loss_amt:,.2f} in false trap losses with a +{delta_win_rate:.1f}% positive win-rate attribution. Highly recommended to retain."
-            }
-
-        rule_meta = {
-            'risk_management': {'icon': 'shield', 'color': '#10b981', 'role': 'Pre-defined Risk & Target Bracket Placement'},
-            'retest_limit': {'icon': 'timelapse', 'color': '#38bdf8', 'role': 'Limit Orders on Retest (Zero Chasing)'},
-            'intraday': {'icon': 'alarm_on', 'color': '#f59e0b', 'role': 'Auto 15:15 IST Square-off (Zero Overnight Risk)'},
-            'trendline_retest': {'icon': 'timeline', 'color': '#a855f7', 'role': 'Breakout Confirmation & Retest Filter'},
-            'india_vix': {'icon': 'speed', 'color': '#ec4899', 'role': 'India VIX Regime & IV Spread Filter'},
-            'loss_rca': {'icon': 'troubleshoot', 'color': '#f43f5e', 'role': 'Stop-Loss Root Cause Diagnostics Engine'},
-            'atr_noise_filter': {'icon': 'tune', 'color': '#06b6d4', 'role': 'Dynamic ATR Volatility & Anti-Noise Guardrail'},
-            'candle_close_sl': {'icon': 'stacked_line_chart', 'color': '#8b5cf6', 'role': 'Candle Close SL & Anti-Wick Hunt Shield'},
-            'liquidity_sweep': {'icon': 'waves', 'color': '#14b8a6', 'role': 'SMC Liquidity Sweep & False Breakout Trap Filter'},
-            'pdh_pdl': {'icon': 'vertical_align_center', 'color': '#0ea5e9', 'role': 'Previous Day High/Low (PDH/PDL) Range & Sweep Filter'},
-            'ict_smc_matrix': {'icon': 'hub', 'color': '#6366f1', 'role': 'ICT Institutional Killzone, MSS, FVG & OTE Matrix'},
-            'ict_smc_v2': {'icon': 'offline_bolt', 'color': '#8b5cf6', 'role': 'ICT v2: Confirmed OTE Retest & Mitigation (Zero Drawdown)'},
-            'ict_smc_v3': {'icon': 'verified_user', 'color': '#10b981', 'role': 'ICT v3: Institutional Displacement, HTF Bias & Liquidity Sweep'},
-            'morning_macd_retest': {'icon': 'candlestick_chart', 'color': '#f59e0b', 'role': 'Morning 3-Min HTF & Option Strike MACD Retest Guardrail'},
-            'macd_1m_retest': {'icon': 'speed', 'color': '#0ea5e9', 'role': 'MACD 1-Min Crossover + 1-Min Retest Setup'},
-            'algo_micro_scalp': {'icon': 'bolt', 'color': '#06b6d4', 'role': 'Institutional VWAP Micro-Scalp & Auto Risk Guard'},
-        }
-        meta = rule_meta.get(rtype, {'icon': 'check_circle', 'color': '#3b82f6', 'role': rule.get_rule_type_display()})
-
-        context = {
-            'backtest': backtest,
-            'rule': rule,
-            'meta': meta,
-            'sub_count': sub_count,
-            'rule_accuracy': rule_accuracy,
-            'with_metrics': {
-                'net_pnl': with_net_pnl,
-                'win_rate': with_win_rate,
-                'max_dd': with_max_dd,
-                'total_trades': with_trades_count,
-                'profit_factor': with_pf,
-            },
-            'without_metrics': {
-                'net_pnl': without_net_pnl,
-                'win_rate': without_win_rate,
-                'max_dd': without_max_dd,
-                'total_trades': without_trades_count,
-                'profit_factor': without_pf,
-            },
-            'deltas': {
-                'net_pnl': delta_pnl,
-                'win_rate': delta_win_rate,
-                'max_dd': delta_max_dd,
-                'total_trades': delta_trades,
-                'profit_factor': delta_pf,
-            },
-            'saved_loss_amt': saved_loss_amt,
-            'prevented_trades': prevented_trades,
-            'sacrificed_profit_amt': sacrificed_profit_amt,
-            'net_rule_edge': net_rule_edge,
-            'verdict': verdict,
-        }
-        return render(request, 'admins/partials/backtest_rule_ablation_modal.html', context)
-
-
-class BacktestRuleUnlinkView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """Safely unlinks/removes a BacktestRule from a specific BacktestTask."""
-
-    def post(self, request, pk, rule_id, *args, **kwargs):
-        backtest = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
-        rule = get_object_or_404(BacktestRule, pk=rule_id, is_deleted=False)
-
-        backtest.rules.remove(rule)
-
-        from django.template.loader import render_to_string
-        oob_badges_html = render_to_string(
-            'admins/partials/backtest_active_rules_badges.html',
-            {'backtest': backtest, 'is_oob': True},
-            request=request
-        )
-        response = HttpResponse(oob_badges_html)
-        response['HX-Trigger'] = json.dumps({
-            'closeGlobalModal': True,
-            'reloadBacktestDetail': True,
-            'showToast': {
-                'message': f"Rule '{rule.name}' detached from Backtest #{backtest.id}!",
-                'level': 'info'
-            }
-        })
-        return response
-
-
 from apps.common.mixins import BaseHtmxScrollListView
 
 
@@ -1938,10 +1417,9 @@ class BacktestDashboardScrollView(LoginRequiredMixin, AdminRequiredMixin, BaseHt
         q = self.request.GET.get('q', '').strip()
         if q:
             clean_q = q.replace('+', ' ').strip()
-            words = [w for w in clean_q.split() if len(w) >= 2]
-            q_filter = Q(strategy_name__icontains=q) | Q(id__icontains=q) | Q(rules__name__icontains=q) | Q(rules__rule_type__icontains=q)
+            q_filter = Q(strategy_name__icontains=q) | Q(id__icontains=q) | Q(index_name__icontains=q)
             for w in words:
-                q_filter |= Q(strategy_name__icontains=w) | Q(rules__name__icontains=w) | Q(rules__rule_type__icontains=w)
+                q_filter |= Q(strategy_name__icontains=w) | Q(index_name__icontains=w)
             queryset = queryset.filter(q_filter).distinct()
         status = self.request.GET.get('status', '').strip()
         if status:
@@ -2516,135 +1994,6 @@ class StrategyDeleteView(LoginRequiredMixin, View):
         return response
 
 
-class BacktestRuleListView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixin, ListView):
-    """Rule Management Dashboard with search, filter, and HTMX partial swap."""
-    model = BacktestRule
-    template_name = 'admins/backtest_rule_list.html'
-    partial_template_name = 'admins/partials/backtest_rule_table_partial.html'
-    context_object_name = 'rules'
-
-    def get_queryset(self):
-        queryset = super().get_queryset().filter(is_deleted=False)
-        q = self.request.GET.get('q', '').strip()
-        if q:
-            queryset = queryset.filter(Q(name__icontains=q) | Q(description__icontains=q) | Q(prompt_directive__icontains=q))
-        market_type = self.request.GET.get('market_type', '').strip()
-        if market_type:
-            queryset = queryset.filter(market_type=market_type)
-        rule_type = self.request.GET.get('rule_type', '').strip()
-        if rule_type:
-            queryset = queryset.filter(rule_type=rule_type)
-        is_active = self.request.GET.get('is_active', '').strip()
-        if is_active in ['true', '1']:
-            queryset = queryset.filter(is_active=True)
-        elif is_active in ['false', '0']:
-            queryset = queryset.filter(is_active=False)
-        return queryset.order_by('-is_system_preset', 'id')
-
-    def get_context_data(self, **kwargs):
-        context = super().get_context_data(**kwargs)
-        context['page_title'] = "Backtest Strategy Rules"
-        context['rule_types'] = BacktestRule.RuleTypeChoices.choices
-        context['market_types'] = BacktestRule.MarketTypeChoices.choices
-        context['current_filters'] = {
-            'q': self.request.GET.get('q', ''),
-            'market_type': self.request.GET.get('market_type', ''),
-            'rule_type': self.request.GET.get('rule_type', ''),
-            'is_active': self.request.GET.get('is_active', ''),
-        }
-        return context
-
-
-class BacktestRuleCreateView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, CreateView):
-    """Dedicated full-page creation view for new custom strategy rules."""
-    model = BacktestRule
-    form_class = BacktestRuleForm
-    template_name = 'admins/index.html'
-    partial_template_name = 'admins/partials/backtest_rule_form_content.html'
-    success_message = "Strategy Rule created successfully."
-    success_url = reverse_lazy('backtest:rule_list')
-
-    def form_valid(self, form):
-        self.object = form.save(commit=False)
-        self.object.is_system_preset = False
-        self.object.save()
-        messages.success(self.request, self.success_message)
-        if self.request.headers.get('HX-Request'):
-            response = HttpResponseRedirect(reverse('backtest:rule_list'))
-            response['HX-Redirect'] = reverse('backtest:rule_list')
-            return response
-        return super().form_valid(form)
-
-
-class BacktestRuleUpdateView(HTMXPartialMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, UpdateView):
-    """Dedicated full-page update view for strategy rules."""
-    model = BacktestRule
-    form_class = BacktestRuleForm
-    template_name = 'admins/index.html'
-    partial_template_name = 'admins/partials/backtest_rule_form_content.html'
-    success_message = "Strategy Rule updated successfully."
-    success_url = reverse_lazy('backtest:rule_list')
-
-    def form_valid(self, form):
-        self.object = form.save()
-        messages.success(self.request, self.success_message)
-        if self.request.headers.get('HX-Request'):
-            response = HttpResponseRedirect(reverse('backtest:rule_list'))
-            response['HX-Redirect'] = reverse('backtest:rule_list')
-            return response
-        return super().form_valid(form)
-
-
-class BacktestRuleDeleteView(HtmxModalMixin, HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixin, DeleteView):
-    """Delete confirmation view with safeguard against system presets."""
-    model = BacktestRule
-    modal_template_name = 'admins/partials/confirm_delete.html'
-    template_name = 'admins/partials/confirm_delete.html'
-    success_message = "Strategy Rule deleted successfully."
-
-    def get(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if self.object.is_system_preset:
-            return render(request, 'admins/partials/confirm_delete.html', {
-                'object': None,
-                'error_msg': "Protected System Preset: Built-in default rules cannot be deleted. You can toggle their active state instead."
-            })
-        return super().get(request, *args, **kwargs)
-
-    def post(self, request, *args, **kwargs):
-        self.object = self.get_object()
-        if self.object.is_system_preset:
-            response = HttpResponse(status=403)
-            response['HX-Trigger'] = json.dumps({
-                'closeGlobalModal': True,
-                'showToast': {'message': "System presets cannot be deleted.", 'level': 'warning'}
-            })
-            return response
-        self.object.is_deleted = True
-        self.object.save()
-        response = HttpResponse(status=204)
-        response['HX-Trigger'] = json.dumps({
-            'closeGlobalModal': True,
-            'showToast': {'message': str(self.success_message), 'level': 'success'},
-            'reloadRuleTable': True
-        })
-        return response
-
-
-class BacktestRuleToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
-    """Quick HTMX toggle endpoint to activate/deactivate strategy rules."""
-    def post(self, request, pk, *args, **kwargs):
-        rule = get_object_or_404(BacktestRule, pk=pk, is_deleted=False)
-        rule.is_active = not rule.is_active
-        rule.save(update_fields=['is_active'])
-        status_str = "activated" if rule.is_active else "deactivated"
-        response = HttpResponse(status=204)
-        response['HX-Trigger'] = json.dumps({
-            'showToast': {'message': f"Rule '{rule.name}' {status_str}.", 'level': 'info'},
-            'reloadRuleTable': True
-        })
-        return response
-
 
 class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
     """Renders and processes modal to adjust backtest parameters and trigger fresh regeneration."""
@@ -2653,38 +2002,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         task = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
         FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
         is_forex = (task.market_type == 'FOREX_FUTURES' or (task.index_name and task.index_name.upper() in FOREX_SYMBOLS))
-
-        if is_forex:
-            available_rules = list(BacktestRule.objects.filter(is_active=True, is_deleted=False, market_type__in=['FOREX_FUTURES', 'ALL']).order_by('-is_system_preset', 'id'))
-        else:
-            available_rules = list(BacktestRule.objects.filter(is_active=True, is_deleted=False, market_type__in=['INDEX_FO', 'ALL']).order_by('-is_system_preset', 'id'))
-
-        active_rule_ids = set(task.rules.values_list('id', flat=True))
-        if not active_rule_ids and task.parameters and 'rules' in task.parameters:
-            for r in task.parameters['rules']:
-                if isinstance(r, dict) and 'id' in r:
-                    active_rule_ids.add(r['id'])
-                elif isinstance(r, dict) and 'name' in r:
-                    matched = next((x for x in available_rules if x.name == r['name']), None)
-                    if matched:
-                        active_rule_ids.add(matched.id)
-
-        # Sort so active rules appear at the top of the list, followed by system presets
-        available_rules.sort(key=lambda r: (0 if r.id in active_rule_ids else 1, -1 if r.is_system_preset else 0, r.id))
-
-        add_rule_type = request.GET.get('add_rule_type', '').strip()
-        add_rule_id = request.GET.get('add_rule_id', '').strip()
-
-        if add_rule_type:
-            rule_match = BacktestRule.objects.filter(rule_type=add_rule_type, is_active=True, is_deleted=False).first()
-            if rule_match:
-                active_rule_ids.add(rule_match.id)
-
-        if add_rule_id:
-            try:
-                active_rule_ids.add(int(add_rule_id))
-            except ValueError:
-                pass
 
         params = task.parameters or {}
 
@@ -2700,8 +2017,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         context = {
             'backtest': task,
             'is_forex': is_forex,
-            'available_rules': available_rules,
-            'active_rule_ids': active_rule_ids,
             'available_macro_backups': available_macro_backups,
             'available_primary_backups': available_primary_backups,
             'available_vix_backups': MarketBackupTask.objects.filter(is_deleted=False, index_name='INDIAVIX').order_by('-id'),
@@ -2744,7 +2059,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             'layer_count_val': int(params.get('layer_count', 3) or 3),
             'retest_percentages_val': params.get('retest_percentages', [25.0, 50.0, 75.0]),
             'layer_lots_val': params.get('layer_lots', [1, 1, 1]),
-            'prompt_directives_val': params.get('prompt_directives', ''),
         }
         return render(request, 'admins/partials/backtest_edit_modal.html', context)
 
@@ -2905,22 +2219,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             except ValueError:
                 pass
 
-        selected_rule_ids = request.POST.getlist('rules')
-        if is_forex:
-            rules_qs = BacktestRule.objects.filter(id__in=selected_rule_ids, is_active=True, is_deleted=False, market_type__in=['FOREX_FUTURES', 'ALL'])
-        else:
-            rules_qs = BacktestRule.objects.filter(id__in=selected_rule_ids, is_active=True, is_deleted=False, market_type__in=['INDEX_FO', 'ALL'])
-
-        rules_list = []
-        for r in rules_qs:
-            rules_list.append({
-                "id": r.id,
-                "name": r.name,
-                "rule_type": r.rule_type,
-                "parameters": r.parameters or {},
-                "prompt_directive": r.prompt_directive or "",
-            })
-
         task.parameters = {
             **(task.parameters or {}),
             "market_type": "FOREX_FUTURES" if is_forex else "INDEX_FO",
@@ -2947,8 +2245,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             "max_capital_utilization_pct": max_cap_util_pct,
             "max_lots_cap": max_lots_cap,
             "strike_selection": strike_selection,
-            "rules": rules_list,
-            "prompt_directives": prompt_directives,
             "use_macro_assist": use_macro_assist,
             "macro_timeframe": macro_timeframe,
             "use_vix_assist": use_vix_assist,
@@ -2980,7 +2276,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
                 max_capital_utilization_pct=max_cap_util_pct,
                 max_lots_cap=max_lots_cap,
             )
-            clone_task.rules.set(rules_qs)
             send_backtest_control_command(clone_task.id, 'START')
 
             response = HttpResponse(status=204)
@@ -2993,7 +2288,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             return response
 
         task.save(update_fields=['start_date', 'end_date', 'initial_capital', 'parameters', 'use_macro_assist', 'macro_timeframe', 'macro_backup_task', 'use_vix_assist', 'vix_backup_task', 'backup_task', 'enable_ai_lot_sizing', 'auto_risk_management', 'max_risk_per_trade_pct', 'max_capital_utilization_pct', 'max_lots_cap'])
-        task.rules.set(rules_qs)
 
         send_backtest_control_command(task.id, 'START')
 
@@ -3243,18 +2537,7 @@ class BacktestDeployModalView(LoginRequiredMixin, View):
             if mock_acc not in user_accounts:
                 user_accounts.append(mock_acc)
 
-        rules_snapshot = [
-            {
-                'rule_id': r.id,
-                'name': r.name,
-                'rule_type': r.rule_type,
-                'market_type': r.market_type,
-                'description': r.description,
-                'prompt_directive': r.prompt_directive,
-                'parameters': r.parameters,
-            }
-            for r in backtest.rules.all()
-        ]
+        rules_snapshot = []
 
         default_account = next((a for a in user_accounts if a.is_default), None) or (user_accounts[0] if user_accounts else None)
         default_mode = default_account.account_type if default_account else AccountTypeChoices.MOCK
@@ -3317,33 +2600,7 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
         else:
             allocated_capital = float(backtest.initial_capital)
 
-        # STRICT ISOLATION: clone rules into immutable dicts
-        rules_snapshot = [
-            {
-                'rule_id': r.id,
-                'name': r.name,
-                'rule_type': r.rule_type,
-                'market_type': r.market_type,
-                'description': r.description,
-                'prompt_directive': r.prompt_directive,
-                'parameters': r.parameters,
-            }
-            for r in backtest.rules.all()
-        ]
-        if not rules_snapshot:
-            matched_rule = BacktestRule.objects.filter(rule_type=backtest.strategy_name).first()
-            if not matched_rule:
-                matched_rule = BacktestRule.objects.filter(rule_type='volume_amd').first()
-            if matched_rule:
-                rules_snapshot = [{
-                    'rule_id': matched_rule.id,
-                    'name': matched_rule.name,
-                    'rule_type': matched_rule.rule_type,
-                    'market_type': matched_rule.market_type,
-                    'description': matched_rule.description,
-                    'prompt_directive': matched_rule.prompt_directive,
-                    'parameters': matched_rule.parameters,
-                }]
+        rules_snapshot = []
         parameters_snapshot = {
             'strategy_parameters': backtest.parameters,
             'initial_capital': float(backtest.initial_capital),
@@ -3482,28 +2739,6 @@ class BacktestApplyAiSuggestionsView(LoginRequiredMixin, AdminRequiredMixin, Vie
             max_lots_cap=backtest.max_lots_cap,
         )
 
-        for rule in backtest.rules.all():
-            new_task.rules.add(rule)
-
-        # Unified Dual-Binding: Create and attach formal BacktestRule record
-        if suggested_params:
-            rec_text = "\n".join(audit_data.get('strategic_recommendations', []))
-            rule_name = f"AI Optimization Guardrail (BT-#{backtest.id})"
-            ai_rule, _ = BacktestRule.objects.get_or_create(
-                name=rule_name,
-                defaults={
-                    'market_type': backtest.market_type,
-                    'rule_type': 'momentum_guardrail',
-                    'description': rec_text or "AI-synthesized execution guardrail and parameter tuning.",
-                    'prompt_directive': f"Add Rule: Dynamic Trailing SL ({suggested_params.get('trailing_sl_trigger_r', 1.2)}R) with {suggested_params.get('entry_delay_minutes', 15)}m opening filter.",
-                    'parameters': suggested_params,
-                    'is_system_preset': False,
-                    'is_active': True,
-                    'created_by': request.user,
-                }
-            )
-            new_task.rules.add(ai_rule)
-
         send_backtest_control_command(new_task.id, 'START_BACKTEST')
 
         response = HttpResponse()
@@ -3551,25 +2786,6 @@ class BacktestSimulateCompoundingView(LoginRequiredMixin, AdminRequiredMixin, Vi
             max_capital_utilization_pct=float(new_params['max_capital_utilization_pct']),
             max_lots_cap=int(new_params['max_lots_cap']),
         )
-
-        for rule in backtest.rules.all():
-            new_task.rules.add(rule)
-
-        rule_name = f"AI {compounding_batch_trades}-Trade Safe Compounding Engine (BT-#{backtest.id})"
-        ai_rule, _ = BacktestRule.objects.get_or_create(
-            name=rule_name,
-            defaults={
-                'market_type': backtest.market_type,
-                'rule_type': 'momentum_guardrail',
-                'description': f"Evaluates closed equity every {compounding_batch_trades} trades. Auto-scales +1 lot per ₹25k net profit (Win Rate >= 50%), with 60% margin budget & drawdown lock.",
-                'prompt_directive': f"Add Rule: AI {compounding_batch_trades}-Trade Safe Compounding (+1 lot/₹25k profit, Win Rate ≥ 50%, Max 60% margin budget, Base-lot lock in drawdowns).",
-                'parameters': new_params,
-                'is_system_preset': False,
-                'is_active': True,
-                'created_by': request.user,
-            }
-        )
-        new_task.rules.add(ai_rule)
 
         send_backtest_control_command(new_task.id, 'START_BACKTEST')
 

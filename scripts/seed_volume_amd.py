@@ -1,5 +1,5 @@
 """
-Seed Volume + AMD Strategy entries into Django BacktestRule and LiveStrategy tables.
+Seed Volume + AMD Strategy entries into LiveStrategy table.
 Can be executed via: python manage.py shell < scripts/seed_volume_amd.py
 or directly inside the django_app container.
 """
@@ -16,38 +16,25 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'marmot.settings')
 django.setup()
 
 from apps.users.models import User
-from apps.backtest.models import BacktestRule
 from apps.trade_config.models import LiveStrategy, UserTradingAccount
 from apps.common.choices import StrategyChoices, MarketTypeChoices, LiveStrategyStatusChoices, AccountTypeChoices
 
 
 def seed_volume_amd():
-    # 1. Ensure BacktestRule exists
-    rule, r_created = BacktestRule.objects.update_or_create(
-        rule_type='volume_amd',
-        defaults={
-            'name': 'Volume + AMD Pattern (1:2.5 Limit Midpoint)',
-            'market_type': 'ALL',
-            'description': 'Institutional Accumulation, Manipulation (Sweep), and Distribution engine with volume absorption spike and 1:2.5 Limit entry.',
-            'parameters': {
-                'ema_fast': 9,
-                'ema_slow': 21,
-                'entry_window_from': 9 * 60 + 25,
-                'entry_window_to': 15 * 60,
-                'sl_pts': 12.0,
-                'rr_ratio': 2.5,
-                'use_orb_filter': False,
-                'min_displacement': 0.50,
-                'trail_breakeven': True,
-                'breakeven_at_r': 1.5,
-                'cooldown_seconds': 300,
-                'order_type': 'LIMIT',
-            },
-            'is_system_preset': True,
-            'is_active': True,
-        }
-    )
-    print(f"[{'CREATED' if r_created else 'UPDATED'}] BacktestRule: {rule.name} (id={rule.id})")
+    amd_params = {
+        'ema_fast': 9,
+        'ema_slow': 21,
+        'entry_window_from': 9 * 60 + 25,
+        'entry_window_to': 15 * 60,
+        'sl_pts': 12.0,
+        'rr_ratio': 2.5,
+        'use_orb_filter': False,
+        'min_displacement': 0.50,
+        'trail_breakeven': True,
+        'breakeven_at_r': 1.5,
+        'cooldown_seconds': 300,
+        'order_type': 'LIMIT',
+    }
 
     # 2. Seed LiveStrategy entry for active users/admin
     users = User.objects.filter(is_active=True)
@@ -66,7 +53,7 @@ def seed_volume_amd():
                     'rule_type': 'volume_amd',
                     'name': 'Volume + AMD Pattern (1:2.5 Limit Midpoint)',
                 }],
-                'frozen_parameters': rule.parameters,
+                'frozen_parameters': amd_params,
                 'is_active': False,
                 'execution_mode': AccountTypeChoices.MOCK if trading_acc and trading_acc.account_type == AccountTypeChoices.MOCK else AccountTypeChoices.LIVE,
                 'status': LiveStrategyStatusChoices.STANDBY,

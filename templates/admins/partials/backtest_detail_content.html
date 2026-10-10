@@ -462,15 +462,7 @@
         </div>
     </div>
 
-    <!-- Active Strategy Rules Badges -->
-    {% include 'admins/partials/backtest_active_rules_badges.html' %}
 
-    {% if backtest.parameters.prompt_directives %}
-    <div class="mt-2 pt-2 border-top border-secondary border-opacity-10 small d-flex align-items-start gap-2">
-        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2 py-0 fw-bold" style="font-size: 0.68rem;">AI DIRECTIVES</span>
-        <span class="theme-text-main fst-italic">"{{ backtest.parameters.prompt_directives }}"</span>
-    </div>
-    {% endif %}
 </div>
 
 <!-- Full-Width Horizontal Capital Accounting & In-Hand Cash Bridge Card -->
@@ -1410,8 +1402,8 @@
     <div class="collapse show" id="lossRcaCollapseBody">
         <div class="p-3 p-md-4">
         <div class="row g-3 g-lg-4">
-            <!-- 1. Primary Failure Mechanisms (Left Column) -->
-            <div class="col-12 col-lg-5">
+            <!-- Primary Failure Mechanisms -->
+            <div class="col-12">
                 <div class="p-3 p-md-4 rounded-3 h-100 rca-subpanel">
                     <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-15">
                         <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-1.5" style="font-size: 0.74rem; letter-spacing: 0.5px;">
@@ -1441,175 +1433,9 @@
                     {% endfor %}
                 </div>
             </div>
-
-            <!-- 2. AI-Synthesized Preventive Rules (Right Column) -->
-            <div class="col-12 col-lg-7">
-                {% include 'admins/partials/backtest_ai_rules_panel.html' %}
-            </div>
         </div>
     </div>
     </div>
-</div>
-{% endif %}
-
-<!-- Active Strategy Rules Efficacy & Precision Attribution Summary Card Widget -->
-{% if rules_performance %}
-<div class="glass-card p-0 overflow-hidden mb-4 border-0">
-    <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2">
-        <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 36px; height: 36px; background: rgba(56, 189, 248, 0.18); color: var(--info);">
-                <span class="material-icons" style="font-size: 1.25rem;">fact_check</span>
-            </div>
-            <div>
-                <h5 class="fw-bold theme-text-main mb-0 d-flex align-items-center gap-2 flex-wrap">
-                    <span>Active Strategy Rules Efficacy & Precision Attribution</span>
-                    <span class="badge bg-secondary bg-opacity-25 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.68rem;" title="Attribution is computed via trade log factor decomposition and keyword clustering models.">
-                        <span class="material-icons align-middle" style="font-size: 0.72rem;">info</span> Heuristic Factor Model
-                    </span>
-                </h5>
-                <small class="theme-text-muted">Statistical factor attribution: execution hit rate, win precision %, net alpha PnL, and simulated false-signal mitigation per rule.</small>
-            </div>
-        </div>
-        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-3 py-1 font-monospace fw-bold" style="font-size: 0.72rem;">
-            {{ rules_performance|length }} Active Rules Monitored
-        </span>
-    </div>
-
-    <!-- DESKTOP / LAPTOP: DENSE RULES EFFICACY TABLE -->
-    <div class="w-100 d-none d-lg-block">
-        <table class="table table-hover custom-glass-table align-middle mb-0 border-0 w-100" style="width: 100%; table-layout: fixed; --bs-table-bg: transparent; color: var(--text-main);">
-            <thead>
-                <tr class="theme-text-muted border-bottom" style="background-color: var(--nav-hover); border-color: var(--border-default) !important;">
-                    <th scope="col" class="ps-3 py-2.5 theme-text-muted text-uppercase small fw-semibold" style="width: 29%; font-size: 0.72rem;">Rule Name & Guardrail Role</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 10%; font-size: 0.72rem;">Invocations</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 15%; font-size: 0.72rem;">Accuracy / Win Rate</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 11%; font-size: 0.72rem;">Win / Loss Split</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold" style="width: 13%; font-size: 0.72rem;">Net Alpha PnL</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 11%; font-size: 0.72rem;">Precision Status</th>
-                    <th scope="col" class="py-2.5 px-1 theme-text-muted text-uppercase small fw-semibold text-center" style="width: 11%; font-size: 0.72rem;">Audit &amp; Actions</th>
-                </tr>
-            </thead>
-            <tbody>
-                {% for r in rules_performance %}
-                <tr class="border-bottom border-secondary border-opacity-10" style="border-color: var(--border-default) !important;">
-                    <td class="ps-3 py-2 bg-transparent">
-                        <div class="d-flex align-items-center gap-2 mb-0.5">
-                            <span class="material-icons fs-6" style="color: {{ r.color }};">{{ r.icon }}</span>
-                            <span class="fw-bold theme-text-main small">{{ r.name }}</span>
-                        </div>
-                        <small class="theme-text-muted d-block ps-4" style="font-size: 0.68rem; margin-top: -2px;">{{ r.role }}</small>
-                    </td>
-
-                    <td class="py-2 px-1 bg-transparent text-center font-monospace">
-                        <span class="badge rounded-pill px-2 py-0.5 fw-semibold" style="font-size: 0.7rem; background: var(--bg-elevated); color: var(--text-primary); border: 1px solid var(--border-default);">
-                            {{ r.triggered_count }} Trades
-                        </span>
-                    </td>
-
-                    <td class="py-2 px-1 bg-transparent font-monospace">
-                        <div class="d-flex justify-content-between align-items-center mb-1">
-                            <span class="fw-bold {% if r.accuracy_pct >= 60 %}text-success{% elif r.accuracy_pct >= 45 %}text-info{% else %}text-warning{% endif %}" style="font-size: 0.75rem;">
-                                {{ r.accuracy_pct }}%
-                            </span>
-                            {% if r.prevented_count > 0 %}
-                            <span class="text-info" style="font-size: 0.65rem;" title="False traps / noise stopouts prevented">
-                                🛡️ {{ r.prevented_count }} Saved
-                            </span>
-                            {% endif %}
-                        </div>
-                        <div class="progress rounded-pill" style="height: 5px; background: rgba(255, 255, 255, 0.08);">
-                            <div class="progress-bar {% if r.accuracy_pct >= 60 %}bg-success{% elif r.accuracy_pct >= 45 %}bg-info{% else %}bg-warning{% endif %} rounded-pill" style="width: {{ r.accuracy_pct }}%;"></div>
-                        </div>
-                    </td>
-
-                    <td class="py-2 px-1 bg-transparent text-center font-monospace" style="font-size: 0.72rem;">
-                        <span class="text-success fw-bold">{{ r.winning_count }}W</span>
-                        <span class="theme-text-muted mx-0.5">/</span>
-                        <span class="text-danger fw-bold">{{ r.losing_count }}L</span>
-                    </td>
-
-                    <td class="py-2 px-1 bg-transparent font-monospace">
-                        <span class="badge rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.74rem; {% if r.net_pnl >= 0 %}background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;{% else %}background: rgba(239, 68, 68, 0.18) !important; color: #ef4444 !important; border: 1px solid rgba(239, 68, 68, 0.35) !important;{% endif %}">
-                            {% if r.net_pnl >= 0 %}+{% endif %}₹{{ r.net_pnl|floatformat:2 }}
-                        </span>
-                    </td>
-
-                    <td class="py-2 px-1 bg-transparent text-center">
-                        {% if r.accuracy_pct >= 65 %}
-                            <span class="badge rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.65rem; background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important; border: 1px solid rgba(16, 185, 129, 0.35) !important;">
-                                🟢 High Precision
-                            </span>
-                        {% elif r.accuracy_pct >= 50 %}
-                            <span class="badge rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.65rem; background: rgba(56, 189, 248, 0.18) !important; color: #0284c7 !important; border: 1px solid rgba(56, 189, 248, 0.35) !important;">
-                                🔵 Solid Filter
-                            </span>
-                        {% else %}
-                            <span class="badge rounded-pill px-2 py-0.5 fw-bold" style="font-size: 0.65rem; background: rgba(245, 158, 11, 0.18) !important; color: #d97706 !important; border: 1px solid rgba(245, 158, 11, 0.35) !important;">
-                                ⚡ Active Shield
-                            </span>
-                        {% endif %}
-                    </td>
-
-                    <td class="py-2 px-1 bg-transparent text-center">
-                        <button type="button" 
-                                class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
-                                style="font-size: 0.7rem; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.08);"
-                                hx-get="{% url 'backtest:backtest_rule_ablation_audit' backtest.id r.id %}"
-                                hx-target="#globalHtmxModalDialog"
-                                data-bs-toggle="modal"
-                                data-bs-target="#globalHtmxModal"
-                                title="1-Click Rule Counterfactual Ablation Audit">
-                            <span class="material-icons" style="font-size: 0.88rem;">offline_bolt</span>
-                            <span>Audit Alpha</span>
-                        </button>
-                    </td>
-                </tr>
-                {% endfor %}
-            </tbody>
-        </table>
-    </div>
-
-    <!-- MOBILE & TABLET VIEW: COMPACT RULE PERFORMANCE CARDS -->
-    <div class="p-3 d-block d-lg-none">
-        <div class="row g-2">
-            {% for r in rules_performance %}
-            <div class="col-12 col-md-6">
-                <div class="p-2.5 rounded-3 border" style="background: var(--bg-elevated); border-color: var(--border-default) !important;">
-                    <div class="d-flex justify-content-between align-items-start mb-1.5">
-                        <div class="d-flex align-items-center gap-1.5">
-                            <span class="material-icons fs-6" style="color: {{ r.color }};">{{ r.icon }}</span>
-                            <span class="fw-bold theme-text-main small">{{ r.name }}</span>
-                        </div>
-                        <span class="badge rounded-pill px-2 py-0.5 font-monospace fw-bold" style="font-size: 0.68rem; {% if r.net_pnl >= 0 %}background: rgba(16, 185, 129, 0.18) !important; color: #10b981 !important;{% else %}background: rgba(239, 68, 68, 0.18) !important; color: #ef4444 !important;{% endif %}">
-                            {% if r.net_pnl >= 0 %}+{% endif %}₹{{ r.net_pnl|floatformat:0 }}
-                        </span>
-                    </div>
-                    <div class="d-flex justify-content-between align-items-center small font-monospace mb-1">
-                        <span class="theme-text-muted" style="font-size: 0.7rem;">Invocations: <strong>{{ r.triggered_count }}</strong> ({{ r.winning_count }}W/{{ r.losing_count }}L)</span>
-                        <span class="fw-bold {% if r.accuracy_pct >= 60 %}text-success{% else %}text-info{% endif %}" style="font-size: 0.72rem;">{{ r.accuracy_pct }}% Win</span>
-                    </div>
-                    <div class="progress rounded-pill mb-2" style="height: 4px; background: rgba(255, 255, 255, 0.08);">
-                        <div class="progress-bar {% if r.accuracy_pct >= 60 %}bg-success{% else %}bg-info{% endif %} rounded-pill" style="width: {{ r.accuracy_pct }}%;"></div>
-                    </div>
-                    <div class="pt-1.5 border-top border-secondary border-opacity-10 d-flex justify-content-between align-items-center">
-                        <span class="theme-text-muted" style="font-size: 0.68rem;">Attribution Model</span>
-                        <button type="button" 
-                                class="btn btn-sm btn-outline-info rounded-pill px-2.5 py-0.5 fw-bold d-inline-flex align-items-center gap-1 shadow-sm"
-                                style="font-size: 0.68rem; border-color: rgba(56, 189, 248, 0.45); background: rgba(56, 189, 248, 0.08);"
-                                hx-get="{% url 'backtest:backtest_rule_ablation_audit' backtest.id r.id %}"
-                                hx-target="#globalHtmxModalDialog"
-                                data-bs-toggle="modal"
-                                data-bs-target="#globalHtmxModal">
-                            <span class="material-icons" style="font-size: 0.78rem;">offline_bolt</span>
-                            <span>Audit Alpha</span>
-                        </button>
-                    </div>
-                </div>
-            </div>
-            {% endfor %}
-        </div>
-    </div>
-
 </div>
 {% endif %}
 

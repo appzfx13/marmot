@@ -198,7 +198,7 @@
 <!-- 3. Order Flow Metrics & Strategy Rules Efficacy Section -->
 <div class="row g-3 g-lg-4 mb-4">
     <!-- Databento Order Flow Analytics Box -->
-    <div class="col-12 col-lg-5">
+    <div class="col-12">
         <div class="forex-glass-card p-3 p-md-4 h-100">
             <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-15">
                 <span class="theme-text-main fw-bold text-uppercase d-flex align-items-center gap-2" style="font-size: 0.82rem; letter-spacing: 0.5px;">
@@ -243,61 +243,10 @@
             </div>
         </div>
     </div>
-
-    <!-- Active Forex Strategy Rules Efficacy Table -->
-    <div class="col-12 col-lg-7">
-        <div class="forex-glass-card p-3 p-md-4 h-100">
-            <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-15">
-                <span class="theme-text-main fw-bold text-uppercase d-flex align-items-center gap-2" style="font-size: 0.82rem; letter-spacing: 0.5px;">
-                    <span class="material-icons text-primary" style="font-size: 1.1rem;">fact_check</span>
-                    Active Forex Rules Efficacy & Alpha Attribution
-                </span>
-                <span class="badge forex-pill-badge rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.68rem;">
-                    {{ rules_performance|length }} Active Rules
-                </span>
-            </div>
-
-            <div class="table-responsive">
-                <table class="table table-hover align-middle mb-0 border-0 w-100" style="font-size: 0.78rem;">
-                    <thead>
-                        <tr class="theme-text-muted border-bottom" style="background: var(--nav-hover);">
-                            <th class="py-2 text-uppercase fw-semibold">Rule Name</th>
-                            <th class="py-2 text-uppercase fw-semibold text-center">Invocations</th>
-                            <th class="py-2 text-uppercase fw-semibold text-center">Win Rate</th>
-                            <th class="py-2 text-uppercase fw-semibold text-end">Net Alpha PnL</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        {% for ritem in rules_performance %}
-                        <tr class="border-bottom border-secondary border-opacity-10">
-                            <td class="py-2 ps-2">
-                                <div class="d-flex align-items-center gap-2">
-                                    <span class="material-icons" style="font-size: 0.95rem; color: {{ ritem.color }};">{{ ritem.icon }}</span>
-                                    <span class="theme-text-main fw-bold text-truncate" style="max-width: 220px;" title="{{ ritem.rule_name }}">
-                                        {{ ritem.rule_name }}
-                                    </span>
-                                </div>
-                            </td>
-                            <td class="py-2 text-center font-monospace">{{ ritem.triggered_count }}</td>
-                            <td class="py-2 text-center font-monospace text-info fw-bold">{{ ritem.accuracy_pct }}%</td>
-                            <td class="py-2 text-end font-monospace fw-bold {% if ritem.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
-                                {% if ritem.net_pnl >= 0 %}+{% endif %}${{ ritem.net_pnl|floatformat:2 }}
-                            </td>
-                        </tr>
-                        {% empty %}
-                        <tr>
-                            <td colspan="4" class="text-center py-4 theme-text-muted fst-italic">No custom rules active for this Forex task.</td>
-                        </tr>
-                        {% endfor %}
-                    </tbody>
-                </table>
-            </div>
-        </div>
-    </div>
 </div>
 
-<!-- 4. Stop-Loss Loss RCA Diagnostics & AI Prevention Rules Card -->
-{% if backtest.results.loss_rca_breakdown or backtest.results.ai_suggested_future_rules %}
+<!-- 4. Stop-Loss Loss RCA Diagnostics Card -->
+{% if backtest.results.loss_rca_breakdown %}
 <div class="forex-glass-card p-0 overflow-hidden mb-4 border-0">
     <div class="p-3 p-md-4 border-bottom border-secondary border-opacity-25 d-flex align-items-center justify-content-between flex-wrap gap-2">
         <div class="d-flex align-items-center gap-2">
@@ -305,8 +254,8 @@
                 <span class="material-icons" style="font-size: 1.25rem;">troubleshoot</span>
             </div>
             <div>
-                <h5 class="fw-bold theme-text-main mb-0">Forex Loss Root Cause Analysis (Loss RCA) & Learning Engine</h5>
-                <small class="theme-text-muted">Go Quant Strategy failure mode decomposition &amp; automated future rule guardrail synthesis.</small>
+                <h5 class="fw-bold theme-text-main mb-0">Forex Loss Root Cause Analysis (Loss RCA) Engine</h5>
+                <small class="theme-text-muted">Go Quant Strategy failure mode decomposition.</small>
             </div>
         </div>
         <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 rounded-pill px-3 py-1 font-monospace fw-bold" style="font-size: 0.72rem;">
@@ -316,8 +265,8 @@
 
     <div class="p-3 p-md-4">
         <div class="row g-3 g-lg-4">
-            <!-- 1. Primary Failure Mechanisms (Left Column) -->
-            <div class="col-12 col-lg-5">
+            <!-- Primary Failure Mechanisms -->
+            <div class="col-12">
                 <div class="p-3 rounded-3 h-100" style="background: var(--bg-elevated); border: 1px solid var(--border-default);">
                     <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom border-secondary border-opacity-15">
                         <span class="theme-text-muted small fw-bold text-uppercase d-flex align-items-center gap-2" style="font-size: 0.74rem; letter-spacing: 0.5px;">
@@ -346,11 +295,6 @@
                     <div class="theme-text-muted small fst-italic p-4 text-center">No recurring stop loss patterns detected.</div>
                     {% endfor %}
                 </div>
-            </div>
-
-            <!-- 2. AI-Synthesized Preventive Rules -->
-            <div class="col-12 col-lg-7">
-                {% include 'admins/partials/backtest_ai_rules_panel.html' %}
             </div>
         </div>
     </div>

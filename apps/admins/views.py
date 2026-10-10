@@ -5410,18 +5410,7 @@ class LiveStrategyToggleView(LoginRequiredMixin, View):
         strategy.is_active = not strategy.is_active
         strategy.status = LiveStrategyStatusChoices.ACTIVE if strategy.is_active else LiveStrategyStatusChoices.PAUSED
         if strategy.is_active and not strategy.frozen_rules_snapshot:
-            from apps.backtest.models import BacktestRule
-            matched_rule = BacktestRule.objects.filter(rule_type=strategy.strategy_name).first() or BacktestRule.objects.filter(rule_type='volume_amd').first()
-            if matched_rule:
-                strategy.frozen_rules_snapshot = [{
-                    'rule_id': matched_rule.id,
-                    'name': matched_rule.name,
-                    'rule_type': matched_rule.rule_type,
-                    'market_type': matched_rule.market_type,
-                    'description': matched_rule.description,
-                    'prompt_directive': matched_rule.prompt_directive,
-                    'parameters': matched_rule.parameters,
-                }]
+            strategy.frozen_rules_snapshot = []
         strategy.save(update_fields=['is_active', 'status', 'frozen_rules_snapshot', 'updated_at'])
 
         # Publish Redis IPC command to Go strategy worker for SANDBOX paper trading

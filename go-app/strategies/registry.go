@@ -2,7 +2,7 @@ package strategies
 
 import "strings"
 
-// StrategyConfig defines a named, hardcoded Go strategy preset activated by a BacktestRule.rule_type.
+// StrategyConfig defines a named, hardcoded Go strategy preset activated by strategy name or ruleType key.
 type StrategyConfig struct {
 	Name            string
 	EMAFast         int
