@@ -36,7 +36,6 @@ class AccountGuardianService:
 
             l1_limit = float(config.primary_loss_limit) if config and config.primary_loss_limit else 1000.0
             l2_limit = float(config.final_loss_limit) if config and config.final_loss_limit else 2000.0
-            profit_limit = float(config.max_profit_limit) if config and config.max_profit_limit else 0.0
 
             payload = {
                 "user_id": user.id,
@@ -44,7 +43,6 @@ class AccountGuardianService:
                 "max_loss_status": bool(config.max_loss_status) if config else False,
                 "primary_loss_limit": l1_limit,
                 "final_loss_limit": l2_limit,
-                "max_profit_limit": profit_limit,
                 "primary_freeze": bool(user.primary_freeze),
                 "final_freeze": bool(user.final_freeze),
                 "trade_eligibility": bool(user.trade_eligibility),

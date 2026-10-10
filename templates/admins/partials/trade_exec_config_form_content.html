@@ -170,63 +170,8 @@
         pointer-events: none;
     }
 
-    /* Market Type Tabs */
-    .market-tab-btn {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 12px 20px;
-        border-radius: 12px;
-        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.15));
-        background: rgba(255,255,255,0.02);
-        color: var(--text-muted);
-        font-size: 0.875rem;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all 0.25s ease;
-        flex: 1;
-    }
-
-    .market-tab-btn:hover {
-        background: var(--nav-hover, rgba(255, 255, 255, 0.08));
-        border-color: rgba(122, 90, 248, 0.3);
-    }
-
-    .market-tab-btn.active-index {
-        background: rgba(13,110,253,0.12) !important;
-        border-color: rgba(13,110,253,0.4) !important;
-        color: #60a5fa !important;
-        box-shadow: 0 4px 12px rgba(13,110,253,0.15);
-    }
-
-    .market-tab-btn.active-forex {
-        background: rgba(16,185,129,0.12) !important;
-        border-color: rgba(16,185,129,0.4) !important;
-        color: #34d399 !important;
-        box-shadow: 0 4px 12px rgba(16,185,129,0.15);
-    }
-    :root[data-theme="light"] .market-tab-btn.active-index,
-    [data-theme="light"] .market-tab-btn.active-index {
-        background: rgba(13,110,253,0.12) !important;
-        border-color: rgba(13,110,253,0.4) !important;
-        color: #0d6efd !important;
-    }
-    :root[data-theme="light"] .market-tab-btn.active-forex,
-    [data-theme="light"] .market-tab-btn.active-forex {
-        background: rgba(16,185,129,0.12) !important;
-        border-color: rgba(5,150,105,0.4) !important;
-        color: #059669 !important;
-    }
-
-    /* Section reveal animation */
-    .market-section {
-        transition: opacity 0.25s ease;
-    }
-
-    .market-section.hidden {
-        display: none !important;
-    }
 </style>
+
 
 <div class="row">
     <!-- Header with proper top spacing -->
@@ -248,7 +193,7 @@
                             {% if object %}Editing ID: #{{ object.pk }}{% else %}New Configuration{% endif %}
                         </span>
                     </h1>
-                    <p class="page-subtitle mb-0">Configure risk controls, lot rules, market types, and execution strategy parameters.</p>
+                    <p class="page-subtitle mb-0">Configure risk controls, circuit breaker limits, and execution strategy parameters.</p>
                 </div>
             </div>
             <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
@@ -279,48 +224,6 @@
                         </div>
                     </div>
                 {% endif %}
-
-                <!-- SECTION 0: MARKET TYPE SELECTOR -->
-                <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-                    <span class="material-icons text-warning fs-5">public</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Market Segment Selection</h6>
-                    <span class="ms-auto badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 small">Required</span>
-                </div>
-
-                <div class="mb-4">
-                    <div class="d-flex flex-column flex-sm-row gap-3" id="marketTabBtns">
-                        <button type="button"
-                                class="market-tab-btn flex-grow-1 p-3 text-start {% if not object or object.market_type == 'INDEX_FO' %}active-index{% endif %}"
-                                id="tabIndexFO"
-                                onclick="setMarketType('INDEX_FO')">
-                            <div class="d-flex align-items-center gap-3">
-                                <span class="material-icons fs-3 text-primary">candlestick_chart</span>
-                                <div>
-                                    <div class="fw-bold theme-text-main">INDEX / F&amp;O (India)</div>
-                                    <div class="small theme-text-muted">Nifty 50 · BankNifty · FinNifty · Stock Options</div>
-                                </div>
-                            </div>
-                        </button>
-
-                        <button type="button"
-                                class="market-tab-btn flex-grow-1 p-3 text-start {% if object and object.market_type == 'FOREX_FUTURES' %}active-forex{% endif %}"
-                                id="tabForex"
-                                onclick="setMarketType('FOREX_FUTURES')">
-                            <div class="d-flex align-items-center gap-3">
-                                <span class="material-icons fs-3 text-success">currency_exchange</span>
-                                <div>
-                                    <div class="fw-bold theme-text-main">FOREX / CME Micro Futures</div>
-                                    <div class="small theme-text-muted">MGC Gold · M6E Euro · MNQ Nasdaq · MES S&amp;P</div>
-                                </div>
-                            </div>
-                        </button>
-                    </div>
-                    <!-- Hidden form select field -->
-                    <div style="display:none;">{{ form.market_type }}</div>
-                    {% if form.market_type.errors %}
-                        <div class="text-danger small mt-1">{{ form.market_type.errors.0 }}</div>
-                    {% endif %}
-                </div>
 
                 <!-- SECTION 1: GENERAL SETTINGS (Optimized Balanced Grid) -->
                 <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
@@ -407,7 +310,7 @@
                                 </div>
                             </div>
                             <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
-                                Level 1 soft warning threshold (e.g. ₹1,000 / $100). Triggers soft freeze with one-click <strong>Unlock Dhan Freeze</strong> on Live Dashboard.
+                                Level 1 soft warning threshold (e.g. ₹1,000). Triggers soft freeze with one-click <strong>Unlock Dhan Freeze</strong> on Live Dashboard.
                             </div>
                         </div>
                     </div>
@@ -432,38 +335,13 @@
                                 </div>
                             </div>
                             <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
-                                Level 2 hard day limit (e.g. ₹2,000 / $200). If hit after unfreezing Level 1, locks account for the <strong>entire day</strong> (no unlock button).
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- Max Profit Limit Card -->
-                    <div class="col-12 col-lg-6">
-                        <div class="config-card-unit p-3">
-                            <div class="d-flex align-items-center justify-content-between flex-wrap gap-3">
-                                <!-- Left: Switch and Title -->
-                                <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
-                                    {{ form.max_profit_status }}
-                                    <label class="form-check-label theme-text-main small fw-bold mb-0 cursor-pointer d-flex align-items-center gap-2" for="id_max_profit_status">
-                                        <span class="material-icons text-success fs-5">verified</span>
-                                        <span>Target Session Profit Limit</span>
-                                    </label>
-                                </div>
-
-                                <!-- Right: Amount Input Field -->
-                                <div id="max_profit_dep_body" class="toggle-dep-container" style="min-width: 150px; max-width: 200px; flex: 1;">
-                                    {{ form.max_profit_limit }}
-                                    {% if form.max_profit_limit.errors %}<div class="text-danger small mt-1">{{ form.max_profit_limit.errors.0 }}</div>{% endif %}
-                                </div>
-                            </div>
-                            <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
-                                Optional target session profit limit for locking profits and preventing giveback.
+                                Level 2 hard day limit (e.g. ₹2,000). If hit after unfreezing Level 1, locks account for the <strong>entire day</strong> (no unlock button).
                             </div>
                         </div>
                     </div>
 
                     <!-- Engine Info Note -->
-                    <div class="col-12 col-lg-6">
+                    <div class="col-12">
                         <div class="config-card-unit p-3 d-flex align-items-center gap-3">
                             <span class="material-icons text-info fs-3">bolt</span>
                             <div>
@@ -475,8 +353,6 @@
                         </div>
                     </div>
                 </div>
-
-
 
                 <!-- Action Buttons -->
                 <div class="d-flex align-items-center justify-content-end gap-3 pt-3 border-top" style="border-color: var(--border-color) !important;">
@@ -534,21 +410,6 @@
 </div>
 
 <script>
-window.applyMarketType = function(val) {
-    const isForex = (val === 'FOREX_FUTURES');
-    const tabIndexFO    = document.getElementById('tabIndexFO');
-    const tabForex      = document.getElementById('tabForex');
-    const marketSelect  = document.getElementById('id_market_type');
-
-    if (tabIndexFO) tabIndexFO.className = 'market-tab-btn flex-grow-1 p-3 text-start' + (!isForex ? ' active-index' : '');
-    if (tabForex) tabForex.className   = 'market-tab-btn flex-grow-1 p-3 text-start' + (isForex  ? ' active-forex' : '');
-    if (marketSelect) marketSelect.value = val;
-};
-
-window.setMarketType = function(val) {
-    window.applyMarketType(val);
-};
-
 window.syncAllFormToggleStates = function() {
     // 0. Master Account Guardian Circuit Breaker
     const guardianCheck = document.getElementById('id_max_loss_status');
@@ -578,27 +439,9 @@ window.syncAllFormToggleStates = function() {
         finalInput.disabled = !guardianActive || !finalCheck.checked;
         if (finalDep) finalDep.classList.toggle('is-dimmed', !guardianActive || !finalCheck.checked);
     }
-
-    // 3. Max Profit Limit
-    const profitCheck = document.getElementById('id_max_profit_status');
-    const profitInput = document.getElementById('id_max_profit_limit');
-    const profitDep   = document.getElementById('max_profit_dep_body');
-    if (profitCheck && profitInput) {
-        profitInput.disabled = !profitCheck.checked;
-        if (profitDep) profitDep.classList.toggle('is-dimmed', !profitCheck.checked);
-    }
 };
 
 document.addEventListener('click', function(e) {
-    const btn = e.target.closest('.market-tab-btn');
-    if (btn) {
-        if (btn.id === 'tabIndexFO') {
-            window.applyMarketType('INDEX_FO');
-        } else if (btn.id === 'tabForex') {
-            window.applyMarketType('FOREX_FUTURES');
-        }
-    }
-
     const confirmBtn = e.target.closest('#confirmSubmitBtn');
     if (confirmBtn) {
         const form = document.getElementById('configForm');
@@ -610,17 +453,13 @@ document.addEventListener('change', function(e) {
     if (e.target && (
         e.target.id === 'id_max_loss_status' ||
         e.target.id === 'id_primary_loss_status' ||
-        e.target.id === 'id_final_loss_status' ||
-        e.target.id === 'id_max_profit_status'
+        e.target.id === 'id_final_loss_status'
     )) {
         window.syncAllFormToggleStates();
     }
 });
 
 (function() {
-    const marketSelect = document.getElementById('id_market_type');
-    const initial = marketSelect ? marketSelect.value : 'INDEX_FO';
-    window.applyMarketType(initial || 'INDEX_FO');
     window.syncAllFormToggleStates();
 })();
 </script>

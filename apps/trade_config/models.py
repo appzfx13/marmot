@@ -4,7 +4,6 @@ from django.db import models
 from apps.common.choices import (
     AccountTypeChoices,
     LiveStrategyStatusChoices,
-    MarketTypeChoices,
     SessionRatingChoices,
     StrategyChoices,
 )
@@ -71,9 +70,6 @@ class TradeExecConfig(BaseModel):
     # Account Mode
     account_type = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.MOCK, help_text="Target execution account mode (LIVE / MOCK)")
 
-    # ─── Market Type ────────────────────────────────────────────────────────
-    market_type = models.CharField(max_length=20, choices=MarketTypeChoices.choices, default=MarketTypeChoices.INDEX_FO, help_text="Market segment")
-
     # General Status
     is_active = models.BooleanField(default=True, help_text="Master toggle to enable or disable auto trade execution features")
     # ─── Risk Controls (Two-Level Account Guardian Limits) ───────────────────
@@ -82,8 +78,7 @@ class TradeExecConfig(BaseModel):
     primary_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, default=1000.00, null=True, blank=True, help_text="Level 1 warning loss threshold")
     final_loss_status = models.BooleanField(default=True, help_text="Enable Level 2 Hard Loss Limit for full-day account freeze")
     final_loss_limit = models.DecimalField(max_digits=12, decimal_places=2, default=2000.00, null=True, blank=True, help_text="Level 2 hard day loss threshold")
-    max_profit_status = models.BooleanField(default=False, help_text="Enable maximum profit limit rule")
-    max_profit_limit = models.DecimalField(max_digits=12, decimal_places=2, null=True, blank=True, help_text="Target max profit limit for session")
+
     class Meta:
         verbose_name = "Trade Execution Configuration"
         verbose_name_plural = "Trade Execution Configurations"
@@ -99,8 +94,6 @@ class TradeExecConfig(BaseModel):
             if self.primary_loss_status and self.final_loss_status and self.primary_loss_limit and self.final_loss_limit:
                 if self.primary_loss_limit >= self.final_loss_limit:
                     raise ValidationError({'final_loss_limit': 'Level 2 Hard Loss Limit must be strictly greater than Level 1 Warning Limit.'})
-        if self.max_profit_status and (self.max_profit_limit is None or self.max_profit_limit <= 0):
-            raise ValidationError({'max_profit_limit': 'Max Profit Limit value is required when Max Profit rule is enabled.'})
 
     def save(self, *args, **kwargs):
         super().save(*args, **kwargs)
@@ -128,10 +121,7 @@ class LiveStrategy(BaseModel):
     name = models.CharField(max_length=255, help_text="Live Strategy Deployment Name")
     strategy_name = models.CharField(max_length=50, choices=StrategyChoices.choices, default=StrategyChoices.QUANT_ENGINE)
     index_name = models.CharField(max_length=50, default='NIFTY', help_text="Target trading asset (e.g. NIFTY, BANKNIFTY)")
-    market_type = models.CharField(max_length=20, choices=MarketTypeChoices.choices, default=MarketTypeChoices.INDEX_FO, help_text="Market segment")
     allocated_capital = models.DecimalField(max_digits=12, decimal_places=2, default=100000.00, help_text="Allocated capital in INR")
-    # FROZEN RULE & PARAMETER SNAPSHOTS (strictly isolated JSONB to prevent mutations from rulebook edits)
-    frozen_rules_snapshot = models.JSONField(default=list, blank=True, help_text="Immutable snapshot of rules at deployment")
     frozen_parameters = models.JSONField(default=dict, blank=True, help_text="Immutable snapshot of parameters at deployment")
     is_active = models.BooleanField(default=False, help_text="Live execution enabled toggle (initially False)")
     execution_mode = models.CharField(max_length=20, choices=AccountTypeChoices.choices, default=AccountTypeChoices.LIVE)

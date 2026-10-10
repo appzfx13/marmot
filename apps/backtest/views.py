@@ -2039,7 +2039,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
                  else 'CALM' if int(task.max_lots_cap or params.get('max_lots_cap', 10)) <= 5 and float(task.max_risk_per_trade_pct or params.get('max_risk_per_trade_pct', 2.0)) <= 1.5
                  else 'MODERATE')
             ),
-            'order_slice_size_val': int(params.get('order_slice_size', 30)),
             'max_sliced_orders_val': int(params.get('max_sliced_orders', 2)),
             'enable_ai_lot_sizing_val': bool(task.enable_ai_lot_sizing or params.get('enable_ai_lot_sizing', False) or params.get('enable_ai_compounding', False)),
             'enable_ai_compounding_val': bool(params.get('enable_ai_compounding', False) or params.get('enable_ai_lot_sizing', False)),
@@ -2154,10 +2153,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         auto_risk_management = ('auto_risk_management' in request.POST)
         risk_profile = request.POST.get('risk_profile', 'MODERATE').strip().upper() or 'MODERATE'
         try:
-            order_slice_size = int(request.POST.get('order_slice_size', '30').strip() or 30)
-        except ValueError:
-            order_slice_size = 30
-        try:
             max_sliced_orders = int(request.POST.get('max_sliced_orders', '2').strip() or 2)
         except ValueError:
             max_sliced_orders = 2
@@ -2223,7 +2218,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             **(task.parameters or {}),
             "market_type": "FOREX_FUTURES" if is_forex else "INDEX_FO",
             "risk_profile": risk_profile,
-            "order_slice_size": order_slice_size,
             "max_sliced_orders": max_sliced_orders,
             "rr_ratio": rr_ratio,
             "stop_loss_points": sl_pts,
@@ -2605,7 +2599,6 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
             'strategy_parameters': backtest.parameters,
             'initial_capital': float(backtest.initial_capital),
             'risk_profile': str((backtest.parameters or {}).get('risk_profile', 'MODERATE')),
-            'order_slice_size': int((backtest.parameters or {}).get('order_slice_size', 30)),
             'max_sliced_orders': int((backtest.parameters or {}).get('max_sliced_orders', 2)),
             'use_macro_assist': backtest.use_macro_assist,
             'macro_timeframe': backtest.macro_timeframe,

@@ -130,50 +130,6 @@
         pointer-events: none;
     }
 
-    /* Market Type Tabs (Read-only styled) */
-    .market-tab-card {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-        padding: 14px 20px;
-        border-radius: 12px;
-        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.12));
-        background: rgba(255,255,255,0.02);
-        color: var(--text-muted);
-        font-size: 0.875rem;
-        flex: 1;
-        transition: all 0.25s ease;
-    }
-
-    .market-tab-card.active-index {
-        background: rgba(13,110,253,0.12) !important;
-        border-color: rgba(13,110,253,0.4) !important;
-        color: #60a5fa !important;
-        box-shadow: 0 4px 12px rgba(13,110,253,0.15);
-    }
-
-    .market-tab-card.active-forex {
-        background: rgba(16,185,129,0.12) !important;
-        border-color: rgba(16,185,129,0.4) !important;
-        color: #34d399 !important;
-        box-shadow: 0 4px 12px rgba(16,185,129,0.15);
-    }
-
-    .market-tab-card.inactive-segment {
-        opacity: 0.45;
-    }
-
-    :root[data-theme="light"] .market-tab-card.active-index {
-        background: rgba(13,110,253,0.12) !important;
-        border-color: rgba(13,110,253,0.4) !important;
-        color: #0d6efd !important;
-    }
-
-    :root[data-theme="light"] .market-tab-card.active-forex {
-        background: rgba(16,185,129,0.12) !important;
-        border-color: rgba(5,150,105,0.4) !important;
-        color: #059669 !important;
-    }
 </style>
 
 <div class="row">
@@ -223,49 +179,6 @@
          hx-target="this">
         <div class="glass-card glass-form-card p-3 p-sm-4">
             
-            <!-- SECTION 0: MARKET TYPE SELECTOR (Read-Only) -->
-            <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
-                <span class="material-icons text-warning fs-5">public</span>
-                <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Market Segment Selection</h6>
-                <span class="ms-auto badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-25 small">Active Segment</span>
-            </div>
-
-            <div class="mb-4">
-                <div class="d-flex flex-column flex-sm-row gap-3">
-                    <!-- Index / F&O Card -->
-                    <div class="market-tab-card flex-grow-1 {% if object.market_type == 'INDEX_FO' %}active-index{% else %}inactive-segment{% endif %}">
-                        <div class="d-flex align-items-center justify-content-between w-100">
-                            <div class="d-flex align-items-center gap-3">
-                                <span class="material-icons fs-3 text-primary">candlestick_chart</span>
-                                <div>
-                                    <div class="fw-bold theme-text-main">INDEX / F&amp;O (India)</div>
-                                    <div class="small theme-text-muted">Nifty 50 · BankNifty · FinNifty · Stock Options</div>
-                                </div>
-                            </div>
-                            {% if object.market_type == 'INDEX_FO' %}
-                                <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small">Selected</span>
-                            {% endif %}
-                        </div>
-                    </div>
-
-                    <!-- Forex / Futures Card -->
-                    <div class="market-tab-card flex-grow-1 {% if object.market_type == 'FOREX_FUTURES' %}active-forex{% else %}inactive-segment{% endif %}">
-                        <div class="d-flex align-items-center justify-content-between w-100">
-                            <div class="d-flex align-items-center gap-3">
-                                <span class="material-icons fs-3 text-success">currency_exchange</span>
-                                <div>
-                                    <div class="fw-bold theme-text-main">FOREX / CME Micro Futures</div>
-                                    <div class="small theme-text-muted">MGC Gold · M6E Euro · MNQ Nasdaq · MES S&amp;P</div>
-                                </div>
-                            </div>
-                            {% if object.market_type == 'FOREX_FUTURES' %}
-                                <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 small">Selected</span>
-                            {% endif %}
-                        </div>
-                    </div>
-                </div>
-            </div>
-
             <!-- SECTION 1: GENERAL SETTINGS (Read-Only) -->
             <div class="d-flex align-items-center gap-2 mb-3 pb-2 border-bottom" style="border-color: var(--border-color) !important;">
                 <span class="material-icons text-primary fs-5">settings</span>
@@ -360,11 +273,11 @@
                 </div>
             </div>
 
-            <!-- SECTION 2: RISK CONTROL LIMITS (Two-Level Account Guardian & Profit Limits) -->
+            <!-- SECTION 2: RISK CONTROL LIMITS (Two-Level Account Guardian) -->
             <div class="d-flex align-items-center justify-content-between mb-3 pb-2 border-bottom mt-4" style="border-color: var(--border-color) !important;">
                 <div class="d-flex align-items-center gap-2">
                     <span class="material-icons text-primary fs-5">shield</span>
-                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Two-Level Account Guardian &amp; Profit Limits</h6>
+                    <h6 class="fw-bold text-uppercase mb-0 theme-text-main tracking-wider small">Two-Level Account Guardian Limits</h6>
                     <span class="ms-2 badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 small">Risk Firewall</span>
                 </div>
                 <div class="d-flex align-items-center gap-2">
@@ -383,7 +296,7 @@
 
             <div class="row g-3 mb-4" {% if not object.max_loss_status %}style="opacity: 0.55;"{% endif %}>
                 <!-- Level 1 Warning Loss Limit Card -->
-                <div class="col-12 col-lg-4">
+                <div class="col-12 col-lg-6">
                     <div class="config-card-unit p-3">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                             <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
@@ -401,7 +314,7 @@
                         </div>
                         <div class="toggle-dep-container {% if not object.primary_loss_status %}is-dimmed{% endif %}">
                             <div class="readonly-field-box font-monospace fw-bold text-warning justify-content-end">
-                                {% if object.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ object.primary_loss_limit|default:"1000.00" }}
+                                ₹{{ object.primary_loss_limit|default:"1000.00" }}
                             </div>
                         </div>
                         <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
@@ -411,7 +324,7 @@
                 </div>
 
                 <!-- Level 2 Hard Loss Limit Card -->
-                <div class="col-12 col-lg-4">
+                <div class="col-12 col-lg-6">
                     <div class="config-card-unit p-3">
                         <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
                             <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
@@ -429,39 +342,11 @@
                         </div>
                         <div class="toggle-dep-container {% if not object.final_loss_status %}is-dimmed{% endif %}">
                             <div class="readonly-field-box font-monospace fw-bold text-danger justify-content-end">
-                                {% if object.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ object.final_loss_limit|default:"2000.00" }}
+                                ₹{{ object.final_loss_limit|default:"2000.00" }}
                             </div>
                         </div>
                         <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
                             Full-day trading freeze trigger halting all orders until next session.
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Max Profit Limit Card -->
-                <div class="col-12 col-lg-4">
-                    <div class="config-card-unit p-3">
-                        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mb-2">
-                            <div class="form-check form-switch d-flex align-items-center gap-2 mb-0">
-                                <input class="form-check-input"
-                                       type="checkbox"
-                                       role="switch"
-                                       id="detail_max_profit_status"
-                                       {% if object.max_profit_status %}checked{% endif %}
-                                       disabled>
-                                <label class="form-check-label theme-text-main small fw-bold mb-0 d-flex align-items-center gap-1" for="detail_max_profit_status">
-                                    <span class="material-icons text-success fs-5">verified</span>
-                                    <span>Max Profit Target</span>
-                                </label>
-                            </div>
-                        </div>
-                        <div class="toggle-dep-container {% if not object.max_profit_status %}is-dimmed{% endif %}">
-                            <div class="readonly-field-box font-monospace fw-bold text-success justify-content-end">
-                                {% if object.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ object.max_profit_limit|default:"0.00" }}
-                            </div>
-                        </div>
-                        <div class="theme-text-muted small mt-2" style="font-size: 0.75rem;">
-                            Target session profit limit for automatic trade locking.
                         </div>
                     </div>
                 </div>

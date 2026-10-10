@@ -767,7 +767,7 @@
                         </span>
                     </div>
                     <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.70rem;">
-                        {% if is_forex or backtest.market_type == 'FOREX_FUTURES' %}Pip Matrix{% else %}Strike Setup{% endif %}
+                        {% if is_forex or backtest.market_type == 'FOREX_FUTURES' %}Pip Matrix{% else %}Rule 13 Dynamic ATM±3 Sweep{% endif %}
                     </span>
                 </div>
 
@@ -794,34 +794,21 @@
                     </div>
                 </div>
                 {% else %}
-                <!-- Index F&O Parameters (With Strike Selection) -->
+                <!-- Index F&O Parameters (Dynamic ATM±3 Sweep) -->
                 <div class="row g-3.5">
-                    <div class="col-6 col-md-3">
+                    <div class="col-12 col-md-4">
                         <label class="form-label edit-modal-label small fw-bold text-uppercase mb-2" for="edit_lots_count" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                             Lots Count<span class="text-danger ms-1">*</span>
                         </label>
                         <input type="number" min="1" max="100" name="lots_count" id="edit_lots_count" class="form-control edit-modal-input font-monospace fw-bold" value="{{ lots_count_val }}" required style="font-size: 0.88rem;">
                     </div>
-                    <div class="col-6 col-md-3">
-                        <label class="form-label edit-modal-label small fw-bold text-uppercase mb-2" for="edit_strike_selection" style="font-size: 0.75rem; letter-spacing: 0.5px;">
-                            Strike Selection
-                        </label>
-                        <select name="strike_selection" id="edit_strike_selection" class="form-select edit-modal-input fw-semibold" style="font-size: 0.88rem;">
-                            <option value="ITM2" {% if strike_selection_val == 'ITM2' %}selected{% endif %}>ITM2 (Deep ITM · High Delta)</option>
-                            <option value="ITM1" {% if strike_selection_val == 'ITM1' %}selected{% endif %}>ITM1 (In The Money)</option>
-                            <option value="ATM" {% if strike_selection_val == 'ATM' %}selected{% endif %}>ATM (At The Money)</option>
-                            <option value="OTM1" {% if strike_selection_val == 'OTM1' %}selected{% endif %}>OTM1 (Out Of The Money)</option>
-                            <option value="OTM2" {% if strike_selection_val == 'OTM2' %}selected{% endif %}>OTM2 (+100 OTM)</option>
-                            <option value="OTM3" {% if strike_selection_val == 'OTM3' %}selected{% endif %}>OTM3 (Deep OTM)</option>
-                        </select>
-                    </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md-4">
                         <label class="form-label edit-modal-label small fw-bold text-uppercase mb-2" for="edit_stop_loss_points" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                             Stop Loss (Pts)<span class="text-danger ms-1">*</span>
                         </label>
                         <input type="number" step="0.5" min="1" name="stop_loss_points" id="edit_stop_loss_points" class="form-control edit-modal-input font-monospace fw-bold text-danger" value="{{ stop_loss_points_val }}" required style="font-size: 0.88rem;">
                     </div>
-                    <div class="col-6 col-md-3">
+                    <div class="col-6 col-md-4">
                         <label class="form-label edit-modal-label small fw-bold text-uppercase mb-2" for="edit_rr_ratio" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                             Risk : Reward (1:X)<span class="text-danger ms-1">*</span>
                         </label>

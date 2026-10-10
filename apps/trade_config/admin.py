@@ -24,8 +24,8 @@ class UserTradingAccountAdmin(admin.ModelAdmin):
 
 @admin.register(TradeExecConfig)
 class TradeExecConfigAdmin(admin.ModelAdmin):
-    list_display = ('name', 'admins_user', 'account_type', 'market_type', 'is_active', 'primary_loss_limit', 'final_loss_limit')
-    list_filter = ('account_type', 'market_type', 'is_active')
+    list_display = ('name', 'admins_user', 'account_type', 'is_active', 'primary_loss_limit', 'final_loss_limit')
+    list_filter = ('account_type', 'is_active')
     search_fields = ('name', 'admins_user__username')
 
 

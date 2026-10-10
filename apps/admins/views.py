@@ -4408,7 +4408,6 @@ class AdminTradeExecConfigScrollView(LoginRequiredMixin, AdminRequiredMixin, Bas
             'name', '-name',
             'primary_loss_limit', '-primary_loss_limit',
             'final_loss_limit', '-final_loss_limit',
-            'max_profit_limit', '-max_profit_limit',
         ]
         if sort in allowed_sort:
             return queryset.order_by(sort)
@@ -4519,7 +4518,6 @@ class AdminTradeExecConfigToggleView(LoginRequiredMixin, AdminRequiredMixin, Vie
         'max_loss_status': 'Master Account Guardian toggle',
         'primary_loss_status': 'Level 1 Warning Loss Limit rule',
         'final_loss_status': 'Level 2 Hard Day Loss Limit rule',
-        'max_profit_status': 'Max Profit Limit rule',
         'is_active': 'Master Active status',
     }
 
@@ -5409,9 +5407,7 @@ class LiveStrategyToggleView(LoginRequiredMixin, View):
 
         strategy.is_active = not strategy.is_active
         strategy.status = LiveStrategyStatusChoices.ACTIVE if strategy.is_active else LiveStrategyStatusChoices.PAUSED
-        if strategy.is_active and not strategy.frozen_rules_snapshot:
-            strategy.frozen_rules_snapshot = []
-        strategy.save(update_fields=['is_active', 'status', 'frozen_rules_snapshot', 'updated_at'])
+        strategy.save(update_fields=['is_active', 'status', 'updated_at'])
 
         # Publish Redis IPC command to Go strategy worker for SANDBOX paper trading
         try:
@@ -5466,9 +5462,7 @@ class LiveStrategyToggleView(LoginRequiredMixin, View):
                     'strike_step': dynamic_step,
                     'sl_pts': dyn_sl_pts,
                     'rr_ratio': dyn_rr,
-                    'frozen_rules_snapshot': strategy.frozen_rules_snapshot or [],
                     'frozen_parameters': f_params,
-                    'rules': strategy.frozen_rules_snapshot or [],
                 },
             }
             from apps.market.services import dispatch_task_command
@@ -5561,7 +5555,6 @@ class LiveStrategyEditModalView(LoginRequiredMixin, View):
             'target_profit_pct': strat_params.get('target_profit_pct', 3.0),
             'trailing_sl_pct': strat_params.get('trailing_sl_pct', 0.8),
             'max_lots_per_trade': strat_params.get('max_lots_per_trade', 4),
-            'frozen_rules': strategy.frozen_rules_snapshot or [],
         }
         return render(request, 'admins/partials/live_strategy_edit_modal.html', context)
 

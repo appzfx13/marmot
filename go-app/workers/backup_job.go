@@ -1067,9 +1067,14 @@ func (j *BackupJob) runForexBackupPipeline(ctx context.Context, taskID, userID, 
 	}
 
 	if !databentoSuccess {
-		log.Printf("ℹ️ [Task #%s] Databento live API key not active or restricted; generating valid FOREX Parquet dataset for %s...", taskID, symbol)
-		records := generateForexCandleRecords(symbol, startDate, endDate)
-		_ = services.WriteChunkParquet(stagingChunkPath, records)
+		errMsg := fmt.Sprintf("Databento API credentials unavailable or data fetch failed for symbol %s (%s to %s)", symbol, startDate, endDate)
+		log.Printf("❌ [Task #%s] %s", taskID, errMsg)
+		if j.dbService != nil {
+			_ = j.dbService.UpdateTaskProgress(ctx, taskID, "error", 0)
+		}
+		j.broadcastProgress(ctx, taskID, 0, "error", 0.0, "")
+		_ = os.RemoveAll(stagingDir)
+		return
 	}
 
 	if j.dbService != nil {
@@ -1094,63 +1099,6 @@ func (j *BackupJob) runForexBackupPipeline(ctx context.Context, taskID, userID, 
 
 	log.Printf("🎉 [Task #%s] FOREX / CME Micro Futures Backup Task COMPLETED! Size: %.2f MB | Saved to %s",
 		taskID, fileSizeMB, finalParquetPath)
-}
-
-// generateForexCandleRecords creates valid binary Parquet records for FOREX / CME Micro Futures
-func generateForexCandleRecords(symbol, startDate, endDate string) []models.MarketCandleRecord {
-	start, err := time.Parse("2006-01-02", startDate)
-	if err != nil {
-		start = time.Now().AddDate(0, 0, -5)
-	}
-	end, err := time.Parse("2006-01-02", endDate)
-	if err != nil {
-		end = time.Now()
-	}
-
-	ist, _ := time.LoadLocation("Asia/Kolkata")
-	basePrice := 2000.0
-	switch strings.ToUpper(symbol) {
-	case "M6E":
-		basePrice = 1.08
-	case "M6J":
-		basePrice = 0.0067
-	case "MYM":
-		basePrice = 39000.0
-	case "MNQ":
-		basePrice = 19500.0
-	case "MES":
-		basePrice = 5500.0
-	case "MCL":
-		basePrice = 75.0
-	}
-
-	var records []models.MarketCandleRecord
-	curr := start
-	for curr.Before(end) || curr.Equal(end) {
-		for h := 9; h < 17; h++ {
-			for m := 0; m < 60; m += 5 {
-				t := time.Date(curr.Year(), curr.Month(), curr.Day(), h, m, 0, 0, ist)
-				records = append(records, models.MarketCandleRecord{
-					Timestamp:      t.Unix(),
-					Datetime:       t.Format("2006-01-02 15:04:05"),
-					IndexName:      symbol,
-					InstrumentType: "FUTURES",
-					Strike:         "FUT",
-					OptionType:     "FOREX",
-					Open:           basePrice,
-					High:           basePrice * 1.001,
-					Low:            basePrice * 0.999,
-					Close:          basePrice * 1.0005,
-					Volume:         150,
-					OI:             500,
-					IV:             0.0,
-					SpotPrice:      basePrice,
-				})
-			}
-		}
-		curr = curr.AddDate(0, 0, 1)
-	}
-	return records
 }
 
 // ── Option Symbol & Expiry Helpers ────────────────────────────────────────────

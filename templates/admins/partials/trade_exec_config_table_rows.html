@@ -35,29 +35,11 @@
     <td class="py-3 text-end fw-semibold bg-transparent">
         {% if config.primary_loss_status or config.final_loss_status %}
             <div class="d-flex flex-column align-items-end">
-                <span class="text-warning small" style="font-size:0.75rem;">L1: {% if config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ config.primary_loss_limit|default:1000 }}</span>
-                <span class="text-danger fw-bold" style="font-size:0.8rem;">L2: {% if config.market_type == 'FOREX_FUTURES' %}${% else %}₹{% endif %}{{ config.final_loss_limit|default:2000 }}</span>
+                <span class="text-warning small" style="font-size:0.75rem;">L1: ₹{{ config.primary_loss_limit|default:1000 }}</span>
+                <span class="text-danger fw-bold" style="font-size:0.8rem;">L2: ₹{{ config.final_loss_limit|default:2000 }}</span>
             </div>
         {% else %}
             <span class="theme-text-muted opacity-50 small">—</span>
-        {% endif %}
-    </td>
-
-    <!-- Max Profit -->
-    <td class="py-3 text-end fw-semibold bg-transparent">
-        {% if config.max_profit_status and config.max_profit_limit is not None %}
-            <span class="text-success">${{ config.max_profit_limit }}</span>
-        {% else %}
-            <span class="theme-text-muted opacity-50 small">—</span>
-        {% endif %}
-    </td>
-
-    <!-- Market Segment -->
-    <td class="py-3 text-center bg-transparent">
-        {% if config.market_type == 'FOREX_FUTURES' %}
-            <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 small">Forex CME</span>
-        {% else %}
-            <span class="badge bg-primary bg-opacity-25 text-primary border border-primary border-opacity-25 rounded-pill px-2.5 py-1 small">Index F&amp;O</span>
         {% endif %}
     </td>
 
@@ -100,7 +82,7 @@
 
 {% if page_obj.has_next %}
 <tr id="config-desk-sentinel-{{ page_obj.number }}">
-    <td colspan="9" class="text-center py-3 bg-transparent border-0">
+    <td colspan="7" class="text-center py-3 bg-transparent border-0">
         <button type="button"
                 hx-get="{% url 'admins:trade_exec_config_scroll' %}?page={{ page_obj.next_page_number }}&scroll_type=rows&sort={{ current_sort }}&{{ current_filters }}"
                 hx-target="#config-desk-sentinel-{{ page_obj.number }}"
@@ -121,7 +103,7 @@
 </tr>
 {% elif paginator.count > 0 %}
 <tr class="border-0">
-    <td colspan="9" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.72rem;">
+    <td colspan="7" class="text-center py-3 theme-text-muted border-0 bg-transparent" style="font-size: 0.72rem;">
         <span class="material-icons fs-6 align-middle text-success me-1">check_circle</span> All {{ paginator.count }} trade configurations loaded
     </td>
 </tr>

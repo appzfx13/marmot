@@ -2,7 +2,7 @@ from django import forms
 import json
 from .models import BacktestTask
 from apps.market.models import MarketBackupTask
-from apps.common.choices import StrikeSelectionChoices, IndexChoices, ForexInstrumentChoices, MarketTypeChoices, MacroTimeframeChoices, CompoundingProfileChoices
+from apps.common.choices import IndexChoices, ForexInstrumentChoices, MarketTypeChoices, MacroTimeframeChoices, CompoundingProfileChoices
 
 
 class BackupTaskSelectWidget(forms.Select):
@@ -41,13 +41,6 @@ class IndexBacktestTaskForm(forms.ModelForm):
         choices=IndexChoices.choices,
         required=True,
         widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_index_name'})
-    )
-    strike_selection = forms.ChoiceField(
-        choices=StrikeSelectionChoices.choices,
-        initial=StrikeSelectionChoices.ATM,
-        required=False,
-        help_text="Target Option Strike (ATM, ITM +/- 1/2, OTM +/- 1/2)",
-        widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_strike_selection'})
     )
     risk_reward_ratio = forms.FloatField(initial=2.0, required=False, help_text="Risk to Reward Ratio (e.g. 2.0)")
     stop_loss_points = forms.FloatField(initial=30.0, required=False, help_text="Stop Loss in Index/Option Points (e.g. 30 pts)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_stop_loss_points', 'step': '0.5'}))
