@@ -43,6 +43,7 @@ var StrategyPresets = map[string]StrategyConfig{
 	"volume_amd":         VolumeAMDPreset,
 	"ema_macd_retest":    EMAMACDRetestPreset,
 	"macd_1m_retest":     MACD1mRetestPreset,
+	"ict_sweep_choch":    ICTSweepCHoCHPreset,
 }
 
 // GetStrategyPreset returns a StrategyConfig by rule_type key (case-insensitive).
@@ -65,6 +66,7 @@ var strategyRegistry = map[string]Strategy{
 	"volume_amd":      NewQuantEngineStrategy("volume_amd"),
 	"ema_macd_retest": NewQuantEngineStrategy("ema_macd_retest"),
 	"macd_1m_retest":  NewQuantEngineStrategy("macd_1m_retest"),
+	"ict_sweep_choch": NewQuantEngineStrategy("ict_sweep_choch"),
 }
 
 // GetStrategy resolves a plug-and-play strategy instance by its strategy_name.

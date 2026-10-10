@@ -42,3 +42,4 @@ class BacktestRuleTypeChoices(models.TextChoices):
     VOLUME_AMD = 'volume_amd', 'Volume + AMD (Accumulation, Manipulation, Distribution) Pattern'
     EMA_MACD_RETEST = 'ema_macd_retest', 'EMA 9/21 Retest + MACD Momentum'
     MACD_1M_RETEST = 'macd_1m_retest', 'MACD 1-Min Crossover + Retest'
+    ICT_SWEEP_CHOCH = 'ict_sweep_choch', 'ICT Liquidity Sweep + CHoCH Retest'

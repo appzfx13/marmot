@@ -195,6 +195,25 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 		Quantity   int
 		Filled     bool
 	}
+	type pendingLimitOrder struct {
+		SignalTime      string
+		SignalEpoch     int64
+		SignalSpotPrice float64
+		SignalStrikeCMP float64
+		ConcreteStrike  string
+		IndexName       string
+		OptionType      string
+		LimitPrice      float64
+		SpotLimitPrice  float64
+		Quantity        int
+		SlPts           float64
+		RRRatio         float64
+		Reason          string
+		MacroTag        string
+		ExpiresAt       time.Time
+		Layers          []pendingLayer
+	}
+	var pending *pendingLimitOrder
 	var activeLayers []pendingLayer
 	filledCost := 0.0
 	filledQty := 0
@@ -328,6 +347,101 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 				localEngine.lastSignalTime = exitTime
 			}
 			continue
+		}
+
+		// ── 1b. Check Pending Retest Limit Order Fills ─────────────────────────
+		if pending != nil {
+			tickTime := time.Unix(tick.Timestamp, 0).In(istLocation)
+			if len(tick.Datetime) >= 19 {
+				if pt, err := time.ParseInLocation("2006-01-02 15:04:05", tick.Datetime[:19], istLocation); err == nil {
+					tickTime = pt
+				}
+			}
+
+			// Cancel if pending limit order has expired past retest window
+			if !pending.ExpiresAt.IsZero() && tickTime.After(pending.ExpiresAt) {
+				pending = nil
+			} else {
+				optSnap, hasOpt := tick.Options[pending.ConcreteStrike]
+				isTouched := false
+				fillPrice := pending.LimitPrice
+
+				// Retest fill check on option premium
+				if hasOpt && optSnap.Close > 0 {
+					optLow := optSnap.Low
+					if optLow <= 0 {
+						optLow = optSnap.Close
+					}
+					if optLow <= pending.LimitPrice {
+						isTouched = true
+						fillPrice = pending.LimitPrice
+					}
+				} else {
+					// Spot level fallback check
+					if pending.OptionType == "CALL" && tick.SpotLow <= pending.SpotLimitPrice {
+						isTouched = true
+					} else if pending.OptionType == "PUT" && tick.SpotHigh >= pending.SpotLimitPrice {
+						isTouched = true
+					}
+				}
+
+				if isTouched {
+					targetOptPrice := math.Round((fillPrice + pending.SlPts*pending.RRRatio)*100) / 100
+					slOptPrice := math.Round((fillPrice - pending.SlPts)*100) / 100
+					if slOptPrice < 0.5 {
+						slOptPrice = 0.5
+					}
+
+					fillQty := pending.Quantity
+					activeLayers = nil
+					filledCost = 0.0
+					filledQty = 0
+
+					if enableRetestLayering && len(pending.Layers) > 0 {
+						activeLayers = pending.Layers
+						activeLayers[0].Filled = true
+						fillQty = activeLayers[0].Quantity
+						filledQty = fillQty
+						filledCost = fillPrice * float64(fillQty)
+					}
+
+					sigT := time.Unix(pending.SignalEpoch, 0)
+					retestDur := int(math.Max(1, math.Round(tickTime.Sub(sigT).Minutes())))
+
+					activeTrade = &TradeSignal{
+						Timestamp:             tick.Datetime,
+						SignalTimestamp:       pending.SignalTime,
+						DecisionTimestamp:     pending.SignalTime,
+						OrderPlacedTimestamp:  pending.SignalTime,
+						DecisionSpotPrice:     pending.SignalSpotPrice,
+						DecisionStrikeLTP:     pending.SignalStrikeCMP,
+						LimitPrice:            pending.LimitPrice,
+						RetestDurationMinutes: retestDur,
+						Strike:                pending.ConcreteStrike,
+						Symbol:                input.IndexName,
+						TradeType:             "BUY",
+						IndexEntryPrice:       tick.SpotClose,
+						EntryPrice:            fillPrice,
+						TargetPrice:           targetOptPrice,
+						StopLossPrice:         slOptPrice,
+						InitialTargetPrice:    targetOptPrice,
+						InitialStopLossPrice:  slOptPrice,
+						TrailingStopLossPrice: slOptPrice,
+						Quantity:              fillQty,
+						UtilizedCapital:       math.Round(fillPrice * float64(fillQty)),
+						Status:                "OPEN",
+						Reason:                pending.Reason + pending.MacroTag,
+					}
+					activeStrikeKey = pending.ConcreteStrike
+					lastKnownOptPrice = fillPrice
+					activeSlPts = pending.SlPts
+					activeRRRatio = pending.RRRatio
+					pending = nil
+					continue
+				}
+				// Order is resting on the order book: wait for fill or expiry before seeking new signals
+				continue
+			}
 		}
 
 		// ── 2. Evaluate entry signal on spot candle ───────────────────────────
@@ -483,8 +597,96 @@ func (s *QuantEngineStrategy) Execute(input StrategyInput) StrategyResult {
 		activeSlPts = slPts
 		activeRRRatio = rrRatio
 
+		limitPrice := 0.0
+		if bestStrike != nil && bestStrike.LimitPrice > 0 {
+			limitPrice = bestStrike.LimitPrice
+		} else if preset.OrderType == "LIMIT" {
+			limitPrice = math.Round(entryOptPrice*0.995*100) / 100
+		} else if sig.OrderType == "LIMIT" && sig.LimitPrice > 0 && sig.LimitPrice != 120.0 && sig.LimitPrice != 250.0 {
+			limitPrice = sig.LimitPrice
+		}
+
+		spotLimitPrice := tick.SpotClose
+		if optionType == "CALL" {
+			spotLimitPrice = tick.SpotClose - 2.5
+		} else {
+			spotLimitPrice = tick.SpotClose + 2.5
+		}
+
+		signalEpoch := tick.Timestamp
+		if signalEpoch <= 0 {
+			signalEpoch = time.Now().Unix()
+		}
+
+		if preset.OrderType == "LIMIT" && limitPrice > 0 {
+			sigTime := time.Unix(tick.Timestamp, 0).In(istLocation)
+			if len(tick.Datetime) >= 19 {
+				if pt, err := time.ParseInLocation("2006-01-02 15:04:05", tick.Datetime[:19], istLocation); err == nil {
+					sigTime = pt
+				}
+			}
+
+			var layers []pendingLayer
+			if enableRetestLayering && layerCount > 1 {
+				baseLotSize := sig.Quantity / max(1, layerCount)
+				if baseLotSize <= 0 {
+					baseLotSize = sig.Quantity
+				}
+				sumPresetLots := sumLots(layerLots)
+				for idx := 0; idx < layerCount; idx++ {
+					pct := 25.0 * float64(idx+1)
+					if idx < len(retestPercentages) {
+						pct = retestPercentages[idx]
+					}
+					layerLimit := math.Round((limitPrice*(1.0-(pct/5000.0)))*100) / 100
+					if layerLimit <= 0.5 {
+						layerLimit = math.Round(limitPrice*(1.0-(float64(idx)*0.005))*100) / 100
+					}
+					layerQty := baseLotSize
+					if idx < len(layerLots) && layerLots[idx] > 0 && sumPresetLots > 0 {
+						layerQty = layerLots[idx] * (sig.Quantity / sumPresetLots)
+						if layerQty <= 0 {
+							layerQty = baseLotSize
+						}
+					}
+					layers = append(layers, pendingLayer{
+						LimitPrice: layerLimit,
+						Quantity:   layerQty,
+						Filled:     false,
+					})
+				}
+			}
+
+			pending = &pendingLimitOrder{
+				SignalTime:      tick.Datetime,
+				SignalEpoch:     signalEpoch,
+				SignalSpotPrice: tick.SpotClose,
+				SignalStrikeCMP: entryOptPrice,
+				ConcreteStrike:  concreteStrike,
+				IndexName:       input.IndexName,
+				OptionType:      optionType,
+				LimitPrice:      limitPrice,
+				SpotLimitPrice:  spotLimitPrice,
+				Quantity:        sig.Quantity,
+				SlPts:           slPts,
+				RRRatio:         rrRatio,
+				Reason:          sig.TriggerReason,
+				MacroTag:        macroTag,
+				ExpiresAt:       sigTime.Add(15 * time.Minute),
+				Layers:          layers,
+			}
+			continue
+		}
+
 		activeTrade = &TradeSignal{
 			Timestamp:             tick.Datetime,
+			SignalTimestamp:       tick.Datetime,
+			DecisionTimestamp:     tick.Datetime,
+			OrderPlacedTimestamp:  tick.Datetime,
+			DecisionSpotPrice:     tick.SpotClose,
+			DecisionStrikeLTP:     entryOptPrice,
+			LimitPrice:            entryOptPrice,
+			RetestDurationMinutes: 0,
 			Strike:                concreteStrike,
 			Symbol:                input.IndexName,
 			TradeType:             "BUY",
@@ -708,6 +910,12 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 			s.candleBuffer = s.candleBuffer[1:]
 		}
 	}
+
+	// Always sync local price variables to reflect the current running 1-minute candle OHLC
+	openPrice = s.runningOpen
+	highPrice = s.runningHigh
+	lowPrice = s.runningLow
+	closePrice = s.runningClose
 
 	// 3. Time-Based Opening Range Discovery (ORB) (09:15 - 09:30 AM IST = 15 Minutes)
 	minuteOfDay := candleTime.Hour()*60 + candleTime.Minute()
@@ -1051,6 +1259,106 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 				"⚡ [%s] Bearish MACD 1m Retest (High=%.1f >= EMA12-%.1f) | MACD=%.3f <= Sig=%.3f | Disp=%.1f%%",
 				preset.Name, highPrice, retestTolerance, macdLine, signalLine, displacementPct,
 			)
+		}
+	} else if presetKey == "ict_sweep_choch" && len(s.candleBuffer) >= 12 {
+		// ICT Liquidity Sweep (BSL/SSL) + CHoCH Retest Engine
+		for offset := 1; offset <= 4; offset++ {
+			sbIdx := len(s.candleBuffer) - 1 - offset
+			if sbIdx < 5 {
+				continue
+			}
+			lookback := 10
+			if sbIdx < lookback {
+				lookback = sbIdx
+			}
+			startB := sbIdx - lookback
+
+			bsl := 0.0
+			ssl := 99999999.0
+			for b := startB; b < sbIdx; b++ {
+				bH, _ := s.candleBuffer[b]["high"].(float64)
+				bL, _ := s.candleBuffer[b]["low"].(float64)
+				if bH > bsl {
+					bsl = bH
+				}
+				if bL > 0 && bL < ssl {
+					ssl = bL
+				}
+			}
+			if bsl == 0 || ssl == 99999999.0 {
+				continue
+			}
+
+			sweepBar := s.candleBuffer[sbIdx]
+			sbH, _ := sweepBar["high"].(float64)
+			sbL, _ := sweepBar["low"].(float64)
+			sbO, _ := sweepBar["open"].(float64)
+			sbC, _ := sweepBar["close"].(float64)
+			sbRange := math.Max(1.0, sbH-sbL)
+			sbLowerWick := math.Min(sbO, sbC) - sbL
+			sbUpperWick := sbH - math.Max(sbO, sbC)
+
+			// Bullish Sweep of Sell-side Liquidity (SSL) + CHoCH Reversal:
+			if sbL < ssl && (sbC >= (ssl-2.0) || (sbLowerWick/sbRange) >= 0.18) {
+				if closePrice > openPrice && closePrice >= sbH && displacementRatio >= minDisplacement && closePrice >= (emaSlow-5.0) {
+					isBullishSignal = true
+					triggerReason = fmt.Sprintf(
+						"⚡ [%s] Bullish Sweep (SSL=%.1f swept to %.1f) + CHoCH Break (Close=%.1f >= %.1f) | Disp=%.1f%%",
+						preset.Name, ssl, sbL, closePrice, sbH, displacementPct,
+					)
+					break
+				}
+			}
+
+			// Bearish Sweep of Buy-side Liquidity (BSL) + CHoCH Reversal:
+			if !isBullishSignal && sbH > bsl && (sbC <= (bsl+2.0) || (sbUpperWick/sbRange) >= 0.18) {
+				if closePrice < openPrice && closePrice <= sbL && displacementRatio >= minDisplacement && closePrice <= (emaSlow+5.0) {
+					isBearishSignal = true
+					triggerReason = fmt.Sprintf(
+						"⚡ [%s] Bearish Sweep (BSL=%.1f swept to %.1f) + CHoCH Break (Close=%.1f <= %.1f) | Disp=%.1f%%",
+						preset.Name, bsl, sbH, closePrice, sbL, displacementPct,
+					)
+					break
+				}
+			}
+		}
+
+		if !isBullishSignal && !isBearishSignal {
+			lookbackSB := 10
+			if len(s.candleBuffer)-1 < lookbackSB {
+				lookbackSB = len(s.candleBuffer) - 1
+			}
+			bslCurr := 0.0
+			sslCurr := 99999999.0
+			for b := len(s.candleBuffer) - 1 - lookbackSB; b < len(s.candleBuffer)-1; b++ {
+				if b < 0 {
+					continue
+				}
+				bH, _ := s.candleBuffer[b]["high"].(float64)
+				bL, _ := s.candleBuffer[b]["low"].(float64)
+				if bH > bslCurr {
+					bslCurr = bH
+				}
+				if bL > 0 && bL < sslCurr {
+					sslCurr = bL
+				}
+			}
+
+			lowerWick := math.Min(openPrice, closePrice) - lowPrice
+			upperWick := highPrice - math.Max(openPrice, closePrice)
+			if sslCurr < 99999999.0 && lowPrice < sslCurr && closePrice > openPrice && closePrice >= sslCurr && (lowerWick/candRange) >= 0.22 && displacementRatio >= minDisplacement && closePrice >= (emaSlow-5.0) {
+				isBullishSignal = true
+				triggerReason = fmt.Sprintf(
+					"⚡ [%s] Single-Bar Bullish Sweep (SSL=%.1f swept to %.1f) | Wick=%.1f%% | Close=%.1f",
+					preset.Name, sslCurr, lowPrice, (lowerWick/candRange)*100, closePrice,
+				)
+			} else if bslCurr > 0 && highPrice > bslCurr && closePrice < openPrice && closePrice <= bslCurr && (upperWick/candRange) >= 0.22 && displacementRatio >= minDisplacement && closePrice <= (emaSlow+5.0) {
+				isBearishSignal = true
+				triggerReason = fmt.Sprintf(
+					"⚡ [%s] Single-Bar Bearish Sweep (BSL=%.1f swept to %.1f) | Wick=%.1f%% | Close=%.1f",
+					preset.Name, bslCurr, highPrice, (upperWick/candRange)*100, closePrice,
+				)
+			}
 		}
 	}
 

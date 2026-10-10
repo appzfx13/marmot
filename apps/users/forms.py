@@ -308,24 +308,6 @@ class UserBacktestTaskForm(forms.ModelForm):
         empty_label="-- Select Existing Backup File (Optional) --",
         widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_user_backup_task'})
     )
-    macro_backup_task = forms.ModelChoiceField(
-        queryset=MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=True),
-        required=False,
-        empty_label="-- Select Pre-Generated Macro Dataset (Optional) --",
-        widget=BackupTaskSelectWidget(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_user_macro_backup_task'})
-    )
-    use_macro_assist = forms.BooleanField(
-        required=False,
-        initial=False,
-        label="USE AI MACRO ASSIST",
-        widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_user_use_macro_assist'})
-    )
-    macro_timeframe = forms.ChoiceField(
-        choices=MacroTimeframeChoices.choices,
-        initial=MacroTimeframeChoices.H1,
-        required=False,
-        widget=forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_user_macro_timeframe'})
-    )
     index_name = forms.ChoiceField(
         choices=IndexChoices.choices + ForexInstrumentChoices.choices,
         required=True,
@@ -336,7 +318,7 @@ class UserBacktestTaskForm(forms.ModelForm):
 
     class Meta:
         model = BacktestTask
-        fields = ['market_type', 'backup_task', 'macro_backup_task', 'use_macro_assist', 'macro_timeframe', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital']
+        fields = ['market_type', 'backup_task', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital']
         widgets = {
             'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_user_index_name'}),

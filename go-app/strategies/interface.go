@@ -57,9 +57,16 @@ type StrategyInput struct {
 
 // TradeSignal represents an executed trade entry/exit signal.
 type TradeSignal struct {
-	Timestamp       string  `json:"timestamp"`         // Entry time
-	ExitTimestamp   string  `json:"exit_timestamp"`    // Exit time
-	Strike          string  `json:"strike"`            // Option key e.g. "ATM+1 CALL"
+	Timestamp             string  `json:"timestamp"`                        // Entry time
+	SignalTimestamp       string  `json:"signal_timestamp,omitempty"`        // Signal trigger time
+	DecisionTimestamp     string  `json:"decision_timestamp,omitempty"`      // Decision time
+	OrderPlacedTimestamp  string  `json:"order_placed_timestamp,omitempty"` // Order placed time
+	DecisionSpotPrice     float64 `json:"decision_spot_price,omitempty"`     // Spot price at signal
+	DecisionStrikeLTP     float64 `json:"decision_strike_ltp,omitempty"`     // Option CMP at signal
+	RetestDurationMinutes int     `json:"retest_duration_minutes,omitempty"` // Retest duration
+	LimitPrice            float64 `json:"limit_price,omitempty"`            // Planned limit price
+	ExitTimestamp         string  `json:"exit_timestamp"`                   // Exit time
+	Strike                string  `json:"strike"`                           // Option key e.g. "ATM+1 CALL"
 	Symbol          string  `json:"symbol"`            // Index name e.g. "NIFTY"
 	TradeType       string  `json:"trade_type"`        // BUY
 	IndexEntryPrice float64 `json:"index_entry_price"` // Spot level at entry

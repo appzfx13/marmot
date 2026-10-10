@@ -411,6 +411,40 @@
             border-color: #38bdf8;
             color: #fff;
         }
+
+        /* Signal Yellow Dot Interactive Pulse Indicator */
+        .signal-dot-pulse {
+            display: inline-block;
+            width: 10px;
+            height: 10px;
+            background-color: #facc15;
+            border-radius: 50%;
+            box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7);
+            animation: yellowPulse 1.8s infinite;
+            vertical-align: middle;
+        }
+        @keyframes yellowPulse {
+            0% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(234, 179, 8, 0.7);
+            }
+            70% {
+                transform: scale(1.15);
+                box-shadow: 0 0 0 8px rgba(234, 179, 8, 0);
+            }
+            100% {
+                transform: scale(0.95);
+                box-shadow: 0 0 0 0 rgba(234, 179, 8, 0);
+            }
+        }
+        .modal-signal-box {
+            background: rgba(15, 23, 42, 0.96);
+            backdrop-filter: blur(24px);
+            border: 1px solid rgba(234, 179, 8, 0.4);
+            border-radius: 14px;
+            box-shadow: 0 25px 60px rgba(0, 0, 0, 0.9), 0 0 30px rgba(234, 179, 8, 0.15);
+            color: #F1F5F9;
+        }
     </style>
 </head>
 <body>
@@ -984,6 +1018,126 @@
                             Gemini 3.6 Flash is analyzing Spot momentum, OTE displacement, option Greeks, and failure root causes for Trade #{{ trade.serial_no }}.
                         </p>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 5. Signal Trigger & Trade Entry Planning RCA Modal -->
+    <div class="modal fade" id="signalRcaModal" tabindex="-1" aria-labelledby="signalRcaModalLabel" aria-hidden="true">
+        <div class="modal-dialog modal-dialog-centered modal-lg">
+            <div class="modal-content modal-signal-box">
+                <div class="modal-header border-bottom border-secondary border-opacity-25 px-4 py-3 d-flex align-items-center justify-content-between">
+                    <div class="d-flex align-items-center gap-2.5">
+                        <div class="rounded-circle d-flex align-items-center justify-content-center" 
+                             style="width: 36px; height: 36px; background: rgba(234, 179, 8, 0.18); color: #facc15; border: 1px solid rgba(234, 179, 8, 0.45);">
+                            <span class="material-icons" style="font-size: 1.25rem;">bolt</span>
+                        </div>
+                        <div>
+                            <div class="d-flex align-items-center gap-2">
+                                <h6 class="modal-title fw-bold text-white mb-0" id="signalRcaModalLabel">
+                                    SIGNAL TRIGGER &amp; ENTRY PLANNING RCA
+                                </h6>
+                                <span class="badge rounded-pill bg-warning text-dark fw-bold px-2 py-0.5" style="font-size: 0.68rem;">
+                                    ● SIGNAL
+                                </span>
+                            </div>
+                            <small class="text-muted font-monospace" style="font-size: 0.72rem;">Detailed Entry Diagnostics &amp; Microstructure Execution Rules</small>
+                        </div>
+                    </div>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body p-4">
+                    <!-- Key Instrument & Timestamp Bar -->
+                    <div class="row g-2 mb-3">
+                        <div class="col-sm-6 col-md-3">
+                            <div class="p-2.5 rounded" style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08);">
+                                <small class="text-muted d-block" style="font-size: 0.68rem;">SIGNAL TIME</small>
+                                <span class="fw-bold font-monospace text-warning" id="modalSignalTime" style="font-size: 0.85rem;">-</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <div class="p-2.5 rounded" style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08);">
+                                <small class="text-muted d-block" style="font-size: 0.68rem;">INSTRUMENT</small>
+                                <span class="fw-bold font-monospace text-white" id="modalSignalInstrument" style="font-size: 0.85rem;">-</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <div class="p-2.5 rounded" style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08);">
+                                <small class="text-muted d-block" style="font-size: 0.68rem;">SPOT AT SIGNAL</small>
+                                <span class="fw-bold font-monospace text-info" id="modalSignalSpot" style="font-size: 0.85rem;">-</span>
+                            </div>
+                        </div>
+                        <div class="col-sm-6 col-md-3">
+                            <div class="p-2.5 rounded" style="background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.08);">
+                                <small class="text-muted d-block" style="font-size: 0.68rem;">STRIKE CMP</small>
+                                <span class="fw-bold font-monospace text-success" id="modalSignalStrikeLtp" style="font-size: 0.85rem;">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Planning Parameters Box (Exact User Format) -->
+                    <div class="p-3 rounded mb-3" style="background: rgba(2, 132, 199, 0.08); border: 1px solid rgba(56, 189, 248, 0.35);">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-bold text-info small">
+                                📋 PLANNED ORDER EXECUTION BRACKET
+                            </span>
+                            <span class="badge bg-primary text-white font-monospace" style="font-size: 0.65rem;">LIMIT ORDER</span>
+                        </div>
+                        <div class="font-monospace fw-bold" style="font-size: 0.88rem; line-height: 1.8;">
+                            <div class="text-white">
+                                <span class="text-info">PLANNING TO PLACE ENTRY LIMIT :</span> <span class="text-white fs-6" id="modalPlanEntryLimit">₹0.00</span>
+                            </div>
+                            <div class="text-white">
+                                <span class="text-danger">SL :</span> <span class="text-danger fs-6" id="modalPlanSL">₹0.00</span>
+                                <span class="text-muted small fw-normal ms-2" id="modalPlanSLPts">(-0.0 pts)</span>
+                            </div>
+                            <div class="text-white">
+                                <span class="text-success">TP :</span> <span class="text-success fs-6" id="modalPlanTP">₹0.00</span>
+                                <span class="text-muted small fw-normal ms-2" id="modalPlanTPPts">(+0.0 pts)</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Detailed Precise Entry Reason / Strategy RCA (Exact User Format) -->
+                    <div class="p-3 rounded mb-3" style="background: rgba(245, 158, 11, 0.08); border: 1px solid rgba(245, 158, 11, 0.35);">
+                        <div class="d-flex align-items-center justify-content-between mb-2">
+                            <span class="fw-bold text-warning small">
+                                💡 STRATEGY SIGNAL REASON &amp; ENTRY RCA
+                            </span>
+                            <span class="badge rounded-pill px-2 py-0.5" style="background: rgba(245, 158, 11, 0.25); color: #fbbf24; font-size: 0.65rem;">REC RCA</span>
+                        </div>
+                        <div class="font-monospace text-white p-2.5 rounded" style="background: rgba(0, 0, 0, 0.4); border: 1px solid rgba(255, 255, 255, 0.08); font-size: 0.82rem; line-height: 1.5; word-break: break-word;">
+                            <span class="text-warning fw-bold">REC :</span> <span id="modalPlanRecText">-</span>
+                        </div>
+                    </div>
+
+                    <!-- Execution Lifecycle & Order Verification Flow -->
+                    <div class="p-3 rounded" style="background: rgba(0, 0, 0, 0.25); border: 1px solid rgba(255, 255, 255, 0.08);">
+                        <div class="fw-bold text-white small mb-2">⚡ LIFECYCLE LATENCY &amp; RISK REWARD</div>
+                        <div class="row g-2 font-monospace" style="font-size: 0.75rem;">
+                            <div class="col-6 col-md-3">
+                                <span class="text-muted d-block">Limit Placed Time:</span>
+                                <span class="text-white fw-bold" id="modalPlacedTime">-</span>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <span class="text-muted d-block">Fill / Tapped Time:</span>
+                                <span class="text-info fw-bold" id="modalFillTime">-</span>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <span class="text-muted d-block">Fill Latency:</span>
+                                <span class="text-warning fw-bold" id="modalFillLatency">0s</span>
+                            </div>
+                            <div class="col-6 col-md-3">
+                                <span class="text-muted d-block">Risk : Reward Ratio:</span>
+                                <span class="text-success fw-bold" id="modalRiskReward">-</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer border-secondary border-opacity-25 py-2.5 px-4 d-flex justify-content-between">
+                    <span class="small text-muted font-monospace" style="font-size: 0.72rem;">Click on the Yellow Dot on any chart anytime to inspect Signal RCA.</span>
+                    <button type="button" class="btn btn-sm btn-secondary px-4 fw-bold font-monospace" data-bs-dismiss="modal">Close</button>
                 </div>
             </div>
         </div>
@@ -1896,34 +2050,26 @@
                 (tradeType.includes('PE') || tradeType.includes('PUT') || strikeStr.includes('PE') || strikeStr.includes('PUT') || tradeType.includes('SHORT') || tradeType.includes('SELL'));
             const markers = [];
 
-            // 1. Signal & Entry Markers (Spot Chart)
-            if (signalEpoch && signalEpoch !== entryEpoch) {
+            // 1. Signal Marker (Yellow Dot - Shape Circle)
+            if (signalEpoch) {
                 markers.push({
                     time: findNearestCandleTime(activeSpotCandles, signalEpoch),
                     position: isBearishSpot ? 'aboveBar' : 'belowBar',
                     color: '#eab308',
-                    shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
-                    text: `⚡ SIGNAL (${tl.signal_time || ''})`,
+                    shape: 'circle',
+                    text: '● SIGNAL',
                     size: 1,
                 });
-                if (entryEpoch) {
-                    markers.push({
-                        time: findNearestCandleTime(activeSpotCandles, entryEpoch),
-                        position: isBearishSpot ? 'aboveBar' : 'belowBar',
-                        color: '#0284c7',
-                        shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
-                        text: `${isBearishSpot ? '▼' : '▲'} ENTRY ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
-                        size: 1,
-                    });
-                }
-            } else if (entryEpoch) {
-                // Unified Signal & Entry Badge when on the same bar/tick
+            }
+
+            // 2. Entry Marker (Vivid Blue Arrow)
+            if (entryEpoch) {
                 markers.push({
                     time: findNearestCandleTime(activeSpotCandles, entryEpoch),
                     position: isBearishSpot ? 'aboveBar' : 'belowBar',
-                    color: '#eab308',
+                    color: '#2563eb',
                     shape: isBearishSpot ? 'arrowDown' : 'arrowUp',
-                    text: `⚡ ENTRY ${spotEntryP.toFixed(1)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    text: `${isBearishSpot ? '▼' : '▲'} ENTRY ${spotEntryP.toFixed(1)}`,
                     size: 1,
                 });
             }
@@ -1946,7 +2092,7 @@
                     position: isBearishSpot ? 'belowBar' : 'aboveBar',
                     color: exitColor,
                     shape: isBearishSpot ? 'arrowUp' : 'arrowDown',
-                    text: `${exitTag} ${spotExitP.toFixed(1)} (${tl.exit_time || rawTradeData.exit.time})`,
+                    text: `${exitTag} ${spotExitP.toFixed(1)}`,
                     size: 1,
                 });
             }
@@ -1964,14 +2110,14 @@
             const placedEpoch = tl.limit_placed_epoch;
             const markers = [];
 
-            // 1. Signal Time Marker (Yellow Arrow - distinct from entry)
-            if (signalEpoch && signalEpoch !== entryEpoch) {
+            // 1. Signal Time Marker (Yellow Dot - Shape Circle)
+            if (signalEpoch) {
                 markers.push({
                     time: findNearestCandleTime(activeOptCandles, signalEpoch),
                     position: 'belowBar',
                     color: '#eab308',
-                    shape: 'arrowUp',
-                    text: `⚡ SIGNAL (${tl.signal_time || ''})`,
+                    shape: 'circle',
+                    text: '● SIGNAL',
                     size: 1,
                 });
             }
@@ -1983,22 +2129,19 @@
                     position: 'belowBar',
                     color: '#38bdf8',
                     shape: 'square',
-                    text: `📝 LIMIT (${tl.limit_placed_time || ''}) @ ₹${optLevels.entryP.toFixed(1)}`,
+                    text: `📝 LIMIT @ ₹${optLevels.entryP.toFixed(1)}`,
                     size: 1,
                 });
             }
 
-            // 3. Limit Tapped / Filled Marker (Blue Arrow or Combined Signal Arrow)
+            // 3. Limit Tapped / Filled Marker (Vivid Blue Arrow)
             if (entryEpoch) {
-                const isSameBar = (signalEpoch && signalEpoch === entryEpoch);
                 markers.push({
                     time: findNearestCandleTime(activeOptCandles, entryEpoch),
                     position: 'belowBar',
-                    color: isSameBar ? '#eab308' : '#0284c7',
+                    color: '#2563eb',
                     shape: 'arrowUp',
-                    text: isSameBar ?
-                        `⚡ ENTRY ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})` :
-                        `▲ ENTRY ₹${optLevels.entryP.toFixed(2)} (${tl.limit_tapped_time || rawTradeData.entry.time})`,
+                    text: `▲ ENTRY ₹${optLevels.entryP.toFixed(2)}`,
                     size: 1,
                 });
             }
@@ -2027,7 +2170,7 @@
                     position: 'aboveBar',
                     color: exitColor,
                     shape: 'arrowDown',
-                    text: `${exitLabel} @ ₹${optLevels.exitP.toFixed(2)} (${tl.exit_time || rawTradeData.exit.time})`,
+                    text: `${exitLabel} @ ₹${optLevels.exitP.toFixed(2)}`,
                     size: 1,
                 });
             }
@@ -2330,6 +2473,40 @@
                     ctx.stroke();
                 });
                 ctx.restore();
+            }
+
+            // 2B. Interactive Signal Yellow Dot Halo on Canvas
+            const tl = rawTradeData.timeline || {};
+            const sigEpoch = tl.signal_epoch || (rawTradeData.entry ? rawTradeData.entry.epoch : 0);
+            if (sigEpoch) {
+                const sigIdx = findCandleIndex(candlesList, sigEpoch);
+                let sigX = (sigIdx >= 0) ? chartInst.timeScale().logicalToCoordinate(sigIdx) : null;
+                if (sigX === null) sigX = chartInst.timeScale().timeToCoordinate(sigEpoch);
+                if (sigX !== null && sigX >= -20 && sigX <= w + 20) {
+                    const cSig = (sigIdx >= 0) ? candlesList[sigIdx] : null;
+                    const isBearishSpot = Boolean(rawTradeData.is_bearish_spot);
+                    const refPrice = cSig ? ((paneType === 'SPOT' && isBearishSpot) ? cSig.high : cSig.low) : entryP;
+                    const refY = seriesInst.priceToCoordinate(refPrice);
+                    if (refY !== null) {
+                        const dotY = (paneType === 'SPOT' && isBearishSpot) ? Math.max(10, refY - 14) : Math.min(h - 10, refY + 14);
+                        ctx.save();
+                        // Outer glowing aura
+                        ctx.beginPath();
+                        ctx.arc(sigX, dotY, 9, 0, Math.PI * 2);
+                        ctx.fillStyle = 'rgba(234, 179, 8, 0.28)';
+                        ctx.fill();
+                        ctx.strokeStyle = '#facc15';
+                        ctx.lineWidth = 1.4;
+                        ctx.stroke();
+
+                        // Inner solid yellow core
+                        ctx.beginPath();
+                        ctx.arc(sigX, dotY, 4, 0, Math.PI * 2);
+                        ctx.fillStyle = '#facc15';
+                        ctx.fill();
+                        ctx.restore();
+                    }
+                }
             }
 
             // 3. SMC Overlays (Fair Value Gaps, Liquidity Sweeps, CHoCH)
@@ -2888,8 +3065,94 @@
                 btnToggleHud.querySelector('.material-icons').innerText = hud.classList.contains('minimized') ? 'unfold_more' : 'unfold_less';
             });
 
+            // Signal Yellow Dot RCA Interactive Click Listeners
+            function handleChartSignalClick(param) {
+                if (!param || !param.time || !rawTradeData) return;
+                const tl = rawTradeData.timeline || {};
+                const sigEpoch = tl.signal_epoch || (rawTradeData.entry ? rawTradeData.entry.epoch : 0);
+                const fillEpoch = tl.limit_tapped_epoch || (rawTradeData.entry ? rawTradeData.entry.epoch : 0);
+                if (Math.abs(param.time - sigEpoch) <= 90 || Math.abs(param.time - fillEpoch) <= 90) {
+                    showSignalRcaModal();
+                }
+            }
+
+            if (spotChart) spotChart.subscribeClick(handleChartSignalClick);
+            if (optionChart) optionChart.subscribeClick(handleChartSignalClick);
+
+            const sigBadge = document.getElementById('hudSignalBadge');
+            if (sigBadge) {
+                sigBadge.style.cursor = 'pointer';
+                sigBadge.addEventListener('click', showSignalRcaModal);
+            }
+            const elBanner = document.getElementById('scenarioBanner');
+            if (elBanner) {
+                elBanner.style.cursor = 'pointer';
+                elBanner.addEventListener('click', showSignalRcaModal);
+            }
+
             initBoxConfigUI();
             setupPaneSplitter();
+        }
+
+        // Show Signal RCA & Precise Entry Planning Modal
+        function showSignalRcaModal() {
+            if (!rawTradeData) return;
+            const modalEl = document.getElementById('signalRcaModal');
+            if (!modalEl || !window.bootstrap) return;
+
+            const tl = rawTradeData.timeline || {};
+            const entry = rawTradeData.entry || {};
+
+            const sigTime = tl.signal_time || entry.time || '-';
+            const sigEpoch = tl.signal_epoch || entry.epoch || 0;
+            const fillTime = tl.limit_tapped_time || entry.time || '-';
+            const fillEpoch = tl.limit_tapped_epoch || entry.epoch || 0;
+            const placedTime = tl.limit_placed_time || sigTime;
+
+            const entryLimitP = Number(tl.limit_price || entry.price || 0);
+            const optLevels = getResolvedOptionLevels();
+            const slP = optLevels ? optLevels.stopP : Number(rawTradeData.initial_stop_loss_price || rawTradeData.stop_loss_price || 0);
+            const tpP = optLevels ? optLevels.targetP : Number(rawTradeData.target_price || 0);
+            const slDiff = Math.abs(entryLimitP - slP).toFixed(1);
+            const tpDiff = Math.abs(tpP - entryLimitP).toFixed(1);
+
+            const spotAtSig = Number(tl.signal_spot || entry.index_price || 0);
+            const strikeLtp = Number(tl.signal_strike_ltp || entryLimitP || 0);
+            const recReason = entry.reason || rawTradeData.reason || '-';
+            const latencySec = (fillEpoch && sigEpoch) ? Math.max(0, fillEpoch - sigEpoch) : 0;
+
+            const elSigTime = document.getElementById('modalSignalTime');
+            const elInst = document.getElementById('modalSignalInstrument');
+            const elSpot = document.getElementById('modalSignalSpot');
+            const elLtp = document.getElementById('modalSignalStrikeLtp');
+            const elLimit = document.getElementById('modalPlanEntryLimit');
+            const elSL = document.getElementById('modalPlanSL');
+            const elSLPts = document.getElementById('modalPlanSLPts');
+            const elTP = document.getElementById('modalPlanTP');
+            const elTPPts = document.getElementById('modalPlanTPPts');
+            const elRec = document.getElementById('modalPlanRecText');
+            const elPlaced = document.getElementById('modalPlacedTime');
+            const elFill = document.getElementById('modalFillTime');
+            const elLat = document.getElementById('modalFillLatency');
+            const elRR = document.getElementById('modalRiskReward');
+
+            if (elSigTime) elSigTime.innerText = sigTime;
+            if (elInst) elInst.innerText = `${rawTradeData.symbol || 'NIFTY'} ${rawTradeData.strike || ''} [${rawTradeData.trade_type || 'BUY'}]`;
+            if (elSpot) elSpot.innerText = spotAtSig > 0 ? `₹${spotAtSig.toFixed(2)}` : '-';
+            if (elLtp) elLtp.innerText = strikeLtp > 0 ? `₹${strikeLtp.toFixed(2)}` : '-';
+            if (elLimit) elLimit.innerText = `₹${entryLimitP.toFixed(2)}`;
+            if (elSL) elSL.innerText = `₹${slP.toFixed(2)}`;
+            if (elSLPts) elSLPts.innerText = `(-${slDiff} pts)`;
+            if (elTP) elTP.innerText = `₹${tpP.toFixed(2)}`;
+            if (elTPPts) elTPPts.innerText = `(+${tpDiff} pts)`;
+            if (elRec) elRec.innerText = recReason;
+            if (elPlaced) elPlaced.innerText = placedTime;
+            if (elFill) elFill.innerText = fillTime;
+            if (elLat) elLat.innerText = `${latencySec}s (${(latencySec / 60).toFixed(1)}m)`;
+            if (elRR) elRR.innerText = rawTradeData.risk_reward || `1:${(Number(tpDiff) / Math.max(0.1, Number(slDiff))).toFixed(2)} RR`;
+
+            const modal = bootstrap.Modal.getOrCreateInstance(modalEl);
+            modal.show();
         }
 
         function initBoxConfigUI() {

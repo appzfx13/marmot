@@ -518,6 +518,32 @@ GO_STRATEGY_PRESETS = [
         'is_system_preset': True,
         'is_active': True,
     },
+    {
+        'rule_type': 'ict_sweep_choch',
+        'name': 'ICT Liquidity Sweep + CHoCH Retest (1:2.5 RR)',
+        'market_type': 'ALL',
+        'description': 'ICT Liquidity Sweep (BSL/SSL) followed by CHoCH market structure shift and limit order retest entry with multi-layer scaling. Strictly Intraday.',
+        'parameters': {
+            'ema_fast': 9,
+            'ema_slow': 21,
+            'entry_window_from': 9 * 60 + 20,
+            'entry_window_to': 14 * 60 + 45,
+            'sl_pts': 12.0,
+            'rr_ratio': 2.5,
+            'use_orb_filter': False,
+            'min_displacement': 0.45,
+            'trail_breakeven': True,
+            'breakeven_at_r': 1.0,
+            'cooldown_seconds': 120,
+            'order_type': 'LIMIT',
+            'enable_retest_layering': True,
+            'layer_count': 3,
+            'retest_percentages': [25.0, 50.0, 75.0],
+            'layer_lots': [1, 1, 1],
+        },
+        'is_system_preset': True,
+        'is_active': True,
+    },
 ]
 
 
