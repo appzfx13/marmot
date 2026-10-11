@@ -11,9 +11,9 @@
     .sim-mode-card {
         transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
         cursor: pointer;
-        border-radius: 12px;
+        border-radius: 14px;
         position: relative;
-        padding: 1.25rem 1.4rem;
+        padding: 1.25rem 1.35rem;
         display: flex;
         flex-direction: column;
         justify-content: space-between;
@@ -24,12 +24,12 @@
     }
     .sim-mode-card.active-mode-live {
         background: radial-gradient(circle at top left, rgba(16, 185, 129, 0.14) 0%, rgba(9, 9, 11, 0.95) 75%) !important;
-        border: 2px solid #10b981 !important;
+        border: 1.5px solid #10b981 !important;
         box-shadow: 0 0 25px rgba(16, 185, 129, 0.22), inset 0 0 15px rgba(16, 185, 129, 0.08) !important;
     }
     .sim-mode-card.active-mode-backup {
         background: radial-gradient(circle at top left, rgba(56, 189, 248, 0.14) 0%, rgba(9, 9, 11, 0.95) 75%) !important;
-        border: 2px solid #38bdf8 !important;
+        border: 1.5px solid #38bdf8 !important;
         box-shadow: 0 0 25px rgba(56, 189, 248, 0.22), inset 0 0 15px rgba(56, 189, 248, 0.08) !important;
     }
     .sim-mode-card.inactive-mode {
@@ -85,67 +85,107 @@
         background: rgba(255, 255, 255, 0.15);
         border-radius: 4px;
     }
+    .gateway-toolbar-group {
+        background: rgba(255, 255, 255, 0.03);
+        border: 1px solid rgba(255, 255, 255, 0.08);
+        border-radius: 50rem;
+        padding: 3px;
+        display: inline-flex;
+        align-items: center;
+        gap: 4px;
+    }
+    .profile-bento-card {
+        flex: 1 1 calc(33.333% - 6px);
+        min-width: 60px;
+    }
+    @media (min-width: 1200px) {
+        .profile-bento-card {
+            flex: 1 1 0%;
+        }
+    }
+    .balance-bridge-card {
+        background: rgba(255, 255, 255, 0.025);
+        border: 1px solid var(--border-color, rgba(255, 255, 255, 0.07));
+        border-radius: 10px;
+        padding: 0.75rem 0.85rem;
+        transition: background 0.15s ease, border-color 0.15s ease;
+    }
+    .balance-bridge-card:hover {
+        background: rgba(255, 255, 255, 0.045);
+        border-color: rgba(255, 255, 255, 0.14);
+    }
 </style>
 
 <!-- Top Header Navigation & Cockpit Title -->
-<div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4 mb-4" style="margin-bottom: 2rem !important; padding-top: 1rem;">
+<div class="page-header d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-4 pb-2 border-bottom border-secondary border-opacity-15">
     <div class="d-flex align-items-center gap-3">
-        <div class="d-flex flex-column gap-2">
-            <h1 class="page-title m-0">Mock Broker</h1>
-            <div class="d-flex align-items-center gap-2 flex-wrap">
+        <div class="d-flex flex-column gap-1.5">
+            <div class="d-flex align-items-center gap-2.5 flex-wrap">
+                <h1 class="page-title m-0 fw-bold fs-4">Mock Broker Gateway</h1>
                 {% if mock_online %}
-                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-2.5 py-1 d-flex align-items-center gap-1 font-monospace fw-bold" style="font-size: 0.75rem;">
-                    <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.5rem; height: 0.5rem;" role="status"></span>
+                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 px-2.5 py-1 d-inline-flex align-items-center gap-1 font-monospace fw-bold" style="font-size: 0.72rem;">
+                    <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.45rem; height: 0.45rem;" role="status"></span>
                     ONLINE :8088
                 </span>
                 {% else %}
-                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-2.5 py-1 d-flex align-items-center gap-1 font-monospace fw-bold" style="font-size: 0.75rem;">
-                    <i class="bi bi-exclamation-triangle fs-6"></i>
+                <span class="badge bg-danger bg-opacity-20 text-danger border border-danger border-opacity-30 px-2.5 py-1 d-inline-flex align-items-center gap-1 font-monospace fw-bold" style="font-size: 0.72rem;">
+                    <i class="bi bi-exclamation-triangle"></i>
                     OFFLINE
                 </span>
                 {% endif %}
-                <span class="badge {% if sim_mode == 'LIVE' %}bg-success text-success border-success{% else %}bg-info text-info border-info{% endif %} bg-opacity-20 border border-opacity-30 px-2 py-1 font-monospace fw-bold" style="font-size: 0.75rem;">
+                <span class="badge {% if sim_mode == 'LIVE' %}bg-success text-success border-success{% else %}bg-info text-info border-info{% endif %} bg-opacity-20 border border-opacity-30 px-2.5 py-1 font-monospace fw-bold" style="font-size: 0.72rem;">
                     {% if sim_mode == 'LIVE' %}LIVE DATA SIMULATION{% else %}BACKUP REPLAY SIMULATION{% endif %}
                 </span>
             </div>
-            <p class="page-subtitle m-0 text-muted">Dhan Gateway v2 Emulator &bull; Microsecond Matcher &bull; Active Account: <strong class="text-info font-monospace">{{ active_account.active_account_id|default:"1000000001" }}</strong> ({{ active_account.account_name|default:"Primary Algorithmic Trading" }})</p>
+            <p class="page-subtitle m-0 text-white-50 small" style="font-size: 0.78rem;">
+                Dhan Gateway v2 Emulator &bull; Microsecond Matcher &bull; Active Account: <strong class="text-info font-monospace">{{ active_account.active_account_id|default:"1000000001" }}</strong> ({{ active_account.account_name|default:"Primary Algorithmic Trading" }})
+            </p>
         </div>
     </div>
 
-    <!-- Live Header Action Buttons -->
-    <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button type="button" class="btn btn-outline-info btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-                data-bs-toggle="modal" data-bs-target="#mockOrderTicketModal"
-                title="Dispatch Manual Mock Order to Matcher">
-            <i class="bi bi-cart-plus fs-6"></i>
-            <span>Place Order Ticket</span>
-        </button>
+    <!-- Live Header Action Toolbar -->
+    <div class="d-flex align-items-center gap-2 flex-wrap ms-lg-auto">
+        <div class="gateway-toolbar-group">
+            <button type="button" class="btn btn-outline-info btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5"
+                    style="font-size: 0.78rem;"
+                    data-bs-toggle="modal" data-bs-target="#mockOrderTicketModal"
+                    title="Dispatch Manual Mock Order to Matcher">
+                <i class="bi bi-cart-plus"></i>
+                <span>Order Ticket</span>
+            </button>
 
-        <button type="button" class="btn btn-outline-success btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-                data-bs-toggle="modal" data-bs-target="#saveSessionModal"
-                title="Save and snapshot current simulation session">
-            <i class="bi bi-bookmark-star fs-6"></i>
-            <span>Save Session</span>
-        </button>
+            <button type="button" class="btn btn-outline-success btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5"
+                    style="font-size: 0.78rem;"
+                    data-bs-toggle="modal" data-bs-target="#saveSessionModal"
+                    title="Save and snapshot current simulation session">
+                <i class="bi bi-bookmark-star"></i>
+                <span>Save Session</span>
+            </button>
 
-        <a href="{% url 'admins:admin-gateway-session-list' %}"
-           class="btn btn-outline-primary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-           title="View all saved simulation sessions">
-            <i class="bi bi-archive fs-6"></i>
-            <span>Saved Sessions</span>
-        </a>
+            <a href="{% url 'admins:admin-gateway-session-list' %}"
+               class="btn btn-outline-primary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5"
+               style="font-size: 0.78rem;"
+               title="View all saved simulation sessions">
+                <i class="bi bi-archive"></i>
+                <span>Sessions</span>
+            </a>
+        </div>
 
-        <button type="button" class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-                data-bs-toggle="modal" data-bs-target="#confirmResetSessionModal" title="Reset all mock orders and restore ₹1,00,000 balance">
-            <i class="bi bi-arrow-counterclockwise fs-6"></i>
-            <span>Reset Session</span>
-        </button>
+        <div class="gateway-toolbar-group">
+            <button type="button" class="btn btn-outline-warning btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5"
+                    style="font-size: 0.78rem;"
+                    data-bs-toggle="modal" data-bs-target="#confirmResetSessionModal" title="Reset all mock orders and restore ₹1,00,000 balance">
+                <i class="bi bi-arrow-counterclockwise"></i>
+                <span>Reset</span>
+            </button>
 
-        <button type="button" class="btn btn-outline-danger btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-                data-bs-toggle="modal" data-bs-target="#confirmKillSwitchModal" title="Emergency kill switch across mock broker">
-            <i class="bi bi-lightning-charge-fill fs-6"></i>
-            <span>Kill Switch</span>
-        </button>
+            <button type="button" class="btn btn-outline-danger btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5"
+                    style="font-size: 0.78rem;"
+                    data-bs-toggle="modal" data-bs-target="#confirmKillSwitchModal" title="Emergency kill switch across mock broker">
+                <i class="bi bi-lightning-charge-fill"></i>
+                <span>Kill Switch</span>
+            </button>
+        </div>
 
         <form hx-post="{% url 'admins:admin-mock-broker-control' %}" hx-target="#gateway-emulator-container" hx-swap="outerHTML" class="d-none" id="gateway-reset-session-form">
             {% csrf_token %}
@@ -158,12 +198,13 @@
             <input type="hidden" name="action" value="kill_switch">
         </form>
 
-        <button type="button" class="btn btn-outline-secondary btn-sm rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-2.5"
+        <button type="button" class="btn btn-outline-secondary btn-sm rounded-circle d-inline-flex align-items-center justify-content-center shadow-sm"
+                style="width: 32px; height: 32px; padding: 0;"
                 hx-get="{% url 'admins:admin-gateway-emulator' %}"
                 hx-target="#gateway-emulator-container"
                 hx-swap="outerHTML"
                 title="Refresh Telemetry">
-            <i class="bi bi-arrow-repeat fs-6"></i>
+            <i class="bi bi-arrow-repeat"></i>
         </button>
     </div>
 </div>
@@ -182,7 +223,7 @@
              role="button"
              tabindex="0">
             <div>
-                <div class="d-flex align-items-start justify-content-between mb-2.5">
+                <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.7rem;">
                             <i class="bi bi-broadcast me-1"></i>FYERS V3 WEBSOCKET
@@ -205,16 +246,16 @@
                     </div>
                 </div>
 
-                <h5 class="fw-bold mb-1.5 {% if sim_mode == 'LIVE' %}text-white{% else %}theme-text-main{% endif %} d-flex align-items-center gap-2">
+                <h5 class="fw-bold mb-2 {% if sim_mode == 'LIVE' %}text-white{% else %}theme-text-main{% endif %} d-flex align-items-center gap-2 fs-6">
                     <i class="bi bi-lightning-charge-fill text-success"></i>
                     <span>Live Data Simulation</span>
                 </h5>
-                <p class="theme-text-muted small mb-3" style="font-size: 0.78rem; line-height: 1.5;">
+                <p class="theme-text-muted small mb-3" style="font-size: 0.78rem; line-height: 1.55; min-height: 44px;">
                     Ingest realtime ticks &amp; options data from FYERS DataSocket V3 directly into the Dhan Mock Engine (:8088). Deployed strategies execute orders via REST API and receive instant feedback via Webhook postback.
                 </p>
             </div>
 
-            <div class="d-flex align-items-center justify-content-between pt-2.5 border-top border-secondary border-opacity-15 font-monospace" style="font-size: 0.72rem;">
+            <div class="d-flex align-items-center justify-content-between pt-2.5 mt-auto border-top border-secondary border-opacity-15 font-monospace" style="font-size: 0.72rem;">
                 <span class="d-inline-flex align-items-center gap-1.5">
                     {% if live_feed_enabled %}
                     <span class="spinner-grow spinner-grow-sm text-success" style="width: 0.45rem; height: 0.45rem;" role="status"></span>
@@ -240,7 +281,7 @@
              role="button"
              tabindex="0">
             <div>
-                <div class="d-flex align-items-start justify-content-between mb-2.5">
+                <div class="d-flex align-items-center justify-content-between mb-3 gap-2 flex-wrap">
                     <div class="d-flex align-items-center gap-2 flex-wrap">
                         <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-0.5 font-monospace" style="font-size: 0.7rem;">
                             <i class="bi bi-hdd-stack me-1"></i>HISTORICAL PARQUET
@@ -263,16 +304,16 @@
                     </div>
                 </div>
 
-                <h5 class="fw-bold mb-1.5 {% if sim_mode == 'BACKUP' %}text-white{% else %}theme-text-main{% endif %} d-flex align-items-center gap-2">
+                <h5 class="fw-bold mb-2 {% if sim_mode == 'BACKUP' %}text-white{% else %}theme-text-main{% endif %} d-flex align-items-center gap-2 fs-6">
                     <i class="bi bi-play-circle-fill text-info"></i>
                     <span>Backup Data Simulation</span>
                 </h5>
-                <p class="theme-text-muted small mb-3" style="font-size: 0.78rem; line-height: 1.5;">
+                <p class="theme-text-muted small mb-3" style="font-size: 0.78rem; line-height: 1.55; min-height: 44px;">
                     Feed historical backup datasets from the dropdown into the Mock engine in the <strong>strictly identical canonical format</strong> as FYERS realtime feed. Accelerate backtests up to 250x with event-driven virtual clock synchronization.
                 </p>
             </div>
 
-            <div class="d-flex align-items-center justify-content-between pt-2.5 border-top border-secondary border-opacity-15 font-monospace" style="font-size: 0.72rem;">
+            <div class="d-flex align-items-center justify-content-between pt-2.5 mt-auto border-top border-secondary border-opacity-15 font-monospace" style="font-size: 0.72rem;">
                 <span class="d-inline-flex align-items-center gap-1.5">
                     {% if streamer_status.is_playing %}
                     <span class="spinner-grow spinner-grow-sm text-info" style="width: 0.45rem; height: 0.45rem;" role="status"></span>
@@ -296,10 +337,10 @@
      ==================================================================== -->
 {% if sim_mode == 'BACKUP' %}
 <!-- Mode B: Backup Replay Controller Toolbar -->
-<div class="card glass-card parquet-controller-card p-4 mb-4 border-info border-opacity-25 shadow-sm" style="background: rgba(14, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.25) !important;">
-    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-4 pb-3 border-bottom border-secondary border-opacity-20" style="margin-bottom: 1.5rem !important;">
-        <div class="d-flex align-items-center gap-2">
-            <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 32px; height: 32px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
+<div class="card glass-card parquet-controller-card p-3.5 p-md-4 mb-4 border-info border-opacity-25 shadow-sm" style="background: rgba(14, 23, 42, 0.75); border: 1px solid rgba(56, 189, 248, 0.25) !important;">
+    <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3 mb-3.5 pb-3 border-bottom border-secondary border-opacity-20">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" style="width: 34px; height: 34px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
                 <i class="bi bi-sliders fs-6"></i>
             </div>
             <div>
@@ -370,40 +411,36 @@
                         class="btn btn-danger btn-sm rounded-pill px-3.5 py-1.5 shadow-sm d-inline-flex align-items-center gap-1.5 fw-bold"
                         title="Functional Stop: Halts stream, kills active strategy workers, and flushes orders">
                     <i class="bi bi-stop-circle-fill fs-6"></i>
-                    <span>STOP SIMULATION</span>
+                    <span>Stop Simulation</span>
                 </button>
             </form>
         </div>
     </div>
 
     <!-- Real-Time Streamer Progress Card (Direct WebSocket Update) -->
-    <div id="gateway-streamer-progress-card" class="p-4 mb-4 rounded-3 border border-secondary border-opacity-20" style="background: rgba(15, 23, 42, 0.75);">
-        <div class="d-flex align-items-center justify-content-between flex-wrap gap-3 mb-3">
+    <div id="gateway-streamer-progress-card" class="p-3 p-md-3.5 mb-3.5 rounded-3 border border-secondary border-opacity-20" style="background: rgba(15, 23, 42, 0.75);">
+        <div class="d-flex align-items-center justify-content-between flex-wrap gap-2.5 mb-2.5">
             <div class="d-flex align-items-center gap-2 flex-wrap font-monospace">
-                <span id="gateway-streamer-badge" class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-3 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm">
+                <span id="gateway-streamer-badge" class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 fs-xs fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm">
                     <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.45rem; height: 0.45rem;"></span>
                     <span id="gateway-streamer-status-text">STREAMING TICK FEED</span>
                 </span>
                 <span class="badge bg-dark border border-white border-opacity-10 text-warning px-2.5 py-1 smaller shadow-sm">
-                    <i class="bi bi-calendar3 me-1.5"></i><span id="gateway-progress-date">{{ streamer_status.current_date|default:"2024-01-01" }}</span>
+                    <i class="bi bi-calendar3 me-1"></i><span id="gateway-progress-date">{{ streamer_status.current_date|default:"2024-01-01" }}</span>
                 </span>
                 <span class="badge bg-dark border border-white border-opacity-10 text-info px-2.5 py-1 smaller shadow-sm">
-                    <i class="bi bi-clock me-1.5"></i><span id="gateway-progress-time">{{ streamer_status.current_time|default:"09:15:00" }} IST</span>
+                    <i class="bi bi-clock me-1"></i><span id="gateway-progress-time">{{ streamer_status.current_time|default:"09:15:00" }} IST</span>
                 </span>
             </div>
-            <div class="d-flex align-items-center gap-3 font-monospace smaller text-secondary flex-wrap">
-                <span>Dataset: <strong id="gateway-progress-file" class="text-white">{{ streamer_status.active_file|default:"1/13/dataset.parquet" }}</strong></span>
-                <span class="opacity-25">|</span>
-                <span>Rows: <strong id="gateway-progress-rows" class="text-white">{{ streamer_status.current_row|default:0 }} / {{ streamer_status.total_rows|default:5678660 }}</strong></span>
-                <span class="opacity-25">|</span>
-                <span>Progress: <strong id="gateway-progress-pct" class="text-success">{{ streamer_status.progress_pct|default:0|floatformat:1 }}%</strong></span>
-                <span class="opacity-25">|</span>
-                <span>Speed: <strong id="gateway-progress-speed" class="text-warning">{{ streamer_status.current_speed|default:25 }}x</strong></span>
-                <span class="opacity-25">|</span>
-                <span>Ticks: <strong id="gateway-progress-ticks" class="text-white">{{ streamer_status.ticks_ingested|default:0 }}</strong></span>
+            <div class="d-flex align-items-center gap-1.5 gap-md-2 font-monospace smaller text-secondary flex-wrap">
+                <span class="px-2 py-0.5 rounded bg-dark border border-white border-opacity-10">File: <strong id="gateway-progress-file" class="text-white">{{ streamer_status.active_file|default:"1/13/dataset.parquet" }}</strong></span>
+                <span class="px-2 py-0.5 rounded bg-dark border border-white border-opacity-10">Rows: <strong id="gateway-progress-rows" class="text-white">{{ streamer_status.current_row|default:0 }} / {{ streamer_status.total_rows|default:5678660 }}</strong></span>
+                <span class="px-2 py-0.5 rounded bg-dark border border-white border-opacity-10">Progress: <strong id="gateway-progress-pct" class="text-success">{{ streamer_status.progress_pct|default:0|floatformat:1 }}%</strong></span>
+                <span class="px-2 py-0.5 rounded bg-dark border border-white border-opacity-10">Speed: <strong id="gateway-progress-speed" class="text-warning">{{ streamer_status.current_speed|default:25 }}x</strong></span>
+                <span class="px-2 py-0.5 rounded bg-dark border border-white border-opacity-10">Ticks: <strong id="gateway-progress-ticks" class="text-white">{{ streamer_status.ticks_ingested|default:0 }}</strong></span>
             </div>
         </div>
-        <div class="progress rounded-pill bg-dark border border-white border-opacity-10 mt-4 mb-2" style="height: 9px;">
+        <div class="progress rounded-pill bg-dark border border-white border-opacity-10 mt-2.5 mb-1.5" style="height: 8px;">
             <div id="gateway-progress-bar" class="progress-bar progress-bar-striped progress-bar-animated bg-success" role="progressbar"
                  style="width: {{ streamer_status.progress_pct|default:'0' }}%; transition: width 0.3s ease;"
                  aria-valuenow="{{ streamer_status.progress_pct|default:'0' }}" aria-valuemin="0" aria-valuemax="100"></div>
@@ -651,7 +688,7 @@
                 </div>
 
                 <!-- 6 Equal-Width Cards Flex Deck (Takes 100% of Width) -->
-                <div class="d-flex gap-2 w-100 align-items-stretch" role="group" id="gateway-speed-profile-selector">
+                <div class="d-flex flex-wrap flex-xl-nowrap gap-2 w-100 align-items-stretch" role="group" id="gateway-speed-profile-selector">
                     
                     <!-- 1: REAL -->
                     <button type="button" class="btn profile-pill-btn profile-bento-card rounded-3 flex-fill position-relative p-2 text-center font-monospace d-flex flex-column align-items-center justify-content-between {% if streamer_status.profile_key == 'REALTIME' %}active{% endif %}"
@@ -883,11 +920,14 @@
      ==================================================================== -->
 <div id="simulation-workspace" class="w-100">
     <!-- Capital Accounting & Balance Bridge Card -->
-    <div class="glass-card p-4 mb-4 position-relative overflow-hidden rounded-3"
+    <div class="glass-card p-3.5 p-md-4 mb-4 position-relative overflow-hidden rounded-3 shadow-sm"
          style="background: var(--card-bg, rgba(255, 255, 255, 0.02)); border: 1px solid var(--border-color) !important;">
         <div class="d-flex align-items-center justify-content-between mb-3">
-            <span class="theme-text-muted small fw-bold text-uppercase tracking-wider" style="font-size: 0.72rem;">Account Balance &amp; Capital Accounting</span>
-            <span id="gateway-net-pnl-badge" class="badge {% if metrics.net_pnl >= 0 %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-25 border border-opacity-25 rounded-pill px-2.5 py-0.5 fs-7 font-monospace">
+            <span class="theme-text-muted small fw-bold text-uppercase tracking-wider d-flex align-items-center gap-1.5" style="font-size: 0.72rem; letter-spacing: 0.5px;">
+                <i class="bi bi-wallet2 text-info"></i>
+                <span>Account Balance &amp; Capital Accounting</span>
+            </span>
+            <span id="gateway-net-pnl-badge" class="badge {% if metrics.net_pnl >= 0 %}bg-success text-success{% else %}bg-danger text-danger{% endif %} bg-opacity-25 border border-opacity-25 rounded-pill px-2.5 py-1 fs-7 font-monospace fw-bold">
                 {% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }} Net Session PnL
             </span>
         </div>
@@ -909,41 +949,59 @@
             </div>
         </div>
 
-        <div class="row g-3 pt-3 pb-2 border-top border-secondary border-opacity-15 small">
+        <div class="row g-2.5 pt-3 pb-1 border-top border-secondary border-opacity-15 small">
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="p-3 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
-                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">1. Starting SOD Capital</div>
-                    <div class="theme-text-main fw-semibold font-monospace mt-1">₹{{ active_account.sod_limit|default:100000|floatformat:2 }}</div>
+                <div class="balance-bridge-card h-100 shadow-sm d-flex flex-column justify-content-between">
+                    <div class="theme-text-muted d-flex align-items-center gap-1.5" style="font-size: 0.68rem; font-weight: 500;">
+                        <span class="badge rounded-circle p-0 d-inline-flex align-items-center justify-content-center bg-secondary bg-opacity-25" style="width: 14px; height: 14px; font-size: 0.55rem;">1</span>
+                        <span>SOD Capital</span>
+                    </div>
+                    <div class="theme-text-main fw-semibold font-monospace mt-1.5" style="font-size: 0.88rem;">₹{{ active_account.sod_limit|default:100000|floatformat:2 }}</div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="p-3 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
-                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">2. (+) Gross Profits</div>
-                    <div class="text-success fw-semibold font-monospace mt-1">+₹{{ metrics.gross_pnl|floatformat:2 }}</div>
+                <div class="balance-bridge-card h-100 shadow-sm d-flex flex-column justify-content-between">
+                    <div class="theme-text-muted d-flex align-items-center gap-1.5" style="font-size: 0.68rem; font-weight: 500;">
+                        <span class="badge rounded-circle p-0 d-inline-flex align-items-center justify-content-center bg-success bg-opacity-25 text-success" style="width: 14px; height: 14px; font-size: 0.55rem;">+</span>
+                        <span>Gross Profits</span>
+                    </div>
+                    <div class="text-success fw-semibold font-monospace mt-1.5" style="font-size: 0.88rem;">+₹{{ metrics.gross_pnl|floatformat:2 }}</div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="p-3 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
-                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">3. (-) Total Brokerage</div>
-                    <div class="text-warning fw-semibold font-monospace mt-1">-₹{{ metrics.total_charges|floatformat:2 }}</div>
+                <div class="balance-bridge-card h-100 shadow-sm d-flex flex-column justify-content-between">
+                    <div class="theme-text-muted d-flex align-items-center gap-1.5" style="font-size: 0.68rem; font-weight: 500;">
+                        <span class="badge rounded-circle p-0 d-inline-flex align-items-center justify-content-center bg-warning bg-opacity-25 text-warning" style="width: 14px; height: 14px; font-size: 0.55rem;">-</span>
+                        <span>Total Brokerage</span>
+                    </div>
+                    <div class="text-warning fw-semibold font-monospace mt-1.5" style="font-size: 0.88rem;">-₹{{ metrics.total_charges|floatformat:2 }}</div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="p-3 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
-                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">4. (➔) Net Realized PnL</div>
-                    <div class="{% if metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold font-monospace mt-1">{% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }}</div>
+                <div class="balance-bridge-card h-100 shadow-sm d-flex flex-column justify-content-between">
+                    <div class="theme-text-muted d-flex align-items-center gap-1.5" style="font-size: 0.68rem; font-weight: 500;">
+                        <span class="badge rounded-circle p-0 d-inline-flex align-items-center justify-content-center bg-info bg-opacity-25 text-info" style="width: 14px; height: 14px; font-size: 0.55rem;">➔</span>
+                        <span>Net Realized PnL</span>
+                    </div>
+                    <div class="{% if metrics.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} fw-semibold font-monospace mt-1.5" style="font-size: 0.88rem;">{% if metrics.net_pnl >= 0 %}+{% endif %}₹{{ metrics.net_pnl|floatformat:2 }}</div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="p-3 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
-                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">5. Closed Pairs</div>
-                    <div class="text-info fw-semibold font-monospace mt-1">{{ metrics.total_trades }} Trades</div>
+                <div class="balance-bridge-card h-100 shadow-sm d-flex flex-column justify-content-between">
+                    <div class="theme-text-muted d-flex align-items-center gap-1.5" style="font-size: 0.68rem; font-weight: 500;">
+                        <i class="bi bi-clock-history text-info" style="font-size: 0.65rem;"></i>
+                        <span>Closed Pairs</span>
+                    </div>
+                    <div class="text-info fw-semibold font-monospace mt-1.5" style="font-size: 0.88rem;">{{ metrics.total_trades }} Trades</div>
                 </div>
             </div>
             <div class="col-6 col-md-4 col-xl-2">
-                <div class="p-3 rounded-3 h-100 shadow-sm" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));">
-                    <div class="theme-text-muted" style="font-size: 0.7rem; font-weight: 500;">6. Current Available</div>
-                    <div class="text-white fw-bold font-monospace mt-1">₹{{ active_account.available_balance|default:100000|floatformat:2 }}</div>
+                <div class="balance-bridge-card h-100 shadow-sm d-flex flex-column justify-content-between">
+                    <div class="theme-text-muted d-flex align-items-center gap-1.5" style="font-size: 0.68rem; font-weight: 500;">
+                        <i class="bi bi-check-circle-fill text-success" style="font-size: 0.65rem;"></i>
+                        <span>Available Cash</span>
+                    </div>
+                    <div class="text-white fw-bold font-monospace mt-1.5" style="font-size: 0.88rem;">₹{{ active_account.available_balance|default:100000|floatformat:2 }}</div>
                 </div>
             </div>
         </div>
@@ -999,8 +1057,8 @@
      ==================================================================== -->
 <div class="modal fade" id="mockOrderTicketModal" tabindex="-1" aria-labelledby="mockOrderTicketModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 480px;">
-        <div class="modal-content glass-card rounded-4 border-secondary border-opacity-25" style="background: #0f1117; backdrop-filter: blur(25px);">
-            <div class="modal-header border-secondary border-opacity-20 pb-2">
+        <div class="modal-content glass-card border border-secondary border-opacity-25 shadow-lg" style="background: rgba(15, 17, 23, 0.98); backdrop-filter: blur(25px); border-radius: 14px;">
+            <div class="modal-header px-4 py-3 border-bottom border-secondary border-opacity-20">
                 <div class="d-flex align-items-center gap-2">
                     <div class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(56, 189, 248, 0.15); color: #38bdf8;">
                         <i class="bi bi-lightning-fill"></i>
@@ -1010,7 +1068,7 @@
                         <div class="smaller text-muted">Terminal Execution API &bull; Port :8088 Matcher</div>
                     </div>
                 </div>
-                <button type="button" class="btn-close btn-close-white" data-bs-toggle="modal" data-bs-target="#mockOrderTicketModal" aria-label="Close"></button>
+                <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <form hx-post="{% url 'admins:admin-live-order-place' %}"
                   hx-swap="none"
@@ -1019,7 +1077,7 @@
                 <input type="hidden" name="execution_mode" value="SANDBOX">
                 <input type="hidden" name="target_scope" value="ALL">
 
-                <div class="modal-body pt-3 pb-2">
+                <div class="modal-body px-4 py-3">
                     <!-- Buy / Sell Segment -->
                     <div class="row g-2 mb-3">
                         <div class="col-6">
@@ -1076,9 +1134,9 @@
                     </div>
                 </div>
 
-                <div class="modal-footer border-secondary border-opacity-20 pt-2">
+                <div class="modal-footer px-4 py-3 border-top border-secondary border-opacity-20">
                     <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
-                    <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 fw-bold">
+                    <button type="submit" class="btn btn-primary btn-sm rounded-pill px-4 fw-bold shadow-sm">
                         <i class="bi bi-send-fill me-1"></i>Dispatch Order
                     </button>
                 </div>
@@ -1516,7 +1574,7 @@
 <div class="modal fade" id="confirmPauseModal" tabindex="-1" aria-labelledby="confirmPauseModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-card border border-warning border-opacity-30 shadow-lg" style="background: rgba(20, 20, 24, 0.95); backdrop-filter: blur(25px); color: #fafafa; border-radius: 14px;">
-            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+            <div class="modal-header px-4 py-3 border-bottom border-secondary border-opacity-20">
                 <h6 class="modal-title fw-bold text-white d-flex align-items-center gap-2" id="confirmPauseModalLabel">
                     <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">
                         <i class="bi bi-pause-fill fs-5"></i>
@@ -1525,7 +1583,7 @@
                 </h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body py-3">
+            <div class="modal-body px-4 py-3">
                 <p class="text-white-50 small mb-3">You are about to pause playback for the active historical Parquet dataset. This will freeze simulated execution and virtual time:</p>
                 <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(255, 255, 255, 0.03);">
                     <ul class="list-unstyled mb-0 smaller text-white-50 d-flex flex-column gap-1.5">
@@ -1544,7 +1602,7 @@
                     </ul>
                 </div>
             </div>
-            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+            <div class="modal-footer px-4 py-3 border-top border-secondary border-opacity-20">
                 <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-toggle-form', 'confirmPauseModal')">
                     <i class="bi bi-pause-fill me-1"></i>Yes, Pause Replay
@@ -1558,7 +1616,7 @@
 <div class="modal fade" id="confirmRewindModal" tabindex="-1" aria-labelledby="confirmRewindModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-card border border-info border-opacity-30 shadow-lg" style="background: rgba(20, 20, 24, 0.95); backdrop-filter: blur(25px); color: #fafafa; border-radius: 14px;">
-            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+            <div class="modal-header px-4 py-3 border-bottom border-secondary border-opacity-20">
                 <h6 class="modal-title fw-bold text-white d-flex align-items-center gap-2" id="confirmRewindModalLabel">
                     <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(56, 189, 248, 0.15); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.3);">
                         <i class="bi bi-arrow-repeat fs-5"></i>
@@ -1567,7 +1625,7 @@
                 </h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body py-3">
+            <div class="modal-body px-4 py-3">
                 <p class="text-white-50 small mb-3">Rewinding will restart playback of the dataset from the beginning of the market day:</p>
                 <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(255, 255, 255, 0.03);">
                     <ul class="list-unstyled mb-0 smaller text-white-50 d-flex flex-column gap-1.5">
@@ -1582,7 +1640,7 @@
                     </ul>
                 </div>
             </div>
-            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+            <div class="modal-footer px-4 py-3 border-top border-secondary border-opacity-20">
                 <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-info text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-rewind-form', 'confirmRewindModal')">
                     <i class="bi bi-arrow-repeat me-1"></i>Yes, Rewind Replay
@@ -1596,7 +1654,7 @@
 <div class="modal fade" id="confirmStopModal" tabindex="-1" aria-labelledby="confirmStopModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
         <div class="modal-content glass-card border border-danger border-opacity-30 shadow-lg" style="background: rgba(20, 20, 24, 0.95); backdrop-filter: blur(25px); color: #fafafa; border-radius: 14px;">
-            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+            <div class="modal-header px-4 py-3 border-bottom border-secondary border-opacity-20">
                 <h6 class="modal-title fw-bold text-white d-flex align-items-center gap-2" id="confirmStopModalLabel">
                     <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
                         <i class="bi bi-stop-circle-fill fs-5"></i>
@@ -1605,7 +1663,7 @@
                 </h6>
                 <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body py-3">
+            <div class="modal-body px-4 py-3">
                 <p class="text-white-50 small mb-3">You are about to execute a functional simulation stop. The following operations will be executed immediately:</p>
                 <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(255, 255, 255, 0.03);">
                     <ul class="list-unstyled mb-0 smaller text-white-50 d-flex flex-column gap-1.5">
@@ -1624,7 +1682,7 @@
                     </ul>
                 </div>
             </div>
-            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+            <div class="modal-footer px-4 py-3 border-top border-secondary border-opacity-20">
                 <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Keep Running</button>
                 <button type="button" class="btn btn-danger fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-stop-form', 'confirmStopModal')">
                     <i class="bi bi-stop-circle-fill me-1"></i>Yes, Halt Simulation
@@ -1637,8 +1695,8 @@
 <!-- 4. Save Simulation Session Modal -->
 <div class="modal fade" id="saveSessionModal" tabindex="-1" aria-labelledby="saveSessionModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered" style="max-width: 520px;">
-        <div class="modal-content glass-card border border-success border-opacity-30 shadow-lg" style="background: rgba(18, 20, 26, 0.98); backdrop-filter: blur(25px); color: #fafafa; border-radius: 16px;">
-            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+        <div class="modal-content glass-card border border-success border-opacity-30 shadow-lg" style="background: rgba(18, 20, 26, 0.98); backdrop-filter: blur(25px); color: #fafafa; border-radius: 14px;">
+            <div class="modal-header px-4 py-3 border-bottom border-secondary border-opacity-20">
                 <div class="d-flex align-items-center gap-2">
                     <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 34px; height: 34px; background: rgba(34, 197, 94, 0.15); color: #22c55e; border: 1px solid rgba(34, 197, 94, 0.3);">
                         <i class="bi bi-bookmark-star-fill fs-5"></i>
@@ -1655,7 +1713,7 @@
                   hx-swap="outerHTML"
                   onsubmit="setTimeout(() => { bootstrap.Modal.getInstance(document.getElementById('saveSessionModal'))?.hide(); }, 200);">
                 {% csrf_token %}
-                <div class="modal-body py-3">
+                <div class="modal-body px-4 py-3">
                     <!-- Session Summary Preview Card -->
                     <div class="p-3 rounded-3 mb-3 border border-secondary border-opacity-25" style="background: rgba(255, 255, 255, 0.03);">
                         <div class="d-flex justify-content-between align-items-center mb-2">
@@ -1684,7 +1742,7 @@
                     <div class="mb-3">
                         <label class="form-label smaller fw-semibold text-white-50">SESSION NAME <span class="text-danger">*</span></label>
                         <input type="text" name="name" class="form-control bg-dark border-secondary border-opacity-30 text-white font-monospace"
-                               placeholder="e.g. NIFTY 15m Momentum Replay 5x Multiplier" required>
+                                placeholder="e.g. NIFTY 15m Momentum Replay 5x Multiplier" required>
                     </div>
 
                     <!-- Rating: 1, 2, 3 Stars -->
@@ -1731,7 +1789,7 @@
                         </label>
                     </div>
                 </div>
-                <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+                <div class="modal-footer px-4 py-3 border-top border-secondary border-opacity-20">
                     <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3" data-bs-dismiss="modal">Cancel</button>
                     <button type="submit" class="btn btn-success fw-bold btn-sm rounded-pill px-4 shadow-sm">
                         <i class="bi bi-check2-circle me-1"></i>Snapshot &amp; Save Session
@@ -1745,8 +1803,8 @@
 <!-- 5. Confirm Reset Session Modal -->
 <div class="modal fade" id="confirmResetSessionModal" tabindex="-1" aria-labelledby="confirmResetSessionModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content glass-card border border-warning border-opacity-30 shadow-lg" style="background: var(--card-bg, #141720); backdrop-filter: blur(25px); color: var(--text-primary, #ffffff); border-radius: 16px;">
-            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+        <div class="modal-content glass-card border border-warning border-opacity-30 shadow-lg" style="background: var(--card-bg, #141720); backdrop-filter: blur(25px); color: var(--text-primary, #ffffff); border-radius: 14px;">
+            <div class="modal-header px-4 py-3 border-bottom border-secondary border-opacity-20">
                 <h6 class="modal-title fw-bold theme-text-main d-flex align-items-center gap-2" id="confirmResetSessionModalLabel">
                     <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(234, 179, 8, 0.15); color: #eab308; border: 1px solid rgba(234, 179, 8, 0.3);">
                         <i class="bi bi-arrow-counterclockwise fs-5"></i>
@@ -1755,7 +1813,7 @@
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body py-3">
+            <div class="modal-body px-4 py-3">
                 <p class="theme-text-muted small mb-3">You are about to reset the active simulation session. This will clear runtime state across the emulator and Django:</p>
                 <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(234, 179, 8, 0.05);">
                     <ul class="list-unstyled mb-0 smaller theme-text-muted d-flex flex-column gap-1.5">
@@ -1774,7 +1832,7 @@
                     </ul>
                 </div>
             </div>
-            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+            <div class="modal-footer px-4 py-3 border-top border-secondary border-opacity-20">
                 <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-warning text-dark fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-reset-session-form', 'confirmResetSessionModal')">
                     <i class="bi bi-arrow-counterclockwise me-1"></i>Yes, Reset Session
@@ -1787,8 +1845,8 @@
 <!-- 6. Confirm Kill Switch Modal -->
 <div class="modal fade" id="confirmKillSwitchModal" tabindex="-1" aria-labelledby="confirmKillSwitchModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content glass-card border border-danger border-opacity-30 shadow-lg" style="background: var(--card-bg, #141720); backdrop-filter: blur(25px); color: var(--text-primary, #ffffff); border-radius: 16px;">
-            <div class="modal-header border-bottom border-secondary border-opacity-25 pb-3">
+        <div class="modal-content glass-card border border-danger border-opacity-30 shadow-lg" style="background: var(--card-bg, #141720); backdrop-filter: blur(25px); color: var(--text-primary, #ffffff); border-radius: 14px;">
+            <div class="modal-header px-4 py-3 border-bottom border-secondary border-opacity-20">
                 <h6 class="modal-title fw-bold theme-text-main d-flex align-items-center gap-2" id="confirmKillSwitchModalLabel">
                     <span class="rounded-circle d-flex align-items-center justify-content-center" style="width: 32px; height: 32px; background: rgba(239, 68, 68, 0.15); color: #ef4444; border: 1px solid rgba(239, 68, 68, 0.3);">
                         <i class="bi bi-lightning-charge-fill fs-5"></i>
@@ -1797,7 +1855,7 @@
                 </h6>
                 <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
-            <div class="modal-body py-3">
+            <div class="modal-body px-4 py-3">
                 <p class="theme-text-muted small mb-3">Emergency override command across all simulated algorithmic accounts:</p>
                 <div class="p-2.5 rounded-3 border border-secondary border-opacity-20 mb-2" style="background: rgba(239, 68, 68, 0.05);">
                     <ul class="list-unstyled mb-0 smaller theme-text-muted d-flex flex-column gap-1.5">
@@ -1812,7 +1870,7 @@
                     </ul>
                 </div>
             </div>
-            <div class="modal-footer border-top border-secondary border-opacity-25 pt-2.5">
+            <div class="modal-footer px-4 py-3 border-top border-secondary border-opacity-20">
                 <button type="button" class="btn btn-secondary btn-sm rounded-pill px-3 py-1.5" data-bs-dismiss="modal">Cancel</button>
                 <button type="button" class="btn btn-danger fw-bold btn-sm rounded-pill px-3.5 py-1.5 shadow-sm" onclick="confirmGatewayAction('gateway-kill-switch-form', 'confirmKillSwitchModal')">
                     <i class="bi bi-lightning-charge-fill me-1"></i>Yes, Trigger Kill-Switch

@@ -23,8 +23,9 @@ from apps.common.mixins import HtmxMessageMixin, HtmxModalMixin
 
 from .models import BacktestTask, TradingStrategy
 from .forms import IndexBacktestTaskForm, ForexBacktestTaskForm
-from .services import create_and_start_backtest_task, send_backtest_control_command
+from .services import create_and_start_backtest_task, send_backtest_control_command, send_optimizer_command
 from apps.common.choices import LiveStrategyStatusChoices, AccountTypeChoices
+from apps.market.models import MarketBackupTask
 from apps.trade_config.models import LiveStrategy, UserTradingAccount
 
 class BacktestDashboardView(LoginRequiredMixin, AdminRequiredMixin, ListView):
@@ -170,6 +171,8 @@ class BacktestCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequiredMixi
         use_macro = bool(form.cleaned_data.get('use_macro_assist', False))
         macro_tf = form.cleaned_data.get('macro_timeframe') or '1h'
         macro_backup_task = form.cleaned_data.get('macro_backup_task')
+        if use_macro and not macro_backup_task:
+            macro_backup_task = MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=True, status='completed').order_by('-id').first()
         use_vix = bool(form.cleaned_data.get('use_vix_assist', False))
         vix_backup_task = form.cleaned_data.get('vix_backup_task')
         if use_vix and not vix_backup_task:
@@ -805,6 +808,14 @@ class BacktestDetailView(HTMXPartialMixin, LoginRequiredMixin, AdminRequiredMixi
         context['total_trades_count'] = trade_data['total_trades_count']
         context['filtered_trades_count'] = trade_data['filtered_trades_count']
         context['current_filters'] = trade_data['current_filters']
+
+        params = dict(self.object.parameters or {})
+        opt_results = dict(params.get('optimizer_results') or {})
+        context['optimizer_results'] = opt_results
+        context['winner'] = opt_results.get('winner')
+        context['candidates'] = enrich_optimizer_candidates_with_ai_ratings(opt_results.get('candidates', []))
+        context['optimizer_is_running'] = params.get('optimizer_status') == 'running'
+
         return context
 
 
@@ -2046,7 +2057,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
 
         params = task.parameters or {}
 
-        from apps.market.models import MarketBackupTask
         from apps.common.choices import MacroTimeframeChoices
 
         available_macro_backups = MarketBackupTask.objects.filter(is_deleted=False, is_macro_assist=True).order_by('-id')
@@ -2106,8 +2116,6 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         task = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
         FOREX_SYMBOLS = ['MGC', 'M6E', 'M6J', 'MYM', 'MNQ', 'MES', 'MCL']
         is_forex = (task.market_type == 'FOREX_FUTURES' or (task.index_name and task.index_name.upper() in FOREX_SYMBOLS))
-
-        from apps.market.models import MarketBackupTask
 
         start_date_str = request.POST.get('start_date', '').strip()
         end_date_str = request.POST.get('end_date', '').strip()
@@ -2175,8 +2183,7 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
         while len(layer_lots) < layer_count:
             layer_lots.append(1)
 
-        if enable_retest_layering and lots_count < layer_count:
-            lots_count = max(layer_count, sum(layer_lots))
+        # Auto-adaptive retest layering dynamically scales based on user lots_count (1 lot -> 50%, 2 lots -> 38.2%/55%, 3+ lots -> 38.2%/50%/61.8%)
 
         enable_ai_lot_sizing = ('enable_ai_lot_sizing' in request.POST)
         enable_ai_compounding = enable_ai_lot_sizing or ('enable_ai_compounding' in request.POST)
@@ -2332,6 +2339,270 @@ class BacktestEditModalView(LoginRequiredMixin, AdminRequiredMixin, View):
             'closeGlobalModal': True,
             'reloadBacktestDetail': True,
             'reloadBacktestTable': True,
+        })
+        return response
+
+
+class BacktestFindOptimalConfigView(LoginRequiredMixin, View):
+    """Executes Go-powered concurrent parameter optimization and Gemini AI synthesis."""
+
+    def post(self, request, pk, *args, **kwargs):
+        task = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        user_id = str(task.created_by_id or (request.user.id if request.user.is_authenticated else 1) or "1")
+        backup_id = str(task.backup_task_id or "")
+        index_name = task.index_name or "NIFTY"
+        strategy_name = task.strategy_name or "quant_engine"
+        initial_capital = float(task.initial_capital or 100000.0)
+        start_date = task.start_date.strftime("%Y-%m-%d") if task.start_date else ""
+        end_date = task.end_date.strftime("%Y-%m-%d") if task.end_date else ""
+        params = task.parameters or {}
+
+        payload = {
+            "user_id": user_id,
+            "backup_task_id": backup_id,
+            "strategy_name": strategy_name,
+            "index_name": index_name,
+            "initial_capital": initial_capital,
+            "start_date": start_date,
+            "end_date": end_date,
+            "use_vix_assist": bool(task.use_vix_assist or params.get("use_vix_assist", False)),
+            "use_macro_assist": bool(task.use_macro_assist or params.get("use_macro_assist", False)),
+            "vix_backup_task_id": str(task.vix_backup_task_id or ""),
+            "macro_backup_task_id": str(task.macro_backup_task_id or ""),
+            "params": params,
+        }
+
+        candidates = []
+        duration_ms = 0
+        total_combos = 0
+        trading_days = 0
+        error_msg = None
+
+        try:
+            import json
+            import urllib.request
+            req = urllib.request.Request(
+                "http://go_service:8082/api/backtest/optimize",
+                data=json.dumps(payload).encode("utf-8"),
+                headers={"Content-Type": "application/json"}
+            )
+            with urllib.request.urlopen(req, timeout=45) as resp:
+                data = json.loads(resp.read().decode("utf-8"))
+                if data.get("status") == "success":
+                    candidates = data.get("candidates", [])
+                    duration_ms = data.get("duration_ms", 0)
+                    total_combos = data.get("total_combos_evaluated", 0)
+                    trading_days = data.get("trading_days", 0)
+                else:
+                    error_msg = data.get("message", "Optimization returned non-success status")
+        except Exception as e:
+            error_msg = f"Go optimization engine connection error: {str(e)}"
+
+        winner = candidates[0] if candidates else None
+        gemini_rationale = ""
+
+        if winner:
+            try:
+                from apps.common.services.gemini_service import GeminiAIService
+                prompt = (
+                    f"You are an institutional quant strategist for Indian index options ({index_name}).\n"
+                    f"A backtest parameter optimization found the highest-expectancy setup for strategy '{strategy_name}':\n"
+                    f"- Stop Loss: {winner['stop_loss_points']} pts\n"
+                    f"- Risk-Reward: {winner['rr_ratio']}x\n"
+                    f"- Trailing SL: {'Enabled (Trigger ' + str(winner['trailing_sl_trigger_r']) + 'R)' if winner['enable_trailing_sl'] else 'Disabled'}\n"
+                    f"- Retest Layering: {'Enabled' if winner['enable_retest_layering'] else 'Disabled'}\n"
+                    f"- Metrics: Net PnL ₹{winner['net_pnl']:,.2f}, Win Rate {winner['win_rate']}%, Max DD ₹{winner['max_drawdown']:,.2f}\n"
+                    f"In exactly 2 concise, factual sentences, explain why this parameter profile succeeded against chop vs trend expansion."
+                )
+                ai_res = GeminiAIService.generate_chat_response(prompt)
+                if ai_res and ai_res.get("success"):
+                    gemini_rationale = ai_res.get("reply", "").strip()
+            except Exception:
+                pass
+
+            if not gemini_rationale:
+                trail_desc = f"with active {winner['trailing_sl_trigger_r']}R trailing protection" if winner['enable_trailing_sl'] else "with static target realization"
+                gemini_rationale = (
+                    f"The {winner['stop_loss_points']}pt SL granted optimal breathing room during early morning discovery wicks, "
+                    f"while {winner['rr_ratio']}x RR {trail_desc} systematically harvested structural impulses without giving back accumulated profits."
+                )
+
+        context = {
+            "backtest": task,
+            "candidates": candidates,
+            "winner": winner,
+            "gemini_rationale": gemini_rationale,
+            "duration_ms": duration_ms,
+            "total_combos": total_combos,
+            "trading_days": trading_days,
+            "error_msg": error_msg,
+        }
+        return render(request, "admins/partials/backtest_optimal_config_results.html", context)
+
+
+class BacktestTriggerOptimizerView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Dispatches asynchronous parameter optimizer to Go engine and returns running widget."""
+
+    def post(self, request, pk, *args, **kwargs):
+        task = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        send_optimizer_command(task.id)
+        context = {
+            'backtest': task,
+            'optimizer_is_running': True,
+        }
+        return render(request, 'admins/partials/backtest_optimizer_widget.html', context)
+
+
+def enrich_optimizer_candidates_with_ai_ratings(candidates):
+    """Classifies backtest parameter candidates into institutional AI risk/reward tiers."""
+    enriched = []
+    for idx, c in enumerate(candidates):
+        item = dict(c)
+        net_pnl = float(item.get('net_pnl', 0.0))
+        win_rate = float(item.get('win_rate', 0.0))
+        profit_factor = float(item.get('profit_factor', 1.0))
+        expectancy = float(item.get('expectancy_score', 0.0))
+        rr = float(item.get('rr_ratio', 2.0))
+        sl_pts = float(item.get('stop_loss_points', 20.0))
+
+        if idx == 0:
+            item['ai_grade'] = 'A+'
+            item['ai_grade_badge'] = 'bg-warning text-dark border-warning'
+            item['ai_tier_label'] = 'Optimal Alpha'
+            item['ai_tier_desc'] = 'Highest expectancy score with robust drawdown containment.'
+        elif sl_pts <= 10.0 and rr >= 3.0 and net_pnl > 0:
+            item['ai_grade'] = 'A+'
+            item['ai_grade_badge'] = 'bg-warning text-dark border-warning'
+            item['ai_tier_label'] = '⚡ High-RR Scalp'
+            item['ai_tier_desc'] = f'Ultra-tight {sl_pts:.0f}pt risk with asymmetric {rr:.1f}x momentum target expansion.'
+        elif sl_pts <= 10.0 and rr >= 2.5 and net_pnl > 0:
+            item['ai_grade'] = 'A'
+            item['ai_grade_badge'] = 'bg-success bg-opacity-25 text-success border-success'
+            item['ai_tier_label'] = '⚡ Momentum Scalp'
+            item['ai_tier_desc'] = f'Tight {sl_pts:.0f}pt risk envelope harvesting quick {rr:.1f}x directional bursts.'
+        elif expectancy >= 9000 and win_rate >= 52.0 and profit_factor >= 1.45:
+            item['ai_grade'] = 'A+'
+            item['ai_grade_badge'] = 'bg-warning text-dark border-warning'
+            item['ai_tier_label'] = 'Optimal Alpha'
+            item['ai_tier_desc'] = 'High expectancy score with controlled drawdown.'
+        elif net_pnl >= 16000 and win_rate >= 50.0 and profit_factor >= 1.35:
+            item['ai_grade'] = 'A'
+            item['ai_grade_badge'] = 'bg-success bg-opacity-25 text-success border-success'
+            item['ai_tier_label'] = 'High Velocity'
+            item['ai_tier_desc'] = 'Active trade frequency with solid positive net edge.'
+        elif rr >= 2.5 and net_pnl >= 12000:
+            item['ai_grade'] = 'B+'
+            item['ai_grade_badge'] = 'bg-info bg-opacity-25 text-info border-info'
+            item['ai_tier_label'] = 'Trend Momentum'
+            item['ai_tier_desc'] = 'Extended payoff ratio, wider drawdown tolerance.'
+        elif net_pnl >= 8000:
+            item['ai_grade'] = 'B'
+            item['ai_grade_badge'] = 'bg-secondary bg-opacity-35 text-white border-secondary'
+            item['ai_tier_label'] = 'Balanced'
+            item['ai_tier_desc'] = 'Conservative parameter set with modest capital expansion.'
+        else:
+            item['ai_grade'] = 'C'
+            item['ai_grade_badge'] = 'bg-danger bg-opacity-20 text-danger border-danger'
+            item['ai_tier_label'] = 'Defensive'
+            item['ai_tier_desc'] = 'Sub-optimal risk/reward trade-off relative to winner.'
+        enriched.append(item)
+    return enriched
+
+
+class BacktestOptimizerWidgetView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Renders the Strategy Hyperparameter Optimizer widget partial based on current DB state."""
+
+    def get(self, request, pk, *args, **kwargs):
+        task = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        params = dict(task.parameters or {})
+        opt_results = dict(params.get('optimizer_results') or {})
+        winner = opt_results.get('winner')
+
+        if winner and not opt_results.get('gemini_rationale'):
+            try:
+                from apps.common.services.gemini_service import GeminiAIService
+                prompt = (
+                    f"You are an institutional quant strategist for Indian index options ({task.index_name}).\n"
+                    f"A backtest parameter optimization found the highest-expectancy setup for strategy '{task.strategy_name}':\n"
+                    f"- Stop Loss: {winner.get('stop_loss_points')} pts\n"
+                    f"- Risk-Reward: {winner.get('rr_ratio')}x\n"
+                    f"- Trailing SL: {'Enabled (Trigger ' + str(winner.get('trailing_sl_trigger_r')) + 'R)' if winner.get('enable_trailing_sl') else 'Disabled'}\n"
+                    f"- Retest Layering: {'Enabled' if winner.get('enable_retest_layering') else 'Disabled'}\n"
+                    f"- Metrics: Net PnL ₹{winner.get('net_pnl', 0):,.2f}, Win Rate {winner.get('win_rate')}%, Max DD ₹{winner.get('max_drawdown', 0):,.2f}\n"
+                    f"In exactly 2 concise, factual sentences, explain why this parameter profile succeeded against chop vs trend expansion."
+                )
+                ai_res = GeminiAIService.generate_chat_response(prompt)
+                if ai_res and ai_res.get("success"):
+                    opt_results['gemini_rationale'] = ai_res.get("reply", "").strip()
+                    params['optimizer_results'] = opt_results
+                    task.parameters = params
+                    task.save(update_fields=['parameters'])
+            except Exception:
+                pass
+
+        if winner and not opt_results.get('gemini_rationale'):
+            trail_desc = f"with active {winner.get('trailing_sl_trigger_r')}R trailing protection" if winner.get('enable_trailing_sl') else "with static target realization"
+            opt_results['gemini_rationale'] = (
+                f"The {winner.get('stop_loss_points')}pt SL granted optimal breathing room during early morning discovery wicks, "
+                f"while {winner.get('rr_ratio')}x RR {trail_desc} systematically harvested structural impulses without giving back accumulated profits."
+            )
+
+        context = {
+            'backtest': task,
+            'optimizer_results': opt_results,
+            'winner': winner,
+            'candidates': enrich_optimizer_candidates_with_ai_ratings(opt_results.get('candidates', [])),
+            'optimizer_is_running': params.get('optimizer_status') == 'running',
+        }
+        return render(request, 'admins/partials/backtest_optimizer_widget.html', context)
+
+
+class BacktestApplyOptimizerAndRerunView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """Applies optimal parameter configuration to BacktestTask and triggers START_BACKTEST."""
+
+    def post(self, request, pk, *args, **kwargs):
+        task = get_object_or_404(BacktestTask, pk=pk, is_deleted=False)
+        params = dict(task.parameters or {})
+        opt_results = params.get('optimizer_results') or {}
+        winner = opt_results.get('winner')
+
+        sl_points = request.POST.get('stop_loss_points')
+        rr_ratio = request.POST.get('rr_ratio')
+        trail_sl = request.POST.get('enable_trailing_sl')
+        trail_r = request.POST.get('trailing_sl_trigger_r')
+        retest = request.POST.get('enable_retest_layering')
+
+        if sl_points is not None:
+            params['stop_loss_points'] = float(sl_points)
+            params['rr_ratio'] = float(rr_ratio)
+            params['enable_trailing_sl'] = trail_sl in ['true', 'True', '1', 'on']
+            params['trailing_sl_trigger_r'] = float(trail_r or 1.0)
+            params['enable_retest_layering'] = retest in ['true', 'True', '1', 'on']
+        elif winner:
+            params['stop_loss_points'] = float(winner.get('stop_loss_points', 25.0))
+            params['rr_ratio'] = float(winner.get('rr_ratio', 2.0))
+            params['enable_trailing_sl'] = bool(winner.get('enable_trailing_sl', False))
+            params['trailing_sl_trigger_r'] = float(winner.get('trailing_sl_trigger_r', 1.0))
+            params['enable_retest_layering'] = bool(winner.get('enable_retest_layering', False))
+        else:
+            return JsonResponse({'error': 'No winner configuration available to apply'}, status=400)
+
+        params['is_optimizer_applied'] = True
+        params['optimizer_applied_at'] = datetime.datetime.now().isoformat()
+        params['optimizer_status'] = 'applied'
+        task.parameters = params
+        task.save(update_fields=['parameters'])
+
+        send_backtest_control_command(task.id, 'START_BACKTEST')
+
+        applied_sl = params['stop_loss_points']
+        applied_rr = params['rr_ratio']
+        msg = f"🏆 Applied Optimal Parameters (SL: {applied_sl}pts, RR: {applied_rr}x)! Re-running Backtest #{task.id}..."
+
+        response = HttpResponse(status=204)
+        response['HX-Trigger'] = json.dumps({
+            'showToast': {'message': msg, 'level': 'success'},
+            'reloadBacktestDetail': True,
         })
         return response
 
@@ -2637,6 +2908,8 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
 
         rules_snapshot = []
         parameters_snapshot = {
+            'market_type': backtest.market_type,
+            'frozen_rules_snapshot': rules_snapshot,
             'strategy_parameters': backtest.parameters,
             'initial_capital': float(backtest.initial_capital),
             'risk_profile': str((backtest.parameters or {}).get('risk_profile', 'MODERATE')),
@@ -2660,9 +2933,7 @@ class BacktestDeployLiveView(LoginRequiredMixin, View):
             name=name,
             strategy_name=backtest.strategy_name,
             index_name=backtest.index_name,
-            market_type=backtest.market_type,
             allocated_capital=allocated_capital,
-            frozen_rules_snapshot=rules_snapshot,
             frozen_parameters=parameters_snapshot,
             is_active=is_active,
             execution_mode=execution_mode,

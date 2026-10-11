@@ -1,93 +1,336 @@
 {% load static %}
 <!-- Modal Content: Move to Execute / Deploy to Live Strategy -->
-<div class="modal-content glass-card border-0 shadow-lg" style="background: var(--modal-bg, #0B1D16); color: var(--text-main, #F1F5F9); border: 1px solid var(--border-color, rgba(255,255,255,0.1)) !important; border-radius: 1.25rem;">
+<div class="modal-content deploy-modal-container border-0 shadow-lg">
+    <style>
+        .deploy-modal-container {
+            background: #091712;
+            color: #F1F5F9;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            border-radius: 1.25rem;
+            box-shadow: 0 24px 60px rgba(0, 0, 0, 0.7), 0 0 35px rgba(180, 241, 5, 0.05);
+        }
+
+        .deploy-section-title {
+            font-size: 0.72rem;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+            font-weight: 700;
+            color: #94A3B8;
+            margin-bottom: 0.55rem;
+            display: block;
+        }
+
+        .deploy-isolation-banner {
+            background: rgba(180, 241, 5, 0.06);
+            border: 1px solid rgba(180, 241, 5, 0.22);
+            border-left: 4px solid var(--brand-lime, #B4F105) !important;
+        }
+
+        .isolation-icon-box {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(180, 241, 5, 0.15);
+            border: 1px solid rgba(180, 241, 5, 0.35);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--brand-lime, #B4F105);
+            font-size: 1.1rem;
+        }
+
+        .deploy-tile-card {
+            padding: 1.10rem 1.25rem;
+            border-radius: 0.90rem;
+            border: 1.5px solid rgba(255, 255, 255, 0.09);
+            background: rgba(255, 255, 255, 0.025);
+            cursor: pointer;
+            user-select: none;
+            transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+            position: relative;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .deploy-tile-card:hover {
+            border-color: rgba(255, 255, 255, 0.28);
+            background: rgba(255, 255, 255, 0.05);
+            transform: translateY(-2px);
+        }
+
+        .deploy-tile-card.active-sandbox {
+            background: rgba(180, 241, 5, 0.08) !important;
+            border-color: rgba(180, 241, 5, 0.6) !important;
+            box-shadow: 0 0 20px rgba(180, 241, 5, 0.15) !important;
+        }
+
+        .deploy-tile-card.active-live {
+            background: rgba(234, 179, 8, 0.10) !important;
+            border-color: rgba(234, 179, 8, 0.6) !important;
+            box-shadow: 0 0 20px rgba(234, 179, 8, 0.15) !important;
+        }
+
+        .deploy-tile-card.active-standby {
+            background: rgba(255, 255, 255, 0.07) !important;
+            border-color: rgba(255, 255, 255, 0.4) !important;
+            box-shadow: 0 0 16px rgba(255, 255, 255, 0.08) !important;
+        }
+
+        .deploy-tile-card.active-trade {
+            background: rgba(16, 185, 129, 0.10) !important;
+            border-color: rgba(16, 185, 129, 0.6) !important;
+            box-shadow: 0 0 20px rgba(16, 185, 129, 0.15) !important;
+        }
+
+        .tile-icon-box {
+            width: 38px;
+            height: 38px;
+            border-radius: 0.6rem;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.15rem;
+            flex-shrink: 0;
+        }
+
+        .tile-icon-sandbox {
+            background: rgba(180, 241, 5, 0.15);
+            border: 1px solid rgba(180, 241, 5, 0.35);
+            color: var(--brand-lime, #B4F105);
+        }
+
+        .tile-icon-live {
+            background: rgba(234, 179, 8, 0.15);
+            border: 1px solid rgba(234, 179, 8, 0.35);
+            color: #FBBF24;
+        }
+
+        .tile-icon-standby {
+            background: rgba(255, 255, 255, 0.10);
+            border: 1px solid rgba(255, 255, 255, 0.25);
+            color: #E2E8F0;
+        }
+
+        .tile-icon-active {
+            background: rgba(16, 185, 129, 0.15);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: #10B981;
+        }
+
+        .tile-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            letter-spacing: -0.2px;
+            line-height: 1.2;
+        }
+
+        .tile-badge-sub {
+            font-size: 0.72rem;
+            font-weight: 500;
+            line-height: 1.2;
+        }
+
+        .tile-desc {
+            font-size: 0.78rem;
+            color: #94A3B8;
+            line-height: 1.45;
+            margin-top: 0.65rem;
+        }
+
+        .deploy-input-group {
+            border: 1px solid rgba(255, 255, 255, 0.14);
+            border-radius: 0.75rem;
+            background: rgba(255, 255, 255, 0.04);
+            transition: all 0.2s ease;
+        }
+
+        .deploy-input-group:focus-within {
+            border-color: rgba(180, 241, 5, 0.65);
+            box-shadow: 0 0 0 3px rgba(180, 241, 5, 0.18);
+            background: rgba(255, 255, 255, 0.06);
+        }
+
+        .deploy-input-field {
+            background: transparent !important;
+            border: none !important;
+            color: #FFFFFF !important;
+            padding: 0.75rem 1rem !important;
+            font-size: 0.92rem !important;
+            font-weight: 600 !important;
+            box-shadow: none !important;
+        }
+
+        .deploy-btn-confirm {
+            background: var(--brand-lime, #B4F105) !important;
+            color: #05140D !important;
+            font-weight: 700 !important;
+            border-radius: 50rem !important;
+            padding: 0.70rem 1.75rem !important;
+            border: none !important;
+            box-shadow: 0 6px 22px rgba(180, 241, 5, 0.3) !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .deploy-btn-confirm:hover {
+            transform: translateY(-1px) !important;
+            box-shadow: 0 8px 26px rgba(180, 241, 5, 0.45) !important;
+            background: #c3fb2b !important;
+        }
+
+        .deploy-btn-cancel {
+            background: transparent !important;
+            color: #CBD5E1 !important;
+            border: 1px solid rgba(255, 255, 255, 0.18) !important;
+            border-radius: 50rem !important;
+            padding: 0.70rem 1.50rem !important;
+            font-weight: 500 !important;
+            transition: all 0.2s ease !important;
+        }
+
+        .deploy-btn-cancel:hover {
+            color: #FFFFFF !important;
+            border-color: rgba(255, 255, 255, 0.4) !important;
+            background: rgba(255, 255, 255, 0.05) !important;
+        }
+    </style>
+
     <!-- Modal Header -->
-    <div class="modal-header border-bottom border-white border-opacity-10 px-4 py-3">
-        <div class="d-flex align-items-center gap-2.5">
-            <div class="rounded-circle p-2 d-flex align-items-center justify-content-center" 
-                 style="width: 42px; height: 42px; background: rgba(180, 241, 5, 0.15); border: 1px solid rgba(180, 241, 5, 0.3);">
-                <i class="bi bi-rocket-takeoff" style="color: var(--brand-lime, #B4F105); font-size: 1.25rem;"></i>
+    <div class="modal-header border-bottom border-white border-opacity-10 px-4 px-md-5 py-3.5">
+        <div class="d-flex align-items-center gap-3">
+            <div class="isolation-icon-box">
+                <i class="bi bi-rocket-takeoff-fill"></i>
             </div>
             <div>
-                <h5 class="modal-title fw-bold mb-0 text-white">Deploy to Execution Strategy</h5>
-                <small style="color: rgba(241, 245, 249, 0.7);">Clone Backtest #BT-{{ backtest.id|stringformat:"04d" }} into isolated Execution Strategy</small>
+                <h5 class="modal-title fw-bold mb-0 text-white" style="font-size: 1.18rem; letter-spacing: -0.2px;">
+                    Deploy to Execution Strategy</h5>
+                <small style="color: #94A3B8; font-size: 0.80rem;">Clone Backtest #BT-{{ backtest.id|stringformat:"04d"
+                    }} into isolated Execution Strategy</small>
             </div>
         </div>
-        <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="modal" aria-label="Close"></button>
+        <button type="button" class="btn-close btn-close-white opacity-75" data-bs-dismiss="modal"
+            aria-label="Close"></button>
     </div>
 
-    <!-- Mock Broker Live Telemetry Status Banner -->
+    <!-- Gateway Telemetry Bar -->
     {% if mock_broker_available %}
-    <div class="d-flex align-items-center justify-content-between px-4 py-2 border-bottom border-white border-opacity-10" style="background: rgba(16, 185, 129, 0.08);">
+    <div class="d-flex align-items-center justify-content-between px-4 px-md-5 py-2.5 border-bottom border-white border-opacity-10"
+        style="background: rgba(16, 185, 129, 0.07);">
         <div class="d-flex align-items-center gap-2">
-            <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.65rem; height: 0.65rem;"></span>
-            <span class="small fw-semibold text-success"><i class="bi bi-hdd-network-fill me-1"></i> Dhan Mock Gateway Available (:8088)</span>
+            <span class="spinner-grow spinner-grow-sm text-success" role="status"
+                style="width: 0.65rem; height: 0.65rem;"></span>
+            <span class="small fw-semibold text-success"><i class="bi bi-hdd-network-fill me-1"></i> Dhan Mock Gateway
+                Available (:8088)</span>
         </div>
-        <span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-0.5 smaller font-monospace">ONLINE</span>
+        <span
+            class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-35 rounded-pill px-3 py-1 smaller font-monospace">ONLINE
+            (:8088)</span>
     </div>
     {% else %}
-    <div class="d-flex align-items-center justify-content-between px-4 py-2 border-bottom border-white border-opacity-10" style="background: rgba(255, 255, 255, 0.03);">
+    <div class="d-flex align-items-center justify-content-between px-4 px-md-5 py-2.5 border-bottom border-white border-opacity-10"
+        style="background: rgba(255, 255, 255, 0.02);">
         <div class="d-flex align-items-center gap-2">
             <i class="bi bi-dash-circle text-muted"></i>
-            <span class="small text-muted">Dhan Mock Gateway (:8088) Offline</span>
+            <span class="small text-muted">Dhan Mock Gateway (:8088) Offline / Not Running</span>
         </div>
-        <span class="badge bg-secondary bg-opacity-20 text-muted border border-white border-opacity-10 rounded-pill px-2.5 py-0.5 smaller">STANDBY</span>
+        <span
+            class="badge bg-secondary bg-opacity-20 text-muted border border-white border-opacity-10 rounded-pill px-3 py-1 smaller">STANDBY</span>
     </div>
     {% endif %}
 
     <!-- Form for Deploying to LiveStrategy -->
-    <form hx-post="{% url 'backtest:backtest_deploy_live' backtest.pk %}"
-          hx-target="#globalHtmxModalDialog"
-          hx-swap="innerHTML"
-          id="deployLiveStrategyForm">
+    <form hx-post="{% url 'backtest:backtest_deploy_live' backtest.pk %}" hx-target="#globalHtmxModalDialog"
+        hx-swap="innerHTML" id="deployLiveStrategyForm">
         {% csrf_token %}
-        <div class="modal-body px-4 py-3">
-            <!-- Critical Isolation Guarantee Notice -->
-            <div class="alert border-0 rounded-3 p-3 mb-3 d-flex align-items-start gap-2.5" 
-                 style="background: rgba(180, 241, 5, 0.08); border-left: 4px solid #B4F105 !important;">
-                <i class="bi bi-shield-check mt-0.5 fs-5" style="color: var(--brand-lime, #B4F105);"></i>
-                <div class="small">
-                    <strong class="text-white d-block mb-1">Strict Rulebook Isolation Guarantee:</strong>
-                    <span style="color: rgba(241, 245, 249, 0.85); line-height: 1.5;">
-                        All <strong>{{ rules_snapshot|length }} attached strategy rules</strong> and RL hyperparameters will be cloned into an <strong class="text-white">immutable JSON snapshot</strong> in the <code class="text-white px-1 py-0.5 rounded" style="background: rgba(255,255,255,0.08);">LiveStrategy</code> table. Any future edits, tuning, or deletions in the general Strategy Rulebook will <strong>NEVER</strong> alter this execution strategy.
-                    </span>
+        <div class="modal-body px-4 px-md-5 py-4">
+
+            <!-- Compact Strict Rulebook Isolation Strip -->
+            <div class="deploy-isolation-banner d-flex align-items-center gap-3 p-3 rounded-3 mb-4 shadow-sm">
+                <div class="isolation-icon-box flex-shrink-0" style="width: 32px; height: 32px; font-size: 0.95rem;">
+                    <i class="bi bi-shield-check"></i>
+                </div>
+                <div class="small flex-grow-1" style="font-size: 0.81rem; line-height: 1.45;">
+                    <span class="text-white fw-bold">Strict Rulebook Isolation:</span>
+                    <span class="text-white-50">Clones an immutable JSON snapshot of all {{ rules_snapshot|length }}
+                        attached rules into <code
+                            class="text-white bg-white bg-opacity-10 px-1.5 py-0.5 rounded font-monospace">LiveStrategy</code>.
+                        Future rule edits will never alter this deployment.</span>
                 </div>
             </div>
 
-            <div class="d-flex flex-column gap-3">
+            <div class="d-flex flex-column gap-4">
                 <!-- Strategy Deployment Name -->
                 <div>
-                    <label class="form-label small fw-semibold text-white mb-1">Execution Strategy Name</label>
-                    <input type="text" name="name" id="deployStrategyNameInput" class="form-control" 
-                           style="background: rgba(255,255,255,0.06); border: 1px solid var(--border-color); color: #fff;"
-                           value="{{ suggested_name }}" required>
+                    <label class="deploy-section-title">Execution Strategy Name</label>
+                    <div class="deploy-input-group d-flex align-items-center px-2 shadow-sm">
+                        <i class="bi bi-tag-fill ms-2 text-muted"
+                            style="color: var(--brand-lime, #B4F105) !important; font-size: 0.95rem;"></i>
+                        <input type="text" name="name" id="deployStrategyNameInput"
+                            class="form-control deploy-input-field flex-grow-1" value="{{ suggested_name }}" required
+                            placeholder="e.g. Sandbox NIFTY Momentum #BT-0024">
+                    </div>
                 </div>
 
-                <!-- Execution Mode Selection (Pill Cards) -->
+                <!-- Execution Mode Selection (Interactive Cards with integrated broker info) -->
                 <div>
-                    <label class="form-label small fw-semibold text-white mb-1.5">Execution Mode</label>
+                    <label class="deploy-section-title">Execution Mode</label>
                     <input type="hidden" name="execution_mode" id="deployExecutionModeInput" value="SANDBOX">
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <div class="p-2.5 rounded-3 border text-start cursor-pointer transition-all mode-pill active" id="pillModeSandbox"
-                                 onclick="setDeployMode('SANDBOX')"
-                                 style="background: rgba(180, 241, 5, 0.12); border-color: rgba(180, 241, 5, 0.4) !important; cursor: pointer;">
-                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                    <span class="small fw-bold text-white"><i class="bi bi-shield-check text-success me-1"></i> SANDBOX</span>
-                                    <span class="badge bg-success bg-opacity-25 text-success rounded-pill px-2 py-0.5 smaller font-monospace">RECOMMENDED</span>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="deploy-tile-card active-sandbox" id="pillModeSandbox"
+                                onclick="setDeployMode('SANDBOX')">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="d-flex align-items-center gap-2.5">
+                                            <div class="tile-icon-box tile-icon-sandbox">
+                                                <i class="bi bi-shield-check"></i>
+                                            </div>
+                                            <div>
+                                                <div class="tile-title text-white">SANDBOX</div>
+                                                <div class="tile-badge-sub text-success">Virtual Simulation</div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span
+                                                class="badge bg-success bg-opacity-25 text-success rounded-pill px-2.5 py-1 smaller font-monospace fw-semibold">RECOMMENDED</span>
+                                            <i class="bi bi-check-circle-fill text-success fs-5"
+                                                id="iconModeSandbox"></i>
+                                        </div>
+                                    </div>
+                                    <div class="tile-desc">
+                                        Routes simulated orders to <strong>Dhan Mock Gateway (:8088)</strong> with
+                                        auto-managed virtual capital.
+                                    </div>
                                 </div>
-                                <div class="smaller text-muted" style="font-size: 0.75rem;">Simulated virtual capital &amp; Dhan Mock Gateway (:8088)</div>
                             </div>
                         </div>
-                        <div class="col-6">
-                            <div class="p-2.5 rounded-3 border text-start cursor-pointer transition-all mode-pill" id="pillModeLive"
-                                 onclick="setDeployMode('LIVE')"
-                                 style="background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.1) !important; cursor: pointer;">
-                                <div class="d-flex align-items-center justify-content-between mb-1">
-                                    <span class="small fw-bold text-white"><i class="bi bi-lightning-charge-fill text-warning me-1"></i> LIVE MARKET</span>
-                                    <span class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2 py-0.5 smaller font-monospace">REAL CAPITAL</span>
+
+                        <div class="col-12 col-md-6">
+                            <div class="deploy-tile-card" id="pillModeLive" onclick="setDeployMode('LIVE')">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="d-flex align-items-center gap-2.5">
+                                            <div class="tile-icon-box tile-icon-live">
+                                                <i class="bi bi-lightning-charge-fill"></i>
+                                            </div>
+                                            <div>
+                                                <div class="tile-title text-white">LIVE MARKET</div>
+                                                <div class="tile-badge-sub text-warning">Real Capital</div>
+                                            </div>
+                                        </div>
+                                        <div class="d-flex align-items-center gap-2">
+                                            <span
+                                                class="badge bg-warning bg-opacity-25 text-warning rounded-pill px-2.5 py-1 smaller font-monospace fw-semibold">REAL
+                                                BROKER</span>
+                                            <i class="bi bi-circle text-muted fs-5" id="iconModeLive"></i>
+                                        </div>
+                                    </div>
+                                    <div class="tile-desc">
+                                        Routes live trades to your <strong>Profile Broker API</strong> (Fyers/Dhan)
+                                        using real account margin.
+                                    </div>
                                 </div>
-                                <div class="smaller text-muted" style="font-size: 0.75rem;">Direct broker API connection (Fyers/Dhan live trading)</div>
                             </div>
                         </div>
                     </div>
@@ -95,88 +338,107 @@
 
                 <!-- Initial Deployment Status Selection -->
                 <div>
-                    <label class="form-label small fw-semibold text-white mb-1.5">Initial Deployment Status</label>
+                    <label class="deploy-section-title">Initial Deployment Status</label>
                     <input type="hidden" name="is_active" id="deployIsActiveInput" value="false">
-                    <div class="row g-2">
-                        <div class="col-6">
-                            <div class="p-2.5 rounded-3 border text-start cursor-pointer transition-all status-pill active" id="pillStatusStandby"
-                                 onclick="setInitialStatus('false')"
-                                 style="background: rgba(255, 255, 255, 0.08); border-color: rgba(255, 255, 255, 0.3) !important; cursor: pointer;">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <span class="small fw-bold text-white"><i class="bi bi-pause-circle text-warning me-1"></i> STANDBY (Inactive)</span>
-                                    <i class="bi bi-check-circle-fill text-success" id="iconStatusStandby"></i>
+                    <div class="row g-3">
+                        <div class="col-12 col-md-6">
+                            <div class="deploy-tile-card active-standby" id="pillStatusStandby"
+                                onclick="setInitialStatus('false')">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="d-flex align-items-center gap-2.5">
+                                            <div class="tile-icon-box tile-icon-standby">
+                                                <i class="bi bi-pause-circle-fill"></i>
+                                            </div>
+                                            <div>
+                                                <div class="tile-title text-white">STANDBY</div>
+                                                <div class="tile-badge-sub text-muted">Safe / Inactive</div>
+                                            </div>
+                                        </div>
+                                        <i class="bi bi-check-circle-fill text-success fs-5" id="iconStatusStandby"></i>
+                                    </div>
+                                    <div class="tile-desc">
+                                        Deployed safely in standby mode. Review parameters and activate manually when
+                                        ready.
+                                    </div>
                                 </div>
-                                <div class="smaller text-muted mt-1" style="font-size: 0.73rem;">Deployed safely in standby; activate manually later</div>
                             </div>
                         </div>
-                        <div class="col-6">
-                            <div class="p-2.5 rounded-3 border text-start cursor-pointer transition-all status-pill" id="pillStatusActive"
-                                 onclick="setInitialStatus('true')"
-                                 style="background: rgba(255, 255, 255, 0.03); border-color: rgba(255, 255, 255, 0.1) !important; cursor: pointer;">
-                                <div class="d-flex align-items-center justify-content-between">
-                                    <span class="small fw-bold text-white"><i class="bi bi-play-circle text-success me-1"></i> ACTIVE (Trade Now)</span>
-                                    <i class="bi bi-circle text-muted" id="iconStatusActive"></i>
+
+                        <div class="col-12 col-md-6">
+                            <div class="deploy-tile-card" id="pillStatusActive" onclick="setInitialStatus('true')">
+                                <div>
+                                    <div class="d-flex align-items-center justify-content-between mb-2">
+                                        <div class="d-flex align-items-center gap-2.5">
+                                            <div class="tile-icon-box tile-icon-active">
+                                                <i class="bi bi-play-circle-fill"></i>
+                                            </div>
+                                            <div>
+                                                <div class="tile-title text-white">ACTIVE</div>
+                                                <div class="tile-badge-sub text-success">Trade Immediately</div>
+                                            </div>
+                                        </div>
+                                        <i class="bi bi-circle text-muted fs-5" id="iconStatusActive"></i>
+                                    </div>
+                                    <div class="tile-desc">
+                                        Immediately starts listening to live market ticks and executing strategy
+                                        signals.
+                                    </div>
                                 </div>
-                                <div class="smaller text-muted mt-1" style="font-size: 0.73rem;">Instantly begins listening to live market ticks</div>
                             </div>
                         </div>
                     </div>
                 </div>
 
-                <!-- Dynamic Auto-Configured Broker & Capital Card -->
-                <div id="sandboxAutoRouterCard" class="p-3 rounded-3" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25);">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div class="d-flex align-items-center gap-2.5">
-                            <i class="bi bi-hdd-network-fill text-success fs-4"></i>
-                            <div>
-                                <span class="small fw-bold text-white d-block">Auto-Bound Sandbox Broker &amp; Capital</span>
-                                <span class="smaller text-muted">Orders &amp; virtual PnL route to Dhan Mock Gateway (<code class="text-success">:8088</code>) &bull; Capital auto-managed</span>
-                            </div>
-                        </div>
-                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 smaller font-monospace">ONLINE (:8088)</span>
+                <!-- Frozen Strategy Rules Snapshot Preview -->
+                <div>
+                    <div class="d-flex align-items-center justify-content-between mb-2">
+                        <label class="deploy-section-title mb-0">Frozen Strategy Rules ({{ rules_snapshot|length
+                            }})</label>
+                        <span
+                            class="badge bg-success bg-opacity-20 text-success rounded-pill px-2.5 py-1 smaller fw-bold border border-success border-opacity-25 font-monospace">
+                            Snapshot Ready
+                        </span>
                     </div>
-                </div>
 
-                <div id="liveAutoRouterCard" class="p-3 rounded-3 d-none" style="background: rgba(56, 189, 248, 0.08); border: 1px solid rgba(56, 189, 248, 0.25);">
-                    <div class="d-flex align-items-center justify-content-between">
-                        <div class="d-flex align-items-center gap-2.5">
-                            <i class="bi bi-person-badge-fill text-info fs-4"></i>
-                            <div>
-                                <span class="small fw-bold text-white d-block">Auto-Linked Profile Broker Account</span>
-                                <span class="smaller text-muted">Live orders route to your Profile Broker API &bull; Available margin auto-fetched from broker</span>
-                            </div>
-                        </div>
-                        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-30 rounded-pill px-2.5 py-1 smaller font-monospace">LIVE BROKER API</span>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Frozen Rules Preview Accordion -->
-            <div class="mt-3">
-                <div class="d-flex align-items-center justify-content-between mb-1.5">
-                    <span class="small fw-semibold text-white">Frozen Strategy Rules ({{ rules_snapshot|length }})</span>
-                    <span class="badge bg-success bg-opacity-20 text-success rounded-pill px-2 py-0.5 smaller fw-bold border border-success border-opacity-25">Snapshot Ready</span>
-                </div>
-                <div class="p-2.5 rounded-3 border border-white border-opacity-10 overflow-auto" style="max-height: 120px; background: rgba(0,0,0,0.25);">
                     {% if rules_snapshot %}
+                    <div class="p-3 rounded-3 border border-white border-opacity-10 overflow-auto shadow-inner"
+                        style="max-height: 120px; background: rgba(0,0,0,0.35);">
                         {% for r in rules_snapshot %}
-                        <div class="d-flex align-items-center justify-content-between py-1 border-bottom border-white border-opacity-5 smaller">
-                            <span class="text-white fw-semibold"><i class="bi bi-shield-check text-primary me-1"></i>{{ r.name }}</span>
-                            <span class="badge bg-primary bg-opacity-20 text-primary font-monospace">{{ r.rule_type }}</span>
+                        <div
+                            class="d-flex align-items-center justify-content-between py-1.5 border-bottom border-white border-opacity-5 smaller">
+                            <span class="text-white fw-semibold"><i
+                                    class="bi bi-shield-check text-primary me-1.5"></i>{{ r.name }}</span>
+                            <span class="badge bg-primary bg-opacity-20 text-primary font-monospace">{{ r.rule_type
+                                }}</span>
                         </div>
                         {% endfor %}
+                    </div>
                     {% else %}
-                        <div class="smaller py-2 text-center" style="color: rgba(241, 245, 249, 0.6);">No explicit rules attached. Baseline Go Quant Engine policy will be frozen.</div>
+                    <!-- Compact single-line indicator for 0 attached custom rules -->
+                    <div class="d-flex align-items-center justify-content-between px-3 py-2.5 rounded-3 border border-white border-opacity-10"
+                        style="background: rgba(255,255,255,0.025);">
+                        <div class="d-flex align-items-center gap-2 small text-muted">
+                            <i class="bi bi-cpu text-info"></i>
+                            <span>Policy: <strong class="text-white">Baseline Go Quant Engine Policy</strong> (0
+                                attached custom rule overrides)</span>
+                        </div>
+                        <span
+                            class="badge bg-secondary bg-opacity-25 text-white-50 rounded-pill px-2 py-0.5 smaller font-monospace">Frozen</span>
+                    </div>
                     {% endif %}
                 </div>
             </div>
         </div>
 
         <!-- Modal Footer -->
-        <div class="modal-footer border-top border-white border-opacity-10 px-4 py-3 d-flex align-items-center justify-content-between">
-            <button type="button" class="btn btn-outline-secondary rounded-pill px-3 py-1.5 small text-white border-white border-opacity-25" data-bs-dismiss="modal">Cancel</button>
-            <button type="submit" class="btn text-dark fw-bold rounded-pill px-4 py-2 d-inline-flex align-items-center gap-1.5 shadow-sm" 
-                    style="background: var(--brand-lime, #B4F105);" id="btnConfirmDeployLive">
+        <div
+            class="modal-footer border-top border-white border-opacity-10 px-4 px-md-5 py-3.5 d-flex align-items-center justify-content-between">
+            <button type="button" class="btn deploy-btn-cancel" data-bs-dismiss="modal">
+                Cancel
+            </button>
+            <button type="submit" class="btn deploy-btn-confirm d-inline-flex align-items-center gap-2"
+                id="btnConfirmDeployLive">
                 <i class="bi bi-lightning-charge-fill fs-5"></i>
                 <span>Confirm &amp; Deploy Strategy</span>
             </button>
@@ -184,70 +446,80 @@
     </form>
 
     <script>
-    (function() {
-        var modeInput = document.getElementById('deployExecutionModeInput');
-        var isActiveInput = document.getElementById('deployIsActiveInput');
-        var nameInput = document.getElementById('deployStrategyNameInput');
-        var pillSandbox = document.getElementById('pillModeSandbox');
-        var pillLive = document.getElementById('pillModeLive');
-        var cardSandbox = document.getElementById('sandboxAutoRouterCard');
-        var cardLive = document.getElementById('liveAutoRouterCard');
-        var pillStandby = document.getElementById('pillStatusStandby');
-        var pillActive = document.getElementById('pillStatusActive');
-        var iconStandby = document.getElementById('iconStatusStandby');
-        var iconActive = document.getElementById('iconStatusActive');
-
-        window.setDeployMode = function(mode) {
-            if (!modeInput) return;
-            modeInput.value = mode;
-            if (mode === 'SANDBOX') {
-                pillSandbox.style.background = 'rgba(180, 241, 5, 0.12)';
-                pillSandbox.style.borderColor = 'rgba(180, 241, 5, 0.4)';
-                pillLive.style.background = 'rgba(255, 255, 255, 0.03)';
-                pillLive.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                cardSandbox.classList.remove('d-none');
-                cardLive.classList.add('d-none');
-                if (nameInput) {
-                    var val = nameInput.value;
-                    if (val.startsWith('Live ')) nameInput.value = 'Sandbox ' + val.substring(5);
-                    else if (val.startsWith('Mock ')) nameInput.value = 'Sandbox ' + val.substring(5);
-                    else if (!val.startsWith('Sandbox ')) nameInput.value = 'Sandbox ' + val;
-                }
-            } else {
-                pillLive.style.background = 'rgba(234, 179, 8, 0.15)';
-                pillLive.style.borderColor = 'rgba(234, 179, 8, 0.4)';
-                pillSandbox.style.background = 'rgba(255, 255, 255, 0.03)';
-                pillSandbox.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                cardLive.classList.remove('d-none');
-                cardSandbox.classList.add('d-none');
-                if (nameInput) {
-                    var val = nameInput.value;
-                    if (val.startsWith('Sandbox ')) nameInput.value = 'Live ' + val.substring(8);
-                    else if (val.startsWith('Mock ')) nameInput.value = 'Live ' + val.substring(5);
-                    else if (!val.startsWith('Live ')) nameInput.value = 'Live ' + val;
-                }
+        (function () {
+            // Dynamically expand modal dialog to 840px for generous breathing room
+            var dialog = document.getElementById('globalHtmxModalDialog');
+            if (dialog) {
+                dialog.style.setProperty('max-width', '840px', 'important');
+                dialog.style.setProperty('width', '94vw', 'important');
             }
-        };
-
-        window.setInitialStatus = function(activeVal) {
-            if (!isActiveInput) return;
-            isActiveInput.value = activeVal;
-            if (activeVal === 'true') {
-                pillActive.style.background = 'rgba(16, 185, 129, 0.15)';
-                pillActive.style.borderColor = 'rgba(16, 185, 129, 0.4)';
-                pillStandby.style.background = 'rgba(255, 255, 255, 0.03)';
-                pillStandby.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                iconActive.className = 'bi bi-check-circle-fill text-success';
-                iconStandby.className = 'bi bi-circle text-muted';
-            } else {
-                pillStandby.style.background = 'rgba(255, 255, 255, 0.08)';
-                pillStandby.style.borderColor = 'rgba(255, 255, 255, 0.3)';
-                pillActive.style.background = 'rgba(255, 255, 255, 0.03)';
-                pillActive.style.borderColor = 'rgba(255, 255, 255, 0.1)';
-                iconStandby.className = 'bi bi-check-circle-fill text-success';
-                iconActive.className = 'bi bi-circle text-muted';
+            var modalEl = document.getElementById('globalHtmxModal');
+            if (modalEl) {
+                var onHide = function () {
+                    if (dialog) {
+                        dialog.style.removeProperty('max-width');
+                        dialog.style.removeProperty('width');
+                    }
+                    modalEl.removeEventListener('hidden.bs.modal', onHide);
+                };
+                modalEl.addEventListener('hidden.bs.modal', onHide);
             }
-        };
-    })();
+
+            var modeInput = document.getElementById('deployExecutionModeInput');
+            var isActiveInput = document.getElementById('deployIsActiveInput');
+            var nameInput = document.getElementById('deployStrategyNameInput');
+            var pillSandbox = document.getElementById('pillModeSandbox');
+            var pillLive = document.getElementById('pillModeLive');
+            var iconModeSandbox = document.getElementById('iconModeSandbox');
+            var iconModeLive = document.getElementById('iconModeLive');
+            var pillStandby = document.getElementById('pillStatusStandby');
+            var pillActive = document.getElementById('pillStatusActive');
+            var iconStandby = document.getElementById('iconStatusStandby');
+            var iconActive = document.getElementById('iconStatusActive');
+
+            window.setDeployMode = function (mode) {
+                if (!modeInput) return;
+                modeInput.value = mode;
+                if (mode === 'SANDBOX') {
+                    pillSandbox.classList.add('active-sandbox');
+                    pillLive.classList.remove('active-live');
+                    if (iconModeSandbox) iconModeSandbox.className = 'bi bi-check-circle-fill text-success fs-5';
+                    if (iconModeLive) iconModeLive.className = 'bi bi-circle text-muted fs-5';
+                    if (nameInput) {
+                        var val = nameInput.value;
+                        if (val.startsWith('Live ')) nameInput.value = 'Sandbox ' + val.substring(5);
+                        else if (val.startsWith('Mock ')) nameInput.value = 'Sandbox ' + val.substring(5);
+                        else if (!val.startsWith('Sandbox ')) nameInput.value = 'Sandbox ' + val;
+                    }
+                } else {
+                    pillLive.classList.add('active-live');
+                    pillSandbox.classList.remove('active-sandbox');
+                    if (iconModeLive) iconModeLive.className = 'bi bi-check-circle-fill text-warning fs-5';
+                    if (iconModeSandbox) iconModeSandbox.className = 'bi bi-circle text-muted fs-5';
+                    if (nameInput) {
+                        var val = nameInput.value;
+                        if (val.startsWith('Sandbox ')) nameInput.value = 'Live ' + val.substring(8);
+                        else if (val.startsWith('Mock ')) nameInput.value = 'Live ' + val.substring(5);
+                        else if (!val.startsWith('Live ')) nameInput.value = 'Live ' + val;
+                    }
+                }
+            };
+
+            window.setInitialStatus = function (activeVal) {
+                if (!isActiveInput) return;
+                isActiveInput.value = activeVal;
+                if (activeVal === 'true') {
+                    pillActive.classList.add('active-trade');
+                    pillStandby.classList.remove('active-standby');
+                    if (iconActive) iconActive.className = 'bi bi-check-circle-fill text-success fs-5';
+                    if (iconStandby) iconStandby.className = 'bi bi-circle text-muted fs-5';
+                } else {
+                    pillStandby.classList.add('active-standby');
+                    pillActive.classList.remove('active-trade');
+                    if (iconStandby) iconStandby.className = 'bi bi-check-circle-fill text-success fs-5';
+                    if (iconActive) iconActive.className = 'bi bi-circle text-muted fs-5';
+                }
+            };
+        })();
     </script>
 </div>

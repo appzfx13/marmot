@@ -20,7 +20,7 @@ var ICTSweepCHoCHPreset = StrategyConfig{
 	CooldownSeconds:      120,
 	OrderType:            "LIMIT",
 	Description:          "ICT Liquidity Sweep (BSL/SSL) followed by CHoCH market structure shift and limit order retest entry with optional multi-layer scaling. Strictly Intraday.",
-	EnableRetestLayering: true,
+	EnableRetestLayering: false,
 	LayerCount:           3,
 	RetestPercentages:    []float64{25.0, 50.0, 75.0},
 	LayerLots:            []int{1, 1, 1},

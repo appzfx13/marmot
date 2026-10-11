@@ -37,7 +37,7 @@
     <!-- Theme Stylesheets (Base Theme followed by Shadcn Override) -->
     <link rel="stylesheet" href="{% static 'libs/bootstrap-icons/bootstrap-icons.css' %}">
     <link rel="stylesheet" href="{% static 'css/antigravity-theme.css' %}?v=2.1">
-    <link rel="stylesheet" href="{% static 'css/spark-theme.css' %}?v=2.1">
+    <link rel="stylesheet" href="{% static 'css/spark-theme.css' %}?v=2.2">
     <link rel="stylesheet" href="{% static 'css/theme-shadcn.css' %}?v=2.1">
 
     <!-- HTMX Configuration: Disable LocalStorage historyCache to prevent QuotaExceededError on large data pages -->
@@ -3103,13 +3103,18 @@
                                         }
                                     }
                                 }
-                                if (data.type === 'progress' || data.type === 'backtest_progress') {
+                                if (data.type === 'progress' || data.type === 'backtest_progress' || data.type === 'optimizer_progress' || data.type === 'optimizer_completed') {
                                     const taskIdStr = String(data.task_id);
                                     const cbs = window.MarmotWS.callbacks[taskIdStr];
                                     if (cbs && cbs.length > 0) {
                                         cbs.forEach(function (cb) {
                                             try { cb(data); } catch (err) { }
                                         });
+                                    }
+                                    if (data.type === 'optimizer_progress') {
+                                        window.dispatchEvent(new CustomEvent('marmot:optimizer_progress', { detail: data }));
+                                    } else if (data.type === 'optimizer_completed') {
+                                        window.dispatchEvent(new CustomEvent('marmot:optimizer_completed', { detail: data }));
                                     }
                                 }
                             } catch (e) { }

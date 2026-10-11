@@ -40,6 +40,12 @@ class MarketBackupTask(BaseModel):
     macro_timeframe = models.CharField(max_length=10, choices=MacroTimeframeChoices.choices, default=MacroTimeframeChoices.H1, null=True, blank=True, help_text="Macro interval (default 1h)")
     linked_backup_task = models.ForeignKey('self', on_delete=models.SET_NULL, null=True, blank=True, related_name='macro_backups', help_text="Co-located market backup task")
 
+    # Unified Dataset Bundle Configuration (Co-located Index + VIX + Macro)
+    include_vix = models.BooleanField(default=True, help_text="Bundle co-located India VIX volatility ticks into /vix/ directory")
+    include_macro = models.BooleanField(default=False, help_text="Bundle co-located Gemini AI Macro sentiment analysis into /macro/ directory")
+    has_vix_data = models.BooleanField(default=False, help_text="Indicates whether India VIX parquet dataset exists in bundle")
+    has_macro_data = models.BooleanField(default=False, help_text="Indicates whether AI Macro sentiment parquet exists in bundle")
+
     # 2. Control & Progress State (Tracked by Go Engine & Django UI)
     status = models.CharField(max_length=20, choices=StatusChoices.choices, default=StatusChoices.CREATED)
     progress = models.PositiveIntegerField(default=0, help_text="Execution progress percentage from 0 to 100")
@@ -125,6 +131,11 @@ class MarketBackupTask(BaseModel):
             return f"Spot Volatility Index Only ({freq} Stream)"
         contracts_text = f"±{self.strike_count} ATM ({self.total_strikes_count} Contracts)" if self.strike_count else "Spot Only"
         return f"Spot: 1s Ticks | Options: {freq} across {contracts_text}"
+
+    @property
+    def has_bundle(self):
+        """Returns True if this task contains a multi-folder bundle (index + vix or macro)."""
+        return bool(self.has_vix_data or self.has_macro_data or (self.include_vix and self.index_name != 'INDIAVIX') or self.include_macro)
 
     def delete_dataset_files(self):
         """Removes task backup dataset folder from disk."""

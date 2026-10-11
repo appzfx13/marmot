@@ -28,6 +28,18 @@ class MarketBackupForm(forms.ModelForm):
         help_text="Fetch 1-Second (1S) ultra-precision resolution tick data (30-day trailing range)",
         widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_1s'})
     )
+    include_vix = forms.BooleanField(
+        required=False,
+        initial=True,
+        help_text="Bundle co-located India VIX volatility ticks into /vix/ subfolder",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_include_vix'})
+    )
+    include_macro = forms.BooleanField(
+        required=False,
+        initial=False,
+        help_text="Bundle co-located Gemini AI Macro sentiment analysis into /macro/ subfolder",
+        widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_include_macro'})
+    )
 
     class Meta:
         model = MarketBackupTask
@@ -35,7 +47,7 @@ class MarketBackupForm(forms.ModelForm):
             'market_type',
             'start_date', 'end_date',
             # INDEX / F&O
-            'index_name', 'strike_count', 'use_30_days_5s', 'use_30_days_1s',
+            'index_name', 'strike_count', 'use_30_days_5s', 'use_30_days_1s', 'include_vix', 'include_macro',
             # FOREX / CME
             'forex_instrument', 'databento_schema',
         ]
@@ -46,6 +58,8 @@ class MarketBackupForm(forms.ModelForm):
             'index_name':       forms.Select(attrs={'class': _SELECT_CSS}),
             'use_30_days_5s':   forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_5s'}),
             'use_30_days_1s':   forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_1s'}),
+            'include_vix':      forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_include_vix'}),
+            'include_macro':    forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_include_macro'}),
             'forex_instrument': forms.Select(attrs={'class': _SELECT_CSS}),
             'databento_schema': forms.Select(attrs={'class': _SELECT_CSS}),
         }

@@ -784,14 +784,13 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
 
     def post(self, request, *args, **kwargs):
         import requests
+        from apps.market.services import redis_client
         action = request.POST.get('action') or request.GET.get('action')
         toast_title = 'Mock Broker Action'
         toast_msg = 'Command processed.'
         toast_type = 'success'
         try:
             if action in ('toggle_live_feed', 'live_feed_toggle'):
-                from apps.market.services import redis_client
-                import json
                 current_state = request.session.get('gateway_live_feed_enabled', None)
                 if current_state is None:
                     try:
@@ -823,8 +822,6 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
                     toast_msg = 'FYERS realtime ingestion stream is paused in standby mode.'
                     toast_type = 'warning'
             elif action == 'live_feed_on':
-                from apps.market.services import redis_client
-                import json
                 request.session['gateway_live_feed_enabled'] = True
                 try:
                     redis_client.set('marmot:gateway:live_feed_enabled', '1')
@@ -839,8 +836,6 @@ class AdminMockBrokerControlView(LoginRequiredMixin, AdminRequiredMixin, View):
                 toast_msg = 'FYERS realtime ingestion stream is now active.'
                 toast_type = 'success'
             elif action == 'live_feed_off':
-                from apps.market.services import redis_client
-                import json
                 request.session['gateway_live_feed_enabled'] = False
                 try:
                     redis_client.set('marmot:gateway:live_feed_enabled', '0')

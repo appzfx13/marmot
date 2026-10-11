@@ -131,6 +131,16 @@ func (s *DBService) MarkTaskComplete(ctx context.Context, taskID string, filePat
 	return nil
 }
 
+// UpdateTaskBundleFlags updates has_vix_data and has_macro_data status flags in Postgres.
+func (s *DBService) UpdateTaskBundleFlags(ctx context.Context, taskID string, hasVIX, hasMacro bool) error {
+	query := fmt.Sprintf(`UPDATE %s SET has_vix_data=$1, has_macro_data=$2, updated_at=NOW() WHERE id=$3`, s.TableName)
+	if _, dbErr := s.Pool.Exec(ctx, query, hasVIX, hasMacro, taskID); dbErr != nil {
+		log.Printf("⚠️ [DB] UpdateTaskBundleFlags PG write error [Task %s]: %v\n", taskID, dbErr)
+		return dbErr
+	}
+	return nil
+}
+
 // RecordError writes error state and message to Postgres and broadcasts via Redis.
 func (s *DBService) RecordError(ctx context.Context, taskID string, errorMsg string) error {
 	query := fmt.Sprintf(`UPDATE %s SET status='error', error_logs=$1, updated_at=NOW() WHERE id=$2`, s.TableName)

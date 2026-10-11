@@ -1571,7 +1571,12 @@ func (m *MatchingEngine) StartRedisOrderConsumer(ctx context.Context) {
 		}).Result()
 
 		if err != nil && err != redis.Nil {
-			log.Printf("[MOCK BROKER] Redis XReadGroup error: %v", err)
+			if strings.Contains(err.Error(), "NOGROUP") {
+				log.Println("[MOCK BROKER] Auto-healing: Consumer group missing. Creating stream & group...")
+				_ = m.rdb.XGroupCreateMkStream(ctx, streamName, groupName, "0").Err()
+			} else {
+				log.Printf("[MOCK BROKER] Redis XReadGroup error: %v", err)
+			}
 			time.Sleep(1 * time.Second)
 			continue
 		}

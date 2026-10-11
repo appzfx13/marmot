@@ -1105,15 +1105,22 @@ func (h *Handler) handleStreamerSelect(w http.ResponseWriter, r *http.Request) {
 	toastTitle := "Dataset Selected"
 	toastType := "info"
 	toastMsg := fmt.Sprintf("Replaying %s", file)
-	if strings.Contains(file, "48/dataset") || strings.Contains(file, "35/dataset") {
-		toastType = "success"
-		toastMsg = fmt.Sprintf("Full Bilateral Options feed active (%s)", file)
-	} else if strings.Contains(file, "33/dataset") || strings.Contains(file, "60/dataset") {
-		toastMsg = fmt.Sprintf("Single-leg options active (%s)", file)
-	} else if strings.Contains(file, "macro") {
-		toastTitle = "Macro Sentiment Feed"
-		toastType = "warning"
-		toastMsg = fmt.Sprintf("%s is Macro AI sentiment only (no option strikes)", file)
+
+	// Dynamically resolve dataset label and option capability
+	for _, f := range h.streamer.ListParquetDetails() {
+		if f.RelativePath == file {
+			if f.HasOptions {
+				toastType = "success"
+				toastMsg = fmt.Sprintf("%s active (%s)", f.TypeLabel, file)
+			} else if strings.Contains(file, "macro") || f.TypeLabel == "Macro AI" {
+				toastTitle = "Macro Sentiment Feed"
+				toastType = "warning"
+				toastMsg = fmt.Sprintf("%s is Macro AI sentiment only (no option strikes)", file)
+			} else {
+				toastMsg = fmt.Sprintf("Spot replay active: %s (%s)", f.IndexName, file)
+			}
+			break
+		}
 	}
 	w.Header().Set("HX-Trigger", fmt.Sprintf(`{"reloadMockOptionChain": true, "showToast": {"title": "%s", "message": "%s", "type": "%s"}}`, toastTitle, toastMsg, toastType))
 	h.handleDashboardControls(w, r)

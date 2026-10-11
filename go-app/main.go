@@ -66,6 +66,9 @@ func main() {
 	http.HandleFunc("/api/chart", func(w http.ResponseWriter, r *http.Request) {
 		services.ServeChartData(dbService, w, r)
 	})
+	http.HandleFunc("/api/backtest/optimize", func(w http.ResponseWriter, r *http.Request) {
+		workers.ServeBacktestOptimize(cfg, w, r)
+	})
 	http.HandleFunc("/api/udf/config", services.ServeUDFConfig)
 	http.HandleFunc("/api/udf/symbols", services.ServeUDFSymbols)
 	http.HandleFunc("/api/udf/history", func(w http.ResponseWriter, r *http.Request) {

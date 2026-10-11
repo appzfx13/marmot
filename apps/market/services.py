@@ -24,7 +24,7 @@ def dispatch_task_command(payload: dict) -> None:
     redis_client.publish(REDIS_CHANNEL, payload_str)
 
 
-def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None, use_30_days_5s=False, use_30_days_1s=False):
+def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None, use_30_days_5s=False, use_30_days_1s=False, include_vix=True, include_macro=False, macro_timeframe=None):
     """Creates the backup record in Postgres with pre-stored path and dispatches to Go engine."""
     task = MarketBackupTask.objects.create(
         market_type=market_type or MarketTypeChoices.INDEX_FO,
@@ -34,6 +34,9 @@ def create_and_start_backup_task(start_date, end_date, index_name=None, strike_c
         strike_count=strike_count,
         use_30_days_5s=use_30_days_5s,
         use_30_days_1s=use_30_days_1s,
+        include_vix=include_vix,
+        include_macro=include_macro,
+        macro_timeframe=macro_timeframe or '1h',
         forex_instrument=forex_instrument,
         databento_schema=databento_schema or MarketBackupTask.DatabentoSchemaChoices.OHLCV_1M,
         status=MarketBackupTask.StatusChoices.CREATED,
@@ -210,6 +213,9 @@ def send_control_command(task_id, command):
             "strike_count": 0 if (task.strike_count == 0 or task.index_name == 'INDIAVIX') else (task.strike_count if task.strike_count is not None else 15),
             "use_30_days_5s": task.use_30_days_5s,
             "use_30_days_1s": task.use_30_days_1s,
+            "include_vix": bool(task.include_vix),
+            "include_macro": bool(task.include_macro),
+            "macro_timeframe": task.macro_timeframe or "1h",
             "security_id": index_params.get("security_id", ""),
             "exchange_segment": index_params.get("exchange_segment", ""),
             "instrument": index_params.get("instrument", ""),
@@ -242,12 +248,16 @@ def inspect_parquet_dataset(task, query=None, limit=50):
         macro_name = f"macro_{tf}_{symbol}.parquet"
         candidate_paths = [
             task.parquet_file_path,
+            os.path.join('/app', 'backup', user_id, task_id, 'macro', 'macro.parquet'),
+            os.path.join(settings.BASE_DIR, 'backup', user_id, task_id, 'macro', 'macro.parquet'),
             os.path.join('/app', 'backup', user_id, task_id, macro_name),
             os.path.join(settings.BASE_DIR, 'backup', user_id, task_id, macro_name),
         ]
         if task.linked_backup_task:
             linked_id = str(task.linked_backup_task.id)
             candidate_paths.extend([
+                os.path.join('/app', 'backup', user_id, linked_id, 'macro', 'macro.parquet'),
+                os.path.join(settings.BASE_DIR, 'backup', user_id, linked_id, 'macro', 'macro.parquet'),
                 os.path.join('/app', 'backup', user_id, linked_id, macro_name),
                 os.path.join(settings.BASE_DIR, 'backup', user_id, linked_id, macro_name),
             ])
@@ -258,6 +268,8 @@ def inspect_parquet_dataset(task, query=None, limit=50):
     else:
         candidate_paths = [
             task.parquet_file_path,
+            os.path.join('/app', 'backup', user_id, task_id, 'index', 'dataset.parquet'),
+            os.path.join(settings.BASE_DIR, 'backup', user_id, task_id, 'index', 'dataset.parquet'),
             os.path.join(settings.BASE_DIR, 'backup', user_id, task_id, 'dataset.parquet'),
             os.path.join('/app', 'backup', user_id, task_id, 'dataset.parquet'),
         ]

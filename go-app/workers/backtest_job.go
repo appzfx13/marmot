@@ -87,12 +87,15 @@ func (j *BacktestJob) Run(ctx context.Context) {
 	backupTaskID := params.BackupTaskID
 	_ = strings.ToLower(indexName) // idxLower reserved for future partitioned datasets
 
-	// Resolve flat parquet dataset path: /app/backup/{userID}/{backupTaskID}/dataset.parquet
+	// Resolve flat or bundle parquet dataset path: /app/backup/{userID}/{backupTaskID}/index/dataset.parquet or dataset.parquet
 	parquetFilePath := ""
 	if backupTaskID != "" && backupTaskID != "<nil>" {
-		candidate := fmt.Sprintf("/app/backup/%s/%s/dataset.parquet", userID, backupTaskID)
-		if isFile(candidate) {
-			parquetFilePath = candidate
+		candBundle := fmt.Sprintf("/app/backup/%s/%s/index/dataset.parquet", userID, backupTaskID)
+		candFlat := fmt.Sprintf("/app/backup/%s/%s/dataset.parquet", userID, backupTaskID)
+		if isFile(candBundle) {
+			parquetFilePath = candBundle
+		} else if isFile(candFlat) {
+			parquetFilePath = candFlat
 		}
 	}
 
@@ -161,11 +164,28 @@ func (j *BacktestJob) Run(ctx context.Context) {
 	var macroDaily map[string]strategies.MacroSnapshot
 	if useMacroAssist {
 		macroPath := ""
-		// 1. Check directory of current dataset.parquet for macro_1h_{INDEX}.parquet
-		if parquetFilePath != "" {
-			cand := filepath.Join(filepath.Dir(parquetFilePath), fmt.Sprintf("macro_1h_%s.parquet", indexName))
-			if isFile(cand) {
-				macroPath = cand
+		// 1. Check co-located bundle macro/ folder: /app/backup/{userID}/{backupTaskID}/macro/*.parquet
+		if backupTaskID != "" && backupTaskID != "<nil>" {
+			macroBundle := fmt.Sprintf("/app/backup/%s/%s/macro/macro.parquet", userID, backupTaskID)
+			if isFile(macroBundle) {
+				macroPath = macroBundle
+			} else {
+				mMatches, _ := filepath.Glob(fmt.Sprintf("/app/backup/%s/%s/macro/*.parquet", userID, backupTaskID))
+				if len(mMatches) > 0 {
+					macroPath = mMatches[0]
+				}
+			}
+		}
+		// 2. Check sibling macro/ or parent directory of current dataset.parquet
+		if macroPath == "" && parquetFilePath != "" {
+			candSub := filepath.Join(filepath.Dir(parquetFilePath), "..", "macro", "macro.parquet")
+			if isFile(candSub) {
+				macroPath = candSub
+			} else {
+				cand := filepath.Join(filepath.Dir(parquetFilePath), fmt.Sprintf("macro_1h_%s.parquet", indexName))
+				if isFile(cand) {
+					macroPath = cand
+				}
 			}
 		}
 		// 2. Fallback: scan /app/backup/{userID}/ for any macro_1h_{INDEX}.parquet or macro backup
@@ -217,15 +237,40 @@ func (j *BacktestJob) Run(ctx context.Context) {
 	var vixDailyMap map[string]float64
 	if useVixAssist {
 		vixPath := ""
-		if p, ok := params.Params["vix_parquet_path"].(string); ok && p != "" {
-			if isFile(p) {
-				vixPath = p
-			} else if isFile(filepath.Join(p, "dataset.parquet")) {
-				vixPath = filepath.Join(p, "dataset.parquet")
+		// 1. Check co-located bundle vix/ folder: /app/backup/{userID}/{backupTaskID}/vix/*.parquet
+		if backupTaskID != "" && backupTaskID != "<nil>" {
+			vixBundle := fmt.Sprintf("/app/backup/%s/%s/vix/vix.parquet", userID, backupTaskID)
+			if isFile(vixBundle) {
+				vixPath = vixBundle
 			} else {
-				matches, _ := filepath.Glob(filepath.Join(p, "*vix*.parquet"))
-				if len(matches) > 0 {
-					vixPath = matches[0]
+				vMatches, _ := filepath.Glob(fmt.Sprintf("/app/backup/%s/%s/vix/*.parquet", userID, backupTaskID))
+				if len(vMatches) > 0 {
+					vixPath = vMatches[0]
+				} else if isFile(fmt.Sprintf("/app/backup/%s/%s/vix.parquet", userID, backupTaskID)) {
+					vixPath = fmt.Sprintf("/app/backup/%s/%s/vix.parquet", userID, backupTaskID)
+				}
+			}
+		}
+		// 2. Check sibling vix/ from current dataset.parquet
+		if vixPath == "" && parquetFilePath != "" {
+			candSub := filepath.Join(filepath.Dir(parquetFilePath), "..", "vix", "vix.parquet")
+			if isFile(candSub) {
+				vixPath = candSub
+			} else if isFile(filepath.Join(filepath.Dir(parquetFilePath), "vix.parquet")) {
+				vixPath = filepath.Join(filepath.Dir(parquetFilePath), "vix.parquet")
+			}
+		}
+		if vixPath == "" {
+			if p, ok := params.Params["vix_parquet_path"].(string); ok && p != "" {
+				if isFile(p) {
+					vixPath = p
+				} else if isFile(filepath.Join(p, "dataset.parquet")) {
+					vixPath = filepath.Join(p, "dataset.parquet")
+				} else {
+					matches, _ := filepath.Glob(filepath.Join(p, "*vix*.parquet"))
+					if len(matches) > 0 {
+						vixPath = matches[0]
+					}
 				}
 			}
 		}

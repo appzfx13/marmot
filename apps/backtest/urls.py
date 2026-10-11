@@ -24,6 +24,10 @@ from .views import (
     BacktestAiAuditView,
     BacktestApplyAiSuggestionsView,
     BacktestSimulateCompoundingView,
+    BacktestFindOptimalConfigView,
+    BacktestTriggerOptimizerView,
+    BacktestOptimizerWidgetView,
+    BacktestApplyOptimizerAndRerunView,
 )
 
 app_name = 'backtest'
@@ -48,6 +52,10 @@ urlpatterns = [
     path('<int:pk>/deploy-modal/', BacktestDeployModalView.as_view(), name='backtest_deploy_modal'),
     path('<int:pk>/deploy-live/', BacktestDeployLiveView.as_view(), name='backtest_deploy_live'),
     path('<int:pk>/edit-modal/', BacktestEditModalView.as_view(), name='backtest_edit_modal'),
+    path('<int:pk>/find-optimal-config/', BacktestFindOptimalConfigView.as_view(), name='backtest_find_optimal_config'),
+    path('<int:pk>/trigger-optimizer/', BacktestTriggerOptimizerView.as_view(), name='backtest_trigger_optimizer'),
+    path('<int:pk>/optimizer-widget/', BacktestOptimizerWidgetView.as_view(), name='backtest_optimizer_widget'),
+    path('<int:pk>/apply-optimizer-rerun/', BacktestApplyOptimizerAndRerunView.as_view(), name='backtest_apply_optimizer_rerun'),
     path('<int:pk>/delete/', BacktestDeleteView.as_view(), name='backtest_delete'),
     
     # Strategy Hub & Web UI Code Editor Endpoints

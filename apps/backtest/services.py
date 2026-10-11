@@ -220,6 +220,40 @@ def send_backtest_control_command(task_id, command):
     return task
 
 
+def send_optimizer_command(task_id):
+    """Dispatches START_OPTIMIZER to Go engine via Redis control channel."""
+    task = BacktestTask.objects.get(id=task_id)
+    if not isinstance(task.parameters, dict):
+        task.parameters = {}
+    task.parameters['optimizer_status'] = 'running'
+    task.save(update_fields=['parameters'])
+
+    payload = {
+        "task_id": str(task.id),
+        "command": "START_OPTIMIZER",
+        "params": {
+            "strategy_name": task.strategy_name,
+            "index_name": task.index_name,
+            "start_date": task.start_date.isoformat(),
+            "end_date": task.end_date.isoformat(),
+            "initial_capital": float(task.initial_capital or 100000.0),
+            "user_id": str(task.created_by.id if getattr(task, 'created_by', None) else 1),
+            "backup_task_id": str(task.backup_task.id) if task.backup_task else "",
+            "use_vix_assist": bool(task.use_vix_assist),
+            "vix_backup_task_id": str(task.vix_backup_task.id) if task.vix_backup_task else "",
+            "vix_parquet_path": (task.vix_backup_task.parquet_file_path if task.vix_backup_task else "") or "",
+            "params": task.parameters or {}
+        }
+    }
+    try:
+        from apps.market.services import dispatch_task_command
+        dispatch_task_command(payload)
+    except Exception as e:
+        logger.warning(f"Redis optimizer dispatch warning: {e}")
+
+    return task
+
+
 GO_STRATEGY_PRESETS = [
     {
         'rule_type': 'gamma_blast',

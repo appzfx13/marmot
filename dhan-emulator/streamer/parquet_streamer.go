@@ -119,19 +119,10 @@ func NewParquetStreamer(eng *engine.MatchingEngine, backupDir string) *ParquetSt
 		if envFile := os.Getenv("EMULATOR_DATASET"); envFile != "" {
 			selected = envFile
 		} else {
-			// Check for verified complete symmetric options dataset first
 			for _, f := range files {
-				if f.RelativePath == "1/33/dataset.parquet" || f.RelativePath == "1/13/dataset.parquet" || f.RelativePath == "1/48/dataset.parquet" {
+				if f.HasOptions {
 					selected = f.RelativePath
 					break
-				}
-			}
-			if selected != "1/33/dataset.parquet" && selected != "1/13/dataset.parquet" && selected != "1/48/dataset.parquet" {
-				for _, f := range files {
-					if f.HasOptions || f.RelativePath == "1/35/dataset.parquet" {
-						selected = f.RelativePath
-						break
-					}
 				}
 			}
 		}
@@ -1938,16 +1929,26 @@ func (ps *ParquetStreamer) streamSynthetic() {
 	}
 }
 
+// DatasetManifest represents the metadata.json manifest created during automated download.
+type DatasetManifest struct {
+	TaskID      string  `json:"task_id"`
+	IndexName   string  `json:"index_name"`
+	StartDate   string  `json:"start_date"`
+	EndDate     string  `json:"end_date"`
+	StrikeCount int     `json:"strike_count"`
+	HasVIX      bool    `json:"has_vix"`
+	HasMacro    bool    `json:"has_macro"`
+	TotalRows   int64   `json:"total_rows"`
+	FileSizeMB  float64 `json:"file_size_mb"`
+}
+
 // ListAvailableParquets returns file paths for selection.
 func (ps *ParquetStreamer) ListAvailableParquets() []string {
-	var files []string
-	_ = filepath.Walk(ps.availableDir, func(path string, info os.FileInfo, err error) error {
-		if err == nil && !info.IsDir() && filepath.Ext(path) == ".parquet" {
-			rel, _ := filepath.Rel(ps.availableDir, path)
-			files = append(files, filepath.ToSlash(rel))
-		}
-		return nil
-	})
+	details := ps.ListParquetDetails()
+	files := make([]string, len(details))
+	for i, d := range details {
+		files[i] = d.RelativePath
+	}
 	return files
 }
 
@@ -2012,6 +2013,17 @@ func readParquetMeta(filePath string) (string, string, string) {
 	return idx, start, end
 }
 
+// extractTaskID parses the numeric task ID from relative path (e.g. "1/52/dataset.parquet" -> 52).
+func extractTaskID(relPath string) int {
+	parts := strings.Split(relPath, "/")
+	if len(parts) >= 2 {
+		if id, err := strconv.Atoi(parts[1]); err == nil {
+			return id
+		}
+	}
+	return 0
+}
+
 // ListParquetDetails returns full details for available datasets, prioritizing option-ready datasets.
 func (ps *ParquetStreamer) ListParquetDetails() []ParquetFileInfo {
 	var results []ParquetFileInfo
@@ -2021,31 +2033,65 @@ func (ps *ParquetStreamer) ListParquetDetails() []ParquetFileInfo {
 		}
 		if info.IsDir() {
 			name := info.Name()
-			if name == "ticks" || name == "staging" || strings.HasPrefix(name, ".") {
+			if name == "ticks" || name == "staging" || name == "index" || name == "vix" || name == "macro" || strings.HasPrefix(name, "staging") || strings.HasPrefix(name, ".") {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if filepath.Ext(path) == ".parquet" {
+			baseName := filepath.Base(path)
+			dir := filepath.Dir(path)
+
+			// Skip sidecar vix.parquet when primary consolidated dataset.parquet is co-located in the task folder
+			if baseName == "vix.parquet" {
+				if _, statErr := os.Stat(filepath.Join(dir, "dataset.parquet")); statErr == nil {
+					return nil
+				}
+			}
+
 			rel, _ := filepath.Rel(ps.availableDir, path)
 			relSlash := filepath.ToSlash(rel)
 			szMB := float64(info.Size()) / (1024 * 1024)
 
+			// Attempt reading co-located metadata.json manifest from the download task folder
+			var manifest *DatasetManifest
+			manifestPath := filepath.Join(dir, "metadata.json")
+			if mData, mErr := os.ReadFile(manifestPath); mErr == nil {
+				var m DatasetManifest
+				if jErr := json.Unmarshal(mData, &m); jErr == nil {
+					manifest = &m
+				}
+			}
+
 			hasOpts := false
 			typeLabel := "Spot Only"
 
-			if strings.Contains(relSlash, "macro") || info.Size() < 50000 {
-				typeLabel = "Macro AI"
-			} else if relSlash == "1/13/dataset.parquet" || relSlash == "1/33/dataset.parquet" || relSlash == "1/48/dataset.parquet" || relSlash == "1/35/dataset.parquet" {
-				hasOpts = true
-				typeLabel = "Spot + Options (Full Bilateral)"
-			} else if relSlash == "1/60/dataset.parquet" {
-				hasOpts = true
-				typeLabel = "Spot + Options (Single Leg)"
-			} else if relSlash == "1/37/dataset.parquet" || relSlash == "1/38/dataset.parquet" || relSlash == "1/40/dataset.parquet" || relSlash == "1/62/dataset.parquet" {
-				typeLabel = "Futures / Forex"
-			} else if szMB > 100.0 {
-				typeLabel = "Multi-Year Spot"
+			if manifest != nil {
+				if manifest.StrikeCount > 0 {
+					hasOpts = true
+					typeLabel = fmt.Sprintf("Spot + Options (ATM±%d)", manifest.StrikeCount)
+				} else if manifest.HasMacro || strings.Contains(relSlash, "macro") {
+					typeLabel = "Macro AI"
+				} else if strings.EqualFold(manifest.IndexName, "INDIAVIX") {
+					typeLabel = "VIX / Macro"
+				} else {
+					typeLabel = "Spot Only"
+				}
+			} else {
+				// Legacy heuristics for older datasets without metadata.json
+				if strings.Contains(relSlash, "macro") || info.Size() < 50000 {
+					typeLabel = "Macro AI"
+				} else if relSlash == "1/13/dataset.parquet" || relSlash == "1/33/dataset.parquet" || relSlash == "1/35/dataset.parquet" {
+					hasOpts = true
+					typeLabel = "Spot + Options (Full Bilateral)"
+				} else if relSlash == "1/60/dataset.parquet" {
+					hasOpts = true
+					typeLabel = "Spot + Options (Single Leg)"
+				} else if relSlash == "1/37/dataset.parquet" || relSlash == "1/38/dataset.parquet" || relSlash == "1/40/dataset.parquet" || relSlash == "1/62/dataset.parquet" {
+					typeLabel = "Futures / Forex"
+				} else if szMB > 100.0 {
+					typeLabel = "Multi-Year Spot"
+				}
 			}
 
 			// Read metadata with caching
@@ -2060,19 +2106,34 @@ func (ps *ParquetStreamer) ListParquetDetails() []ParquetFileInfo {
 				startDate = cached.StartDate
 				endDate = cached.EndDate
 			} else {
-				indexName, startDate, endDate = readParquetMeta(path)
-				if startDate != "" && endDate != "" {
-					d1 := strings.Split(startDate, " ")[0]
-					d2 := strings.Split(endDate, " ")[0]
-					if d1 != "" && d2 != "" {
-						if d1 == d2 {
-							dateRange = d1
-						} else {
-							dateRange = fmt.Sprintf("%s – %s", d1, d2)
+				if manifest != nil && manifest.IndexName != "" {
+					indexName = manifest.IndexName
+				}
+				if manifest != nil && manifest.StartDate != "" && manifest.EndDate != "" {
+					dateRange = fmt.Sprintf("%s – %s", manifest.StartDate, manifest.EndDate)
+				}
+
+				pIdx, pStart, pEnd := readParquetMeta(path)
+				if indexName == "" {
+					indexName = pIdx
+				}
+				startDate = pStart
+				endDate = pEnd
+
+				if dateRange == "" {
+					if startDate != "" && endDate != "" {
+						d1 := strings.Split(startDate, " ")[0]
+						d2 := strings.Split(endDate, " ")[0]
+						if d1 != "" && d2 != "" {
+							if d1 == d2 {
+								dateRange = d1
+							} else {
+								dateRange = fmt.Sprintf("%s – %s", d1, d2)
+							}
 						}
+					} else if startDate != "" {
+						dateRange = strings.Split(startDate, " ")[0]
 					}
-				} else if startDate != "" {
-					dateRange = strings.Split(startDate, " ")[0]
 				}
 
 				if indexName == "" {
@@ -2116,16 +2177,15 @@ func (ps *ParquetStreamer) ListParquetDetails() []ParquetFileInfo {
 		return nil
 	})
 
-	// Sort so that verified Spot + Options datasets appear first, with 1/48 at top
+	// Sort so that verified Spot + Options datasets appear first, ordered by newest Task ID
 	sort.SliceStable(results, func(i, j int) bool {
-		if results[i].RelativePath == "1/48/dataset.parquet" {
-			return true
-		}
-		if results[j].RelativePath == "1/48/dataset.parquet" {
-			return false
-		}
 		if results[i].HasOptions != results[j].HasOptions {
 			return results[i].HasOptions
+		}
+		idI := extractTaskID(results[i].RelativePath)
+		idJ := extractTaskID(results[j].RelativePath)
+		if idI != idJ {
+			return idI > idJ
 		}
 		return results[i].RelativePath < results[j].RelativePath
 	})

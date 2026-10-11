@@ -1,0 +1,511 @@
+<!-- templates/admins/partials/backtest_optimizer_widget.html -->
+<div id="backtest-optimizer-widget" class="glass-card p-3 p-md-4 mb-4 position-relative overflow-hidden" 
+     style="border: 1px solid rgba(245, 158, 11, 0.40) !important; background: linear-gradient(135deg, rgba(20, 29, 24, 0.85) 0%, rgba(9, 23, 18, 0.95) 100%); border-radius: 1rem; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5), 0 0 25px rgba(245, 158, 11, 0.08);">
+
+    <!-- Top Decorative Gradient Glow Accent -->
+    <div class="position-absolute top-0 start-0 w-100" style="height: 3px; background: linear-gradient(90deg, #F59E0B, #B4F105, #10B981);"></div>
+
+    {% if optimizer_is_running %}
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- STATE 1: RUNNING / REAL-TIME WEBSOCKET PROGRESS        -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="optimizer-running-panel" class="py-2">
+        <div class="d-flex align-items-center justify-content-between mb-3 flex-wrap gap-2">
+            <div class="d-flex align-items-center gap-2.5">
+                <div class="spinner-grow spinner-grow-sm text-warning" role="status" style="width: 1.1rem; height: 1.1rem;"></div>
+                <div>
+                    <h6 class="fw-bold mb-0 text-white d-flex align-items-center gap-2" style="font-size: 0.95rem;">
+                        <span>Go In-Memory Parallel Strategy Optimizer</span>
+                        <span class="badge rounded-pill bg-warning bg-opacity-20 text-warning border border-warning border-opacity-30 font-monospace" style="font-size: 0.72rem;">
+                            Grid Sweep Active
+                        </span>
+                    </h6>
+                    <small class="theme-text-muted" style="font-size: 0.76rem;">Simulating 24 parameter combinations across {{ backtest.index_name }} tick data in RAM...</small>
+                </div>
+            </div>
+            <span id="optimizer-live-pct" class="badge bg-warning text-dark font-monospace fw-bold fs-6 px-3 py-1.5 rounded-pill shadow-sm">
+                5%
+            </span>
+        </div>
+
+        <div class="progress rounded-pill bg-dark bg-opacity-60 border border-secondary border-opacity-25 mb-2" style="height: 12px;">
+            <div id="optimizer-live-progress-bar" 
+                 class="progress-bar progress-bar-striped progress-bar-animated bg-gradient" 
+                 role="progressbar" 
+                 style="width: 5%; background: linear-gradient(90deg, #F59E0B, #10B981); transition: width 0.3s ease;" 
+                 aria-valuenow="5" aria-valuemin="0" aria-valuemax="100">
+            </div>
+        </div>
+
+        <div class="d-flex align-items-center justify-content-between mt-2 flex-wrap gap-2">
+            <div id="optimizer-live-step" class="text-info small font-monospace fst-italic">
+                🚀 Dispatched job to Go High-Speed Engine. Loading Parquet dataset into memory...
+            </div>
+            <div class="theme-text-muted smaller font-monospace">
+                <span>Task #BT-{{ backtest.id|stringformat:"04d" }}</span> &nbsp;|&nbsp; <span>Zero HTTP Polling (WS Push)</span>
+            </div>
+        </div>
+    </div>
+
+    {% elif winner %}
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- STATE 2: COMPLETED / EXECUTIVE LEADERBOARD             -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="optimizer-completed-panel">
+        <!-- Header & Action Buttons -->
+        <div id="optimizer-header-row" class="d-flex flex-column flex-lg-row align-items-start align-items-lg-center justify-content-between gap-3 mb-3.5 pb-3 border-bottom border-secondary border-opacity-20">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0 shadow-sm" 
+                     style="width: 40px; height: 40px; background: rgba(245, 158, 11, 0.15); border: 1.5px solid rgba(245, 158, 11, 0.45); color: #F59E0B;">
+                    <span class="material-icons" style="font-size: 1.45rem;">emoji_events</span>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 flex-wrap mb-1">
+                        <h6 class="fw-bold mb-0 text-white" style="font-size: 1.05rem; letter-spacing: -0.2px;">Strategy Hyperparameter Optimizer Leaderboard</h6>
+                        <span class="badge rounded-pill font-monospace" style="background: rgba(16, 185, 129, 0.15); color: #10B981; border: 1px solid rgba(16, 185, 129, 0.35); font-size: 0.72rem;">
+                            {% if optimizer_results.total_combos_evaluated %}{{ optimizer_results.total_combos_evaluated }}{% else %}{{ candidates|length }}{% endif %} Tested &bull; {{ optimizer_results.duration_ms|default:0 }}ms
+                        </span>
+                        {% if backtest.parameters.is_optimizer_applied %}
+                        <span class="badge rounded-pill bg-success text-white font-monospace" style="font-size: 0.70rem;">
+                            ✓ APPLIED
+                        </span>
+                        {% endif %}
+                    </div>
+                    <small class="text-white-50 d-block" style="font-size: 0.78rem;">
+                        Evaluated {% if optimizer_results.total_combos_evaluated %}{{ optimizer_results.total_combos_evaluated }}{% else %}{{ candidates|length }}{% endif %} parameter permutations in Go memory across {{ optimizer_results.trading_days|default:0 }} historical trading days.
+                    </small>
+                </div>
+            </div>
+
+            <!-- Action Controls & Info Toggle -->
+            <div class="d-flex align-items-center gap-2 flex-wrap ms-lg-auto">
+                <!-- Info / Methodology Toggle Button (XPAND IFOR) -->
+                <button type="button" 
+                        class="btn btn-outline-info rounded-pill px-3 py-1.5 d-inline-flex align-items-center gap-1.5"
+                        style="font-size: 0.80rem; border-color: rgba(56, 189, 248, 0.35); background: rgba(56, 189, 248, 0.05);"
+                        onclick="toggleOptimizerMethodology()"
+                        title="Expand mathematical methodology, scoring equations, and grid search parameters">
+                    <span class="material-icons" style="font-size: 1.05rem;">info</span>
+                    <span>Methodology &amp; Scoring</span>
+                </button>
+
+                <form hx-post="{% url 'backtest:backtest_apply_optimizer_rerun' backtest.pk %}" 
+                      hx-disabled-elt="#btnApplyWinnerMain"
+                      class="d-inline m-0">
+                    {% csrf_token %}
+                    <button type="submit" 
+                            id="btnApplyWinnerMain"
+                            class="btn text-dark fw-bold rounded-pill px-3.5 py-1.5 d-inline-flex align-items-center gap-1.5 shadow-sm"
+                            style="background: var(--brand-lime, #B4F105); font-size: 0.82rem; transition: transform 0.15s ease;"
+                            title="Apply Rank #1 parameters and restart backtest simulation immediately">
+                        <span class="material-icons" style="font-size: 1.05rem;">bolt</span>
+                        <span>Apply Winner &amp; Re-Run (⚡ 1-Click)</span>
+                    </button>
+                </form>
+
+                <form hx-post="{% url 'backtest:backtest_trigger_optimizer' backtest.pk %}" 
+                      hx-target="#backtest-optimizer-widget" 
+                      hx-swap="outerHTML"
+                      hx-disabled-elt="#btnReRunOptimizer"
+                      class="d-inline m-0">
+                    {% csrf_token %}
+                    <button type="submit" 
+                            id="btnReRunOptimizer"
+                            class="btn btn-outline-secondary rounded-pill px-3 py-1.5 text-light d-inline-flex align-items-center gap-1"
+                            style="font-size: 0.80rem;"
+                            title="Re-run parameter grid optimization in Go memory">
+                        <span class="material-icons" style="font-size: 0.95rem;">refresh</span>
+                        <span>Re-Optimize</span>
+                    </button>
+                </form>
+
+                <!-- Collapse / Expand Entire Widget Toggle Button with Arrow -->
+                <button type="button" 
+                        id="btnToggleOptimizerWidget" 
+                        class="btn btn-outline-secondary rounded-circle d-inline-flex align-items-center justify-content-center p-0 text-white shadow-sm flex-shrink-0"
+                        style="width: 32px; height: 32px; border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.06); transition: all 0.2s ease;"
+                        onclick="toggleOptimizerWidgetBody()" 
+                        title="Collapse / Expand Optimizer Leaderboard"
+                        aria-label="Collapse or expand optimizer leaderboard">
+                    <span class="material-icons" id="iconToggleOptimizerWidget" style="font-size: 1.25rem; transition: transform 0.2s ease;">expand_less</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- ── Collapsible Optimizer Widget Body ── -->
+        <div id="optimizer-widget-body">
+
+        <!-- ── Collapsible Methodology & Scoring Info Drawer (XPAND IFOR) ── -->
+        <div id="optimizerMethodologyDrawer" class="d-none mb-3.5 p-3.5 rounded-3 border border-info border-opacity-30 shadow-sm" 
+             style="background: rgba(14, 165, 233, 0.05);">
+            <div class="d-flex align-items-center justify-content-between mb-2 pb-1.5 border-bottom border-white border-opacity-10">
+                <div class="d-flex align-items-center gap-2">
+                    <span class="material-icons text-info" style="font-size: 1.15rem;">calculate</span>
+                    <strong class="text-white small text-uppercase tracking-wider">Quant Scoring Model &amp; Grid Methodology</strong>
+                </div>
+                <button type="button" class="btn btn-sm btn-link text-muted p-0 text-decoration-none" onclick="toggleOptimizerMethodology()">
+                    <span class="material-icons" style="font-size: 1.1rem;">close</span>
+                </button>
+            </div>
+            <div class="row g-3 small">
+                <div class="col-12 col-md-4">
+                    <span class="text-info fw-bold d-block mb-1">1. Mathematical Expectancy Formula</span>
+                    <p class="text-white-50 mb-0" style="font-size: 0.78rem; line-height: 1.45;">
+                        Ranking is sorted strictly by Expectancy Score:
+                        <code class="text-info font-monospace d-block my-1 px-2 py-1 rounded bg-black bg-opacity-40">Score = (WinRate &times; AvgWin) &minus; (LossRate &times; AvgLoss)</code>
+                        Penalizes high-drawdown outliers while rewarding consistent payoff impulse harvesting.
+                    </p>
+                </div>
+                <div class="col-12 col-md-4">
+                    <span class="text-info fw-bold d-block mb-1">2. In-Memory Go Microservice Sweep</span>
+                    <p class="text-white-50 mb-0" style="font-size: 0.78rem; line-height: 1.45;">
+                        Simulates high-impact <strong>momentum scalping &amp; trend expansion permutations</strong> over historical ticks directly in Go RAM with zero disk I/O latency, adhering strictly to Rule 10 standards.
+                    </p>
+                </div>
+                <div class="col-12 col-md-4">
+                    <span class="text-info fw-bold d-block mb-1">3. Permutation Search Space</span>
+                    <p class="text-white-50 mb-0" style="font-size: 0.78rem; line-height: 1.45;">
+                        Swept dimensions: <strong>Stop Loss:</strong> [5, 8, 12, 18, 25 pts] &bull; <strong>R:R Ratio:</strong> [1:2.0x, 1:2.5x, 1:3.0x, 1:4.0x] &bull; <strong>Trailing SL:</strong> [Disabled, Active 1.2R, Active 1.5R Runner Lock] &bull; <strong>Retest Layering:</strong> [Active, Off].
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Rank #1 Winner Card ── -->
+        <div class="winner-card p-3.5 rounded-3 mb-3 position-relative" 
+             style="background: rgba(245, 158, 11, 0.08); border: 1.5px solid rgba(245, 158, 11, 0.55); box-shadow: 0 0 20px rgba(245, 158, 11, 0.14);">
+            <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-3">
+                <div class="d-flex align-items-center gap-2 flex-wrap">
+                    <span class="badge rounded-pill px-3 py-1.5 fw-bold font-monospace shadow-sm" 
+                          style="background: #F59E0B; color: #000; font-size: 0.80rem;">
+                        🏆 RANK #1 WINNER
+                    </span>
+                    <span class="badge bg-warning bg-opacity-25 text-warning border border-warning border-opacity-40 rounded-pill px-2.5 py-1 font-monospace fw-bold" style="font-size: 0.75rem;">
+                        GRADE A+ &bull; Optimal Alpha
+                    </span>
+                    <span class="text-warning small fw-semibold font-monospace ms-1">Expectancy Score: {{ winner.expectancy_score|floatformat:1 }}</span>
+                </div>
+                <div class="small text-white-50 font-monospace">
+                    Trades: <strong class="text-white">{{ winner.total_trades }}</strong> &nbsp;|&nbsp; 
+                    Profit Factor: <strong class="text-white">{{ winner.profit_factor|floatformat:2 }}</strong> &nbsp;|&nbsp; 
+                    Max Drawdown: <strong class="text-danger">₹{{ winner.max_drawdown|floatformat:2 }}</strong>
+                </div>
+            </div>
+
+            <!-- Metric Grid -->
+            <div class="row g-2.5 small">
+                <div class="col-6 col-md-3">
+                    <div class="p-2.5 rounded-3 bg-black bg-opacity-50 border border-secondary border-opacity-25 shadow-sm">
+                        <span class="text-white-50 d-block mb-0.5" style="font-size: 0.70rem; text-transform: uppercase; letter-spacing: 0.5px;">Stop Loss</span>
+                        <span class="fw-bold text-danger font-monospace fs-6">{{ winner.stop_loss_points }} pts</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-2.5 rounded-3 bg-black bg-opacity-50 border border-secondary border-opacity-25 shadow-sm">
+                        <span class="text-white-50 d-block mb-0.5" style="font-size: 0.70rem; text-transform: uppercase; letter-spacing: 0.5px;">Risk-to-Reward</span>
+                        <span class="fw-bold text-primary font-monospace fs-6">1:{{ winner.rr_ratio }}x</span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-2.5 rounded-3 bg-black bg-opacity-50 border border-secondary border-opacity-25 shadow-sm">
+                        <span class="text-white-50 d-block mb-0.5" style="font-size: 0.70rem; text-transform: uppercase; letter-spacing: 0.5px;">Trailing SL</span>
+                        <span class="fw-bold {% if winner.enable_trailing_sl %}text-info{% else %}text-muted{% endif %} font-monospace fs-6">
+                            {% if winner.enable_trailing_sl %}Active ({{ winner.trailing_sl_trigger_r }}R){% else %}Disabled{% endif %}
+                        </span>
+                    </div>
+                </div>
+                <div class="col-6 col-md-3">
+                    <div class="p-2.5 rounded-3 bg-black bg-opacity-50 border border-secondary border-opacity-25 shadow-sm">
+                        <span class="text-white-50 d-block mb-0.5" style="font-size: 0.70rem; text-transform: uppercase; letter-spacing: 0.5px;">Net PnL / Win Rate</span>
+                        <span class="fw-bold {% if winner.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %} font-monospace fs-6">
+                            {% if winner.net_pnl >= 0 %}+₹{% else %}₹{% endif %}{{ winner.net_pnl|floatformat:2 }} 
+                            <small class="text-white-50 font-monospace">({{ winner.win_rate }}%)</small>
+                        </span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ── Gemini AI Strategic Rationale ── -->
+        {% if optimizer_results.gemini_rationale %}
+        <div class="p-3 rounded-3 mb-3 border border-info border-opacity-25 d-flex align-items-start gap-2.5 shadow-sm" 
+             style="background: rgba(14, 165, 233, 0.07);">
+            <span class="material-icons text-info flex-shrink-0 mt-0.5" style="font-size: 1.25rem;">psychology</span>
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                    <span class="fw-bold text-info" style="font-size: 0.78rem; letter-spacing: 0.5px; text-transform: uppercase;">Gemini AI Strategic Synthesis</span>
+                    <span class="badge rounded-pill bg-info bg-opacity-20 text-info py-0 px-2 font-monospace" style="font-size: 0.68rem;">Institutional Rationale</span>
+                </div>
+                <p class="mb-0 text-white-50 small" style="font-size: 0.82rem; line-height: 1.5;">
+                    {{ optimizer_results.gemini_rationale }}
+                </p>
+            </div>
+        </div>
+        {% endif %}
+
+        <!-- ── Candidates Leaderboard Table (with AI Rating & Expand Toggle) ── -->
+        {% if candidates %}
+        <div class="table-responsive rounded-3 border border-secondary border-opacity-20 mb-2 shadow-sm" style="background: rgba(0, 0, 0, 0.35);">
+            <table class="table table-dark table-hover table-sm align-middle mb-0 font-monospace" style="font-size: 0.77rem;">
+                <thead>
+                    <tr class="text-muted text-uppercase" style="border-bottom: 1px solid rgba(255,255,255,0.12); font-size: 0.68rem;">
+                        <th class="ps-3 py-2.5" style="width: 85px;">Rank</th>
+                        <th class="py-2.5" style="width: 140px;">AI Rating</th>
+                        <th class="py-2.5">SL Points</th>
+                        <th class="py-2.5 text-center">R:R Ratio</th>
+                        <th class="py-2.5 text-center">Trailing SL</th>
+                        <th class="py-2.5 text-center">Retest Layering</th>
+                        <th class="py-2.5 text-center">Trades</th>
+                        <th class="py-2.5 text-center">Win Rate</th>
+                        <th class="py-2.5 text-end">Max DD</th>
+                        <th class="py-2.5 text-end">Net PnL</th>
+                        <th class="pe-3 py-2.5 text-end" style="width: 90px;">Action</th>
+                    </tr>
+                </thead>
+
+                <!-- Top 5 Candidate Rows (Always Visible) -->
+                <tbody>
+                    {% for c in candidates|slice:":5" %}
+                    <tr class="{% if forloop.first %}table-warning bg-opacity-10{% endif %}">
+                        <td class="ps-3 py-2.5">
+                            {% if forloop.first %}
+                                <span class="badge rounded-pill shadow-sm" style="background: #F59E0B; color: #000; font-size: 0.70rem;">#1 Winner</span>
+                            {% else %}
+                                <span class="badge rounded-pill bg-secondary bg-opacity-35 text-light" style="font-size: 0.70rem;">#{{ c.rank|default:forloop.counter }}</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5">
+                            <span class="badge rounded-pill px-2 py-0.5 border font-monospace fw-bold {{ c.ai_grade_badge|default:'bg-secondary bg-opacity-25 text-white-50 border-secondary' }}" style="font-size: 0.68rem;">
+                                {{ c.ai_grade|default:'A' }} &bull; {{ c.ai_tier_label|default:'Quant Edge' }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 text-danger fw-semibold">{{ c.stop_loss_points }} pts</td>
+                        <td class="py-2.5 text-primary fw-semibold text-center">1:{{ c.rr_ratio }}x</td>
+                        <td class="py-2.5 text-center">
+                            {% if c.enable_trailing_sl %}
+                                <span class="text-info fw-semibold">{{ c.trailing_sl_trigger_r }}R Trail</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 text-center">
+                            {% if c.enable_retest_layering %}
+                                <span class="text-success fw-semibold">Active</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 text-center">{{ c.total_trades }}</td>
+                        <td class="py-2.5 text-center">{{ c.win_rate }}%</td>
+                        <td class="py-2.5 text-end text-danger">₹{{ c.max_drawdown|floatformat:2 }}</td>
+                        <td class="py-2.5 text-end fw-bold {% if c.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if c.net_pnl >= 0 %}+₹{% else %}₹{% endif %}{{ c.net_pnl|floatformat:2 }}
+                        </td>
+                        <td class="pe-3 py-2.5 text-end">
+                            <form hx-post="{% url 'backtest:backtest_apply_optimizer_rerun' backtest.pk %}" class="d-inline m-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="stop_loss_points" value="{{ c.stop_loss_points }}">
+                                <input type="hidden" name="rr_ratio" value="{{ c.rr_ratio }}">
+                                <input type="hidden" name="enable_trailing_sl" value="{{ c.enable_trailing_sl|yesno:'true,false' }}">
+                                <input type="hidden" name="trailing_sl_trigger_r" value="{{ c.trailing_sl_trigger_r }}">
+                                <input type="hidden" name="enable_retest_layering" value="{{ c.enable_retest_layering|yesno:'true,false' }}">
+                                <button type="submit" 
+                                        class="btn btn-outline-warning btn-xs rounded-pill px-2.5 py-0.5" 
+                                        style="font-size: 0.70rem;"
+                                        title="Apply this configuration and re-run simulation">
+                                    Apply
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+                <!-- Candidates #6 to #24 (Expandable Container) -->
+                {% if candidates|length > 5 %}
+                <tbody id="optimizer-candidates-expanded" class="d-none border-top border-white border-opacity-10">
+                    {% for c in candidates|slice:"5:" %}
+                    <tr>
+                        <td class="ps-3 py-2.5">
+                            <span class="badge rounded-pill bg-secondary bg-opacity-25 text-white-50" style="font-size: 0.70rem;">#{{ c.rank|default:forloop.counter|add:5 }}</span>
+                        </td>
+                        <td class="py-2.5">
+                            <span class="badge rounded-pill px-2 py-0.5 border font-monospace fw-bold {{ c.ai_grade_badge|default:'bg-secondary bg-opacity-25 text-white-50 border-secondary' }}" style="font-size: 0.68rem;">
+                                {{ c.ai_grade|default:'B' }} &bull; {{ c.ai_tier_label|default:'Tiered' }}
+                            </span>
+                        </td>
+                        <td class="py-2.5 text-danger fw-semibold">{{ c.stop_loss_points }} pts</td>
+                        <td class="py-2.5 text-primary fw-semibold text-center">1:{{ c.rr_ratio }}x</td>
+                        <td class="py-2.5 text-center">
+                            {% if c.enable_trailing_sl %}
+                                <span class="text-info fw-semibold">{{ c.trailing_sl_trigger_r }}R Trail</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 text-center">
+                            {% if c.enable_retest_layering %}
+                                <span class="text-success fw-semibold">Active</span>
+                            {% else %}
+                                <span class="text-muted">—</span>
+                            {% endif %}
+                        </td>
+                        <td class="py-2.5 text-center">{{ c.total_trades }}</td>
+                        <td class="py-2.5 text-center">{{ c.win_rate }}%</td>
+                        <td class="py-2.5 text-end text-danger">₹{{ c.max_drawdown|floatformat:2 }}</td>
+                        <td class="py-2.5 text-end fw-bold {% if c.net_pnl >= 0 %}text-success{% else %}text-danger{% endif %}">
+                            {% if c.net_pnl >= 0 %}+₹{% else %}₹{% endif %}{{ c.net_pnl|floatformat:2 }}
+                        </td>
+                        <td class="pe-3 py-2.5 text-end">
+                            <form hx-post="{% url 'backtest:backtest_apply_optimizer_rerun' backtest.pk %}" class="d-inline m-0">
+                                {% csrf_token %}
+                                <input type="hidden" name="stop_loss_points" value="{{ c.stop_loss_points }}">
+                                <input type="hidden" name="rr_ratio" value="{{ c.rr_ratio }}">
+                                <input type="hidden" name="enable_trailing_sl" value="{{ c.enable_trailing_sl|yesno:'true,false' }}">
+                                <input type="hidden" name="trailing_sl_trigger_r" value="{{ c.trailing_sl_trigger_r }}">
+                                <input type="hidden" name="enable_retest_layering" value="{{ c.enable_retest_layering|yesno:'true,false' }}">
+                                <button type="submit" 
+                                        class="btn btn-outline-warning btn-xs rounded-pill px-2.5 py-0.5" 
+                                        style="font-size: 0.70rem;"
+                                        title="Apply this configuration and re-run simulation">
+                                    Apply
+                                </button>
+                            </form>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                {% endif %}
+            </table>
+        </div>
+
+        <!-- Expand / Collapse All Candidates Toggle Button (XPAND IFOR) -->
+        {% if candidates|length > 5 %}
+        <div class="d-flex align-items-center justify-content-between pt-1 pb-1">
+            <span class="text-white-50 smaller font-monospace">
+                Showing top 5 of {{ candidates|length }} evaluated combinations
+            </span>
+            <button type="button" 
+                    id="btnToggleAllPermutations" 
+                    class="btn btn-outline-warning rounded-pill px-3.5 py-1.5 fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    style="font-size: 0.78rem; border-color: rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.06);"
+                    onclick="toggleOptimizerPermutations()">
+                <span class="material-icons" id="iconTogglePermutations" style="font-size: 1.05rem;">unfold_more</span>
+                <span id="textTogglePermutations">Show All {{ candidates|length }} Permutations (Expand)</span>
+            </button>
+        </div>
+        {% endif %}
+        {% endif %}
+        </div>
+    </div>
+
+    {% else %}
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <!-- STATE 3: IDLE / READY TO RUN                           -->
+    <!-- ═══════════════════════════════════════════════════════ -->
+    <div id="optimizer-idle-panel" class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-3 py-1">
+        <div class="d-flex align-items-center gap-2.5">
+            <div class="rounded-circle d-flex align-items-center justify-content-center shadow-sm" 
+                 style="width: 38px; height: 38px; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); color: #F59E0B;">
+                <span class="material-icons" style="font-size: 1.4rem;">offline_bolt</span>
+            </div>
+            <div>
+                <h6 class="fw-bold mb-0 text-white d-flex align-items-center gap-2" style="font-size: 0.95rem;">
+                    <span>Strategy Hyperparameter Optimizer</span>
+                    <span class="badge rounded-pill bg-warning bg-opacity-15 text-warning border border-warning border-opacity-25 font-monospace" style="font-size: 0.70rem;">
+                        24-Grid In-Memory Sweep
+                    </span>
+                </h6>
+                <small class="theme-text-muted" style="font-size: 0.78rem;">
+                    Automatically sweep SL (12–25 pts), Risk-Reward (1.8–2.5x), Trailing SL (1.2R), and Retest Layering over historical ticks in Go RAM with zero disk bottlenecks.
+                </small>
+            </div>
+        </div>
+
+        <form hx-post="{% url 'backtest:backtest_trigger_optimizer' backtest.pk %}" 
+              hx-target="#backtest-optimizer-widget" 
+              hx-swap="outerHTML"
+              hx-disabled-elt="#btnStartOptimizer"
+              class="m-0 flex-shrink-0">
+            {% csrf_token %}
+            <button type="submit" 
+                    id="btnStartOptimizer"
+                    class="btn btn-warning rounded-pill px-4 py-2 fw-bold text-dark d-inline-flex align-items-center gap-2 shadow"
+                    style="font-size: 0.85rem; transition: transform 0.15s ease;">
+                <span class="material-icons" style="font-size: 1.15rem;">bolt</span>
+                <span>Run Strategy Optimizer</span>
+            </button>
+        </form>
+    </div>
+    {% endif %}
+
+    <script>
+    function toggleOptimizerWidgetBody() {
+        var body = document.getElementById('optimizer-widget-body');
+        var icon = document.getElementById('iconToggleOptimizerWidget');
+        var headerRow = document.getElementById('optimizer-header-row');
+        if (!body || !icon) return;
+
+        var isHidden = body.classList.contains('d-none');
+        if (isHidden) {
+            body.classList.remove('d-none');
+            icon.textContent = 'expand_less';
+            if (headerRow) {
+                headerRow.classList.add('mb-3.5', 'pb-3', 'border-bottom');
+                headerRow.classList.remove('mb-0', 'pb-0', 'border-bottom-0');
+            }
+            try { localStorage.setItem('marmot_optimizer_widget_collapsed', 'false'); } catch (e) {}
+        } else {
+            body.classList.add('d-none');
+            icon.textContent = 'expand_more';
+            if (headerRow) {
+                headerRow.classList.remove('mb-3.5', 'pb-3', 'border-bottom');
+                headerRow.classList.add('mb-0', 'pb-0', 'border-bottom-0');
+            }
+            try { localStorage.setItem('marmot_optimizer_widget_collapsed', 'true'); } catch (e) {}
+        }
+    }
+
+    (function initOptimizerWidgetState() {
+        try {
+            if (localStorage.getItem('marmot_optimizer_widget_collapsed') === 'true') {
+                var body = document.getElementById('optimizer-widget-body');
+                var icon = document.getElementById('iconToggleOptimizerWidget');
+                var headerRow = document.getElementById('optimizer-header-row');
+                if (body && icon) {
+                    body.classList.add('d-none');
+                    icon.textContent = 'expand_more';
+                    if (headerRow) {
+                        headerRow.classList.remove('mb-3.5', 'pb-3', 'border-bottom');
+                        headerRow.classList.add('mb-0', 'pb-0', 'border-bottom-0');
+                    }
+                }
+            }
+        } catch (e) {}
+    })();
+
+    function toggleOptimizerMethodology() {
+        var drawer = document.getElementById('optimizerMethodologyDrawer');
+        if (drawer) {
+            drawer.classList.toggle('d-none');
+        }
+    }
+
+    function toggleOptimizerPermutations() {
+        var expandedBody = document.getElementById('optimizer-candidates-expanded');
+        var btnText = document.getElementById('textTogglePermutations');
+        var btnIcon = document.getElementById('iconTogglePermutations');
+        if (!expandedBody) return;
+
+        if (expandedBody.classList.contains('d-none')) {
+            expandedBody.classList.remove('d-none');
+            if (btnText) btnText.textContent = 'Collapse to Top 5 Leaderboard';
+            if (btnIcon) btnIcon.textContent = 'unfold_less';
+        } else {
+            expandedBody.classList.add('d-none');
+            if (btnText) btnText.textContent = 'Show All {{ candidates|length }} Permutations (Expand)';
+            if (btnIcon) btnIcon.textContent = 'unfold_more';
+        }
+    }
+    </script>
+</div>

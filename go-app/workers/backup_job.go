@@ -212,14 +212,71 @@ func (j *BackupJob) Run(ctx context.Context) {
 	// Clean up staging directory after successful consolidation
 	_ = os.RemoveAll(stagingDir)
 
+	// ── STEP 4: Structure into Unified Multi-Folder Bundle (index/, vix/, macro/) ──
+	indexDir := filepath.Join(backupTaskDir, "index")
+	_ = os.MkdirAll(indexDir, 0755)
+	indexDatasetFile := filepath.Join(indexDir, "dataset.parquet")
+	_ = copyFile(finalDatasetFile, indexDatasetFile)
+
+	hasVIX := false
+	if params.IncludeVIX && !strings.EqualFold(indexName, "INDIAVIX") {
+		log.Printf("📊 [Task #%s] Bundling co-located India VIX Volatility ticks into vix/ subfolder...", taskID)
+		vixStagingDir := filepath.Join(backupTaskDir, "staging_vix")
+		_ = os.MkdirAll(vixStagingDir, 0755)
+		vixFiles, _, vixErr := j.downloadIndexSpot(ctx, taskID, vixStagingDir, "INDIAVIX", startDate, endDate, false, fyersAppID, fyersAccessToken, false, params.Use30Days5s)
+		if vixErr == nil && len(vixFiles) > 0 {
+			vixDir := filepath.Join(backupTaskDir, "vix")
+			_ = os.MkdirAll(vixDir, 0755)
+			finalVixFile := filepath.Join(vixDir, "vix.parquet")
+			_, _, mergeVixErr := services.MergeParquetFilesWithProgress(finalVixFile, vixFiles, nil)
+			if mergeVixErr == nil {
+				hasVIX = true
+				_ = copyFile(finalVixFile, filepath.Join(backupTaskDir, "vix.parquet"))
+				log.Printf("✅ [Task #%s] Co-located India VIX Volatility subfolder bundled: %s", taskID, finalVixFile)
+			}
+		}
+		_ = os.RemoveAll(vixStagingDir)
+	}
+
+	hasMacro := false
+	macroDir := filepath.Join(backupTaskDir, "macro")
+	macroFiles, _ := filepath.Glob(filepath.Join(backupTaskDir, "*macro*.parquet"))
+	if len(macroFiles) > 0 {
+		_ = os.MkdirAll(macroDir, 0755)
+		_ = copyFile(macroFiles[0], filepath.Join(macroDir, "macro.parquet"))
+		hasMacro = true
+		log.Printf("🧠 [Task #%s] Co-located Gemini AI Macro subfolder bundled: %s", taskID, filepath.Join(macroDir, "macro.parquet"))
+	}
+
+	// Write metadata.json manifest
+	manifest := map[string]interface{}{
+		"task_id":      taskID,
+		"index_name":   indexName,
+		"start_date":   startDate,
+		"end_date":     endDate,
+		"strike_count": strikeCount,
+		"has_vix":      hasVIX,
+		"has_macro":    hasMacro,
+		"total_rows":   totalRows,
+		"file_size_mb": fileSizeMB,
+		"updated_at":   time.Now().UTC().Format(time.RFC3339),
+	}
+	if manifestBytes, mErr := json.MarshalIndent(manifest, "", "  "); mErr == nil {
+		_ = os.WriteFile(filepath.Join(backupTaskDir, "metadata.json"), manifestBytes, 0644)
+	}
+
+	if j.dbService != nil {
+		_ = j.dbService.UpdateTaskBundleFlags(ctx, taskID, hasVIX, hasMacro)
+	}
+
 	if err := j.dbService.MarkTaskComplete(ctx, taskID, finalDatasetFile, fileSizeMB); err != nil {
 		log.Printf("❌ [Task #%s] Failed to mark completion in DB: %v\n", taskID, err)
 		j.broadcastProgress(ctx, taskID, 0, "error", fileSizeMB, finalDatasetFile)
 		return
 	}
 
-	log.Printf("✅ [Task #%s] Unified Single-File Parquet Backup Complete! Saved: %s (%.2f MB, %d total records)\n",
-		taskID, finalDatasetFile, fileSizeMB, totalRows)
+	log.Printf("✅ [Task #%s] Unified Single-File Parquet Backup Complete! Saved: %s (%.2f MB, %d total records | VIX: %v, Macro: %v)\n",
+		taskID, finalDatasetFile, fileSizeMB, totalRows, hasVIX, hasMacro)
 	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, finalDatasetFile)
 }
 
@@ -1210,4 +1267,22 @@ func spotNearExpiry(spotMap map[int64]float64, expiry time.Time) float64 {
 		}
 	}
 	return best
+}
+
+// copyFile copies a single file from src to dst path
+func copyFile(src, dst string) error {
+	in, err := os.Open(src)
+	if err != nil {
+		return err
+	}
+	defer in.Close()
+
+	out, err := os.Create(dst)
+	if err != nil {
+		return err
+	}
+	defer out.Close()
+
+	_, err = io.Copy(out, in)
+	return err
 }

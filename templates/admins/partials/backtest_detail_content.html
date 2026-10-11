@@ -193,23 +193,40 @@
         </div>
     </div>
     <div class="page-header-actions d-flex align-items-center gap-2 flex-wrap">
+        <!-- Quant AI Intelligence Tools -->
         <button type="button" 
                 hx-get="{% url 'backtest:backtest_ai_audit' backtest.pk %}" 
                 hx-target="#backtest-ai-audit-section" 
                 hx-swap="innerHTML" 
                 hx-indicator="#aiAuditHeaderSpinner"
-                class="btn rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 fw-bold text-white" 
-                style="background: linear-gradient(135deg, #0ea5e9 0%, #3b82f6 100%); border: 1px solid rgba(56, 189, 248, 0.4); font-size: 0.825rem;"
+                class="btn rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 fw-semibold" 
+                style="font-size: 0.825rem; border: 1px solid rgba(14, 165, 233, 0.4); background: rgba(14, 165, 233, 0.08); color: #38bdf8;"
                 title="Run Vectorized Trade Action Engine & AI Strategy Audit">
-            <span id="aiAuditHeaderSpinner" class="spinner-border spinner-border-sm text-white htmx-indicator" role="status" style="width: 0.80rem; height: 0.80rem;"></span>
+            <span id="aiAuditHeaderSpinner" class="spinner-border spinner-border-sm text-info htmx-indicator" role="status" style="width: 0.80rem; height: 0.80rem;"></span>
             <span class="material-icons" style="font-size: 1.05rem;">auto_awesome</span>
             <span>AI Strategy Audit</span>
         </button>
-        <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" class="btn btn-success text-white rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5 fw-semibold" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border-color: #059669; font-size: 0.825rem;" title="Download Executive Multi-Sheet Excel Report">
+        <button type="button" 
+                onclick="document.getElementById('backtest-optimizer-widget') ? document.getElementById('backtest-optimizer-widget').scrollIntoView({behavior: 'smooth'}) : null" 
+                class="btn rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 fw-semibold" 
+                style="font-size: 0.825rem; border: 1px solid rgba(245, 158, 11, 0.45); background: rgba(245, 158, 11, 0.10); color: #F59E0B;" 
+                title="Jump to Strategy Hyperparameter Optimizer">
+            <span class="material-icons" style="font-size: 1.05rem;">offline_bolt</span>
+            <span>Strategy Optimizer</span>
+        </button>
+
+        <!-- Reporting & Logs -->
+        <a href="{% url 'backtest:backtest_export_excel' backtest.pk %}" 
+           class="btn rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 fw-semibold" 
+           style="font-size: 0.825rem; border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); color: #10B981;" 
+           title="Download Executive Multi-Sheet Excel Report">
             <span class="material-icons" style="font-size: 1.05rem;">file_download</span>
             <span>Download Report</span>
         </a>
-        <a href="{% url 'backtest:strategy_list' %}" class="btn btn-outline-primary rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" target="_blank" title="Strategy Hub & Parameters" style="font-size: 0.825rem;">
+        <a href="{% url 'backtest:strategy_list' %}" 
+           class="btn rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 text-light" 
+           target="_blank" title="Strategy Hub & Parameters" 
+           style="font-size: 0.825rem; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.03);">
             <span class="material-icons" style="font-size: 1.05rem;">tune</span>
             <span class="fw-medium">Strategy Hub</span>
         </a>
@@ -217,19 +234,21 @@
                 hx-get="{% url 'backtest:backtest_logs_modal' backtest.pk %}" 
                 hx-target="#globalHtmxModalDialog" 
                 hx-swap="innerHTML" 
-                class="btn btn-outline-info rounded-pill d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5 fw-semibold" 
+                class="btn rounded-pill d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5 text-light" 
                 title="View Backtest Execution Trace & Telemetry" 
-                style="font-size: 0.825rem;">
+                style="font-size: 0.825rem; border: 1px solid rgba(255, 255, 255, 0.15); background: rgba(255, 255, 255, 0.03);">
             <span class="material-icons" style="font-size: 1.05rem;">terminal</span>
             <span class="fw-medium">Execution Logs</span>
         </button>
+
+        <!-- Execution & Deployment Controls -->
         <div id="backtest-control-actions" class="d-inline-flex align-items-center gap-2">
             {% if backtest.status|lower == 'created' %}
             <button type="button" 
                     hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
                     hx-target="#globalHtmxModalDialog" 
                     hx-swap="innerHTML" 
-                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" 
                     style="font-size: 0.825rem;">
                 <span class="material-icons" style="font-size: 1.05rem;">play_arrow</span>
                 <span>Start Execution</span>
@@ -239,7 +258,7 @@
                     hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=resume" 
                     hx-target="#globalHtmxModalDialog" 
                     hx-swap="innerHTML" 
-                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    class="btn btn-success rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" 
                     style="font-size: 0.825rem;">
                 <span class="material-icons" style="font-size: 1.05rem;">play_arrow</span>
                 <span>Resume</span>
@@ -248,7 +267,7 @@
                     hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
                     hx-target="#globalHtmxModalDialog" 
                     hx-swap="innerHTML" 
-                    class="btn btn-outline-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    class="btn btn-outline-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" 
                     style="font-size: 0.825rem;">
                 <span class="material-icons" style="font-size: 1.05rem;">stop</span>
                 <span>Cancel</span>
@@ -258,7 +277,7 @@
                     hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=pause" 
                     hx-target="#globalHtmxModalDialog" 
                     hx-swap="innerHTML" 
-                    class="btn btn-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    class="btn btn-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" 
                     style="font-size: 0.825rem;">
                 <span class="material-icons" style="font-size: 1.05rem;">pause</span>
                 <span>Pause</span>
@@ -267,7 +286,7 @@
                     hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=cancel" 
                     hx-target="#globalHtmxModalDialog" 
                     hx-swap="innerHTML" 
-                    class="btn btn-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
+                    class="btn btn-danger rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" 
                     style="font-size: 0.825rem;">
                 <span class="material-icons" style="font-size: 1.05rem;">stop</span>
                 <span>Stop</span>
@@ -277,8 +296,8 @@
                     hx-get="{% url 'backtest:backtest_control' backtest.pk %}?action=start" 
                     hx-target="#globalHtmxModalDialog" 
                     hx-swap="innerHTML" 
-                    class="btn btn-outline-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3 py-1.5" 
-                    style="font-size: 0.825rem;">
+                    class="btn rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" 
+                    style="font-size: 0.825rem; border: 1px solid rgba(16, 185, 129, 0.4); background: rgba(16, 185, 129, 0.08); color: #10B981;">
                 <span class="material-icons" style="font-size: 1.05rem;">replay</span>
                 <span>Re-run Backtest</span>
             </button>
@@ -289,10 +308,10 @@
                     hx-swap="innerHTML" 
                     data-bs-toggle="modal" 
                     data-bs-target="#globalHtmxModal" 
-                    class="btn btn-outline-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3 py-1.5" 
-                    style="font-size: 0.825rem;" 
+                    class="btn text-dark fw-bold rounded-pill d-inline-flex align-items-center gap-1.5 shadow px-3.5 py-1.5" 
+                    style="font-size: 0.825rem; background: var(--brand-lime, #B4F105); box-shadow: 0 4px 18px rgba(180, 241, 5, 0.35) !important;" 
                     title="Clone configuration to isolated Live Strategy registry">
-                <span class="material-icons text-warning" style="font-size: 1.05rem;">rocket_launch</span>
+                <span class="material-icons text-dark" style="font-size: 1.05rem;">rocket_launch</span>
                 <span>Move to Execute</span>
             </button>
         </div>
@@ -348,6 +367,9 @@
     {% endif %}
 </div>
 
+<!-- Strategy Hyperparameter Optimizer Section -->
+{% include 'admins/partials/backtest_optimizer_widget.html' %}
+
 <!-- Comprehensive Strategy Configuration & Execution Parameters Card -->
 <div class="glass-card p-3 p-md-4 mb-4 position-relative overflow-hidden">
     <div class="d-flex flex-column flex-md-row align-items-start align-items-md-center justify-content-between gap-2 mb-3 pb-2 border-bottom border-secondary border-opacity-15">
@@ -359,7 +381,16 @@
                 <span class="fw-bold theme-text-main small text-uppercase tracking-wider">Strategy Configuration & Execution Parameters</span>
             </div>
         </div>
-        <div>
+        <div class="d-flex align-items-center gap-2">
+            <button type="button" 
+                    hx-get="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    class="btn btn-outline-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
+                    onclick="setTimeout(function(){ var b = document.getElementById('btnFindBestConfig'); if(b) b.click(); }, 350)">
+                <span class="material-icons text-warning" style="font-size: 1.1rem;">auto_awesome</span>
+                <span>⚡ Find Best Config</span>
+            </button>
             <button type="button" 
                     hx-get="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
                     hx-target="#globalHtmxModalDialog"
@@ -2281,6 +2312,11 @@
 
     function applyBacktestProgressUpdate(data) {
         if (!data) return;
+        if (data.type === 'optimizer_progress' || data.type === 'optimizer_completed') {
+            handleOptimizerWsUpdate(data);
+            return;
+        }
+
         const progress = data.progress !== undefined ? data.progress : 0;
         const status = data.status || '';
         const stepInfo = data.step_info || '';
@@ -2409,145 +2445,48 @@
             window.location.reload();
         }
     });
-})();
-</script>
+    function handleOptimizerWsUpdate(data) {
+        if (!data || String(data.task_id) !== String(taskId)) return;
+        if (data.type === 'optimizer_progress') {
+            const progressBar = document.getElementById('optimizer-live-progress-bar');
+            const pctBadge = document.getElementById('optimizer-live-pct');
+            const stepInfo = document.getElementById('optimizer-live-step');
+            const runningPanel = document.getElementById('optimizer-running-panel');
 
-<!-- Real-Time WebSocket Progress Updates & Auto-Reload for RL Backtest Engine -->
-<script>
-(function() {
-    const taskId = "{{ backtest.id }}";
-    const taskStatus = "{{ backtest.status }}";
-    let isFinished = (taskStatus === 'completed' || taskStatus === 'error' || taskStatus === 'cancelled');
-
-    function applyBacktestProgressUpdate(data) {
-        if (!data) return;
-        const progress = data.progress !== undefined ? data.progress : 0;
-        const status = data.status || '';
-        const stepInfo = data.step_info || '';
-        const tradesCount = data.total_trades !== undefined ? data.total_trades : null;
-        const netPnL = data.net_pnl !== undefined ? data.net_pnl : null;
-
-        if (status === 'running' || status === 'pending' || (progress > 0 && progress < 100)) {
-            isFinished = false;
-        }
-
-        const liveCard = document.getElementById('backtest-live-progress-card');
-        const progressBar = document.getElementById('backtest-live-progress-bar') || document.getElementById('backtest-progress-bar');
-        const progressPercent = document.getElementById('backtest-live-progress-pct') || document.getElementById('backtest-progress-percent');
-        const stepStatus = document.getElementById('backtest-step-status');
-        const liveTrades = document.getElementById('backtest-live-trades');
-        const livePnL = document.getElementById('backtest-live-pnl');
-
-        if (liveCard && (status === 'running' || status === 'pending' || (progress > 0 && progress < 100))) {
-            liveCard.classList.remove('d-none');
-        }
-
-        if (progressBar) {
-            progressBar.style.width = Math.max(5, progress) + '%';
-            progressBar.setAttribute('aria-valuenow', progress);
-            if (status === 'running') {
-                progressBar.classList.add('progress-bar-animated');
-            } else {
-                progressBar.classList.remove('progress-bar-animated');
-            }
-        }
-        if (progressPercent) {
-            progressPercent.textContent = progress + '%';
-        }
-        if (stepStatus && stepInfo) {
-            stepStatus.textContent = stepInfo;
-        }
-        if (liveTrades && tradesCount !== null) {
-            liveTrades.textContent = tradesCount;
-        }
-        if (livePnL && netPnL !== null) {
-            const formatted = (netPnL >= 0 ? '+₹' : '₹') + Number(netPnL).toLocaleString('en-IN', {minimumFractionDigits: 2, maximumFractionDigits: 2});
-            livePnL.textContent = formatted;
-            livePnL.className = 'fw-bold font-monospace ' + (netPnL >= 0 ? 'text-success' : 'text-danger');
-        }
-
-        if ((progress >= 100 || status === 'completed' || status === 'error') && !isFinished) {
-            isFinished = true;
-
-            const actionsContainer = document.getElementById('backtest-control-actions');
-            if (actionsContainer) {
-                actionsContainer.innerHTML = `<button type="button" 
-                        hx-get="/backtest/${taskId}/control/?action=start" 
-                        hx-target="#globalHtmxModalDialog" 
-                        hx-swap="innerHTML" 
-                        class="btn btn-outline-success rounded-pill fw-semibold d-inline-flex align-items-center gap-2 px-3 shadow-sm">
-                    <span class="material-icons fs-5">replay</span>
-                    <span>Re-run Backtest</span>
-                </button>`;
-                if (window.htmx) {
-                    window.htmx.process(actionsContainer);
-                }
-            }
-
-            const badgeContainer = document.getElementById('backtest-status-badge-container');
-            if (badgeContainer) {
-                badgeContainer.innerHTML = status === 'error' 
-                    ? '<span class="badge bg-danger bg-opacity-25 text-danger border border-danger border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Failed</span>'
-                    : '<span class="badge bg-success bg-opacity-25 text-success border border-success border-opacity-25 rounded-pill px-2.5 py-1 fs-6">● Completed</span>';
-            }
-
-            if (stepStatus) {
-                stepStatus.textContent = '✨ Backtest Execution Completed! Rendering full trade analytics...';
-                stepStatus.className = 'mt-2 text-success font-monospace fw-semibold';
-            }
-
-            setTimeout(function() {
-                const container = document.getElementById('backtest-detail-container') || document.getElementById('mainContentBody');
-                if (container && window.htmx) {
-                    window.htmx.ajax('GET', window.location.pathname + window.location.search, {
-                        target: container.id === 'backtest-detail-container' ? '#backtest-detail-container' : '#mainContentBody',
-                        swap: 'innerHTML'
+            if (!runningPanel) {
+                const widget = document.getElementById('backtest-optimizer-widget');
+                if (widget && window.htmx) {
+                    window.htmx.ajax('GET', '/backtest/' + taskId + '/optimizer-widget/', {
+                        target: '#backtest-optimizer-widget',
+                        swap: 'outerHTML'
                     });
-                } else {
-                    window.location.reload();
                 }
-            }, 600);
-        }
-    }
-
-    if (window.MarmotWS) {
-        window.MarmotWS.unsubscribe(taskId);
-        window.MarmotWS.subscribe(taskId, applyBacktestProgressUpdate);
-    }
-
-    if (!isFinished || taskStatus === 'running' || taskStatus === 'pending') {
-        const pollTimer = setInterval(function() {
-            if (isFinished) {
-                clearInterval(pollTimer);
-                return;
             }
-            fetch('/backtest/' + taskId + '/status/', {
-                headers: { 'X-Requested-With': 'XMLHttpRequest' }
-            })
-            .then(function(res) { return res.ok ? res.json() : null; })
-            .then(function(data) {
-                if (data) {
-                    applyBacktestProgressUpdate(data);
-                    if (data.status === 'completed' || data.status === 'error' || data.status === 'cancelled') {
-                        clearInterval(pollTimer);
-                    }
-                }
-            })
-            .catch(function(e) {});
-        }, 1200);
+
+            if (progressBar) {
+                progressBar.style.width = Math.max(5, data.progress) + '%';
+                progressBar.setAttribute('aria-valuenow', data.progress);
+            }
+            if (pctBadge) {
+                pctBadge.textContent = data.progress + '%';
+            }
+            if (stepInfo && data.step_info) {
+                stepInfo.textContent = data.step_info;
+            }
+        } else if (data.type === 'optimizer_completed') {
+            const widget = document.getElementById('backtest-optimizer-widget');
+            if (widget && window.htmx) {
+                window.htmx.ajax('GET', '/backtest/' + taskId + '/optimizer-widget/', {
+                    target: '#backtest-optimizer-widget',
+                    swap: 'outerHTML'
+                });
+            }
+        }
     }
 
-    document.body.addEventListener('reloadBacktestDetail', function() {
-        isFinished = false;
-        const container = document.getElementById('backtest-detail-container') || document.getElementById('mainContentBody');
-        if (container && window.htmx) {
-            window.htmx.ajax('GET', window.location.pathname + window.location.search, {
-                target: container.id === 'backtest-detail-container' ? '#backtest-detail-container' : '#mainContentBody',
-                swap: 'innerHTML'
-            });
-        } else {
-            window.location.reload();
-        }
-    });
+    window.addEventListener('marmot:optimizer_progress', function(e) { handleOptimizerWsUpdate(e.detail); });
+    window.addEventListener('marmot:optimizer_completed', function(e) { handleOptimizerWsUpdate(e.detail); });
 })();
 </script>
+
+

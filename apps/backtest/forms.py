@@ -45,9 +45,11 @@ class IndexBacktestTaskForm(forms.ModelForm):
     risk_reward_ratio = forms.FloatField(initial=2.0, required=False, help_text="Risk to Reward Ratio (e.g. 2.0)")
     stop_loss_points = forms.FloatField(initial=30.0, required=False, help_text="Stop Loss in Index/Option Points (e.g. 30 pts)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_stop_loss_points', 'step': '0.5'}))
     lots_count = forms.IntegerField(initial=1, min_value=1, required=False, help_text="Number of option lots (e.g. 1, 2, 5)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'min': '1'}))
+    use_vix_assist = forms.BooleanField(required=False, initial=False, label="India VIX Volatility Filter", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_index_use_vix_assist', 'role': 'switch'}))
+    use_macro_assist = forms.BooleanField(required=False, initial=False, label="Gemini AI Macro Regime Filter", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_index_use_macro_assist', 'role': 'switch'}))
     class Meta:
         model = BacktestTask
-        fields = ['market_type', 'backup_task', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital']
+        fields = ['market_type', 'backup_task', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'use_vix_assist', 'use_macro_assist']
         widgets = {
             'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_strategy_name'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_index_index_name'}),
@@ -82,9 +84,10 @@ class ForexBacktestTaskForm(forms.ModelForm):
     risk_reward_ratio = forms.FloatField(initial=2.0, required=False, help_text="Risk to Reward Ratio (e.g. 2.0)")
     stop_loss_points = forms.FloatField(initial=25.0, required=False, help_text="Stop Loss in Pips or Ticks (e.g. 25 pips)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_stop_loss_points', 'step': '0.1'}))
     lots_count = forms.IntegerField(initial=1, min_value=1, required=False, help_text="Number of CME Micro Contracts / Lots (e.g. 1, 2, 5)", widget=forms.NumberInput(attrs={'class': 'form-control bg-transparent theme-text-main border-secondary border-opacity-25', 'min': '1'}))
+    use_macro_assist = forms.BooleanField(required=False, initial=False, label="Gemini AI Macro Regime Filter", widget=forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_forex_use_macro_assist', 'role': 'switch'}))
     class Meta:
         model = BacktestTask
-        fields = ['market_type', 'backup_task', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital']
+        fields = ['market_type', 'backup_task', 'strategy_name', 'index_name', 'start_date', 'end_date', 'initial_capital', 'use_macro_assist']
         widgets = {
             'strategy_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_strategy_name'}),
             'index_name': forms.Select(attrs={'class': 'form-select bg-transparent theme-text-main border-secondary border-opacity-25', 'id': 'id_forex_index_name'}),

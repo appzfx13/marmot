@@ -28,6 +28,9 @@ type TaskParams struct {
 	EmaMax          int                    `json:"ema_max,omitempty"`
 	Use30Days1s      bool                   `json:"use_30_days_1s"`
 	Use30Days5s      bool                   `json:"use_30_days_5s"`
+	IncludeVIX       bool                   `json:"include_vix"`
+	IncludeMacro     bool                   `json:"include_macro"`
+	MacroTimeframe   string                 `json:"macro_timeframe"`
 	// FYERS authentication: app_id and access_token injected by Django
 	FyersAppID       string                 `json:"fyers_app_id"`
 	FyersAccessToken string                 `json:"fyers_access_token"`
@@ -59,6 +62,10 @@ type MarketBackupTask struct {
 	ExchangeSegment string    `db:"exchange_segment" json:"exchange_segment"`
 	Instrument      string    `db:"instrument" json:"instrument"`
 	StrikeCount     int       `db:"strike_count" json:"strike_count"`
+	IncludeVIX      bool      `db:"include_vix" json:"include_vix"`
+	IncludeMacro    bool      `db:"include_macro" json:"include_macro"`
+	HasVIXData      bool      `db:"has_vix_data" json:"has_vix_data"`
+	HasMacroData    bool      `db:"has_macro_data" json:"has_macro_data"`
 	Status          string    `db:"status" json:"status"`
 	Progress        int       `db:"progress" json:"progress"`
 	ParquetFilePath string    `db:"parquet_file_path" json:"parquet_file_path"`
