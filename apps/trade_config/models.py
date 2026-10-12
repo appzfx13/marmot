@@ -60,6 +60,20 @@ class UserTradingAccount(BaseModel):
     def __str__(self):
         return f"{self.account_name} [{self.broker.name}] - @{self.user.username} ({self.account_type})"
 
+    @property
+    def available_funds(self):
+        """Return formatted available funds string from account summary or broker details."""
+        summary = self.account_summary or {}
+        val = summary.get('cash') or summary.get('available_margin') or summary.get('balance')
+        if val is None and isinstance(summary.get('details'), dict):
+            val = summary['details'].get('availabelBalance') or summary['details'].get('availableBalance')
+        if val is None:
+            val = summary.get('initial_capital', '0.00')
+        try:
+            return f"{float(str(val).replace(',', '')):,.2f}"
+        except Exception:
+            return str(val)
+
 
 # --- Trade Execution Configuration ---
 class TradeExecConfig(BaseModel):
