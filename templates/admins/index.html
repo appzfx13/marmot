@@ -1777,17 +1777,8 @@
                             class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-sandbox-dashboard' or request.resolver_match.url_name == 'admin-live-mock-dashboard' or '/admins/dashboard/sandbox/' in request.path or '/admins/dashboard/live-mock/' in request.path %}active{% endif %}"
                             id="admin-menu-sandbox-dashboard" hx-get="{% url 'admins:admin-sandbox-dashboard' %}"
                             hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
-                            <i class="bi bi-cpu text-info"></i>
-                            <span>Sandbox Dashboard</span>
-                        </a>
-                    </li>
-                    <li class="sidebar-menu-item">
-                        <a href="{% url 'admins:admin-gateway-emulator' %}"
-                            class="sidebar-menu-link {% if request.resolver_match.url_name == 'admin-gateway-emulator' %}active{% endif %}"
-                            id="admin-menu-gateway-emulator" hx-get="{% url 'admins:admin-gateway-emulator' %}"
-                            hx-target="#app-main-container" hx-swap="innerHTML" hx-push-url="true">
-                            <i class="bi bi-motherboard-fill text-warning"></i>
-                            <span>Mock Broker</span>
+                            <i class="bi bi-shield-check text-info"></i>
+                            <span>Sandbox Terminal</span>
                         </a>
                     </li>
                     <li class="sidebar-menu-item">
@@ -2414,6 +2405,13 @@
             }
         });
 
+        document.body.addEventListener('refreshLiveDashboard', function () {
+            var mainEl = document.getElementById('app-main-container');
+            if (mainEl && window.htmx && (window.location.pathname.includes('/dashboard/') || window.location.pathname.includes('/sandbox/'))) {
+                window.htmx.ajax('GET', window.location.pathname, {target: '#app-main-container', swap: 'innerHTML'});
+            }
+        });
+
         // ── Global showToast handler ──────────────────────────────────────────
         document.body.addEventListener('showToast', function (evt) {
             var msg = (evt.detail && evt.detail.message) ? evt.detail.message : 'Operation completed.';
@@ -2665,10 +2663,19 @@
             window.isLiveMockActive = function () {
                 const path = window.location.pathname || '';
                 const search = window.location.search || '';
-                if (path.includes('/dashboard/live-mock/') || path.includes('/dashboard/sandbox/') || path.includes('/sandbox/') || path.includes('/gateway-emulator/') || path.includes('/emulator/') || search.toUpperCase().includes('ENV=MOCK')) return true;
+                if (path.includes('/dashboard/live-mock/') || path.includes('/gateway-emulator/') || path.includes('/emulator/') || search.toUpperCase().includes('ENV=MOCK')) return true;
                 if (document.getElementById('mockEnvInput') || document.querySelector('[data-env-mode="MOCK"]')) return true;
                 const headerTitle = document.querySelector('.page-title');
-                if (headerTitle && (headerTitle.textContent.toLowerCase().includes('mock') || headerTitle.textContent.toLowerCase().includes('emulator') || headerTitle.textContent.toLowerCase().includes('sandbox'))) return true;
+                if (headerTitle && (headerTitle.textContent.toLowerCase().includes('mock') || headerTitle.textContent.toLowerCase().includes('emulator')) && !headerTitle.textContent.toLowerCase().includes('algo terminal')) return true;
+                return false;
+            };
+
+            window.isSandboxLiveFeedActive = function () {
+                const path = window.location.pathname || '';
+                if (path.includes('/dashboard/sandbox/') || path.includes('/sandbox/')) return true;
+                if (document.querySelector('[data-env-mode="SANDBOX"]')) return true;
+                const headerTitle = document.querySelector('.page-title');
+                if (headerTitle && headerTitle.textContent.toLowerCase().includes('algo terminal')) return true;
                 return false;
             };
 
@@ -4142,8 +4149,23 @@
                 }, interval);
             }
 
-            // Disconnect emulator WebSocket when navigating away to Live Dashboard in HTMX SPA
+            // Disconnect emulator WebSocket when navigating away to Live Dashboard or Livefeed Sandbox
             document.body.addEventListener('htmx:afterSwap', function () {
+                if (window.isSandboxLiveFeedActive && window.isSandboxLiveFeedActive()) {
+                    if (window._DhanEmulatorWS) {
+                        try { window._DhanEmulatorWS.close(); } catch (e) { }
+                        window._DhanEmulatorWS = null;
+                    }
+                    if (_reconnectTimer) {
+                        clearTimeout(_reconnectTimer);
+                        _reconnectTimer = null;
+                    }
+                    if (ocTimer) {
+                        clearInterval(ocTimer);
+                        ocTimer = null;
+                    }
+                    return;
+                }
                 if (window.isLiveMockActive && !window.isLiveMockActive()) {
                     if (window._DhanEmulatorWS) {
                         try { window._DhanEmulatorWS.close(); } catch (e) { }

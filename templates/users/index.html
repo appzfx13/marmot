@@ -2247,6 +2247,13 @@
             }
         });
 
+        document.body.addEventListener('refreshLiveDashboard', function () {
+            var mainEl = document.getElementById('app-main-container');
+            if (mainEl && window.htmx && (window.location.pathname.includes('/dashboard/') || window.location.pathname.includes('/sandbox/'))) {
+                window.htmx.ajax('GET', window.location.pathname, {target: '#app-main-container', swap: 'innerHTML'});
+            }
+        });
+
         // Global Toast Notification handler
         document.body.addEventListener('showToast', function (evt) {
             var msg = (evt.detail && evt.detail.message) ? evt.detail.message : 'Operation completed.';

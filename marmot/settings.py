@@ -219,9 +219,14 @@ DHAN_API_KEY = os.getenv('DHAN_API_KEY')
 DHAN_API_SECRET = os.getenv('DHAN_API_SECRET')
 DHAN_ACCESS_TOKEN = os.getenv('DHAN_ACCESS_TOKEN')
 DHAN_LIVE_BASE_URL = os.getenv('DHAN_LIVE_BASE_URL', 'https://api.dhan.co/v2')
-DHAN_MOCK_BASE_URL = os.getenv('DHAN_MOCK_BASE_URL', 'http://mock_broker:8088/mock/v2')
+DHAN_MOCK_BASE_URL = os.getenv('DHAN_MOCK_BASE_URL', 'http://127.0.0.1:8088/mock/v2')
 DHAN_API_BASE_URL = os.getenv('DHAN_API_BASE_URL', DHAN_LIVE_BASE_URL)
 DHAN_EMULATOR_ENABLED = os.getenv('DHAN_EMULATOR_ENABLED', 'false').lower() in ('true', '1')
+
+# External Sandbox Simulation Broker (Hosted on separate server)
+SANDBOX_BROKER_CLIENT_ID = os.getenv('SANDBOX_BROKER_CLIENT_ID', '1000000001')
+SANDBOX_BROKER_ACCESS_TOKEN = os.getenv('SANDBOX_BROKER_ACCESS_TOKEN', 'sandbox-simulation-token')
+SANDBOX_BROKER_BASE_URL = os.getenv('SANDBOX_BROKER_BASE_URL', 'http://127.0.0.1:8088/mock/v2')
 
 # OpenAlgo Integration
 OPENALGO_API_KEY = os.getenv('OPENALGO_API_KEY')

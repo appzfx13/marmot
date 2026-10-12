@@ -9,6 +9,7 @@ import (
 	"math"
 	"math/rand"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -76,23 +77,67 @@ func isRealLiveMode(mode string) bool {
 	return strings.EqualFold(mode, "REAL_LIVE") || strings.EqualFold(mode, "PRODUCTION")
 }
 
-// getActiveMockAccountID queries the active mock broker account ID dynamically.
+// getSandboxBrokerCredentials resolves external Sandbox Broker URL, Client ID, and Token dynamically.
+func (j *StrategySignalJob) getSandboxBrokerCredentials(ctx context.Context) (string, string, string) {
+	baseURL := os.Getenv("SANDBOX_BROKER_BASE_URL")
+	if baseURL == "" && j.config != nil && j.config.SandboxBrokerBaseURL != "" {
+		baseURL = j.config.SandboxBrokerBaseURL
+	}
+	if baseURL == "" {
+		baseURL = "http://127.0.0.1:8088/mock/v2"
+	}
+	clientID := os.Getenv("SANDBOX_BROKER_CLIENT_ID")
+	if clientID == "" && j.config != nil && j.config.SandboxBrokerClientID != "" {
+		clientID = j.config.SandboxBrokerClientID
+	}
+	if clientID == "" {
+		clientID = "SANDBOX_USER_01"
+	}
+	token := os.Getenv("SANDBOX_BROKER_ACCESS_TOKEN")
+	if token == "" && j.config != nil && j.config.SandboxBrokerToken != "" {
+		token = j.config.SandboxBrokerToken
+	}
+	if token == "" {
+		token = "SANDBOX_TOKEN_SECRET"
+	}
+
+	if j.redisService != nil && j.redisService.Client != nil {
+		if u, err := j.redisService.Client.Get(ctx, "marmot:sandbox:base_url").Result(); err == nil && u != "" {
+			baseURL = u
+		}
+		if c, err := j.redisService.Client.Get(ctx, "marmot:sandbox:client_id").Result(); err == nil && c != "" {
+			clientID = c
+		}
+		if t, err := j.redisService.Client.Get(ctx, "marmot:sandbox:access_token").Result(); err == nil && t != "" {
+			token = t
+		}
+	}
+	return baseURL, clientID, token
+}
+
+// getActiveMockAccountID queries the active mock broker account ID dynamically from the configured Sandbox broker.
 func (j *StrategySignalJob) getActiveMockAccountID() string {
+	baseURL, clientID, token := j.getSandboxBrokerCredentials(context.Background())
 	client := &http.Client{Timeout: 800 * time.Millisecond}
-	resp, err := client.Get("http://mock_broker:8088/mock/v2/active-account")
-	if err == nil && resp.StatusCode == http.StatusOK {
-		defer resp.Body.Close()
-		var res map[string]interface{}
-		if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
-			if accID, ok := res["active_account_id"].(string); ok && accID != "" {
-				return accID
-			}
-			if accID, ok := res["accountId"].(string); ok && accID != "" {
-				return accID
+	req, err := http.NewRequest("GET", strings.TrimRight(baseURL, "/")+"/active-account", nil)
+	if err == nil {
+		req.Header.Set("client-id", clientID)
+		req.Header.Set("access-token", token)
+		resp, err := client.Do(req)
+		if err == nil && resp.StatusCode == http.StatusOK {
+			defer resp.Body.Close()
+			var res map[string]interface{}
+			if err := json.NewDecoder(resp.Body).Decode(&res); err == nil {
+				if accID, ok := res["active_account_id"].(string); ok && accID != "" {
+					return accID
+				}
+				if accID, ok := res["accountId"].(string); ok && accID != "" {
+					return accID
+				}
 			}
 		}
 	}
-	return "1000000001"
+	return clientID
 }
 
 // getDhanLiveCredentials dynamically resolves active Dhan Client ID and access token from Redis cache.
@@ -206,36 +251,67 @@ func (j *StrategySignalJob) dispatchOrderToDhanLive(ctx context.Context, req Dha
 	}()
 }
 
-// dispatchOrderToMockBroker sends a synchronous order request to the Dhan mock broker via Redis.
-func (j *StrategySignalJob) dispatchOrderToMockBroker(ctx context.Context, req DhanOrderPayload) {
+// dispatchOrderToSandboxBroker sends a real REST order with client-id and access-token headers to the Sandbox broker.
+func (j *StrategySignalJob) dispatchOrderToSandboxBroker(ctx context.Context, req DhanOrderPayload, clientID string) {
 	if halted, reason := j.isTradingHaltedByGuardian(ctx, "1"); halted {
-		log.Printf("🛡️ [Account Guardian Gate] Mock Broker Order Blocked: %s (Req: %s %s)", reason, req.TransactionType, req.SecurityID)
+		log.Printf("🛡️ [Account Guardian Gate] Sandbox Broker Order Blocked: %s (Req: %s %s)", reason, req.TransactionType, req.TradingSymbol)
 		return
 	}
 
-	if req.DhanClientID == "" || req.DhanClientID == "1000000001" {
-		req.DhanClientID = j.getActiveMockAccountID()
-	}
-	bodyBytes, err := json.Marshal(req)
-	if err != nil {
-		log.Printf("⚠️ [StrategyWorker] Failed to marshal mock broker order payload: %v", err)
-		return
-	}
+	go func() {
+		baseURL, cid, token := j.getSandboxBrokerCredentials(ctx)
+		if clientID != "" {
+			cid = clientID
+		}
+		if req.DhanClientID == "" || req.DhanClientID == "1000000001" {
+			req.DhanClientID = cid
+		}
 
-	err = j.redisService.Client.XAdd(ctx, &redis.XAddArgs{
-		Stream: "marmot:mock:orders",
-		Values: map[string]interface{}{
-			"payload":           string(bodyBytes),
-			"logical_timestamp": req.LogicalTimestamp,
-		},
-	}).Err()
+		bodyBytes, err := json.Marshal(req)
+		if err != nil {
+			log.Printf("⚠️ [StrategyWorker Sandbox] Failed to marshal sandbox order payload: %v", err)
+			return
+		}
 
-	if err != nil {
-		log.Printf("⚠️ [StrategyWorker] Mock Broker Redis Order API dispatch failed: %v", err)
-		return
-	}
-	log.Printf("📤 [StrategyWorker] Order dispatched to Mock Broker via Redis (Acc: %s | %s %s x %d)",
-		req.DhanClientID, req.TransactionType, req.SecurityID, req.Quantity)
+		ordersURL := strings.TrimRight(baseURL, "/") + "/orders"
+		httpReq, err := http.NewRequestWithContext(ctx, "POST", ordersURL, bytes.NewBuffer(bodyBytes))
+		if err != nil {
+			log.Printf("⚠️ [StrategyWorker Sandbox] Failed to create sandbox order request: %v", err)
+			return
+		}
+
+		httpReq.Header.Set("Content-Type", "application/json")
+		httpReq.Header.Set("access-token", token)
+		httpReq.Header.Set("client-id", cid)
+
+		client := &http.Client{Timeout: 3 * time.Second}
+		startTime := time.Now()
+		resp, err := client.Do(httpReq)
+		latency := time.Since(startTime).Milliseconds()
+
+		if err != nil {
+			log.Printf("⚠️ [StrategyWorker Sandbox] Sandbox Broker API network error (%dms): %v", latency, err)
+			return
+		}
+		defer resp.Body.Close()
+
+		log.Printf("⚡ [StrategyWorker Sandbox Dispatch] Order executed via Sandbox Broker API (Acc: %s | %s %s x %d | Latency: %dms) -> HTTP %d",
+			cid, req.TransactionType, req.TradingSymbol, req.Quantity, latency, resp.StatusCode)
+
+		eventPayload, _ := json.Marshal(map[string]interface{}{
+			"type":         "order_update",
+			"broker":       "SANDBOX",
+			"order_id":     req.CorrelationID,
+			"status":       "TRADED",
+			"execution_ms": latency,
+		})
+		_ = j.redisService.Client.Publish(ctx, "marmot:orders", eventPayload).Err()
+	}()
+}
+
+// dispatchOrderToMockBroker delegates directly to dispatchOrderToSandboxBroker for full backward compatibility.
+func (j *StrategySignalJob) dispatchOrderToMockBroker(ctx context.Context, req DhanOrderPayload) {
+	j.dispatchOrderToSandboxBroker(ctx, req, "")
 }
 
 // MockBrokerPosition represents a position item returned by the Dhan mock broker.
@@ -255,10 +331,17 @@ type MockBrokerPosition struct {
 	TakeProfit       float64 `json:"takeProfit"`
 }
 
-// fetchMockBrokerPositions queries the mock broker for active and closed positions.
+// fetchMockBrokerPositions queries the sandbox broker for active and closed positions via REST API with credentials.
 func (j *StrategySignalJob) fetchMockBrokerPositions() []MockBrokerPosition {
+	baseURL, cid, token := j.getSandboxBrokerCredentials(context.Background())
 	client := &http.Client{Timeout: 1 * time.Second}
-	resp, err := client.Get("http://mock_broker:8088/mock/v2/positions")
+	req, err := http.NewRequest("GET", strings.TrimRight(baseURL, "/")+"/positions", nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("client-id", cid)
+	req.Header.Set("access-token", token)
+	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		if resp != nil {
 			resp.Body.Close()
@@ -289,9 +372,17 @@ type MockBrokerOrderResp struct {
 	} `json:"order"`
 }
 
+// fetchMockBrokerOrders queries the sandbox broker for orders via REST API with credentials.
 func (j *StrategySignalJob) fetchMockBrokerOrders() []SimulatedOrder {
+	baseURL, cid, token := j.getSandboxBrokerCredentials(context.Background())
 	client := &http.Client{Timeout: 1 * time.Second}
-	resp, err := client.Get("http://mock_broker:8088/mock/v2/orders")
+	req, err := http.NewRequest("GET", strings.TrimRight(baseURL, "/")+"/orders", nil)
+	if err != nil {
+		return nil
+	}
+	req.Header.Set("client-id", cid)
+	req.Header.Set("access-token", token)
+	resp, err := client.Do(req)
 	if err != nil || resp.StatusCode != http.StatusOK {
 		if resp != nil {
 			resp.Body.Close()
@@ -484,10 +575,20 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 	}
 
 	tickCounter := 0
-	var prevSpotPrice float64
 	var spotPrice float64
 	var latestLogicalTime time.Time
 	latestLogicalTime = nowIST()
+	var warmUpCandles []map[string]interface{}
+	var lastMinuteKey string
+	var minuteOpen, minuteHigh, minuteLow float64
+
+	if initMetrics := j.fetchSpotMetrics(ctx, indexName); initMetrics.SpotPrice > 0 {
+		spotPrice = initMetrics.SpotPrice
+		minuteOpen = spotPrice
+		minuteHigh = spotPrice
+		minuteLow = spotPrice
+		warmUpCandles = j.seedWarmUpCandles(indexName, spotPrice)
+	}
 
 	var candleSub *redis.PubSub
 	var candleChan <-chan *redis.Message
@@ -822,7 +923,13 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 
 			loopStart := time.Now()
 			tickCounter++
-			spotPrice, _ = j.fetchSpotPrice(ctx, indexName)
+			if p, _ := j.fetchSpotPrice(ctx, indexName); p > 0 {
+				spotPrice = p
+			}
+			latestLogicalTime = nowIST()
+			if spotPrice > 0 && len(warmUpCandles) == 0 && tickCounter <= 5 {
+				warmUpCandles = j.seedWarmUpCandles(indexName, spotPrice)
+			}
 
 			var realizedTotal, unrealizedTotal, marginUtilized float64
 
@@ -1130,12 +1237,14 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 				}
 			}
 
-			if isMarketOpen && tickCounter%8 == 0 {
+			if isMarketOpen && tickCounter%3 == 0 && spotPrice > 0 {
 				activeExp := j.fetchActiveExpiry(ctx, indexName)
 				if params.Params == nil {
 					params.Params = make(map[string]interface{})
 				}
 				params.Params["execution_mode"] = params.ExecutionMode
+				params.Params["strategy_name"] = strategyName
+				params.Params["rule_type"] = strategyName
 				if activeExp != "" {
 					params.Params["active_expiry"] = activeExp
 				}
@@ -1145,25 +1254,43 @@ func (j *StrategySignalJob) Run(ctx context.Context) {
 					params.Params["option_chain"] = optChain
 				}
 
-				if prevSpotPrice == 0 {
-					prevSpotPrice = spotPrice
+				currMinuteKey := latestLogicalTime.Format("2006-01-02 15:04")
+				if currMinuteKey != lastMinuteKey {
+					lastMinuteKey = currMinuteKey
+					minuteOpen = spotPrice
+					minuteHigh = spotPrice
+					minuteLow = spotPrice
+				} else {
+					if spotPrice > minuteHigh {
+						minuteHigh = spotPrice
+					}
+					if spotPrice < minuteLow || minuteLow == 0 {
+						minuteLow = spotPrice
+					}
 				}
-				barOpen := prevSpotPrice
-				barClose := spotPrice
-				barHigh := math.Max(barOpen, barClose) + 0.5
-				barLow := math.Min(barOpen, barClose) - 0.5
-				prevSpotPrice = spotPrice
+				if minuteOpen == 0 {
+					minuteOpen = spotPrice
+				}
+				if minuteHigh == 0 {
+					minuteHigh = math.Max(minuteOpen, spotPrice) + 0.5
+				}
+				if minuteLow == 0 {
+					minuteLow = math.Min(minuteOpen, spotPrice) - 0.5
+				}
 
 				candle := map[string]interface{}{
 					"datetime": latestLogicalTime.Format("2006-01-02 15:04:05"),
-					"close":    barClose,
-					"open":     barOpen,
-					"high":     barHigh,
-					"low":      barLow,
+					"close":    spotPrice,
+					"open":     minuteOpen,
+					"high":     minuteHigh,
+					"low":      minuteLow,
 					"volume":   125000,
 				}
-				sig := strat.EvaluateLiveSignal(candle, nil, indexName, params.Params)
+				sig := strat.EvaluateLiveSignal(candle, warmUpCandles, indexName, params.Params)
+				warmUpCandles = nil // clear once ingested into buffer
 				if sig != nil {
+					log.Printf("⚡ [StrategyWorker #%s] ENTRY SIGNAL FIRED: %s %s @ ₹%.2f | Reason: %s\n",
+						taskID, sig.Transaction, sig.TradingSymbol, sig.LimitPrice, sig.TriggerReason)
 					alreadyOpen := false
 					for _, pos := range positions {
 						if pos.Status == "OPEN" && pos.TradingSymbol == sig.TradingSymbol {
@@ -1456,9 +1583,10 @@ func (j *StrategySignalJob) fetchOptionLTP(ctx context.Context, indexName, tradi
 		return 0.0
 	}
 
-	// 1. In SANDBOX / MOCK mode, query local mock broker emulator directly for live advancing Parquet replay ticks
+	// 1. In SANDBOX / MOCK mode, query configured sandbox broker directly for live advancing Parquet replay ticks
 	if isMockMode(j.payload.Params.ExecutionMode) {
-		resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
+		baseURL, _, _ := j.getSandboxBrokerCredentials(ctx)
+		resp, err := http.Get(fmt.Sprintf("%s/optionchain?index=%s", strings.TrimRight(baseURL, "/"), indexName))
 		if err == nil && resp.StatusCode == http.StatusOK {
 			var ocPayload struct {
 				Strikes []map[string]interface{} `json:"strikes"`
@@ -1563,8 +1691,9 @@ func (j *StrategySignalJob) fetchOptionLTP(ctx context.Context, indexName, tradi
 		}
 	}
 
-	// 4. Fall back to mock broker emulator directly
-	resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
+	// 4. Fall back to configured sandbox broker emulator
+	baseURL, _, _ := j.getSandboxBrokerCredentials(ctx)
+	resp, err := http.Get(fmt.Sprintf("%s/optionchain?index=%s", strings.TrimRight(baseURL, "/"), indexName))
 	if err == nil && resp.StatusCode == http.StatusOK {
 		var ocPayload struct {
 			Strikes []map[string]interface{} `json:"strikes"`
@@ -1721,27 +1850,26 @@ type LiveQuoteMetrics struct {
 func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName string) LiveQuoteMetrics {
 	res := LiveQuoteMetrics{}
 
-	// 0. Primary in LIVE mode: Instant in-memory spot read from Go WebSocket engine (0.00ms, zero Redis load)
-	if !isMockMode(j.payload.Params.ExecutionMode) {
-		if tick, ok := ws.GetLatestSpot(indexName); ok && tick.SpotPrice > 0 {
-			res.SpotPrice = tick.SpotPrice
-			var high, low float64
-			_, _ = fmt.Sscanf(strings.ReplaceAll(tick.High, ",", ""), "%f", &high)
-			_, _ = fmt.Sscanf(strings.ReplaceAll(tick.Low, ",", ""), "%f", &low)
-			res.HighPrice = high
-			res.LowPrice = low
-			step := StrikeIntervalForIndex(indexName)
-			if step <= 0 {
-				step = 50
-			}
-			res.ATMStrike = int(math.Round(tick.SpotPrice/float64(step)) * float64(step))
-			return res
+	// 0. Primary in LIVE and Live-Feed Sandbox: Instant in-memory spot read from Go WebSocket engine (0.00ms, zero Redis load)
+	if tick, ok := ws.GetLatestSpot(indexName); ok && tick.SpotPrice > 0 {
+		res.SpotPrice = tick.SpotPrice
+		var high, low float64
+		_, _ = fmt.Sscanf(strings.ReplaceAll(tick.High, ",", ""), "%f", &high)
+		_, _ = fmt.Sscanf(strings.ReplaceAll(tick.Low, ",", ""), "%f", &low)
+		res.HighPrice = high
+		res.LowPrice = low
+		step := StrikeIntervalForIndex(indexName)
+		if step <= 0 {
+			step = 50
 		}
+		res.ATMStrike = int(math.Round(tick.SpotPrice/float64(step)) * float64(step))
+		return res
 	}
 
-	// 1. In SANDBOX / MOCK mode, query local mock broker emulator directly for live advancing Parquet replay spot
+	// 1. In SANDBOX / MOCK mode with active parquet replay, query configured sandbox broker
 	if isMockMode(j.payload.Params.ExecutionMode) {
-		resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
+		baseURL, _, _ := j.getSandboxBrokerCredentials(ctx)
+		resp, err := http.Get(fmt.Sprintf("%s/optionchain?index=%s", strings.TrimRight(baseURL, "/"), indexName))
 		if err == nil && resp.StatusCode == http.StatusOK {
 			var mockData map[string]interface{}
 			if jsonErr := json.NewDecoder(resp.Body).Decode(&mockData); jsonErr == nil {
@@ -1768,13 +1896,13 @@ func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName stri
 		return res
 	}
 
-	isMock := isMockMode(j.payload.Params.ExecutionMode) || !isRealLiveMode(j.payload.Params.ExecutionMode)
+	isMockReplay := false
 	if val, err := j.redisService.Client.Get(ctx, "marmot:mock_feed:active").Result(); err == nil && val == "true" {
-		isMock = true
+		isMockReplay = true
 	}
 
-	if isMock {
-		// In Mock / Sandbox mode: prioritize local mock broker emulator and mock Redis keys
+	if isMockReplay {
+		// Only prioritize mock Redis keys if mock replay feed is explicitly active
 		mockKeys := []string{
 			fmt.Sprintf("marmot:mock:option_chain:%s", indexName),
 			fmt.Sprintf("marmot:mock:last_known_option_chain:%s", indexName),
@@ -1810,32 +1938,9 @@ func (j *StrategySignalJob) fetchSpotMetrics(ctx context.Context, indexName stri
 				}
 			}
 		}
-
-		// Direct query to local mock broker emulator
-		resp, err := http.Get(fmt.Sprintf("http://mock_broker:8088/mock/v2/optionchain?index=%s", indexName))
-		if err == nil && resp.StatusCode == http.StatusOK {
-			var mockData map[string]interface{}
-			if jsonErr := json.NewDecoder(resp.Body).Decode(&mockData); jsonErr == nil {
-				resp.Body.Close()
-				if p, ok := mockData["raw_spot_ltp"].(float64); ok && p > 0 {
-					res.SpotPrice = p
-					res.OpenPrice = p
-					res.HighPrice = p
-					res.LowPrice = p
-					res.ATMStrike = int(math.Round(p/50.0) * 50.0)
-					if b, mErr := json.Marshal(mockData); mErr == nil && j.redisService != nil && j.redisService.Client != nil {
-						_ = j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:mock:option_chain:%s", indexName), b, 5*time.Minute).Err()
-						_ = j.redisService.Client.Set(ctx, fmt.Sprintf("marmot:mock:last_known_option_chain:%s", indexName), b, 24*time.Hour).Err()
-					}
-					return res
-				}
-			} else {
-				resp.Body.Close()
-			}
-		}
-		return res
 	}
 
+	// 2. Fallback to real-time FYERS Redis quote keys
 	keysToTry := []string{
 		fmt.Sprintf("marmot:fyers_quote:NSE:%s50-INDEX", indexName),
 		fmt.Sprintf("marmot:fyers_quote:NSE:%s-INDEX", indexName),
@@ -1907,6 +2012,32 @@ func (j *StrategySignalJob) fetchSpotPrice(ctx context.Context, indexName string
 		return m.SpotPrice, m.ATMStrike
 	}
 	return 0.0, 0
+}
+
+// seedWarmUpCandles generates 35 1-minute historical baseline bars leading up to current time
+// so that moving averages and MACD buffers are fully warmed up upon cold start.
+func (j *StrategySignalJob) seedWarmUpCandles(indexName string, spotPrice float64) []map[string]interface{} {
+	if spotPrice <= 0 {
+		return nil
+	}
+	now := nowIST()
+	var bars []map[string]interface{}
+	for i := 35; i >= 1; i-- {
+		t := now.Add(-time.Duration(i) * time.Minute)
+		varOffset := math.Sin(float64(i)*0.4) * 2.5
+		p := math.Round((spotPrice+varOffset)*100) / 100
+		bar := map[string]interface{}{
+			"datetime":  t.Format("2006-01-02 15:04:05"),
+			"timestamp": t.Unix(),
+			"open":      p - 0.5,
+			"high":      p + 1.5,
+			"low":       p - 1.5,
+			"close":     p,
+			"volume":    float64(50000 + i*1000),
+		}
+		bars = append(bars, bar)
+	}
+	return bars
 }
 
 // saveTelemetry packages and writes sandbox simulated portfolio state to Redis.

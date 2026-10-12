@@ -54,7 +54,11 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         mode = str(account_type or getattr(self.account, 'account_type', 'SANDBOX')).upper()
         if mode == 'LIVE':
             return getattr(settings, 'DHAN_LIVE_BASE_URL', 'https://api.dhan.co/v2').rstrip('/')
-        return getattr(settings, 'DHAN_MOCK_BASE_URL', 'http://mock_broker:8088/mock/v2').rstrip('/')
+        if getattr(self.account, 'api_base_url', None):
+            return str(self.account.api_base_url).rstrip('/')
+        if hasattr(self.account, 'broker') and getattr(self.account.broker, 'api_base_url', None):
+            return str(self.account.broker.api_base_url).rstrip('/')
+        return getattr(settings, 'SANDBOX_BROKER_BASE_URL', getattr(settings, 'DHAN_MOCK_BASE_URL', 'http://127.0.0.1:8088/mock/v2')).rstrip('/')
 
     @property
     def base_url(self) -> str:
@@ -100,31 +104,56 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         if token_to_test:
             clean_token = str(token_to_test).strip().strip('"').strip("'")
             try:
-                url = f"{self.base_url}/fundlimit"
+                base = self.base_url.rstrip('/')
+                candidate_urls = [f"{base}/fundlimit"]
+                if not base.endswith('/v2') and not base.endswith('/mock/v2'):
+                    candidate_urls.extend([f"{base}/mock/v2/fundlimit", f"{base}/v2/fundlimit"])
                 headers = {
                     "access-token": clean_token,
                     "client-id": clean_client_id,
                     "Accept": "application/json"
                 }
-                resp = requests.get(url, headers=headers, timeout=8)
-                if resp.status_code == 200:
-                    data = resp.json()
-                    avail_cash = data.get("availabelBalance", data.get("cash", "0.00"))
+                resp = None
+                for url in candidate_urls:
                     try:
-                        from apps.trade_core.services.dhan_token_service import _get_redis, _TOKEN_TTL_SECONDS
-                        _get_redis().setex(f"dhan_token:{clean_client_id}", _TOKEN_TTL_SECONDS, clean_token)
+                        resp = requests.get(url, headers=headers, timeout=5)
+                        if resp.status_code == 200:
+                            break
                     except Exception:
-                        pass
+                        continue
+
+                if resp and resp.status_code == 200:
+                    data = resp.json()
+                    avail_cash = data.get("availabelBalance", data.get("availableBalance", data.get("cash", "0.00")))
+                    broker_code = getattr(getattr(self.account, 'broker', None), 'code', 'dhan').lower()
+                    is_sandbox = (broker_code in ['sandbox', 'anvil'] or getattr(self.account, 'account_type', '') == 'SANDBOX')
+                    if is_sandbox:
+                        try:
+                            from apps.market.services import redis_client
+                            redis_client.set("marmot:sandbox:base_url", self.base_url)
+                            redis_client.set("marmot:sandbox:client_id", clean_client_id)
+                            redis_client.set("marmot:sandbox:access_token", clean_token)
+                        except Exception:
+                            pass
+                    else:
+                        try:
+                            from apps.trade_core.services.dhan_token_service import _get_redis, _TOKEN_TTL_SECONDS
+                            _get_redis().setex(f"dhan_token:{clean_client_id}", _TOKEN_TTL_SECONDS, clean_token)
+                        except Exception:
+                            pass
+                    broker_disp = 'ANVIL' if broker_code == 'anvil' else ('SANDBOX' if is_sandbox else 'Dhan')
                     return {
                         'success': True,
                         'status': 'CONNECTED',
-                        'broker': 'DHAN',
+                        'broker': broker_disp.upper(),
                         'client_id': clean_client_id,
                         'cash': avail_cash,
+                        'available_margin': avail_cash,
+                        'balance': avail_cash,
                         'details': data,
-                        'message': f"Dhan Live Connection verified successfully! Available balance: ₹{avail_cash}"
+                        'message': f"{broker_disp} Connection verified successfully! Available balance: ₹{avail_cash}"
                     }
-                elif resp.status_code == 401 and clean_app_secret:
+                elif resp and resp.status_code == 401 and clean_app_secret:
                     # If direct token failed but App Secret is provided, try Partner App Consent Flow
                     pass
                 else:

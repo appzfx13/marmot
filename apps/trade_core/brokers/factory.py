@@ -12,6 +12,7 @@ class BrokerFactory:
         'dhan': DhanBrokerAdapter,
         'fyers': FyersBrokerAdapter,
         'sandbox': DhanBrokerAdapter,
+        'anvil': DhanBrokerAdapter,
     }
 
     @classmethod

@@ -361,8 +361,10 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
     import requests
     from apps.common.constants import get_option_expiry_analysis, get_historical_lot_size
 
+    from django.conf import settings
+    sb_url = getattr(settings, 'SANDBOX_BROKER_BASE_URL', 'http://127.0.0.1:8088/mock/v2').rstrip('/')
     mock_urls = [
-        f"http://mock_broker:8088/mock/v2/optionchain?index={idx_clean}",
+        f"{sb_url}/optionchain?index={idx_clean}",
         f"http://127.0.0.1:8088/mock/v2/optionchain?index={idx_clean}",
     ]
     for url in mock_urls:
@@ -517,7 +519,7 @@ def get_mock_index_option_chain(idx_clean: str, strike_step: int, spot_symbol: s
         'india_vix': 0.0,
         'expiry_info': get_option_expiry_analysis(idx_clean, today),
         'strikes': [],
-        'error_message': 'Dhan Broker Gateway Emulator (:8088) is offline or unreachable. Verify the mock_broker container.',
+        'error_message': 'Sandbox Broker Gateway is offline or unreachable.',
         'last_updated': timezone.localtime().strftime('%I:%M:%S %p IST'),
     }
 
@@ -1170,7 +1172,9 @@ def get_live_macro_ribbon_data(selected_index: str = 'NIFTY', is_mock: bool = Fa
         raw_ltp = float(str(mock_oc.get('raw_spot_ltp') or mock_oc.get('spot_ltp') or 0.0).replace(',', '').strip() or 0.0)
         if raw_ltp <= 0:
             try:
-                resp = requests.get(f"http://mock_broker:8088/mock/v2/optionchain?index={idx_upper}", timeout=0.3)
+                from django.conf import settings
+                sb_url = getattr(settings, 'SANDBOX_BROKER_BASE_URL', 'http://127.0.0.1:8088/mock/v2').rstrip('/')
+                resp = requests.get(f"{sb_url}/optionchain?index={idx_upper}", timeout=0.3)
                 if resp.status_code == 200:
                     mock_oc = resp.json()
                     raw_ltp = float(mock_oc.get('raw_spot_ltp', 0.0) or 0.0)

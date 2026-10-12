@@ -100,6 +100,15 @@
                     </div>
                 </div>
 
+                <div class="mb-2" id="apiBaseUrlEditWrapper">
+                    <div class="d-flex justify-content-between align-items-center mb-1">
+                        <label class="form-label theme-text-muted small fw-bold mb-0">Gateway Base URL (for ANVIL / Sandbox)</label>
+                        <span class="badge bg-secondary bg-opacity-25 text-white-50 smaller" style="font-size: 0.65rem;">Configurable</span>
+                    </div>
+                    <input type="text" name="api_base_url" value="{{ account.api_base_url|default:'' }}" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25 font-monospace" placeholder="e.g. http://127.0.0.1:8088/mock/v2 or http://<IP>:8088/mock/v2">
+                    <small class="theme-text-muted smaller" style="font-size: 0.72rem;">External ANVIL Gateway URL. Leave empty to use system default.</small>
+                </div>
+
                 <div class="mb-2">
                     <div class="d-flex justify-content-between align-items-center mb-1">
                         <label class="form-label theme-text-muted small fw-bold mb-0">API Key / Access Token</label>
@@ -107,6 +116,18 @@
                     </div>
                     <input type="password" name="api_key" value="" class="form-control bg-transparent theme-text-main border-secondary border-opacity-25" placeholder="Paste new Access Token or leave blank to keep saved credentials">
                 </div>
+
+                {% if account.account_summary %}
+                <div class="p-2 rounded-3 my-2 d-flex align-items-center justify-content-between" style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25);">
+                    <div class="d-flex align-items-center gap-2">
+                        <span class="material-icons text-success fs-5">account_balance</span>
+                        <span class="small theme-text-main fw-bold">Broker Verified Balance:</span>
+                    </div>
+                    <span class="font-monospace fw-bold text-success fs-6">
+                        ₹{{ account.account_summary.cash|default:account.account_summary.availabelBalance|default:account.account_summary.availableBalance|default:account.account_summary.balance|default:"0.00" }}
+                    </span>
+                </div>
+                {% endif %}
 
                 <div class="p-2 rounded-3 mt-2 mb-2 d-flex align-items-center justify-content-between" style="background: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color);">
                     <div class="d-flex flex-column pe-2">

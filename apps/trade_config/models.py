@@ -39,6 +39,7 @@ class UserTradingAccount(BaseModel):
     broker_client_id = models.CharField(max_length=255, blank=True, null=True, help_text="Broker Client ID / User ID")
     api_key = models.TextField(blank=True, null=True, help_text="API Key / Access Token")
     app_id = models.TextField(blank=True, null=True, help_text="App ID / Secret Key")
+    api_base_url = models.URLField(max_length=255, blank=True, null=True, help_text="Custom Broker Gateway Base URL (e.g. ANVIL server)")
 
     # Account Controls & Telemetry
     is_default = models.BooleanField(default=False, help_text="Is this the default primary trading account for the user?")

@@ -1238,17 +1238,18 @@ class UserAccountCreateModalView(HtmxModalMixin, LoginRequiredMixin, View):
     template_name = 'users/partials/account_create_modal.html'
 
     def get(self, request, *args, **kwargs):
-        brokers = BrokerMaster.objects.filter(is_active=True).exclude(code='sandbox')
+        brokers = BrokerMaster.objects.filter(is_active=True).order_by('name')
         if not brokers.exists():
+            BrokerMaster.objects.get_or_create(code='anvil', defaults={'name': 'ANVIL', 'description': 'ANVIL Sandbox Broker Platform'})
             BrokerMaster.objects.get_or_create(code='dhan', defaults={'name': 'DHAN', 'description': 'Dhan Broker Platform'})
             BrokerMaster.objects.get_or_create(code='fyers', defaults={'name': 'FYERS', 'description': 'Fyers Broker Platform'})
-            brokers = BrokerMaster.objects.filter(is_active=True).exclude(code='sandbox')
+            brokers = BrokerMaster.objects.filter(is_active=True).order_by('name')
 
         return render(request, self.modal_template_name, {'brokers': brokers})
 
 
 class UserAccountCreateView(LoginRequiredMixin, View):
-    """Handle creating a new trading account with Live API Auth Hit verification."""
+    """Handle creating a new trading account with Live or ANVIL API Auth Hit verification."""
     def post(self, request, *args, **kwargs):
         user = request.user
         account_type = request.POST.get('account_type', 'LIVE').upper()
@@ -1256,27 +1257,55 @@ class UserAccountCreateView(LoginRequiredMixin, View):
 
         try:
             if account_type == 'SANDBOX':
-                account_name = request.POST.get('sandbox_account_name') or request.POST.get('account_name') or 'Sandbox Demo Account'
+                broker_id = request.POST.get('broker_id')
+                broker = BrokerMaster.objects.filter(id=broker_id, is_deleted=False).first() if broker_id else None
+                if not broker:
+                    broker = BrokerMaster.objects.filter(code='anvil', is_deleted=False).first() or BrokerMaster.objects.filter(code='sandbox', is_deleted=False).first()
+                if not broker:
+                    broker, _ = BrokerMaster.objects.get_or_create(code='anvil', defaults={'name': 'ANVIL', 'description': 'ANVIL Sandbox Broker Platform'})
+
+                account_name = request.POST.get('sandbox_account_name') or request.POST.get('account_name') or f"{broker.name} Sandbox Account"
+                client_id = str(request.POST.get('broker_client_id', '')).strip().strip('"').strip("'") or getattr(settings, 'SANDBOX_BROKER_CLIENT_ID', '1000000001')
+                api_key = str(request.POST.get('api_key', '')).strip().strip('"').strip("'") or getattr(settings, 'SANDBOX_BROKER_ACCESS_TOKEN', 'SANDBOX_TOKEN')
+                api_base_url = str(request.POST.get('api_base_url', '')).strip().strip('"').strip("'") or getattr(settings, 'SANDBOX_BROKER_BASE_URL', '')
+
                 try:
                     capital = float(request.POST.get('initial_capital', 100000))
                 except ValueError:
                     capital = 100000.0
 
-                sandbox_broker, _ = BrokerMaster.objects.get_or_create(
-                    code='sandbox',
-                    defaults={'name': 'SANDBOX', 'description': 'Paper Trading Sandbox'}
-                )
-
-                account = UserTradingAccount.objects.create(
+                candidate_account = UserTradingAccount(
                     user=user,
-                    broker=sandbox_broker,
+                    broker=broker,
                     account_name=account_name,
                     account_type='SANDBOX',
+                    broker_client_id=client_id,
+                    api_key=api_key,
+                    api_base_url=api_base_url,
                     is_default=is_default,
                     is_active=True,
-                    is_configured=True,
-                    account_summary={'initial_capital': capital, 'balance': capital}
+                    is_configured=False,
+                    account_summary={'initial_capital': capital, 'balance': capital, 'cash': str(capital)}
                 )
+
+                try:
+                    adapter = BrokerFactory.get_adapter(candidate_account)
+                    auth_res = adapter.test_connection()
+                    if auth_res.get('success') is True or auth_res.get('connected') is True:
+                        candidate_account.is_configured = True
+                        candidate_account.account_summary = auth_res
+                        msg = f"ANVIL Sandbox Account '{account_name}' connected & verified! Balance: ₹{auth_res.get('cash', capital)}"
+                        level = 'success'
+                    else:
+                        candidate_account.is_configured = False
+                        msg = f"Sandbox Account '{account_name}' saved (Broker offline: {auth_res.get('message', 'Unreachable')})"
+                        level = 'warning'
+                except Exception as ex:
+                    msg = f"Sandbox Account '{account_name}' saved (Verification skipped: {str(ex)})"
+                    level = 'warning'
+
+                candidate_account.save()
+                account = candidate_account
 
                 if is_default or not user.trading_accounts.filter(is_default=True).exists():
                     user.trading_accounts.exclude(id=account.id).update(is_default=False)
@@ -1284,9 +1313,6 @@ class UserAccountCreateView(LoginRequiredMixin, View):
                     account.save(update_fields=['is_default'])
 
                 request.session['active_account_id'] = account.id
-                msg = f"Sandbox Account '{account_name}' created with ₹{capital:,.2f} virtual capital!"
-                messages.success(request, msg)
-                level = 'success'
 
             else:
                 # LIVE Account Creation with Auth Hit
@@ -1385,12 +1411,12 @@ class UserAccountEditModalView(HtmxModalMixin, LoginRequiredMixin, View):
             messages.error(request, "Trading account not found.")
             return HttpResponse('<div class="p-3 text-danger">Trading account not found.</div>')
 
-        brokers = BrokerMaster.objects.filter(is_active=True).exclude(code='sandbox')
+        brokers = BrokerMaster.objects.filter(is_active=True).order_by('name')
         return render(request, self.modal_template_name, {'account': account, 'brokers': brokers})
 
 
 class UserAccountEditView(LoginRequiredMixin, View):
-    """Handle editing an existing trading account with optional Live API re-validation."""
+    """Handle editing an existing trading account with optional Live/ANVIL API re-validation."""
     def post(self, request, pk, *args, **kwargs):
         user = request.user
         account = user.trading_accounts.filter(pk=pk, is_deleted=False).first()
@@ -1405,17 +1431,41 @@ class UserAccountEditView(LoginRequiredMixin, View):
                 is_default = request.POST.get('is_default') == 'on'
 
                 if account.account_type == 'SANDBOX':
+                    broker_id = request.POST.get('broker_id')
+                    if broker_id:
+                        broker = BrokerMaster.objects.filter(id=broker_id, is_deleted=False).first()
+                        if broker:
+                            account.broker = broker
                     account_name = request.POST.get('sandbox_account_name') or request.POST.get('account_name') or account.account_name
-                    try:
-                        capital = float(request.POST.get('initial_capital', 100000))
-                    except ValueError:
-                        capital = float(account.account_summary.get('initial_capital', 100000))
-
                     account.account_name = account_name
-                    summary = dict(account.account_summary) if isinstance(account.account_summary, dict) else {}
-                    summary['initial_capital'] = capital
-                    summary['balance'] = capital
-                    account.account_summary = summary
+
+                    api_base_url = str(request.POST.get('api_base_url', '')).strip().strip('"').strip("'")
+                    client_id = str(request.POST.get('broker_client_id', '')).strip().strip('"').strip("'")
+                    api_key = str(request.POST.get('api_key', '')).strip().strip('"').strip("'")
+
+                    if api_base_url:
+                        account.api_base_url = api_base_url
+                    if client_id:
+                        account.broker_client_id = client_id
+                    if api_key:
+                        account.api_key = api_key
+
+                    try:
+                        adapter = BrokerFactory.get_adapter(account)
+                        auth_res = adapter.test_connection()
+                        if auth_res.get('success') is True or auth_res.get('connected') is True:
+                            account.is_configured = True
+                            account.account_summary = auth_res
+                            msg = f"ANVIL Account '{account_name}' connected & synced! Balance: ₹{auth_res.get('cash', '0.00')}"
+                            level = 'success'
+                        else:
+                            account.is_configured = False
+                            msg = f"ANVIL Account '{account_name}' updated, but server check failed: {auth_res.get('message', 'Unreachable')}"
+                            level = 'warning'
+                    except Exception as ex:
+                        msg = f"ANVIL Account '{account_name}' updated, but connection check error: {str(ex)}"
+                        level = 'warning'
+
                     account.is_default = is_default
                     account.save()
 
@@ -1482,6 +1532,7 @@ class UserAccountEditView(LoginRequiredMixin, View):
             if level == 'success':
                 trigger_dict['closeGlobalModal'] = True
                 trigger_dict['refreshAccounts'] = True
+                trigger_dict['refreshLiveDashboard'] = True
 
             status_code = 204 if level == 'success' else 200
             response = HttpResponse(status=status_code)
@@ -1509,9 +1560,6 @@ class UserAccountTestAuthView(LoginRequiredMixin, View):
         if not account:
             msg = "Account not found."
             level = 'error'
-        elif account.account_type == 'SANDBOX':
-            msg = "Sandbox accounts operate locally in paper-trading mode."
-            level = 'info'
         else:
             try:
                 adapter = BrokerFactory.get_adapter(account)
@@ -1539,7 +1587,8 @@ class UserAccountTestAuthView(LoginRequiredMixin, View):
             response = render(request, 'users/partials/profile_accounts_cards.html', {'user_trading_accounts': accounts})
             response['HX-Trigger'] = json.dumps({
                 'showToast': {'message': msg, 'level': level},
-                'refreshAccounts': True
+                'refreshAccounts': True,
+                'refreshLiveDashboard': True
             })
             return response
 

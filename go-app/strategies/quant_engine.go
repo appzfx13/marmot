@@ -2,6 +2,7 @@ package strategies
 
 import (
 	"fmt"
+	"log"
 	"math"
 	"strconv"
 	"strings"
@@ -24,6 +25,7 @@ type QuantEngineStrategy struct {
 	runningLow     float64
 	runningClose   float64
 	runningVolume  int64
+	lastDebugLog   time.Time
 }
 
 // NewQuantEngineStrategy creates a new QuantEngineStrategy instance.
@@ -1118,8 +1120,14 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		}
 	}
 
-	// Time window pre-filter: outside any valid market trading hours
-	if minuteOfDay < (9*60+15) || minuteOfDay > (15*60+5) {
+	// Time window pre-filter: market trading hours (09:15 - 15:30 IST)
+	maxMarketMinute := 15*60 + 30
+	if params != nil {
+		if mode, ok := params["execution_mode"].(string); ok && (strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "SANDBOX")) {
+			maxMarketMinute = 24 * 60 // Full simulation hours in Sandbox/Mock mode
+		}
+	}
+	if minuteOfDay < (9*60+15) || minuteOfDay > maxMarketMinute {
 		return nil // Outside valid market hours
 	}
 
@@ -1252,7 +1260,13 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 	isBearishMACD := !useMACDFilter || macdLine <= signalLine
 
 	// Apply preset entry time window filter
-	if minuteOfDay < preset.EntryWindowFrom || minuteOfDay > preset.EntryWindowTo {
+	entryWindowTo := preset.EntryWindowTo
+	if params != nil {
+		if mode, ok := params["execution_mode"].(string); ok && (strings.EqualFold(mode, "MOCK") || strings.EqualFold(mode, "SANDBOX")) && entryWindowTo <= 15*60 {
+			entryWindowTo = 15*60 + 25
+		}
+	}
+	if minuteOfDay < preset.EntryWindowFrom || minuteOfDay > entryWindowTo {
 		return nil
 	}
 
@@ -1429,12 +1443,18 @@ func (s *QuantEngineStrategy) EvaluateLiveSignal(
 		isBullishRetest := isTrendBullish &&
 			lowPrice <= (emaFast + retestTolerance) &&
 			closePrice > openPrice &&
-			displacementRatio >= minDisplacement
+			(displacementRatio >= minDisplacement || (closePrice-openPrice) >= 1.0)
 
 		isBearishRetest := isTrendBearish &&
 			highPrice >= (emaFast - retestTolerance) &&
 			closePrice < openPrice &&
-			displacementRatio >= minDisplacement
+			(displacementRatio >= minDisplacement || (openPrice-closePrice) >= 1.0)
+
+		if time.Since(s.lastDebugLog) >= 10*time.Second {
+			s.lastDebugLog = time.Now()
+			log.Printf("📊 [MACD 1m Eval] %s | Spot=%.1f (BufLen=%d) | EMA12=%.1f EMA26=%.1f | MACD=%.3f Sig=%.3f | Low=%.1f High=%.1f | Disp=%.1f%% (Min=%.1f%%) | BullTrend=%v BearTrend=%v | BullRetest=%v BearRetest=%v\n",
+				indexName, closePrice, len(s.candleBuffer), emaFast, emaSlow, macdLine, signalLine, lowPrice, highPrice, displacementPct, minDisplacement*100, isTrendBullish, isTrendBearish, isBullishRetest, isBearishRetest)
+		}
 
 		if isBullishRetest {
 			isBullishSignal = true

@@ -5,9 +5,21 @@
     <!-- START: Live Dashboard Header Banner -->
     <div class="page-header d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-4 mb-4" style="margin-bottom: 2rem !important; padding-top: 1rem;">
         <div class="d-flex flex-column gap-2">
-            <h1 class="page-title m-0">{% if env_mode == 'MOCK' %}Dashboard - Mock{% else %}Dashboard - Live{% endif %}</h1>
+            <h1 class="page-title m-0">{% if env_mode == 'SANDBOX' or is_livefeed_sandbox %}Sandbox Terminal{% elif env_mode == 'MOCK' %}Dashboard - Mock{% else %}Dashboard - Live{% endif %}</h1>
             <div class="d-flex align-items-center gap-2 flex-wrap">
-                {% if env_mode == 'MOCK' %}
+                {% if env_mode == 'SANDBOX' or is_livefeed_sandbox %}
+                <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-40 px-2.5 py-1 fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">
+                    <i class="bi bi-shield-check me-1"></i> SANDBOX TERMINAL
+                </span>
+                <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm" style="font-size: 0.75rem;">
+                    <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.42rem; height: 0.42rem;"></span>
+                    <span>LIVE SIMULATION (FYERS FEED)</span>
+                </span>
+                <span class="badge bg-primary bg-opacity-20 text-info border border-info border-opacity-35 px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm" style="font-size: 0.75rem;">
+                    <i class="bi bi-shield-check"></i>
+                    <span>PAPER TRADING &bull; ZERO RISK</span>
+                </span>
+                {% elif env_mode == 'MOCK' %}
                 <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-40 px-2.5 py-1 fw-bold" style="font-size: 0.75rem; letter-spacing: 0.5px;">
                     <i class="bi bi-cpu me-1"></i> DHAN EMULATOR (:8088)
                 </span>
@@ -32,7 +44,7 @@
                     <span>1S BACKUP SCHEDULER: ARMED</span>
                 </span>
             </div>
-            <p class="page-subtitle m-0 text-muted">{% if env_mode == 'MOCK' %}High-fidelity broker gateway emulator, virtual ledger MTM, and chaos simulation.{% else %}Realtime live broker telemetry, active portfolio margin, orders, and execution controls.{% endif %}</p>
+            <p class="page-subtitle m-0 text-muted">{% if env_mode == 'SANDBOX' or is_livefeed_sandbox %}Risk-free live market strategy simulation powered by real-time Fyers tick data and virtual ledger execution.{% elif env_mode == 'MOCK' %}High-fidelity broker gateway emulator, virtual ledger MTM, and chaos simulation.{% else %}Realtime live broker telemetry, active portfolio margin, orders, and execution controls.{% endif %}</p>
         </div>
         <div class="page-header-actions d-flex align-items-center justify-content-center justify-content-md-end gap-2 flex-wrap ms-md-auto">
             {% if request.user.trade_eligibility and not request.user.is_blocked %}
@@ -59,7 +71,54 @@
                 </span>
             {% endif %}
 
-            {% if env_mode == 'MOCK' %}
+            {% if env_mode == 'SANDBOX' or is_livefeed_sandbox %}
+            {% if live_account %}
+            <button type="button" 
+                    class="btn btn-outline-warning rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none"
+                    style="font-size: 0.8rem; border-color: rgba(234, 179, 8, 0.4); background: rgba(234, 179, 8, 0.08); color: #facc15;"
+                    hx-get="{% url 'users:user-account-edit-modal' live_account.id %}"
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    data-bs-toggle="modal" 
+                    data-bs-target="#globalHtmxModal">
+                <i class="bi bi-sliders"></i>
+                <span>Configure ANVIL</span>
+            </button>
+            {% else %}
+            <button type="button" 
+                    class="btn btn-outline-warning rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none"
+                    style="font-size: 0.8rem; border-color: rgba(234, 179, 8, 0.4); background: rgba(234, 179, 8, 0.08); color: #facc15;"
+                    hx-get="{% url 'users:user-account-create-modal' %}"
+                    hx-target="#globalHtmxModalDialog"
+                    hx-swap="innerHTML"
+                    data-bs-toggle="modal" 
+                    data-bs-target="#globalHtmxModal">
+                <i class="bi bi-plus-circle"></i>
+                <span>Connect ANVIL</span>
+            </button>
+            {% endif %}
+            <button type="button" 
+                    class="btn btn-outline-danger rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                    style="font-size: 0.8rem;"
+                    hx-post="{% url 'admins:admin-sandbox-clear-session' %}"
+                    hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                    hx-swap="none"
+                    hx-confirm="Are you sure you want to clear all sandbox simulated positions, orders, and restore starting balance (₹1,00,000)?">
+                <i class="bi bi-trash3"></i>
+                <span>Clear Session</span>
+            </button>
+            <a href="{% url 'admins:admin-sandbox-deployments' %}" 
+               class="btn btn-outline-info rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm text-decoration-none"
+               style="font-size: 0.8rem; border-color: rgba(56, 189, 248, 0.4); background: rgba(56, 189, 248, 0.08); color: #38bdf8;"
+               hx-get="{% url 'admins:admin-sandbox-deployments' %}"
+               hx-target="#app-main-container"
+               hx-swap="innerHTML"
+               hx-push-url="true">
+                <i class="bi bi-rocket-takeoff"></i>
+                <span>Deployments</span>
+                <i class="bi bi-chevron-right ms-1 smaller opacity-75"></i>
+            </a>
+            {% elif env_mode == 'MOCK' %}
             <button type="button" 
                     class="btn btn-outline-danger rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
                     style="font-size: 0.8rem;"
@@ -106,7 +165,69 @@
     <!-- Top Latest Macro Market Benchmark Cards Ribbon -->
     {% include 'admins/partials/live_macro_cards_ribbon.html' %}
 
-    {% if env_mode == 'MOCK' %}
+    {% if is_livefeed_sandbox or env_mode == 'SANDBOX' %}
+    <!-- Livefeed Sandbox Real-Time Engine HUD Banner (ANVIL Broker) -->
+    <div class="card glass-card p-3.5 rounded-4 border border-info border-opacity-25 shadow-sm"
+         style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.06) 0%, rgba(14, 165, 233, 0.02) 100%);">
+        <div class="d-flex flex-column flex-md-row align-items-md-center justify-content-between gap-3">
+            <div class="d-flex align-items-center gap-3">
+                <div class="rounded-circle bg-info bg-opacity-15 text-info d-flex align-items-center justify-content-center flex-shrink-0" style="width: 46px; height: 46px; border: 1px solid rgba(56, 189, 248, 0.25);">
+                    <i class="bi bi-broadcast fs-4 text-info"></i>
+                </div>
+                <div>
+                    <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                        <span class="fw-bold fs-6 theme-text-main">Live Feed Sandbox Engine (ANVIL)</span>
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold">
+                            <span class="spinner-grow spinner-grow-sm text-success me-1" style="width: 0.38rem; height: 0.38rem;"></span>LIVE FYERS STREAM
+                        </span>
+                        <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold">
+                            ANVIL GATEWAY (:ISOLATED)
+                        </span>
+                    </div>
+                    <div class="theme-text-muted smaller d-flex align-items-center gap-2 flex-wrap font-monospace">
+                        <span>Gateway: <strong class="text-info">{{ live_account.api_base_url|default:"http://127.0.0.1:8088/mock/v2" }}</strong></span>
+                        <span>&bull;</span>
+                        <span>Client ID: <strong class="text-white">{{ live_account.broker_client_id|default:"SANDBOX_USER_01" }}</strong></span>
+                        <span>&bull;</span>
+                        <span>Balance: <strong class="text-success">₹{{ cash_balance }}</strong></span>
+                        <span>&bull;</span>
+                        <span>Engine Latency: <span id="sandbox-latency-indicator" class="text-success fw-bold"><span id="sandbox-latency-ms">0</span>ms</span></span>
+                    </div>
+                </div>
+            </div>
+            <div class="d-flex align-items-center gap-2 flex-wrap">
+                {% if live_account %}
+                <button type="button" 
+                        class="btn btn-sm btn-outline-info rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                        style="font-size: 0.78rem;"
+                        hx-get="{% url 'users:user-account-edit-modal' live_account.id %}"
+                        hx-target="#globalHtmxModalDialog"
+                        hx-swap="innerHTML"
+                        data-bs-toggle="modal" 
+                        data-bs-target="#globalHtmxModal">
+                    <i class="bi bi-sliders"></i>
+                    <span>Configure ANVIL</span>
+                </button>
+                <form method="POST" action="{% url 'users:user-account-test-auth' live_account.id %}" class="d-inline m-0"
+                      hx-post="{% url 'users:user-account-test-auth' live_account.id %}"
+                      hx-swap="none">
+                    {% csrf_token %}
+                    <button type="submit" 
+                            class="btn btn-sm btn-outline-success rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
+                            style="font-size: 0.78rem;"
+                            title="Verify Connection &amp; Sync Balance from ANVIL Broker">
+                        <i class="bi bi-arrow-repeat"></i>
+                        <span>Sync Balance</span>
+                    </button>
+                </form>
+                {% endif %}
+                <span class="badge bg-secondary bg-opacity-25 text-white-50 px-3 py-1.5 rounded-pill font-monospace small">
+                    Zero Real-Money Risk
+                </span>
+            </div>
+        </div>
+    </div>
+    {% elif env_mode == 'MOCK' %}
     <!-- Mock Replay Telemetry & Playback Control Status Card -->
     <div class="card glass-card p-3.5 rounded-4 border border-info border-opacity-25 shadow-sm"
          style="background: linear-gradient(135deg, rgba(56, 189, 248, 0.06) 0%, rgba(14, 165, 233, 0.02) 100%);">
@@ -159,7 +280,7 @@
     </div>
     {% endif %}
 
-    {% if not has_live_account and env_mode != 'MOCK' %}
+    {% if not has_live_account and env_mode != 'MOCK' and env_mode != 'SANDBOX' and not is_livefeed_sandbox %}
     <!-- Onboarding Guide for Live Accounts -->
     <div class="card glass-card p-4 text-center border-warning border-opacity-25" 
          style="background: linear-gradient(135deg, rgba(255, 193, 7, 0.06) 0%, rgba(180, 241, 5, 0.04) 100%); border-radius: 16px !important;">
@@ -260,7 +381,9 @@
             <div class="col-12 col-sm-6 col-xl-3">
                 <div class="card alert-green-card">
                     <div class="position-relative z-index-2">
-                        {% if is_mock_mode %}
+                        {% if is_livefeed_sandbox or env_mode == 'SANDBOX' %}
+                            <span class="alert-green-badge">ANVIL Sandbox Online</span>
+                        {% elif is_mock_mode %}
                             <span class="alert-green-badge">Dhan Mock Emulator Online</span>
                         {% elif is_token_active %}
                             <span class="alert-green-badge">Live Broker Online</span>
@@ -286,7 +409,19 @@
                             <span>Accounts</span>
                             <i class="bi bi-arrow-right"></i>
                         </a>
-                        {% if live_account %}
+                        {% if is_livefeed_sandbox or env_mode == 'SANDBOX' %}
+                            {% if live_account %}
+                            <button type="button" 
+                                    class="btn btn-sm btn-link text-white text-opacity-75 p-0 text-decoration-none smaller"
+                                    hx-get="{% url 'users:user-account-edit-modal' live_account.id %}"
+                                    hx-target="#globalHtmxModalDialog"
+                                    hx-swap="innerHTML"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#globalHtmxModal">
+                                <i class="bi bi-gear-fill me-1"></i>Configure
+                            </button>
+                            {% endif %}
+                        {% elif live_account %}
                         <button type="button" 
                                 class="btn btn-sm btn-link text-white text-opacity-75 p-0 text-decoration-none smaller"
                                 hx-get="{% url 'users:user-account-consent-modal' live_account.id %}"
@@ -349,6 +484,16 @@
                                 <i class="bi bi-wallet2 text-success"></i>
                                 <span>Available Margin</span>
                             </span>
+                            {% if env_mode == 'SANDBOX' or is_livefeed_sandbox %}
+                            <a href="{% url 'admins:admin-sandbox-dashboard' %}" 
+                               class="btn btn-sm btn-link theme-text-muted p-0 text-decoration-none smaller"
+                               hx-get="{% url 'admins:admin-sandbox-dashboard' %}"
+                               hx-target="#app-main-container"
+                               hx-swap="innerHTML"
+                               title="Refresh Margin">
+                                <i class="bi bi-arrow-repeat text-primary"></i>
+                            </a>
+                            {% else %}
                             <a href="{% url 'admins:admin-live-dashboard' %}" 
                                class="btn btn-sm btn-link theme-text-muted p-0 text-decoration-none smaller"
                                hx-get="{% url 'admins:admin-live-dashboard' %}"
@@ -357,6 +502,7 @@
                                title="Refresh Margin">
                                 <i class="bi bi-arrow-repeat text-primary"></i>
                             </a>
+                            {% endif %}
                         </div>
                         <div class="metric-card-date">Broker Funds &bull; Cash: <span id="live-summary-cash-balance">₹{{ cash_balance }}</span></div>
                         <div id="live-summary-available-margin" class="metric-card-value font-monospace text-primary">
@@ -710,3 +856,127 @@
     <!-- END: Broker Orders & Execution Book -->
 
 </div>
+
+<!-- Real-Time WebSocket Telemetry Sync for Sandbox & Live Portfolio -->
+<script>
+    (function () {
+        function updateMetric(elId, val, prefix) {
+            const el = document.getElementById(elId);
+            if (!el) return;
+            const num = parseFloat(val) || 0;
+            const formatted = '₹' + Math.abs(num).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+            const displayText = (num > 0 && prefix === '+') ? '+' + formatted : (num < 0 ? '-' + formatted : formatted);
+            if (el.textContent.trim() !== displayText) {
+                el.textContent = displayText;
+                if (num > 0) {
+                    el.classList.add('text-success');
+                    el.classList.remove('text-danger');
+                } else if (num < 0) {
+                    el.classList.add('text-danger');
+                    el.classList.remove('text-success');
+                }
+            }
+        }
+
+        function handleDashboardTelemetry(data) {
+            const payload = data.data || data;
+            if (!payload) return;
+
+            // Live PnL updates
+            if (payload.live_net_pnl !== undefined) {
+                updateMetric('live-positions-net-pnl', payload.live_net_pnl, '+');
+                updateMetric('sandbox-live-net-pnl', payload.live_net_pnl, '+');
+                updateMetric('live-net-pnl-val', payload.live_net_pnl, '+');
+            }
+            if (payload.unrealized_pnl !== undefined) {
+                updateMetric('live-positions-unrealized-pnl', payload.unrealized_pnl, '+');
+                updateMetric('sandbox-unrealized-pnl', payload.unrealized_pnl, '+');
+                updateMetric('unrealized-pnl-val', payload.unrealized_pnl, '+');
+            }
+            if (payload.realized_pnl !== undefined) {
+                updateMetric('live-positions-realized-pnl', payload.realized_pnl, '+');
+                updateMetric('sandbox-realized-pnl', payload.realized_pnl, '+');
+                updateMetric('realized-pnl-val', payload.realized_pnl, '+');
+            }
+            if (payload.available_margin !== undefined) {
+                updateMetric('sandbox-available-margin', payload.available_margin);
+                updateMetric('available-margin-val', payload.available_margin);
+            }
+
+            // Sync counts
+            if (payload.open_positions_count !== undefined) {
+                const openBadge = document.getElementById('positions-filter-open-count');
+                if (openBadge) openBadge.textContent = payload.open_positions_count;
+                const sbxPosBadge = document.getElementById('sandbox-open-positions-badge');
+                if (sbxPosBadge) sbxPosBadge.textContent = payload.open_positions_count + ' Active Pos';
+            }
+            if (payload.closed_positions_count !== undefined) {
+                const closedBadge = document.getElementById('positions-filter-closed-count');
+                if (closedBadge) closedBadge.textContent = payload.closed_positions_count;
+            }
+            if (payload.todays_orders_count !== undefined) {
+                const ordMain = document.getElementById('orders-filter-all-count');
+                if (ordMain) ordMain.textContent = payload.todays_orders_count;
+            }
+
+            // Micro-updates for positions rows
+            if (payload.positions && Array.isArray(payload.positions) && payload.positions.length > 0) {
+                payload.positions.forEach(function (pos, idx) {
+                    const sym = (pos.trading_symbol || '').trim();
+                    let row = null;
+                    if (sym) {
+                        row = document.querySelector('#live-positions-container tbody tr[data-symbol="' + sym + '"]');
+                    }
+                    if (!row) {
+                        row = document.querySelector('#live-positions-container tbody tr:nth-child(' + (idx + 1) + ')');
+                    }
+                    if (row) {
+                        const ltpEl = row.querySelector('.pos-live-ltp');
+                        if (ltpEl && pos.current_ltp) {
+                            ltpEl.textContent = '₹' + parseFloat(pos.current_ltp).toFixed(2);
+                        }
+                        const unrlEl = row.querySelector('.pos-live-unrealized');
+                        if (unrlEl && pos.unrealized_profit !== undefined) {
+                            const u = parseFloat(pos.unrealized_profit) || 0;
+                            unrlEl.textContent = (u >= 0 ? '+₹' : '-₹') + Math.abs(u).toFixed(2);
+                            unrlEl.className = 'text-end font-monospace small pos-live-unrealized ' + (u >= 0 ? 'text-success' : 'text-danger');
+                        }
+                        const totEl = row.querySelector('.pos-live-total');
+                        if (totEl && pos.total_pnl !== undefined) {
+                            const t = parseFloat(pos.total_pnl) || 0;
+                            totEl.textContent = (t >= 0 ? '+₹' : '-₹') + Math.abs(t).toFixed(2);
+                            totEl.className = 'text-end font-monospace fw-bold fs-6 pos-live-total ' + (t >= 0 ? 'text-success' : 'text-danger');
+                        }
+                    }
+                });
+            }
+
+            // Latency indicator
+            if (payload.processing_latency_ms !== undefined) {
+                const latEl = document.getElementById('sandbox-latency-ms');
+                if (latEl) latEl.textContent = payload.processing_latency_ms;
+            }
+
+            // Event-driven table reload when counts change
+            const curPosCount = (payload.positions || []).length;
+            const curOrdCount = (payload.orders || []).length;
+            if ((window._lastKnownPosCount !== undefined && window._lastKnownPosCount !== curPosCount) ||
+                (window._lastKnownOrdCount !== undefined && window._lastKnownOrdCount !== curOrdCount)) {
+                document.body.dispatchEvent(new CustomEvent('brokerOrderUpdate'));
+            }
+            window._lastKnownPosCount = curPosCount;
+            window._lastKnownOrdCount = curOrdCount;
+        }
+
+        window.addEventListener('marmot:sandbox-telemetry', function (e) { handleDashboardTelemetry(e.detail); });
+        window.addEventListener('marmot:mock-telemetry', function (e) { handleDashboardTelemetry(e.detail); });
+        window.addEventListener('marmot:telemetry', function (e) { handleDashboardTelemetry(e.detail); });
+
+        if (window.MarmotWS) {
+            {% for strat in live_strategies %}
+            window.MarmotWS.subscribe("strategy_{{ strat.id }}", handleDashboardTelemetry);
+            {% endfor %}
+            window.MarmotWS.connect();
+        }
+    })();
+</script>

@@ -9,7 +9,7 @@ var MACD1mRetestPreset = StrategyConfig{
 	SLPts:           15.0,
 	MinDisplacement: 0.35,
 	EntryWindowFrom: 9*60 + 18,
-	EntryWindowTo:   15 * 60,
+	EntryWindowTo:   15*60 + 25,
 	UseORBFilter:    false,
 	TrailBreakeven:  true,
 	BreakevenAtR:    1.0,

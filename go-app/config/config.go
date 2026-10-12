@@ -6,11 +6,14 @@ import (
 )
 
 type Config struct {
-	DatabaseURL     string
-	RedisURL        string
-	DBTableName     string
-	WSPort          string
-	DatabentoAPIKey string
+	DatabaseURL          string
+	RedisURL             string
+	DBTableName          string
+	WSPort               string
+	DatabentoAPIKey      string
+	SandboxBrokerBaseURL string
+	SandboxBrokerClientID string
+	SandboxBrokerToken   string
 }
 
 func LoadConfig() *Config {
@@ -29,12 +32,19 @@ func LoadConfig() *Config {
 	wsPort := getEnv("WS_PORT", "8082")
 	databentoKey := os.Getenv("DATABENTO_API_KEY")
 
+	sandboxURL := getEnv("SANDBOX_BROKER_BASE_URL", "http://127.0.0.1:8088/mock/v2")
+	sandboxClientID := getEnv("SANDBOX_BROKER_CLIENT_ID", "SANDBOX_USER_01")
+	sandboxToken := getEnv("SANDBOX_BROKER_ACCESS_TOKEN", "SANDBOX_TOKEN_SECRET")
+
 	cfg := &Config{
-		DatabaseURL:     dbURL,
-		RedisURL:        redisURL,
-		DBTableName:     tableName,
-		WSPort:          wsPort,
-		DatabentoAPIKey: databentoKey,
+		DatabaseURL:          dbURL,
+		RedisURL:             redisURL,
+		DBTableName:          tableName,
+		WSPort:               wsPort,
+		DatabentoAPIKey:      databentoKey,
+		SandboxBrokerBaseURL: sandboxURL,
+		SandboxBrokerClientID: sandboxClientID,
+		SandboxBrokerToken:   sandboxToken,
 	}
 
 	// DEBUG: Log loaded config values

@@ -151,14 +151,51 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         user = self.request.user
+        is_livefeed_sandbox = getattr(self, 'is_livefeed_sandbox', False) or (
+            '/sandbox/' in self.request.path and '/live-mock/' not in self.request.path
+        )
         is_mock = getattr(self, 'is_mock_view', False) or (
             self.request.GET.get('env', '').upper() == 'MOCK' or
             self.request.GET.get('mode', '').upper() == 'MOCK' or
-            '/live-mock/' in self.request.path or
-            '/sandbox/' in self.request.path
+            '/live-mock/' in self.request.path
         )
 
-        if is_mock:
+        if is_livefeed_sandbox:
+            account_type = 'SANDBOX'
+            active_tab = 'sandbox-dashboard'
+            env_mode = 'SANDBOX'
+            dashboard_title = 'Sandbox Terminal'
+            live_accounts = list(user.trading_accounts.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']).order_by('-is_default', 'account_name'))
+            anvil_accts = [a for a in live_accounts if getattr(a.broker, 'code', '') == 'anvil']
+            if anvil_accts:
+                live_account = next((a for a in anvil_accts if a.is_default), anvil_accts[0])
+            else:
+                live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
+            if not live_account:
+                sandbox_broker = BrokerMaster.objects.filter(code='anvil').first() or BrokerMaster.objects.filter(code='sandbox').first() or BrokerMaster.objects.filter(code='dhan').first()
+                live_account, _ = UserTradingAccount.objects.get_or_create(
+                    user=user,
+                    broker=sandbox_broker,
+                    account_type='SANDBOX',
+                    defaults={
+                        'account_name': 'ANVIL Sandbox Account',
+                        'api_base_url': getattr(settings, 'SANDBOX_BROKER_BASE_URL', 'http://127.0.0.1:8088/mock/v2'),
+                        'broker_client_id': getattr(settings, 'SANDBOX_BROKER_CLIENT_ID', 'SANDBOX_USER_01'),
+                        'api_key': getattr(settings, 'SANDBOX_BROKER_ACCESS_TOKEN', 'SANDBOX_TOKEN_SECRET'),
+                        'app_id': 'marmot_sandbox',
+                        'is_active': True,
+                        'is_configured': True,
+                        'account_summary': {
+                            'initial_capital': 100000.0,
+                            'balance': 100000.0,
+                            'available_margin': '100,000.00',
+                            'cash': '100,000.00',
+                            'margin_utilized': '0.00',
+                        },
+                    },
+                )
+                live_accounts.append(live_account)
+        elif is_mock:
             account_type = AccountTypeChoices.MOCK
             active_tab = 'live-mock'
             env_mode = 'MOCK'
@@ -211,7 +248,8 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
 
         context['active_tab'] = active_tab
         context['env_mode'] = env_mode
-        context['is_mock_mode'] = is_mock
+        context['is_mock_mode'] = is_mock or is_livefeed_sandbox
+        context['is_livefeed_sandbox'] = is_livefeed_sandbox
         context['dashboard_title'] = dashboard_title
         context['live_account'] = live_account
         context['live_accounts'] = live_accounts
@@ -225,7 +263,7 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         ).select_related('trading_account')
 
         mock_online = False
-        if is_mock:
+        if is_mock and not is_livefeed_sandbox:
             try:
                 import requests
                 r_health = requests.get('http://mock_broker:8088/health', timeout=1.0)
@@ -233,6 +271,8 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
             except Exception:
                 mock_online = False
             context['mock_online'] = mock_online
+        elif is_livefeed_sandbox:
+            context['mock_online'] = True
 
         is_token_active = False
         needs_consent = False
@@ -261,7 +301,41 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         raw_pos = []
         raw_ord = []
 
-        if live_account:
+        if is_livefeed_sandbox:
+            broker_name = (live_account.broker.name if (live_account and live_account.broker) else 'ANVIL Sandbox')
+            is_token_active = bool(live_account and live_account.is_configured)
+            acct_summary = (live_account.account_summary or {}) if live_account else {}
+            raw_avail = acct_summary.get('available_margin') or acct_summary.get('balance') or acct_summary.get('cash') or "100,000.00"
+            raw_cash = acct_summary.get('cash') or acct_summary.get('balance') or "100,000.00"
+            try:
+                available_margin = f"{float(str(raw_avail).replace(',', '')):,.2f}"
+            except Exception:
+                available_margin = str(raw_avail)
+            try:
+                cash_balance = f"{float(str(raw_cash).replace(',', '')):,.2f}"
+            except Exception:
+                cash_balance = str(raw_cash)
+            raw_pos = get_sandbox_simulated_positions(user_id=user.id)
+            raw_ord = get_sandbox_simulated_orders(user_id=user.id)
+            if raw_pos:
+                open_positions_count = sum(1 for p in raw_pos if str(p.get('status', '')).upper() == 'OPEN')
+                closed_positions_count = sum(1 for p in raw_pos if str(p.get('status', '')).upper() == 'CLOSED')
+                realized_pnl = round(sum(float(p.get('realized_profit', 0.0) or 0.0) for p in raw_pos), 2)
+                unrealized_pnl = round(sum(float(p.get('unrealized_profit', 0.0) or 0.0) for p in raw_pos), 2)
+                live_net_pnl = round(realized_pnl + unrealized_pnl, 2)
+                context['all_positions_count'] = len(raw_pos)
+                pos_paginator = Paginator(raw_pos, 10)
+                context['live_positions'] = pos_paginator.page(1).object_list
+                context['page_obj'] = pos_paginator.page(1)
+                context['is_paginated'] = pos_paginator.num_pages > 1
+            if raw_ord:
+                todays_orders_count = len(raw_ord)
+                open_orders_count = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() in ['PENDING', 'TRANSIT', 'CONFIRM'])
+                traded_orders_count = sum(1 for o in raw_ord if str(o.get('order_status', '')).upper() in ['TRADED', 'FILLED', 'COMPLETE'])
+                ord_paginator = Paginator(raw_ord, 10)
+                context['live_orders'] = ord_paginator.page(1).object_list
+                context['orders_count'] = len(raw_ord)
+        elif live_account:
             broker_name = 'Dhan Emulator (:8088)' if is_mock else (live_account.broker.name if live_account.broker else 'DHAN')
             try:
                 adapter = BrokerFactory.get_adapter(live_account)
@@ -372,9 +446,9 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         site_settings = SiteSettings.load()
         context['site_settings'] = site_settings
         context['master_live_switch'] = site_settings.live_execution_master_switch
-        strat_modes = [AccountTypeChoices.MOCK, 'SANDBOX'] if is_mock else [AccountTypeChoices.LIVE]
+        strat_modes = [AccountTypeChoices.MOCK, 'SANDBOX'] if (is_mock or is_livefeed_sandbox) else [AccountTypeChoices.LIVE]
         strat_qs = user.live_strategies.filter(is_deleted=False, execution_mode__in=strat_modes).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
-        if is_mock and not strat_qs.exists():
+        if (is_mock or is_livefeed_sandbox) and not strat_qs.exists():
             strat_qs = user.live_strategies.filter(is_deleted=False).select_related('trading_account__broker', 'backtest_task').order_by('-created_at')
         context['live_strategies'] = strat_qs
         context['market_clock'] = get_ist_market_clock()
@@ -388,7 +462,7 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         available_indexes = get_available_backup_indexes()
         context['available_backup_indexes'] = available_indexes
         context['selected_index'] = selected_index
-        context['option_chain'] = get_live_index_option_chain(selected_index, is_mock=is_mock)
+        context['option_chain'] = get_live_index_option_chain(selected_index, is_mock=(is_mock and not is_livefeed_sandbox))
         today = timezone.localdate()
         is_fyers_token_valid = bool(site_settings.fyers_access_token and site_settings.fyers_token_generated_date == today)
         context['fyers_telemetry'] = {
@@ -397,14 +471,19 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
             'app_id': site_settings.fyers_app_id,
             'status': 'ONLINE' if (site_settings.fyers_feed_is_active and is_fyers_token_valid) else ('AUTH_REQUIRED' if not is_fyers_token_valid else 'STANDBY'),
         }
-        macro_ribbon = get_live_macro_ribbon_data(selected_index, is_mock=is_mock)
+        macro_ribbon = get_live_macro_ribbon_data(selected_index, is_mock=(is_mock and not is_livefeed_sandbox))
         context['macro_ribbon'] = macro_ribbon
         context['selected_macro_card'] = macro_ribbon.get('selected_card')
         context['macro_ai_cards'] = macro_ribbon.get('macro_cards')
         context['macro_market_cards'] = get_live_macro_market_cards()
-        context['is_sandbox'] = False
-        context['positions_partial_url'] = reverse('admins:admin-live-positions-partial')
-        context['orders_partial_url'] = reverse('admins:admin-live-orders-partial')
+        context['is_sandbox'] = is_livefeed_sandbox
+        context['is_livefeed_sandbox'] = is_livefeed_sandbox
+        if is_livefeed_sandbox:
+            context['positions_partial_url'] = reverse('admins:admin-sandbox-positions-partial')
+            context['orders_partial_url'] = reverse('admins:admin-sandbox-orders-partial')
+        else:
+            context['positions_partial_url'] = reverse('admins:admin-live-positions-partial')
+            context['orders_partial_url'] = reverse('admins:admin-live-orders-partial')
 
         pos_labels = [p.get('trading_symbol', p.get('tradingSymbol', 'Position')) for p in raw_pos]
         pos_pnls = [
@@ -459,10 +538,11 @@ def _build_mock_broker_calendar(daily_map: dict, selected_year: int = 2026):
 
 
 class AdminSandboxDashboardView(AdminLiveDashboardView):
-    """Admin Sandbox Trading & Strategy Simulation Dashboard running on Dhan Mock Emulator (:8088)."""
+    """Admin Sandbox Terminal — Live Feed Sandbox Run mirroring Live UI with real-time Fyers data and virtual ledger."""
     template_name = 'admins/live_dashboard.html'
     partial_template_name = 'admins/partials/live_dashboard_content.html'
-    is_mock_view = True
+    is_mock_view = False
+    is_livefeed_sandbox = True
 
 
 AdminLiveMockDashboardView = AdminSandboxDashboardView
@@ -1903,7 +1983,13 @@ def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=N
         if not positions_raw:
             try:
                 import requests
-                r_pos = requests.get('http://mock_broker:8088/mock/v2/positions', timeout=0.8)
+                from django.conf import settings
+                sandbox_url = getattr(settings, 'SANDBOX_BROKER_BASE_URL', 'http://127.0.0.1:8088/mock/v2').rstrip('/')
+                headers = {
+                    'client-id': getattr(settings, 'SANDBOX_BROKER_CLIENT_ID', 'SANDBOX_USER_01'),
+                    'access-token': getattr(settings, 'SANDBOX_BROKER_ACCESS_TOKEN', 'SANDBOX_TOKEN_SECRET'),
+                }
+                r_pos = requests.get(f"{sandbox_url}/positions", headers=headers, timeout=0.8)
                 if r_pos.status_code == 200:
                     mb_positions = r_pos.json()
                     for mp in mb_positions:
@@ -2017,7 +2103,13 @@ def get_sandbox_simulated_orders(user_id=None, strategy_id=None, account_id=None
         if not orders_raw:
             try:
                 import requests
-                r_ord = requests.get('http://mock_broker:8088/mock/v2/orders', timeout=0.8)
+                from django.conf import settings
+                sandbox_url = getattr(settings, 'SANDBOX_BROKER_BASE_URL', 'http://127.0.0.1:8088/mock/v2').rstrip('/')
+                headers = {
+                    'client-id': getattr(settings, 'SANDBOX_BROKER_CLIENT_ID', 'SANDBOX_USER_01'),
+                    'access-token': getattr(settings, 'SANDBOX_BROKER_ACCESS_TOKEN', 'SANDBOX_TOKEN_SECRET'),
+                }
+                r_ord = requests.get(f"{sandbox_url}/orders", headers=headers, timeout=0.8)
                 if r_ord.status_code == 200:
                     mb_orders = r_ord.json()
                     for mo in mb_orders:
