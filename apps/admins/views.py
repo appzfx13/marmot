@@ -171,17 +171,31 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
                 live_account = next((a for a in anvil_accts if a.is_default), anvil_accts[0])
             else:
                 live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
+            req_acc_id = self.request.GET.get('account_id')
+            if req_acc_id and str(req_acc_id).isdigit():
+                matched_acc = next((a for a in live_accounts if a.id == int(req_acc_id)), None)
+                if matched_acc:
+                    live_account = matched_acc
             if not live_account:
                 sandbox_broker = BrokerMaster.objects.filter(code='anvil').first() or BrokerMaster.objects.filter(code='sandbox').first() or BrokerMaster.objects.filter(code='dhan').first()
+                if not sandbox_broker:
+                    sandbox_broker, _ = BrokerMaster.objects.get_or_create(
+                        code='anvil',
+                        defaults={
+                            'name': 'ANVIL',
+                            'api_base_url': getattr(settings, 'SANDBOX_BROKER_BASE_URL', 'https://pep-erratic-violate.ngrok-free.dev'),
+                            'description': 'Anvil High-Throughput Trading Simulation Broker',
+                        }
+                    )
                 live_account, _ = UserTradingAccount.objects.get_or_create(
                     user=user,
                     broker=sandbox_broker,
                     account_type='SANDBOX',
                     defaults={
                         'account_name': 'ANVIL Sandbox Account',
-                        'api_base_url': getattr(settings, 'SANDBOX_BROKER_BASE_URL', 'http://127.0.0.1:8088/mock/v2'),
-                        'broker_client_id': getattr(settings, 'SANDBOX_BROKER_CLIENT_ID', 'SANDBOX_USER_01'),
-                        'api_key': getattr(settings, 'SANDBOX_BROKER_ACCESS_TOKEN', 'SANDBOX_TOKEN_SECRET'),
+                        'api_base_url': getattr(settings, 'SANDBOX_BROKER_BASE_URL', 'https://pep-erratic-violate.ngrok-free.dev'),
+                        'broker_client_id': getattr(settings, 'SANDBOX_BROKER_CLIENT_ID', '1072641686'),
+                        'api_key': getattr(settings, 'SANDBOX_BROKER_ACCESS_TOKEN', 'dhn_sec_sandbox_u3XsDKCFKyelHn2ARPYwMlmU7ujHYVjO'),
                         'app_id': 'marmot_sandbox',
                         'is_active': True,
                         'is_configured': True,
@@ -209,7 +223,13 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
                     description='DhanHQ Broker Gateway / Emulator',
                 )
             live_accounts = list(user.trading_accounts.filter(is_active=True, account_type=AccountTypeChoices.MOCK).order_by('-is_default', 'account_name'))
-            live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
+            req_acc_id = self.request.GET.get('account_id')
+            if req_acc_id and str(req_acc_id).isdigit():
+                matched_acc = next((a for a in live_accounts if a.id == int(req_acc_id)), None)
+                if matched_acc:
+                    live_account = matched_acc
+            else:
+                live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
             if not live_account:
                 live_account, _ = UserTradingAccount.objects.get_or_create(
                     user=user,
@@ -238,7 +258,13 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
             env_mode = 'LIVE'
             dashboard_title = 'Live Trading Dashboard — Dhan Production'
             live_accounts = list(user.trading_accounts.filter(is_active=True, account_type=AccountTypeChoices.LIVE).order_by('-is_default', 'account_name'))
-            live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
+            req_acc_id = self.request.GET.get('account_id')
+            if req_acc_id and str(req_acc_id).isdigit():
+                matched_acc = next((a for a in live_accounts if a.id == int(req_acc_id)), None)
+                if matched_acc:
+                    live_account = matched_acc
+            else:
+                live_account = next((a for a in live_accounts if a.is_default), None) or (live_accounts[0] if live_accounts else None)
             if not live_account:
                 dhan_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
                 if dhan_account:
@@ -254,6 +280,7 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
         context['live_account'] = live_account
         context['live_accounts'] = live_accounts
         context['has_live_account'] = bool(live_account)
+        context['selected_account_id'] = str(live_account.id) if live_account else ''
         context['marmot_profile'] = get_user_profile(user.username)
 
         context['live_strategy_configs'] = TradeExecConfig.objects.filter(
@@ -315,8 +342,8 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
                 cash_balance = f"{float(str(raw_cash).replace(',', '')):,.2f}"
             except Exception:
                 cash_balance = str(raw_cash)
-            raw_pos = get_sandbox_simulated_positions(user_id=user.id)
-            raw_ord = get_sandbox_simulated_orders(user_id=user.id)
+            raw_pos = get_sandbox_simulated_positions(user_id=user.id, account_id=live_account.id if live_account else None)
+            raw_ord = get_sandbox_simulated_orders(user_id=user.id, account_id=live_account.id if live_account else None)
             if raw_pos:
                 open_positions_count = sum(1 for p in raw_pos if str(p.get('status', '')).upper() == 'OPEN')
                 closed_positions_count = sum(1 for p in raw_pos if str(p.get('status', '')).upper() == 'CLOSED')
@@ -324,7 +351,15 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
                 unrealized_pnl = round(sum(float(p.get('unrealized_profit', 0.0) or 0.0) for p in raw_pos), 2)
                 live_net_pnl = round(realized_pnl + unrealized_pnl, 2)
                 context['all_positions_count'] = len(raw_pos)
-                pos_paginator = Paginator(raw_pos, 10)
+                req_filter_status = self.request.GET.get('status', 'ALL').upper()
+                context['filter_status'] = req_filter_status
+                if req_filter_status == 'OPEN':
+                    disp_pos = [p for p in raw_pos if str(p.get('status', '')).upper() == 'OPEN']
+                elif req_filter_status == 'CLOSED':
+                    disp_pos = [p for p in raw_pos if str(p.get('status', '')).upper() == 'CLOSED']
+                else:
+                    disp_pos = raw_pos
+                pos_paginator = Paginator(disp_pos, 10)
                 context['live_positions'] = pos_paginator.page(1).object_list
                 context['page_obj'] = pos_paginator.page(1)
                 context['is_paginated'] = pos_paginator.num_pages > 1
@@ -369,7 +404,15 @@ class AdminLiveDashboardView(HTMXPartialMixin, LoginRequiredMixin, AdminRequired
                                 pos_dict['current_ltp'] = l_quote
 
                     context['all_positions_count'] = len(raw_pos)
-                    pos_paginator = Paginator(raw_pos, 10)
+                    req_filter_status = self.request.GET.get('status', 'ALL').upper()
+                    context['filter_status'] = req_filter_status
+                    if req_filter_status == 'OPEN':
+                        disp_pos = [p for p in raw_pos if str(p.get('status', '')).upper() == 'OPEN']
+                    elif req_filter_status == 'CLOSED':
+                        disp_pos = [p for p in raw_pos if str(p.get('status', '')).upper() == 'CLOSED']
+                    else:
+                        disp_pos = raw_pos
+                    pos_paginator = Paginator(disp_pos, 10)
                     context['live_positions'] = pos_paginator.page(1).object_list
                     context['page_obj'] = pos_paginator.page(1)
                     context['is_paginated'] = pos_paginator.num_pages > 1
@@ -1430,38 +1473,79 @@ class AdminLivePositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View
         is_mock = (
             request.GET.get('env', '').upper() == 'MOCK' or
             'ENV=MOCK' in request.GET.get('env', '').upper() or
-            request.session.get('active_tab') == 'live-mock' or
+            (request.session.get('active_tab') == 'live-mock' if hasattr(request, 'session') else False) or
             'live-mock' in request.META.get('HTTP_REFERER', '') or
             'sandbox' in request.META.get('HTTP_REFERER', '') or
             'sandbox' in request.headers.get('Hx-Current-Url', '') or
             'ENV=MOCK' in request.META.get('HTTP_REFERER', '').upper()
         )
-        if is_mock:
-            live_account = user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type__in=['MOCK', 'SANDBOX']).first()
-            if not live_account:
-                live_account = user.trading_accounts.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).order_by('-is_default').first()
-            if not live_account:
-                live_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True, account_type__in=['MOCK', 'SANDBOX']).first()
-            if not live_account:
-                live_account = UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
-        else:
-            live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first() or UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+        raw_acc_id = request.GET.get('account_id', '').strip()
+        account_id_param = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
+        live_account = None
+        if account_id_param and account_id_param.isdigit():
+            live_account = user.trading_accounts.filter(id=int(account_id_param), is_active=True).first()
 
-        positions_res = {'positions': [], 'net_pnl': 0.00, 'realized_pnl': 0.00, 'unrealized_pnl': 0.00, 'open_positions_count': 0, 'closed_positions_count': 0}
+        if not live_account:
+            if is_mock:
+                live_account = (
+                    user.trading_accounts.filter(is_active=True, broker__code='anvil').first() or
+                    user.trading_accounts.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).order_by('-is_default', 'account_name').first() or
+                    UserTradingAccount.objects.filter(broker__code='anvil', is_active=True).first() or
+                    UserTradingAccount.objects.filter(broker__code='dhan', is_active=True, account_type__in=['MOCK', 'SANDBOX']).first() or
+                    UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+                )
+            else:
+                live_account = user.trading_accounts.filter(is_active=True, account_type='LIVE').order_by('-is_default', 'account_name').first() or UserTradingAccount.objects.filter(broker__code='dhan', is_active=True).first()
+
+        raw_positions = []
         if live_account:
             try:
                 adapter = BrokerFactory.get_adapter(live_account)
                 positions_res = adapter.get_live_positions()
+                if positions_res.get('success'):
+                    raw_positions = positions_res.get('positions', [])
             except Exception as e:
-                logger.warning("Error fetching live positions partial: %s", e)
+                logger.warning("Error fetching live positions partial from adapter: %s", e)
+
+        if not raw_positions and is_mock:
+            raw_positions = get_sandbox_simulated_positions(user_id=user.id, account_id=live_account.id if live_account else None)
+
+        from apps.common.services.live_feed_service import get_live_contract_market_quote
+        for p in raw_positions:
+            net_qty = int(p.get('net_qty', p.get('netQty', 0)) or 0)
+            st = str(p.get('status', '')).upper()
+            if st in ('OPEN', 'ACTIVE') or net_qty != 0:
+                p['status'] = 'OPEN'
+                cur_ltp = float(p.get('current_ltp') or 0.0)
+                if cur_ltp <= 0:
+                    l_quote = get_live_contract_market_quote(p.get('trading_symbol') or p.get('security_id'))
+                    if l_quote > 0:
+                        cur_ltp = l_quote
+                        p['current_ltp'] = cur_ltp
+                if cur_ltp > 0:
+                    buy_avg = float(p.get('buy_avg', 0.0) or 0.0)
+                    sell_avg = float(p.get('sell_avg', 0.0) or 0.0)
+                    if net_qty > 0 and buy_avg > 0:
+                        p['unrealized_profit'] = round((cur_ltp - buy_avg) * net_qty, 2)
+                    elif net_qty < 0 and sell_avg > 0:
+                        p['unrealized_profit'] = round((sell_avg - cur_ltp) * abs(net_qty), 2)
+                    p['total_pnl'] = round(float(p.get('realized_profit', 0.0) or 0.0) + float(p.get('unrealized_profit', 0.0) or 0.0), 2)
+            else:
+                p['status'] = 'CLOSED'
+
+        open_cnt = sum(1 for p in raw_positions if p.get('status') == 'OPEN')
+        closed_cnt = sum(1 for p in raw_positions if p.get('status') == 'CLOSED')
+        realized_pnl = round(sum(float(p.get('realized_profit', 0.0) or 0.0) for p in raw_positions), 2)
+        unrealized_pnl = round(sum(float(p.get('unrealized_profit', 0.0) or 0.0) for p in raw_positions), 2)
+        live_net_pnl = round(realized_pnl + unrealized_pnl, 2)
 
         filter_status = request.GET.get('status', 'ALL').upper()
-        raw_positions = positions_res.get('positions', [])
         if filter_status == 'OPEN':
             filtered_positions = [p for p in raw_positions if p.get('status') == 'OPEN']
         elif filter_status == 'CLOSED':
             filtered_positions = [p for p in raw_positions if p.get('status') == 'CLOSED']
         else:
+            raw_positions.sort(key=lambda p: (0 if p.get('status') == 'OPEN' else 1, -float(p.get('total_pnl', 0.0) or 0.0)))
             filtered_positions = raw_positions
 
         page_num = request.GET.get('page', 1)
@@ -1471,24 +1555,28 @@ class AdminLivePositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, View
         except (PageNotAnInteger, EmptyPage):
             page_obj = paginator.page(1)
 
+        pos_url = reverse('admins:admin-sandbox-positions-partial') if ('sandbox' in request.path or 'sandbox' in request.META.get('HTTP_REFERER', '')) else reverse('admins:admin-live-positions-partial')
+
         context = {
             'live_positions': page_obj.object_list,
             'page_obj': page_obj,
             'paginator': paginator,
             'is_paginated': paginator.num_pages > 1,
             'all_positions_count': len(raw_positions),
-            'open_positions_count': positions_res.get('open_positions_count', 0),
-            'closed_positions_count': positions_res.get('closed_positions_count', 0),
-            'live_net_pnl': positions_res.get('net_pnl', 0.00),
-            'realized_pnl': positions_res.get('realized_pnl', 0.00),
-            'unrealized_pnl': positions_res.get('unrealized_pnl', 0.00),
+            'open_positions_count': open_cnt,
+            'closed_positions_count': closed_cnt,
+            'live_net_pnl': live_net_pnl,
+            'realized_pnl': realized_pnl,
+            'unrealized_pnl': unrealized_pnl,
             'filter_status': filter_status,
             'live_account': live_account,
+            'selected_account_id': str(live_account.id) if live_account else '',
             'is_mock_mode': is_mock,
             'env_mode': 'MOCK' if is_mock else 'LIVE',
-            'positions_partial_url': reverse('admins:admin-live-positions-partial'),
+            'positions_partial_url': pos_url,
         }
         return render(request, 'admins/partials/live_positions_table.html', context)
+
 
 
 class AdminLiveHoldingsPartialView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -1630,13 +1718,52 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
         from django.http import HttpResponse
         from django.conf import settings
 
+        acc_param = request.GET.get('account_id') or request.POST.get('account_id')
+        target_account = None
+        if acc_param and str(acc_param).strip().isdigit():
+            target_account = request.user.trading_accounts.filter(id=int(acc_param), is_active=True).first()
+        if not target_account:
+            target_account = (
+                request.user.trading_accounts.filter(is_active=True, broker__code='anvil').first() or
+                request.user.trading_accounts.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']).order_by('-is_default', 'account_name').first()
+            )
+
+        is_anvil = target_account and getattr(target_account.broker, 'code', '').lower() == 'anvil'
+        is_success = False
+
+        if is_anvil:
+            try:
+                base_url = target_account.api_base_url.rstrip('/')
+                token = target_account.api_key
+                headers = {
+                    'Authorization': f'Bearer {token}',
+                    'access-token': token,
+                    'client-id': target_account.broker_client_id,
+                }
+                r_traders = requests.get(f'{base_url}/api/admin-portal/traders/', headers=headers, timeout=3)
+                if r_traders.status_code == 200:
+                    traders_list = r_traders.json().get('traders', [])
+                    trader_obj = next((t for t in traders_list if t.get('dhan_client_id') == target_account.broker_client_id), None)
+                    if trader_obj:
+                        t_id = trader_obj['id']
+                        r_act = requests.post(
+                            f'{base_url}/api/admin-portal/traders/{t_id}/action/',
+                            headers=headers,
+                            json={'action': 'reset_ledger'},
+                            timeout=3
+                        )
+                        is_success = (r_act.status_code == 200)
+            except Exception as e:
+                logger.warning("Failed to reset Anvil sandbox ledger: %s", e)
+
+        # Call Dhan mock broker emulator if present
         mock_url = getattr(settings, 'DHAN_MOCK_BASE_URL', 'http://mock_broker:8088/mock/v2').replace('/mock/v2', '/mock/api/session/clear?account=all').replace('/v2', '/mock/api/session/clear?account=all')
         try:
-            resp_mock = requests.post(mock_url, timeout=5)
-            is_success = resp_mock.status_code == 200
+            resp_mock = requests.post(mock_url, timeout=3)
+            if resp_mock.status_code == 200:
+                is_success = True
         except Exception as e:
-            logger.warning("Failed to call mock_broker clear session: %s", e)
-            is_success = False
+            logger.debug("Mock broker clear session fallback: %s", e)
 
         # 1. Publish IPC command to Go TaskManager to clear active strategy workers and reset in-memory telemetry
         try:
@@ -1666,23 +1793,37 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
         # 3. Reset Sandbox and Mock user trading accounts to initial capital
         try:
             from apps.trade_config.models import UserTradingAccount
-            for acc in UserTradingAccount.objects.filter(user=request.user, account_type__in=['SANDBOX', 'MOCK']):
-                init_cap = float((acc.account_summary or {}).get('initial_capital', 100000.0) or 100000.0)
-                acc.account_summary = {
-                    'initial_capital': init_cap,
-                    'balance': init_cap,
-                    'available_margin': f"{init_cap:,.2f}",
-                    'cash': f"{init_cap:,.2f}",
-                    'margin_utilized': "0.00"
-                }
-                acc.save(update_fields=['account_summary'])
+            accts_to_reset = [target_account] if target_account else list(UserTradingAccount.objects.filter(user=request.user, account_type__in=['SANDBOX', 'MOCK']))
+            for acc in accts_to_reset:
+                if acc:
+                    init_cap = float((acc.account_summary or {}).get('initial_capital', 100000.0) or 100000.0)
+                    acc.account_summary = {
+                        'initial_capital': init_cap,
+                        'balance': init_cap,
+                        'available_margin': f"{init_cap:,.2f}",
+                        'cash': f"{init_cap:,.2f}",
+                        'margin_utilized': "0.00"
+                    }
+                    acc.save(update_fields=['account_summary'])
         except Exception as a_err:
             logger.debug("UserTradingAccount reset error: %s", a_err)
 
         # 4. Clear mock and sandbox postbacks to reset settled trade history
         try:
             from apps.common.models import PostbackLog
-            PostbackLog.objects.filter(payload__execution_mode__in=['MOCK', 'SANDBOX']).delete()
+            from django.db.models import Q
+            sandbox_client_ids = set()
+            if target_account and target_account.broker_client_id:
+                sandbox_client_ids.add(target_account.broker_client_id)
+            for sa in request.user.trading_accounts.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']):
+                if sa.broker_client_id:
+                    sandbox_client_ids.add(sa.broker_client_id)
+            pb_filter = Q(payload__execution_mode__in=['MOCK', 'SANDBOX'])
+            if sandbox_client_ids:
+                pb_filter |= Q(broker_client_id__in=list(sandbox_client_ids))
+            if target_account:
+                pb_filter |= Q(user=request.user, broker__iexact=getattr(target_account.broker, 'code', ''))
+            PostbackLog.objects.filter(pb_filter).delete()
         except Exception as p_err:
             logger.debug("PostbackLog mock clear error: %s", p_err)
 
@@ -1702,6 +1843,7 @@ class AdminLiveMockClearSessionView(LoginRequiredMixin, AdminRequiredMixin, View
             'reloadLiveOrders': True,
             'reloadSandboxOrders': True,
             'reloadLiveStrategies': True,
+            'reloadPostbackTable': True,
             'showToast': {
                 'title': 'Session Reset' if is_success else 'Session Reset Dispatched',
                 'message': toast_msg,
@@ -1800,7 +1942,9 @@ class AdminLiveOrderPlaceView(LoginRequiredMixin, AdminRequiredMixin, View):
         # 2. Resolve Target Trading Accounts
         accounts = []
         if execution_mode == 'SANDBOX':
-            accounts = list(user.trading_accounts.filter(is_active=True, account_type='MOCK'))
+            accounts = list(user.trading_accounts.filter(is_active=True, broker__code='anvil'))
+            if not accounts:
+                accounts = list(user.trading_accounts.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']))
             if not accounts:
                 accounts = list(user.trading_accounts.filter(is_active=True).order_by('-is_default'))[:1]
         elif target_scope == 'DHAN_ONLY':
@@ -1937,11 +2081,12 @@ def enrich_trading_symbol_dict(item: dict) -> dict:
 
 
 def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=None):
-    """Return simulated intraday and closed options positions from live Redis telemetry with fresh live ticks."""
+    """Return simulated intraday and closed options positions from live Redis telemetry or active broker with fresh live ticks."""
     try:
         from apps.market.services import redis_client
         from apps.common.services.live_feed_service import get_live_contract_market_quote
-        from apps.trade_config.models import LiveStrategy
+        from apps.trade_config.models import LiveStrategy, UserTradingAccount
+        from apps.trade_core.brokers import BrokerFactory
         import json
         positions_raw = []
         target_key = None
@@ -1964,15 +2109,14 @@ def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=N
                     Q(trading_account_id=account_id) | Q(trading_account__isnull=True),
                     is_deleted=False
                 ).values_list('id', flat=True))
-                if not strat_ids:
-                    return []
                 agg_positions = []
                 for s_id in strat_ids:
                     s_raw = redis_client.get(f"marmot:sandbox:telemetry:strategy:{s_id}") or redis_client.get(f"marmot:mock:telemetry:strategy:{s_id}")
                     if s_raw:
                         sd = json.loads(s_raw)
                         agg_positions.extend(sd.get("positions", []))
-                positions_raw = agg_positions
+                if agg_positions:
+                    positions_raw = agg_positions
         elif user_id:
             target_key = f"marmot:sandbox:telemetry:{user_id}"
             raw = redis_client.get(target_key) or redis_client.get(f"marmot:mock:telemetry:{user_id}")
@@ -1980,56 +2124,59 @@ def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=N
                 d = json.loads(raw)
                 positions_raw = d.get("positions", [])
 
+        # Direct broker adapter resolution if telemetry is empty
         if not positions_raw:
-            try:
-                import requests
-                from django.conf import settings
-                sandbox_url = getattr(settings, 'SANDBOX_BROKER_BASE_URL', 'http://127.0.0.1:8088/mock/v2').rstrip('/')
-                headers = {
-                    'client-id': getattr(settings, 'SANDBOX_BROKER_CLIENT_ID', 'SANDBOX_USER_01'),
-                    'access-token': getattr(settings, 'SANDBOX_BROKER_ACCESS_TOKEN', 'SANDBOX_TOKEN_SECRET'),
-                }
-                r_pos = requests.get(f"{sandbox_url}/positions", headers=headers, timeout=0.8)
-                if r_pos.status_code == 200:
-                    mb_positions = r_pos.json()
-                    for mp in mb_positions:
-                        positions_raw.append({
-                            'trading_symbol': mp.get('tradingSymbol') or mp.get('securityId'),
-                            'exchange_segment': mp.get('exchangeSegment', 'NSE_FNO'),
-                            'status': 'OPEN' if mp.get('netQty', 0) != 0 else 'CLOSED',
-                            'product_type': mp.get('productType', 'INTRADAY'),
-                            'net_qty': mp.get('netQty', 0),
-                            'buy_qty': mp.get('buyQty', 0),
-                            'buy_avg': mp.get('buyAvg', 0.0),
-                            'sell_qty': mp.get('sellQty', 0),
-                            'sell_avg': mp.get('sellAvg', 0.0),
-                            'current_ltp': mp.get('sellAvg') or mp.get('buyAvg', 0.0),
-                            'realized_profit': round(float(mp.get('realizedProfit', 0.0)), 2),
-                            'unrealized_profit': round(float(mp.get('unrealizedProfit', 0.0)), 2),
-                            'total_pnl': round(float(mp.get('realizedProfit', 0.0)) + float(mp.get('unrealizedProfit', 0.0)), 2),
-                        })
-            except Exception:
-                pass
+            target_account = None
+            if account_id and str(account_id).upper() != 'ALL':
+                try:
+                    target_account = UserTradingAccount.objects.filter(id=int(account_id), is_active=True).first()
+                except Exception:
+                    pass
+            if not target_account and user_id:
+                target_account = (
+                    UserTradingAccount.objects.filter(user_id=user_id, is_active=True, broker__code='anvil').first() or
+                    UserTradingAccount.objects.filter(user_id=user_id, is_active=True, account_type__in=['SANDBOX', 'MOCK']).order_by('-is_default', 'account_name').first()
+                )
+            if target_account:
+                try:
+                    adapter = BrokerFactory.get_adapter(target_account)
+                    pos_res = adapter.get_live_positions()
+                    if pos_res.get('success'):
+                        positions_raw = pos_res.get('positions', [])
+                except Exception as ex:
+                    logger.debug("Failed querying adapter live positions in get_sandbox_simulated_positions: %s", ex)
+
+        if not positions_raw and user_id:
+            raw_user = redis_client.get(f"marmot:sandbox:telemetry:{user_id}") or redis_client.get(f"marmot:mock:telemetry:{user_id}")
+            if raw_user:
+                try:
+                    du = json.loads(raw_user)
+                    positions_raw = du.get("positions", [])
+                except Exception:
+                    pass
 
         if positions_raw:
             has_updates = False
             enriched_list = []
             for p in positions_raw:
                 ep = enrich_trading_symbol_dict(p)
-                if ep.get('status') == 'OPEN':
+                net_qty = int(ep.get('net_qty', ep.get('netQty', 0)) or 0)
+                st = str(ep.get('status', '')).upper()
+                if st in ('OPEN', 'ACTIVE') or net_qty != 0:
+                    ep['status'] = 'OPEN'
                     live_ltp = get_live_contract_market_quote(ep.get('trading_symbol'))
                     if live_ltp > 0:
                         ep['current_ltp'] = live_ltp
-                        buy_avg = float(ep.get('buy_avg', live_ltp))
-                        qty = int(ep.get('net_qty', 0))
-                        pnl = round((live_ltp - buy_avg) * qty, 2)
+                        buy_avg = float(ep.get('buy_avg', live_ltp) or live_ltp)
+                        pnl = round((live_ltp - buy_avg) * net_qty, 2)
                         ep['unrealized_profit'] = pnl
-                        ep['total_pnl'] = round(float(ep.get('realized_profit', 0.0)) + pnl, 2)
+                        ep['total_pnl'] = round(float(ep.get('realized_profit', 0.0) or 0.0) + pnl, 2)
                         ep['pnl_percentage'] = round(((live_ltp - buy_avg) / buy_avg) * 100, 2) if buy_avg > 0 else 0.0
                         has_updates = True
                 else:
+                    ep['status'] = 'CLOSED'
                     ep['unrealized_profit'] = 0.0
-                    ep['total_pnl'] = round(float(ep.get('realized_profit', 0.0)), 2)
+                    ep['total_pnl'] = round(float(ep.get('realized_profit', 0.0) or 0.0), 2)
                 enriched_list.append(ep)
             if has_updates and target_key and raw:
                 try:
@@ -2042,9 +2189,10 @@ def get_sandbox_simulated_positions(user_id=None, strategy_id=None, account_id=N
                     pass
             enriched_list.sort(key=lambda p: (0 if str(p.get('status', '')).upper() == 'OPEN' else 1, -float(p.get('total_pnl', 0.0) or 0.0)))
             return enriched_list
-    except Exception:
-        pass
+    except Exception as e:
+        logger.debug("Error in get_sandbox_simulated_positions: %s", e)
     return []
+
 
 
 def get_sandbox_simulated_orders(user_id=None, strategy_id=None, account_id=None):
@@ -2099,6 +2247,28 @@ def get_sandbox_simulated_orders(user_id=None, strategy_id=None, account_id=None
                         sd = json.loads(s_raw)
                         agg_orders.extend(sd.get("orders", []))
                 orders_raw = agg_orders
+
+        if not orders_raw:
+            target_account = None
+            if account_id and str(account_id).upper() != 'ALL':
+                try:
+                    target_account = UserTradingAccount.objects.filter(id=int(account_id), is_active=True).first()
+                except Exception:
+                    pass
+            if not target_account and user_id:
+                target_account = (
+                    UserTradingAccount.objects.filter(user_id=user_id, is_active=True, broker__code='anvil').first() or
+                    UserTradingAccount.objects.filter(user_id=user_id, is_active=True, account_type__in=['SANDBOX', 'MOCK']).order_by('-is_default', 'account_name').first()
+                )
+            if target_account:
+                try:
+                    from apps.trade_core.brokers import BrokerFactory
+                    adapter = BrokerFactory.get_adapter(target_account)
+                    ord_res = adapter.get_live_orders()
+                    if ord_res.get('success'):
+                        orders_raw = ord_res.get('orders', [])
+                except Exception as ex:
+                    logger.debug("Failed querying adapter live orders in get_sandbox_simulated_orders: %s", ex)
 
         if not orders_raw:
             try:
@@ -2545,14 +2715,56 @@ class AdminSandboxPositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, V
         account_id_param = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
         sandbox_account = None
         if account_id_param and account_id_param.isdigit():
-            sandbox_account = user.trading_accounts.filter(id=int(account_id_param), is_active=True, account_type='SANDBOX').first()
+            sandbox_account = user.trading_accounts.filter(id=int(account_id_param), is_active=True).first()
         if not sandbox_account:
-            sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+            sandbox_account = (
+                user.trading_accounts.filter(is_active=True, broker__code='anvil').first() or
+                user.trading_accounts.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']).order_by('-is_default', 'account_name').first() or
+                UserTradingAccount.objects.filter(broker__code='anvil', is_active=True).first() or
+                UserTradingAccount.objects.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']).first()
+            )
 
         raw_strat_id = request.GET.get('strategy_id', '').strip()
         strategy_id = raw_strat_id.split('?')[0].split('&')[0].strip() if raw_strat_id else ''
         target_account_id = sandbox_account.id if (sandbox_account and (not strategy_id or strategy_id == 'ALL')) else None
         raw_positions = get_sandbox_simulated_positions(user_id=user.id, strategy_id=strategy_id, account_id=target_account_id)
+
+        if not raw_positions and sandbox_account:
+            try:
+                adapter = BrokerFactory.get_adapter(sandbox_account)
+                pos_res = adapter.get_live_positions()
+                if pos_res.get('success'):
+                    raw_positions = pos_res.get('positions', [])
+            except Exception as ex:
+                logger.debug("Failed querying sandbox adapter positions: %s", ex)
+
+        from apps.common.services.live_feed_service import get_live_contract_market_quote
+        for p in raw_positions:
+            net_qty = int(p.get('net_qty', p.get('netQty', 0)) or 0)
+            st = str(p.get('status', '')).upper()
+            if st in ('OPEN', 'ACTIVE') or net_qty != 0:
+                p['status'] = 'OPEN'
+                cur_ltp = float(p.get('current_ltp') or 0.0)
+                if cur_ltp <= 0:
+                    l_quote = get_live_contract_market_quote(p.get('trading_symbol') or p.get('security_id'))
+                    if l_quote > 0:
+                        cur_ltp = l_quote
+                        p['current_ltp'] = cur_ltp
+                if cur_ltp > 0:
+                    buy_avg = float(p.get('buy_avg', 0.0) or 0.0)
+                    sell_avg = float(p.get('sell_avg', 0.0) or 0.0)
+                    if net_qty > 0 and buy_avg > 0:
+                        p['unrealized_profit'] = round((cur_ltp - buy_avg) * net_qty, 2)
+                    elif net_qty < 0 and sell_avg > 0:
+                        p['unrealized_profit'] = round((sell_avg - cur_ltp) * abs(net_qty), 2)
+                    p['total_pnl'] = round(float(p.get('realized_profit', 0.0) or 0.0) + float(p.get('unrealized_profit', 0.0) or 0.0), 2)
+            else:
+                p['status'] = 'CLOSED'
+
+        open_cnt = sum(1 for p in raw_positions if p.get('status') == 'OPEN')
+        closed_cnt = sum(1 for p in raw_positions if p.get('status') == 'CLOSED')
+        realized_pnl = sum(float(p.get('realized_profit', 0.0) or 0.0) for p in raw_positions)
+        unrealized_pnl = sum(float(p.get('unrealized_profit', 0.0) or 0.0) for p in raw_positions)
 
         filter_status = request.GET.get('status', 'ALL').upper()
         if filter_status == 'OPEN':
@@ -2569,18 +2781,6 @@ class AdminSandboxPositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, V
             page_obj = paginator.page(page_num)
         except (PageNotAnInteger, EmptyPage):
             page_obj = paginator.page(1)
-
-        open_cnt = sum(1 for p in raw_positions if p.get('status') == 'OPEN')
-        closed_cnt = sum(1 for p in raw_positions if p.get('status') == 'CLOSED')
-        realized_pnl = sum(p.get('realized_profit', 0.0) for p in raw_positions)
-        unrealized_pnl = sum(p.get('unrealized_profit', 0.0) for p in raw_positions)
-
-        query_params = []
-        if strategy_id and strategy_id != 'ALL':
-            query_params.append(f"strategy_id={strategy_id}")
-        if sandbox_account:
-            query_params.append(f"account_id={sandbox_account.id}")
-        query_suffix = f"?{'&'.join(query_params)}" if query_params else ""
 
         base_positions_url = reverse('admins:admin-sandbox-positions-partial')
         context = {
@@ -2603,6 +2803,7 @@ class AdminSandboxPositionsPartialView(LoginRequiredMixin, AdminRequiredMixin, V
             'live_account': sandbox_account,
         }
         return render(request, 'admins/partials/live_positions_table.html', context)
+
 
 
 class AdminSandboxPositionSquareOffView(LoginRequiredMixin, AdminRequiredMixin, View):
@@ -2636,9 +2837,14 @@ class AdminSandboxOrdersPartialView(LoginRequiredMixin, AdminRequiredMixin, View
         account_id_param = raw_acc_id.split('?')[0].split('&')[0].strip() if raw_acc_id else ''
         sandbox_account = None
         if account_id_param and account_id_param.isdigit():
-            sandbox_account = user.trading_accounts.filter(id=int(account_id_param), is_active=True, account_type='SANDBOX').first()
+            sandbox_account = user.trading_accounts.filter(id=int(account_id_param), is_active=True).first()
         if not sandbox_account:
-            sandbox_account = user.trading_accounts.filter(is_active=True, account_type='SANDBOX').order_by('-is_default', 'account_name').first()
+            sandbox_account = (
+                user.trading_accounts.filter(is_active=True, broker__code='anvil').first() or
+                user.trading_accounts.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']).order_by('-is_default', 'account_name').first() or
+                UserTradingAccount.objects.filter(broker__code='anvil', is_active=True).first() or
+                UserTradingAccount.objects.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']).first()
+            )
 
         raw_strat_id = request.GET.get('strategy_id', '').strip()
         strategy_id = raw_strat_id.split('?')[0].split('&')[0].strip() if raw_strat_id else ''
@@ -3918,28 +4124,54 @@ class AdminSandboxTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
         context['user'] = user
 
         context['has_configured_master'] = True # Mock always ready
-        context['broker_code'] = 'mock'
-        context['broker_name'] = 'MOCK BROKER ENGINE'
-        context['account_type'] = 'ADMIN SANDBOX'
-        context['account_id_display'] = 'SANDBOX-SIM-01'
-        context['is_token_active'] = True
-        context['is_sandbox'] = True
         watchlist = get_initial_watchlist_indices(is_sandbox=True)
         context['watchlist_indices'] = watchlist
         first_idx = watchlist[0] if watchlist else {}
         context['default_lot_size'] = first_idx.get('lot') or 65
         context['default_symbol'] = first_idx.get('symbol') or 'NIFTY 50'
         context['default_fyers_sym'] = first_idx.get('fyers_sym') or 'NSE:NIFTY50-INDEX'
-        acc = user.trading_accounts.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).first() or UserTradingAccount.objects.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).first()
+        acc = (
+            user.trading_accounts.filter(is_active=True, broker__code='anvil').first() or
+            user.trading_accounts.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']).order_by('-is_default', 'account_name').first() or
+            UserTradingAccount.objects.filter(is_active=True, broker__code='anvil').first() or
+            UserTradingAccount.objects.filter(is_active=True, account_type__in=['SANDBOX', 'MOCK']).first()
+        )
         context['active_account'] = acc
-        context['initial_telemetry'] = {
-            'balance': '₹10,00,000.00',
-            'equity': '₹10,00,000.00',
+        context['broker_code'] = 'anvil' if (acc and getattr(acc.broker, 'code', '') == 'anvil') else 'mock'
+        context['broker_name'] = 'ANVIL SANDBOX ENGINE' if (acc and getattr(acc.broker, 'code', '') == 'anvil') else 'MOCK BROKER ENGINE'
+        context['account_type'] = 'ADMIN SANDBOX'
+        context['account_id_display'] = acc.broker_client_id if (acc and acc.broker_client_id) else 'SANDBOX-SIM-01'
+        context['is_token_active'] = True
+        context['is_sandbox'] = True
+
+        telemetry = {
+            'balance': '₹5,00,000.00',
+            'equity': '₹5,00,000.00',
             'margin': '₹0.00',
-            'free_margin': '₹10,00,000.00',
+            'free_margin': '₹5,00,000.00',
             'session_pnl': '₹+0.00',
             'is_pnl_positive': True
         }
+        if acc:
+            try:
+                from apps.trade_core.brokers.factory import BrokerFactory
+                adapter = BrokerFactory.get_adapter(acc)
+                fund_data = adapter.get_fund_limits()
+                if fund_data.get('success'):
+                    avail = float(fund_data.get('available_balance', 0.0) or 0.0)
+                    utilized = float(fund_data.get('margin_utilized', 0.0) or 0.0)
+                    withdrawable = float(fund_data.get('withdrawable', avail) or avail)
+                    telemetry = {
+                        'balance': f"₹{avail:,.2f}",
+                        'equity': f"₹{avail:,.2f}",
+                        'margin': f"₹{utilized:,.2f}",
+                        'free_margin': f"₹{withdrawable:,.2f}",
+                        'session_pnl': "₹+0.00",
+                        'is_pnl_positive': True
+                    }
+            except Exception as e:
+                logger.warning("Could not load initial sandbox terminal funds: %s", e)
+        context['initial_telemetry'] = telemetry
         return context
 
 
@@ -3956,9 +4188,12 @@ class AdminTerminalOperationalDataAPIView(LoginRequiredMixin, AdminRequiredMixin
         is_sandbox = (mode == 'SANDBOX')
 
         if is_sandbox:
-            acc = user.trading_accounts.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).first()
-            if not acc:
-                acc = UserTradingAccount.objects.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).first()
+            acc = (
+                user.trading_accounts.filter(is_active=True, broker__code='anvil').first() or
+                user.trading_accounts.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).order_by('-is_default', 'account_name').first() or
+                UserTradingAccount.objects.filter(is_active=True, broker__code='anvil').first() or
+                UserTradingAccount.objects.filter(is_active=True, account_type__in=['MOCK', 'SANDBOX']).first()
+            )
         else:
             acc = (
                 user.trading_accounts.filter(is_active=True, broker__code='dhan', account_type='LIVE').first() or
@@ -5026,7 +5261,16 @@ class PostbackLogClearView(LoginRequiredMixin, DeveloperOrAdminRequiredMixin, Vi
     def post(self, request, *args, **kwargs):
         mode = str(request.POST.get('mode', 'MOCK')).upper().strip()
         if mode == 'MOCK':
-            qs = PostbackLog.objects.filter(is_deleted=False, payload__execution_mode='MOCK')
+            from django.db.models import Q
+            sandbox_client_ids = list(
+                request.user.trading_accounts.filter(account_type__in=['SANDBOX', 'MOCK'])
+                .values_list('broker_client_id', flat=True)
+            )
+            qs = PostbackLog.objects.filter(is_deleted=False).filter(
+                Q(payload__execution_mode__in=['MOCK', 'SANDBOX']) |
+                Q(broker_client_id__in=sandbox_client_ids) |
+                Q(broker__iexact='anvil')
+            )
             count = qs.count()
             qs.delete()
             msg = f"Successfully cleared {count} Mock Postback log{'s' if count != 1 else ''}."

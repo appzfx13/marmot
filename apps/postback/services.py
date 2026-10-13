@@ -102,6 +102,7 @@ class GenericBrokerPostbackParser:
 
 PARSERS = {
     'dhan': DhanPostbackParser,
+    'anvil': DhanPostbackParser,
     'fyers': FyersPostbackParser,
 }
 

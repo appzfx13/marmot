@@ -386,47 +386,51 @@
                     hx-get="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
                     hx-target="#globalHtmxModalDialog"
                     hx-swap="innerHTML"
-                    class="btn btn-outline-warning rounded-pill fw-semibold d-inline-flex align-items-center gap-1.5 shadow-sm px-3"
-                    onclick="setTimeout(function(){ var b = document.getElementById('btnFindBestConfig'); if(b) b.click(); }, 350)">
-                <span class="material-icons text-warning" style="font-size: 1.1rem;">auto_awesome</span>
-                <span>⚡ Find Best Config</span>
-            </button>
-            <button type="button" 
-                    hx-get="{% url 'backtest:backtest_edit_modal' backtest.pk %}" 
-                    hx-target="#globalHtmxModalDialog"
-                    hx-swap="innerHTML"
-                    class="btn btn-outline-primary rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3">
-                <span class="material-icons" style="font-size: 1.1rem;">edit</span>
-                <span>Edit Parameters & Regenerate</span>
+                    class="btn btn-outline-primary rounded-pill fw-semibold d-inline-flex align-items-center gap-2 shadow-sm px-3.5 py-1.5"
+                    style="font-size: 0.82rem;">
+                <span class="material-icons" style="font-size: 1.05rem;">edit</span>
+                <span>Edit Parameters &amp; Regenerate</span>
             </button>
         </div>
     </div>
 
-    <!-- Key Parameters Grid -->
-    <div class="row g-3 small">
+    <!-- Key Parameters Grid (Polished Metric Tiles) -->
+    <div class="row g-2.5 small">
         <div class="col-6 col-md-4 col-xl-2">
-            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Strategy Engine</span>
-            <span class="text-info fw-bold">{{ backtest.get_strategy_name_display }}</span>
+            <div class="p-2.5 rounded-3 bg-black bg-opacity-40 border border-secondary border-opacity-20 h-100 shadow-sm">
+                <span class="theme-text-muted d-block mb-1 text-uppercase tracking-wider" style="font-size: 0.68rem;">Strategy Engine</span>
+                <span class="text-info fw-bold text-truncate d-block" title="{{ backtest.get_strategy_name_display }}">{{ backtest.get_strategy_name_display }}</span>
+            </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Target Instrument</span>
-            <span class="theme-text-main fw-bold">{{ backtest.index_name }}</span>
+            <div class="p-2.5 rounded-3 bg-black bg-opacity-40 border border-secondary border-opacity-20 h-100 shadow-sm">
+                <span class="theme-text-muted d-block mb-1 text-uppercase tracking-wider" style="font-size: 0.68rem;">Target Instrument</span>
+                <span class="theme-text-main fw-bold">{{ backtest.index_name }}</span>
+            </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Execution Period</span>
-            <span class="theme-text-main fw-semibold font-monospace">{{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</span>
+            <div class="p-2.5 rounded-3 bg-black bg-opacity-40 border border-secondary border-opacity-20 h-100 shadow-sm">
+                <span class="theme-text-muted d-block mb-1 text-uppercase tracking-wider" style="font-size: 0.68rem;">Execution Period</span>
+                <span class="theme-text-main fw-semibold font-monospace" style="font-size: 0.77rem;">{{ backtest.start_date|date:"M d, Y" }} → {{ backtest.end_date|date:"M d, Y" }}</span>
+            </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Initial Capital</span>
-            <span class="text-success fw-bold font-monospace">₹{{ backtest.initial_capital|floatformat:2 }}</span>
+            <div class="p-2.5 rounded-3 bg-black bg-opacity-40 border border-secondary border-opacity-20 h-100 shadow-sm">
+                <span class="theme-text-muted d-block mb-1 text-uppercase tracking-wider" style="font-size: 0.68rem;">Initial Capital</span>
+                <span class="text-success fw-bold font-monospace">₹{{ backtest.initial_capital|floatformat:2 }}</span>
+            </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Position & Strike</span>
-            <span class="theme-text-main fw-semibold">{{ backtest.parameters.lots_count|default:1 }} Lot(s) | <strong class="text-warning">{{ backtest.parameters.strike_selection|default:"ATM" }}</strong></span>
+            <div class="p-2.5 rounded-3 bg-black bg-opacity-40 border border-secondary border-opacity-20 h-100 shadow-sm">
+                <span class="theme-text-muted d-block mb-1 text-uppercase tracking-wider" style="font-size: 0.68rem;">Position &amp; Strike</span>
+                <span class="theme-text-main fw-semibold">{{ backtest.parameters.lots_count|default:1 }} Lot(s) | <strong class="text-warning">{{ backtest.parameters.strike_selection|default:"ATM" }}</strong></span>
+            </div>
         </div>
         <div class="col-6 col-md-4 col-xl-2">
-            <span class="theme-text-muted d-block" style="font-size: 0.72rem;">Stop Loss & Target</span>
-            <span class="text-danger fw-semibold font-monospace">{{ backtest.parameters.stop_loss_points|default:30 }} pts</span> / <span class="text-success fw-semibold font-monospace">{{ backtest.parameters.rr_ratio|default:2.0 }}x RR</span>
+            <div class="p-2.5 rounded-3 bg-black bg-opacity-40 border border-secondary border-opacity-20 h-100 shadow-sm">
+                <span class="theme-text-muted d-block mb-1 text-uppercase tracking-wider" style="font-size: 0.68rem;">Stop Loss &amp; Target</span>
+                <span class="text-danger fw-semibold font-monospace">{{ backtest.parameters.stop_loss_points|default:30 }} pts</span> / <span class="text-success fw-semibold font-monospace">{{ backtest.parameters.rr_ratio|default:2.0 }}x RR</span>
+            </div>
         </div>
     </div>
 

@@ -223,10 +223,10 @@ DHAN_MOCK_BASE_URL = os.getenv('DHAN_MOCK_BASE_URL', 'http://127.0.0.1:8088/mock
 DHAN_API_BASE_URL = os.getenv('DHAN_API_BASE_URL', DHAN_LIVE_BASE_URL)
 DHAN_EMULATOR_ENABLED = os.getenv('DHAN_EMULATOR_ENABLED', 'false').lower() in ('true', '1')
 
-# External Sandbox Simulation Broker (Hosted on separate server)
-SANDBOX_BROKER_CLIENT_ID = os.getenv('SANDBOX_BROKER_CLIENT_ID', '1000000001')
-SANDBOX_BROKER_ACCESS_TOKEN = os.getenv('SANDBOX_BROKER_ACCESS_TOKEN', 'sandbox-simulation-token')
-SANDBOX_BROKER_BASE_URL = os.getenv('SANDBOX_BROKER_BASE_URL', 'http://127.0.0.1:8088/mock/v2')
+# External Sandbox Simulation Broker (Anvil Hosted / External Server)
+SANDBOX_BROKER_CLIENT_ID = os.getenv('SANDBOX_BROKER_CLIENT_ID')
+SANDBOX_BROKER_ACCESS_TOKEN = os.getenv('SANDBOX_BROKER_ACCESS_TOKEN')
+SANDBOX_BROKER_BASE_URL = os.getenv('SANDBOX_BROKER_BASE_URL')
 
 # OpenAlgo Integration
 OPENALGO_API_KEY = os.getenv('OPENALGO_API_KEY')

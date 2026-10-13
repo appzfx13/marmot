@@ -32,9 +32,9 @@ func LoadConfig() *Config {
 	wsPort := getEnv("WS_PORT", "8082")
 	databentoKey := os.Getenv("DATABENTO_API_KEY")
 
-	sandboxURL := getEnv("SANDBOX_BROKER_BASE_URL", "http://127.0.0.1:8088/mock/v2")
-	sandboxClientID := getEnv("SANDBOX_BROKER_CLIENT_ID", "SANDBOX_USER_01")
-	sandboxToken := getEnv("SANDBOX_BROKER_ACCESS_TOKEN", "SANDBOX_TOKEN_SECRET")
+	sandboxURL := getEnv("SANDBOX_BROKER_BASE_URL", "https://pep-erratic-violate.ngrok-free.dev")
+	sandboxClientID := getEnv("SANDBOX_BROKER_CLIENT_ID", "1072641686")
+	sandboxToken := getEnv("SANDBOX_BROKER_ACCESS_TOKEN", "dhn_sec_sandbox_u3XsDKCFKyelHn2ARPYwMlmU7ujHYVjO")
 
 	cfg := &Config{
 		DatabaseURL:          dbURL,

@@ -381,8 +381,12 @@
                     if (sym) {
                         row = document.querySelector('#live-positions-container tbody tr[data-symbol="' + sym + '"]');
                     }
-                    if (!row) {
-                        row = document.querySelector('#live-positions-container tbody tr:nth-child(' + (idx + 1) + ')');
+                    if (!row && sym) {
+                        document.querySelectorAll('#live-positions-container tbody tr[data-symbol]').forEach(function (r) {
+                            if (!row && typeof isOptionSymbolMatch === 'function' && isOptionSymbolMatch(r.getAttribute('data-symbol'), sym)) {
+                                row = r;
+                            }
+                        });
                     }
                     if (row) {
                         const ltpEl = row.querySelector('.pos-live-ltp');

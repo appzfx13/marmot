@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 import time
 import uuid
@@ -18,27 +19,30 @@ logger = logging.getLogger(__name__)
 
 
 def _format_precise_time(raw_val: Any) -> str:
-    """Formats an ISO timestamp or date object into human-readable HH:MM:SS.mmm AM/PM (IST)."""
+    """Formats an ISO timestamp or date object into ISO string with IST timezone (UTC+05:30)."""
     if not raw_val or str(raw_val).strip() in ('', '-', 'None', '0001-01-01T00:00:00Z'):
         return '-'
+    from datetime import datetime
+    from django.utils import timezone as dj_timezone
+    ist = dj_timezone.get_fixed_timezone(330)
+
+    if isinstance(raw_val, datetime):
+        if dj_timezone.is_naive(raw_val):
+            raw_val = raw_val.replace(tzinfo=dj_timezone.utc)
+        return raw_val.astimezone(ist).isoformat()
+
     val_str = str(raw_val).strip()
-    if 'T' not in val_str and not val_str.endswith('Z'):
-        return val_str
     try:
-        clean_str = val_str.rstrip('Z')
-        if '.' in clean_str:
-            base, frac = clean_str.split('.', 1)
-            frac = (frac + '000000')[:6]
-            clean_str = f"{base}.{frac}+00:00"
-        else:
+        clean_str = val_str.replace('Z', '+00:00')
+        if 'T' not in clean_str and ' ' in clean_str:
+            clean_str = clean_str.replace(' ', 'T')
+        has_offset = ('+' in clean_str[10:]) or ('-' in clean_str[10:])
+        if not has_offset:
             clean_str = f"{clean_str}+00:00"
-        from datetime import datetime
-        from django.utils import timezone as dj_timezone
         dt = datetime.fromisoformat(clean_str)
-        ist = dj_timezone.get_fixed_timezone(330)
-        dt_ist = dt.astimezone(ist)
-        millis = dt_ist.microsecond // 1000
-        return dt_ist.strftime(f"%I:%M:%S.{millis:03d} %p")
+        if dt.tzinfo is None:
+            dt = dt.replace(tzinfo=dj_timezone.utc)
+        return dt.astimezone(ist).isoformat()
     except Exception:
         return val_str
 
@@ -54,11 +58,19 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         mode = str(account_type or getattr(self.account, 'account_type', 'SANDBOX')).upper()
         if mode == 'LIVE':
             return getattr(settings, 'DHAN_LIVE_BASE_URL', 'https://api.dhan.co/v2').rstrip('/')
+        url = ''
         if getattr(self.account, 'api_base_url', None):
-            return str(self.account.api_base_url).rstrip('/')
-        if hasattr(self.account, 'broker') and getattr(self.account.broker, 'api_base_url', None):
-            return str(self.account.broker.api_base_url).rstrip('/')
-        return getattr(settings, 'SANDBOX_BROKER_BASE_URL', getattr(settings, 'DHAN_MOCK_BASE_URL', 'http://127.0.0.1:8088/mock/v2')).rstrip('/')
+            url = str(self.account.api_base_url).rstrip('/')
+        elif hasattr(self.account, 'broker') and getattr(self.account.broker, 'api_base_url', None):
+            url = str(self.account.broker.api_base_url).rstrip('/')
+        else:
+            url = getattr(settings, 'SANDBOX_BROKER_BASE_URL', getattr(settings, 'DHAN_MOCK_BASE_URL', 'http://127.0.0.1:8088/mock/v2')).rstrip('/')
+
+        if (os.path.exists('/.dockerenv') or os.environ.get('DOCKER_CONTAINER')) and ('127.0.0.1' in url or 'localhost' in url):
+            url = url.replace('127.0.0.1', 'host.docker.internal').replace('localhost', 'host.docker.internal')
+        if not url.endswith('/v2') and not url.endswith('/mock/v2'):
+            url = f"{url}/v2"
+        return url
 
     @property
     def base_url(self) -> str:
@@ -81,6 +93,40 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         """
         return UserDhanClient(self.account).get_access_token()
 
+    def exchange_credentials_for_token(self) -> Dict[str, Any]:
+        """Exchanges App ID / Client ID and Client Secret with Anvil Gateway for permanent Access Token."""
+        clean_client_id = str(self.client_id or getattr(self.account, 'broker_client_id', '') or '').strip().strip('"').strip("'")
+        clean_app_secret = str(getattr(self.account, 'app_id', '') or getattr(self.account, 'api_key', '') or '').strip().strip('"').strip("'")
+        target_base = self.get_base_url('SANDBOX').rstrip('/')
+
+        candidate_urls = [
+            f"{target_base}/token",
+            f"{target_base}/auth/token",
+        ]
+        if not target_base.endswith('/v2') and not target_base.endswith('/mock/v2'):
+            candidate_urls.insert(0, f"{target_base}/v2/token")
+
+        for url in candidate_urls:
+            try:
+                payload = {
+                    'client_id': clean_client_id,
+                    'app_id': clean_client_id,
+                    'client_secret': clean_app_secret,
+                    'app_secret': clean_app_secret,
+                }
+                resp = requests.post(url, json=payload, timeout=6)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    tok = data.get('accessToken') or data.get('access_token')
+                    if tok:
+                        if self.account:
+                            self.account.api_key = tok
+                            self.account.save(update_fields=['api_key'])
+                        return {'success': True, 'access_token': tok, 'data': data}
+            except Exception:
+                continue
+        return {'success': False, 'message': 'Failed to exchange credentials with Anvil gateway.'}
+
     def test_connection(self) -> Dict[str, Any]:
         """
         Performs live HTTP authentication verification against Dhan servers.
@@ -99,6 +145,14 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
         clean_api_key = str(self.api_key or getattr(self.account, 'api_key', '') or '').strip().strip('"').strip("'")
         clean_app_secret = str(getattr(self.account, 'app_id', '') or '').strip().strip('"').strip("'")
 
+        # Auto-exchange credentials with Anvil if API key is a secret or empty but secret provided
+        broker_code = getattr(getattr(self.account, 'broker', None), 'code', 'dhan').lower()
+        if (broker_code in ['anvil', 'sandbox'] or getattr(self.account, 'account_type', '') == 'SANDBOX'):
+            if clean_api_key.startswith('sec_anvil_') or (not clean_api_key and clean_app_secret):
+                tok_res = self.exchange_credentials_for_token()
+                if tok_res.get('success'):
+                    clean_api_key = tok_res['access_token']
+
         # 1. If direct Access Token is provided (starts with eyJ or len > 40)
         token_to_test = clean_api_key or self.get_access_token()
         if token_to_test:
@@ -107,7 +161,7 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                 base = self.base_url.rstrip('/')
                 candidate_urls = [f"{base}/fundlimit"]
                 if not base.endswith('/v2') and not base.endswith('/mock/v2'):
-                    candidate_urls.extend([f"{base}/mock/v2/fundlimit", f"{base}/v2/fundlimit"])
+                    candidate_urls.extend([f"{base}/v2/fundlimit", f"{base}/mock/v2/fundlimit"])
                 headers = {
                     "access-token": clean_token,
                     "client-id": clean_client_id,
@@ -122,10 +176,23 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                     except Exception:
                         continue
 
+                # If 401 on Sandbox, attempt credential exchange and retry
+                if (not resp or resp.status_code == 401) and (broker_code in ['anvil', 'sandbox'] or getattr(self.account, 'account_type', '') == 'SANDBOX') and clean_app_secret:
+                    tok_res = self.exchange_credentials_for_token()
+                    if tok_res.get('success'):
+                        clean_token = tok_res['access_token']
+                        headers["access-token"] = clean_token
+                        for url in candidate_urls:
+                            try:
+                                resp = requests.get(url, headers=headers, timeout=5)
+                                if resp.status_code == 200:
+                                    break
+                            except Exception:
+                                continue
+
                 if resp and resp.status_code == 200:
                     data = resp.json()
                     avail_cash = data.get("availabelBalance", data.get("availableBalance", data.get("cash", "0.00")))
-                    broker_code = getattr(getattr(self.account, 'broker', None), 'code', 'dhan').lower()
                     is_sandbox = (broker_code in ['sandbox', 'anvil'] or getattr(self.account, 'account_type', '') == 'SANDBOX')
                     if is_sandbox:
                         try:
@@ -157,20 +224,20 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                     # If direct token failed but App Secret is provided, try Partner App Consent Flow
                     pass
                 else:
-                    err_msg = resp.text
+                    err_msg = resp.text if resp else 'No response from server'
                     try:
-                        err_json = resp.json()
-                        err_msg = err_json.get("errorMessage") or err_json.get("remarks", {}).get("error_message") or err_json.get("message") or resp.text
+                        err_json = resp.json() if resp else {}
+                        err_msg = err_json.get("errorMessage") or err_json.get("remarks", {}).get("error_message") or err_json.get("message") or err_msg
                     except Exception:
                         pass
-                    if resp.status_code == 401:
-                        err_msg = f"{err_msg}. Please verify your 10-digit Dhan Client ID and ensure you paste the full Access Token (starts with eyJ...) from web.dhan.co > DhanHQ Developer section."
+                    if resp and resp.status_code == 401:
+                        err_msg = f"{err_msg}. Please verify your 10-digit Dhan/Anvil Client ID and Access Token or Client Secret."
                     return {
                         'success': False,
                         'status': 'AUTH_FAILED',
-                        'broker': 'DHAN',
+                        'broker': 'DHAN' if broker_code != 'anvil' else 'ANVIL',
                         'client_id': clean_client_id,
-                        'message': f"Dhan Live Auth Failed (HTTP {resp.status_code}): {err_msg}"
+                        'message': f"Broker Auth Failed (HTTP {resp.status_code if resp else 'ERR'}): {err_msg}"
                     }
             except requests.RequestException as e:
                 logger.error("Dhan test_connection network error: %s", e)
@@ -251,9 +318,19 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
             }
         }
         # Forward order to Dhan API (Live or Mock Emulator Sandbox)
-        if account_type == 'LIVE' or getattr(settings, 'DHAN_EMULATOR_ENABLED', False):
+        broker_code = getattr(getattr(self.account, 'broker', None), 'code', 'dhan').lower()
+        is_anvil_sandbox = (
+            account_type == 'SANDBOX' and (
+                broker_code in ['anvil', 'sandbox'] or
+                bool(getattr(self.account, 'api_base_url', None)) or
+                getattr(settings, 'SANDBOX_BROKER_BASE_URL', None)
+            )
+        )
+        if account_type == 'LIVE' or getattr(settings, 'DHAN_EMULATOR_ENABLED', False) or is_anvil_sandbox:
             try:
-                target_base_url = self.get_base_url(account_type)
+                target_base_url = self.get_base_url(account_type).rstrip('/')
+                if not target_base_url.endswith('/v2') and not target_base_url.endswith('/mock/v2'):
+                    target_base_url = f"{target_base_url}/v2"
                 token = str(self.get_access_token() or '').strip().strip('"').strip("'")
                 clean_cid = str(self.client_id or '1000000001').strip().strip('"').strip("'")
                 clean_corr_id = re.sub(r'[^a-zA-Z0-9]', '', f"MMT{int(time.time()*1000)}{uuid.uuid4().hex[:6]}")[:25]
@@ -1067,17 +1144,25 @@ class DhanBrokerAdapter(BaseBrokerAdapter):
                         self.square_off_position(symbol=sym, quantity=net_qty, side=side, product_type=prod, security_id=sec_id)
                         squared += 1
             
-            # Hit the Dhan Kill Switch API
+            # Hit the Dhan / Anvil Kill Switch API
             token = str(self.get_access_token() or '').strip().strip('"').strip("'")
             client_id = str(self.client_id or '').strip().strip('"').strip("'")
             if token and client_id:
-                url = f"{self.base_url}/killswitch?killSwitchStatus=ACTIVATE"
+                base = self.base_url.rstrip('/')
+                candidate_kill_urls = [
+                    f"{base}/killswitch?killSwitchStatus=ACTIVATE",
+                ]
+                if not base.endswith('/v2') and not base.endswith('/mock/v2'):
+                    candidate_kill_urls.insert(0, f"{base}/v2/killswitch?killSwitchStatus=ACTIVATE")
                 headers = {"access-token": token, "client-id": client_id, "Accept": "application/json", "Content-Type": "application/json"}
-                kill_resp = requests.post(url, headers=headers, timeout=6)
-                if kill_resp.status_code == 200:
-                    logger.warning(f"Dhan HQ Kill Switch API activated successfully for {client_id}")
-                else:
-                    logger.error(f"Dhan HQ Kill Switch API failed for {client_id}: {kill_resp.text}")
+                for kill_url in candidate_kill_urls:
+                    try:
+                        kill_resp = requests.post(kill_url, headers=headers, timeout=6)
+                        if kill_resp.status_code == 200:
+                            logger.warning(f"Dhan/Anvil Kill Switch API activated successfully for {client_id}")
+                            break
+                    except Exception:
+                        continue
 
         except Exception as e:
             logger.error(f"Error executing emergency kill actions: {e}")

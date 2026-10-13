@@ -38,11 +38,26 @@
         <!-- Telemetry Badges & Emergency Kill Switch Trigger -->
         <div class="d-flex align-items-center gap-2 flex-wrap ms-md-auto">
             {% if is_sandbox %}
-                <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1.5 font-monospace small d-flex align-items-center gap-1">
-                    <span class="material-icons fs-6">monetization_on</span>Virtual Capital: <strong id="sandboxCapitalDisplay">{{ active_account.account_summary.initial_capital|default:"—" }}</strong>
+                <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1 font-monospace small d-flex align-items-center gap-1">
+                    <span class="pulse-dot active me-0.5" style="width:7px;height:7px;background:#f59e0b;border-radius:50%;display:inline-block;"></span>
+                    ANVIL SANDBOX GATEWAY
+                </span>
+                <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 font-monospace small d-flex align-items-center gap-1">
+                    <span class="pulse-dot active me-0.5" style="width:7px;height:7px;background:#10b981;border-radius:50%;display:inline-block;"></span>
+                    FYERS LIVE FEED
+                </span>
+                <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1 font-monospace small d-flex align-items-center gap-1">
+                    <span class="material-icons fs-6">monetization_on</span>Capital: <strong id="sandboxCapitalDisplay">{{ active_account.account_summary.initial_capital|default:"5,00,000.00" }}</strong>
                 </span>
                 <button type="button" class="btn btn-xs btn-outline-warning rounded-pill px-2.5 py-1 fw-bold d-inline-flex align-items-center gap-1" onclick="resetSandboxVirtualBalance()">
                     <span class="material-icons fs-6">restart_alt</span>Reset Balance
+                </button>
+                <button class="btn btn-sm btn-danger rounded-pill px-3 py-1 fw-bold d-flex align-items-center gap-1 shadow-sm text-white"
+                        hx-get="{% url 'users:user-kill-switch' %}"
+                        hx-target="#globalHtmxModalDialog"
+                        title="Emergency Kill Switch across Anvil Sandbox">
+                    <span class="material-icons fs-6">power_settings_new</span>
+                    <span>Emergency Kill Switch</span>
                 </button>
             {% else %}
                 <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 font-monospace small d-flex align-items-center gap-1">

@@ -100,7 +100,7 @@
             <button type="button" 
                     class="btn btn-outline-danger rounded-pill px-3 py-1.5 fw-bold d-inline-flex align-items-center gap-1.5 shadow-sm"
                     style="font-size: 0.8rem;"
-                    hx-post="{% url 'admins:admin-sandbox-clear-session' %}"
+                    hx-post="{% url 'admins:admin-sandbox-clear-session' %}{% if selected_account_id %}?account_id={{ selected_account_id }}{% elif live_account %}?account_id={{ live_account.id }}{% endif %}"
                     hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
                     hx-swap="none"
                     hx-confirm="Are you sure you want to clear all sandbox simulated positions, orders, and restore starting balance (₹1,00,000)?">
@@ -927,8 +927,12 @@
                     if (sym) {
                         row = document.querySelector('#live-positions-container tbody tr[data-symbol="' + sym + '"]');
                     }
-                    if (!row) {
-                        row = document.querySelector('#live-positions-container tbody tr:nth-child(' + (idx + 1) + ')');
+                    if (!row && sym) {
+                        document.querySelectorAll('#live-positions-container tbody tr[data-symbol]').forEach(function (r) {
+                            if (!row && typeof isOptionSymbolMatch === 'function' && isOptionSymbolMatch(r.getAttribute('data-symbol'), sym)) {
+                                row = r;
+                            }
+                        });
                     }
                     if (row) {
                         const ltpEl = row.querySelector('.pos-live-ltp');

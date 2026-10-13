@@ -534,6 +534,7 @@ class UserSandboxDashboardView(HTMXPartialMixin, MarmotRoleRequiredMixin, Templa
         context['sandbox_account'] = sandbox_account
         context['sandbox_accounts'] = sandbox_accounts
         context['has_live_account'] = True
+        context['selected_account_id'] = str(sandbox_account.id) if sandbox_account else ''
         context['marmot_profile'] = get_user_profile(user.username)
         context['broker_name'] = 'SANDBOX PAPER BROKER'
         context['is_token_active'] = True
@@ -1267,6 +1268,7 @@ class UserAccountCreateView(LoginRequiredMixin, View):
                 account_name = request.POST.get('sandbox_account_name') or request.POST.get('account_name') or f"{broker.name} Sandbox Account"
                 client_id = str(request.POST.get('broker_client_id', '')).strip().strip('"').strip("'") or getattr(settings, 'SANDBOX_BROKER_CLIENT_ID', '1000000001')
                 api_key = str(request.POST.get('api_key', '')).strip().strip('"').strip("'") or getattr(settings, 'SANDBOX_BROKER_ACCESS_TOKEN', 'SANDBOX_TOKEN')
+                app_secret = str(request.POST.get('app_id', '')).strip().strip('"').strip("'")
                 api_base_url = str(request.POST.get('api_base_url', '')).strip().strip('"').strip("'") or getattr(settings, 'SANDBOX_BROKER_BASE_URL', '')
 
                 try:
@@ -1281,6 +1283,7 @@ class UserAccountCreateView(LoginRequiredMixin, View):
                     account_type='SANDBOX',
                     broker_client_id=client_id,
                     api_key=api_key,
+                    app_id=app_secret,
                     api_base_url=api_base_url,
                     is_default=is_default,
                     is_active=True,

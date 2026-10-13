@@ -41,7 +41,7 @@
                         hx-swap="outerHTML">
                     <i class="bi bi-layers"></i>
                     <span>All</span>
-                    <span id="positions-filter-all-count" class="filter-count-badge font-monospace">{% if all_positions_count %}{{ all_positions_count }}{% else %}{{ open_positions_count|default:"0"|add:closed_positions_count|default:"0" }}{% endif %}</span>
+                    <span id="positions-filter-all-count" class="filter-count-badge font-monospace">{{ all_positions_count|default:"0" }}</span>
                 </button>
             </div>
         </div>
@@ -91,7 +91,7 @@
             </thead>
             <tbody>
                 {% for pos in live_positions %}
-                <tr data-symbol="{{ pos.trading_symbol }}" data-status="{{ pos.status }}" data-buy-avg="{{ pos.buy_avg|default:0 }}" data-qty="{{ pos.net_qty|default:0 }}" data-pnl="{{ pos.total_pnl|default:pos.unrealized_profit|default:0 }}" data-ltp="{{ pos.current_ltp|default:0 }}" class="{% if pos.status == 'OPEN' %}table-active border-start border-3 border-success{% endif %}">
+                <tr data-symbol="{{ pos.trading_symbol }}" data-status="{{ pos.status }}" data-buy-avg="{{ pos.buy_avg|default:0 }}" data-sell-avg="{{ pos.sell_avg|default:0 }}" data-qty="{{ pos.net_qty|default:0 }}" data-realized-pnl="{{ pos.realized_profit|default:0 }}" data-pnl="{{ pos.unrealized_profit|default:pos.total_pnl|default:0 }}" data-ltp="{{ pos.current_ltp|default:0 }}" class="{% if pos.status == 'OPEN' %}table-active border-start border-3 border-success{% endif %}">
                     <td>
                         <div class="fw-bold theme-text-main font-monospace d-flex align-items-center gap-1.5 flex-wrap">
                             <span>{{ pos.trading_symbol }}</span>
@@ -232,8 +232,16 @@
         <div class="rounded-circle bg-secondary bg-opacity-10 d-inline-flex align-items-center justify-content-center mb-3" style="width: 54px; height: 54px;">
             <i class="bi bi-pie-chart fs-3 opacity-50"></i>
         </div>
-        <h6 class="theme-text-main fw-bold mb-1">No Open or Closed Positions</h6>
-        <p class="small mb-0 opacity-75">Intraday and delivery positions from your Dhan account will stream here in real-time.</p>
+        {% if filter_status == 'OPEN' %}
+            <h6 class="theme-text-main fw-bold mb-1">No Open Positions</h6>
+            <p class="small mb-0 opacity-75">All intraday positions have been closed or squared off for this account.</p>
+        {% elif filter_status == 'CLOSED' %}
+            <h6 class="theme-text-main fw-bold mb-1">No Closed Positions</h6>
+            <p class="small mb-0 opacity-75">Completed and squared off trades for this session will show here.</p>
+        {% else %}
+            <h6 class="theme-text-main fw-bold mb-1">No Open or Closed Positions</h6>
+            <p class="small mb-0 opacity-75">Intraday and delivery positions from your broker account will stream here in real-time.</p>
+        {% endif %}
     </div>
     {% endif %}
 
