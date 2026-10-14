@@ -36,6 +36,7 @@ type LiveTickPayload struct {
 	IsPositive    bool    `json:"is_positive"`
 	FormattedTime string  `json:"formatted_time"`
 	Timestamp     string  `json:"timestamp"`
+	T             int64   `json:"t"`
 	IsMock        bool    `json:"is_mock,omitempty"`
 	IsVirtual     bool    `json:"is_virtual,omitempty"`
 	Source        string  `json:"source,omitempty"`
@@ -291,6 +292,7 @@ func fetchLatestTickFromRedis(ctx context.Context, redisService *services.RedisS
 				IsPositive:    !strings.HasPrefix(chStr, "-"),
 				FormattedTime: timeStr,
 				Timestamp:     timeStr,
+				T:             time.Now().Unix(),
 				IsMock:        isKeyMock,
 				IsVirtual:     false,
 				Source:        map[bool]string{true: "EMULATOR", false: "FYERS"}[isKeyMock],
@@ -759,6 +761,7 @@ func processOptionTick(ctx context.Context, sym string, data map[string]interfac
 				IsPositive:    ch >= 0,
 				FormattedTime: nowStr,
 				Timestamp:     nowStr,
+				T:             time.Now().Unix(),
 				Bid:           bid,
 				Ask:           ask,
 				Volume:        volume,

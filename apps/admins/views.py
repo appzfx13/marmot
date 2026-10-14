@@ -4171,7 +4171,14 @@ class AdminSandboxTerminalView(HTMXPartialMixin, LoginRequiredMixin, AdminRequir
                     }
             except Exception as e:
                 logger.warning("Could not load initial sandbox terminal funds: %s", e)
-        context['initial_telemetry'] = telemetry
+        # Resolve Simulation Mode (LIVE vs BACKUP) - synchronized with Redis & Session
+        sim_mode = self.request.session.get('gateway_emulator_mode', 'LIVE')
+        context['sim_mode'] = sim_mode
+        try:
+            from apps.market.models import MarketBackupTask
+            context['completed_backups'] = MarketBackupTask.objects.filter(is_deleted=False, status=MarketBackupTask.StatusChoices.COMPLETED).order_by('-id')
+        except Exception:
+            context['completed_backups'] = []
         return context
 
 

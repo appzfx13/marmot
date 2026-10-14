@@ -42,10 +42,25 @@
                     <span class="pulse-dot active me-0.5" style="width:7px;height:7px;background:#f59e0b;border-radius:50%;display:inline-block;"></span>
                     ANVIL SANDBOX GATEWAY
                 </span>
-                <span class="badge bg-success bg-opacity-15 text-success border border-success border-opacity-30 rounded-pill px-2.5 py-1 font-monospace small d-flex align-items-center gap-1">
-                    <span class="pulse-dot active me-0.5" style="width:7px;height:7px;background:#10b981;border-radius:50%;display:inline-block;"></span>
-                    FYERS LIVE FEED
-                </span>
+                <!-- Interactive Feed Source Toggle (LIVE FYERS vs ANVIL BACKUP) -->
+                <div class="btn-group btn-group-sm p-0.5 rounded-pill" style="background: rgba(255, 255, 255, 0.06); border: 1px solid var(--border-color, rgba(255,255,255,0.15));" role="group" aria-label="Terminal Feed Source">
+                    <button type="button" 
+                            id="feedSourceLiveBtn"
+                            class="btn btn-xs rounded-pill px-2.5 py-0.5 fw-bold font-monospace d-inline-flex align-items-center gap-1 {% if sim_mode == 'LIVE' %}btn-success active shadow-sm{% else %}btn-outline-secondary text-muted border-0{% endif %}"
+                            onclick="switchTerminalFeedSource('LIVE')"
+                            title="Direct realtime tick stream from FYERS WebSocket">
+                        <span class="pulse-dot active" style="width:6px;height:6px;background:{% if sim_mode == 'LIVE' %}#ffffff{% else %}#10b981{% endif %};border-radius:50%;display:inline-block;"></span>
+                        FYERS LIVE
+                    </button>
+                    <button type="button" 
+                            id="feedSourceBackupBtn"
+                            class="btn btn-xs rounded-pill px-2.5 py-0.5 fw-bold font-monospace d-inline-flex align-items-center gap-1 {% if sim_mode == 'BACKUP' %}btn-info text-dark active shadow-sm{% else %}btn-outline-secondary text-muted border-0{% endif %}"
+                            onclick="switchTerminalFeedSource('BACKUP')"
+                            title="Historical Parquet playback feed via Anvil Replay Streamer">
+                        <span class="material-icons" style="font-size:0.75rem;">history</span>
+                        ANVIL BACKUP
+                    </button>
+                </div>
                 <span class="badge bg-warning bg-opacity-15 text-warning border border-warning border-opacity-30 rounded-pill px-2.5 py-1 font-monospace small d-flex align-items-center gap-1">
                     <span class="material-icons fs-6">monetization_on</span>Capital: <strong id="sandboxCapitalDisplay">{{ active_account.account_summary.initial_capital|default:"5,00,000.00" }}</strong>
                 </span>
@@ -2406,6 +2421,41 @@
         renderPinnedStrikes();
         loadTerminalOperationalData();
     }, 150);
+
+    // ─────────────────────────────────────────────────────────────
+    // Terminal Feed Source Switching (LIVE FYERS vs ANVIL BACKUP)
+    // ─────────────────────────────────────────────────────────────
+    function switchTerminalFeedSource(mode) {
+        const liveBtn = document.getElementById('feedSourceLiveBtn');
+        const backupBtn = document.getElementById('feedSourceBackupBtn');
+        if (mode === 'LIVE') {
+            if (liveBtn) {
+                liveBtn.className = 'btn btn-xs rounded-pill px-2.5 py-0.5 fw-bold font-monospace d-inline-flex align-items-center gap-1 btn-success active shadow-sm';
+            }
+            if (backupBtn) {
+                backupBtn.className = 'btn btn-xs rounded-pill px-2.5 py-0.5 fw-bold font-monospace d-inline-flex align-items-center gap-1 btn-outline-secondary text-muted border-0';
+            }
+        } else {
+            if (backupBtn) {
+                backupBtn.className = 'btn btn-xs rounded-pill px-2.5 py-0.5 fw-bold font-monospace d-inline-flex align-items-center gap-1 btn-info text-dark active shadow-sm';
+            }
+            if (liveBtn) {
+                liveBtn.className = 'btn btn-xs rounded-pill px-2.5 py-0.5 fw-bold font-monospace d-inline-flex align-items-center gap-1 btn-outline-secondary text-muted border-0';
+            }
+        }
+        // Send state update to server session and redis
+        fetch('{% url "admins:admin-gateway-emulator" %}?mode=' + mode, {
+            method: 'GET',
+            headers: { 'X-Requested-With': 'XMLHttpRequest' }
+        }).then(function(res) {
+            console.log('⚡ [Terminal Feed Switch] Switched to:', mode);
+            if (window.MarmotWS && typeof window.MarmotWS.connect === 'function') {
+                window.MarmotWS.connect();
+            }
+        }).catch(function(err) {
+            console.warn('⚠️ [Terminal Feed Switch] Error updating feed state:', err);
+        });
+    }
 
     // Tab switch event listeners to refresh operational drawer data
     document.getElementById('tab-positions-btn')?.addEventListener('click', loadTerminalOperationalData);
