@@ -1,0 +1,104 @@
+{% load static %}
+<div class="card glass-card p-3 rounded-4 border shadow-sm mb-3 position-relative overflow-hidden" 
+     id="sandbox-feed-source-card"
+     style="border-color: {% if sandbox_feed_mode == 'BACKUP' %}rgba(245, 158, 11, 0.28){% else %}rgba(16, 185, 129, 0.28){% endif %} !important; background: linear-gradient(135deg, {% if sandbox_feed_mode == 'BACKUP' %}rgba(245, 158, 11, 0.05){% else %}rgba(16, 185, 129, 0.05){% endif %} 0%, rgba(14, 18, 26, 0.92) 100%);">
+    
+    <div class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3">
+        <!-- Feed Source Identity & Status -->
+        <div class="d-flex align-items-center gap-3">
+            <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0" 
+                 style="width: 44px; height: 44px; background: {% if sandbox_feed_mode == 'BACKUP' %}rgba(245, 158, 11, 0.15){% else %}rgba(16, 185, 129, 0.15){% endif %}; border: 1px solid {% if sandbox_feed_mode == 'BACKUP' %}rgba(245, 158, 11, 0.35){% else %}rgba(16, 185, 129, 0.35){% endif %};">
+                <i class="bi {% if sandbox_feed_mode == 'BACKUP' %}bi-archive-fill text-warning{% else %}bi-broadcast text-success{% endif %} fs-5"></i>
+            </div>
+            <div>
+                <div class="d-flex align-items-center gap-2 mb-1 flex-wrap">
+                    <span class="fw-bold theme-text-main" style="font-size: 0.95rem; letter-spacing: -0.01em;">Market Data Feed Source</span>
+                    {% if sandbox_feed_mode == 'BACKUP' %}
+                        <span class="badge bg-warning bg-opacity-20 text-warning border border-warning border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold small d-inline-flex align-items-center gap-1.5">
+                            <span class="spinner-grow spinner-grow-sm text-warning" role="status" style="width: 0.38rem; height: 0.38rem;"></span>
+                            ANVIL BACKUP STREAM ACTIVE
+                        </span>
+                        <span class="badge bg-info bg-opacity-20 text-info border border-info border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace smaller">
+                            REPLAY &bull; HISTORICAL PARQUET
+                        </span>
+                    {% else %}
+                        <span class="badge bg-success bg-opacity-20 text-success border border-success border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace fw-bold small d-inline-flex align-items-center gap-1.5">
+                            <span class="spinner-grow spinner-grow-sm text-success" role="status" style="width: 0.38rem; height: 0.38rem;"></span>
+                            LIVE FYERS STREAM ACTIVE
+                        </span>
+                        <span class="badge bg-primary bg-opacity-20 text-primary border border-primary border-opacity-35 rounded-pill px-2.5 py-0.5 font-monospace smaller">
+                            1S SUB-SECOND STREAM
+                        </span>
+                    {% endif %}
+                </div>
+                <div class="theme-text-muted smaller d-flex align-items-center gap-2 flex-wrap font-monospace">
+                    <span>Gateway: <strong class="{% if sandbox_feed_mode == 'BACKUP' %}text-warning{% else %}text-success{% endif %}">{% if sandbox_feed_mode == 'BACKUP' %}ANVIL Replay WS (:8088){% else %}FYERS v3 WS (Production){% endif %}</strong></span>
+                    <span>&bull;</span>
+                    <span>Clock Mode: <strong class="text-white">{% if sandbox_feed_mode == 'BACKUP' %}Virtual Tick Clock (Rule 10){% else %}Exchange Realtime (IST){% endif %}</strong></span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Interactive Mutually Exclusive Feed Switch Pill -->
+        <div class="d-flex align-items-center gap-3 ms-lg-auto flex-wrap">
+            <div class="btn-group p-1 rounded-pill shadow-sm" 
+                 style="background: rgba(0, 0, 0, 0.45); border: 1px solid var(--border-color); backdrop-filter: blur(12px);" 
+                 role="group" 
+                 aria-label="Market Data Feed Source Selector">
+                
+                <!-- LIVE FYERS TOGGLE BUTTON -->
+                <button type="button" 
+                        class="btn btn-xs rounded-pill px-3 py-1.5 fw-bold font-monospace d-inline-flex align-items-center gap-1.5 transition-all {% if sandbox_feed_mode != 'BACKUP' %}btn-success active shadow-sm text-white{% else %}btn-outline-secondary text-muted border-0 hover-white{% endif %}"
+                        hx-post="{% url 'admins:admin-sandbox-feed-toggle' %}?mode=LIVE"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        hx-target="#sandbox-feed-source-card"
+                        hx-swap="outerHTML"
+                        title="Direct 1-Second realtime market tick stream from FYERS WebSocket">
+                    <span class="pulse-dot active" style="width:6px; height:6px; background: {% if sandbox_feed_mode != 'BACKUP' %}#ffffff{% else %}#10b981{% endif %}; border-radius: 50%; display: inline-block;"></span>
+                    <span>FYERS LIVE (1s)</span>
+                </button>
+
+                <!-- ANVIL BACKUP TOGGLE BUTTON -->
+                <button type="button" 
+                        class="btn btn-xs rounded-pill px-3 py-1.5 fw-bold font-monospace d-inline-flex align-items-center gap-1.5 transition-all {% if sandbox_feed_mode == 'BACKUP' %}btn-warning text-dark active shadow-sm fw-bolder{% else %}btn-outline-secondary text-muted border-0 hover-white{% endif %}"
+                        hx-post="{% url 'admins:admin-sandbox-feed-toggle' %}?mode=BACKUP"
+                        hx-headers='{"X-CSRFToken": "{{ csrf_token }}"}'
+                        hx-target="#sandbox-feed-source-card"
+                        hx-swap="outerHTML"
+                        title="Replay feed via ANVIL WebSocket: 1-Minute Index, 5-Second Strike, 1-Minute VIX">
+                    <i class="bi bi-clock-history {% if sandbox_feed_mode == 'BACKUP' %}text-dark{% else %}text-warning{% endif %}"></i>
+                    <span>ANVIL BACKUP (1m/5s)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Active Feed Resolution Matrix Telemetry Ribbon -->
+    <div class="mt-2.5 pt-2 border-top border-secondary border-opacity-15 d-flex align-items-center justify-content-between flex-wrap gap-2 font-monospace smaller">
+        <div class="d-flex align-items-center gap-2 flex-wrap">
+            <span class="text-uppercase text-muted fw-bold" style="font-size: 0.68rem; letter-spacing: 0.05em;">Resolution Matrix:</span>
+            
+            <!-- Index Resolution Badge -->
+            <span class="badge {% if sandbox_feed_mode == 'BACKUP' %}bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25{% else %}bg-success bg-opacity-15 text-success border border-success border-opacity-30{% endif %} rounded-pill px-2 py-0.5">
+                INDEX: <strong class="{% if sandbox_feed_mode == 'BACKUP' %}text-warning{% else %}text-white{% endif %}">{% if sandbox_feed_mode == 'BACKUP' %}1 MINUTE{% else %}1 SECOND{% endif %}</strong>
+            </span>
+
+            <!-- Strike Resolution Badge -->
+            <span class="badge {% if sandbox_feed_mode == 'BACKUP' %}bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25{% else %}bg-success bg-opacity-15 text-success border border-success border-opacity-30{% endif %} rounded-pill px-2 py-0.5">
+                STRIKE: <strong class="{% if sandbox_feed_mode == 'BACKUP' %}text-warning{% else %}text-white{% endif %}">{% if sandbox_feed_mode == 'BACKUP' %}5 SECONDS{% else %}1 SECOND{% endif %}</strong>
+            </span>
+
+            <!-- VIX Resolution Badge -->
+            <span class="badge {% if sandbox_feed_mode == 'BACKUP' %}bg-secondary bg-opacity-25 text-white-50 border border-secondary border-opacity-25{% else %}bg-success bg-opacity-15 text-success border border-success border-opacity-30{% endif %} rounded-pill px-2 py-0.5">
+                INDIA VIX: <strong class="{% if sandbox_feed_mode == 'BACKUP' %}text-warning{% else %}text-white{% endif %}">{% if sandbox_feed_mode == 'BACKUP' %}1 MINUTE{% else %}1 SECOND{% endif %}</strong>
+            </span>
+        </div>
+
+        <div class="d-flex align-items-center gap-2">
+            <span class="text-muted" style="font-size: 0.7rem;">Engine Sampling:</span>
+            <span class="{% if sandbox_feed_mode == 'BACKUP' %}text-warning{% else %}text-success{% endif %} fw-semibold" style="font-size: 0.72rem;">
+                {% if sandbox_feed_mode == 'BACKUP' %}Quantized Bar Execution (Smooth Noise Filter){% else %}Ultra-Fast Micro-Momentum (Sub-second Fill){% endif %}
+            </span>
+        </div>
+    </div>
+</div>

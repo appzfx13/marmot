@@ -581,11 +581,61 @@ def _build_mock_broker_calendar(daily_map: dict, selected_year: int = 2026):
 
 
 class AdminSandboxDashboardView(AdminLiveDashboardView):
-    """Admin Sandbox Terminal — Live Feed Sandbox Run mirroring Live UI with real-time Fyers data and virtual ledger."""
+    """Admin Sandbox Terminal — Live Feed Sandbox Run mirroring Live UI with dual feed support."""
     template_name = 'admins/live_dashboard.html'
     partial_template_name = 'admins/partials/live_dashboard_content.html'
     is_mock_view = False
     is_livefeed_sandbox = True
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        from apps.market.services import redis_client
+        req_mode = self.request.GET.get('feed_mode', '').upper().strip()
+        if req_mode in ['LIVE', 'BACKUP']:
+            feed_mode = req_mode
+            self.request.session['sandbox_feed_mode'] = feed_mode
+            if redis_client:
+                try:
+                    redis_client.set('marmot:sandbox:feed_mode', feed_mode, ex=86400)
+                except Exception:
+                    pass
+        else:
+            feed_mode = self.request.session.get('sandbox_feed_mode')
+            if not feed_mode and redis_client:
+                try:
+                    raw_val = redis_client.get('marmot:sandbox:feed_mode')
+                    if raw_val:
+                        feed_mode = raw_val.decode('utf-8') if isinstance(raw_val, bytes) else str(raw_val)
+                except Exception:
+                    pass
+            if not feed_mode:
+                feed_mode = 'LIVE'
+        context['sandbox_feed_mode'] = feed_mode
+        return context
+
+
+class AdminSandboxFeedToggleView(LoginRequiredMixin, AdminRequiredMixin, View):
+    """HTMX endpoint to switch Sandbox Market Data feed mode between LIVE and BACKUP."""
+
+    def post(self, request, *args, **kwargs):
+        from apps.market.services import redis_client
+        mode = request.POST.get('mode', request.GET.get('mode', 'LIVE')).upper().strip()
+        if mode not in ['LIVE', 'BACKUP']:
+            mode = 'LIVE'
+        request.session['sandbox_feed_mode'] = mode
+        if redis_client:
+            try:
+                redis_client.set('marmot:sandbox:feed_mode', mode, ex=86400)
+            except Exception:
+                pass
+        context = {
+            'sandbox_feed_mode': mode,
+            'is_livefeed_sandbox': True,
+        }
+        return render(request, 'admins/partials/sandbox_feed_toggle_card.html', context)
+
+    def get(self, request, *args, **kwargs):
+        return self.post(request, *args, **kwargs)
 
 
 AdminLiveMockDashboardView = AdminSandboxDashboardView
