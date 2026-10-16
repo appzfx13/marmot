@@ -24,7 +24,7 @@ def dispatch_task_command(payload: dict) -> None:
     redis_client.publish(REDIS_CHANNEL, payload_str)
 
 
-def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None, use_30_days_5s=False, use_30_days_1s=False, include_vix=True, include_macro=False, macro_timeframe=None):
+def create_and_start_backup_task(start_date, end_date, index_name=None, strike_count=None, user=None, market_type='INDEX_FO', forex_instrument=None, databento_schema=None, cfd_instrument=None, oanda_granularity=None, use_30_days_5s=False, use_30_days_1s=False, include_vix=True, include_macro=False, macro_timeframe=None):
     """Creates the backup record in Postgres with pre-stored path and dispatches to Go engine."""
     task = MarketBackupTask.objects.create(
         market_type=market_type or MarketTypeChoices.INDEX_FO,
@@ -39,6 +39,8 @@ def create_and_start_backup_task(start_date, end_date, index_name=None, strike_c
         macro_timeframe=macro_timeframe or '1h',
         forex_instrument=forex_instrument,
         databento_schema=databento_schema or MarketBackupTask.DatabentoSchemaChoices.OHLCV_1M,
+        cfd_instrument=cfd_instrument,
+        oanda_granularity=oanda_granularity or MarketBackupTask.OandaGranularityChoices.M1,
         status=MarketBackupTask.StatusChoices.CREATED,
         created_by=user
     )
@@ -226,6 +228,11 @@ def send_control_command(task_id, command):
             "databento_schema": task.databento_schema or 'ohlcv-1m',
             # Databento auth: API key from settings/env
             "databento_api_key": getattr(settings, 'DATABENTO_API_KEY', ''),
+            # OANDA CFD parameters & auth
+            "cfd_instrument": task.cfd_instrument or '',
+            "oanda_granularity": task.oanda_granularity or 'M1',
+            "oanda_api_token": getattr(settings, 'OANDA_API_TOKEN', ''),
+            "oanda_environment": getattr(settings, 'OANDA_ENVIRONMENT', 'practice'),
         }
 
     dispatch_task_command(payload)

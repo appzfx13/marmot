@@ -3,13 +3,15 @@ import shutil
 from django.conf import settings
 from django.db import models
 from apps.common.models import BaseModel
-from apps.common.choices import TaskStatusChoices, IndexChoices, MarketTypeChoices, ForexInstrumentChoices, DatabentoSchemaChoices, MacroTimeframeChoices
+from apps.common.choices import TaskStatusChoices, IndexChoices, MarketTypeChoices, ForexInstrumentChoices, ForexCFDInstrumentChoices, OandaGranularityChoices, DatabentoSchemaChoices, MacroTimeframeChoices
 
 class MarketBackupTask(BaseModel):
     StatusChoices = TaskStatusChoices
     IndexChoices = IndexChoices
     MarketTypeChoices = MarketTypeChoices
     ForexInstrumentChoices = ForexInstrumentChoices
+    ForexCFDInstrumentChoices = ForexCFDInstrumentChoices
+    OandaGranularityChoices = OandaGranularityChoices
     DatabentoSchemaChoices = DatabentoSchemaChoices
     MacroTimeframeChoices = MacroTimeframeChoices
 
@@ -22,7 +24,7 @@ class MarketBackupTask(BaseModel):
         max_length=20,
         choices=MarketTypeChoices.choices,
         default=MarketTypeChoices.INDEX_FO,
-        help_text="Market segment: INDEX/F&O (India) or FOREX/Futures (CME Micros)"
+        help_text="Market segment: INDEX/F&O, FOREX/Futures (CME Micros), or FOREX/CFD (OANDA)"
     )
 
     # INDEX / F&O fields (existing)
@@ -31,9 +33,13 @@ class MarketBackupTask(BaseModel):
     use_30_days_5s = models.BooleanField(default=True, help_text="Fetch 5S resolution data (INDEX/F&O only)")
     use_30_days_1s = models.BooleanField(default=False, help_text="Fetch 1S resolution data (INDEX/F&O only)")
 
-    # FOREX / CME Micro Futures fields (NEW — nullable)
+    # FOREX / CME Micro Futures fields (nullable)
     forex_instrument = models.CharField(max_length=10, choices=ForexInstrumentChoices.choices, null=True, blank=True, help_text="CME Micro Futures instrument to back up (FOREX/FUTURES only)")
     databento_schema = models.CharField(max_length=20, choices=DatabentoSchemaChoices.choices, default=DatabentoSchemaChoices.OHLCV_1M, null=True, blank=True, help_text="Databento Order Flow schema (FOREX/FUTURES only)")
+
+    # FOREX / CFD fields (OANDA API — nullable)
+    cfd_instrument = models.CharField(max_length=20, choices=ForexCFDInstrumentChoices.choices, null=True, blank=True, help_text="OANDA CFD instrument to back up (FOREX/CFD only)")
+    oanda_granularity = models.CharField(max_length=10, choices=OandaGranularityChoices.choices, default=OandaGranularityChoices.M1, null=True, blank=True, help_text="OANDA candle granularity (FOREX/CFD only)")
 
     # AI Macro Assist Fields
     is_macro_assist = models.BooleanField(default=False, help_text="Designates this dataset as an AI Macro & Fundamental sentiment backup")
@@ -62,30 +68,38 @@ class MarketBackupTask(BaseModel):
 
     @property
     def display_symbol(self):
-        """Returns readable asset symbol (e.g. Nifty 50 or XAUUSD / Gold -> MGC)."""
+        """Returns readable asset symbol (e.g. Nifty 50, XAUUSD / Gold -> MGC, or XAU/USD CFD)."""
+        if self.market_type == MarketTypeChoices.FOREX_CFD and self.cfd_instrument:
+            return self.get_cfd_instrument_display()
         if self.market_type == MarketTypeChoices.FOREX_FUTURES and self.forex_instrument:
             return self.get_forex_instrument_display()
         return self.get_index_name_display() if self.index_name else "INDEX/F&O"
 
     @property
     def asset_code(self):
-        """Returns short asset code (e.g. NIFTY or MGC)."""
+        """Returns short asset code (e.g. NIFTY, MGC, or XAU_USD)."""
+        if self.market_type == MarketTypeChoices.FOREX_CFD and self.cfd_instrument:
+            return self.cfd_instrument
         if self.market_type == MarketTypeChoices.FOREX_FUTURES and self.forex_instrument:
             return self.forex_instrument
         return self.index_name or "INDEX"
 
     @property
     def provider_name(self):
-        """Returns the market data provider (FYERS vs Databento)."""
+        """Returns the market data provider (FYERS vs Databento vs OANDA)."""
+        if self.market_type == MarketTypeChoices.FOREX_CFD:
+            return "OANDA"
         if self.market_type == MarketTypeChoices.FOREX_FUTURES:
             return "Databento"
         return "FYERS"
 
     @property
     def resolution_label(self):
-        """Short readable resolution badge label (e.g. 5s Ticks, 1s High-Freq, 1h Macro)."""
+        """Short readable resolution badge label (e.g. 5s Ticks, 1s High-Freq, 1h Macro, S5 CFD)."""
         if self.is_macro_assist:
             return f"{self.macro_timeframe or '1h'} Macro"
+        if self.market_type == MarketTypeChoices.FOREX_CFD:
+            return f"{self.oanda_granularity or 'M1'} CFD"
         if self.market_type == MarketTypeChoices.FOREX_FUTURES:
             if self.databento_schema == DatabentoSchemaChoices.OHLCV_1M:
                 return "1m OHLCV"
@@ -105,6 +119,8 @@ class MarketBackupTask(BaseModel):
         """Color styling for resolution badge."""
         if self.is_macro_assist:
             return "background:rgba(234,179,8,0.18);color:#facc15;border:1px solid rgba(234,179,8,0.4);"
+        if self.market_type == MarketTypeChoices.FOREX_CFD:
+            return "background:rgba(59,130,246,0.18);color:#60a5fa;border:1px solid rgba(59,130,246,0.4);"
         if self.market_type == MarketTypeChoices.FOREX_FUTURES:
             return "background:rgba(16,185,129,0.18);color:#34d399;border:1px solid rgba(16,185,129,0.4);"
         if self.use_30_days_1s:

@@ -39,7 +39,12 @@ type TaskParams struct {
 	ForexInstrument string                 `json:"forex_instrument"`
 	ProviderName    string                 `json:"provider_name"`
 	DatabentoAPIKey string                 `json:"databento_api_key"`
-	DatabentoSchema     string                    `json:"databento_schema"`
+	DatabentoSchema string                 `json:"databento_schema"`
+	// FOREX / CFD (OANDA) parameters
+	CFDInstrument    string                `json:"cfd_instrument"`
+	OandaGranularity string                `json:"oanda_granularity"`
+	OandaAPIToken    string                `json:"oanda_api_token"`
+	OandaEnvironment string                `json:"oanda_environment"`
 	FrozenRulesSnapshot []map[string]interface{}  `json:"frozen_rules_snapshot,omitempty"`
 	FrozenParameters    map[string]interface{}    `json:"frozen_parameters,omitempty"`
 	Params              map[string]interface{}    `json:"params"`

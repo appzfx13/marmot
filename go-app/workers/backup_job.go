@@ -66,8 +66,14 @@ func (j *BackupJob) Run(ctx context.Context) {
 	_ = os.MkdirAll(stagingDir, 0755)
 
 	// ── ROUTE FOREX / CME FUTURES (DATABENTO) TASKS ───────────────────────────
-	if strings.EqualFold(params.MarketType, "FOREX_FUTURES") || params.ForexInstrument != "" {
+	if strings.EqualFold(params.MarketType, "FOREX_FUTURES") || (params.ForexInstrument != "" && !strings.EqualFold(params.MarketType, "FOREX_CFD")) {
 		j.runForexBackupPipeline(ctx, taskID, userID, backupTaskDir, stagingDir)
+		return
+	}
+
+	// ── ROUTE FOREX / CFD (OANDA) TASKS ───────────────────────────────────────
+	if strings.EqualFold(params.MarketType, "FOREX_CFD") || params.CFDInstrument != "" {
+		j.runForexCFDBackupPipeline(ctx, taskID, userID, backupTaskDir, stagingDir)
 		return
 	}
 	if strings.EqualFold(indexName, "INDIAVIX") {
@@ -1156,6 +1162,203 @@ func (j *BackupJob) runForexBackupPipeline(ctx context.Context, taskID, userID, 
 
 	log.Printf("🎉 [Task #%s] FOREX / CME Micro Futures Backup Task COMPLETED! Size: %.2f MB | Saved to %s",
 		taskID, fileSizeMB, finalParquetPath)
+}
+
+// OandaCandleResponse defines the JSON structure returned by OANDA v20 REST candles endpoint.
+type OandaCandleResponse struct {
+	Instrument  string `json:"instrument"`
+	Granularity string `json:"granularity"`
+	Candles     []struct {
+		Complete bool   `json:"complete"`
+		Volume   int64  `json:"volume"`
+		Time     string `json:"time"`
+		Mid      struct {
+			O string `json:"o"`
+			H string `json:"h"`
+			L string `json:"l"`
+			C string `json:"c"`
+		} `json:"mid"`
+	} `json:"candles"`
+}
+
+// runForexCFDBackupPipeline handles OANDA CFD historical candle/tick data ingestion into Apache Parquet.
+func (j *BackupJob) runForexCFDBackupPipeline(ctx context.Context, taskID, userID, backupTaskDir, stagingDir string) {
+	params := j.payload.Params
+	symbol := params.CFDInstrument
+	if symbol == "" {
+		symbol = "XAU_USD"
+	}
+	granularity := params.OandaGranularity
+	if granularity == "" {
+		granularity = "M1"
+	}
+	startDate := params.StartDate
+	endDate := params.EndDate
+
+	apiToken := params.OandaAPIToken
+	if apiToken == "" && j.config != nil {
+		apiToken = j.config.OandaAPIToken
+	}
+
+	environment := params.OandaEnvironment
+	if environment == "" && j.config != nil {
+		environment = j.config.OandaEnvironment
+	}
+	if environment == "" {
+		environment = "practice"
+	}
+
+	baseURL := "https://api-fxpractice.oanda.com"
+	if strings.EqualFold(environment, "live") || strings.EqualFold(environment, "production") {
+		baseURL = "https://api-fxtrade.oanda.com"
+	}
+
+	log.Printf("🌐 [Task #%s] Starting FOREX / CFD (OANDA) Backup for %s (%s → %s) | Granularity: %s | Environment: %s | Token Present: %v",
+		taskID, symbol, startDate, endDate, granularity, environment, apiToken != "")
+
+	startProgress := 10
+	if j.dbService != nil {
+		_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", startProgress)
+	}
+	j.broadcastProgress(ctx, taskID, startProgress, "running", 0.0, "")
+
+	startTime, err := time.Parse("2006-01-02", startDate)
+	if err != nil {
+		startTime = time.Now().AddDate(0, 0, -30)
+	}
+	endTime, err := time.Parse("2006-01-02", endDate)
+	if err != nil {
+		endTime = time.Now()
+	}
+	endTime = endTime.Add(23*time.Hour + 59*time.Minute + 59*time.Second)
+
+	var records []models.MarketCandleRecord
+	client := &http.Client{Timeout: 45 * time.Second}
+
+	currentStart := startTime
+	for currentStart.Before(endTime) {
+		select {
+		case <-ctx.Done():
+			log.Printf("⏸️ [Task #%s] OANDA CFD backup paused/cancelled.", taskID)
+			return
+		default:
+		}
+
+		currentEnd := currentStart.AddDate(0, 0, 7) // 7-day batches
+		if currentEnd.After(endTime) {
+			currentEnd = endTime
+		}
+
+		reqURL := fmt.Sprintf("%s/v3/instruments/%s/candles?price=M&granularity=%s&from=%s&to=%s",
+			baseURL, symbol, granularity,
+			currentStart.UTC().Format(time.RFC3339),
+			currentEnd.UTC().Format(time.RFC3339))
+
+		req, reqErr := http.NewRequestWithContext(ctx, "GET", reqURL, nil)
+		if reqErr != nil {
+			log.Printf("⚠️ [Task #%s] OANDA request creation failed: %v", taskID, reqErr)
+			currentStart = currentEnd
+			continue
+		}
+
+		if apiToken != "" {
+			req.Header.Set("Authorization", fmt.Sprintf("Bearer %s", apiToken))
+		}
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("Accept-Datetime-Format", "RFC3339")
+
+		resp, doErr := client.Do(req)
+		if doErr != nil {
+			log.Printf("⚠️ [Task #%s] OANDA HTTP request failed: %v", taskID, doErr)
+			currentStart = currentEnd
+			continue
+		}
+
+		if resp.StatusCode == http.StatusOK {
+			var oandaResp OandaCandleResponse
+			if decErr := json.NewDecoder(resp.Body).Decode(&oandaResp); decErr == nil {
+				for _, c := range oandaResp.Candles {
+					t, pErr := time.Parse(time.RFC3339Nano, c.Time)
+					if pErr != nil {
+						t, _ = time.Parse(time.RFC3339, c.Time)
+					}
+					var o, h, l, cl float64
+					fmt.Sscanf(c.Mid.O, "%f", &o)
+					fmt.Sscanf(c.Mid.H, "%f", &h)
+					fmt.Sscanf(c.Mid.L, "%f", &l)
+					fmt.Sscanf(c.Mid.C, "%f", &cl)
+
+					records = append(records, models.MarketCandleRecord{
+						Timestamp:      t.Unix(),
+						Datetime:       t.Format("2006-01-02 15:04:05"),
+						IndexName:      symbol,
+						InstrumentType: "FOREX_CFD",
+						TradingSymbol:  symbol,
+						Strike:         "CFD",
+						OptionType:     "SPOT",
+						Open:           o,
+						High:           h,
+						Low:            l,
+						Close:          cl,
+						Volume:         c.Volume,
+						SpotPrice:      cl,
+					})
+				}
+			}
+		} else {
+			bodyBytes, _ := io.ReadAll(resp.Body)
+			log.Printf("⚠️ [Task #%s] OANDA returned HTTP %d: %s", taskID, resp.StatusCode, string(bodyBytes))
+		}
+		resp.Body.Close()
+
+		currentStart = currentEnd
+	}
+
+	if len(records) == 0 {
+		errMsg := fmt.Sprintf("OANDA API returned 0 records for %s [%s → %s]. Verify OANDA_API_TOKEN is valid.", symbol, startDate, endDate)
+		log.Printf("❌ [Task #%s] %s", taskID, errMsg)
+		if j.dbService != nil {
+			_ = j.dbService.RecordError(ctx, taskID, errMsg)
+			_ = j.dbService.UpdateTaskProgress(ctx, taskID, "error", 0)
+		}
+		j.broadcastProgress(ctx, taskID, 0, "error", 0.0, "")
+		_ = os.RemoveAll(stagingDir)
+		return
+	}
+
+	stagingChunkPath := filepath.Join(stagingDir, fmt.Sprintf("chunk_cfd_%s_%s_%s_to_%s.parquet", symbol, granularity, startDate, endDate))
+	if err := services.WriteChunkParquet(stagingChunkPath, records); err != nil {
+		log.Printf("❌ [Task #%s] Failed to write CFD chunk parquet: %v", taskID, err)
+		if j.dbService != nil {
+			_ = j.dbService.RecordError(ctx, taskID, err.Error())
+			_ = j.dbService.UpdateTaskProgress(ctx, taskID, "error", 0)
+		}
+		_ = os.RemoveAll(stagingDir)
+		return
+	}
+
+	if j.dbService != nil {
+		_ = j.dbService.UpdateTaskProgress(ctx, taskID, "running", 85)
+	}
+	j.broadcastProgress(ctx, taskID, 85, "running", 0.0, "")
+
+	finalParquetPath := filepath.Join(backupTaskDir, "dataset.parquet")
+	_, fileSizeMB, mergeErr := services.MergeParquetFiles(finalParquetPath, []string{stagingChunkPath})
+	if mergeErr != nil {
+		_ = os.Rename(stagingChunkPath, finalParquetPath)
+		if fileInfo, statErr := os.Stat(finalParquetPath); statErr == nil {
+			fileSizeMB = float64(fileInfo.Size()) / (1024 * 1024)
+		}
+	}
+	_ = os.RemoveAll(stagingDir)
+
+	if j.dbService != nil {
+		_ = j.dbService.MarkTaskComplete(ctx, taskID, finalParquetPath, fileSizeMB)
+	}
+	j.broadcastProgress(ctx, taskID, 100, "completed", fileSizeMB, finalParquetPath)
+
+	log.Printf("🎉 [Task #%s] FOREX / CFD (OANDA) Backup Task COMPLETED! Records: %d | Size: %.2f MB | Saved to %s",
+		taskID, len(records), fileSizeMB, finalParquetPath)
 }
 
 // ── Option Symbol & Expiry Helpers ────────────────────────────────────────────

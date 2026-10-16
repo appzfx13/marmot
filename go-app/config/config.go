@@ -11,6 +11,8 @@ type Config struct {
 	DBTableName          string
 	WSPort               string
 	DatabentoAPIKey      string
+	OandaAPIToken        string
+	OandaEnvironment     string
 	SandboxBrokerBaseURL string
 	SandboxBrokerClientID string
 	SandboxBrokerToken   string
@@ -31,6 +33,8 @@ func LoadConfig() *Config {
 	tableName := getEnv("DB_TABLE_NAME", "market_marketbackuptask")
 	wsPort := getEnv("WS_PORT", "8082")
 	databentoKey := os.Getenv("DATABENTO_API_KEY")
+	oandaToken := os.Getenv("OANDA_API_TOKEN")
+	oandaEnv := getEnv("OANDA_ENVIRONMENT", "practice")
 
 	sandboxURL := getEnv("SANDBOX_BROKER_BASE_URL", "https://pep-erratic-violate.ngrok-free.dev")
 	sandboxClientID := getEnv("SANDBOX_BROKER_CLIENT_ID", "1072641686")
@@ -42,6 +46,8 @@ func LoadConfig() *Config {
 		DBTableName:          tableName,
 		WSPort:               wsPort,
 		DatabentoAPIKey:      databentoKey,
+		OandaAPIToken:        oandaToken,
+		OandaEnvironment:     oandaEnv,
 		SandboxBrokerBaseURL: sandboxURL,
 		SandboxBrokerClientID: sandboxClientID,
 		SandboxBrokerToken:   sandboxToken,

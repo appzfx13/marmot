@@ -50,18 +50,22 @@ class MarketBackupForm(forms.ModelForm):
             'index_name', 'strike_count', 'use_30_days_5s', 'use_30_days_1s', 'include_vix', 'include_macro',
             # FOREX / CME
             'forex_instrument', 'databento_schema',
+            # FOREX / CFD
+            'cfd_instrument', 'oanda_granularity',
         ]
         widgets = {
-            'market_type':      forms.Select(attrs={'class': _SELECT_CSS, 'id': 'id_market_type'}),
-            'start_date':       forms.DateInput(attrs={'type': 'date', 'class': _FIELD_CSS}),
-            'end_date':         forms.DateInput(attrs={'type': 'date', 'class': _FIELD_CSS}),
-            'index_name':       forms.Select(attrs={'class': _SELECT_CSS}),
-            'use_30_days_5s':   forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_5s'}),
-            'use_30_days_1s':   forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_1s'}),
-            'include_vix':      forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_include_vix'}),
-            'include_macro':    forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_include_macro'}),
-            'forex_instrument': forms.Select(attrs={'class': _SELECT_CSS}),
-            'databento_schema': forms.Select(attrs={'class': _SELECT_CSS}),
+            'market_type':        forms.Select(attrs={'class': _SELECT_CSS, 'id': 'id_market_type'}),
+            'start_date':         forms.DateInput(attrs={'type': 'date', 'class': _FIELD_CSS}),
+            'end_date':           forms.DateInput(attrs={'type': 'date', 'class': _FIELD_CSS}),
+            'index_name':         forms.Select(attrs={'class': _SELECT_CSS}),
+            'use_30_days_5s':     forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_5s'}),
+            'use_30_days_1s':     forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_use_30_days_1s'}),
+            'include_vix':        forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_include_vix'}),
+            'include_macro':      forms.CheckboxInput(attrs={'class': 'form-check-input', 'id': 'id_include_macro'}),
+            'forex_instrument':   forms.Select(attrs={'class': _SELECT_CSS}),
+            'databento_schema':   forms.Select(attrs={'class': _SELECT_CSS}),
+            'cfd_instrument':     forms.Select(attrs={'class': _SELECT_CSS, 'id': 'id_cfd_instrument'}),
+            'oanda_granularity': forms.Select(attrs={'class': _SELECT_CSS, 'id': 'id_oanda_granularity'}),
         }
 
     def clean(self):
@@ -70,6 +74,7 @@ class MarketBackupForm(forms.ModelForm):
         index_name  = cleaned_data.get('index_name')
         strike_count = cleaned_data.get('strike_count')
         forex_instrument = cleaned_data.get('forex_instrument')
+        cfd_instrument = cleaned_data.get('cfd_instrument')
 
         if market_type == MarketTypeChoices.INDEX_FO:
             # Existing validation — untouched
@@ -79,15 +84,25 @@ class MarketBackupForm(forms.ModelForm):
                 cleaned_data['strike_count'] = 0
             elif strike_count is None or strike_count < 0:
                 self.add_error('strike_count', 'Strike count cannot be negative.')
-            # Clear forex field
+            # Clear forex and CFD fields
             cleaned_data['forex_instrument'] = None
+            cleaned_data['cfd_instrument'] = None
 
         elif market_type == MarketTypeChoices.FOREX_FUTURES:
             if not forex_instrument:
                 self.add_error('forex_instrument', 'Please select a CME Micro Futures instrument.')
-            # Clear INDEX fields
+            # Clear INDEX and CFD fields
             cleaned_data['index_name'] = None
             cleaned_data['strike_count'] = None
+            cleaned_data['cfd_instrument'] = None
+
+        elif market_type == MarketTypeChoices.FOREX_CFD:
+            if not cfd_instrument:
+                self.add_error('cfd_instrument', 'Please select an OANDA CFD instrument.')
+            # Clear INDEX and Futures fields
+            cleaned_data['index_name'] = None
+            cleaned_data['strike_count'] = None
+            cleaned_data['forex_instrument'] = None
 
         return cleaned_data
 

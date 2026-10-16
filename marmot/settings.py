@@ -297,6 +297,10 @@ UI_THEME = os.getenv('UI_THEME', 'default')
 # Databento Order Flow & CME Futures API Configuration
 DATABENTO_API_KEY = os.getenv('DATABENTO_API_KEY', '')
 
+# OANDA REST API Configuration (CFD & Forex Tick/Candle Data)
+OANDA_API_TOKEN = os.getenv('OANDA_API_TOKEN', '')
+OANDA_ENVIRONMENT = os.getenv('OANDA_ENVIRONMENT', 'practice')
+
 # Google Gemini AI Copilot Configuration
-GEMINI_API_KEY = os.getenv('GEMINI_API_KEY') 
+GEMINI_API_KEY = os.getenv('GEMINI_API_KEY')
 

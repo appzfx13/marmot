@@ -110,9 +110,10 @@ class AccountTypeChoices(models.TextChoices):
 class MarketTypeChoices(models.TextChoices):
     INDEX_FO = "INDEX_FO", "INDEX / F&O (India — Nifty, BankNifty…)"
     FOREX_FUTURES = "FOREX_FUTURES", "FOREX / Futures (CME Micro Futures)"
+    FOREX_CFD = "FOREX_CFD", "FOREX / CFD (OANDA Spot & CFDs)"
 
 
-# ─── New: Forex / CME Micro Futures Instrument Choices ──────────────────────
+# ─── Forex / CME Micro Futures Instrument Choices ───────────────────────────
 class ForexInstrumentChoices(models.TextChoices):
     XAUUSD_MGC  = "MGC",  "XAUUSD / Gold  →  MGC  (Micro Gold)"
     EURUSD_M6E  = "M6E",  "EURUSD          →  M6E  (Micro Euro FX)"
@@ -121,6 +122,25 @@ class ForexInstrumentChoices(models.TextChoices):
     NAS100_MNQ  = "MNQ",  "NAS100 / Nasdaq →  MNQ  (Micro Nasdaq)"
     SPX500_MES  = "MES",  "SPX500 / S&P    →  MES  (Micro S&P 500)"
     USOIL_MCL   = "MCL",  "USOIL / Crude   →  MCL  (Micro Crude Oil)"
+
+
+# ─── Forex / CFD Instrument Choices (OANDA Spot & Commodities) ──────────────
+class ForexCFDInstrumentChoices(models.TextChoices):
+    XAU_USD = "XAU_USD", "XAU/USD (Gold Spot CFD)"
+    EUR_USD = "EUR_USD", "EUR/USD (Euro / US Dollar)"
+    GBP_USD = "GBP_USD", "GBP/USD (British Pound / US Dollar)"
+    USD_JPY = "USD_JPY", "USD/JPY (US Dollar / Japanese Yen)"
+    NAS100_USD = "NAS100_USD", "NAS100/USD (Nasdaq 100 Index CFD)"
+    SPX500_USD = "SPX500_USD", "SPX500/USD (S&P 500 Index CFD)"
+    BCO_USD = "BCO_USD", "BCO/USD (Brent Crude Oil CFD)"
+
+
+# OANDA Data Granularity Choices
+class OandaGranularityChoices(models.TextChoices):
+    S5 = "S5", "5-Second High Resolution (S5)"
+    M1 = "M1", "1-Minute Candles (M1)"
+    M5 = "M5", "5-Minute Candles (M5)"
+    H1 = "H1", "1-Hour Candles (H1)"
 
 
 # Databento Order Flow Data Schema Choices

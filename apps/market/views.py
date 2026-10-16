@@ -115,6 +115,8 @@ class MarketBackupCreateView(HtmxMessageMixin, LoginRequiredMixin, AdminRequired
             market_type=form.cleaned_data.get('market_type'),
             forex_instrument=form.cleaned_data.get('forex_instrument'),
             databento_schema=form.cleaned_data.get('databento_schema'),
+            cfd_instrument=form.cleaned_data.get('cfd_instrument'),
+            oanda_granularity=form.cleaned_data.get('oanda_granularity'),
             use_30_days_5s=form.cleaned_data.get('use_30_days_5s', True),
             use_30_days_1s=form.cleaned_data.get('use_30_days_1s', False),
             include_vix=form.cleaned_data.get('include_vix', True),
